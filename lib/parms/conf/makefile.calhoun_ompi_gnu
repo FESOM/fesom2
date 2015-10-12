@@ -1,0 +1,57 @@
+# Sample makefile.in for MSI's SGI altix cluster - Calhoun machine.
+# This assumes usage of the ompi/gnu module. Be sure to also load 
+# the mkl module, for lapack and blas routines.
+#
+# i.e. Type: 'module load ompi/gnu mkl' to load the modules
+# before doing a make.
+
+SHELL			=	/bin/sh
+
+.SUFFIXES:
+.SUFFIXES: .c .o .f .F
+
+# C compiler
+CC			=	mpicc
+
+# optimization flags
+COPTFLAGS		=	-O3 -Wall -g
+
+# other compile options
+CFLAGS			=       -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS 
+CFFLAGS			=	-DFORTRAN_UNDERSCORE -DVOID_POINTER_SIZE_8
+
+# FORTRAN compiler
+F90			=	mpif90
+FC			=	mpif77
+
+# FORTRAN compile options
+FFLAGS			=	-O3 -DVOID_POINTER_SIZE_8 -g
+
+# linker and options
+F90LINKER		=	${F90}
+LINKER			=	${FC}
+CLINKFLAGS		=	${FFLAGS}
+FLINKFLAGS		=	${FFLAGS}
+
+# 
+RM			=	rm
+RMFLAGS			=	-rf
+
+# archive and options
+AR			=	ar
+ARFLAGS			=	-cr
+EXTFLAGS		=	-x
+
+# MPI library
+MPI_LIB_DIR			=
+MPI_LIB			=	-lmpi
+
+# LAPACK, BLAS library
+LAPACK_BLAS_LIB_DIR		=       -L/soft/intel/mkl/10.2.1.017/lib/em64t
+LAPACK_BLAS_LIB		=	-lmkl_lapack -lmkl_intel_thread -lmkl_core \
+				-lguide -lmkl_intel_lp64
+
+# general math libary
+MATH_LIB_DIR		=     
+MATH_LIB		=       -lm
+

@@ -1,0 +1,132 @@
+
+README for tests/general directory
+================================
+
+This  directory contains  a few  test drivers  to solve  a distributed
+sparse linear  system using preconditioned  FGMRES. 
+
+ *  dd-HB-dse.c is a test program with a harwell-boeing matrix 
+    using parms's simple DSE partitioner.  Each processor reads 
+    the whole matrix from a file [The matrix is assumed to be in the
+    Harwell-Boeing format]. 
+    It  then  partitions  its  graph  using DSE, a  simple partitioning
+    routine, and scatters the local matrices to each processor. Once
+    these submatrices are received each processor solves the problem
+    using preconditioned (F)GMRES. See README or comments for the list of
+    available preconditioners.
+
+
+The command
+%make dd-HB-dse.ex
+will create an executable for the corresponding driver.
+
+To compile  the code in general,  make sure that the  makefile.in in
+the home directory of PARMS has  been configured properly and make sure to
+have  the library  generated [make  lib at  the top  directory  -- see
+instructions on how to make the library]
+
+All test drivers will read input test parameters 
+from a file. The  sample input  file called  "inputs" in
+examples/general is  read by default (i.e., when  the executables are
+invoked with  no arguments on the command  line).  Another  file can
+be  specified for the  inputs by entering it as an argument at the
+command line. 
+
+Example:
+
+%mpirun -np <proc_number> dd-HB-dse.ex
+The file called "inputs" will be read by the executable.
+
+%mpirun -np <proc_number> dd-HB-dse.ex my_inputs
+The file called "my_inputs" will be read by the executable.
+
+-------------------------------------------------------------------
+The other files in this directory are:
+	
+- skit.f, a suite or routines adapted from SPARSKIT for processing matrices
+            in Harwell-Boeing sparse matrix format
+      
+- aux.c,    reads input parameters for the run from a file
+
+- inputs   : input file for various parameters 
+
+
+NOTE: The functions defined in the above files handle both the real 
+      and complex cases. See the driver for the preprocessor calls
+      to the respective functions.
+---------------------------------------------------------------------
+
+===========  
+INPUT FILE 
+===========
+
+A sample of the input file (see also file "inputs") follows
+
+SHERMAN3       The name of matrix
+ras            parallel preconditioner (RAS, SCHUR, BJ)
+arms           local preconditioner (ilu0, iluk, ilut, arms)
+0.01           eps(tolerance for inner iteration)
+1.0e-6         eps1(tolerance for outer iteration)
+5              nlev(number of levels for ARMS)   
+400             bsize(block size for block independent sets)
+0.2            tolind(tolerance used in independent set)
+60             im (krylov subspace size for outer iteration)
+500            maxits (outer fgmres)
+5              kim (krylov subspace size for inner iteration)
+5              itsgmr(inner fgmres)
+10             lfil0(ilut, iluk and arms for lfil[0-3])
+10             lfil4(schur)
+10             lfil5(ILUT L, ILUT U)
+0.001          droptol0(droptol[0=3], L, U, L^{-1}F, EU^{-1}
+0.001          droptol4(for schur complements at each level)
+0.001          droptol5(for ILUT in last level Schur Complement)
+
+-----------------------------------------------------------------------
+
+===================
+Matrix Files
+===================
+The files, matfileReal and matfileCmplx contain a list of matrices 
+to be tested. These matrices are stored in the /examples/matices/ 
+folder, and contain both complex and real-valued matrices. matfileReal 
+will read only the real matrices, and matfileCmplx will read only the 
+complex-valued matrices.
+
+The list of matrices to be tested is terminated by ##.
+---------------------------------------------------------------------
+
+==========================
+PRECONDITIONERS AVAILABLE 
+==========================  
+
+The following preconditioner methods are available in PARMS:
+
+BJ, SCHUR, RAS
+
+RAS indicates restrictive additive Schwarz preconditioner.
+
+BJ indicates block Jacobi preconditioner.
+
+SCHUR indicates Schur complement based preconditioner.
+
+NOTE: SCHUR require inner iterations
+(so ipar[3], ipar[4] should be > 0. It is a good idea to set 
+ipar[3] = ipar[4] = a small number - e.g., 5) 
+
+All above parallel preconditioners can be combined with the following
+local preconditioners:
+
+ILU0, ILUK, ILUT, ARMS
+
+-----------------------------------------------------------------------
+
+=======
+EXTRAS
+=======
+
+The directory  "extras" contains script files and  sample input files.
+*.pbs and *.cmd  are script files for submitting  jobs for PBS
+scheduler and LoadLeveler respectively.  These need  to be edited
+before being submitted since they  correspond  to  the  specific
+environment available at the University of Minnesota.
+

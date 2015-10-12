@@ -1,0 +1,374 @@
+! =================================================================
+subroutine ocean_setup
+USE o_PARAM
+USE g_PARSUP
+USE o_ARRAYS
+USE g_config
+#ifdef BTR_SPLIT
+USE o_split
+#endif
+IMPLICIT NONE
+         
+        call array_setup
+	call stiff_mat
+	if(mype==0) write(*,*) 'Arrays are set'
+        
+	!if(open_boundary) call set_open_boundary   !TODO
+	
+	if ((tracer_adv==4) .or. (tracer_adv==5))  call fct_init
+	if(tracer_adv==2) call quadratic_reconstruction_init
+	if((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5))  call muscl_adv_init   
+	!=====================
+	! Initialize fields
+	! A user-defined routine has to be called here!
+	!=====================
+	if(toy_ocean) then  
+#ifdef NA_TEST
+	 call init_fields_na_test
+#else
+	 call initial_state_test
+#endif
+	 !call initial_state_channel_test 
+	 !call initial_state_channel_narrow_test
+	 !call init_fields_na_test  
+ 	 !call init_fields_global_test
+        else
+#ifdef NA_TEST
+	 call init_fields_na_test
+#else
+         call oce_initial_state   ! Use it if not running tests
+#endif
+        end if
+
+	!=====================
+	!
+	!===================== 
+	 if ((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5).or.(Redi_GM)) then
+	   tr_arr_old=tr_arr
+	 end if
+#ifdef BTR_SPLIT
+         call init_split
+#endif        
+	 if(mype==0) write(*,*) 'Initial state'
+if (w_split .and. mype==0) then
+	write(*,*) '******************************************************************************'
+	write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
+	write(*,*) 'maximum explicit W is set to: ', w_exp_max
+	write(*,*) '******************************************************************************'
+end if
+end subroutine ocean_setup
+
+!==========================================================
+!
+SUBROUTINE array_setup
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+use g_config
+IMPLICIT NONE
+integer     :: elem_size, node_size
+
+elem_size=myDim_elem2D+eDim_elem2D
+node_size=myDim_nod2D+eDim_nod2D
+
+! ================
+! Velocities
+! ================     
+!allocate(stress_diag(2, elem_size))!delete me
+allocate(UV(2, nl-1, elem_size))
+
+if (use_means) allocate(UV_mean(2,nl-1, elem_size))
+allocate(UV_rhs(2,nl-1, elem_size))
+allocate(UV_rhsAB(2,nl-1, elem_size))
+allocate(Visc(nl-1, elem_size))
+! ================
+! elevation and its rhs
+! ================
+allocate(eta_n(node_size), d_eta(node_size))
+if (use_means) allocate(eta_n_mean(node_size))
+allocate(ssh_rhs(node_size))
+! ================
+! Monin-Obukhov
+! ================
+if (use_ice .and. mo_on) allocate(mo(nl,node_size),mixlength(node_size))
+if (use_ice .and. mo_on) mixlength=0.
+! ================
+! Vertical velocity and pressure
+! ================
+allocate(Wvel(nl, node_size), hpressure(nl,node_size))
+allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
+allocate(CFL_W(nl-1, node_size))
+if (use_means) allocate(Wvel_mean(nl, node_size))
+if (use_means) allocate(cfl_w_mean(nl-1, node_size))
+! ================
+! Temperature and salinity
+! ================
+allocate(T_rhs(nl-1, node_size))
+allocate(S_rhs(nl-1, node_size))
+!allocate(tr_arr(num_tracers,nl-1,node_size),tr_arr_old(num_tracers,nl-1,node_size))
+allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
+allocate(del_ttf(nl-1,node_size))
+if (use_means) allocate(tr_arr_mean(nl-1,node_size,num_tracers))
+
+allocate(bvfreq(nl-1,node_size),mixlay_dep(node_size),bv_ref(node_size))
+! ================
+! Ocean forcing arrays
+! ================
+allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+allocate(relax2clim(node_size)) 
+allocate(heat_flux(node_size), Tsurf(node_size))
+allocate(water_flux(node_size), Ssurf(node_size))
+! =================
+! Arrays used to organize surface forcing
+! =================
+allocate( Tsurf_t(node_size,2), Ssurf_t(node_size,2))
+allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
+
+! =================
+! All auxiliary arrays
+! =================
+             ! velocity gradient storage
+allocate(vel_grad(nl-1, 4, elem_size))
+ 
+if(mom_adv==4) then
+allocate(vorticity(nl-1,node_size))
+vorticity=0.0_8
+end if
+!Visc and Diff coefs
+allocate(Av(nl,elem_size),Kv(nl,node_size))
+Av=0d0
+Kv=0d0
+!Velocities at nodes
+allocate(Unode(2,nl,node_size))
+
+!Tracer gradients&RHS  
+allocate(ttrhs(nl-1,node_size))
+allocate(tt_xy_stored(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
+allocate(tt_xynodes_stored(2,nl-1,node_size,num_tracers))
+!allocate(ttx_stored(nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers), tty_stored(nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
+!allocate(ttxnodes_stored(nl-1,node_size,num_tracers),ttynodes_stored(nl-1,node_size,num_tracers))
+
+!--------------------------------------
+
+!allocate(tsh(4,nl-1,myDim_elem2D))
+!allocate(tsv(2,nl,myDim_nod2D+eDim_nod2D))
+!allocate(hd_flux(4,nl-1))
+!allocate(vd_flux(2,nl-1))
+!allocate(tsh_nodes(4,nl-1,myDim_nod2D+eDim_nod2D))
+ allocate(neutral_slope(3, nl-1, node_size))
+ allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
+ neutral_slope=0.0_WP
+ Kd=0.0_WP
+if(Redi_GM) then
+ allocate(sw_beta(nl-1,node_size), sw_alpha(nl-1,node_size))
+ sw_beta=0.0_WP
+ sw_alpha=0.0_WP
+end if
+
+! =================
+! Initialize with zeros 
+! =================
+
+    vel_grad=0.0_WP
+!    
+    UV=0.0_WP
+    UV_rhs=0.0_WP
+    UV_rhsAB=0.0_WP
+!
+    eta_n=0.0_WP
+    ssh_rhs=0.0_WP
+    Wvel=0.0_WP
+    Wvel_e	=0.0_WP
+    Wvel_i	=0.0_WP
+    CFL_W=0.0_WP
+    hpressure=0.0_WP
+!
+    T_rhs=0.0_WP
+    heat_flux=0.0_WP
+    Tsurf=0.0_WP
+
+    S_rhs=0.0_WP
+    water_flux=0.0_WP
+    Ssurf=0.0_WP
+
+    tr_arr=0d0
+    tr_arr_old=0d0    
+
+    relax2clim=0.0_WP
+
+    Tsurf_t=0.0_WP
+    Ssurf_t=0.0_WP
+    tau_x_t=0.0_WP
+    tau_y_t=0.0_WP
+
+    if (use_means) then
+    UV_mean=0.0_WP
+    Wvel_mean=0.0_WP
+    cfl_w_mean=0.0_WP
+    eta_n_mean=0.0_WP
+    tr_arr_mean=0d0
+    endif
+!
+END SUBROUTINE array_setup
+!==========================================================================
+SUBROUTINE oce_timestep(n)
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+#ifdef BTR_SPLIT
+USE o_split
+#endif
+IMPLICIT NONE
+real(kind=8)      :: t1, t2, t3, t4, t5
+
+integer i,elem,nz,n
+real*8,external:: dnrm2
+real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
+  t1=MPI_Wtime() 
+  call pressure
+!  if (pe_status/=0) then
+!     write(*,*) 'Something wrong on PE:', mype
+!     call par_ex(1)
+!  endif
+  call status_check
+  call oce_mixing_PP
+
+  if(mom_adv<4) then
+    call compute_vel_rhs
+  else
+    call v_inv_mom_adv
+  ! call momentum_vert_visc
+  end if
+  if (tau_c > 1.e-12) call viscosity_filt2x
+  if (i_vert_visc)    call impl_vert_visc ! Probably should be moved for Btr-bcl splitting case
+
+#ifdef BTR_SPLIT
+  t2=MPI_Wtime()
+  call bar_split
+  t3=MPI_Wtime() 
+#else
+  call compute_ssh_rhs
+  t2=MPI_Wtime()
+  call solve_ssh
+  t3=MPI_Wtime() 
+#endif
+  call update_vel
+
+  call vert_vel
+  t4=MPI_Wtime()
+  call solve_tracers
+  t5=MPI_Wtime() 
+  if(mype==0) write(*,*) 'SSH PE=0 ', maxval(eta_n), minval(eta_n)
+
+
+  call CFL_diag_W
+
+
+  if(mype==0) then  
+   write(*,*) 'Step took   ', t5-t1
+   write(*,*) 'Solver      ', t3-t2
+   write(*,*) 'Dynamics    ', t2-t1
+   write(*,*) 'Update+W    ', t4-t3
+   write(*,*) 'Tracer      ', t5-t4
+  end if
+
+
+END SUBROUTINE oce_timestep
+!==========================================================================
+SUBROUTINE oce_initial_state
+USE o_MESH
+USE o_ARRAYS
+USE g_PARSUP
+USE g_config
+USE g_input
+  !
+  ! reads the initial state or the restart file for the ocean
+  !
+  implicit none
+  integer       :: i, node
+
+  ! ===============
+  ! read ocean state
+  ! ===============
+  
+  call read_init_ts
+     Tclim=tr_arr(:,:,1)
+     Sclim=tr_arr(:,:,2)
+     Tsurf=tr_arr(1,:,1)
+     Ssurf=tr_arr(1,:,2)
+  if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
+  !=====================
+  ! Restart from NetCDF output (not fully rigorous because of AB)
+  !=====================    
+  if (r_restart) then
+     if(mype==0) write(*,*) 'read ocean restart file'
+     call oce_input
+  end if
+
+  relax2clim=0.0
+  
+  call init_passive_age_tracers   
+end subroutine oce_initial_state
+!==========================================================================
+subroutine init_passive_age_tracers
+use g_config
+use g_clock
+use o_passive_tracer_mod
+use o_age_tracer_mod
+use g_parsup
+use g_input
+implicit none
+
+! ocean passive tracers
+
+  if (use_passive_tracer) then
+     if(mype==0) write(*,*) 'initialize passive tracers'
+     call passive_tracer_init
+     if(ptr_start_year<yearnew .or. &
+          (ptr_start_year==yearnew .and. (daynew>1 .or. timenew>dt))) then
+        if(mype==0) write(*,*) 'read passive tracer restart fields'
+        call passive_tracer_input
+     end if
+  end if
+
+
+  ! ocean age tracers
+
+  if (use_age_tracer) then
+     if(mype==0) write(*,*) 'initialize age tracers'
+     call age_tracer_init
+     if(age_tracer_start_year<yearnew .or. &
+          (age_tracer_start_year==yearnew .and. (daynew>1 .or. timenew>dt))) then
+        call age_tracer_input
+     end if
+  end if
+end subroutine init_passive_age_tracers
+!==========================================================================
+subroutine CFL_diag_W
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+use g_comm_auto
+use g_config
+IMPLICIT NONE
+
+integer       :: n, nz
+real(kind=WP) :: DZ, wmax
+
+! ===================
+! compute CFL respective to the vertical advection
+! ===================
+ Do n=1, myDim_nod2D
+   DO nz=1, nl-1
+      wmax=maxval(abs(Wvel(nz:nz+1,n)), 1)
+      dz=zbar(nz)-zbar(nz+1)
+      CFL_W(nz,n)=wmax*dt/dz
+   END DO
+END DO
+
+end subroutine CFL_diag_W
+

@@ -1,0 +1,49 @@
+SHELL			=	/bin/sh
+
+.SUFFIXES:
+.SUFFIXES: .c .o .f .F
+
+# C compiler
+CC			=	mpicc
+
+# optimization flags
+COPTFLAGS		=	-O3 -Wall -g
+
+# other compile options
+CFLAGS			=       -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS 
+CFFLAGS			=	-DFORTRAN_UNDERSCORE -DVOID_POINTER_SIZE_4 
+
+# FORTRAN compiler
+F90			=	mpif90
+FC			=	mpif77
+
+# FORTRAN compile options
+FFLAGS			=	-O3 -DVOID_POINTER_SIZE_4 -g
+
+# linker and options
+F90LINKER			=	${F90}
+LINKER			=	${FC}
+CLINKFLAGS		=	${FFLAGS} 
+FLINKFLAGS		=	${FFLAGS} 
+
+# 
+RM			=	rm
+RMFLAGS			=	-rf
+
+# archive and options
+AR			=	ar
+ARFLAGS			=	-cr
+EXTFLAGS		=	-x
+
+# MPI library
+MPI_LIB_DIR		=
+MPI_LIB			=
+
+# LAPACK, BLAS library
+LAPACK_BLAS_LIB_DIR	=
+LAPACK_BLAS_LIB		=	-llapack -lblas-3
+
+# general math libary
+MATH_LIB_DIR		=     
+MATH_LIB		=     -lm
+

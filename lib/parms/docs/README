@@ -1,0 +1,109 @@
+
+This package contains  a simplified version of the  new pARMS package,
+initially  developed by  Zhongze  Li  and Yousef  Saad.   A number  of
+changes have been  made relative to the earlier  versions in an effort
+to improve  readability.  Below is  a description of the  pARMS object
+hierarchy,  and some  details  on how  the  package may  be used  and/
+extended.
+
+-DOK.
+------------------------------------------------------
+
+
+Hierarchy of Struct Objects
+===========================
+
+1) Matrix:
+		     Parms_Mat
+  		        |
+     ___________________|___________
+     |                               | 
+ MatVCSR(Serial CSR matrix)	    MatDVCSR(Parallel CSR matrix)
+
+Each one of these have their own definitions for the following operations characterizing the Parms_Mat struct:
+a) apply (which is matvec)
+b) setup (setting up communication handler for matvec, and reordering matrix into internal and interface nodes)
+c) setcommtype (set the communication type: P2P or DERIVED)
+d) mvpy (Performs z = beta*y + alpha*A*x: where z, y, and x are vectors; alpha and beta are scalars; and A is the matrix.)
+e) getdiag (get diagonal part of local matrix)
+f) getlmat (get local matrix)
+g) extend ( Extend the submatrix mat by including equations that correspond to immediate neighbouring variables.)
+h) mvoffd ( matvec for off-diagonal part)
+i) gethandler (get the communication handler for matvec)
+j) matfree (free the matrix)
+
+eg. Calling parms_MatVec will call the appropriate matvec operation depending on which type of matrix we are using (ie. matvcsr or matdvcsr).
+
+See ./src/include/parms_mat_impl.h, ./src/parms_mat.c, ./src/parms_mat_vcsr.c, and ./src/parms_mat_dvcsr.c for details.
+
+2) Preconditioner:
+
+				   Parms_PC
+                                | 
+________________________________|______________________________
+|                               |                             |
+SCHUR                          RAS                       BLOCK JACOBI
+  |                             |                              |
+Parms_OP                      Parms_OP                      Parms_OP
+
+The Parms_PC struct defines the global preconditioners (SCHUR, RAS, and BLOCK JACOBI). Each one implements the following operations:
+a) apply (apply the preconditioner to a vector)
+b) setup (setup the preconditioner - memory allocation, ilu factorization , etc)
+c) getratio (get the fill factor or memory use)
+d) pc_free (free the precon)
+e) pc_view (view preconditioner info) 
+
+Each of these global preconditioners implements a local (ILU-based) preconditioner defined as the Parms_OP struct.
+
+ See \src\include\parms_pc_impl.h, \src\parms_pc.c, parms_pc_schur.c, parms_pc_ras.c, and parms_pc_bj.c for details
+
+3) Operators (ILU-based local precons):
+
+				Parms_OP
+                                 |                   
+_________________________________|_______________________________
+|                   |                        |                  |
+ARMS               ILUT                     ILUK               ILU0
+
+These operators implement the following operations:
+a) apply (apply local ilu preconditioner to a vector)
+b) lsol (perform forward solve)
+c) invS (perform the schur complement solve (at the last level))
+d) ascend (perform block back substitution)
+e) getsize ( get the size of the local schur complement)
+f) getnnz (get the nnz for the local preconditioner (also returns the size of the original matrix))
+g) operator_free (free local precon)
+h) operator_view (view local precon info)
+
+ See \src\include\parms_opt_impl.h, \src\parms_operator.c), and \src\parms_ilu_vcsr.c for iluk, ilu0, and ilut, and \src\DDPQ\arms2.c for arms.
+
+ 
+4) Solver:
+
+				Parms_Solver
+                                 |                   
+                    _____________|____________
+                    |                        |                  
+                 FGMRES                   GMRES(left preconditioned)
+
+The Parms_Solver struct currently has gmres and fgmres as the only choices. It implements the following operations:
+
+a) apply (apply the solver)
+b) getresidual (get the residual vector)
+c) getresidualnorm (return the residual 2-norm)
+d) setksize ( set Krylov dimension)
+e) setneig (set number of eigenvalues to compute -- NOT CURRENTLY IMPLEMENTED)
+f) solver_free (free solver)
+g) solver_view (view solver details)
+
+ See \src\include\parms_solver_impl.h, \src\parms_solver.c, and \src\fgmres.c for details.
+
+==================================================
+
+The above hierarchies help make it simple to add new features to the code. For instance, to add a new solver, one only needs to ensure that the new 
+solver to be added implements the appropriate solver operations as defined in \src\include\parms_solver_impl.h (and implemented in \src\fgmres.c). 
+The new solver can then be included as a choice in the /src/parms_solver.c file. Similarly, new preconditioners and operators may be added.
+
+--- Daniel Osei-Kuffuor ----
+----------------------------
+                  

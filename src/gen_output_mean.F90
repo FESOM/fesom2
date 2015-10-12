@@ -1,0 +1,697 @@
+subroutine init_output_mean(do_init)
+  use o_mesh
+  use o_passive_tracer_mod
+  use o_age_tracer_mod
+  use g_config
+  use g_clock
+  use g_parsup
+  implicit none
+
+#include "netcdf.inc"
+
+  logical, intent(in)       :: do_init  
+  integer                   :: status, ncid, dimid_rec, j
+  integer                   :: dimid_2d, dimid_2de, dimid_nl1, dimid_nl
+  integer                   :: dimids(2), dimid3(3)
+  integer                   :: time_varid, iter_varid
+  integer                   :: ssh_varid, tra_varid(num_tracer)
+  integer                   :: u_varid, v_varid, w_varid, wpot_varid, cflw_varid
+  integer                   :: area_varid, hice_varid, hsnow_varid
+  integer                   :: uice_varid, vice_varid
+  character(100)            :: longname
+  character(100)            :: filename
+  character(1)              :: trind
+
+  if (.not. do_init) return
+  ! Serial output implemented so far
+  if (mype/=0) return
+
+  ! create an ocean output file
+  write(*,*) 'initialize new output files'
+  filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
+
+  status = nf_create(filename, nf_clobber, ncid)
+  if (status.ne.nf_noerr) call handle_err(status)
+
+  ! Define the dimensions
+  status = nf_def_dim(ncid, 'nodes_2d', nod2d, dimid_2d)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_dim(ncid, 'elem_2d', elem2d, dimid_2de)  !!!! 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_dim(ncid, 'nl_1', nl-1, dimid_nl1)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_dim(ncid, 'nl', nl, dimid_nl)
+  if (status .ne. nf_noerr) call handle_err(status)       !!!!
+
+  status = nf_def_dim(ncid, 'T', NF_UNLIMITED, dimid_rec)
+  if (status .ne. nf_noerr) call handle_err(status)
+  ! Define the time and iteration variables
+  status = nf_def_var(ncid, 'time', NF_DOUBLE, 1, dimid_rec, time_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'iter', NF_INT, 1, dimid_rec, iter_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  ! Define the netCDF variables for 2D fields.
+  ! In Fortran, the unlimited dimension must come
+  ! last on the list of dimids.
+  dimids(1) = dimid_2d
+  dimids(2) = dimid_rec
+  
+  status = nf_def_var(ncid, 'ssh', NF_FLOAT, 2, dimids, ssh_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  ! Define the netCDF variables for 3D fields
+  ! ocean horizontal velocity u, v
+  dimid3(1) = dimid_nl1
+  dimid3(2) = dimid_2de
+  dimid3(3) = dimid_rec
+
+  status = nf_def_var(ncid, 'u', NF_FLOAT, 3, dimid3, u_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'v', NF_FLOAT, 3, dimid3, v_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+     
+  ! ocean vertical velocity w
+  dimid3(1) = dimid_nl
+  dimid3(2) = dimid_2d
+  dimid3(3) = dimid_rec
+
+  status = nf_def_var(ncid, 'w', NF_FLOAT, 3, dimid3, w_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  ! scalar fields like T, S
+  dimid3(1) = dimid_nl1
+  dimid3(2) = dimid_2d
+  dimid3(3) = dimid_rec
+
+  status = nf_def_var(ncid, 'temp', NF_FLOAT, 3, dimid3, tra_varid(1))
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'salt', NF_FLOAT, 3, dimid3, tra_varid(2))
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'cfl_w', NF_FLOAT, 3, dimid3, cflw_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  if (use_passive_tracer) then
+     do j=1,num_passive_tracer
+        write(trind,'(i1)') j
+        status = nf_def_var(ncid, 'ptr'//trind, NF_FLOAT, 3, dimid3, &
+             tra_varid(index_passive_tracer(j)))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
+  end if
+
+  if (use_age_tracer) then
+     do j=1,num_age_tracer
+        write(trind,'(i1)') j
+        status = nf_def_var(ncid, 'age'//trind, NF_FLOAT, 3, dimid3, &
+             tra_varid(index_age_tracer(j)))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
+  end if
+
+  ! Assign long_name and units attributes to variables.
+
+  longname='model time'
+  status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname))
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, time_varid, 'units', 1, 's')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='iteration_count'
+  status = nf_PUT_ATT_TEXT(ncid, iter_varid, 'long_name', len_trim(longname), trim(longname))
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  longname='sea surface elevation'
+  status = nf_put_att_text(ncid, ssh_varid, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, ssh_varid, 'units', 1, 'm')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='zonal velocity'
+  status = nf_put_att_text(ncid, u_varid, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, u_varid, 'units', 3, 'm/s')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='meridional velocity'
+  status = nf_put_att_text(ncid, v_varid, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, v_varid, 'units', 3, 'm/s')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='vertical velocity'
+  status = nf_put_att_text(ncid, w_varid, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, w_varid, 'units', 3, 'm/s')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='potential temperature'
+  status = nf_put_att_text(ncid, tra_varid(1), 'description', len_trim(longname), trim(longname))
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, tra_varid(1), 'units', 4, 'degC')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='salinity'
+  status = nf_put_att_text(ncid, tra_varid(2), 'description', len_trim(longname), longname) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, tra_varid(2), 'units', 3, 'psu')
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  if (use_passive_tracer) then
+     do j=1,num_passive_tracer
+        write(trind,'(i1)') j
+        longname='passive tracer '//trind
+        status = nf_put_att_text(ncid, tra_varid(index_passive_tracer(j)), &
+             'description', len_trim(longname), longname) 
+        if (status .ne. nf_noerr) call handle_err(status)  
+     end do
+  end if
+
+  if (use_age_tracer) then
+     do j=1,num_age_tracer
+        write(trind,'(i1)') j
+        longname='age tracer '//trind
+        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
+             'description', len_trim(longname), longname) 
+        if (status .ne. nf_noerr) call handle_err(status)
+        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
+             'units', 4, 'Year')
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
+  end if
+
+  status = nf_enddef(ncid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  status=nf_close(ncid)
+  if (status .ne. nf_noerr) call handle_err(status)
+
+  ! ice part
+  ! create an ice output file
+  if (use_ice) then
+     filename=trim(ResultPath)//runid//'.'//cyearnew//'.ice.nc'
+     status = nf_create(filename, nf_clobber, ncid)
+     if (status.ne.nf_noerr) call handle_err(status)
+
+     ! Define the dimensions
+     status = nf_def_dim(ncid, 'nodes_2d', nod2d, dimid_2d)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_dim(ncid, 'elem_2d', elem2d, dimid_2de)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_dim(ncid, 'T', NF_UNLIMITED, dimid_rec)
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     ! Define the time and iteration variables
+     status = nf_def_var(ncid, 'time', NF_DOUBLE, 1, dimid_rec, time_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_var(ncid, 'iter', NF_INT, 1, dimid_rec, iter_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     ! Define the netCDF variables for 2D fields.
+     ! In Fortran, the unlimited dimension must come
+     ! last on the list of dimids.
+     dimids(1) = dimid_2d
+     dimids(2) = dimid_rec
+
+     status = nf_def_var(ncid, 'area', NF_FLOAT, 2, dimids, area_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_var(ncid, 'hice', NF_FLOAT, 2, dimids, hice_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_var(ncid, 'hsnow', NF_FLOAT, 2, dimids, hsnow_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  
+     status = nf_def_var(ncid, 'uice', NF_FLOAT, 2, dimids, uice_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_def_var(ncid, 'vice', NF_FLOAT, 2, dimids, vice_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  
+     ! Assign long_name and units attributes to variables.
+     longname='model time'
+     status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, time_varid, 'units', 1, 's')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='iteration_count'
+     status = nf_PUT_ATT_TEXT(ncid, iter_varid, 'long_name', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='ice concentration [0 to 1]'
+     status = nf_PUT_ATT_TEXT(ncid, area_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='effective ice thickness'
+     status = nf_PUT_ATT_TEXT(ncid, hice_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, hice_varid, 'units', 1, 'm')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='effective snow thickness'
+     status = nf_PUT_ATT_TEXT(ncid, hsnow_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, hsnow_varid, 'units', 1, 'm')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='zonal velocity'
+     status = nf_PUT_ATT_TEXT(ncid, uice_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, uice_varid, 'units', 3, 'm/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='meridional velocity'
+     status = nf_PUT_ATT_TEXT(ncid, vice_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, vice_varid, 'units', 3, 'm/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     status = nf_enddef(ncid)
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     status=nf_close(ncid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  endif
+end subroutine init_output_mean
+!======================================================================
+subroutine write_means(istep)
+
+  use o_arrays
+  use o_mesh
+  use o_passive_tracer_mod
+  use o_age_tracer_mod
+  use i_arrays
+  use g_config
+  use g_clock
+  use g_parsup
+  use g_comm_auto
+  implicit none
+
+#include "netcdf.inc" 
+
+  integer                   :: status, ncid, j, istep
+  integer                   :: time_varid, iter_varid
+  integer                   :: ssh_varid, tra_varid(num_tracer)
+  integer                   :: u_varid, v_varid, w_varid, wpot_varid, cflw_varid
+  integer                   :: area_varid, hice_varid, hsnow_varid
+  integer                   :: uice_varid, vice_varid, count_id
+  integer                   :: start(2), count(2),start3(3), count3(3) 
+  real(kind=8)              :: sec_in_year
+  character(100)            :: filename
+  character(1)              :: trind
+  real(kind=8), allocatable :: aux2(:), aux3(:,:) 
+
+  ! ocean part
+  if (mype==0) then ! Serial output implemented so far
+     ! open files
+     filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
+     status = nf_open(filename, nf_write, ncid)
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     ! inquire variable id
+     status=nf_inq_varid(ncid, 'time', time_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'iter', iter_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'ssh', ssh_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'u', u_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'v', v_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'w', w_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'temp', tra_varid(1))
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'salt', tra_varid(2))
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'cfl_w', cflw_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     ! continue writing netcdf keeping the old records
+     status = nf_inq_dimid(ncid, 'T', count_id)
+     if(status .ne. nf_noerr) call handle_err(status)
+     status=  nf_inq_dimlen(ncid, count_id, save_count_mean)
+     if(status .ne. nf_noerr) call handle_err(status)
+     save_count_mean=save_count_mean+1
+
+     if (use_passive_tracer) then
+        do j=1,num_passive_tracer
+           write(trind,'(i1)') j
+           status = nf_inq_varid(ncid, 'ptr'//trind, tra_varid(index_passive_tracer(j)))
+           if (status .ne. nf_noerr) call handle_err(status)
+        end do
+     end if
+
+     if (use_age_tracer) then
+        do j=1,num_age_tracer
+           write(trind,'(i1)') j
+           status = nf_inq_varid(ncid, 'age'//trind, tra_varid(index_age_tracer(j)))
+           if (status .ne. nf_noerr) call handle_err(status)
+        end do
+     end if
+     ! write variables
+     sec_in_year=dt*istep
+     ! time and iteration
+     status=nf_put_vara_double(ncid, time_varid, save_count_mean, 1, sec_in_year)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_put_vara_int(ncid, iter_varid, save_count_mean, 1, istep)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if ! mype==0
+  allocate(aux2(nod2D), aux3(nl-1, elem2D)) ! auxuary arrays for broadcasting the SSH and horizontal velocities
+  ! 2d fields
+  call broadcast_nod(eta_n_mean, aux2)
+  if(mype==0) then            
+     start=(/1,save_count_mean/)
+     count=(/nod2d, 1/)
+     status=nf_put_vara_real(ncid, ssh_varid, start, count, real(aux2, 4)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  ! 3d fields
+  call broadcast_elem(UV_mean(1,:,:), aux3)
+  if (mype==0) then                  
+     start3=(/1, 1, save_count_mean/)
+     count3=(/nl-1, elem2D, 1/)
+     status=nf_put_vara_real(ncid, u_varid, start3, count3, real(aux3, 4)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  call broadcast_elem(UV_mean(2,:,:),aux3)  
+  if(mype==0) then                      
+     status=nf_put_vara_real(ncid, v_varid, start3, count3, real(aux3, 4))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  deallocate(aux3) !reallocate for w
+  allocate(aux3(nl,nod2D))
+
+  call broadcast_nod(Wvel_mean,aux3)
+  if(mype==0) then                        
+     count3=(/nl, nod2D, 1/)
+     status=nf_put_vara_real(ncid, w_varid, start3, count3, real(aux3, 4))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+  
+  deallocate(aux3) !reallocate for scalar variables
+  allocate(aux3(nl-1,nod2D))
+  call broadcast_nod(tr_arr_mean(:,:,1),aux3)
+  if(mype==0) then                        
+     count3=(/nl-1, nod2D, 1/)
+     status=nf_put_vara_real(ncid, tra_varid(1), start3, count3, real(aux3, 4))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+  call broadcast_nod(tr_arr_mean(:,:,2),aux3)
+  if(mype==0) then                        
+     status=nf_put_vara_real(ncid, tra_varid(2), start3, count3, real(aux3, 4))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+  
+  do j=3,num_tracer
+     call broadcast_nod(tracer(:,:,j-2),aux3)    
+     if(mype==0) then
+        status=nf_put_vara_real(ncid, tra_varid(j), start3, count3, real(aux3, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+  end do
+
+  call broadcast_nod(cfl_w_mean(:,:),aux3)
+  if (mype==0) then
+     status=nf_put_vara_real(ncid, cflw_varid, start3, count3, real(aux3, 4))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  if(mype==0) then
+     status=nf_close(ncid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+  deallocate(aux3)
+  ! ice part
+  if (use_ice) then
+     if (mype==0) then ! Serial output implemented so far
+        ! open files
+        filename=trim(ResultPath)//runid//'.'//cyearnew//'.ice.nc'
+        status = nf_open(filename, nf_write, ncid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        ! inquire variable id
+        status=nf_inq_varid(ncid, 'time', time_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'iter', iter_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'area', area_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'hice', hice_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'hsnow', hsnow_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'uice', uice_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'vice', vice_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+
+        ! write variables
+        ! time and iteration
+        status=nf_put_vara_double(ncid, time_varid, save_count_mean, 1, sec_in_year)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_put_vara_int(ncid, iter_varid, save_count_mean, 1, istep)
+        if (status .ne. nf_noerr) call handle_err(status)
+
+        ! 2d fields
+        start=(/1,save_count_mean/)
+        count=(/nod2d, 1/)
+     end if ! mype==0
+
+     call broadcast_nod(a_ice_mean,aux2)                
+     if (mype==0) then                           
+        status=nf_put_vara_real(ncid, area_varid, start, count, real(aux2, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     call broadcast_nod(m_ice_mean,aux2)              
+     if (mype==0) then                          
+        status=nf_put_vara_real(ncid, hice_varid, start, count, real(aux2, 4))   
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     call broadcast_nod(m_snow_mean,aux2)              
+     if (mype==0) then                            
+        status=nf_put_vara_real(ncid, hsnow_varid, start, count, real(aux2, 4))  
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     call broadcast_nod(u_ice_mean,aux2)              
+     if (mype==0) then
+        status=nf_put_vara_real(ncid, uice_varid, start, count, real(aux2, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     call broadcast_nod(v_ice_mean,aux2)              
+     if (mype==0) then                          
+        status=nf_put_vara_real(ncid, vice_varid, start, count, real(aux2, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     if(mype==0) then
+        status=nf_close(ncid)
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+  end if !use_ice
+  deallocate(aux2)
+end subroutine write_means
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine update_means(do_output)
+use g_parsup
+use g_config
+use o_arrays
+use i_arrays
+use g_clock
+implicit none
+logical do_output
+integer nsteps
+ndpyr=365+fleapyear
+  if (output_length_unit.eq.'y') then                                                                 
+     nsteps=ndpyr*step_per_day                                                                    
+  else if (output_length_unit.eq.'m') then                                                            
+     nsteps=num_day_in_month(fleapyear,month)*step_per_day                                                                   
+  else if (output_length_unit.eq.'d') then                                                            
+     nsteps=step_per_day                                                                     
+  else if (output_length_unit.eq.'h') then                                                            
+     nsteps=int(real(step_per_day)/24.0)                                                                
+  endif
+   UV_mean=UV_mean+UV ; if (do_output) UV_mean=UV_mean/dble(nsteps)                              
+   Wvel_mean=Wvel_mean+Wvel; if (do_output) Wvel_mean=Wvel_mean/dble(nsteps)
+   eta_n_mean=eta_n_mean+eta_n; if (do_output) eta_n_mean=eta_n_mean/dble(nsteps)
+   tr_arr_mean(:,:,1)=tr_arr_mean(:,:,1)+tr_arr(:,:,1);
+   tr_arr_mean(:,:,2)=tr_arr_mean(:,:,2)+tr_arr(:,:,2);
+   if (do_output) tr_arr_mean=tr_arr_mean/dble(nsteps)
+   cfl_w_mean=cfl_w_mean+cfl_w ; if (do_output) cfl_w_mean=cfl_w_mean/dble(nsteps)
+   if (use_ice) then! ice has different update rate, so this is extra work
+   U_ice_mean=U_ice_mean+U_ice ; if (do_output) U_ice_mean=U_ice_mean/dble(nsteps)
+   V_ice_mean=V_ice_mean+V_ice ; if (do_output) V_ice_mean=V_ice_mean/dble(nsteps)
+   m_ice_mean=m_ice_mean+m_ice ; if (do_output) m_ice_mean=m_ice_mean/dble(nsteps)
+   a_ice_mean=a_ice_mean+a_ice ; if (do_output) a_ice_mean=a_ice_mean/dble(nsteps)
+   m_snow_mean=m_snow_mean+m_snow ; if (do_output) m_snow_mean=m_snow_mean/dble(nsteps)
+   endif
+end subroutine update_means
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine clean_means
+use g_parsup
+use g_config
+use o_arrays
+use i_arrays
+implicit none
+logical do_output
+
+   UV_mean=0d0
+   Wvel_mean=0d0
+   cfl_w_mean=0d0
+   eta_n_mean=0d0
+   tr_arr_mean(:,:,:)=0d0
+   if (use_ice) then! ice has different update rate, so this is extra work
+    U_ice_mean=0d0
+    V_ice_mean=0d0
+    m_ice_mean=0d0
+    a_ice_mean=0d0
+    m_snow_mean=0d0
+   endif
+end subroutine clean_means
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine output(directionflag,istep)
+  ! main output routine
+  !
+  ! Coded by Ralph Timmermann
+  ! Modified by Qiang Wang for more diagnose output
+  ! Reviewed by ??
+  !--------------------------------------------------------------	
+
+  use g_config
+  use g_clock
+  use g_parsup
+  implicit none
+
+  logical :: do_output=.false.
+  integer :: directionflag,istep
+  !check whether we want to do output
+  if (output_length_unit.eq.'y') then
+     call annual_event(do_output)
+  else if (output_length_unit.eq.'m') then 
+     call monthly_event(do_output) 
+  else if (output_length_unit.eq.'d') then
+     call daily_event(do_output, output_length)  
+  else if (output_length_unit.eq.'h') then
+     call hourly_event(do_output, output_length) 
+  else if (output_length_unit.eq.'s') then
+     call step_event(do_output, istep, output_length) 
+  else
+     write(*,*) 'You did not specify a supported outputflag.'
+     write(*,*) 'The program will stop to give you opportunity to do it.'
+     call par_ex(1)
+     stop
+  endif
+
+  if (directionflag.eq.1) do_output=.true.  
+
+  if (use_means) call update_means(do_output)
+
+  if (.not.do_output) return
+
+  ! write results
+  if(mype==0) write(*,*)'Do output (netCDF) ...'
+  if (use_means) then
+     call write_means(istep)
+     call clean_means
+  endif
+end subroutine output
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine annual_event(do_output)
+  !decides whether it's time to do output
+  use g_clock
+  implicit none
+
+  logical :: do_output
+
+  if ((daynew == ndpyr) .and. (timenew==86400.)) then
+     do_output=.true.
+  else
+     do_output=.false.
+  endif
+
+end subroutine annual_event
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine monthly_event(do_output)
+  !decides whether it's time to do output
+  use g_clock
+  implicit none
+
+  logical :: do_output
+
+  if (day_in_month==num_day_in_month(fleapyear,month) .and. &
+       timenew==86400.) then
+     do_output=.true.
+  else
+     do_output=.false.
+  end if
+
+end subroutine monthly_event
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine daily_event(do_output, N)
+  !decides whether it's time to do output
+  use g_clock
+  implicit none
+
+  logical             :: do_output
+  integer, intent(in) :: N
+  if (mod(daynew, N)==0 .and. timenew==86400.) then
+     do_output=.true.
+  else
+     do_output=.false.
+  endif
+
+end subroutine daily_event
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine hourly_event(do_output, N)
+  !decides whether it's time to do output
+  use g_clock
+  implicit none
+
+  logical             :: do_output
+  integer, intent(in) :: N
+
+  if (mod(timenew, 3600.*N)==0) then
+     do_output=.true.
+  else
+     do_output=.false.
+  endif
+
+end subroutine hourly_event
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine step_event(do_output,istep, N)
+  !decides whether it's time to do output
+  use g_config
+  implicit none
+
+  logical             :: do_output
+  integer             :: istep
+  integer, intent(in) :: N
+
+  if (mod(istep, N)==0) then
+     do_output=.true.
+  else
+     do_output=.false.
+  endif
+
+end subroutine step_event
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine handle_err(errcode)
+  use g_parsup
+  implicit none
+  
+#include "netcdf.inc" 
+  
+  integer errcode
+  
+  write(*,*) 'Error: ', nf_strerror(errcode)
+  call par_ex(1)
+  stop
+end subroutine handle_err
+!
+!--------------------------------------------------------------------------------------------
+!

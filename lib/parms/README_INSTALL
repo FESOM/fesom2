@@ -1,0 +1,86 @@
+
+------------------------------ INSTALLING AND RUNNING pARMS3 -----------------
+
+
+I. INSTALLING pARMS.
+
+  a) Copy the appropriate conf/makefile.XX to makefile.in in this 
+     directory
+
+  b) Edit makefile.in to change the paths of BLAS and MPI. 
+     If no BLAS installation exists, remove -DHAS_BLAS from CFLAGS in 
+     make_inc
+   
+   NOTE: To compile the complex version of pARMS, replace the -DDBL flag in 
+   makefile.in with -DDBL_CMPLX.     
+
+  c) Type 'make' to build the library -- 
+
+II. Running the examples 
+
+  a) Now try running the  example with systems from Finite Difference
+     matrices.  Enter directory grid and type 'make dd-grid.ex' 
+     to build all the executable and run it. Recall however that there
+     the number of processors is restricted to being equal to
+     nprocx*nprocy [see input file and README for details] 
+
+  b) Try running some examples with general matrices. 
+     Enter directory 'examples/general'. There are several options:
+     -- if you want a simple run with the partitioner 'dse' available with
+        parms type make dd-HB-dse.ex  and run the executable dd-HB-dse.ex
+     -- if you want a run with the partitioner 'metis' you need to
+        modify the makefile and change the flags XIFLAGS and XLIB 
+        to give a path for the library and the include directory.
+     -- See the reference guide for details on how to setup the parms map
+     -- object when using metis. 
+    
+  c)  Enter  directory  'examples/petsc  and  type  'make  dd-petsc.ex
+      -user_defined_pc' to build
+      the petsc version of driver program. The option -user_defined_pc 
+      allows us to use  parms preconditioners with the PETSc solver. 
+      Without this option, a default PETSc precoditioner will be used.
+     
+  d)   Fortran  versions of  the above  examples  also exist  in the  same
+    directory. They typically have the prefix 'f' attached to the name. So
+    for instance, in the grid directory, one would type 'make fdd-grid.ex'
+    to build  the executable, and 'mpirun  -np 2 ./fdd-grid.ex'  to run it
+    with  two processors.  Again note  the restriction  for the  number of
+    processors for the grid problem. See input file and README file in the
+    grid directory for details.
+
+
+III Details on the test runs 
+   There are three subdirectories: grid, general, and petsc.
+   a). The file dd-grid.c in subdirectory grid 
+       solve a poisson equation in parallel. The scale of problem 
+     	 on each PE is fixed.
+   b). The file dd-HB-dse.c in subdirectory 'general'
+       show how to solve a system with a general matrix with pARMS.
+   c). The file dd-petsc.c in subdirectory petsc shows how to use
+       preconditioners in pARMS as add-ons to PETSc.
+
+IV. Sequences in which routines are called.
+  a). Partition the mesh or graph using a partitioner such as  Metis,
+      or dse (included), or ParMetis, or zoltan, etc...  
+  b). Create a map object based on the output from a mesh
+      partitioning software. For example, based on the output from
+      the Metis, you may create a map object by calling function
+      parms_MapCreateFromGlobal(...). 
+  c). Create matrix based on the map created
+      above. parms_MatCreate(&mat, map);
+  d). Insert entries into the vectors and the matrix. Note that
+      the indices of entries are in global labeling. Vectors in this 
+      version of pARMS use the standard C array pointers. FLOAT *rhs, *sol; 
+  e). Set up the matrix by calling
+      parms_MatSetup(mat); After this call above, one cannot insert entries to 
+      the matrix anymore.  
+  f). Create a preconditioner based on the matrix created
+      above. parms_PCCreate(&pc, mat); You can set the type of the
+      preconditioner by parms_PCSetType. Currently, PCBJ(block
+      Jacobi), PCSCHUR(Schur complement), PCRAS(restrctive
+      additive Schwarz) are available. More robust preconditioner
+      like SCHURRAS will be available soon-- 
+  g). Call parms_PCSetup(pc) to create the preconditioning matrix. 
+  h). Create a solver based on the matrix and the preconditioner
+      created above. parms_SolverCreate(&solver, mat, pc); 
+  i). Solve the linear equation. parms_SolverApply(solver, rhs, sol);

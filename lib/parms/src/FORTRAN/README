@@ -1,0 +1,25 @@
+This directory contains fortran interfaces to the pARMS functions. 
+Any characters used in the FORTRAN  source code will be changed to all
+lowercase  in object  files  for all architectures but  Cray. So,  the
+interface functions to FORTRAN must be all lowercase (or all uppercase
+for Cray).
+
+NOTE: 
+
+The following functions:
+parms_mapcreatefromlocal_
+parms_mapcreatefromglobal_
+parms_mapcreatefromptr_
+parms_mapcreatefromdist_
+parms_mapcreatefrompetsc_
+
+all have an MPI_Comm argument as part of their argument list. In fortran, this
+argument is not used. It is merely included to make the call consistent with the
+calling function in C. The default communicator used in this case is the 
+MPI_COMM_WORLD communicator. This is to bypass a glitch in passing the MPI
+communicator from a fortran environment, to a C environment. Hence the fortran 
+user will have no choice but to have the map object defined over the entire domain.
+
+In C however, a different communicator may be used without any compatibility issues.
+
+
