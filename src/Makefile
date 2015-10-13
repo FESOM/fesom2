@@ -44,13 +44,12 @@ OBJECTS=  fvom_main.o \
           oce_dyn2.o \
           oce_vinv_mom_adv.o \
           oce_biharmonic.o \
-          oce_tracer.o \
+	  oce_pressure_bv.o \
           oce_adv_miura.o \
 	  oce_fct2p1_muscl_adv.o \
           oce_quad_rec_adv.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \
-          oce_redi_gm.o \
           oce_mixing.o \
           oce_ice_init_state.o \
           ice_setup_step.o \
@@ -68,6 +67,10 @@ OBJECTS=  fvom_main.o \
           gen_output_mean.o \
           gen_output_restart.o
 
+
+
+# oce_pressure_bv.o \
+#          oce_redi_gm.o \
 # Name of executables
 
 EXE     = fvom.x

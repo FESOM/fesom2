@@ -3,53 +3,6 @@ module o_tracers
 implicit none
 contains
 !=======================================================================
-subroutine pp_diff(nz, node, diffcoeff)
-! Computes the Richardson number dependent diffusivity as in Gent & Cane 
-! parameterization of mixing (see Large and Gent JPO 1999, 449-464).
-! (slightly modified Pacanowski-Philander)
-!
-USE o_PARAM
-USE o_MESH
-USE o_ARRAYS
-IMPLICIT NONE
-integer, intent(in)         :: nz, node
-real*8, intent(out)   :: diffcoeff
-
-real*8                :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s
-integer                     :: nn, elem, ne 
- 
-  dz_inv=1./(Z(nz-1)-Z(nz))
-  t=tr_arr(nz-1, node,1)
-  s=tr_arr(nz-1, node,2)
-  call densityJM(t, s, zbar(nz), rho_up)
-  t=tr_arr(nz, node,1)
-  s=tr_arr(nz, node,2)
-  call densityJM(t, s, zbar(nz), rho_dn)  
-  ! both densities are referenced to the plane 
-  ! where flux is computed (zbar(nz)
-  bv  = -g*dz_inv*(rho_up-rho_dn)/density_0
-  
-    if (bv<0) then
-        a=1_WP   
-    else
-        shear=0.0_WP
-	nn=0
-	DO ne=1, nod_in_elem2D_num(node)
-	   elem=nod_in_elem2D(ne,node)
-	   if(nz>nlevels(elem)-1) cycle
-	   shear=shear+(UV(1,nz-1,elem)-UV(1,nz,elem))**2 +&
-	               (UV(2,nz-1,elem)-UV(2,nz,elem))**2 
-           nn=nn+1
-	END DO   
-        shear=shear*dz_inv*dz_inv/nn
-	a=shear/(shear+10*bv)
-    end if
-    
-    diffcoeff=K_ver+0.01_WP*a*a*a	    	
-    
-    
-end subroutine pp_diff 
-!=======================================================================
 SUBROUTINE tracer_gradient_nodes (tt_xy, tt_xynodes)
 
 ! tt_xy      elemental gradient of tracer 
@@ -132,10 +85,10 @@ if (tr_num<=2) then
    call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
   enddo
 
-  if (Redi_GM) then
-      call compute_neutral_slope(tr_arr(:,:,1),tr_arr(:,:,2))
-      call redi_gm_coef  
-  endif
+!  if (Redi_GM) then
+!      call compute_neutral_slope(tr_arr(:,:,1),tr_arr(:,:,2))
+!      call redi_gm_coef  
+!  endif
    
   endif
 else
@@ -181,10 +134,10 @@ if (tr_num<=2) then
   call tracer_gradient_elements(tr_arr_old(:,:,n), tt_xy_stored(:,:,:,n))
   call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
  enddo
-  if (Redi_GM) then
-      call compute_neutral_slope(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
-      call redi_gm_coef 
-  endif
+!  if (Redi_GM) then
+!      call compute_neutral_slope(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
+!      call redi_gm_coef 
+!  endif
   endif
 else
 ! =================
@@ -582,3 +535,49 @@ tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+rela
 end if 
 end subroutine relax_to_clim
 end module o_tracers
+!======================================================================
+SUBROUTINE solve_tracers
+use g_parsup
+use o_PARAM, only: tracer_adv,num_tracers
+use o_arrays
+use o_mesh
+use g_comm_auto
+use o_tracers
+IMPLICIT NONE
+integer :: tr_num
+!real(kind=8)      :: t6, t2, t3, t4, t5
+!1-Temperature
+!2-Salinity
+!>2-Rest
+do tr_num=1,num_tracers
+!   t2=MPI_Wtime()
+select case (tracer_adv)
+case(1,2) !Miura, Quadratic reconstr.
+   call init_tracers(tr_num)
+case(3,4,5) !MUSCL(+FCT)
+   call init_tracers_AB(tr_num)
+CASE DEFAULT !unknown
+	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
+        call par_ex(1)
+END SELECT
+!  t3=MPI_Wtime()
+   call adv_tracers(tr_num)
+!  t4=MPI_Wtime()
+   call diff_tracers(tr_num)
+!  t5=MPI_Wtime()
+   call relax_to_clim(tr_num)
+!  t6=MPI_Wtime()
+!   if (mype==0) then
+!    write(*,*) 'INIT_TRACERS',tr_num, t3-t2
+!    write(*,*) 'DIFF_TRACERS',tr_num, t4-t3
+!    write(*,*) 'ADV_TRACERS',tr_num, t5-t3
+!    write(*,*) 'RELAX_TO_CLIM',tr_num, t6-t5
+!   endif
+   call exchange_nod(tr_arr(:,:,tr_num))
+enddo
+
+!where (tr_arr(:, :, 2) < 20.)
+!tr_arr(:, :, 2)=20.
+!end where
+
+end subroutine solve_tracers

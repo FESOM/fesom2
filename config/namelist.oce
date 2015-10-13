@@ -8,7 +8,7 @@ A_hor=0.               ! 500.      ! Background horizontal viscosity
 A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
 Div_c=0.  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
 Leith_c=0.	       ! The strength of the Leith viscosity
-tau_c=0.1	       ! Controls the strength of filters (1.0 and 0.1 for dt=1min and 15min, respectively)
+tau_c=1.0	       ! Controls the strength of filters (1.0 and 0.1 for dt=1min and 15min, respectively)
 Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
 biharmonic=.false.     ! Use biharmonic viscosity
 Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s

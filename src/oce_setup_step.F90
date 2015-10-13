@@ -106,12 +106,11 @@ if (use_means) allocate(cfl_w_mean(nl-1, node_size))
 ! ================
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
-!allocate(tr_arr(num_tracers,nl-1,node_size),tr_arr_old(num_tracers,nl-1,node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
 allocate(del_ttf(nl-1,node_size))
 if (use_means) allocate(tr_arr_mean(nl-1,node_size,num_tracers))
 
-allocate(bvfreq(nl-1,node_size),mixlay_dep(node_size),bv_ref(node_size))
+allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 ! Ocean forcing arrays
 ! ================
@@ -196,6 +195,10 @@ end if
     tr_arr=0d0
     tr_arr_old=0d0    
 
+    bvfreq=0d0
+    mixlay_dep=0d0
+    bv_ref=0d0
+
     relax2clim=0.0_WP
 
     Tsurf_t=0.0_WP
@@ -228,11 +231,8 @@ integer i,elem,nz,n
 real*8,external:: dnrm2
 real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
   t1=MPI_Wtime() 
-  call pressure
-!  if (pe_status/=0) then
-!     write(*,*) 'Something wrong on PE:', mype
-!     call par_ex(1)
-!  endif
+  call pressure_bv
+
   call status_check
   call oce_mixing_PP
 
