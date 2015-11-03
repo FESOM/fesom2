@@ -38,7 +38,8 @@ real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
-logical                       :: Redi_GM=.true.  !flag for Redi/GM scheme
+logical                       :: Redi_GM=.false.  !flag for Redi/GM scheme
+logical                       :: Fer_GM =.true.   !flag for Ferrari et al. (2010) GM scheme
 character*5                   :: taper_scheme='fesom' !'odm95','ldd97','fesom'     
 ! character*5                 :: taper_scheme='odm95'!,'fesom'     
 real(kind=WP)                 :: K_GM=100.0_WP   ! K_GM diffusivity (skew)
@@ -488,7 +489,6 @@ real(kind=WP), allocatable    :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
 real(kind=WP), allocatable    :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
 real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
-real(kind=WP), allocatable    :: CFL_W(:,:)
 real(kind=WP), allocatable    :: stress_surf(:,:)
 real(kind=WP), allocatable    :: T_rhs(:,:) 
 real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
@@ -526,6 +526,7 @@ real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 
 ! Auxiliary arrays to store Redi-GM fields
 real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
+real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
@@ -537,11 +538,16 @@ real(kind=WP), allocatable :: Kd(:,:,:)
 real(kind=WP), allocatable    :: UV_mean(:,:,:)
 real(kind=WP), allocatable    :: eta_n_mean(:),Wvel_mean(:,:)
 real(kind=WP), allocatable    :: tr_arr_mean(:,:,:)
-real(kind=WP), allocatable    :: cfl_w_mean(:,:)
+real(kind=WP), allocatable    :: fer_UV_mean(:,:,:), fer_wvel_mean(:,:)
+
 
 !Monin-Obukhov correction
 real*8,allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real*8,allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
+
+real(kind=WP), allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:,:), fer_gamma(:,:,:)
+
 END MODULE o_ARRAYS
 !==========================================================

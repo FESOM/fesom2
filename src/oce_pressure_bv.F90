@@ -38,7 +38,6 @@ real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit
         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
         rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz))
         rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0
-
      END DO
     ! -------
     ! Pressure
@@ -61,13 +60,13 @@ real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit
      END DO
      bvfreq(1,node)=bvfreq(2,node)
      bvfreq(nl1+1,node)=bvfreq(nl1,node) 
-    ! ------
-    ! The mixed layer depth 
-    ! ------
-    ! mixlay_depth    
-    ! bv_ref
+     ! ------
+     ! The mixed layer depth 
+     ! ------
+     ! mixlay_depth    
+     ! bv_ref
   END DO
-    ! BV is defined on full levels except for the first and the last ones.
+     ! BV is defined on full levels except for the first and the last ones.
 end subroutine pressure_bv
 ! ===========================================================================
 SUBROUTINE densityJM_local(t, s, pz, rho_out)

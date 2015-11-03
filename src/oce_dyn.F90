@@ -842,7 +842,10 @@ real(kind=WP) :: ff, c1, c2, deltaX1, deltaY1, deltaX2, deltaY2
    Do n=1, myDim_nod2D        !! m=1, myDim_nod2D       
                               !! n=myList_nod2D(m)
       DO nz=1, nl
-      Wvel(nz,n)=0.0_8
+         wvel(nz,n)=0.0_8
+         if (Fer_GM) then
+            fer_wvel(nz,n)=0.0_8
+         end if
       END DO
    END DO
 ! =================
@@ -866,7 +869,13 @@ real(kind=WP) :: ff, c1, c2, deltaX1, deltaY1, deltaX2, deltaY2
       
    Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c1
    Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c1
-   
+   if (Fer_GM) then
+      c1=(fer_UV(2,nz,el(1))*deltaX1- &
+         fer_UV(1,nz,el(1))*deltaY1)*(zbar(nz)-zbar(nz+1))
+      
+      fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
+      fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
+   end if   
    END DO
 
    if(el(2)>0)then
@@ -875,6 +884,13 @@ real(kind=WP) :: ff, c1, c2, deltaX1, deltaY1, deltaX2, deltaY2
       UV(1,nz,el(2))*deltaY2)*(zbar(nz)-zbar(nz+1))
    Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
    Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c2
+
+   if (Fer_GM) then
+      c2=-(fer_UV(2,nz,el(2))*deltaX2- &
+         fer_UV(1,nz,el(2))*deltaY2)*(zbar(nz)-zbar(nz+1))
+      fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c2
+      fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c2
+   end if
    
    END DO
    end if
@@ -888,17 +904,24 @@ END DO
                                        !! n=myList_nod2D(m)
    DO nz=nl-1,1,-1
    Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
+   if (Fer_GM) then 
+      fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
+   end if
    END DO
 END DO
 
  Do n=1, myDim_nod2D                   !! m=1, myDim_nod2D
                                        !! n=myList_nod2D(m)
    DO nz=1,nlevels_nod2D(n)-1
-   Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
+      Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
+      if (Fer_GM) then 
+         fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)          
+      end if
    END DO
 END DO
 
-call exchange_nod(Wvel) 
+call exchange_nod(Wvel)
+call exchange_nod(fer_Wvel)
 
 ! Split implicit vertical velocity onto implicit and explicit components
 if (w_split) then

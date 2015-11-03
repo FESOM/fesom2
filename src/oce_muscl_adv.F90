@@ -294,7 +294,7 @@ END SUBROUTINE fill_up_dn_grad
 !===========================================================================
 ! It is assumed that velocity is at n+1/2, hence only tracer field 
 ! is AB2 interpolated to n+1/2. 
-SUBROUTINE adv_tracer_muscl(ttf, dttf, ttfold, tr_num,tt_xy,tt_xynodes)
+SUBROUTINE adv_tracer_muscl(ttf, dttf, ttfold)
 USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
@@ -309,9 +309,6 @@ IMPLICIT NONE
  real(kind=8) :: Tx, Ty, Tmean, rdata=0.0
  real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
  real(kind=8) :: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
-real*8      :: tt_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D)
-real*8      :: tt_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D)
-
 
 ! =================
 ! Clean the rhs

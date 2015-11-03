@@ -84,7 +84,6 @@ if (tr_num<=2) then
    call tracer_gradient_elements(tr_arr(:,:,n), tt_xy_stored(:,:,:,n))
    call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
   enddo
-
 !  if (Redi_GM) then
 !      call compute_neutral_slope(tr_arr(:,:,1),tr_arr(:,:,2))
 !      call redi_gm_coef  
@@ -100,8 +99,8 @@ case(1)
 	continue
 case(2) !Quadratic reconstr.
 ! Get coefs
-  	call linear_reconstruction(tt_xy_stored(:,:,:,tr_num))
-        call quadratic_reconstruction(tr_arr(:,:,tr_num)) 
+!  	call linear_reconstruction(tt_xy_stored(:,:,:,tr_num))
+!       call quadratic_reconstruction(tr_arr(:,:,tr_num)) 
 CASE DEFAULT !unknown
 	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
         call par_ex(1)
@@ -138,6 +137,12 @@ if (tr_num<=2) then
 !      call compute_neutral_slope(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
 !      call redi_gm_coef 
 !  endif
+ if (Fer_GM) then
+    call compute_sigma_xy(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
+    call fer_solve_Gamma
+    call fer_gamma2vel
+ end if
+
   endif
 else
 ! =================
@@ -159,7 +164,6 @@ CASE DEFAULT !Unknown
         call par_ex(1)
 END SELECT
 end subroutine init_tracers_AB
-
 !==============================================================================
 SUBROUTINE adv_tracers(tr_num)
 use g_parsup
@@ -170,15 +174,18 @@ IMPLICIT NONE
 integer :: tr_num 
 select case (tracer_adv)
 case(1) !Miura
-	call adv_tracer_miura(tr_arr(:,:,tr_num), del_ttf, tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num) )
+	if (mype==0) write(*,*) 'This scheme is not supported yet'
+        call par_ex(1)
 case(2) !Quadratic reconstr.
-	call adv_tracer_second_order_rec(tr_arr(:,:,tr_num),del_ttf,tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num) )
+	if (mype==0) write(*,*) 'This scheme is not supported yet'
+        call par_ex(1)
 case(3) !MUSCL
-        call adv_tracer_muscl(tr_arr(:,:,tr_num), del_ttf, tr_arr_old(:,:,tr_num), tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num) )
+        call adv_tracer_muscl(tr_arr(:,:,tr_num), del_ttf, tr_arr_old(:,:,tr_num))
 case(4) !MUSCL+FCT(3D)
-        call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.0_WP)
+	call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.0_WP)
 case(5) !MUSCL+FCT(2D+1D)
-        call adv_tracer_fct2p1_34(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num),tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num) )
+	if (mype==0) write(*,*) 'This scheme is not supported yet'
+        call par_ex(1)
 CASE DEFAULT !unknown
 	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
         call par_ex(1)
@@ -417,7 +424,7 @@ real*8                ::  rsss, Ty,Ty1,c1,zinv1,zinv2, v_adv
           zinv2=1.0_WP/(Z(nz)-Z(nz+1))
           zinv=1.0_WP*dt/(zbar(1)-zbar(2))
           Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + \
-              Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
+               Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
           c(1)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(2,n)/area(1,n)
           a(1)=0.0_WP
           b(1)=-c(1)+1.0_WP
@@ -560,6 +567,7 @@ CASE DEFAULT !unknown
 	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
         call par_ex(1)
 END SELECT
+
 !  t3=MPI_Wtime()
    call adv_tracers(tr_num)
 !  t4=MPI_Wtime()

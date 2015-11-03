@@ -45,9 +45,7 @@ OBJECTS=  fvom_main.o \
           oce_vinv_mom_adv.o \
           oce_biharmonic.o \
 	  oce_pressure_bv.o \
-          oce_adv_miura.o \
-	  oce_fct2p1_muscl_adv.o \
-          oce_quad_rec_adv.o \
+	  oce_fer_gm.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \
           oce_mixing.o \

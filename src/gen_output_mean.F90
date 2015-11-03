@@ -16,6 +16,7 @@ subroutine init_output_mean(do_init)
   integer                   :: time_varid, iter_varid
   integer                   :: ssh_varid, tra_varid(num_tracer)
   integer                   :: u_varid, v_varid, w_varid, wpot_varid, cflw_varid
+  integer                   :: gmu_varid, gmv_varid, gmw_varid
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid
   character(100)            :: longname
@@ -70,6 +71,15 @@ subroutine init_output_mean(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_def_var(ncid, 'v', NF_FLOAT, 3, dimid3, v_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+
+  if (Fer_GM) then
+     status = nf_def_var(ncid, 'GM_u', NF_FLOAT, 3, dimid3, gmu_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+
+     status = nf_def_var(ncid, 'GM_v', NF_FLOAT, 3, dimid3, gmv_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
      
   ! ocean vertical velocity w
   dimid3(1) = dimid_nl
@@ -79,6 +89,11 @@ subroutine init_output_mean(do_init)
   status = nf_def_var(ncid, 'w', NF_FLOAT, 3, dimid3, w_varid)
   if (status .ne. nf_noerr) call handle_err(status)
 
+  if (Fer_GM) then
+     status = nf_def_var(ncid, 'GM_w', NF_FLOAT, 3, dimid3, gmw_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
   ! scalar fields like T, S
   dimid3(1) = dimid_nl1
   dimid3(2) = dimid_2d
@@ -87,8 +102,6 @@ subroutine init_output_mean(do_init)
   status = nf_def_var(ncid, 'temp', NF_FLOAT, 3, dimid3, tra_varid(1))
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_def_var(ncid, 'salt', NF_FLOAT, 3, dimid3, tra_varid(2))
-  if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_def_var(ncid, 'cfl_w', NF_FLOAT, 3, dimid3, cflw_varid)
   if (status .ne. nf_noerr) call handle_err(status)
 
   if (use_passive_tracer) then
@@ -140,6 +153,23 @@ subroutine init_output_mean(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, w_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
+  if (Fer_GM) then
+     longname='subgrid zonal velocity'
+     status = nf_put_att_text(ncid, gmu_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, gmu_varid, 'units', 3, 'm/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='subgrid meridional velocity'
+     status = nf_put_att_text(ncid, gmv_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, gmv_varid, 'units', 3, 'm/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+     longname='subgrid vertical velocity'
+     status = nf_put_att_text(ncid, gmw_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, gmw_varid, 'units', 3, 'm/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
   longname='potential temperature'
   status = nf_put_att_text(ncid, tra_varid(1), 'description', len_trim(longname), trim(longname))
   if (status .ne. nf_noerr) call handle_err(status)
@@ -277,7 +307,8 @@ subroutine write_means(istep)
   integer                   :: status, ncid, j, istep
   integer                   :: time_varid, iter_varid
   integer                   :: ssh_varid, tra_varid(num_tracer)
-  integer                   :: u_varid, v_varid, w_varid, wpot_varid, cflw_varid
+  integer                   :: u_varid, v_varid, w_varid, wpot_varid
+  integer                   :: gmu_varid, gmv_varid, gmw_varid
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid, count_id
   integer                   :: start(2), count(2),start3(3), count3(3) 
@@ -310,8 +341,15 @@ subroutine write_means(istep)
      if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'salt', tra_varid(2))
      if (status .ne. nf_noerr) call handle_err(status)
-     status=nf_inq_varid(ncid, 'cfl_w', cflw_varid)
-     if (status .ne. nf_noerr) call handle_err(status)
+
+     if (Fer_GM) then
+        status=nf_inq_varid(ncid, 'GM_u', gmu_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'GM_v', gmv_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        status=nf_inq_varid(ncid, 'GM_w', gmw_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if	
 
      ! continue writing netcdf keeping the old records
      status = nf_inq_dimid(ncid, 'T', count_id)
@@ -368,6 +406,22 @@ subroutine write_means(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
+  if (Fer_GM) then
+     call broadcast_elem(fer_UV_mean(1,:,:), aux3)
+     if (mype==0) then                  
+        start3=(/1, 1, save_count_mean/)
+        count3=(/nl-1, elem2D, 1/)
+        status=nf_put_vara_real(ncid, gmu_varid, start3, count3, real(aux3, 4)) 
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+
+     call broadcast_elem(fer_UV_mean(2,:,:),aux3)  
+     if(mype==0) then                      
+        status=nf_put_vara_real(ncid, gmv_varid, start3, count3, real(aux3, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if     
+   end if
+
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
 
@@ -376,6 +430,15 @@ subroutine write_means(istep)
      count3=(/nl, nod2D, 1/)
      status=nf_put_vara_real(ncid, w_varid, start3, count3, real(aux3, 4))
      if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  if (Fer_GM) then
+     call broadcast_nod(fer_Wvel_mean,aux3)
+     if (mype==0) then                        
+        count3=(/nl, nod2D, 1/)
+        status=nf_put_vara_real(ncid, gmw_varid, start3, count3, real(aux3, 4))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if     
   end if
   
   deallocate(aux3) !reallocate for scalar variables
@@ -399,12 +462,6 @@ subroutine write_means(istep)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
   end do
-
-  call broadcast_nod(cfl_w_mean(:,:),aux3)
-  if (mype==0) then
-     status=nf_put_vara_real(ncid, cflw_varid, start3, count3, real(aux3, 4))
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
 
   if(mype==0) then
      status=nf_close(ncid)
@@ -506,7 +563,6 @@ ndpyr=365+fleapyear
    tr_arr_mean(:,:,1)=tr_arr_mean(:,:,1)+tr_arr(:,:,1);
    tr_arr_mean(:,:,2)=tr_arr_mean(:,:,2)+tr_arr(:,:,2);
    if (do_output) tr_arr_mean=tr_arr_mean/dble(nsteps)
-   cfl_w_mean=cfl_w_mean+cfl_w ; if (do_output) cfl_w_mean=cfl_w_mean/dble(nsteps)
    if (use_ice) then! ice has different update rate, so this is extra work
    U_ice_mean=U_ice_mean+U_ice ; if (do_output) U_ice_mean=U_ice_mean/dble(nsteps)
    V_ice_mean=V_ice_mean+V_ice ; if (do_output) V_ice_mean=V_ice_mean/dble(nsteps)
@@ -514,6 +570,10 @@ ndpyr=365+fleapyear
    a_ice_mean=a_ice_mean+a_ice ; if (do_output) a_ice_mean=a_ice_mean/dble(nsteps)
    m_snow_mean=m_snow_mean+m_snow ; if (do_output) m_snow_mean=m_snow_mean/dble(nsteps)
    endif
+   if (Fer_GM) then
+      fer_UV_mean=fer_UV_mean+fer_UV ; if (do_output) fer_UV_mean=fer_UV_mean/dble(nsteps)
+      fer_wvel_mean=fer_wvel_mean+fer_wvel ; if (do_output) fer_wvel_mean=fer_wvel_mean/dble(nsteps)
+   end if
 end subroutine update_means
 !
 !--------------------------------------------------------------------------------------------
@@ -528,16 +588,19 @@ logical do_output
 
    UV_mean=0d0
    Wvel_mean=0d0
-   cfl_w_mean=0d0
    eta_n_mean=0d0
    tr_arr_mean(:,:,:)=0d0
    if (use_ice) then! ice has different update rate, so this is extra work
-    U_ice_mean=0d0
-    V_ice_mean=0d0
-    m_ice_mean=0d0
-    a_ice_mean=0d0
-    m_snow_mean=0d0
+      U_ice_mean=0d0
+      V_ice_mean=0d0
+      m_ice_mean=0d0
+      a_ice_mean=0d0
+      m_snow_mean=0d0
    endif
+   if (Fer_GM) then
+      fer_UV_mean=0.0_WP
+      fer_wvel_mean=0.0_WP
+   end if
 end subroutine clean_means
 !
 !--------------------------------------------------------------------------------------------

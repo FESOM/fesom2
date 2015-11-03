@@ -16,7 +16,7 @@ IMPLICIT NONE
 	!if(open_boundary) call set_open_boundary   !TODO
 	
 	if ((tracer_adv==4) .or. (tracer_adv==5))  call fct_init
-	if(tracer_adv==2) call quadratic_reconstruction_init
+!	if(tracer_adv==2) call quadratic_reconstruction_init
 	if((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5))  call muscl_adv_init   
 	!=====================
 	! Initialize fields
@@ -98,9 +98,7 @@ if (use_ice .and. mo_on) mixlength=0.
 ! ================
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
-allocate(CFL_W(nl-1, node_size))
 if (use_means) allocate(Wvel_mean(nl, node_size))
-if (use_means) allocate(cfl_w_mean(nl-1, node_size))
 ! ================
 ! Temperature and salinity
 ! ================
@@ -122,7 +120,7 @@ allocate(water_flux(node_size), Ssurf(node_size))
 ! =================
 ! Arrays used to organize surface forcing
 ! =================
-allocate( Tsurf_t(node_size,2), Ssurf_t(node_size,2))
+allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
 allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
 
 ! =================
@@ -146,25 +144,30 @@ allocate(Unode(2,nl,node_size))
 allocate(ttrhs(nl-1,node_size))
 allocate(tt_xy_stored(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
 allocate(tt_xynodes_stored(2,nl-1,node_size,num_tracers))
-!allocate(ttx_stored(nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers), tty_stored(nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
-!allocate(ttxnodes_stored(nl-1,node_size,num_tracers),ttynodes_stored(nl-1,node_size,num_tracers))
+allocate(neutral_slope(3, nl-1, node_size))
+allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
+neutral_slope=0.0_WP
 
-!--------------------------------------
+allocate(sigma_xy(2, nl-1, node_size))
+sigma_xy=0.0_WP
+Kd=0.0_WP
 
-!allocate(tsh(4,nl-1,myDim_elem2D))
-!allocate(tsv(2,nl,myDim_nod2D+eDim_nod2D))
-!allocate(hd_flux(4,nl-1))
-!allocate(vd_flux(2,nl-1))
-!allocate(tsh_nodes(4,nl-1,myDim_nod2D+eDim_nod2D))
- allocate(neutral_slope(3, nl-1, node_size))
- allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
- neutral_slope=0.0_WP
- Kd=0.0_WP
-if(Redi_GM) then
- allocate(sw_beta(nl-1,node_size), sw_alpha(nl-1,node_size))
- sw_beta=0.0_WP
- sw_alpha=0.0_WP
+if (Fer_GM) then
+   allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(nl-1, node_size))
+   allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
+   if (use_means) then
+      allocate(fer_UV_mean(2, nl-1, elem_size), fer_wvel_mean(nl, node_size))
+   end if
+   allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
+   sw_beta=0.0_WP
+   sw_alpha=0.0_WP
+   fer_gamma=0.0_WP
+   fer_uv=0.0_WP
+   fer_wvel=0.0_WP
+   fer_K=500.
+   fer_c=1.
 end if
+
 
 ! =================
 ! Initialize with zeros 
@@ -181,7 +184,6 @@ end if
     Wvel=0.0_WP
     Wvel_e	=0.0_WP
     Wvel_i	=0.0_WP
-    CFL_W=0.0_WP
     hpressure=0.0_WP
 !
     T_rhs=0.0_WP
@@ -207,13 +209,15 @@ end if
     tau_y_t=0.0_WP
 
     if (use_means) then
-    UV_mean=0.0_WP
-    Wvel_mean=0.0_WP
-    cfl_w_mean=0.0_WP
-    eta_n_mean=0.0_WP
-    tr_arr_mean=0d0
+       UV_mean=0.0_WP
+       Wvel_mean=0.0_WP
+       eta_n_mean=0.0_WP
+       tr_arr_mean=0.0_WP
+       if (Fer_GM) then
+          fer_UV_mean=0.0_WP
+          fer_wvel_mean=0.0_WP
+       end if
     endif
-!
 END SUBROUTINE array_setup
 !==========================================================================
 SUBROUTINE oce_timestep(n)
@@ -263,10 +267,6 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
   t5=MPI_Wtime() 
   if(mype==0) write(*,*) 'SSH PE=0 ', maxval(eta_n), minval(eta_n)
 
-
-  call CFL_diag_W
-
-
   if(mype==0) then  
    write(*,*) 'Step took   ', t5-t1
    write(*,*) 'Solver      ', t3-t2
@@ -274,8 +274,6 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
    write(*,*) 'Update+W    ', t4-t3
    write(*,*) 'Tracer      ', t5-t4
   end if
-
-
 END SUBROUTINE oce_timestep
 !==========================================================================
 SUBROUTINE oce_initial_state
@@ -346,29 +344,4 @@ implicit none
      end if
   end if
 end subroutine init_passive_age_tracers
-!==========================================================================
-subroutine CFL_diag_W
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-use g_comm_auto
-use g_config
-IMPLICIT NONE
-
-integer       :: n, nz
-real(kind=WP) :: DZ, wmax
-
-! ===================
-! compute CFL respective to the vertical advection
-! ===================
- Do n=1, myDim_nod2D
-   DO nz=1, nl-1
-      wmax=maxval(abs(Wvel(nz:nz+1,n)), 1)
-      dz=zbar(nz)-zbar(nz+1)
-      CFL_W(nz,n)=wmax*dt/dz
-   END DO
-END DO
-
-end subroutine CFL_diag_W
 

@@ -87,7 +87,7 @@ end subroutine sw_alpha_beta
 !
 !====================================================================
 !
-subroutine compute_neutral_slope(TF1,SF1)
+subroutine compute_sigma_xy(TF1,SF1)
   !--------------------------------------------------------------------
   ! DESCRIPTION:
   !   A function to calculate GM_rhs on nodes
@@ -109,31 +109,11 @@ subroutine compute_neutral_slope(TF1,SF1)
   implicit none
   !
   real(kind=WP), intent(IN)   :: TF1(nl-1, myDim_nod2D+eDim_nod2D), SF1(nl-1, myDim_nod2D+eDim_nod2D)
-  real(kind=WP)               :: tx, ty, sx, sy, eps, dz, vol
-  real(kind=WP)               :: sigma_x, sigma_y, sigma_z
+  real(kind=WP)               :: tx, ty, sx, sy, dz, vol
   integer                     :: n, nz, elnodes(3),elem, k
   !
   ! calculate alpha and beta(elementwise)
-  eps=1.0e-8
-  
   call sw_alpha_beta(TF1, SF1)
-
-  ! =========
-  ! Vertical derivatives
-  ! on full levels
-  ! =========
-  DO n=1,myDim_nod2D+eDim_nod2D
-     DO nz=2,nlevels_nod2D(n)-1
-        dz=Z(nz-1)-Z(nz)
-        tz(nz,n)=(TF1(nz-1,n)-TF1(nz,n))/dz
-        sz(nz,n)=(SF1(nz-1,n)-SF1(nz,n))/dz
-     END DO
-        tz(1,n)=0.0_WP
-	tz(1,n)=0.0_WP
-	nz=nlevels_nod2D(n)
-        tz(nz,n)=0.0_WP
-        sz(nz,n)=0.0_WP
-   END DO
 
   DO n=1, myDim_nod2D
      DO nz=1, nlevels_nod2D(n)-1
@@ -145,21 +125,112 @@ subroutine compute_neutral_slope(TF1,SF1)
 	DO k=1, nod_in_elem2D_num(n)
            elem=nod_in_elem2D(k, n)
            if(nlevels(elem)-1 < nz) cycle
-           tvol=tvol+elem_area(elem)
+           vol=vol+elem_area(elem)
 	   elnodes=elem2D_nodes(:,elem)
 
            tx=tx+sum(gradient_sca(1:3,elem)*TF1(nz,elnodes))*elem_area(elem)
 	   ty=ty+sum(gradient_sca(4:6,elem)*TF1(nz,elnodes))*elem_area(elem)
            sx=sx+sum(gradient_sca(1:3,elem)*SF1(nz,elnodes))*elem_area(elem)
 	   sy=sy+sum(gradient_sca(4:6,elem)*SF1(nz,elnodes))*elem_area(elem)
+
         END DO 
-    
-	  sigma_xyz(1,nz,n)=(-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/tvol
-	  sigma_xyz(2,nz,n)=(-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/tvol
-	  sigma_xyz(3,nz,n)=0.5_WP*(-sw_alpha(nz,n)*(tz(nz,n)+tz(nz+1,n))+ &
-	             sw_beta(nz,n)*(sz(nz,n)+sz(nz+1,n)))
-	  sigma_xyz(3,nz,n)=sigma_xyz(3,nz,n)+sign(eps, sigma_z)
+        
+	  sigma_xy(1,nz,n)=(-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/vol*density_0
+	  sigma_xy(2,nz,n)=(-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/vol*density_0
      END DO
   END DO 
-  call exchange_n3D(neutral_slope, 3, nl-1)
-end subroutine compute_neutral_slope
+
+  call exchange_n3D(sigma_xy, 2, nl-1)
+end subroutine compute_sigma_xy
+!===========================================================================
+subroutine fer_solve_Gamma
+   USE o_MESH
+   USE o_PARAM
+   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K
+   USE g_PARSUP
+   USE g_CONFIG
+   use g_comm
+   IMPLICIT NONE
+
+   integer                         :: nz, n, nzmax
+   real*8                          :: zinv1,zinv2, zinv, m, r
+   real*8                          :: a(nl), b(nl), c(nl)
+   real*8                          :: cp(nl), tp(2,nl)
+   real*8, dimension(:,:), pointer :: tr
+   DO n=1,myDim_nod2D
+          tr=>fer_gamma(:,:,n)
+!         nzmax=nlevels_nod2D(n)
+          nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+          ! The first row
+          c(1)=0.0_WP
+          a(1)=0.0_WP
+          b(1)=1.0_WP
+
+          zinv2=1.0_WP/(zbar(1)-zbar(2))
+          DO nz=2, nzmax-1
+             zinv1=zinv2
+	     zinv2=1.0_WP/(zbar(nz)-zbar(nz+1))
+	     zinv =1.0_WP/(Z(nz-1)-Z(nz))
+             a(nz)= fer_c(n)*zinv1*zinv
+             c(nz)= fer_c(n)*zinv2*zinv
+             b(nz)=-a(nz)-c(nz)-bvfreq(nz,n)
+          END DO
+          ! The last row
+          nz=nzmax
+          ! The first row
+          c(nz)=0.0_WP
+          a(nz)=0.0_WP
+          b(nz)=1.0_WP
+          ! ===========================================
+          ! The rhs:
+          tr(:, 1)=0.
+          tr(:, nzmax)=0.
+          DO nz=2, nzmax-1
+             r=g/density_0
+             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n)*fer_K(nz-1:nz, n))
+             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n)*fer_K(nz-1:nz, n))
+          END DO 
+         ! =============================================
+          ! The sweep algorithm
+          ! initialize c-prime and s,t-prime
+          cp(1) = c(1)/b(1)
+          tp(:,1) = tr(:,1)/b(1)
+! solve for vectors c-prime and t, s-prime
+          DO nz = 2, nzmax
+           m = b(nz)-cp(nz-1)*a(nz)
+           cp(nz) = c(nz)/m
+           tp(:,nz) = (tr(:,nz)-tp(:,nz-1)*a(nz))/m
+          END DO
+! initialize x
+          tr(:,nzmax) = tp(:,nzmax)
+         ! solve for x from the vectors c-prime and d-prime
+          do nz = nzmax-1, 1, -1
+             tr(:,nz) = tp(:,nz)-cp(nz)*tr(:,nz+1)
+          end do
+   END DO   !!! cycle over nodes
+
+   call exchange_n3D(fer_gamma, 2, nl)
+   END subroutine fer_solve_Gamma
+!====================================================================
+subroutine fer_gamma2vel
+  USE o_MESH
+  USE o_PARAM
+  USE o_ARRAYS, ONLY: fer_gamma, fer_uv
+  USE g_PARSUP
+  USE g_CONFIG
+  use g_comm_auto
+  IMPLICIT NONE
+
+   integer                         :: nz, el, elnod(3)
+   real*8                          :: zinv
+   DO el=1,myDim_elem2D
+      elnod=elem2D_nodes(:,el)
+      DO nz=1, nlevels(el)-1
+	 zinv=1.0_WP/(zbar(nz)-zbar(nz+1))
+         fer_uv(:,nz,el)=sum(fer_gamma(:,nz,elnod)-fer_gamma(:,nz+1,elnod), 2)*zinv/3._WP
+      END DO
+   END DO
+   call exchange_elem(fer_uv(1,:,:))
+   call exchange_elem(fer_uv(2,:,:))
+end subroutine fer_gamma2vel
+!====================================================================
