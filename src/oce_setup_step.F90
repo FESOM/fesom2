@@ -153,7 +153,7 @@ sigma_xy=0.0_WP
 Kd=0.0_WP
 
 if (Fer_GM) then
-   allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(nl-1, node_size))
+   allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(node_size))
    allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
    if (use_means) then
       allocate(fer_UV_mean(2, nl-1, elem_size), fer_wvel_mean(nl, node_size))

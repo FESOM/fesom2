@@ -138,6 +138,7 @@ if (tr_num<=2) then
 !      call redi_gm_coef 
 !  endif
  if (Fer_GM) then
+    call fer_compute_C_K
     call compute_sigma_xy(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
     call fer_solve_Gamma
     call fer_gamma2vel

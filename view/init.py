@@ -1,6 +1,6 @@
 # set the paths to the mesh & results
 result_path='../results/'
-meshpath  ='../input/mesh/mesh_aguv/'
+meshpath  ='../input/mesh/mesh_CORE2_final/'
 
 #result_path='../results/expl/'
 #meshpath  ='../input/mesh/mesh_ref/'

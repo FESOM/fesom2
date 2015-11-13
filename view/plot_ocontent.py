@@ -5,7 +5,7 @@ execfile("include.py")
 execfile("init.py")
 #	set the years & months for the average
 months=np.linspace(0,11,12).astype(int)
-years=[1948, 2010]
+years=[1948, 1977]
 
 
 str_id ='salt'
@@ -29,6 +29,8 @@ fig = plt.figure(figsize=(7, 7))
 for I, Y in enumerate(years):
 	plt.plot(layer_content[I,:]/layer_volume, mesh.zlev[0:dimZ],label='FVOM '+str(Y))
 
+import sys
+sys.exit()
 
 agu03=np.loadtxt('agu03.dat')
 if str_id =='temp':

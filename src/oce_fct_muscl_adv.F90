@@ -303,6 +303,7 @@ IMPLICIT NONE
  real(kind=WP) :: tvert(nl), a, b, c, d, da, db, dg, un1, un2, Tupw1
  real(kind=WP) :: Tx, Ty, Tmean, Tmean1, Tmean2, rdata=0.0, num_ord
  real(kind=WP) :: ttf(nl-1,myDim_nod2D+eDim_nod2D), ttfold(nl-1,myDim_nod2D+eDim_nod2D)
+ real(kind=WP) :: U(2), V(2), W
  ! ----------------------------------------
  ! It is assumed that velocity is at n+1/2, hence only tracer field 
  ! is AB2 interpolated to n+1/2. 
@@ -351,8 +352,18 @@ IMPLICIT NONE
       edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
       edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_8    
    
-   un1=  -UV(2,nz,el(1))*deltaX1+ UV(1,nz,el(1))*deltaY1   ! normal outer velocity
-   un2=   UV(2,nz,el(2))*deltaX2- UV(1,nz,el(2))*deltaY2   ! from 1 to 2
+   U(1)=UV(1,nz,el(1))
+   V(1)=UV(2,nz,el(1))
+   U(2)=UV(1,nz,el(2))
+   V(2)=UV(2,nz,el(2))
+   if (Fer_GM) then
+      U(1)=U(1)+fer_UV(1,nz,el(1))
+      V(1)=V(1)+fer_UV(2,nz,el(1))
+      U(2)=U(2)+fer_UV(1,nz,el(2))
+      V(2)=V(2)+fer_UV(2,nz,el(2))
+   end if
+   un1=  -V(1)*deltaX1+ U(1)*deltaY1   ! normal outer velocity
+   un2=   V(2)*deltaX2- U(2)*deltaY2   ! from 1 to 2
    un1=un1+un2
    Tupw1=0.5_8*(ttf(nz, enodes(1))*(un1+abs(un1))+ttf(nz, enodes(2))*(un1-abs(un1)))
    c1=-Tupw1
@@ -375,7 +386,13 @@ IMPLICIT NONE
       edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
       edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_8    
    
-      un1=  -UV(2,nz,el(1))*deltaX1+ UV(1,nz,el(1))*deltaY1   ! normal outer velocity
+      U(1)=UV(1,nz,el(1))
+      V(1)=UV(2,nz,el(1))
+      if (Fer_GM) then
+         U(1)=U(1)+fer_UV(1,nz,el(1))
+         V(1)=V(1)+fer_UV(2,nz,el(1))
+      end if
+      un1=  -V(1)*deltaX1+ U(1)*deltaY1   ! normal outer velocity
                                                               ! from 1 to 2
       Tupw1=0.5_8*(ttf(nz, enodes(1))*(un1+abs(un1))+ttf(nz, enodes(2))*(un1-abs(un1)))
       c1=-Tupw1
@@ -396,8 +413,15 @@ IMPLICIT NONE
       (2.0_8*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
       edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
       edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_8    
-                                                              ! normal outer velocity
-      un1=   UV(2,nz,el(2))*deltaX2- UV(1,nz,el(2))*deltaY2   ! from 1 to 2
+
+      ! normal outer velocity from 1 to 2
+      U(2)=UV(1,nz,el(2))
+      V(2)=UV(2,nz,el(2))
+      if (Fer_GM) then
+         U(2)=U(2)+fer_UV(1,nz,el(2))
+         V(2)=V(2)+fer_UV(2,nz,el(2))
+      end if
+      un1=   V(2)*deltaX2- U(2)*deltaY2   
       Tupw1=0.5_8*(ttf(nz, enodes(1))*(un1+abs(un1))+ttf(nz, enodes(2))*(un1-abs(un1)))
       c1=-Tupw1
       fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+c1 
@@ -417,7 +441,10 @@ DO n=1, myDim_nod2D
     ! -----
     ! upper level --- linear free surface
     ! -----
-    tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)
+    nz=1
+    W=Wvel_e(nz,n)
+    if (Fer_GM) W=W+fer_Wvel(nz,n)
+    tvert(nz)= -W*ttf(nz,n)*area(nz,n)
     ! -----
     ! No flux through the bottom
     ! -----
@@ -426,16 +453,20 @@ DO n=1, myDim_nod2D
     ! Centered differences for the second and 
     ! last but one
     ! ------ 
-    nz=2  
-    Tupw1=0.5_8*(ttf(nz,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-                 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
-    Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))*Wvel_e(nz,n) 
+    nz=2
+    W=Wvel_e(nz,n)
+    if (Fer_GM) W=W+fer_Wvel(nz,n)
+    Tupw1=0.5_8*(ttf(nz,n)*(W+abs(W))+ &
+                 ttf(nz-1,n)*(W-abs(W)))
+    Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))*W
     tvert(nz)= -Tupw1*area(nz,n)
     fct_aec_ver(nz,n)=(-Tmean+Tupw1)*area(nz,n)
     nz=nl1-1
-    Tupw1=0.5_8*(ttf(nz,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-                 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
-    Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))*Wvel_e(nz,n) 
+    W=Wvel_e(nz,n)
+    if (Fer_GM) W=W+fer_Wvel(nz,n)
+    Tupw1=0.5_8*(ttf(nz,n)*(W+abs(W))+ &
+                 ttf(nz-1,n)*(W-abs(W)))
+    Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))*W
     tvert(nz)= -Tupw1*area(nz,n)
     fct_aec_ver(nz,n)=(-Tmean+Tupw1)*area(nz,n)
     ! the remaining levels    
@@ -443,8 +474,10 @@ DO n=1, myDim_nod2D
     ! ------
     ! First-order upwind estimate
     ! ------
-    Tupw1=0.5*(ttf(nz,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-              ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+    W=Wvel_e(nz,n)
+    if (Fer_GM) W=W+fer_Wvel(nz,n)
+    Tupw1=0.5*(ttf(nz,n)*(W+abs(W))+ &
+              ttf(nz-1,n)*(W-abs(W)))
     ! -----
     ! centered (4th order)
     ! -----
@@ -453,9 +486,9 @@ DO n=1, myDim_nod2D
     qd=(ttfold(nz-2,n)-ttfold(nz-1,n))/(Z(nz-2)-Z(nz-1))
     Tmean1=ttfold(nz,n)+(2*qc+qu)*(zbar(nz)-Z(nz))/3.0_8
     Tmean2=ttfold(nz-1,n)+(2*qc+qd)*(zbar(nz)-Z(nz-1))/3.0_8
-    Tmean=(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))*Tmean1+(Wvel_e(nz,n)-abs(Wvel_e(nz,n)))*Tmean2
+    Tmean=(W+abs(W))*Tmean1+(W-abs(W))*Tmean2
     tvert(nz)=-Tupw1*area(nz,n)
-    fct_aec_ver(nz,n)=(-0.5_8*(num_ord*(Tmean1+Tmean2)*Wvel_e(nz,n)+(1.0_8-num_ord)*Tmean)+Tupw1)*area(nz,n)
+    fct_aec_ver(nz,n)=(-0.5_8*(num_ord*(Tmean1+Tmean2)*W+(1.0_8-num_ord)*Tmean)+Tupw1)*area(nz,n)
     end do
     fct_aec_ver(1,n)=0.0_8
     fct_aec_ver(nl1,n)=0.0_8

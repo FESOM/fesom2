@@ -174,7 +174,7 @@ integer                                    :: nl
 real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
 integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
 real(kind=8), allocatable, dimension(:,:)  :: area
-
+real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
 
 
   type sparse_matrix 
@@ -540,14 +540,12 @@ real(kind=WP), allocatable    :: eta_n_mean(:),Wvel_mean(:,:)
 real(kind=WP), allocatable    :: tr_arr_mean(:,:,:)
 real(kind=WP), allocatable    :: fer_UV_mean(:,:,:), fer_wvel_mean(:,:)
 
-
 !Monin-Obukhov correction
 real*8,allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real*8,allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
 real(kind=WP), allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
-real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:,:), fer_gamma(:,:,:)
-
+real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:), fer_gamma(:,:,:)
 END MODULE o_ARRAYS
 !==========================================================

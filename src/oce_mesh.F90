@@ -633,15 +633,15 @@ IMPLICIT NONE
 ! area(nl, myDim_nod2D)
 
 
-integer              :: n,j,q, elnodes(3), ed(2), elem, nz
-real(kind=8)	     :: a(2), b(2), ax, ay, lon, lat, vol
-
+integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
+real(kind=8)	                          :: a(2), b(2), ax, ay, lon, lat, vol
+real(kind=WP), allocatable,dimension(:)   :: work_array
 	 
  allocate(elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  !allocate(elem_area(myDim_elem2D))
  allocate(area(nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
-                                             !! in some further routines     
- 
+                                             !! in some further routines
+ allocate(mesh_resolution(myDim_nod2d+eDim_nod2D))
  ! ============
  ! The areas of triangles:
  ! ============
@@ -689,6 +689,25 @@ real(kind=8)	     :: a(2), b(2), ax, ay, lon, lat, vol
  ! and areas are in m^2
  
 
+ allocate(work_array(myDim_nod2d+eDim_nod2D))
+ mesh_resolution=sqrt(area(1, :)/pi)*2._WP
+ DO q=1, 3 !apply mass matrix N times to smooth the field
+ DO n=1, myDim_nod2D
+    vol=0._WP
+    work_array(n)=0._WP
+    DO j=1, nod_in_elem2D_num(n)
+       elem=nod_in_elem2D(j, n)
+       elnodes=elem2D_nodes(:,elem)
+       work_array(n)=work_array(n)+sum(mesh_resolution(elnodes))/3._WP*elem_area(elem)
+       vol=vol+elem_area(elem)
+    END DO
+    work_array(n)=work_array(n)/vol
+ END DO
+ mesh_resolution=work_array
+ call exchange_nod(mesh_resolution)
+ END DO
+ deallocate(work_array)
+
  vol=0.0_WP
  do n=1, myDim_nod2D
     vol=vol+area(1, n)
@@ -697,14 +716,14 @@ real(kind=8)	     :: a(2), b(2), ax, ay, lon, lat, vol
  call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_WORLD, MPIerr)
 
-
- 
  write(*,*)  mype, 'Mesh statistics:'
  write(*,*)  mype, 'maxArea ',maxval(elem_area), '   MinArea ', minval(elem_area)
  write(*,*)  mype, 'maxScArea ',maxval(area(1,:)), &
             '   MinScArea ', minval(area(1,:))
- write(*,*)  mype, 'Edges:    ', edge2D, ' internal ', edge2D_in	  
- write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
+ write(*,*)  mype, 'Edges:    ', edge2D, ' internal ', edge2D_in
+ if (mype==0) then
+    write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
+ end if
 END SUBROUTINE mesh_areas
 
 !===================================================================

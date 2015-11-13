@@ -173,7 +173,7 @@ subroutine fer_solve_Gamma
 	     zinv =1.0_WP/(Z(nz-1)-Z(nz))
              a(nz)= fer_c(n)*zinv1*zinv
              c(nz)= fer_c(n)*zinv2*zinv
-             b(nz)=-a(nz)-c(nz)-bvfreq(nz,n)
+             b(nz)=-a(nz)-c(nz)-max(bvfreq(nz,n), 1.e-12)
           END DO
           ! The last row
           nz=nzmax
@@ -187,8 +187,8 @@ subroutine fer_solve_Gamma
           tr(:, nzmax)=0.
           DO nz=2, nzmax-1
              r=g/density_0
-             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n)*fer_K(nz-1:nz, n))
-             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n)*fer_K(nz-1:nz, n))
+             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n))*fer_K(n)
+             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n))*fer_K(n)
           END DO 
          ! =============================================
           ! The sweep algorithm
@@ -233,4 +233,40 @@ subroutine fer_gamma2vel
    call exchange_elem(fer_uv(1,:,:))
    call exchange_elem(fer_uv(2,:,:))
 end subroutine fer_gamma2vel
+!====================================================================
+subroutine fer_compute_C_K
+  USE o_MESH
+  USE o_PARAM
+  USE o_ARRAYS, ONLY: fer_c, fer_k, bvfreq, coriolis_node
+  USE g_PARSUP
+  USE g_CONFIG
+  use g_comm_auto
+  IMPLICIT NONE
+
+   integer                         :: n, nz, nzmax
+   real*8                          :: reso, c1, rosb, scaling, rr_ratio
+   real*8                          :: d, dz
+   real*8                          :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
+   real*8                          :: c_min=0.5, f_min=1.e-6, r_max=200000.
+   DO n=1,myDim_nod2D
+      c1=0._wp
+      nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+!     reso=sqrt(area(1, n)/pi)*2._WP
+      reso=mesh_resolution(n)
+      d=0._WP
+      DO nz=1, nzmax-1
+	 dz=(zbar(nz)-zbar(nz+1))
+         d=d+dz
+         c1=c1+dz*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
+      END DO
+      c1=max(c_min, c1/pi)
+      rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+      rr_ratio=min(reso/rosb, 5._WP)
+      scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
+      fer_c(n)=c1
+      fer_k(n)=1000._WP*scaling
+   END DO
+   call exchange_nod(fer_c)
+   call exchange_nod(fer_k)
+end subroutine fer_compute_C_K
 !====================================================================

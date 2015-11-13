@@ -920,6 +920,12 @@ END DO
    END DO
 END DO
 
+
+!!DELETE IT
+!fer_Wvel(1,:)=fer_k
+!fer_Wvel(2,:)=fer_c
+!!
+
 call exchange_nod(Wvel)
 call exchange_nod(fer_Wvel)
 
