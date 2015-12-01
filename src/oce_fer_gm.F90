@@ -264,7 +264,7 @@ subroutine fer_compute_C_K
       rr_ratio=min(reso/rosb, 5._WP)
       scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
       fer_c(n)=c1
-      fer_k(n)=1000._WP*scaling
+      fer_k(n)=1500._WP*scaling
    END DO
    call exchange_nod(fer_c)
    call exchange_nod(fer_k)

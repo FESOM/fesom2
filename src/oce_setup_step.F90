@@ -261,6 +261,13 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
 #endif
   call update_vel
 
+  if (Fer_GM) then
+     call fer_compute_C_K
+     call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
+     call fer_solve_Gamma
+     call fer_gamma2vel
+  end if
+
   call vert_vel
   t4=MPI_Wtime()
   call solve_tracers
@@ -306,42 +313,6 @@ USE g_input
      call oce_input
   end if
 
-  relax2clim=0.0
-  
-  call init_passive_age_tracers   
+  relax2clim=0.0 
 end subroutine oce_initial_state
 !==========================================================================
-subroutine init_passive_age_tracers
-use g_config
-use g_clock
-use o_passive_tracer_mod
-use o_age_tracer_mod
-use g_parsup
-use g_input
-implicit none
-
-! ocean passive tracers
-
-  if (use_passive_tracer) then
-     if(mype==0) write(*,*) 'initialize passive tracers'
-     call passive_tracer_init
-     if(ptr_start_year<yearnew .or. &
-          (ptr_start_year==yearnew .and. (daynew>1 .or. timenew>dt))) then
-        if(mype==0) write(*,*) 'read passive tracer restart fields'
-        call passive_tracer_input
-     end if
-  end if
-
-
-  ! ocean age tracers
-
-  if (use_age_tracer) then
-     if(mype==0) write(*,*) 'initialize age tracers'
-     call age_tracer_init
-     if(age_tracer_start_year<yearnew .or. &
-          (age_tracer_start_year==yearnew .and. (daynew>1 .or. timenew>dt))) then
-        call age_tracer_input
-     end if
-  end if
-end subroutine init_passive_age_tracers
-

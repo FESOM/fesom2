@@ -1,7 +1,5 @@
 subroutine init_output_mean(do_init)
   use o_mesh
-  use o_passive_tracer_mod
-  use o_age_tracer_mod
   use g_config
   use g_clock
   use g_parsup
@@ -21,7 +19,8 @@ subroutine init_output_mean(do_init)
   integer                   :: uice_varid, vice_varid
   character(100)            :: longname
   character(100)            :: filename
-  character(1)              :: trind
+  character(100)            :: trname, units
+
 
   if (.not. do_init) return
   ! Serial output implemented so far
@@ -99,29 +98,18 @@ subroutine init_output_mean(do_init)
   dimid3(2) = dimid_2d
   dimid3(3) = dimid_rec
 
-  status = nf_def_var(ncid, 'temp', NF_FLOAT, 3, dimid3, tra_varid(1))
-  if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_def_var(ncid, 'salt', NF_FLOAT, 3, dimid3, tra_varid(2))
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  if (use_passive_tracer) then
-     do j=1,num_passive_tracer
-        write(trind,'(i1)') j
-        status = nf_def_var(ncid, 'ptr'//trind, NF_FLOAT, 3, dimid3, &
-             tra_varid(index_passive_tracer(j)))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
-
-  if (use_age_tracer) then
-     do j=1,num_age_tracer
-        write(trind,'(i1)') j
-        status = nf_def_var(ncid, 'age'//trind, NF_FLOAT, 3, dimid3, &
-             tra_varid(index_age_tracer(j)))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
-
+  do j=1,num_tracers
+     SELECT CASE (j) 
+       CASE(1)
+         trname='temp'
+       CASE(2)
+         trname='salt'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'ptr', j
+     END SELECT
+     status = nf_def_var(ncid, trim(trname), NF_FLOAT, 3, dimid3, tra_varid(j))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end do
   ! Assign long_name and units attributes to variables.
 
   longname='model time'
@@ -170,39 +158,25 @@ subroutine init_output_mean(do_init)
      status = nf_put_att_text(ncid, gmw_varid, 'units', 3, 'm/s')
      if (status .ne. nf_noerr) call handle_err(status)
   end if
-  longname='potential temperature'
-  status = nf_put_att_text(ncid, tra_varid(1), 'description', len_trim(longname), trim(longname))
-  if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_put_att_text(ncid, tra_varid(1), 'units', 4, 'degC')
-  if (status .ne. nf_noerr) call handle_err(status)
-  longname='salinity'
-  status = nf_put_att_text(ncid, tra_varid(2), 'description', len_trim(longname), longname) 
-  if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_put_att_text(ncid, tra_varid(2), 'units', 3, 'psu')
-  if (status .ne. nf_noerr) call handle_err(status)
 
-  if (use_passive_tracer) then
-     do j=1,num_passive_tracer
-        write(trind,'(i1)') j
-        longname='passive tracer '//trind
-        status = nf_put_att_text(ncid, tra_varid(index_passive_tracer(j)), &
-             'description', len_trim(longname), longname) 
-        if (status .ne. nf_noerr) call handle_err(status)  
-     end do
-  end if
+  do j=1,num_tracers
+     SELECT CASE (j) 
+       CASE(1)
+         longname='potential temperature'
+         units='degC'
+       CASE(2)
+         longname='salinity'
+         units='psu'
+       CASE DEFAULT
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     status = nf_put_att_text(ncid, tra_varid(j), 'description', len_trim(longname), trim(longname))
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, tra_varid(j), 'units', len_trim(units), trim(units))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end do
 
-  if (use_age_tracer) then
-     do j=1,num_age_tracer
-        write(trind,'(i1)') j
-        longname='age tracer '//trind
-        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
-             'description', len_trim(longname), longname) 
-        if (status .ne. nf_noerr) call handle_err(status)
-        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
-             'units', 4, 'Year')
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
 
   status = nf_enddef(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
@@ -293,8 +267,6 @@ subroutine write_means(istep)
 
   use o_arrays
   use o_mesh
-  use o_passive_tracer_mod
-  use o_age_tracer_mod
   use i_arrays
   use g_config
   use g_clock
@@ -314,7 +286,7 @@ subroutine write_means(istep)
   integer                   :: start(2), count(2),start3(3), count3(3) 
   real(kind=8)              :: sec_in_year
   character(100)            :: filename
-  character(1)              :: trind
+  character(100)            :: trname
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
 
   ! ocean part
@@ -337,10 +309,6 @@ subroutine write_means(istep)
      if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'w', w_varid)
      if (status .ne. nf_noerr) call handle_err(status)
-     status=nf_inq_varid(ncid, 'temp', tra_varid(1))
-     if (status .ne. nf_noerr) call handle_err(status)
-     status=nf_inq_varid(ncid, 'salt', tra_varid(2))
-     if (status .ne. nf_noerr) call handle_err(status)
 
      if (Fer_GM) then
         status=nf_inq_varid(ncid, 'GM_u', gmu_varid)
@@ -351,28 +319,24 @@ subroutine write_means(istep)
         if (status .ne. nf_noerr) call handle_err(status)
      end if	
 
+      do j=1,num_tracers
+        SELECT CASE (j) 
+          CASE(1)
+            trname='temp'
+          CASE(2)
+            trname='salt'
+          CASE DEFAULT
+            write(trname,'(A3,i1)') 'ptr', j
+        END SELECT
+        status=nf_inq_varid(ncid, trim(trname), tra_varid(j))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
      ! continue writing netcdf keeping the old records
      status = nf_inq_dimid(ncid, 'T', count_id)
      if(status .ne. nf_noerr) call handle_err(status)
      status=  nf_inq_dimlen(ncid, count_id, save_count_mean)
      if(status .ne. nf_noerr) call handle_err(status)
      save_count_mean=save_count_mean+1
-
-     if (use_passive_tracer) then
-        do j=1,num_passive_tracer
-           write(trind,'(i1)') j
-           status = nf_inq_varid(ncid, 'ptr'//trind, tra_varid(index_passive_tracer(j)))
-           if (status .ne. nf_noerr) call handle_err(status)
-        end do
-     end if
-
-     if (use_age_tracer) then
-        do j=1,num_age_tracer
-           write(trind,'(i1)') j
-           status = nf_inq_varid(ncid, 'age'//trind, tra_varid(index_age_tracer(j)))
-           if (status .ne. nf_noerr) call handle_err(status)
-        end do
-     end if
      ! write variables
      sec_in_year=dt*istep
      ! time and iteration
@@ -443,24 +407,15 @@ subroutine write_means(istep)
   
   deallocate(aux3) !reallocate for scalar variables
   allocate(aux3(nl-1,nod2D))
-  call broadcast_nod(tr_arr_mean(:,:,1),aux3)
-  if(mype==0) then                        
-     count3=(/nl-1, nod2D, 1/)
-     status=nf_put_vara_real(ncid, tra_varid(1), start3, count3, real(aux3, 4))
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
-  call broadcast_nod(tr_arr_mean(:,:,2),aux3)
-  if(mype==0) then                        
-     status=nf_put_vara_real(ncid, tra_varid(2), start3, count3, real(aux3, 4))
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
-  
-  do j=3,num_tracer
-     call broadcast_nod(tracer(:,:,j-2),aux3)    
-     if(mype==0) then
-        status=nf_put_vara_real(ncid, tra_varid(j), start3, count3, real(aux3, 4))
+
+  !T,S and passive tracers
+  count3=(/nl-1, nod2D, 1/)
+  do j=1,num_tracers
+     call broadcast_nod(tr_arr_mean(:,:,j),aux3)
+     if(mype==0) then                        
+        status=nf_put_vara_double(ncid, tra_varid(j), start3, count3, real(aux3, 4))
         if (status .ne. nf_noerr) call handle_err(status)
-     end if
+     end if 
   end do
 
   if(mype==0) then
@@ -545,8 +500,9 @@ use o_arrays
 use i_arrays
 use g_clock
 implicit none
-logical do_output
-integer nsteps
+logical, intent(IN)       :: do_output
+integer                   :: nsteps
+integer                   :: j
 ndpyr=365+fleapyear
   if (output_length_unit.eq.'y') then                                                                 
      nsteps=ndpyr*step_per_day                                                                    
@@ -560,8 +516,9 @@ ndpyr=365+fleapyear
    UV_mean=UV_mean+UV ; if (do_output) UV_mean=UV_mean/dble(nsteps)                              
    Wvel_mean=Wvel_mean+Wvel; if (do_output) Wvel_mean=Wvel_mean/dble(nsteps)
    eta_n_mean=eta_n_mean+eta_n; if (do_output) eta_n_mean=eta_n_mean/dble(nsteps)
-   tr_arr_mean(:,:,1)=tr_arr_mean(:,:,1)+tr_arr(:,:,1);
-   tr_arr_mean(:,:,2)=tr_arr_mean(:,:,2)+tr_arr(:,:,2);
+   do j=1, num_tracers
+      tr_arr_mean(:,:,j)=tr_arr_mean(:,:,j)+tr_arr(:,:,j)
+   end do
    if (do_output) tr_arr_mean=tr_arr_mean/dble(nsteps)
    if (use_ice) then! ice has different update rate, so this is extra work
    U_ice_mean=U_ice_mean+U_ice ; if (do_output) U_ice_mean=U_ice_mean/dble(nsteps)

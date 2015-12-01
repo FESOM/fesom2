@@ -1,7 +1,5 @@
 subroutine init_output_restart(do_init)
   use o_mesh
-  use o_passive_tracer_mod
-  use o_age_tracer_mod
   use g_config
   use g_clock
   use g_parsup
@@ -14,13 +12,15 @@ subroutine init_output_restart(do_init)
   integer                   :: dimid_2d, dimid_2de, dimid_nl1, dimid_nl
   integer                   :: dimids(2), dimid3(3)
   integer                   :: time_varid, iter_varid
-  integer                   :: ssh_varid, tra_varid(num_tracer)
-  integer                   :: u_varid, v_varid, w_varid, wpot_varid
+  integer                   :: ssh_varid, tra_varid(num_tracer), tra_varid_ab(num_tracer)
+  integer                   :: u_varid, v_varid, wpot_varid
+  integer                   :: urhs_varid_AB, vrhs_varid_AB
+  integer                   :: w_varid, we_varid, wi_varid
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid
   character(100)            :: longname
   character(100)            :: filename
-  character(1)              :: trind
+  character(100)            :: trname, units
 
   if (.not. do_init) return
   ! Serial output implemented so far
@@ -70,6 +70,12 @@ subroutine init_output_restart(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_def_var(ncid, 'v', NF_DOUBLE, 3, dimid3, v_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+
+  status = nf_def_var(ncid, 'urhs_AB', NF_DOUBLE, 3, dimid3, urhs_varid_AB)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'vrhs_AB', NF_DOUBLE, 3, dimid3, vrhs_varid_AB)
+  if (status .ne. nf_noerr) call handle_err(status)
+
      
   ! ocean vertical velocity w
   dimid3(1) = dimid_nl
@@ -78,34 +84,32 @@ subroutine init_output_restart(do_init)
 
   status = nf_def_var(ncid, 'w', NF_DOUBLE, 3, dimid3, w_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'w_expl', NF_DOUBLE, 3, dimid3, we_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_def_var(ncid, 'w_impl', NF_DOUBLE, 3, dimid3, wi_varid)
+  if (status .ne. nf_noerr) call handle_err(status)
 
   ! scalar fields like T, S
   dimid3(1) = dimid_nl1
   dimid3(2) = dimid_2d
   dimid3(3) = dimid_rec
 
-  status = nf_def_var(ncid, 'temp', NF_DOUBLE, 3, dimid3, tra_varid(1))
-  if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_def_var(ncid, 'salt', NF_DOUBLE, 3, dimid3, tra_varid(2))
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  if (use_passive_tracer) then
-     do j=1,num_passive_tracer
-        write(trind,'(i1)') j
-        status = nf_def_var(ncid, 'ptr'//trind, NF_DOUBLE, 3, dimid3, &
-             tra_varid(index_passive_tracer(j)))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
-
-  if (use_age_tracer) then
-     do j=1,num_age_tracer
-        write(trind,'(i1)') j
-        status = nf_def_var(ncid, 'age'//trind, NF_DOUBLE, 3, dimid3, &
-             tra_varid(index_age_tracer(j)))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
+  do j=1,num_tracers
+     SELECT CASE (j) 
+       CASE(1)
+         trname='temp'
+       CASE(2)
+         trname='salt'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'ptr', j
+     END SELECT
+     status = nf_def_var(ncid, trim(trname), NF_DOUBLE, 3, dimid3, tra_varid(j))
+     if (status .ne. nf_noerr) call handle_err(status)
+     ! Adams–Bashforth part
+     trname=trim(trname)//'_AB'
+     status = nf_def_var(ncid, trim(trname), NF_DOUBLE, 3, dimid3, tra_varid_ab(j))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end do
 
   ! Assign long_name and units attributes to variables.
 
@@ -133,44 +137,55 @@ subroutine init_output_restart(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, v_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
+  longname='Adams–Bashforth RHS for zonal velocity'
+  status = nf_put_att_text(ncid, urhs_varid_AB, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, urhs_varid_AB, 'units', 3, 'm3/s2')
+  if (status .ne. nf_noerr) call handle_err(status)
+  longname='Adams–Bashforth RHS for meridional velocity'
+  status = nf_put_att_text(ncid, vrhs_varid_AB, 'description', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  status = nf_put_att_text(ncid, vrhs_varid_AB, 'units', 3, 'm3/s2')
+  if (status .ne. nf_noerr) call handle_err(status)
   longname='vertical velocity'
   status = nf_put_att_text(ncid, w_varid, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, w_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
-  longname='potential temperature'
-  status = nf_put_att_text(ncid, tra_varid(1), 'description', len_trim(longname), trim(longname))
+  longname='vertical velocity (explicit part)'
+  status = nf_put_att_text(ncid, we_varid, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_put_att_text(ncid, tra_varid(1), 'units', 4, 'degC')
+  status = nf_put_att_text(ncid, we_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
-  longname='salinity'
-  status = nf_put_att_text(ncid, tra_varid(2), 'description', len_trim(longname), longname) 
+  longname='vertical velocity (implicit part)'
+  status = nf_put_att_text(ncid, wi_varid, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
-  status = nf_put_att_text(ncid, tra_varid(2), 'units', 3, 'psu')
+  status = nf_put_att_text(ncid, wi_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
 
-  if (use_passive_tracer) then
-     do j=1,num_passive_tracer
-        write(trind,'(i1)') j
-        longname='passive tracer '//trind
-        status = nf_put_att_text(ncid, tra_varid(index_passive_tracer(j)), &
-             'description', len_trim(longname), longname) 
-        if (status .ne. nf_noerr) call handle_err(status)  
-     end do
-  end if
-
-  if (use_age_tracer) then
-     do j=1,num_age_tracer
-        write(trind,'(i1)') j
-        longname='age tracer '//trind
-        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
-             'description', len_trim(longname), longname) 
-        if (status .ne. nf_noerr) call handle_err(status)
-        status = nf_put_att_text(ncid, tra_varid(index_age_tracer(j)), &
-             'units', 4, 'Year')
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if
+  do j=1,num_tracers
+     SELECT CASE (j) 
+       CASE(1)
+         longname='potential temperature'
+         units='degC'
+       CASE(2)
+         longname='salinity'
+         units='psu'
+       CASE DEFAULT
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     status = nf_put_att_text(ncid, tra_varid(j), 'description', len_trim(longname), trim(longname))
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, tra_varid(j), 'units', len_trim(units), trim(units))
+     if (status .ne. nf_noerr) call handle_err(status)
+     ! Adams–Bashforth part
+     longname=trim(longname)//', Adams–Bashforth'
+     status = nf_put_att_text(ncid, tra_varid_ab(j), 'description', len_trim(longname), trim(longname))
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, tra_varid_ab(j), 'units', len_trim(units), trim(units))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end do
 
   status = nf_enddef(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
@@ -261,8 +276,6 @@ subroutine write_restarts(istep)
 
   use o_arrays
   use o_mesh
-  use o_passive_tracer_mod
-  use o_age_tracer_mod
   use i_arrays
   use g_config
   use g_clock
@@ -274,14 +287,16 @@ subroutine write_restarts(istep)
 
   integer                   :: status, ncid, j, istep
   integer                   :: time_varid, iter_varid
-  integer                   :: ssh_varid, tra_varid(num_tracer)
-  integer                   :: u_varid, v_varid, w_varid, wpot_varid
+  integer                   :: ssh_varid, tra_varid(num_tracer), tra_varid_ab(num_tracer)
+  integer                   :: u_varid, v_varid, wpot_varid
+  integer                   :: w_varid, we_varid, wi_varid
+  integer                   :: urhs_varid_AB, vrhs_varid_AB
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid, count_id
   integer                   :: start(2), count(2),start3(3), count3(3) 
   real(kind=8)              :: sec_in_year
   character(100)            :: filename
-  character(1)              :: trind
+  character(100)            :: trname
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
 
   ! ocean part
@@ -302,35 +317,41 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'v', v_varid)
      if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'urhs_AB', urhs_varid_AB)
+     if (status .ne. nf_noerr) call handle_err(status)
+     status=nf_inq_varid(ncid, 'vrhs_AB', vrhs_varid_AB)
+     if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'w', w_varid)
      if (status .ne. nf_noerr) call handle_err(status)
-     status=nf_inq_varid(ncid, 'temp', tra_varid(1))
+     status=nf_inq_varid(ncid, 'w_expl', we_varid)
      if (status .ne. nf_noerr) call handle_err(status)
-     status=nf_inq_varid(ncid, 'salt', tra_varid(2))
+     status=nf_inq_varid(ncid, 'w_impl', wi_varid)
      if (status .ne. nf_noerr) call handle_err(status)
+
+      do j=1,num_tracers
+        SELECT CASE (j) 
+          CASE(1)
+            trname='temp'
+          CASE(2)
+            trname='salt'
+          CASE DEFAULT
+            write(trname,'(A3,i1)') 'ptr', j
+        END SELECT
+        status=nf_inq_varid(ncid, trim(trname), tra_varid(j))
+        if (status .ne. nf_noerr) call handle_err(status)
+        ! Adams–Bashforth part
+        trname=trim(trname)//'_AB'
+        status=nf_inq_varid(ncid, trim(trname), tra_varid_ab(j))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
 
      ! continue writing netcdf keeping the old records
      status = nf_inq_dimid(ncid, 'T', count_id)
      if(status .ne. nf_noerr) call handle_err(status)
      status=  nf_inq_dimlen(ncid, count_id, save_count_restart)
      if(status .ne. nf_noerr) call handle_err(status)
-     save_count_restart=save_count_restart+1     
+     save_count_restart=save_count_restart+1
 
-     if (use_passive_tracer) then
-        do j=1,num_passive_tracer
-           write(trind,'(i1)') j
-           status = nf_inq_varid(ncid, 'ptr'//trind, tra_varid(index_passive_tracer(j)))
-           if (status .ne. nf_noerr) call handle_err(status)
-        end do
-     end if
-
-     if (use_age_tracer) then
-        do j=1,num_age_tracer
-           write(trind,'(i1)') j
-           status = nf_inq_varid(ncid, 'age'//trind, tra_varid(index_age_tracer(j)))
-           if (status .ne. nf_noerr) call handle_err(status)
-        end do
-     end if
      ! write variables
      sec_in_year=dt*istep
      ! time and iteration
@@ -349,7 +370,7 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  ! 3d fields
+  ! 3d fields U, V
   call broadcast_elem(UV(1,:,:), aux3)
   if (mype==0) then                  
      start3=(/1, 1, save_count_restart/)
@@ -364,6 +385,20 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
+  ! 3d fields UV_rhs_AB
+  call broadcast_elem(UV_rhsAB(1,:,:), aux3)
+  if (mype==0) then                  
+     status=nf_put_vara_double(ncid, urhs_varid_AB, start3, count3, aux3) 
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  call broadcast_elem(UV_rhsAB(2,:,:), aux3)  
+  if(mype==0) then                      
+     status=nf_put_vara_double(ncid, vrhs_varid_AB, start3, count3, aux3)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
 
@@ -374,24 +409,35 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
   
+  call broadcast_nod(Wvel_e,aux3)
+  if(mype==0) then                        
+     count3=(/nl, nod2D, 1/)
+     status=nf_put_vara_double(ncid, we_varid, start3, count3, aux3)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+  call broadcast_nod(Wvel_i,aux3)
+  if(mype==0) then                        
+     count3=(/nl, nod2D, 1/)
+     status=nf_put_vara_double(ncid, wi_varid, start3, count3, aux3)
+     if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
   deallocate(aux3) !reallocate for scalar variables
   allocate(aux3(nl-1,nod2D))
-  call broadcast_nod(tr_arr(:,:,1),aux3)
-  if(mype==0) then                        
-     count3=(/nl-1, nod2D, 1/)
-     status=nf_put_vara_double(ncid, tra_varid(1), start3, count3, aux3)
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
-  call broadcast_nod(tr_arr(:,:,2),aux3)
-  if(mype==0) then                        
-     status=nf_put_vara_double(ncid, tra_varid(2), start3, count3, aux3)
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
   
-  do j=3,num_tracer
-     call broadcast_nod(tracer(:,:,j-2),aux3)    
-     if(mype==0) then
+  !T,S and passive tracers
+  count3=(/nl-1, nod2D, 1/)
+  do j=1,num_tracers
+     call broadcast_nod(tr_arr(:,:,j),aux3)
+     if(mype==0) then                        
         status=nf_put_vara_double(ncid, tra_varid(j), start3, count3, aux3)
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+     ! Adams–Bashforth part
+     call broadcast_nod(tr_arr_old(:,:,j),aux3)
+     if(mype==0) then                        
+        status=nf_put_vara_double(ncid, tra_varid_ab(j), start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
   end do

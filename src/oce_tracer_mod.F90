@@ -133,18 +133,7 @@ if (tr_num<=2) then
   call tracer_gradient_elements(tr_arr_old(:,:,n), tt_xy_stored(:,:,:,n))
   call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
  enddo
-!  if (Redi_GM) then
-!      call compute_neutral_slope(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
-!      call redi_gm_coef 
-!  endif
- if (Fer_GM) then
-    call fer_compute_C_K
-    call compute_sigma_xy(tr_arr_old(:,:,1),tr_arr_old(:,:,2))
-    call fer_solve_Gamma
-    call fer_gamma2vel
- end if
-
-  endif
+endif
 else
 ! =================
 ! AB interpolation
@@ -204,6 +193,10 @@ integer             :: n, nl1
 call diff_part_hor(tr_arr(:,:,tr_num),del_ttf,tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num))
 if (Redi_GM)          call ver_redi_gm(tr_arr(:,:,tr_num),del_ttf,tr_num, tt_xynodes_stored(:,:,:,tr_num))
 if (not(i_vert_diff)) call diff_ver_part_expl(tr_arr(:,:,tr_num),del_ttf,tr_num)
+
+if ((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5).or.(Redi_GM)) then
+     tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num)
+endif
 
 !Update tracer berofe implicit operator is applied
 DO n=1, myDim_nod2D !! m=1, myDim_nod2D
@@ -525,10 +518,6 @@ use o_arrays
 use o_PARAM, only: tracer_adv
 implicit none
 integer :: tr_num,n,nz
-
-if ((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5).or.(Redi_GM)) then
-     tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num)
-endif
 
 if((clim_relax>1.0e-8).and.(tr_num==1)) then
   DO n=1, myDim_nod2D !! m=1, myDim_nod2D

@@ -80,33 +80,6 @@ logical                       :: open_b=.false.   ! Reserved
 logical                       :: mo_on=.false. !Monin-Obukhov
 real*8 :: modiff=0.01                   !for PP, mixing coefficient within MO length
 
-
-! *** passive tracer ***
-logical          :: use_passive_tracer=.false.    !use passive tracer
-integer          :: num_passive_tracer=1          !only 1 before update
-integer          :: ptr_start_year=1948           !when to start having ptr
-logical          :: passive_tracer_flux=.false.   !ptr enters from sfc flux
-logical          :: passive_tracer_restore=.true. !add ptr from restoring 
-logical          :: ptr_restore_in_volume=.true.  !restoring in the 3D region
-real(kind=WP)    :: ptr_background_value=0.0      !ptr init. background value
-real(kind=WP)    :: ptr_restore_value=1.0         !restore value for ptr
- 
-  namelist /passive_tracer/ use_passive_tracer, num_passive_tracer, &
-       ptr_start_year, passive_tracer_flux, passive_tracer_restore, &
-       ptr_restore_in_volume, ptr_background_value, ptr_restore_value
-  
-! *** age tracer ***
-logical          :: use_age_tracer=.false.        !use age tracer
-integer          :: num_age_tracer=1              !only 1 before update
-integer          :: age_tracer_start_year=1948    !when to start having age tr.
-logical          :: zero_age_at_release=.true.    !keep zero age in rel. zone
-logical          :: age_tracer_global_surf=.true. !source at all surface nodes or not
-logical          :: age_release_in_volume=.false. !age tr. release in 3D regions
-real(kind=WP)    :: age_tracer_restore_time=864000.!restore time scale in rel. zone
-
-  namelist /age_tracer/ use_age_tracer, age_release_in_volume, zero_age_at_release, &
-       age_tracer_restore_time, num_age_tracer, age_tracer_start_year, age_tracer_global_surf   
-
   ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 

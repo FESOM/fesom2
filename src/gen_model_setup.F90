@@ -96,42 +96,16 @@ subroutine define_prog_tracer
   ! allocate prog_tracer_name
 
   num_tracer=2  ! t and s
-  if(use_passive_tracer) then
-     num_tracer=num_tracer+num_passive_tracer
-  end if
-  if(use_age_tracer) then
-     num_tracer=num_tracer+num_age_tracer
-  end if
 
   allocate(prog_tracer_name(num_tracer))
 
   ! fill prog_tracer_name
 
   num=2  ! t and s
-
   prog_tracer_name(1)='temp'
   prog_tracer_name(2)='salt'
 
-  if(use_passive_tracer) then
-     do j=1,num_passive_tracer
-        write(cageind,'(i1)') j
-        tr_name='ptr'//cageind
-	prog_tracer_name(num+j)=tr_name
-     end do
-     num=num+num_passive_tracer
-  end if
-
-  if(use_age_tracer) then
-     do j=1,num_age_tracer
-        write(cageind,'(i1)') j
-        tr_name='age'//cageind
-	prog_tracer_name(num+j)=tr_name
-     end do
-     num=num+num_age_tracer
-  end if
-
   if(mype==0) write(*,*) 'Number of prognostic ocean tracers: ',num
-
 end subroutine define_prog_tracer
 ! ==============================================================
 subroutine get_run_steps(nsteps)

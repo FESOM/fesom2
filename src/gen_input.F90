@@ -31,12 +31,15 @@ subroutine oce_input
 #include "netcdf.inc" 
 
   integer                   :: status, ncid, j, dimid_rec, nrec
-  integer                   :: ssh_varid, tra_varid(2)
-  integer                   :: u_varid, v_varid, w_varid, wpot_varid
+  integer                   :: ssh_varid
+  integer                   :: tra_varid(num_tracer), tra_varid_ab(num_tracer)
+  integer                   :: u_varid, v_varid
+  integer                   :: w_varid, we_varid, wi_varid
+  integer                   :: urhs_varid_AB, vrhs_varid_AB
   integer                   :: istart(2), icount(2), n2
   integer                   :: istart3(3), icount3(3)
   character(100)            :: filename
-  character(1)              :: trind
+  character(100)            :: trname
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
   real(kind=8)              :: lval, gval
   allocate(aux2(nod2D), aux3(nl-1,elem2D)) 
@@ -59,12 +62,33 @@ subroutine oce_input
   if (status .ne. nf_noerr) call handle_err(status)
   status=nf_inq_varid(ncid, 'v', v_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+  status=nf_inq_varid(ncid, 'urhs_AB', urhs_varid_AB)
+  if (status .ne. nf_noerr) call handle_err(status)
+  status=nf_inq_varid(ncid, 'vrhs_AB', vrhs_varid_AB)
+  if (status .ne. nf_noerr) call handle_err(status)
   status=nf_inq_varid(ncid, 'w', w_varid)
   if (status .ne. nf_noerr) call handle_err(status)
-  status=nf_inq_varid(ncid, 'temp', tra_varid(1))
+  status=nf_inq_varid(ncid, 'w_expl', we_varid)
   if (status .ne. nf_noerr) call handle_err(status)
-  status=nf_inq_varid(ncid, 'salt', tra_varid(2))
+  status=nf_inq_varid(ncid, 'w_impl', wi_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+
+  do j=1,num_tracers
+     SELECT CASE (j) 
+       CASE(1)
+         trname='temp'
+       CASE(2)
+         trname='salt'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'ptr', j
+     END SELECT
+     status=nf_inq_varid(ncid, trim(trname), tra_varid(j))
+     if (status .ne. nf_noerr) call handle_err(status)
+     ! Adams–Bashforth part
+     trname=trim(trname)//'_AB'
+     status=nf_inq_varid(ncid, trim(trname), tra_varid_ab(j))
+     if (status .ne. nf_noerr) call handle_err(status)
+  end do
 
   ! read variables
   ! which record to read
@@ -96,8 +120,17 @@ subroutine oce_input
   status=nf_get_vara_double(ncid, v_varid, istart3, icount3, aux3) 
   if (status .ne. nf_noerr) call handle_err(status)
   UV(2,:,1:n2)=aux3(:, myList_elem2D(1:n2))     
-  deallocate(aux3)
   
+  ! 3d fields UV_rhs_AB
+  status=nf_get_vara_double(ncid, urhs_varid_AB, istart3, icount3, aux3)
+  if (status .ne. nf_noerr) call handle_err(status)
+  UV_rhsAB(1,:,1:n2)=aux3(:, myList_elem2D(1:n2))
+
+  status=nf_get_vara_double(ncid, vrhs_varid_AB, istart3, icount3, aux3)
+  if (status .ne. nf_noerr) call handle_err(status)
+  UV_rhsAB(2,:,1:n2)=aux3(:, myList_elem2D(1:n2))
+
+  deallocate(aux3)
   allocate(aux3(nl,nod2D))
   icount3=(/nl, nod2D, 1/)
   n2=myDim_nod2D+eDim_nod2D
@@ -105,18 +138,29 @@ subroutine oce_input
   status=nf_get_vara_double(ncid, w_varid, istart3, icount3, aux3) 
   if (status .ne. nf_noerr) call handle_err(status)
   Wvel=aux3(:,myList_nod2D)             
+
+  status=nf_get_vara_double(ncid, we_varid, istart3, icount3, aux3) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  Wvel_e=aux3(:,myList_nod2D)             
+
+  status=nf_get_vara_double(ncid, wi_varid, istart3, icount3, aux3) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  Wvel_i=aux3(:,myList_nod2D)             
+
   deallocate(aux3)
-  
   allocate(aux3(nl-1,nod2D)) 
   icount3=(/nl-1, nod2D, 1/)
 
-  status=nf_get_vara_double(ncid, tra_varid(1), istart3, icount3, aux3) 
-  if (status .ne. nf_noerr) call handle_err(status)
-  tr_arr(:,:,1)=aux3(:,myList_nod2D)  
-  
-  status=nf_get_vara_double(ncid, tra_varid(2), istart3, icount3, aux3) 
-  if (status .ne. nf_noerr) call handle_err(status)
-  tr_arr(:,:,2)=aux3(:,myList_nod2D)  
+  !T,S and passive tracers
+  do j=1,num_tracers
+     status=nf_get_vara_double(ncid, tra_varid(j), istart3, icount3, aux3) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     tr_arr(:,:,j)=aux3(:,myList_nod2D)  
+     ! Adams–Bashforth part
+     status=nf_get_vara_double(ncid, tra_varid_ab(j), istart3, icount3, aux3) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     tr_arr_old(:,:,j)=aux3(:,myList_nod2D)  
+  end do
 
   status=nf_close(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
@@ -132,147 +176,6 @@ subroutine oce_input
        MPI_COMM_WORLD, MPIerr)
 if (mype==0) write(*,*) 'The global integral of SSH after restart is:', gval
 end subroutine oce_input
-!
-!-------------------------------------------------------------------------
-!
-subroutine age_tracer_input
-  ! 
-  ! Coded by Qiang Wang
-  ! Reviewed by ??
-  !------------------------------------------------------------------
-  
-  use o_param
-  use o_mesh
-  use o_arrays
-  use o_age_tracer_mod
-  use g_clock
-  use g_config
-  use g_PARSUP
-  implicit none
-
-#include "netcdf.inc" 
-
-  integer                   :: status, ncid, j, dimid_rec, nrec
-  integer                   :: tra_varid(num_age_tracer)
-  integer                   :: istart3(3), icount3(3), n2
-  character(100)            :: filename
-  character(1)              :: trind
-  real(kind=8), allocatable :: aux3(:,:) 
-
-  allocate(aux3(nl-1,nod2D)) 
-  n2=myDim_nod2D+eDim_nod2D           
-
-  ! open files
-  filename=trim(ResultPath)//runid//'.'//cyearold//'.oce.restart.nc'
-  status = nf_open(filename, nf_nowrite, ncid)
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  ! inquire variable id
-  do j=1,num_age_tracer 
-     write(trind,'(i1)') j
-     status=nf_inq_varid(ncid, 'age'//trind, tra_varid(j))
-     if (status .ne. nf_noerr) call handle_err(status)
-  end do
-
-  ! read variables
-
-  ! which record to read
-  if(restartflag=='last') then
-     status = nf_inq_dimid(ncid, 'T', dimid_rec)
-     if(status .ne. nf_noerr) call handle_err(status)
-     status = nf_inq_dimlen(ncid, dimid_rec, nrec)
-     if(status .ne. nf_noerr) call handle_err(status)
-  else
-     read(restartflag,'(i4)') nrec
-  end if
-
-  ! 3d age tracer fields
-  istart3=(/1, 1, nrec/)
-  icount3=(/nl-1, nod2d, 1/)
-
-  do j=1,num_age_tracer
-     status=nf_get_vara_double(ncid, tra_varid(j), istart3, icount3, aux3) 
-     if (status .ne. nf_noerr) call handle_err(status)
-     tracer(:,:,index_age_tracer(j))=aux3(:, myList_nod2D)  
-  end do
-
-  status=nf_close(ncid)
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  deallocate(aux3)   
-
-end subroutine age_tracer_input
-!
-!-------------------------------------------------------------------------
-!
-subroutine passive_tracer_input
-  ! 
-  ! Coded by Qiang Wang
-  ! Reviewed by ??
-  !------------------------------------------------------------------
-
-  use o_param
-  use o_mesh
-  use o_arrays
-  use o_age_tracer_mod
-  use o_passive_tracer_mod
-  use g_config
-  use g_clock
-  use g_PARSUP
-  implicit none
-
-#include "netcdf.inc" 
-
-  integer                   :: status, ncid, j, dimid_rec, nrec
-  integer                   :: tra_varid(num_age_tracer)
-  integer                   :: istart3(3), icount3(3), n2
-  character(100)            :: filename
-  character(1)              :: trind
-  real(kind=8), allocatable :: aux3(:, :) 
-
-  allocate(aux3(nl-1,nod2D)) 
-  n2=myDim_nod2D+eDim_nod2D           
-
-  ! open files
-  filename=trim(ResultPath)//runid//'.'//cyearold//'.oce.restart.nc'
-  status = nf_open(filename, nf_nowrite, ncid)
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  ! inquire variable id
-  do j=1,num_passive_tracer 
-     write(trind,'(i1)') j
-     status=nf_inq_varid(ncid, 'ptr'//trind, tra_varid(j))
-     if (status .ne. nf_noerr) call handle_err(status)
-  end do
-
-  ! read variables
-
-  ! which record to read
-  if(restartflag=='last') then
-     status = nf_inq_dimid(ncid, 'T', dimid_rec)
-     if(status .ne. nf_noerr) call handle_err(status)
-     status = nf_inq_dimlen(ncid, dimid_rec, nrec)
-     if(status .ne. nf_noerr) call handle_err(status)
-  else
-     read(restartflag,'(i4)') nrec
-  end if
-
-  ! 3d age tracer fields
-  istart3=(/1, 1, nrec/)
-  icount3=(/nl-1, nod2d, 1/)
-
-  do j=1,num_passive_tracer
-     status=nf_get_vara_double(ncid, tra_varid(j), istart3, icount3, aux3) 
-     if (status .ne. nf_noerr) call handle_err(status)
-     tracer(:,:,index_passive_tracer(j))=aux3(:,myList_nod2D)  
-  end do
-
-  status=nf_close(ncid)
-  if (status .ne. nf_noerr) call handle_err(status)
-
-  deallocate(aux3)   
-
-end subroutine passive_tracer_input
 !
 !-------------------------------------------------------------------------
 !
