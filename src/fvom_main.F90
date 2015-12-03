@@ -20,14 +20,13 @@ use g_comm_auto
 use g_forcing_arrays
 IMPLICIT NONE
 
-integer      :: n, nsteps,offset,row,i
+integer :: n, nsteps,offset,row,i
 	call par_init 
         !=====================
 	! Read configuration data,  
 	! load the mesh and fill in 
 	! auxiliary mesh arrays
 	!=====================
-        
 	call setup_model          ! Read Namelists, always before clock_init
         call clock_init           ! read the clock file 
 	call get_run_steps(nsteps)

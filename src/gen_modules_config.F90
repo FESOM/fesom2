@@ -43,8 +43,8 @@ module g_config
   logical                :: use_means=.true.       !Mean or snapshot
   integer                :: restart_length=1
   character              :: restart_length_unit='m'
-  namelist /inout/ restartflag, output_length, output_length_unit, logfile_outfreq, use_means, &
-           restart_length, restart_length_unit
+  namelist /inout/ restartflag, output_length, output_length_unit, restart_length, restart_length_unit, &
+	logfile_outfreq, use_means
 
   ! *** mesh ***
   integer                :: grid_type=1 	! z-level, 2 sigma, 3 sigma + z-level

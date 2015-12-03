@@ -15,9 +15,8 @@ IMPLICIT NONE
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	if ((tracer_adv==4) .or. (tracer_adv==5))  call fct_init
-!	if(tracer_adv==2) call quadratic_reconstruction_init
-	if((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5))  call muscl_adv_init   
+	if (tracer_adv==2) call fct_init
+        call muscl_adv_init
 	!=====================
 	! Initialize fields
 	! A user-defined routine has to be called here!
@@ -40,12 +39,7 @@ IMPLICIT NONE
 #endif
         end if
 
-	!=====================
-	!
-	!===================== 
-	 if ((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5).or.(Redi_GM)) then
-	   tr_arr_old=tr_arr
-	 end if
+         if (.not.r_restart) tr_arr_old=tr_arr
 #ifdef BTR_SPLIT
          call init_split
 #endif        
@@ -143,7 +137,6 @@ allocate(Unode(2,nl,node_size))
 !Tracer gradients&RHS  
 allocate(ttrhs(nl-1,node_size))
 allocate(tt_xy_stored(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
-allocate(tt_xynodes_stored(2,nl-1,node_size,num_tracers))
 allocate(neutral_slope(3, nl-1, node_size))
 allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
 neutral_slope=0.0_WP

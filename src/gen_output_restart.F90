@@ -549,6 +549,6 @@ subroutine restart(directionflag, istep)
   if (.not.do_restart) return
 
   ! write results
-  if(mype==0) write(*,*)'Do output (netCDF) ...'
+  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
   call write_restarts(istep)
 end subroutine restart

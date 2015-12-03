@@ -310,22 +310,10 @@ IMPLICIT NONE
  real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
  real(kind=8) :: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
 
-! =================
 ! Clean the rhs
-! =================          
-!  DO n=1, myDim_nod2D                    !! P (a)
-!                                         !! n=myList_nod2D(m)
-!     DO nz=1, nl-1 
-!        ttrhs(nz,n)=0.0_8
-!     END DO
-!  END DO   
 ttrhs=0d0  
-! =================
 ! Horizontal advection
-! =================
-  DO edge=1, myDim_edge2D                   !! P (c) edge=1, edge2d
-    
-                                            !! edge=myList_edge2D(m)
+  DO edge=1, myDim_edge2D
    enodes=edges(:,edge)   
    el=edge_tri(:,edge)
    c1=0.0

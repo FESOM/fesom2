@@ -28,8 +28,6 @@ surf_relax_S=6.43e-07   ! m/s 10./(180.*86400.)
 clim_relax=0.0	    ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
 ref_sss=34.
-Redi_GM=.false.
-K_GM=10.0              ! m^2/s
 i_vert_diff=.true. 
-tracer_adv=4           ! 1=Miura, 2=quad.reconstr., 3=MUSCL, 4=MUSCL+FCT
+tracer_adv=2           ! 1=MUSCL, 2=MUSCL+FCT
 /

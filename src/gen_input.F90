@@ -74,7 +74,7 @@ subroutine oce_input
   if (status .ne. nf_noerr) call handle_err(status)
 
   do j=1,num_tracers
-     SELECT CASE (j) 
+     SELECT CASE (j)
        CASE(1)
          trname='temp'
        CASE(2)
@@ -104,9 +104,9 @@ subroutine oce_input
   ! 2d fields
   istart=(/1,nrec/)
   icount=(/nod2d, 1/)
-  status=nf_get_vara_double(ncid, ssh_varid, istart, icount, aux2) 
+  status=nf_get_vara_double(ncid, ssh_varid, istart, icount, aux2)
   if (status .ne. nf_noerr) call handle_err(status)
-  eta_n=aux2(myList_nod2D)         
+  eta_n=aux2(myList_nod2D)
 
   ! 3d fields, velocities
   istart3=(/1,1,nrec/)
@@ -115,11 +115,11 @@ subroutine oce_input
 
   status=nf_get_vara_double(ncid, u_varid, istart3, icount3, aux3)
   if (status .ne. nf_noerr) call handle_err(status)
-  UV(1,:,1:n2)=aux3(:, myList_elem2D(1:n2))     
+  UV(1,:,1:n2)=aux3(:, myList_elem2D(1:n2))
 
-  status=nf_get_vara_double(ncid, v_varid, istart3, icount3, aux3) 
+  status=nf_get_vara_double(ncid, v_varid, istart3, icount3, aux3)
   if (status .ne. nf_noerr) call handle_err(status)
-  UV(2,:,1:n2)=aux3(:, myList_elem2D(1:n2))     
+  UV(2,:,1:n2)=aux3(:, myList_elem2D(1:n2))
   
   ! 3d fields UV_rhs_AB
   status=nf_get_vara_double(ncid, urhs_varid_AB, istart3, icount3, aux3)
@@ -135,17 +135,17 @@ subroutine oce_input
   icount3=(/nl, nod2D, 1/)
   n2=myDim_nod2D+eDim_nod2D
 
-  status=nf_get_vara_double(ncid, w_varid, istart3, icount3, aux3) 
+  status=nf_get_vara_double(ncid, w_varid, istart3, icount3, aux3)
   if (status .ne. nf_noerr) call handle_err(status)
-  Wvel=aux3(:,myList_nod2D)             
+  Wvel=aux3(:,myList_nod2D)
 
-  status=nf_get_vara_double(ncid, we_varid, istart3, icount3, aux3) 
+  status=nf_get_vara_double(ncid, we_varid, istart3, icount3, aux3)
   if (status .ne. nf_noerr) call handle_err(status)
-  Wvel_e=aux3(:,myList_nod2D)             
+  Wvel_e=aux3(:,myList_nod2D)
 
-  status=nf_get_vara_double(ncid, wi_varid, istart3, icount3, aux3) 
+  status=nf_get_vara_double(ncid, wi_varid, istart3, icount3, aux3)
   if (status .ne. nf_noerr) call handle_err(status)
-  Wvel_i=aux3(:,myList_nod2D)             
+  Wvel_i=aux3(:,myList_nod2D)
 
   deallocate(aux3)
   allocate(aux3(nl-1,nod2D)) 
@@ -153,20 +153,19 @@ subroutine oce_input
 
   !T,S and passive tracers
   do j=1,num_tracers
-     status=nf_get_vara_double(ncid, tra_varid(j), istart3, icount3, aux3) 
+     status=nf_get_vara_double(ncid, tra_varid(j), istart3, icount3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
-     tr_arr(:,:,j)=aux3(:,myList_nod2D)  
+     tr_arr(:,:,j)=aux3(:,myList_nod2D)
      ! Adams–Bashforth part
-     status=nf_get_vara_double(ncid, tra_varid_ab(j), istart3, icount3, aux3) 
+     status=nf_get_vara_double(ncid, tra_varid_ab(j), istart3, icount3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
-     tr_arr_old(:,:,j)=aux3(:,myList_nod2D)  
+     tr_arr_old(:,:,j)=aux3(:,myList_nod2D)
   end do
 
   status=nf_close(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 
-  deallocate(aux3, aux2)   
-
+  deallocate(aux3, aux2)
  lval=0.0_WP
  gval=0.0_WP
  do n2=1, myDim_nod2D

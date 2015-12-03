@@ -104,33 +104,6 @@ endif
  allocate(stress_iceoce_x(e_size), stress_iceoce_y(e_size))    
  allocate(U_w(e_size), V_w(e_size))   ! =uf and vf of ocean at surface nodes
  end if 
- 
-! allocate(U_w(e_size), V_w(e_size))   ! =uf and vf of ocean at surface nodes
-  if ((tracer_adv.ne.2).and.(.not.allocated(nn_num))) then    ! In this case we need to fill in 
-                                ! nodal neighbors array
-  mn=0
-  DO n=1, myDim_nod2D
-  k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
-  if(k>mn) mn=k
-  END DO
-  allocate(nn_num(myDim_nod2D),nn_pos(mn,myDim_nod2D))
-  DO n=1,myDim_nod2d
-     nn_num(n)=1
-     nn_pos(1,n)=n
-  end do   
-  Do n=1, myDim_edge2D
-     n1=edges(1,n)
-     n2=edges(2,n)
-     if(n1<=myDim_nod2D) then
-     nn_pos(nn_num(n1)+1,n1)=n2
-     nn_num(n1)=nn_num(n1)+1
-     end if
-     if(n2<=myDim_nod2D) then
-     nn_pos(nn_num(n2)+1,n2)=n1
-     nn_num(n2)=nn_num(n2)+1
-     end if
-  END DO 
-  end if
 end subroutine ice_array_setup
 !==========================================================================
 subroutine ice_timestep(step)
@@ -188,8 +161,7 @@ subroutine ice_initial_state
      if(mype==0) write(*,*) 'initialize the sea ice'
 
      do i=1,myDim_nod2D+eDim_nod2D                           
-  !      if (.false.) then    !! PD
-        if (tr_arr(1,i,1)< 0.0_WP) then    !! PD
+        if (tr_arr(1,i,1)< 0.0_WP) then
            m_ice(i) = 1.0_WP
            a_ice(i) = 0.9_WP
            u_ice(i) = 0.0_WP

@@ -3,41 +3,6 @@ module o_tracers
 implicit none
 contains
 !=======================================================================
-SUBROUTINE tracer_gradient_nodes (tt_xy, tt_xynodes)
-
-! tt_xy      elemental gradient of tracer 
-! tt_xynodes nodal gradients obtained by averaging
-USE o_PARAM
-USE o_MESH
-!USE o_ARRAYS
-USE g_PARSUP
-use g_comm_auto
-IMPLICIT NONE
-real*8      :: tt_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D)
-real*8      :: tt_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D)
-integer         :: n, nz, elem, k
-real*8   :: tvol, tx, ty
-  DO n=1, myDim_nod2D !! m=1, myDim_nod2D
-                      !! n=myList_nod2D(m)
-     DO nz=1, nlevels_nod2D(n)-1
-        tvol=0.0_WP
-	tx=0.0_WP
-	ty=0.0_WP
-	DO k=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(k,n)
-           if(nlevels(elem)-1<nz) cycle
-           tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy(2,nz,elem)*elem_area(elem)
-        END DO
-	tt_xynodes(1,nz,n)=tx/tvol
-	tt_xynodes(2,nz,n)=ty/tvol
-     END DO
-   END DO 
-   call exchange_nod(tt_xynodes(1,:,:))
-   call exchange_nod(tt_xynodes(2,:,:))
-END SUBROUTINE tracer_gradient_nodes
-!=======================================================================
 SUBROUTINE tracer_gradient_elements (ttf, tt_xy)
 ! ttf - tracer field
 ! ttx, tty  elemental gradient of tracer 
@@ -63,53 +28,9 @@ integer           :: n, nz
      
 END SUBROUTINE tracer_gradient_elements
 !========================================================================================
-SUBROUTINE init_tracers(tr_num)
-use g_parsup
-use o_PARAM, only: tracer_adv,Redi_GM
-use o_arrays
-use o_mesh
-IMPLICIT NONE
-integer :: tr_num,n,nz
-!Allocate stuff if needed
-!Fill work arrays
-! elemental gradients are in ttx, tty
-! nodal gradients are in ttxnodes, ttynodes.
-!TS grads are stored separately from the rest of tracers
-!they are loaded in work arrays ttx,tty,ttxnodes,ttynodes,tsv
-del_ttf=0d0
-
-if (tr_num<=2) then
-  if (tr_num==1) then
-  do n=1,2
-   call tracer_gradient_elements(tr_arr(:,:,n), tt_xy_stored(:,:,:,n))
-   call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
-  enddo
-!  if (Redi_GM) then
-!      call compute_neutral_slope(tr_arr(:,:,1),tr_arr(:,:,2))
-!      call redi_gm_coef  
-!  endif
-   
-  endif
-else
-  call tracer_gradient_elements(tr_arr(:,:,tr_num), tt_xy_stored(:,:,:,tr_num))
-  call tracer_gradient_nodes(tt_xy_stored(:,:,:,tr_num), tt_xynodes_stored(:,:,:,tr_num))
-endif
-select case (tracer_adv)
-case(1) 
-	continue
-case(2) !Quadratic reconstr.
-! Get coefs
-!  	call linear_reconstruction(tt_xy_stored(:,:,:,tr_num))
-!       call quadratic_reconstruction(tr_arr(:,:,tr_num)) 
-CASE DEFAULT !unknown
-	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
-        call par_ex(1)
-END SELECT
-end subroutine init_tracers
-!=================================================================================
 SUBROUTINE init_tracers_AB(tr_num)
 use g_parsup
-use o_PARAM, only: tracer_adv,Redi_GM
+use o_PARAM, only: tracer_adv
 use o_arrays
 use o_mesh
 use g_comm
@@ -124,35 +45,15 @@ integer :: tr_num,n,nz
 
 del_ttf=0d0
 
-
-if (tr_num<=2) then
-  if (tr_num==1) then
-  tr_arr_old(:,:,1:2)=-(0.5+epsilon)*tr_arr_old(:,:,1:2)+(1.5+epsilon)*tr_arr(:,:,1:2)
-
- do n=1,2
-  call tracer_gradient_elements(tr_arr_old(:,:,n), tt_xy_stored(:,:,:,n))
-  call tracer_gradient_nodes(tt_xy_stored(:,:,:,n), tt_xynodes_stored(:,:,:,n))
- enddo
-endif
-else
 ! =================
 ! AB interpolation
 ! =================
-  tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-  call tracer_gradient_elements(tr_arr_old(:,:,tr_num), tt_xy_stored(:,:,:,tr_num))
-  call tracer_gradient_nodes(tt_xy_stored(:,:,:,tr_num), tt_xynodes_stored(:,:,:,tr_num))
-endif
+tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
+call tracer_gradient_elements(tr_arr_old(:,:,tr_num),  tt_xy_stored(:,:,:,tr_num))
 
-select case (tracer_adv)
-case(3,4,5)
-
-        call exchange_elem3D_full(tt_xy_stored(1,:,:,tr_num))
-	call exchange_elem3D_full(tt_xy_stored(2,:,:,tr_num))
-	call fill_up_dn_grad(tt_xy_stored(:,:,:,tr_num))
-CASE DEFAULT !Unknown
-	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
-        call par_ex(1)
-END SELECT
+call exchange_elem3D_full(tt_xy_stored(1,:,:,tr_num))
+call exchange_elem3D_full(tt_xy_stored(2,:,:,tr_num))
+call fill_up_dn_grad(tt_xy_stored(:,:,:,tr_num))
 end subroutine init_tracers_AB
 !==============================================================================
 SUBROUTINE adv_tracers(tr_num)
@@ -163,19 +64,10 @@ use o_arrays
 IMPLICIT NONE
 integer :: tr_num 
 select case (tracer_adv)
-case(1) !Miura
-	if (mype==0) write(*,*) 'This scheme is not supported yet'
-        call par_ex(1)
-case(2) !Quadratic reconstr.
-	if (mype==0) write(*,*) 'This scheme is not supported yet'
-        call par_ex(1)
-case(3) !MUSCL
+case(1) !MUSCL
         call adv_tracer_muscl(tr_arr(:,:,tr_num), del_ttf, tr_arr_old(:,:,tr_num))
-case(4) !MUSCL+FCT(3D)
+case(2) !MUSCL+FCT(3D)
 	call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.0_WP)
-case(5) !MUSCL+FCT(2D+1D)
-	if (mype==0) write(*,*) 'This scheme is not supported yet'
-        call par_ex(1)
 CASE DEFAULT !unknown
 	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
         call par_ex(1)
@@ -190,13 +82,10 @@ IMPLICIT NONE
 integer, intent(in) :: tr_num
 integer             :: n, nl1
 
-call diff_part_hor(tr_arr(:,:,tr_num),del_ttf,tr_num,tt_xy_stored(:,:,:,tr_num),tt_xynodes_stored(:,:,:,tr_num))
-if (Redi_GM)          call ver_redi_gm(tr_arr(:,:,tr_num),del_ttf,tr_num, tt_xynodes_stored(:,:,:,tr_num))
+call diff_part_hor(tr_arr(:,:,tr_num),del_ttf,tr_num,tt_xy_stored(:,:,:,tr_num))
 if (not(i_vert_diff)) call diff_ver_part_expl(tr_arr(:,:,tr_num),del_ttf,tr_num)
 
-if ((tracer_adv==3).or.(tracer_adv==4).or.(tracer_adv==5).or.(Redi_GM)) then
-     tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num)
-endif
+tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num)
 
 !Update tracer berofe implicit operator is applied
 DO n=1, myDim_nod2D !! m=1, myDim_nod2D
@@ -209,7 +98,7 @@ END DO
 if (i_vert_diff)      call diff_ver_part_impl(tr_arr(:,:,tr_num), tr_num)
 end subroutine diff_tracers
 !===========================================================================
-subroutine diff_part_hor(ttf, dttf, tr_num,tt_xy,tt_xynodes)
+subroutine diff_part_hor(ttf, dttf, tr_num,tt_xy)
 use o_ARRAYS
 use g_PARSUP
 use o_MESH
@@ -223,7 +112,6 @@ real*8::temp(3),d,c1,Tx,Ty,Kh
 real*8 :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
 real*8 :: tsv(nl,myDim_nod2D+eDIm_nod2D),tvol
 real*8      :: tt_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D)
-real*8      :: tt_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D)
 ttrhs=0d0
 DO n=1,myDim_nod2D+eDim_nod2D
      DO nz=2,nlevels_nod2D(n)-1
@@ -252,16 +140,6 @@ DO edge=1, myDim_edge2D
   Tx=0d0
   Ty=0d0
 
-  if (Redi_GM) then
-    d=sum(Kd(1,nz,elnodes))/3.0_WP
-    temp=(Kd(2,nz,elnodes)-Kd(3,nz,elnodes))*neutral_slope(1,nz,elnodes)
-    c1=sum(temp*(tsv(nz,elnodes)+tsv(nz+1,elnodes)))/6.0_WP
-    Tx=d*tt_xy(1,nz,el(1))+c1
-    temp=(Kd(2,nz,elnodes)-Kd(3,nz,elnodes))*neutral_slope(2,nz,elnodes)
-    c1=sum(temp*(tsv(nz,elnodes)+tsv(nz+1,elnodes)))/6.0_WP
-    Ty=d*tt_xy(2,nz,el(1))+c1
-  endif !NO Redi_GM
-
   if ((el(2)>0).and.(nz<=nl2)) then
     Tx=Tx+0.5*Kh*(tt_xy(1,nz,el(1))+tt_xy(1,nz,el(2)))
     Ty=Ty+0.5*Kh*(tt_xy(2,nz,el(1))+tt_xy(2,nz,el(2)))
@@ -280,16 +158,6 @@ DO edge=1, myDim_edge2D
   do nz=1,nl2
   Tx=0d0
   Ty=0d0
-  if (Redi_GM) then
-   elnodes=elem2D_nodes(:,el(2))
-   d=sum(Kd(1,nz,elnodes))/3.0_WP                                                                     
-   temp=(Kd(2,nz,elnodes)-Kd(3,nz,elnodes))*neutral_slope(1,nz,elnodes)                               
-   c1=sum(temp*(tsv(nz,elnodes)+tsv(nz+1,elnodes)))/6.0_WP
-   Tx=d*tt_xy(1,nz,el(2))+c1
-   temp=(Kd(2,nz,elnodes)-Kd(3,nz,elnodes))*neutral_slope(2,nz,elnodes)                               
-   c1=sum(temp*(tsv(nz,elnodes)+tsv(nz+1,elnodes)))/6.0_WP                                    
-   Ty=d*tt_xy(2,nz,el(2))+c1
-  endif
 
   if (nz<=nl1) then
       Tx=Tx+0.5*Kh*(tt_xy(1,nz,el(1))+tt_xy(1,nz,el(2)))
@@ -313,38 +181,6 @@ DO n=1, myDim_nod2D
 END DO
 end subroutine diff_part_hor
 !========================================================
-subroutine ver_redi_gm(ttf, dttf, tr_num,tt_xynodes)
-! Vertical diffusive flux from redi_GM:                                                                            
-use o_ARRAYS,only: neutral_slope,Kd,Kv
-use o_MESH
-use g_PARSUP
-use g_config,only: dt
-implicit none
-real*8::vd_flux(nl-1)
-real*8 :: Tx
-integer:: nz,nl1,n,tr_num
-real*8 :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
-real*8      :: tt_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D)
-DO n=1, myDim_nod2D
-nl1=nlevels_nod2D(n)-1
-vd_flux=0d0
-
-do nz=2,nl1
-  vd_flux(nz)=  ((Kd(2,nz-1,n)+Kd(3,nz-1,n))*(Z(nz-1)-zbar(nz)) \
-      *( neutral_slope(1,nz-1,n)*tt_xynodes(1,nz-1,n)+neutral_slope(2,nz-1,n)*tt_xynodes(2,nz-1,n) ) \
-      + \
-       (Kd(2,nz,n)+Kd(3,nz,n))*(zbar(nz)-Z(nz)) \
-      *( neutral_slope(1,nz,n)*tt_xynodes(1,nz,n)+neutral_slope(2,nz,n)*tt_xynodes(2,nz,n) )) \
-      / (Z(nz-1)-Z(nz))*area(nz,n)
-enddo
-do nz=1,nl1-1
- dttf(nz,n) = dttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
-enddo
-dttf(nl1,n) = dttf(nl1,n)+vd_flux(nl1)/(zbar(nl1)-zbar(nl1+1))*dt/area(nl1,n)
-
-ENDDO
-end subroutine ver_redi_gm
-!===================================================================================
 subroutine diff_ver_part_expl(ttf, dttf, tr_num)
 ! Vertical diffusive flux(explicit scheme):                                                                            
 use o_ARRAYS
@@ -542,40 +378,14 @@ use g_comm_auto
 use o_tracers
 IMPLICIT NONE
 integer :: tr_num
-!real(kind=8)      :: t6, t2, t3, t4, t5
-!1-Temperature
-!2-Salinity
-!>2-Rest
-do tr_num=1,num_tracers
-!   t2=MPI_Wtime()
-select case (tracer_adv)
-case(1,2) !Miura, Quadratic reconstr.
-   call init_tracers(tr_num)
-case(3,4,5) !MUSCL(+FCT)
-   call init_tracers_AB(tr_num)
-CASE DEFAULT !unknown
-	if (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
-        call par_ex(1)
-END SELECT
 
-!  t3=MPI_Wtime()
+!only MUSCL(+FCT) supported
+
+do tr_num=1,num_tracers
+   call init_tracers_AB(tr_num)
    call adv_tracers(tr_num)
-!  t4=MPI_Wtime()
    call diff_tracers(tr_num)
-!  t5=MPI_Wtime()
    call relax_to_clim(tr_num)
-!  t6=MPI_Wtime()
-!   if (mype==0) then
-!    write(*,*) 'INIT_TRACERS',tr_num, t3-t2
-!    write(*,*) 'DIFF_TRACERS',tr_num, t4-t3
-!    write(*,*) 'ADV_TRACERS',tr_num, t5-t3
-!    write(*,*) 'RELAX_TO_CLIM',tr_num, t6-t5
-!   endif
    call exchange_nod(tr_arr(:,:,tr_num))
 enddo
-
-!where (tr_arr(:, :, 2) < 20.)
-!tr_arr(:, :, 2)=20.
-!end where
-
 end subroutine solve_tracers

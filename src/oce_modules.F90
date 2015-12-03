@@ -38,13 +38,7 @@ real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
-logical                       :: Redi_GM=.false.  !flag for Redi/GM scheme
 logical                       :: Fer_GM =.true.   !flag for Ferrari et al. (2010) GM scheme
-character*5                   :: taper_scheme='fesom' !'odm95','ldd97','fesom'     
-! character*5                 :: taper_scheme='odm95'!,'fesom'     
-real(kind=WP)                 :: K_GM=100.0_WP   ! K_GM diffusivity (skew)
-real(kind=WP)                 :: K_redi=100.0_WP ! REdi diffusivity (simm)
-
 ! Time stepping                               
 #ifdef BTR_SPLIT
 real(kind=WP)                 :: alpha=0.0_WP, theta=0.0_WP ! implicitness for
@@ -94,7 +88,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max
  NAMELIST /oce_tra/ K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
-		    ref_sss_local, ref_sss, Redi_GM, K_GM, K_redi, i_vert_diff, &
+		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
 END MODULE o_PARAM  
 !==========================================================
@@ -484,8 +478,6 @@ real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)
 !Tracer gradients&RHS      
 real(kind=8), allocatable :: ttrhs(:,:)
 real(kind=8), allocatable :: tt_xy_stored(:,:,:,:)
-!real(kind=8), allocatable :: tt_xynodes(:,:,:)
-real(kind=8), allocatable :: tt_xynodes_stored(:,:,:,:)
 ! Auxiliary arrays to store velocity gradients
 real(kind=WP),allocatable,dimension(:,:,:)    ::   vel_grad
 

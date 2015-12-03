@@ -290,7 +290,9 @@ subroutine write_means(istep)
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
 
   ! ocean part
+write(*,*) mype, 'TEST, writing NETCDF MEAN'
   if (mype==0) then ! Serial output implemented so far
+write(*,*) mype, 'TEST, writing NETCDF MEAN, , NP='
      ! open files
      filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
      status = nf_open(filename, nf_write, ncid)
@@ -602,8 +604,9 @@ subroutine output(directionflag,istep)
   if (.not.do_output) return
 
   ! write results
-  if(mype==0) write(*,*)'Do output (netCDF) ...'
+
   if (use_means) then
+     if(mype==0) write(*,*)'Do output (netCDF, mean) ...'
      call write_means(istep)
      call clean_means
   endif
