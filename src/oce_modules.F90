@@ -477,7 +477,7 @@ real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      
 real(kind=8), allocatable :: ttrhs(:,:)
-real(kind=8), allocatable :: tt_xy_stored(:,:,:,:)
+real(kind=8), allocatable :: tt_xy_stored(:,:,:)
 ! Auxiliary arrays to store velocity gradients
 real(kind=WP),allocatable,dimension(:,:,:)    ::   vel_grad
 

@@ -208,25 +208,24 @@ deallocate(e_nodes, coord_elem)
 edge_up_dn_grad=0.0
 end SUBROUTINE find_up_downwind_triangles
 !=======================================================================
-SUBROUTINE fill_up_dn_grad (tt_xy)
+SUBROUTINE fill_up_dn_grad
 
 ! ttx, tty  elemental gradient of tracer 
 USE o_PARAM
 USE o_MESH
-!USE o_ARRAYS
+USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
-real(kind=8)   :: tt_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D) 
 integer        :: n, nz, elem, k, edge, ednodes(2)
 real(kind=8)   :: tvol, tx, ty
-  
+
   DO edge=1,myDim_edge2D
      ednodes=edges(:,edge)
     if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
     
      DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-        edge_up_dn_grad(1:2,nz,edge)=tt_xy(1,nz,edge_up_dn_tri(:,edge))
-	edge_up_dn_grad(3:4,nz,edge)=tt_xy(2,nz,edge_up_dn_tri(:,edge))
+        edge_up_dn_grad(1:2,nz,edge)=tt_xy_stored(1,nz,edge_up_dn_tri(:,edge))
+	edge_up_dn_grad(3:4,nz,edge)=tt_xy_stored(2,nz,edge_up_dn_tri(:,edge))
      END DO
      DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
         tvol=0.0
@@ -236,8 +235,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(1))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy(2,nz,elem)*elem_area(elem)
+           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
+	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
@@ -250,8 +249,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(2))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy(2,nz,elem)*elem_area(elem)
+           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
+	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(2,nz,edge)=tx/tvol
 	edge_up_dn_grad(4,nz,edge)=ty/tvol
@@ -267,8 +266,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(1))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy(2,nz,elem)*elem_area(elem)
+           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
+	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
@@ -281,8 +280,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(2))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy(2,nz,elem)*elem_area(elem)
+           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
+	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(2,nz,edge)=tx/tvol
 	edge_up_dn_grad(4,nz,edge)=ty/tvol

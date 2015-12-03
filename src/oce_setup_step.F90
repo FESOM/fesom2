@@ -136,7 +136,7 @@ allocate(Unode(2,nl,node_size))
 
 !Tracer gradients&RHS  
 allocate(ttrhs(nl-1,node_size))
-allocate(tt_xy_stored(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D,num_tracers))
+allocate(tt_xy_stored(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 allocate(neutral_slope(3, nl-1, node_size))
 allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
 neutral_slope=0.0_WP

@@ -36,24 +36,15 @@ use o_mesh
 use g_comm
 IMPLICIT NONE
 integer :: tr_num,n,nz 
-!Allocate stuff if needed
+
 !Fill work arrays
-! elemental gradients are in ttx, tty
-! nodal gradients are in ttxnodes, ttynodes.
-!TS grads are stored separately from the rest of tracers
-!they are loaded in work arrays ttx,tty,ttxnodes,ttynodes,tsv
-
 del_ttf=0d0
-
-! =================
-! AB interpolation
-! =================
+!AB interpolation
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-call tracer_gradient_elements(tr_arr_old(:,:,tr_num),  tt_xy_stored(:,:,:,tr_num))
-
-call exchange_elem3D_full(tt_xy_stored(1,:,:,tr_num))
-call exchange_elem3D_full(tt_xy_stored(2,:,:,tr_num))
-call fill_up_dn_grad(tt_xy_stored(:,:,:,tr_num))
+call tracer_gradient_elements(tr_arr_old(:,:,tr_num),  tt_xy_stored(:,:,:))
+call exchange_elem3D_full(tt_xy_stored(1,:,:))
+call exchange_elem3D_full(tt_xy_stored(2,:,:))
+call fill_up_dn_grad
 end subroutine init_tracers_AB
 !==============================================================================
 SUBROUTINE adv_tracers(tr_num)
@@ -82,23 +73,21 @@ IMPLICIT NONE
 integer, intent(in) :: tr_num
 integer             :: n, nl1
 
-call diff_part_hor(tr_arr(:,:,tr_num),del_ttf,tr_num,tt_xy_stored(:,:,:,tr_num))
-if (not(i_vert_diff)) call diff_ver_part_expl(tr_arr(:,:,tr_num),del_ttf,tr_num)
 
-tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num)
-
+tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num) !DS, shall it be moved to somewhere else?
+call diff_part_hor
+if (not(i_vert_diff)) call diff_ver_part_expl(tr_num)
 !Update tracer berofe implicit operator is applied
-DO n=1, myDim_nod2D !! m=1, myDim_nod2D
+DO n=1, myDim_nod2D
       nl1=nlevels_nod2D(n)-1
       tr_arr(1:nl1,n,tr_num)=tr_arr(1:nl1,n,tr_num)+del_ttf(1:nl1,n)
 END DO
 !We do not set del_ttf to zero because it will not be used in this timestep anymore
 !init_tracers will set it to zero for the next timestep
-
-if (i_vert_diff)      call diff_ver_part_impl(tr_arr(:,:,tr_num), tr_num)
+if (i_vert_diff)      call diff_ver_part_impl(tr_num)
 end subroutine diff_tracers
 !===========================================================================
-subroutine diff_part_hor(ttf, dttf, tr_num,tt_xy)
+subroutine diff_part_hor
 use o_ARRAYS
 use g_PARSUP
 use o_MESH
@@ -106,22 +95,11 @@ USE o_param
 use g_config
 implicit none
 real*8::deltaX1,deltaY1,deltaX2,deltaY2
-integer::edge,tr_num
+integer::edge
 integer::nl1,nz,el(2),elnodes(3),n,nl2,enodes(2)
 real*8::temp(3),d,c1,Tx,Ty,Kh
-real*8 :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
-real*8 :: tsv(nl,myDim_nod2D+eDIm_nod2D),tvol
-real*8      :: tt_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D)
 ttrhs=0d0
-DO n=1,myDim_nod2D+eDim_nod2D
-     DO nz=2,nlevels_nod2D(n)-1
-        tvol=Z(nz-1)-Z(nz)
-        tsv(nz,n)=(ttf(nz-1,n)-ttf(nz,n))/tvol
-     END DO
-        tsv(1,n)=0.0_WP
-	nz=nlevels_nod2D(n)
-	tsv(nz,n)=0.0_WP
-END DO
+
 DO edge=1, myDim_edge2D
  deltaX1=edge_cross_dxdy(1,edge)
  deltaY1=edge_cross_dxdy(2,edge)
@@ -141,11 +119,11 @@ DO edge=1, myDim_edge2D
   Ty=0d0
 
   if ((el(2)>0).and.(nz<=nl2)) then
-    Tx=Tx+0.5*Kh*(tt_xy(1,nz,el(1))+tt_xy(1,nz,el(2)))
-    Ty=Ty+0.5*Kh*(tt_xy(2,nz,el(1))+tt_xy(2,nz,el(2)))
+    Tx=Tx+0.5*Kh*(tt_xy_stored(1,nz,el(1))+tt_xy_stored(1,nz,el(2)))
+    Ty=Ty+0.5*Kh*(tt_xy_stored(2,nz,el(1))+tt_xy_stored(2,nz,el(2)))
   else
-    Tx=Tx+Kh*tt_xy(1,nz,el(1))
-    Ty=Ty+Kh*tt_xy(2,nz,el(1))
+    Tx=Tx+Kh*tt_xy_stored(1,nz,el(1))
+    Ty=Ty+Kh*tt_xy_stored(2,nz,el(1))
   end if
   
   ttrhs(nz,enodes(1)) = ttrhs(nz,enodes(1)) - Ty*deltaX1 + Tx*deltaY1
@@ -160,11 +138,11 @@ DO edge=1, myDim_edge2D
   Ty=0d0
 
   if (nz<=nl1) then
-      Tx=Tx+0.5*Kh*(tt_xy(1,nz,el(1))+tt_xy(1,nz,el(2)))
-      Ty=Ty+0.5*Kh*(tt_xy(2,nz,el(1))+tt_xy(2,nz,el(2)))
+      Tx=Tx+0.5*Kh*(tt_xy_stored(1,nz,el(1))+tt_xy_stored(1,nz,el(2)))
+      Ty=Ty+0.5*Kh*(tt_xy_stored(2,nz,el(1))+tt_xy_stored(2,nz,el(2)))
   else
-      Tx=Tx+Kh*tt_xy(1,nz,el(2))
-      Ty=Ty+Kh*tt_xy(2,nz,el(2))
+      Tx=Tx+Kh*tt_xy_stored(1,nz,el(2))
+      Ty=Ty+Kh*tt_xy_stored(2,nz,el(2))
   end if
 
    ttrhs(nz,enodes(1)) = ttrhs(nz,enodes(1)) + Ty*deltaX2 - Tx*deltaY2
@@ -176,12 +154,12 @@ ENDDO
 
 DO n=1, myDim_nod2D
      DO nz=1,nlevels_nod2D(n)-1
-        dttf(nz,n)=dttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
+        del_ttf(nz,n)=del_ttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
      END DO
 END DO
 end subroutine diff_part_hor
 !========================================================
-subroutine diff_ver_part_expl(ttf, dttf, tr_num)
+subroutine diff_ver_part_expl(tr_num)
 ! Vertical diffusive flux(explicit scheme):                                                                            
 use o_ARRAYS
 use o_MESH
@@ -191,7 +169,6 @@ implicit none
 real*8::vd_flux(nl-1)
 real*8 :: rdata,flux,rlx
 integer:: nz,nl1,tr_num,n
-real*8 :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
 real*8 :: zinv1,Ty
 DO n=1, myDim_nod2D
 nl1=nlevels_nod2D(n)-1
@@ -213,7 +190,7 @@ endif
 !Surface forcing
 
 vd_flux(1)= flux + &
-                    rlx*(rdata-ttf(1,n))
+                    rlx*(rdata-tr_arr(1,n,tr_num))
 
 do nz=2,nl1
  zinv1=1.0_WP/(Z(nz-1)-Z(nz))
@@ -221,24 +198,23 @@ do nz=2,nl1
  Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + \
               Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
 
- vd_flux(nz) = (Kv(nz,n)+Ty)*(ttf(nz-1,n)-ttf(nz,n))*zinv1*area(nz,n)
+ vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
 enddo
 do nz=1,nl1-1
- dttf(nz,n) =dttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
+ del_ttf(nz,n) =del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
 enddo
-dttf(nl1,n) = dttf(nl1,n) + (vd_flux(nl1)/(zbar(nl1)-zbar(nl1+1)))*dt/area(nl1,n)
+ del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar(nl1)-zbar(nl1+1)))*dt/area(nl1,n)
 ENDDO
 
 end subroutine diff_ver_part_expl
 !===========================================================================
-subroutine diff_ver_part_impl(ttf, tr_num)
+subroutine diff_ver_part_impl(tr_num)
 USE o_MESH
 USE o_PARAM
 USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-real*8, intent(inout) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
 integer, intent(in)   :: tr_num
 real*8                :: a(nl), b(nl), c(nl), tr(nl)
 real*8                ::  cp(nl), tp(nl)
@@ -246,8 +222,7 @@ integer               ::  nz, n, nzmax
 real*8                ::  m, zinv, dt_inv
 real*8                ::  rsss, Ty,Ty1,c1,zinv1,zinv2, v_adv
    dt_inv=1.0_WP/dt
-   DO n=1,myDim_nod2D      !! m=1,myDim_nod2D 
-                           !! n=myList_nod2D(m)
+   DO n=1,myDim_nod2D
           nzmax=nlevels_nod2D(n)
           ! The first row
           nz=1
@@ -304,12 +279,12 @@ real*8                ::  rsss, Ty,Ty1,c1,zinv1,zinv2, v_adv
           ! ===========================================
           ! The rhs:
           DO nz=2,nzmax-2
-                tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-1.0_WP)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
+                tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-1.0_WP)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
           END DO
           nz=nzmax-1
-          tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-1.0_WP)*ttf(nz,n)
+          tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-1.0_WP)*tr_arr(nz,n,tr_num)
           !  The first row contains also surface forcing
-          tr(1)=-(b(1)-1.0_WP)*ttf(1,n)-c(1)*ttf(2,n)
+          tr(1)=-(b(1)-1.0_WP)*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 
           zinv=1.0_WP*dt/(zbar(1)-zbar(2))
           if (tr_num==1) then
@@ -340,7 +315,7 @@ real*8                ::  rsss, Ty,Ty1,c1,zinv1,zinv2, v_adv
           end do
         
           DO nz=1,nzmax-1
-            ttf(nz,n)=ttf(nz,n)+tr(nz)
+            tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
           END DO
         
    END DO   !!! cycle over nodes
@@ -356,8 +331,7 @@ implicit none
 integer :: tr_num,n,nz
 
 if((clim_relax>1.0e-8).and.(tr_num==1)) then
-  DO n=1, myDim_nod2D !! m=1, myDim_nod2D
-                      !! n=myList_nod2D(m)
+  DO n=1, myDim_nod2D
 tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
   END DO
 end if
