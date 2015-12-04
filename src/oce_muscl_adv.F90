@@ -20,13 +20,13 @@ USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
-  use g_comm_auto
+use g_comm_auto
 use g_config
 IMPLICIT NONE
 integer     :: n, k, n1, n2, n_num
 
- call find_up_downwind_triangles
- n_num=0
+call find_up_downwind_triangles
+n_num=0
   DO n=1, myDim_nod2D
   k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
   if(k>n_num) n_num=k
@@ -194,8 +194,7 @@ END DO
 END DO
 ! For edges touching the boundary --- up or downwind elements may be absent.  
 ! We return to the standard Miura at nodes that
-! belong to such edges. Same at the depth. 
-
+! belong to such edges. Same at the depth.
 ! Count the number of 'good' edges:
 k=0 
 DO n=1,myDim_edge2D
@@ -224,8 +223,8 @@ real(kind=8)   :: tvol, tx, ty
     if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
     
      DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-        edge_up_dn_grad(1:2,nz,edge)=tt_xy_stored(1,nz,edge_up_dn_tri(:,edge))
-	edge_up_dn_grad(3:4,nz,edge)=tt_xy_stored(2,nz,edge_up_dn_tri(:,edge))
+        edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
+	edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
      END DO
      DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
         tvol=0.0
@@ -235,8 +234,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(1))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
+           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
@@ -249,8 +248,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(2))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
+           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(2,nz,edge)=tx/tvol
 	edge_up_dn_grad(4,nz,edge)=ty/tvol
@@ -266,8 +265,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(1))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
+           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
@@ -280,8 +279,8 @@ real(kind=8)   :: tvol, tx, ty
            elem=nod_in_elem2D(k,ednodes(2))
            if(nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
-           tx=tx+tt_xy_stored(1,nz,elem)*elem_area(elem)
-	   ty=ty+tt_xy_stored(2,nz,elem)*elem_area(elem)
+           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
         END DO
 	edge_up_dn_grad(2,nz,edge)=tx/tvol
 	edge_up_dn_grad(4,nz,edge)=ty/tvol

@@ -290,9 +290,7 @@ subroutine write_means(istep)
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
 
   ! ocean part
-write(*,*) mype, 'TEST, writing NETCDF MEAN'
   if (mype==0) then ! Serial output implemented so far
-write(*,*) mype, 'TEST, writing NETCDF MEAN, , NP='
      ! open files
      filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
      status = nf_open(filename, nf_write, ncid)
@@ -415,7 +413,7 @@ write(*,*) mype, 'TEST, writing NETCDF MEAN, , NP='
   do j=1,num_tracers
      call broadcast_nod(tr_arr_mean(:,:,j),aux3)
      if(mype==0) then                        
-        status=nf_put_vara_double(ncid, tra_varid(j), start3, count3, real(aux3, 4))
+        status=nf_put_vara_real(ncid, tra_varid(j), start3, count3, real(aux3, 4))
         if (status .ne. nf_noerr) call handle_err(status)
      end if 
   end do
