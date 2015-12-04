@@ -147,9 +147,9 @@ real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
   type sparse_matrix 
      integer :: nza
      integer :: dim
-     real(kind=8), pointer, dimension(:)      :: values
-     integer(KIND=4), pointer,   dimension(:) :: colind
-     integer(KIND=4), pointer,   dimension(:) :: rowptr
+     real(kind=8), allocatable, dimension(:)      :: values
+     integer(KIND=4), allocatable,   dimension(:) :: colind
+     integer(KIND=4), allocatable,   dimension(:) :: rowptr
   end type sparse_matrix
 ! Elevation stiffness matrix
 type(sparse_matrix)                           :: ssh_stiff
@@ -162,12 +162,12 @@ integer                                       :: ob_num  ! number of OB fragment
 
 TYPE ob_type
     integer      :: len
-    integer, pointer, dimension(:)       :: list
+    integer, allocatable, dimension(:)       :: list
 END TYPE ob_type
 
 TYPE ob_rhs_type
     integer      :: len
-    real(kind=WP), pointer, dimension(:) :: list
+    real(kind=WP), allocatable, dimension(:) :: list
 END TYPE ob_rhs_type
 
 type(ob_type), allocatable                    ::  ob_info(:)
@@ -205,16 +205,16 @@ save
 
   type com_struct
      integer    :: rPEnum                    ! the number of PE I receive info from 
-     integer, dimension(:), pointer :: rPE   ! their list
-     integer, dimension(:), pointer :: rptr  ! pointers to the list of nodes
-     integer, dimension(:), pointer :: rlist ! the list of nodes
+     integer, dimension(:), allocatable :: rPE   ! their list
+     integer, dimension(:), allocatable :: rptr  ! allocatables to the list of nodes
+     integer, dimension(:), allocatable :: rlist ! the list of nodes
      integer    :: sPEnum                    ! send part 
-     integer, dimension(:), pointer :: sPE
-     integer, dimension(:), pointer :: sptr
-     integer, dimension(:), pointer :: slist
+     integer, dimension(:), allocatable :: sPE
+     integer, dimension(:), allocatable :: sptr
+     integer, dimension(:), allocatable :: slist
   end type com_struct
   type com_array_i
-     integer, dimension(:), pointer :: array
+     integer, dimension(:), allocatable :: array
   end  type com_array_i
 
   type(com_struct)   :: com_nod2D
@@ -223,18 +223,18 @@ save
   type(com_struct)   :: com_elem2D_full
   ! Buffer arrays to store information to be communicated
   type com_array
-     real(kind=WP), dimension(:), pointer :: array
+     real(kind=WP), dimension(:), allocatable :: array
   end  type com_array
-  type(com_array), pointer             :: s_buff_nod2D(:),  r_buff_nod2D(:)
-  type(com_array), pointer             :: s_buff_nod3D(:),  r_buff_nod3D(:)
-  type(com_array), pointer             :: s_buff_elem2D(:), r_buff_elem2D(:)
-  type(com_array), pointer             :: s_buff_elem3D(:), r_buff_elem3D(:)
-  type(com_array), pointer             :: s_buff_elem3D_full(:),s_buff_elem2D_full(:)
-  type(com_array), pointer             :: r_buff_elem3D_full(:),r_buff_elem2D_full(:)
-  type(com_array), pointer             :: s_buff_edge2D(:), r_buff_edge2D(:)
-  type(com_array), pointer             :: s_buff_edge3D(:), r_buff_edge3D(:)
-  type(com_array_i), pointer :: s_buff_elem2D_full_i(:), r_buff_elem2D_full_i(:) 
-  type(com_array_i), pointer :: s_buff_nod2D_i(:),  r_buff_nod2D_i(:)
+  type(com_array), allocatable             :: s_buff_nod2D(:),  r_buff_nod2D(:)
+  type(com_array), allocatable             :: s_buff_nod3D(:),  r_buff_nod3D(:)
+  type(com_array), allocatable             :: s_buff_elem2D(:), r_buff_elem2D(:)
+  type(com_array), allocatable             :: s_buff_elem3D(:), r_buff_elem3D(:)
+  type(com_array), allocatable             :: s_buff_elem3D_full(:),s_buff_elem2D_full(:)
+  type(com_array), allocatable             :: r_buff_elem3D_full(:),r_buff_elem2D_full(:)
+  type(com_array), allocatable             :: s_buff_edge2D(:), r_buff_edge2D(:)
+  type(com_array), allocatable             :: s_buff_edge3D(:), r_buff_edge3D(:)
+  type(com_array_i), allocatable :: s_buff_elem2D_full_i(:), r_buff_elem2D_full_i(:) 
+  type(com_array_i), allocatable :: s_buff_nod2D_i(:),  r_buff_nod2D_i(:)
   ! general MPI part
   integer            :: MPIERR
   integer            :: npes
