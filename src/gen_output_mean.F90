@@ -287,7 +287,7 @@ subroutine write_means(istep)
   real(kind=8)              :: sec_in_year
   character(100)            :: filename
   character(100)            :: trname
-  real(kind=8), allocatable :: aux2(:), aux3(:,:) 
+  real(kind=4), allocatable :: aux2(:), aux3(:,:) 
 
   ! ocean part
   if (mype==0) then ! Serial output implemented so far
@@ -347,41 +347,41 @@ subroutine write_means(istep)
   end if ! mype==0
   allocate(aux2(nod2D), aux3(nl-1, elem2D)) ! auxuary arrays for broadcasting the SSH and horizontal velocities
   ! 2d fields
-  call broadcast_nod(eta_n_mean, aux2)
+  call gather_real4_nod(eta_n_mean, aux2)
   if(mype==0) then            
      start=(/1,save_count_mean/)
      count=(/nod2d, 1/)
-     status=nf_put_vara_real(ncid, ssh_varid, start, count, real(aux2, 4)) 
+     status=nf_put_vara_real(ncid, ssh_varid, start, count, aux2) 
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
   ! 3d fields
-  call broadcast_elem(UV_mean(1,:,:), aux3)
+  call gather_real4_elem(UV_mean(1,:,:), aux3)
   if (mype==0) then                  
      start3=(/1, 1, save_count_mean/)
      count3=(/nl-1, elem2D, 1/)
-     status=nf_put_vara_real(ncid, u_varid, start3, count3, real(aux3, 4)) 
+     status=nf_put_vara_real(ncid, u_varid, start3, count3, aux3) 
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  call broadcast_elem(UV_mean(2,:,:),aux3)  
+  call gather_real4_elem(UV_mean(2,:,:),aux3)  
   if(mype==0) then                      
-     status=nf_put_vara_real(ncid, v_varid, start3, count3, real(aux3, 4))
+     status=nf_put_vara_real(ncid, v_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
   if (Fer_GM) then
-     call broadcast_elem(fer_UV_mean(1,:,:), aux3)
+     call gather_real4_elem(fer_UV_mean(1,:,:), aux3)
      if (mype==0) then                  
         start3=(/1, 1, save_count_mean/)
         count3=(/nl-1, elem2D, 1/)
-        status=nf_put_vara_real(ncid, gmu_varid, start3, count3, real(aux3, 4)) 
+        status=nf_put_vara_real(ncid, gmu_varid, start3, count3, aux3) 
         if (status .ne. nf_noerr) call handle_err(status)
      end if
 
-     call broadcast_elem(fer_UV_mean(2,:,:),aux3)  
+     call gather_real4_elem(fer_UV_mean(2,:,:),aux3)  
      if(mype==0) then                      
-        status=nf_put_vara_real(ncid, gmv_varid, start3, count3, real(aux3, 4))
+        status=nf_put_vara_real(ncid, gmv_varid, start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
      end if     
    end if
@@ -389,39 +389,41 @@ subroutine write_means(istep)
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
 
-  call broadcast_nod(Wvel_mean,aux3)
+  call gather_real4_nod(Wvel_mean,aux3)
   if(mype==0) then                        
      count3=(/nl, nod2D, 1/)
-     status=nf_put_vara_real(ncid, w_varid, start3, count3, real(aux3, 4))
+     status=nf_put_vara_real(ncid, w_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
   if (Fer_GM) then
-     call broadcast_nod(fer_Wvel_mean,aux3)
+     call gather_real4_nod(fer_Wvel_mean,aux3)
      if (mype==0) then                        
         count3=(/nl, nod2D, 1/)
-        status=nf_put_vara_real(ncid, gmw_varid, start3, count3, real(aux3, 4))
+        status=nf_put_vara_real(ncid, gmw_varid, start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
      end if     
   end if
-  
+
   deallocate(aux3) !reallocate for scalar variables
   allocate(aux3(nl-1,nod2D))
 
   !T,S and passive tracers
   count3=(/nl-1, nod2D, 1/)
   do j=1,num_tracers
-     call broadcast_nod(tr_arr_mean(:,:,j),aux3)
+     call gather_real4_nod(tr_arr_mean(:,:,j),aux3)
      if(mype==0) then                        
-        status=nf_put_vara_real(ncid, tra_varid(j), start3, count3, real(aux3, 4))
+        status=nf_put_vara_real(ncid, tra_varid(j), start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
      end if 
   end do
+
 
   if(mype==0) then
      status=nf_close(ncid)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
+  
   deallocate(aux3)
   ! ice part
   if (use_ice) then
@@ -458,29 +460,29 @@ subroutine write_means(istep)
         count=(/nod2d, 1/)
      end if ! mype==0
 
-     call broadcast_nod(a_ice_mean,aux2)                
+     call gather_real4_nod(a_ice_mean,aux2)                
      if (mype==0) then                           
-        status=nf_put_vara_real(ncid, area_varid, start, count, real(aux2, 4))
+        status=nf_put_vara_real(ncid, area_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(m_ice_mean,aux2)              
+     call gather_real4_nod(m_ice_mean,aux2)              
      if (mype==0) then                          
-        status=nf_put_vara_real(ncid, hice_varid, start, count, real(aux2, 4))   
+        status=nf_put_vara_real(ncid, hice_varid, start, count, aux2)   
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(m_snow_mean,aux2)              
+     call gather_real4_nod(m_snow_mean,aux2)              
      if (mype==0) then                            
-        status=nf_put_vara_real(ncid, hsnow_varid, start, count, real(aux2, 4))  
+        status=nf_put_vara_real(ncid, hsnow_varid, start, count, aux2)  
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(u_ice_mean,aux2)              
+     call gather_real4_nod(u_ice_mean,aux2)              
      if (mype==0) then
-        status=nf_put_vara_real(ncid, uice_varid, start, count, real(aux2, 4))
+        status=nf_put_vara_real(ncid, uice_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(v_ice_mean,aux2)              
+     call gather_real4_nod(v_ice_mean,aux2)              
      if (mype==0) then                          
-        status=nf_put_vara_real(ncid, vice_varid, start, count, real(aux2, 4))
+        status=nf_put_vara_real(ncid, vice_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
      if(mype==0) then

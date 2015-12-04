@@ -362,7 +362,7 @@ subroutine write_restarts(istep)
   end if ! mype==0
   allocate(aux2(nod2D), aux3(nl-1, elem2D)) ! auxuary arrays for broadcasting the SSH and horizontal velocities
   ! 2d fields
-  call broadcast_nod(eta_n, aux2)
+  call gather_nod(eta_n, aux2)
   if(mype==0) then            
      start=(/1,save_count_restart/)
      count=(/nod2d, 1/)
@@ -371,7 +371,7 @@ subroutine write_restarts(istep)
   end if
 
   ! 3d fields U, V
-  call broadcast_elem(UV(1,:,:), aux3)
+  call gather_elem(UV(1,:,:), aux3)
   if (mype==0) then                  
      start3=(/1, 1, save_count_restart/)
      count3=(/nl-1, elem2D, 1/)
@@ -379,20 +379,20 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  call broadcast_elem(UV(2,:,:),aux3)  
+  call gather_elem(UV(2,:,:),aux3)  
   if(mype==0) then                      
      status=nf_put_vara_double(ncid, v_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
   ! 3d fields UV_rhs_AB
-  call broadcast_elem(UV_rhsAB(1,:,:), aux3)
+  call gather_elem(UV_rhsAB(1,:,:), aux3)
   if (mype==0) then                  
      status=nf_put_vara_double(ncid, urhs_varid_AB, start3, count3, aux3) 
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  call broadcast_elem(UV_rhsAB(2,:,:), aux3)  
+  call gather_elem(UV_rhsAB(2,:,:), aux3)  
   if(mype==0) then                      
      status=nf_put_vara_double(ncid, vrhs_varid_AB, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
@@ -402,21 +402,21 @@ subroutine write_restarts(istep)
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
 
-  call broadcast_nod(Wvel,aux3)
+  call gather_nod(Wvel,aux3)
   if(mype==0) then                        
      count3=(/nl, nod2D, 1/)
      status=nf_put_vara_double(ncid, w_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
   
-  call broadcast_nod(Wvel_e,aux3)
+  call gather_nod(Wvel_e,aux3)
   if(mype==0) then                        
      count3=(/nl, nod2D, 1/)
      status=nf_put_vara_double(ncid, we_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  call broadcast_nod(Wvel_i,aux3)
+  call gather_nod(Wvel_i,aux3)
   if(mype==0) then                        
      count3=(/nl, nod2D, 1/)
      status=nf_put_vara_double(ncid, wi_varid, start3, count3, aux3)
@@ -429,13 +429,13 @@ subroutine write_restarts(istep)
   !T,S and passive tracers
   count3=(/nl-1, nod2D, 1/)
   do j=1,num_tracers
-     call broadcast_nod(tr_arr(:,:,j),aux3)
+     call gather_nod(tr_arr(:,:,j),aux3)
      if(mype==0) then                        
         status=nf_put_vara_double(ncid, tra_varid(j), start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
      ! Adams–Bashforth part
-     call broadcast_nod(tr_arr_old(:,:,j),aux3)
+     call gather_nod(tr_arr_old(:,:,j),aux3)
      if(mype==0) then                        
         status=nf_put_vara_double(ncid, tra_varid_ab(j), start3, count3, aux3)
         if (status .ne. nf_noerr) call handle_err(status)
@@ -482,27 +482,27 @@ subroutine write_restarts(istep)
         count=(/nod2d, 1/)
      end if ! mype==0
 
-     call broadcast_nod(a_ice,aux2)                
+     call gather_nod(a_ice,aux2)                
      if (mype==0) then                           
         status=nf_put_vara_double(ncid, area_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(m_ice,aux2)
+     call gather_nod(m_ice,aux2)
      if (mype==0) then                          
         status=nf_put_vara_double(ncid, hice_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(m_snow,aux2)
+     call gather_nod(m_snow,aux2)
      if (mype==0) then                            
         status=nf_put_vara_double(ncid, hsnow_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(u_ice,aux2)
+     call gather_nod(u_ice,aux2)
      if (mype==0) then
         status=nf_put_vara_double(ncid, uice_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)
      end if
-     call broadcast_nod(v_ice,aux2)
+     call gather_nod(v_ice,aux2)
      if (mype==0) then                          
         status=nf_put_vara_double(ncid, vice_varid, start, count, aux2)
         if (status .ne. nf_noerr) call handle_err(status)

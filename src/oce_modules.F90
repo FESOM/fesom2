@@ -252,6 +252,9 @@ save
 
   integer :: pe_status = 0 ! if /=0 then something is wrong 
 
+   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
+   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
+
 contains
 subroutine par_init    ! initializes MPI
 
@@ -441,9 +444,72 @@ subroutine set_par_support
      end do
      
    end if
+
+   call init_gatherLists
+
   if(mype==0) write(*,*) 'Communication arrays are set' 
-    
+
 end subroutine set_par_support
+
+
+!===================================================================
+subroutine init_gatherLists
+
+  use o_MESH
+  implicit none
+  
+  integer :: n2D, e2D, sum_loc_elem2D
+  integer :: n, estart, nstart
+
+  if (mype==0) then
+
+     if (npes > 1) then
+
+        allocate(remPtr_nod2D(npes))
+        allocate(remPtr_elem2D(npes))
+
+        remPtr_nod2D(1) = 1
+        remPtr_elem2D(1) = 1
+        
+        do n=1, npes-1
+           call MPI_RECV(n2D, 1, MPI_INTEGER, n, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, MPIerr )
+           call MPI_RECV(e2D, 1, MPI_INTEGER, n, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, MPIerr )
+
+           remPtr_nod2D(n+1)  = remPtr_nod2D(n)  + n2D
+           remPtr_elem2D(n+1) = remPtr_elem2D(n) + e2D 
+        enddo
+
+
+
+        allocate(remList_nod2D(remPtr_nod2D(npes)))   ! this should be nod2D - myDim_nod2D
+        allocate(remList_elem2D(remPtr_elem2D(npes))) ! this is > elem2D, because the elements overlap.
+                                                      ! Consider optimization: avoid multiple communication
+                                                      ! of the same elem from different PEs.
+
+        do n=1, npes-1
+           nstart = remPtr_nod2D(n)
+           n2D    = remPtr_nod2D(n+1) - remPtr_nod2D(n) 
+           call MPI_RECV(remList_nod2D(nstart), n2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, &
+                                                           MPI_STATUS_IGNORE, MPIerr ) 
+           estart = remPtr_elem2D(n)
+           e2D    = remPtr_elem2D(n+1) - remPtr_elem2D(n)
+           call MPI_RECV(remList_elem2D(estart),e2D, MPI_INTEGER, n, 3, MPI_COMM_WORLD, &
+                                                           MPI_STATUS_IGNORE, MPIerr ) 
+
+        enddo
+     end if
+  else
+
+     call MPI_SEND(myDim_nod2D,   1,            MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+     call MPI_SEND(myDim_elem2D,  1,            MPI_INTEGER, 0, 1, MPI_COMM_WORLD, MPIerr )
+     call MPI_SEND(myList_nod2D,  myDim_nod2D,  MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
+     call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_WORLD, MPIerr )
+
+  endif
+
+end subroutine init_gatherLists
+
+
 end module g_PARSUP
 
 !==========================================================
