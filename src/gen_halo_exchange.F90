@@ -1657,25 +1657,19 @@ end interface broadcast_elem
 interface gather_nod
       module procedure gather_nod3D
       module procedure gather_nod2D
+      module procedure gather_real4_nod3D
+      module procedure gather_real4_nod2D
 end interface gather_nod
 
 interface gather_elem
       module procedure gather_elem3D
       module procedure gather_elem2D
-end interface gather_elem
-
-interface gather_real4_nod
-      module procedure gather_real4_nod3D
-      module procedure gather_real4_nod2D
-end interface gather_real4_nod
-
-interface gather_real4_elem
       module procedure gather_real4_elem3D
       module procedure gather_real4_elem2D
-end interface gather_real4_elem
+end interface gather_elem
 
 
 private  ! hides items not listed on public statement 
 public :: exchange_nod,exchange_edge,exchange_elem,broadcast_nod,broadcast_elem, &
-          gather_nod, gather_elem, gather_real4_nod, gather_real4_elem
+          gather_nod, gather_elem
 end module g_comm_auto
