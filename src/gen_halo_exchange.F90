@@ -1180,12 +1180,12 @@ IF ( mype == 0 ) THEN
          call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
       enddo
       
-      arr3D_global(1:nl,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl,1:myDim_nod2D)
+      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
    
       call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
    
-      arr3D_global(1:nl, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                     = recvbuf(1:nl, 1 : remPtr_nod2D(npes)-1)
+      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
 
       deallocate(recvbuf)
 
