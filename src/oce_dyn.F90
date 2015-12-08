@@ -420,8 +420,9 @@ real(kind=WP)      :: tx, ty, tvol
         Unode(2,nz,n)=ty/tvol
     END DO
  END DO
-   call exchange_nod(Unode(1,:,:))
-   call exchange_nod(Unode(2,:,:))
+   call exchange_nod(Unode)
+!   call exchange_nod(Unode(1,:,:))
+!   call exchange_nod(Unode(2,:,:))
 end subroutine compute_vel_nodes
 !===========================================================================
 subroutine impl_vert_visc

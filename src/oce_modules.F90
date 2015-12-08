@@ -225,8 +225,7 @@ save
   type com_array
      real(kind=WP), dimension(:), allocatable :: array
   end  type com_array
-  type(com_array), allocatable             :: s_buff_nod2D(:),  r_buff_nod2D(:)
-  type(com_array), allocatable             :: s_buff_nod3D(:),  r_buff_nod3D(:)
+
   type(com_array), allocatable             :: s_buff_elem2D(:), r_buff_elem2D(:)
   type(com_array), allocatable             :: s_buff_elem3D(:), r_buff_elem3D(:)
   type(com_array), allocatable             :: s_buff_elem3D_full(:),s_buff_elem2D_full(:)
@@ -234,7 +233,14 @@ save
   type(com_array), allocatable             :: s_buff_edge2D(:), r_buff_edge2D(:)
   type(com_array), allocatable             :: s_buff_edge3D(:), r_buff_edge3D(:)
   type(com_array_i), allocatable :: s_buff_elem2D_full_i(:), r_buff_elem2D_full_i(:) 
-  type(com_array_i), allocatable :: s_buff_nod2D_i(:),  r_buff_nod2D_i(:)
+
+  ! MPI Datatypes for interface exchange
+
+  ! Nodal fields (2D; 2D integer; 3D with nl-1 or nl levels, one, two, or three values)
+  integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:) 
+  integer, allocatable       :: s_mpitype_nod2D_i(:),   r_mpitype_nod2D_i(:)
+  integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:) 
+
   ! general MPI part
   integer            :: MPIERR
   integer            :: npes
@@ -325,6 +331,9 @@ subroutine set_par_support
   implicit none
 
   integer   n, offset
+  integer :: i, max_nb, nb, nini, nend, nl1, n_val
+  integer, allocatable :: blocklen(:),     displace(:)
+
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
@@ -334,41 +343,7 @@ subroutine set_par_support
   ! Allocate communication buffers: 
   !=============
   if (npes>1) then
-      !=========
-      ! Send and receive buffers for nodal arrays 
-      !=========
-      ! 2D
-     allocate(s_buff_nod2D(com_nod2D%sPEnum),r_buff_nod2D(com_nod2D%rPEnum))
-     do n=1, com_nod2D%sPEnum
-        offset=com_nod2D%sptr(n+1) - com_nod2D%sptr(n)
-        allocate(s_buff_nod2D(n)%array(offset))
-     end do
-     do n=1, com_nod2D%rPEnum
-        offset=com_nod2D%rptr(n+1) - com_nod2D%rptr(n)
-        allocate(r_buff_nod2D(n)%array(offset))
-     end do
-      allocate(s_buff_nod2D_i(com_nod2D%sPEnum),r_buff_nod2D_i(com_nod2D%rPEnum))                     
-      do n=1, com_nod2D%sPEnum                                                                        
-        offset=com_nod2D%sptr(n+1) - com_nod2D%sptr(n)                                                
-        allocate(s_buff_nod2D_i(n)%array(offset))                                                     
-      end do                                                                                          
-      do n=1, com_nod2D%rPEnum                                                                        
-        offset=com_nod2D%rptr(n+1) - com_nod2D%rptr(n)                                                
-        allocate(r_buff_nod2D_i(n)%array(offset))                                                     
-      end do                                                                                          
-              
-      ! 3D
-     allocate(s_buff_nod3D(com_nod2D%sPEnum),r_buff_nod3D(com_nod2D%rPEnum))
-     do n=1, com_nod2D%sPEnum
-        offset=com_nod2D%sptr(n+1) - com_nod2D%sptr(n)
-	!allocate(s_buff_nod3D(n)%array(offset*(nl-1)))
-	allocate(s_buff_nod3D(n)%array(offset*nl))
-     end do
-     do n=1, com_nod2D%rPEnum
-        offset=com_nod2D%rptr(n+1) - com_nod2D%rptr(n)
-	!allocate(r_buff_nod3D(n)%array(offset*(nl-1)))
-	allocate(r_buff_nod3D(n)%array(offset*nl))
-     end do
+
       !=========
       ! Send and receive buffers for elemental arrays
       !========= 
@@ -444,6 +419,100 @@ subroutine set_par_support
      end do
      
    end if
+
+   if (npes > 1) then
+
+   ! Build MPI Data types for halo exchange: Nodes
+
+      allocate(r_mpitype_nod2D(com_nod2D%rPEnum))     ! 2D
+      allocate(s_mpitype_nod2D(com_nod2D%sPEnum))
+      allocate(r_mpitype_nod2D_i(com_nod2D%rPEnum))   ! 2D integer
+      allocate(s_mpitype_nod2D_i(com_nod2D%sPEnum))   
+
+      allocate(r_mpitype_nod3D(com_nod2D%rPEnum,nl-1:nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
+      allocate(s_mpitype_nod3D(com_nod2D%sPEnum,nl-1:nl,3))
+  
+      ! Upper limit for the length of the local interface between the neighbor PEs 
+      max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
+                   maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
+
+      allocate(displace(max_nb), blocklen(max_nb))
+
+      do n=1,com_nod2D%rPEnum
+         nb = 1
+         nini = com_nod2D%rptr(n)
+         nend = com_nod2D%rptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_nod2D%rlist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_nod2D%rlist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+              r_mpitype_nod2D(n),     MPIerr)
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
+              r_mpitype_nod2D_i(n),   MPIerr)
+
+         call MPI_TYPE_COMMIT(r_mpitype_nod2D(n),     MPIerr)    
+         call MPI_TYPE_COMMIT(r_mpitype_nod2D_i(n),   MPIerr)     
+
+         DO nl1=nl-1, nl
+            DO n_val=1,3
+               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+                    r_mpitype_nod3D(n,nl1,n_val),  MPIerr)
+
+               call MPI_TYPE_COMMIT(r_mpitype_nod3D(n,nl1,n_val),  MPIerr)  
+            ENDDO
+         ENDDO
+      enddo
+
+      do n=1,com_nod2D%sPEnum
+         nb = 1
+         nini = com_nod2D%sptr(n)
+         nend = com_nod2D%sptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_nod2D%slist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_nod2D%slist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+              s_mpitype_nod2D(n),     MPIerr)
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
+              s_mpitype_nod2D_i(n),   MPIerr)
+
+         call MPI_TYPE_COMMIT(s_mpitype_nod2D(n),     MPIerr)    
+         call MPI_TYPE_COMMIT(s_mpitype_nod2D_i(n),   MPIerr)     
+
+         DO nl1=nl-1, nl
+            DO n_val=1,3
+               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+                    s_mpitype_nod3D(n,nl1,n_val),  MPIerr)
+
+               call MPI_TYPE_COMMIT(s_mpitype_nod3D(n,nl1,n_val),  MPIerr)  
+            ENDDO
+         ENDDO
+      enddo
+
+      deallocate(blocklen,     displace)
+
+   endif
 
    call init_gatherLists
 

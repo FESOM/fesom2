@@ -554,8 +554,9 @@ allocate(Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D))
    end if
  END DO  
 
- call exchange_nod(Unode_rhs(1,:,:))
- call exchange_nod(Unode_rhs(2,:,:))     
+ call exchange_nod(Unode_rhs(:	,:,:))
+! call exchange_nod(Unode_rhs(1,:,:))
+! call exchange_nod(Unode_rhs(2,:,:))     
  DO elem=1,  myDim_elem2D     !! m=1,  myDim_elem2D   
                               !! elem=myList_elem2D(m)
    elnodes=elem2D_nodes(:,elem)

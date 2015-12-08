@@ -105,7 +105,7 @@ subroutine compute_sigma_xy(TF1,SF1)
   use o_param
   use o_arrays
   use g_parsup
-  use g_comm
+  use g_comm_auto
   implicit none
   !
   real(kind=WP), intent(IN)   :: TF1(nl-1, myDim_nod2D+eDim_nod2D), SF1(nl-1, myDim_nod2D+eDim_nod2D)
@@ -140,7 +140,7 @@ subroutine compute_sigma_xy(TF1,SF1)
      END DO
   END DO 
 
-  call exchange_n3D(sigma_xy, 2, nl-1)
+  call exchange_nod(sigma_xy)
 end subroutine compute_sigma_xy
 !===========================================================================
 subroutine fer_solve_Gamma
@@ -149,7 +149,7 @@ subroutine fer_solve_Gamma
    USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K
    USE g_PARSUP
    USE g_CONFIG
-   use g_comm
+   use g_comm_auto
    IMPLICIT NONE
 
    integer                         :: nz, n, nzmax
@@ -209,7 +209,7 @@ subroutine fer_solve_Gamma
           end do
    END DO   !!! cycle over nodes
 
-   call exchange_n3D(fer_gamma, 2, nl)
+   call exchange_nod(fer_gamma)
    END subroutine fer_solve_Gamma
 !====================================================================
 subroutine fer_gamma2vel

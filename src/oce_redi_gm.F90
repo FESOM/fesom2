@@ -161,5 +161,5 @@ subroutine compute_neutral_slope(TF1,SF1)
 	  sigma_xyz(3,nz,n)=sigma_xyz(3,nz,n)+sign(eps, sigma_z)
      END DO
   END DO 
-  call exchange_n3D(neutral_slope, 3, nl-1)
+  call exchange_nod(neutral_slope)
 end subroutine compute_neutral_slope

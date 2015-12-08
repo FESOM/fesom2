@@ -20,61 +20,35 @@ contains
 
 subroutine exchange_nod2D_i(nod_array2D)
 USE o_MESH
-USE g_PARSUP 
+USE g_PARSUP
+USE o_PARAM 
 IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
-! of integer type
  
- INTEGER  :: sreq(maxPEnum)
- INTEGER  :: rreq(maxPEnum)
- INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
- INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
- integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
- integer  :: nod_array2D(:) 
- 
+ integer, intent(inout)  :: nod_array2D(:)
+
+ INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
+ integer  :: n, sn, rn
+
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
-  
-  ! Put data to be communicated into send buffer 
- 
-  Do n=1,com_nod2D%sPEnum
-   nini=com_nod2D%sptr(n)
-   nend=com_nod2D%sptr(n+1)-1
-   s_buff_nod2D_i(n)%array=nod_array2D(com_nod2D%slist(nini:nend))
-  end do  
+
+  DO n=1,rn    
+     
+     call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO 
  
   DO n=1, sn
-     dest=com_nod2D%sPE(n)
-     nini=com_nod2D%sptr(n)
-     offset=com_nod2D%sptr(n+1) - nini
      
-     
-     call MPI_ISEND(s_buff_nod2D_i(n)%array, offset, MPI_INTEGER, dest, mype, & 
-               MPI_COMM_WORLD, sreq(n), MPIerr)
+     call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
+                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
   END DO
-  DO n=1,rn    
-     source=com_nod2D%rPE(n)
-     nini=com_nod2D%rptr(n)
-     offset=com_nod2D%rptr(n+1) - nini
-     
-      
-     call MPI_IRECV(r_buff_nod2D_i(n)%array, offset, MPI_INTEGER, source, &
-               source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-            
-  END DO 
   
-     call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-     call MPI_WAITALL(rn,rreq,rstat, MPIerr)
+  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
   
-  ! Put received data to their destination
-  Do n=1,com_nod2D%rPEnum
-   nini=com_nod2D%rptr(n)
-   nend=com_nod2D%rptr(n+1)-1
-   nod_array2D(com_nod2D%rlist(nini:nend))=r_buff_nod2D_i(n)%array
-  end do 
-  
-  
+ 
 END SUBROUTINE exchange_nod2D_i
 
 ! ========================================================================
@@ -86,55 +60,28 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- INTEGER  :: sreq(maxPEnum)
- INTEGER  :: rreq(maxPEnum)
- INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
- INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
- integer    :: n, sn, rn, dest, nini, nend, offset, source,tag
- !real*8 :: nod_array2D(myDim_nod2D+eDim_nod2D) 
- real*8 :: nod_array2D(:)
+ real*8, intent(inout)  :: nod_array2D(:)
+
+ INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
+ integer  :: n, sn, rn
+
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
-  ! Put data to be communicated into send buffer 
-  !nod_array2D=0
-  Do n=1,com_nod2D%sPEnum
-   nini=com_nod2D%sptr(n)
-   nend=com_nod2D%sptr(n+1)-1
-   s_buff_nod2D(n)%array=nod_array2D(com_nod2D%slist(nini:nend))
-  end do  
- 
+
+  DO n=1,rn         
+     call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO  
   DO n=1, sn
-     dest=com_nod2D%sPE(n)
-     nini=com_nod2D%sptr(n)
-     offset=com_nod2D%sptr(n+1) - nini
-     
-     
-     call MPI_ISEND(s_buff_nod2D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-               MPI_COMM_WORLD, sreq(n), MPIerr)
+     call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
   END DO
-!call  MPI_Barrier(MPI_COMM_WORLD,MPIerr)
-  DO n=1,rn    
-     source=com_nod2D%rPE(n)
-     nini=com_nod2D%rptr(n)
-     offset=com_nod2D%rptr(n+1) - nini
-     
-      
-     call MPI_IRECV(r_buff_nod2D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-               source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-            
-  END DO 
   
-     call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-     call MPI_WAITALL(rn,rreq,rstat, MPIerr)
+  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
   
-  ! Put received data to their destination
-  Do n=1,com_nod2D%rPEnum
-   nini=com_nod2D%rptr(n)
-   nend=com_nod2D%rptr(n+1)-1
-   nod_array2D(com_nod2D%rlist(nini:nend))=r_buff_nod2D(n)%array
-  end do 
-   
+ 
 END SUBROUTINE exchange_nod2D
+
 ! ========================================================================
 subroutine exchange_nod3D(nod_array3D)
 USE o_MESH
@@ -142,70 +89,89 @@ USE g_PARSUP
 USE o_PARAM 
 IMPLICIT NONE
 
+
+real(kind=WP), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
- INTEGER  :: sreq(maxPEnum)
- INTEGER  :: rreq(maxPEnum)
- INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
- INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
- integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
- integer  :: nz, nh, nc, nl1
+ INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
+ integer  :: n, sn, rn
+ integer  :: nz, nl1
  !real(kind=WP) :: nod_array3D(:,myDim_nod2D+eDim_nod2D) 
- real(kind=WP) :: nod_array3D(:,:) 
+
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
-  ! Put data to be communicated into send buffer 
+
   nl1=ubound(nod_array3D,1)
-  Do n=1,com_nod2D%sPEnum
-   nini=com_nod2D%sptr(n)
-   nend=com_nod2D%sptr(n+1)-1
-   nc=0
-   DO nh=nini, nend 
-      DO nz=1,nl1
-      nc=nc+1
-      s_buff_nod3D(n)%array(nc)=nod_array3D(nz,com_nod2D%slist(nh))
-      END DO
-   END DO   
-  end do  
+  
+  if ((nl1<nl-1) .or. (nl1>nl)) then
+     if (mype==0) then
+        print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
+        print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
+     endif
+     call par_ex(1)
+  endif
+
+  DO n=1,rn    
+     call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
+          com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO
  
   DO n=1, sn
-     dest=com_nod2D%sPE(n)
-     nini=com_nod2D%sptr(n)
-     offset=(com_nod2D%sptr(n+1) - nini)*(nl1)
-     
-     
-     call MPI_ISEND(s_buff_nod3D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-               MPI_COMM_WORLD, sreq(n), MPIerr)
+     call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
+          mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
   END DO
-  DO n=1,rn    
-     source=com_nod2D%rPE(n)
-     nini=com_nod2D%rptr(n)
-     offset=(com_nod2D%rptr(n+1) - nini)*(nl1)
-     
-      
-     call MPI_IRECV(r_buff_nod3D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-               source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-            
-  END DO 
-  
-     call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-     call MPI_WAITALL(rn,rreq,rstat, MPIerr)
-  
-  ! Put received data to their destination
-  Do n=1,com_nod2D%rPEnum
-   nini=com_nod2D%rptr(n)
-   nend=com_nod2D%rptr(n+1)-1
-   nc=0
-   DO nh=nini, nend
-      DO nz=1, nl1
-      nc=nc+1
-      nod_array3D(nz,com_nod2D%rlist(nh))=r_buff_nod3D(n)%array(nc)
-      END DO
-   END DO   
-  end do 
+
+  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
    
 END SUBROUTINE exchange_nod3D
+
+! ========================================================================
+subroutine exchange_nod3D_n(nod_array3D)
+USE o_MESH
+USE g_PARSUP
+USE o_PARAM 
+IMPLICIT NONE
+
+
+real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+! General version of the communication routine for 3D nodal fields
+! stored in (vertical, horizontal) format
+ 
+ INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
+ integer  :: n, sn, rn
+ integer  :: nz, nl1, n_val
+
+ !real(kind=WP) :: nod_array3D(:,myDim_nod2D+eDim_nod2D) 
+
+  nl1= ubound(nod_array3D,2)
+  n_val = ubound(nod_array3D,1)
+
+  if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 3)) then
+     if (mype==0) then
+        print *,'Subroutine exchange_nod3D_n not implemented for'
+        print *,nl1,'layers and / or ',n_val,'values per element.'
+        print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
+     endif
+     call par_ex(1)
+  endif
+  sn=com_nod2D%sPEnum
+  rn=com_nod2D%rPEnum
+
+  DO n=1,rn    
+     call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
+          com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO
+ 
+  DO n=1, sn
+     call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
+          mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+  END DO
+  
+
+  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
+   
+END SUBROUTINE exchange_nod3D_n
 ! ========================================================================
 subroutine exchange_edge3D(edge_array3D)
   use o_MESH
@@ -710,107 +676,6 @@ IMPLICIT NONE
   
   
 END SUBROUTINE exchange_e2D
-! ========================================================================
-! ========================================================================
-subroutine exchange_n3D(nod_array3D,ne,vsize)
-USE o_MESH
-USE g_PARSUP
-USE o_PARAM 
-IMPLICIT NONE
-
-! General version of the communication routine for 3D nodal fields
-! stored in (vertical, horizontal) format
- 
- INTEGER  :: sreq(maxPEnum)
- INTEGER  :: rreq(maxPEnum)
- INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
- INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
- integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
- integer  :: nz, nh, nc, nn
- integer, intent(in)          :: ne,vsize 
- real(kind=WP), intent(inout) :: nod_array3D(ne,vsize,myDim_nod2D+eDim_nod2D)
- type(com_array), allocatable :: s_buff(:),  r_buff(:)
-
-  sn=com_nod2D%sPEnum
-  rn=com_nod2D%rPEnum
-  
-  ! ============
-  ! Allocate buffers
-  ! ============
-     allocate(s_buff(com_nod2D%sPEnum),r_buff(com_nod2D%rPEnum))
-     do n=1, com_nod2D%sPEnum
-        offset=com_nod2D%sptr(n+1) - com_nod2D%sptr(n)
-	allocate(s_buff(n)%array(offset*ne*vsize))
-     end do
-     do n=1, com_nod2D%rPEnum
-        offset=com_nod2D%rptr(n+1) - com_nod2D%rptr(n)
-	allocate(r_buff(n)%array(offset*ne*vsize))
-     end do
-  
-  ! Put data to be communicated into send buffer 
- 
-  Do n=1,com_nod2D%sPEnum
-   nini=com_nod2D%sptr(n)
-   nend=com_nod2D%sptr(n+1)-1
-   nc=0
-   DO nh=nini, nend 
-      DO nz=1,vsize
-      DO nn=1,ne
-      nc=nc+1
-      s_buff(n)%array(nc)=nod_array3D(nn,nz,com_nod2D%slist(nh))
-      END DO
-      END DO
-   END DO   
-  end do  
- 
-  DO n=1, sn
-     dest=com_nod2D%sPE(n)
-     nini=com_nod2D%sptr(n)
-     offset=(com_nod2D%sptr(n+1) - nini)*ne*vsize
-     
-     
-     call MPI_ISEND(s_buff(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-               MPI_COMM_WORLD, sreq(n), MPIerr)
-  END DO
-  DO n=1,rn    
-     source=com_nod2D%rPE(n)
-     nini=com_nod2D%rptr(n)
-     offset=(com_nod2D%rptr(n+1) - nini)*ne*vsize
-     
-      
-     call MPI_IRECV(r_buff(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-               source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-            
-  END DO 
-  
-     call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-     call MPI_WAITALL(rn,rreq,rstat, MPIerr)
-  
-  ! Put received data to their destination
-  Do n=1,com_nod2D%rPEnum
-   nini=com_nod2D%rptr(n)
-   nend=com_nod2D%rptr(n+1)-1
-   nc=0
-   DO nh=nini, nend
-      DO nz=1, vsize
-       DO nn=1,ne
-       nc=nc+1
-       nod_array3D(nn,nz,com_nod2D%rlist(nh))=r_buff(n)%array(nc)
-       END DO
-      END DO
-   END DO   
-  end do 
-! ===============  
-! Deallocate the buffers
-! ===============
-      do n=com_nod2D%rPEnum,1,-1
-        deallocate(r_buff(n)%array)
-      end do
-      do n=com_nod2D%sPEnum,1,-1
-        deallocate(s_buff(n)%array)
-      end do
-      deallocate(r_buff, s_buff)   
-END SUBROUTINE exchange_n3D
 ! ========================================================================
 
 
@@ -1628,6 +1493,7 @@ interface exchange_nod
       module procedure exchange_nod2D
       module procedure exchange_nod2D_i
       module procedure exchange_nod3D
+      module procedure exchange_nod3D_n
 !      module procedure exchange_nod3D_full
 end interface exchange_nod
 
