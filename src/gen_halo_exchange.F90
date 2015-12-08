@@ -868,7 +868,7 @@ IF ( mype == 0 ) THEN
       allocate(recvbuf(nl1,nod2D))
 
       do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl
+         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
          start = remPtr_nod2D(n)
          call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
       enddo
@@ -1109,7 +1109,7 @@ IF ( mype == 0 ) THEN
 !      if (ierr/=0) print *,'allocate knall auf pe=0 in nod3D_real4',ierr
 
       do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl
+         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
          start = remPtr_nod2D(n)
          call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
       enddo
@@ -1231,7 +1231,7 @@ IF ( mype == 0 ) THEN
       allocate(recvbuf(nl1,remPtr_elem2D(npes)))
 
       do  n = 1, npes-1
-         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl
+         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
          start = remPtr_elem2D(n)
          call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
       enddo
