@@ -178,122 +178,105 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:,:)
    
 END SUBROUTINE exchange_nod3D_n
 ! ========================================================================
-subroutine exchange_edge3D(edge_array3D)
-  use o_MESH
-  use g_PARSUP 
-  implicit none
-  
- ! Communication of edge based data stored in (vertical, horizontal) format 
 
- INTEGER  :: sreq(maxPEnum)
- INTEGER  :: rreq(maxPEnum)
- INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
- INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
- integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
- integer  :: nz, nh, nc
- real(kind=WP) :: edge_array3D(nl-1,edge2D) 
-  
-  sn=com_edge2D%sPEnum
-  rn=com_edge2D%rPEnum
-  ! Put data to be communicated into send buffer 
-
-
-  do n=1, sn
-     nini=com_edge2D%sptr(n)
-     nend=com_edge2D%sptr(n+1) - 1
-      nc=0
-      DO nh=nini, nend
-         DO nz=1, nl-1
-	 nc=nc+1
-         s_buff_edge3D(n)%array(nc)=edge_array3D(nz,com_edge2D%slist(nh))
-	 END DO
-      END DO	 
-  end do
-
-
-  do n=1, sn
-     dest=com_edge2D%sPE(n)
-     nini=com_edge2D%sptr(n)
-     offset=(com_edge2D%sptr(n+1) - nini)*(nl-1)
-
-     call MPI_ISEND(s_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-          MPI_COMM_WORLD, sreq(n), MPIerr)
-  end do
-  do n=1, rn
-     source=com_edge2D%rPE(n)
-     nini=com_edge2D%rptr(n)
-     offset=(com_edge2D%rptr(n+1) - nini)*(nl-1)
-
-     call MPI_IRECV(r_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-          source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-  end do
-
-  call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-  call MPI_WAITALL(rn,rreq,rstat, MPIerr)
-
-  ! Put received data to their destination
-
-  do n=1, rn
-     nini=com_edge2D%rptr(n)
-     nend=com_edge2D%rptr(n+1) - 1
-      nc=0
-      DO nh=nini, nend
-         DO nz=1, nl-1
-	 nc=nc+1
-	 edge_array3D(nz,com_edge2D%rlist(nh))=r_buff_edge3D(n)%array(nc)
-         END DO
-      END DO	  
-  end do
-
-end subroutine exchange_edge3D
+!nr  Not used, no MPI datatype built (yet)
+!
+!!$subroutine exchange_edge3D(edge_array3D)
+!!$  use o_MESH
+!!$  use g_PARSUP 
+!!$  implicit none
+!!$  
+!!$ ! Communication of edge based data stored in (vertical, horizontal) format 
+!!$
+!!$ INTEGER  :: sreq(maxPEnum)
+!!$ INTEGER  :: rreq(maxPEnum)
+!!$ INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
+!!$ INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
+!!$ integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
+!!$ integer  :: nz, nh, nc
+!!$ real(kind=WP) :: edge_array3D(nl-1,edge2D) 
+!!$  
+!!$  sn=com_edge2D%sPEnum
+!!$  rn=com_edge2D%rPEnum
+!!$  ! Put data to be communicated into send buffer 
+!!$
+!!$
+!!$  do n=1, sn
+!!$     nini=com_edge2D%sptr(n)
+!!$     nend=com_edge2D%sptr(n+1) - 1
+!!$      nc=0
+!!$      DO nh=nini, nend
+!!$         DO nz=1, nl-1
+!!$	 nc=nc+1
+!!$         s_buff_edge3D(n)%array(nc)=edge_array3D(nz,com_edge2D%slist(nh))
+!!$	 END DO
+!!$      END DO	 
+!!$  end do
+!!$
+!!$
+!!$  do n=1, sn
+!!$     dest=com_edge2D%sPE(n)
+!!$     nini=com_edge2D%sptr(n)
+!!$     offset=(com_edge2D%sptr(n+1) - nini)*(nl-1)
+!!$
+!!$     call MPI_ISEND(s_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
+!!$          MPI_COMM_WORLD, sreq(n), MPIerr)
+!!$  end do
+!!$  do n=1, rn
+!!$     source=com_edge2D%rPE(n)
+!!$     nini=com_edge2D%rptr(n)
+!!$     offset=(com_edge2D%rptr(n+1) - nini)*(nl-1)
+!!$
+!!$     call MPI_IRECV(r_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
+!!$          source, MPI_COMM_WORLD, rreq(n), MPIerr) 
+!!$  end do
+!!$
+!!$  call MPI_WAITALL(sn,sreq,sstat, MPIerr)
+!!$  call MPI_WAITALL(rn,rreq,rstat, MPIerr)
+!!$
+!!$  ! Put received data to their destination
+!!$
+!!$  do n=1, rn
+!!$     nini=com_edge2D%rptr(n)
+!!$     nend=com_edge2D%rptr(n+1) - 1
+!!$      nc=0
+!!$      DO nh=nini, nend
+!!$         DO nz=1, nl-1
+!!$	 nc=nc+1
+!!$	 edge_array3D(nz,com_edge2D%rlist(nh))=r_buff_edge3D(n)%array(nc)
+!!$         END DO
+!!$      END DO	  
+!!$  end do
+!!$
+!!$end subroutine exchange_edge3D
 !==========================================================================
 
 subroutine exchange_edge2D(edge_array2D)
   use o_MESH
   use g_PARSUP 
   implicit none
-  INTEGER  :: sreq(maxPEnum)
-  INTEGER  :: rreq(maxPEnum)
-  INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
-  INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
-  integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
-  real(kind=8) :: edge_array2D(myDim_edge2D+eDim_edge2D) 
+
+! General version of the communication routine for 2D edge fields
+ 
+ real*8, intent(inout)  :: edge_array2D(:)
+
+ INTEGER  :: req(com_edge2D%rPEnum + com_edge2D%sPEnum)
+ integer  :: n, sn, rn
 
   sn=com_edge2D%sPEnum
   rn=com_edge2D%rPEnum
-  ! Put data to be communicated into send buffer 
- do n=1, sn
-     nini=com_edge2D%sptr(n)
-     nend=com_edge2D%sptr(n+1) - 1
-     s_buff_edge2D(n)%array=edge_array2D(com_edge2D%slist(nini:nend))
-  end do
-  do n=1, sn
-     dest=com_edge2D%sPE(n)
-     nini=com_edge2D%sptr(n)
-     offset=com_edge2D%sptr(n+1) - nini
 
-     call MPI_ISEND(s_buff_edge2D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-          MPI_COMM_WORLD, sreq(n), MPIerr)
+  DO n=1,rn         
+     call MPI_IRECV(edge_array2D, 1, r_mpitype_edge2D(n), com_edge2D%rPE(n), &
+               com_edge2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO  
+  DO n=1, sn
+     call MPI_ISEND(edge_array2D, 1, s_mpitype_edge2D(n), com_edge2D%sPE(n), &
+                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
   END DO
-  DO n=1,rn 
-     source=com_edge2D%rPE(n)
-     nini=com_edge2D%rptr(n)
-     offset=com_edge2D%rptr(n+1) - nini
-
-     call MPI_IRECV(r_buff_edge2D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-          source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-  end do
-  call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-  call MPI_WAITALL(rn,rreq,rstat, MPIerr)
-
-  ! Put received data to their destination
-
-  do n=1, rn
-     nini=com_edge2D%rptr(n)
-     nend=com_edge2D%rptr(n+1) - 1
-     edge_array2D(com_edge2D%rlist(nini:nend))=r_buff_edge2D(n)%array
-  end do
-
+  
+  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
+  
 end subroutine exchange_edge2D
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D)
@@ -307,6 +290,8 @@ IMPLICIT NONE
  real(kind=WP), intent(inout) :: elem_array3D(:,:) 
  INTEGER  :: req(2*maxPEnum)
  integer  :: n, sn, rn, nl1
+ integer, pointer :: r_mpitype(:), s_mpitype(:)
+ integer, pointer :: r_PE(:), s_PE(:)
 
  nl1=ubound(elem_array3D,1)
  
@@ -315,28 +300,49 @@ IMPLICIT NONE
      sn=com_elem2D%sPEnum
      rn=com_elem2D%rPEnum
 
-     DO n=1,rn         
-        call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,1), com_elem2D%rPE(n), &
-                       com_elem2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
-     END DO
-     DO n=1, sn
-        call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,1), com_elem2D%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
-     END DO
+     s_PE => com_elem2D%sPE(1:sn)
+     r_PE => com_elem2D%rPE(1:rn)
+
+     if (nl1==nl .or. nl1==nl-1) then
+        r_mpitype =>  r_mpitype_elem3D(:,nl1,1)
+        s_mpitype =>  s_mpitype_elem3D(:,nl1,1)
+     elseif (nl1 <= 4) then
+        ! In fact, this is a 2D-array with up to 4 values, e.g. derivatives
+        r_mpitype =>  r_mpitype_elem2D(:,nl1)
+        s_mpitype =>  s_mpitype_elem2D(:,nl1)
+     else
+        if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
+        call par_ex(1)
+     endif
 
   else
      sn=com_elem2D_full%sPEnum
      rn=com_elem2D_full%rPEnum
 
-     DO n=1,rn         
-        call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,1), com_elem2D_full%rPE(n), &
-                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
-     END DO
-     DO n=1, sn
-        call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,1), com_elem2D_full%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
-     END DO
-  end if     
+     s_PE => com_elem2D_full%sPE(1:sn)
+     r_PE => com_elem2D_full%rPE(1:rn)
+
+     if (nl1==nl .or. nl1==nl-1) then
+        r_mpitype =>  r_mpitype_elem3D_full(:,nl1,1)
+        s_mpitype =>  s_mpitype_elem3D_full(:,nl1,1)
+     elseif (nl1 <= 4) then
+        ! In fact, this is a 2D-array with up to 4 values, e.g. derivatives
+        r_mpitype =>  r_mpitype_elem2D_full(:,nl1)
+        s_mpitype =>  s_mpitype_elem2D_full(:,nl1)
+     else
+        if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
+        call par_ex(1)
+     endif     
+
+  endif
+
+  DO n=1,rn         
+     call MPI_IRECV(elem_array3D, 1, r_mpitype(n), r_PE(n), r_PE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+  END DO
+  DO n=1, sn
+     call MPI_ISEND(elem_array3D, 1, s_mpitype(n), s_PE(n), mype,    MPI_COMM_WORLD, req(rn+n), MPIerr)
+  END DO
+
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
   
@@ -424,11 +430,11 @@ IMPLICIT NONE
      rn=com_elem2D%rPEnum
 
      DO n=1,rn         
-        call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n), com_elem2D%rPE(n), &
+        call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n,1), com_elem2D%rPE(n), &
                        com_elem2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
      END DO
      DO n=1, sn
-        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n), com_elem2D%sPE(n), &
+        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
                        mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
      END DO
 
@@ -437,11 +443,11 @@ IMPLICIT NONE
      rn=com_elem2D_full%rPEnum
 
      DO n=1,rn         
-        call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n), com_elem2D_full%rPE(n), &
+        call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n,1), com_elem2D_full%rPE(n), &
                        com_elem2D_full%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
      END DO
      DO n=1, sn
-        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n), com_elem2D_full%sPE(n), &
+        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
                        mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
      END DO
   end if     
@@ -480,102 +486,6 @@ IMPLICIT NONE
      
 END SUBROUTINE exchange_elem2D_i
 !=============================================================================
-
-subroutine exchange_e2D(elem_array2D, ne)
-USE o_MESH
-USE g_PARSUP 
-IMPLICIT NONE
-
-! General version of the communication routine for 2D elemental fields
-! stored in (vertical, horizontal) format
- 
- INTEGER  :: sreq(npes)
- INTEGER  :: rreq(npes)
- INTEGER  :: sstat(MPI_STATUS_SIZE,npes)
- INTEGER  :: rstat(MPI_STATUS_SIZE,npes)
- integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
- integer  :: nz, nh, nc, ne
- real(kind=8) :: elem_array2D(ne,elem2D) 
- type(com_array), allocatable :: s_buff(:), r_buff(:)
- 
-      allocate(s_buff(com_elem2D%sPEnum))
-      allocate(r_buff(com_elem2D%rPEnum))
-      do n=1, com_elem2D%sPEnum
-        offset=com_elem2D%sptr(n+1) - com_elem2D%sptr(n)
-        allocate(s_buff(n)%array(offset*ne))
-      end do
-      do n=1, com_elem2D%rPEnum
-        offset=com_elem2D%rptr(n+1) - com_elem2D%rptr(n)
-        allocate(r_buff(n)%array(offset*ne))
-      end do
- 
-  sn=com_elem2D%sPEnum
-  rn=com_elem2D%rPEnum
-  ! Put data to be communicated into send buffer 
-  
-  do n=1, sn
-     nini=com_elem2D%sptr(n)
-     nend=com_elem2D%sptr(n+1) - 1
-     nc=0
-   DO nh=nini, nend 
-      DO nz=1,ne
-      nc=nc+1
-      s_buff(n)%array(nc)=elem_array2D(nz,com_elem2D%slist(nh))
-      END DO
-   END DO   
-  end do
-  
-  DO n=1, sn
-     dest=com_elem2D%sPE(n)
-     nini=com_elem2D%sptr(n)
-     offset=(com_elem2D%sptr(n+1) - nini)
-     
-     
-     call MPI_ISEND(s_buff(n)%array, ne*offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-               MPI_COMM_WORLD, sreq(n), MPIerr)
-  END DO
-  DO n=1, rn   
-     source=com_elem2D%rPE(n)
-     nini=com_elem2D%rptr(n)
-     offset=(com_elem2D%rptr(n+1) - nini)
-     
-      
-     call MPI_IRECV(r_buff(n)%array, ne*offset, MPI_DOUBLE_PRECISION, source, &
-               source, MPI_COMM_WORLD, rreq(n), MPIerr) 
-            
-  END DO 
-  
-     call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-     call MPI_WAITALL(sn,rreq,rstat, MPIerr)
-  
-  ! Put received data to their destination
-   do n=1, rn
-     nini=com_elem2D%rptr(n)
-     nend=com_elem2D%rptr(n+1) - 1
-     nc=0
-      DO nh=nini, nend
-       DO nz=1, ne
-       nc=nc+1
-       elem_array2D(nz,com_elem2D%rlist(nh))=r_buff(n)%array(nc)
-       END DO
-      END DO
-   end do 
- ! ===============  
-! Deallocate the buffers
-! ===============
-      do n=com_elem2D%rPEnum,1,-1
-        deallocate(r_buff(n)%array)
-      end do
-      do n=com_elem2D%sPEnum,1,-1
-        deallocate(s_buff(n)%array)
-      end do
-      deallocate(r_buff, s_buff)    
-  
-  
-END SUBROUTINE exchange_e2D
-! ========================================================================
-
-
 
 
 
@@ -1391,12 +1301,11 @@ interface exchange_nod
       module procedure exchange_nod2D_i
       module procedure exchange_nod3D
       module procedure exchange_nod3D_n
-!      module procedure exchange_nod3D_full
 end interface exchange_nod
 
 interface exchange_edge
       module procedure exchange_edge2D
-      module procedure exchange_edge3D
+!      module procedure exchange_edge3D  ! not available, not used
 end interface exchange_edge
 
 interface exchange_elem

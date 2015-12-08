@@ -12,7 +12,7 @@ USE o_MESH
 USE i_ARRAYS
 USE i_PARAM
 USE g_PARSUP
-USE g_comm
+USE g_comm_auto
 IMPLICIT NONE
 real(kind=WP)    :: x(3), y(3), u, v, r1, r2
 real(kind=WP)    :: zc(2), un, grad_aux(4)
@@ -54,7 +54,7 @@ integer         :: elem, el, j, nz, m
  	 ice_grad_vel(:,elem)=grad_aux(:)
 	 
   END DO	  
- call exchange_e2D(ice_grad_vel, 4)
+ call exchange_elem(ice_grad_vel)
 
 END SUBROUTINE ice_vel_gradients
 !===========================================================================

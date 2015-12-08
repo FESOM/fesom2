@@ -213,30 +213,24 @@ save
      integer, dimension(:), allocatable :: sptr
      integer, dimension(:), allocatable :: slist
   end type com_struct
-  type com_array_i
-     integer, dimension(:), allocatable :: array
-  end  type com_array_i
 
   type(com_struct)   :: com_nod2D
   type(com_struct)   :: com_edge2D
-  type(com_struct)   :: com_elem2D
-  type(com_struct)   :: com_elem2D_full
-  ! Buffer arrays to store information to be communicated
-  type com_array
-     real(kind=WP), dimension(:), allocatable :: array
-  end  type com_array
-  type(com_array), allocatable             :: s_buff_edge2D(:), r_buff_edge2D(:)
-  type(com_array), allocatable             :: s_buff_edge3D(:), r_buff_edge3D(:)
-
+  type(com_struct), target :: com_elem2D
+  type(com_struct), target :: com_elem2D_full
+ 
   ! MPI Datatypes for interface exchange
 
+  ! Edge fields (2D)
+  integer, allocatable       :: s_mpitype_edge2D(:),         r_mpitype_edge2D(:)   
+
   ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
-  !                 small halo and full halo
-  integer, allocatable       :: s_mpitype_elem2D(:),         r_mpitype_elem2D(:) 
-  integer, allocatable       :: s_mpitype_elem2D_full_i(:),  r_mpitype_elem2D_full_i(:) 
-  integer, allocatable       :: s_mpitype_elem2D_full(:),    r_mpitype_elem2D_full(:) 
-  integer, allocatable       :: s_mpitype_elem3D(:,:,:),     r_mpitype_elem3D(:,:,:) 
-  integer, allocatable       :: s_mpitype_elem3D_full(:,:,:),r_mpitype_elem3D_full(:,:,:) 
+  !                 small halo and / or full halo
+  integer, allocatable, target :: s_mpitype_elem2D(:,:),       r_mpitype_elem2D(:,:) 
+  integer, allocatable         :: s_mpitype_elem2D_full_i(:),  r_mpitype_elem2D_full_i(:) 
+  integer, allocatable, target :: s_mpitype_elem2D_full(:,:),  r_mpitype_elem2D_full(:,:) 
+  integer, allocatable, target :: s_mpitype_elem3D(:,:,:),     r_mpitype_elem3D(:,:,:) 
+  integer, allocatable, target :: s_mpitype_elem3D_full(:,:,:),r_mpitype_elem3D_full(:,:,:) 
 
   ! Nodal fields (2D; 2D integer; 3D with nl-1 or nl levels, one, two, or three values)
   integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:) 
@@ -339,40 +333,76 @@ subroutine set_par_support
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
-  ! routine. Here only communication buffers are set. 
-  ! 
-  !=============
-  ! Allocate communication buffers: 
-  !=============
-  if (npes>1) then
-     
-      !=========
-      ! Send and receive buffers for edge arrays
-      !========= 
-      ! 2D
-     
-     allocate(s_buff_edge2D(com_edge2D%sPEnum),r_buff_edge2D(com_edge2D%rPEnum))
-     do n=1, com_edge2D%sPEnum
-        offset=com_edge2D%sptr(n+1) - com_edge2D%sptr(n)
-	allocate(s_buff_edge2D(n)%array(offset))
-     end do
-     do n=1, com_edge2D%rPEnum
-        offset=com_edge2D%rptr(n+1) - com_edge2D%rptr(n)
-        allocate(r_buff_edge2D(n)%array(offset))
-     end do
-     
-   end if
+  ! routine. Here only MPI datatypes are set. 
 
    if (npes > 1) then
 
+      ! Build MPI Data types for halo exchange: Edges
+      allocate(r_mpitype_edge2D(com_edge2D%rPEnum))  ! 2D
+      allocate(s_mpitype_edge2D(com_edge2D%sPEnum))  
+
+      ! Upper limit for the length of the local interface between the neighbor PEs 
+      max_nb = max(maxval(com_edge2D%rptr(2:com_edge2D%rPEnum+1) - com_edge2D%rptr(1:com_edge2D%rPEnum)), &
+                   maxval(com_edge2D%sptr(2:com_edge2D%sPEnum+1) - com_edge2D%sptr(1:com_edge2D%sPEnum)))
+
+      allocate(displace(max_nb), blocklen(max_nb))
+
+      do n=1,com_edge2D%rPEnum
+         nb = 1
+         nini = com_edge2D%rptr(n)
+         nend = com_edge2D%rptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_edge2D%rlist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_edge2D%rlist(i) /= com_edge2D%rlist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_edge2D%rlist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+         
+         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, r_mpitype_edge2D(n), MPIerr)
+
+         call MPI_TYPE_COMMIT(r_mpitype_edge2D(n),   MPIerr) 
+      enddo
+
+      do n=1,com_edge2D%sPEnum
+         nb = 1
+         nini = com_edge2D%sptr(n)
+         nend = com_edge2D%sptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_edge2D%slist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_edge2D%slist(i) /= com_edge2D%slist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_edge2D%slist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+         
+         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, s_mpitype_edge2D(n), MPIerr)
+
+         call MPI_TYPE_COMMIT(s_mpitype_edge2D(n),   MPIerr) 
+
+      enddo
+
+      deallocate(displace, blocklen)
+
+
       ! Build MPI Data types for halo exchange: Elements
-      allocate(r_mpitype_elem2D(com_elem2D%rPEnum))     ! 2D, small halo
-      allocate(s_mpitype_elem2D(com_elem2D%sPEnum))
+      allocate(r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
+      allocate(s_mpitype_elem2D(com_elem2D%sPEnum,4))
       allocate(r_mpitype_elem2D_full_i(com_elem2D_full%rPEnum))   ! 2D, wide halo, integer
       allocate(s_mpitype_elem2D_full_i(com_elem2D_full%sPEnum))
 
-      allocate(r_mpitype_elem2D_full(com_elem2D_full%rPEnum))     ! 2D, wide halo 
-      allocate(s_mpitype_elem2D_full(com_elem2D_full%sPEnum))
+      allocate(r_mpitype_elem2D_full(com_elem2D_full%rPEnum,4))     ! 2D, wide halo 
+      allocate(s_mpitype_elem2D_full(com_elem2D_full%sPEnum,4))
 
       allocate(r_mpitype_elem3D(com_elem2D%rPEnum, nl-1:nl,4))     ! 3D, small halo 
       allocate(s_mpitype_elem3D(com_elem2D%sPEnum, nl-1:nl,4))
@@ -408,12 +438,13 @@ subroutine set_par_support
             endif
          enddo
          
-         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, r_mpitype_elem2D(n), MPIerr)
+         DO n_val=1,4
+            call MPI_TYPE_INDEXED(nb, blocklen*n_val, displace*n_val, MPI_DOUBLE_PRECISION, &
+                 r_mpitype_elem2D(n,n_val), MPIerr)
 
-         call MPI_TYPE_COMMIT(r_mpitype_elem2D(n),   MPIerr) 
+            call MPI_TYPE_COMMIT(r_mpitype_elem2D(n,n_val), MPIerr) 
 
-         DO nl1=nl-1, nl
-            DO n_val=1,4
+            DO nl1=nl-1, nl
                call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D(n,nl1,n_val),  MPIerr)
 
@@ -438,13 +469,14 @@ subroutine set_par_support
                blocklen(nb) = blocklen(nb)+1
             endif
          enddo
-         
-         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, s_mpitype_elem2D(n), MPIerr)
+                  
+         DO n_val=1,4
+            call MPI_TYPE_INDEXED(nb, blocklen*n_val, displace*n_val, MPI_DOUBLE_PRECISION, &
+                 s_mpitype_elem2D(n, n_val), MPIerr)
 
-         call MPI_TYPE_COMMIT(s_mpitype_elem2D(n),   MPIerr) 
+            call MPI_TYPE_COMMIT(s_mpitype_elem2D(n, n_val),   MPIerr) 
  
-         DO nl1=nl-1, nl
-            DO n_val=1,4
+            DO nl1=nl-1, nl
                call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
                     s_mpitype_elem3D(n,nl1,n_val),  MPIerr)
 
@@ -470,14 +502,17 @@ subroutine set_par_support
             endif
          enddo
          
-         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_DOUBLE_PRECISION,r_mpitype_elem2D_full(n),MPIerr)
-         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_INTEGER       ,r_mpitype_elem2D_full_i(n),MPIerr)
+         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_INTEGER, r_mpitype_elem2D_full_i(n),MPIerr)
 
-         call MPI_TYPE_COMMIT(r_mpitype_elem2D_full(n),   MPIerr)
          call MPI_TYPE_COMMIT(r_mpitype_elem2D_full_i(n), MPIerr)
 
-         DO nl1=nl-1, nl
-            DO n_val=1,4
+         DO n_val=1,4
+
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+                 r_mpitype_elem2D_full(n,n_val), MPIerr)
+            call MPI_TYPE_COMMIT(r_mpitype_elem2D_full(n, n_val),   MPIerr)
+
+            DO nl1=nl-1, nl
                call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)
 
@@ -503,14 +538,16 @@ subroutine set_par_support
             endif
          enddo
          
-         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_DOUBLE_PRECISION,s_mpitype_elem2D_full(n),MPIerr)
-         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_INTEGER,       s_mpitype_elem2D_full_i(n),MPIerr)
+         call MPI_TYPE_INDEXED(nb, blocklen,displace,MPI_INTEGER, s_mpitype_elem2D_full_i(n), MPIerr)
 
-         call MPI_TYPE_COMMIT(s_mpitype_elem2D_full(n),   MPIerr)  
          call MPI_TYPE_COMMIT(s_mpitype_elem2D_full_i(n), MPIerr)  
  
-         DO nl1=nl-1, nl
-            DO n_val=1,4
+         DO n_val=1,4
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+                 s_mpitype_elem2D_full(n,n_val),MPIerr)
+            call MPI_TYPE_COMMIT(s_mpitype_elem2D_full(n,n_val),   MPIerr)
+  
+            DO nl1=nl-1, nl
                call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
                     s_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)
 
