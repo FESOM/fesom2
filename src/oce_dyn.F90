@@ -645,9 +645,8 @@ DO elem=1, myDim_elem2D     !! m=1, myDim_elem2D
    end do   ! cycle over neighbor elements
 END DO
 
-do j=1,4
- call exchange_elem(vel_grad(:,j,:))
-enddo
+ call exchange_elem(vel_grad(:,:,:))
+
 END SUBROUTINE vel_gradients
 !===========================================================================
 SUBROUTINE compute_vel_rhs
@@ -822,8 +821,9 @@ real(kind=WP) :: Fx, Fy
 #endif
  END DO
  eta_n=eta_n+d_eta
- call exchange_elem(UV(1,:,:))
- call exchange_elem(UV(2,:,:))
+ call exchange_elem(UV)
+! call exchange_elem(UV(1,:,:))
+! call exchange_elem(UV(2,:,:))
 
 end subroutine update_vel
 !==========================================================================

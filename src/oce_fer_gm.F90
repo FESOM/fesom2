@@ -230,8 +230,9 @@ subroutine fer_gamma2vel
          fer_uv(:,nz,el)=sum(fer_gamma(:,nz,elnod)-fer_gamma(:,nz+1,elnod), 2)*zinv/3._WP
       END DO
    END DO
-   call exchange_elem(fer_uv(1,:,:))
-   call exchange_elem(fer_uv(2,:,:))
+   call exchange_elem(fer_uv)
+!   call exchange_elem(fer_uv(1,:,:))
+!   call exchange_elem(fer_uv(2,:,:))
 end subroutine fer_gamma2vel
 !====================================================================
 subroutine fer_compute_C_K

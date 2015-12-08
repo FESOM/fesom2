@@ -29,7 +29,7 @@ use g_parsup
 use o_PARAM, only: tracer_adv
 use o_arrays
 use o_mesh
-use g_comm
+use g_comm_auto
 IMPLICIT NONE
 integer :: tr_num,n,nz 
 
@@ -38,8 +38,8 @@ del_ttf=0d0
 !AB interpolation
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
 call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
-call exchange_elem3D_full(tr_xy(1,:,:))
-call exchange_elem3D_full(tr_xy(2,:,:))
+call exchange_elem(tr_xy)
+
 call fill_up_dn_grad
 END SUBROUTINE init_tracers_AB
 !========================================================================================

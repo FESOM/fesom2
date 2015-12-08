@@ -205,8 +205,9 @@ allocate(UV_c(2,nl-1,ed))
      UV_c(2,nz,ed)=-UV_c(2,nz,ed)*tau_inv*sqrt(scale_area/elem_area(ed))
     END DO
  end do
- call exchange_elem(UV_c(1,:,:))
- call exchange_elem(UV_c(2,:,:))
+ call exchange_elem(UV_c)
+! call exchange_elem(UV_c(1,:,:))
+! call exchange_elem(UV_c(2,:,:))
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -346,9 +347,8 @@ integer       :: n, elem, nz, k, elnodes(3), m
    END DO
  END DO
 
- do m=1,4
-   call exchange_elem(vel_grad(:,m,:))   
- enddo
+ call exchange_elem(vel_grad)   
+ 
 END subroutine gradients_p1
 ! ===================================================================
 SUBROUTINE momentum_adv_p1
@@ -524,7 +524,7 @@ allocate(Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D))
    end if
  END DO  
 
- call exchange_nod(Unode_rhs(:,:,:))
+ call exchange_nod(Unode_rhs)
 ! call exchange_nod(Unode_rhs(1,:,:))
 ! call exchange_nod(Unode_rhs(2,:,:))     
  DO elem=1,  myDim_elem2D     !! m=1,  myDim_elem2D   

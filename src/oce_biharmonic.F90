@@ -97,9 +97,9 @@ SUBROUTINE vel_lapl_gradients(UV_c)
      end do   ! cycle over neighbor elements 	 
   END DO
 
-  do j=1,4
-   call exchange_elem(vel_grad(:,j,:))
-  enddo
+
+  call exchange_elem(vel_grad)
+
 END SUBROUTINE vel_lapl_gradients
 !
 !===========================================================================
@@ -225,8 +225,9 @@ SUBROUTINE biharmonic_viscosity
  ! this multiplication too.  
 
 
-  call exchange_elem(UV_c(:,1,:))
-  call exchange_elem(UV_c(:,2,:))
+  call exchange_elem(UV_c)
+!  call exchange_elem(UV_c(:,1,:))
+!  call exchange_elem(UV_c(:,2,:))
   call vel_lapl_gradients(UV_c)
 
   ! =============
