@@ -30,6 +30,8 @@ IMPLICIT NONE
  INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
  integer  :: n, sn, rn
 
+ if (npes > 1) then
+
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
 
@@ -47,7 +49,7 @@ IMPLICIT NONE
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
   
- 
+endif
 END SUBROUTINE exchange_nod2D_i
 
 ! ========================================================================
@@ -64,6 +66,8 @@ IMPLICIT NONE
  INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
  integer  :: n, sn, rn
 
+ if (npes > 1) then
+
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
 
@@ -77,7 +81,7 @@ IMPLICIT NONE
   END DO
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+end if
  
 END SUBROUTINE exchange_nod2D
 
@@ -98,6 +102,7 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:)
  integer  :: nz, nl1
  !real(kind=WP) :: nod_array3D(:,myDim_nod2D+eDim_nod2D) 
 
+if (npes > 1) then
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
 
@@ -122,7 +127,7 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:)
   END DO
 
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-   
+endif
 END SUBROUTINE exchange_nod3D
 
 ! ========================================================================
@@ -141,6 +146,7 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:,:)
  integer  :: n, sn, rn
  integer  :: nz, nl1, n_val
 
+if (npes>1) then
  ! nod_array3D(n_val,nl1,nod2D_size)
   nl1= ubound(nod_array3D,2)
   n_val = ubound(nod_array3D,1)
@@ -175,7 +181,7 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:,:)
   
 
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-   
+endif
 END SUBROUTINE exchange_nod3D_n
 ! ========================================================================
 
@@ -263,6 +269,7 @@ subroutine exchange_edge2D(edge_array2D)
  INTEGER  :: req(com_edge2D%rPEnum + com_edge2D%sPEnum)
  integer  :: n, sn, rn
 
+ if (npes> 1) then
   sn=com_edge2D%sPEnum
   rn=com_edge2D%rPEnum
 
@@ -276,7 +283,9 @@ subroutine exchange_edge2D(edge_array2D)
   END DO
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+
+  endif
+
 end subroutine exchange_edge2D
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D)
@@ -292,6 +301,8 @@ IMPLICIT NONE
  integer  :: n, sn, rn, nl1
  integer, pointer :: r_mpitype(:), s_mpitype(:)
  integer, pointer :: r_PE(:), s_PE(:)
+
+ if (npes> 1) then
 
  nl1=ubound(elem_array3D,1)
  
@@ -345,7 +356,8 @@ IMPLICIT NONE
 
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+endif
+
 END SUBROUTINE exchange_elem3D
 
 !=============================================================================
@@ -361,6 +373,7 @@ IMPLICIT NONE
  INTEGER  :: req(2*maxPEnum)
  integer  :: n, sn, rn, n_val, nl1
 
+ if (npes> 1) then
  nl1   = ubound(elem_array3D,2)
  n_val = ubound(elem_array3D,1)
  
@@ -409,7 +422,8 @@ IMPLICIT NONE
   end if     
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+
+endif  
 END SUBROUTINE exchange_elem3D_n
 !========================================================================
 subroutine exchange_elem2D(elem_array2D)
@@ -423,6 +437,8 @@ IMPLICIT NONE
  real(kind=WP), intent(inout) :: elem_array2D(:) 
  INTEGER  :: req(2*maxPEnum)
  integer  :: n, sn, rn
+
+ if (npes> 1) then
 
   if (ubound(elem_array2D,1)<=myDim_elem2D+eDim_elem2D) then
 
@@ -453,7 +469,8 @@ IMPLICIT NONE
   end if     
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+
+end if
   
 END SUBROUTINE exchange_elem2D
 ! ========================================================================
@@ -467,6 +484,8 @@ IMPLICIT NONE
 
  INTEGER  :: req(2*maxPEnum)
  integer  :: n, sn, rn
+
+ if (npes> 1) then
 
   sn=com_elem2D_full%sPEnum
   rn=com_elem2D_full%rPEnum
@@ -483,7 +502,8 @@ IMPLICIT NONE
   END DO
   
   call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-     
+end if
+
 END SUBROUTINE exchange_elem2D_i
 !=============================================================================
 
@@ -835,6 +855,7 @@ real(kind=WP), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
+ if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -871,7 +892,7 @@ ELSE
    
 ENDIF
 
-
+end if
 end subroutine gather_nod3D
 !==============================================
 subroutine gather_nod2D(arr2D, arr2D_global)
@@ -891,6 +912,7 @@ real(kind=WP)  :: recvbuf(nod2D)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
+ if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 
@@ -925,7 +947,7 @@ ELSE
    
 ENDIF
 
-
+endif
 end subroutine gather_nod2D
 !==============================================
 !============================================================================
@@ -951,6 +973,7 @@ integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
 
+ if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -991,7 +1014,7 @@ ELSE
    
 ENDIF
 
-
+endif
 end subroutine gather_elem3D
 !==============================================
 subroutine gather_elem2D(arr2D, arr2D_global)
@@ -1012,6 +1035,7 @@ integer        :: req(npes-1)
 integer        :: start, e2D
 
 
+ if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -1044,7 +1068,7 @@ ELSE
    call MPI_SEND( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_WORLD, MPIerr )
    
 ENDIF
-
+end if
 
 end subroutine gather_elem2D
 
@@ -1071,6 +1095,7 @@ real(kind=4), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D, ierr
 
+ if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 nl1=ubound(arr3D,1)
@@ -1112,6 +1137,7 @@ ELSE
    
 ENDIF
 
+end if
 
 end subroutine gather_real4_nod3D
 !==============================================
@@ -1134,6 +1160,7 @@ integer        :: start, n2D
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
+ if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 IF ( mype == 0 ) THEN
    
@@ -1165,7 +1192,7 @@ ELSE
    
 ENDIF
 
-
+end if
 end subroutine gather_real4_nod2D
 !==============================================
 !============================================================================
@@ -1192,6 +1219,7 @@ integer        :: req(npes-1)
 integer        :: start, e3D
 
 
+ if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 nl1=ubound(arr3D,1)
 
@@ -1229,7 +1257,7 @@ ELSE
    deallocate(sendbuf)
 ENDIF
 
-
+end if
 end subroutine gather_real4_elem3D
 !==============================================
 subroutine gather_real4_elem2D(arr2D, arr2D_global)
@@ -1251,6 +1279,7 @@ integer        :: req(npes-1)
 integer        :: start, e2D
 
 
+ if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -1285,7 +1314,7 @@ ELSE
    
 ENDIF
 
-
+end if
 end subroutine gather_real4_elem2D
 !==============================================
 
