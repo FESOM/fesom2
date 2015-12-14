@@ -120,8 +120,6 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
 ! =================
 ! All auxiliary arrays
 ! =================
-             ! velocity gradient storage
-allocate(vel_grad(nl-1, 4, elem_size))
  
 if(mom_adv==4) then
 allocate(vorticity(nl-1,node_size))
@@ -166,8 +164,6 @@ end if
 ! Initialize with zeros 
 ! =================
 
-    vel_grad=0.0_WP
-!    
     UV=0.0_WP
     UV_rhs=0.0_WP
     UV_rhsAB=0.0_WP
@@ -233,11 +229,10 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
   call status_check
   call oce_mixing_PP
 
-  if(mom_adv<4) then
+  if(mom_adv/=3) then
     call compute_vel_rhs
   else
-    call v_inv_mom_adv
-  ! call momentum_vert_visc
+    call compute_vel_rhs_vinv
   end if
   if (tau_c > 1.e-12) call viscosity_filt2x
   if (i_vert_visc)    call impl_vert_visc ! Probably should be moved for Btr-bcl splitting case

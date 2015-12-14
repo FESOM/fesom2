@@ -245,7 +245,6 @@ subroutine stiff_mat
 
 end subroutine stiff_mat
 ! =================================================================
-! =================================================================
 subroutine solve_ssh
   use o_PARAM
   use o_MESH
@@ -421,8 +420,6 @@ real(kind=WP)      :: tx, ty, tvol
     END DO
  END DO
    call exchange_nod(Unode)
-!   call exchange_nod(Unode(1,:,:))
-!   call exchange_nod(Unode(2,:,:))
 end subroutine compute_vel_nodes
 !===========================================================================
 subroutine impl_vert_visc
@@ -536,245 +533,8 @@ real(kind=WP)              ::  zinv, m, friction, wu, wd
        UV_rhs(2,nz,elem)=vr(nz)
     END DO
  END DO   !!! cycle over elements
-END subroutine impl_vert_visc        
+END subroutine impl_vert_visc
 !===========================================================================
-SUBROUTINE vel_gradients
-! Compute derivatives of velocity by least square interpolation.
-! The interpolation coefficients are already saved
-! For the no-slip case, it is assumed that velocity at 
-! the boundary edge == 0. For the free-slip case, there are only 2
-! neighbours
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-  use g_comm_auto
-IMPLICIT NONE
-real(kind=WP)    :: x(3), y(3), u, v, r1, r2
-real(kind=WP)    :: zc1, zc2, zc_inv, un
-integer         :: elem, el, j, nz, m
-DO elem=1, myDim_elem2D     !! m=1, myDim_elem2D
-   !! elem=myList_elem2D(m)
-   vel_grad(1:nlevels(elem)-1,:,elem) = 0.0_WP
-
-   DO j=1,3
-      el=elem_neighbors(j,elem)
-
-      if (el>0) then
-         ! ======================
-         ! fill in virtual values in the velocity array
-         ! ======================
-         ! Filling in velocity gradients:
-         ! ======================
-         if(nlevels(el)<nlevels(elem)) then
-            DO nz=1, nlevels(el)-1
-               u=UV(1,nz,el)-UV(1,nz,elem)
-               v=UV(2,nz,el)-UV(2,nz,elem)
-               vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-               vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-               vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-               vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v
-            END DO
-            if(free_slip) then
-               zc1=edge_dxdy(1,elem_edges(j,elem))*elem_cos(elem)
-               zc2=edge_dxdy(2,elem_edges(j,elem))
-               zc_inv = 1./(zc1*zc1+zc2*zc2)
-               DO nz=nlevels(el),nlevels(elem)-1
-                  un = -2.*(UV(1,nz,elem)*zc2 - UV(2,nz,elem)*zc1)*zc_inv
-                  u = un*zc2
-                  v =-un*zc1
-                  vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-                  vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-                  vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-                  vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v
-               END DO
-            else     ! noslip
-               DO nz=nlevels(el),nlevels(elem)-1
-                  u= -2.*UV(1,nz,elem)
-                  v= -2.*UV(2,nz,elem)
-                  vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-                  vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-                  vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-                  vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v    
-               END DO
-            end if
-         
-         else
-            DO nz=1, nlevels(elem)-1
-               u=UV(1,nz,el)-UV(1,nz,elem)
-               v=UV(2,nz,el)-UV(2,nz,elem)
-               vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-               vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-               vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-               vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v
-
-            END DO
-         end if
-      else
-
-         ! ===============
-         ! Boundary element
-         ! ===============
-         !    (Here we do not have place for virtual velocities
-         !     in the velocity array so we use auxiliary array)
-         ! ======================
-         if(free_slip) then
-            zc1=edge_dxdy(1,elem_edges(j,elem))*elem_cos(elem)
-            zc2=edge_dxdy(2,elem_edges(j,elem))
-            zc_inv = 1./(zc1*zc1+zc2*zc2)
-            DO nz=1,nlevels(elem)-1
-               un=-2.*(UV(1,nz,elem)*zc2-UV(2,nz,elem)*zc1)*zc_inv
-               u = un*zc2
-               v = -un*zc1
-               vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-               vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-               vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-               vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v
-            END DO
-         else     ! noslip
-            DO nz=1,nlevels(elem)-1
-               u=-2.*UV(1,nz,elem)
-               v=-2.*UV(2,nz,elem)
-               vel_grad(nz,1,elem)=vel_grad(nz,1,elem)+gradient_vec(j,elem)*u
-               vel_grad(nz,2,elem)=vel_grad(nz,2,elem)+gradient_vec(j+3,elem)*u
-               vel_grad(nz,3,elem)=vel_grad(nz,3,elem)+gradient_vec(j,elem)*v
-               vel_grad(nz,4,elem)=vel_grad(nz,4,elem)+gradient_vec(j+3,elem)*v    
-            END DO
-         end if
-      end if
-   end do   ! cycle over neighbor elements
-END DO
-
- call exchange_elem(vel_grad(:,:,:))
-
-END SUBROUTINE vel_gradients
-!===========================================================================
-SUBROUTINE compute_vel_rhs
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE g_CONFIG
-  use g_comm_auto
-IMPLICIT NONE
-integer          :: elem, elnodes(3), nz 
-real(kind=WP)    :: eta(3), ff, gg, mm 
-real(kind=WP)    :: Fx, Fy, pre(3)
-logical, save    :: lfirst=.true.
-real(kind=WP)    :: t1, t2, t3, t4, t5, t6
-
-t1=MPI_Wtime()
-  
- ! =================
- ! Take care of the AB part
- ! =================
- Do elem=1, myDim_elem2D    !!m=1, myDim_elem2D           (a)
-                            !!elem=myList_elem2D(m)
-    DO nz=1,nl-1 
-       UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
-       UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
-    END DO
- END DO 
- ! ====================
- ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
- ! and the Coriolis force + metric terms
- ! ====================
- DO elem=1,  myDim_elem2D           !! m=1,  myDim_elem2D          
-                                    !! elem=myList_elem2D(m)
-    elnodes=elem2D_nodes(:,elem)
-    !eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
-    eta=g*eta_n(elnodes)
-    gg=elem_area(elem)
-    ff=coriolis(elem)*gg
-    !mm=metric_factor(elem)*gg
-    if(mom_adv==4) mm=0.0_WP
-    DO nz=1,nlevels(elem)-1
-      pre=-(eta+hpressure(nz,elnodes)/density_0)
-      Fx=sum(gradient_sca(1:3,elem)*pre)
-      Fy=sum(gradient_sca(4:6,elem)*pre)
-      UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+Fx*gg 
-      UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+Fy*gg 
-      UV_rhsAB(1,nz,elem)= UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-      UV_rhsAB(2,nz,elem)=-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
-    END DO
- END DO
-t2=MPI_Wtime() 
- ! ====================
- ! Compute velocity gradients
- ! (to be used in viscosity operator
- ! and in flux estimates)
- ! ====================
- call vel_gradients
-t3=MPI_Wtime() 
- ! ====================
- ! Horizontal advection
- ! ====================
- if(mom_adv==1) call momentum_adv_upwind   
- If(mom_adv==2) call momentum_adv_p1
- if(mom_adv==3) call momentum_adv_scalar
-
-t4=MPI_Wtime() 
- !======
- ! Horizontal viscosity part
- !======
-  if(laplacian.or.biharmonic) call h_viscosity2
-
-  if(laplacian.and.biharmonic) then    ! Both harmonic and biharmonic 
-  call biPlusharmonic_viscosity
-  elseif(laplacian) then               ! Only harmonic
-  call laplacian_viscosity 
-  elseif (biharmonic) then
-  call biharmonic_viscosity            ! Only biharmonic
-  end if
- ! ======================
- ! subroutine biharmonic redefines gradients!
- ! Do not move it from here
- ! ======================
- 
-t5=MPI_Wtime() 
- !======
- ! Vertical advection and viscosity
- !======
- if(mom_adv==3) then
-    !call momentum_vert_visc
- else
-    call momentum_vert_adv_visc
- end if 
-
- ! =======================
- ! Update the rhs   
- ! =======================
- ff=(1.5_WP+epsilon)
-  if(lfirst.and.(.not.r_restart)) then
-    ff=1.0_WP
-    lfirst=.false.
-  end if
-  
- DO elem=1, myDim_elem2D       !! m=1, myDim_elem2D 
-                               !! elem=myList_elem2D(m)
-    DO nz=1,nlevels(elem)-1   
-       UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,nz,elem)*ff)/elem_area(elem)
-       UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
-    END DO 
-
- END DO
-
- ! =======================  
- ! U_rhs contains all contributions to velocity from old time steps   
- ! =======================
- t6=MPI_Wtime() 
-call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
-
- if(mype==0) then 
-   write(*,*) 'Momentum:   ', t6-t1
-   write(*,*) 'pres., Cor: ', t2-t1
-   write(*,*) 'grads:      ', t3-t2
-   write(*,*) 'h adv       ', t4-t3
-   write(*,*) 'h visc      ', t5-t4
-   write(*,*) 'vert. part  ', t6-t5
- end if     
-END SUBROUTINE compute_vel_rhs
-!==========================================================================
 SUBROUTINE update_vel
 USE o_MESH
 USE o_ARRAYS
@@ -822,9 +582,6 @@ real(kind=WP) :: Fx, Fy
  END DO
  eta_n=eta_n+d_eta
  call exchange_elem(UV)
-! call exchange_elem(UV(1,:,:))
-! call exchange_elem(UV(2,:,:))
-
 end subroutine update_vel
 !==========================================================================
 SUBROUTINE vert_vel
@@ -921,12 +678,6 @@ END DO
    END DO
 END DO
 
-
-!!DELETE IT
-!fer_Wvel(1,:)=fer_k
-!fer_Wvel(2,:)=fer_c
-!!
-
 call exchange_nod(Wvel)
 call exchange_nod(fer_Wvel)
 
@@ -942,242 +693,95 @@ else
 end if
 Wvel_i=Wvel-Wvel_e
 end subroutine vert_vel
-! =================================================================
-SUBROUTINE momentum_adv_upwind
-! 
-! Linear reconstruction upwind horizontal momentum advection.
-! It is typically too damping or too noisy, so other options are
-! recommended instead.
-! 
-USE o_PARAM
+!==========================================================================
+SUBROUTINE viscosity_filt2x
 USE o_MESH
 USE o_ARRAYS
+USE o_PARAM
 USE g_PARSUP
-
+USE g_config
+USE g_comm_auto
 IMPLICIT NONE
-integer          :: ed, nodes(2), el(2), nz, nl1, nl2
-real(kind=WP)    :: x1, y1, x2, y2, u1, u2, v1, v2
-real(kind=WP)    :: un, xe, ye
 
-! ======================
-! Horizontal momentum advection   -\int div(uu)dS=-\sum u(un)l
-! (assembly over edges)        
-! ======================
-
-
- DO ed=1, myDim_edge2D+eDim_edge2D  !! m=1, myDim_edge2D+eDim_edge2D   
-                                     !! ed=myList_edge2D(m)
-   if(myList_edge2D(ed)>edge2D_in) cycle
-   
-   nodes=edges(:,ed)   
-   el=edge_tri(:,ed)
-   nl1=nlevels(el(1))-1
-   nl2=nlevels(el(2))-1
-   
-   x1=-edge_cross_dxdy(1,ed)
-   y1=-edge_cross_dxdy(2,ed)
-   x2=-edge_cross_dxdy(3,ed)
-   y2=-edge_cross_dxdy(4,ed)
-   xe=edge_dxdy(1,ed)
-   ye=edge_dxdy(2,ed)
-   
-   DO nz=1, min(nl1,nl2)   ! Only faces that do not belong to
-                           ! vertical walls can contribute to
-			   ! the momentum advection 
-   !====== 
-   ! The piece below gives second order spatial accuracy for
-   ! the momentum fluxes. 
-   !======
-   
-   u1=UV(1,nz,el(1))+ vel_grad(nz,1,el(1))*x1+vel_grad(nz,2,el(1))*y1
-   v1=UV(2,nz,el(1))+ vel_grad(nz,3,el(1))*x1+vel_grad(nz,4,el(1))*y1
-   u2=UV(1,nz,el(2))+ vel_grad(nz,1,el(2))*x2+vel_grad(nz,2,el(2))*y2
-   v2=UV(2,nz,el(2))+ vel_grad(nz,3,el(2))*x2+vel_grad(nz,4,el(2))*y2
-   
-   !======
-   ! Normal velocity at edge ed directed to el(2)
-   ! (outer to el(1)) multiplied with the length of the edge
-   ! and mean depth dmean
-   !======
-   un=0.5_WP*r_earth*((u1+u2)*ye-(v1*elem_cos(el(1))+v2*elem_cos(el(2)))*xe)
-   !======
-   ! If it is positive, take velocity in the left element (el(1)),
-   ! and use the velocity at el(2) otherwise.
-   !======  
-   
-  if(un>=0) then    
-  u2=u1
-  v2=v1
-  end if   
-   
-   UV_rhsAB(1,nz,el(1))=UV_rhsAB(1,nz,el(1))-u2*un
-   UV_rhsAB(2,nz,el(1))=UV_rhsAB(2,nz,el(1))-v2*un
-   UV_rhsAB(1,nz,el(2))=UV_rhsAB(1,nz,el(2))+u2*un
-   UV_rhsAB(2,nz,el(2))=UV_rhsAB(2,nz,el(2))+v2*un
+real(kind=8)  :: u1, v1, tau_inv, s
+integer       :: ed, el(2), nz
+real(kind=8), allocatable  :: UV_c(:,:,:), UV_f(:,:,:)
  
-   END DO
- END DO  
+ ! Filter is applied twice. It should be approximately 
+ ! equivalent to biharmonic operator with the coefficient
+ ! (tau_c/day)a^3/9. Scaling inside is found to help 
+ ! with smoothness in places of mesh transition. *(it makes a^3 from a^4) 
+ed=myDim_elem2D+eDim_elem2D
+allocate(UV_c(2,nl-1,ed)) ! to store the filtered velocity
+allocate(UV_f(2,nl-1,ed)) ! to store the contributions into the RHS
 
-END SUBROUTINE momentum_adv_upwind
-! ============================================================================
-SUBROUTINE momentum_vert_adv_visc
-! 
-! Vertical momentum advection and viscosity
-! For advection, quadratic upwind reconstruction is used.
-! 
+
+ UV_c=0.0_8
+ UV_f=0.0_8
+ tau_inv=dt*tau_c/3600.0/24.0     ! SET IT experimentally 
+  
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+        u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+        v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+
+        UV_c(1,nz,el(1))=UV_c(1,nz,el(1))-u1
+        UV_c(1,nz,el(2))=UV_c(1,nz,el(2))+u1
+        UV_c(2,nz,el(1))=UV_c(2,nz,el(1))-v1
+        UV_c(2,nz,el(2))=UV_c(2,nz,el(2))+v1
+    END DO 
+ END DO
  
-USE o_PARAM
-USE o_MESH
-USE o_ARRAYS
-USE g_PARSUP
-USE g_CONFIG
-IMPLICIT NONE
+ ! ============ 
+ ! Contribution from boundary edges (Dirichlet boundary conditions)
+ ! ============
+! DO ed=1, myDim_edge2D+eDim_edge2D
+!    if(myList_edge2D(ed)<=edge2D_in) cycle
+!    el=edge_tri(:, ed)
+!    DO  nz=1, nlevels(el(1))-1
+!        UV_c(1,nz,el(1))=UV_c(1,nz,el(1))-2.0_WP*UV(1,nz,el(1))
+!        UV_c(2,nz,el(1))=UV_c(2,nz,el(1))-2.0_WP*UV(2,nz,el(1))
+!    END DO
+! END DO
 
-integer          :: elem, elnodes(3), nz 
-real(kind=WP)    :: friction,temp
-real(kind=WP)    :: w, uvertAB(2, nl)
-real(kind=WP)    :: uvert(2,nl), umean, vmean, a, b, c, d, dg, da, db
+ Do ed=1,myDim_elem2D
+    Do nz=1,nlevels(ed)-1
+     UV_c(1,nz,ed)=-UV_c(1,nz,ed)*tau_inv*sqrt(scale_area/elem_area(ed))
+     UV_c(2,nz,ed)=-UV_c(2,nz,ed)*tau_inv*sqrt(scale_area/elem_area(ed))
+    END DO
+ end do
 
-! =======================
-! Vertical momentum advection 
-! and vertical viscosity
-! =======================
- uvert=0.0_WP
- uvertAB=0.0_WP
+ call exchange_elem(UV_c)
+! call exchange_elem(UV_c(1,:,:))
+! call exchange_elem(UV_c(2,:,:))
 
- DO elem=1, myDim_elem2D         !! m=1, myDim_elem2D        !! P (d) elem=1,elem2D
-                                 !! elem=myList_elem2D(m)
-   elnodes=elem2D_nodes(:,elem)
-   DO nz=2, nlevels(elem)-1
-          w=sum(Wvel(nz,elnodes))*elem_area(elem)/3.0_WP
-	  umean=0.5_WP*(UV(1,nz-1,elem)+UV(1,nz,elem))
-  	  vmean=0.5_WP*(UV(2,nz-1,elem)+UV(2,nz,elem))
-      if(w>0) then
-        if(nz==nlevels(elem)-1) then
-	    umean=0.5_WP*(UV(1,nz-1,elem)+UV(1,nz,elem))
-  	    vmean=0.5_WP*(UV(2,nz-1,elem)+UV(2,nz,elem))
-	                                       ! or replace this with first
-	                                       ! order upwind  
-	else
-	a=Z(nz-1)-zbar(nz)
-	b=zbar(nz)-Z(nz)
-	c=zbar(nz)-Z(nz+1)
-	d=(c+a)*(b**2-a**2)-(c**2-a**2)*(b+a)
-        dg=a*b*(a+b)/d
-	db=-a*c*(a+c)/d
-	da=1.0_WP-dg-db
-	umean=UV(1,nz-1,elem)*da+UV(1,nz,elem)*db+UV(1,nz+1,elem)*dg
-	vmean=UV(2,nz-1,elem)*da+UV(2,nz,elem)*db+UV(2,nz+1,elem)*dg
-	end if
-      end if
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1 
+        u1=(UV_c(1,nz,el(1))-UV_c(1,nz,el(2)))
+        v1=(UV_c(2,nz,el(1))-UV_c(2,nz,el(2)))
 
-      if(w<0) then
-        if(nz==2) then
-	    umean=0.5_WP*(UV(1,nz-1,elem)+UV(1,nz,elem))
-  	    vmean=0.5_WP*(UV(2,nz-1,elem)+UV(2,nz,elem))
-	else  
-	a=zbar(nz)-Z(nz)
-	b=Z(nz-1)-zbar(nz)
-	c=Z(nz-2)-zbar(nz)
-	d=(c+a)*(b**2-a**2)-(c**2-a**2)*(b+a)
-        dg=a*b*(a+b)/d
-	db=-a*c*(a+c)/d
-	da=1.0_WP-dg-db
-	umean=UV(1,nz,elem)*da+UV(1,nz-1,elem)*db+UV(1,nz-2,elem)*dg
-	vmean=UV(2,nz,elem)*da+UV(2,nz-1,elem)*db+UV(2,nz-2,elem)*dg
-	end if
-      end if
-          temp=Av(nz,elem)/(Z(nz-1)-Z(nz))*elem_area(elem)
-          uvertAB(1,nz)= -umean*w 
-	  uvert(1,nz)= temp*(UV(1,nz-1,elem)-UV(1,nz,elem))
-	  uvertAB(2,nz)= -vmean*w 
-	  uvert(2,nz)= temp*(UV(2,nz-1,elem)-UV(2,nz,elem))
-   END DO
-   ! Wind stress and bottom drag
-   if (i_vert_visc) then
-          uvert(1,1)=0d0
-          uvert(2,1)=0d0
-          uvert(1,nlevels(elem))=0d0
-          uvert(2,nlevels(elem))=0d0
-   else
-	  uvert(1,1)= stress_surf(1,elem)*elem_area(elem)/density_0
-	  uvert(2,1)= stress_surf(2,elem)*elem_area(elem)/density_0
-	  friction=C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
-	               UV(2,nlevels(elem)-1,elem)**2)*elem_area(elem)
-          
-	  uvert(1,nlevels(elem))=friction*UV(1,nlevels(elem)-1,elem)
-	  uvert(2,nlevels(elem))=friction*UV(2,nlevels(elem)-1,elem)
-    endif
-          w=sum(Wvel(1,elnodes))*elem_area(elem)/3.0_WP 
-	  uvertAB(1,1)= -w*UV(1,1,elem)
-	  uvertAB(2,1)= -w*UV(2,1,elem) 
-	  ! + sign here because it is subtracted!
-	  uvertAB(1,nlevels(elem))=0.0_WP 
-	  uvertAB(2,nlevels(elem))=0.0_WP 
-   DO nz=1,nlevels(elem)-1
-      UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+(uvert(1,nz)-uvert(1,nz+1))/(zbar(nz)-zbar(nz+1))
-      UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+(uvert(2,nz)-uvert(2,nz+1))/(zbar(nz)-zbar(nz+1))
-      UV_rhsAB(1,nz,elem)=UV_rhsAB(1,nz,elem)+(uvertAB(1,nz)-uvertAB(1,nz+1))/(zbar(nz)-zbar(nz+1))
-      UV_rhsAB(2,nz,elem)=UV_rhsAB(2,nz,elem)+(uvertAB(2,nz)-uvertAB(2,nz+1))/(zbar(nz)-zbar(nz+1))
-   END DO
-END DO
-END SUBROUTINE momentum_vert_adv_visc
-! ===================================================================================
-SUBROUTINE momentum_vert_visc
-! 
-! Vertical viscosity, explicit 
-! 
-USE o_PARAM
-USE o_ARRAYS
-USE o_MESH
-USE g_PARSUP
-use g_comm_auto
-USE g_CONFIG
-IMPLICIT NONE
-
-integer          :: elem, elnodes(3), nz 
-real(kind=WP)    :: friction 
-real(kind=WP)    :: uvert(2,nl)
-real(kind=WP)    :: s_coeff
-
-! =======================
-! Vertical viscosity
-! =======================
- DO elem=1, myDim_elem2D         !! m=1, myDim_elem2D        !! P (d) elem=1,elem2D
-
-    if (mom_adv/=4) then
-       s_coeff=elem_area(elem)
-    else
-       s_coeff=dt
-    end if
-                                 !! elem=myList_elem2D(m)
-   elnodes=elem2D_nodes(:,elem)
-   DO nz=2, nlevels(elem)-1
-          uvert(1,nz)= Av(nz,elem)*(UV(1,nz-1,elem)-UV(1,nz,elem))/(Z(nz-1)-Z(nz))
-	  uvert(2,nz)= Av(nz,elem)*(UV(2,nz-1,elem)-UV(2,nz,elem))/(Z(nz-1)-Z(nz))
-   END DO
-   if (i_vert_visc) then
-          uvert(1,1)=0d0
-          uvert(2,1)=0d0
-          uvert(1,nlevels(elem))=0d0
-          uvert(2,nlevels(elem))=0d0
-   else
-   ! Wind stress and bottom drag
-          uvert(1,1)= stress_surf(1,elem)*elem_area(elem)/density_0
-	  uvert(2,1)= stress_surf(2,elem)*elem_area(elem)/density_0
-	  friction=C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
-	               UV(2,nlevels(elem)-1,elem)**2)*elem_area(elem)
-          
-	  uvert(1,nlevels(elem))=friction*UV(1,nlevels(elem)-1,elem)
-	  uvert(2,nlevels(elem))=friction*UV(2,nlevels(elem)-1,elem)
-	  ! + sign here because it is subtracted!
-	 
-   endif
-   DO nz=1, nlevels(elem)-1
-      UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+(uvert(1,nz)-uvert(1,nz+1))/(zbar(nz)-zbar(nz+1))*s_coeff
-      UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+(uvert(2,nz)-uvert(2,nz+1))/(zbar(nz)-zbar(nz+1))*s_coeff
-   END DO
+        UV_f(1,nz,el(1))=UV_f(1,nz,el(1))-u1
+        UV_f(1,nz,el(2))=UV_f(1,nz,el(2))+u1
+        UV_f(2,nz,el(1))=UV_f(2,nz,el(1))-v1
+        UV_f(2,nz,el(2))=UV_f(2,nz,el(2))+v1
+    END DO 
+ END DO
+ 
+ DO ed=1, myDim_elem2D
+    DO  nz=1, nlevels(ed)-1 
+        u1=sqrt(UV_f(1,nz,ed)**2+UV_f(2,nz,ed)**2)+1.e-5
+        v1=sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2)
+        ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
+        ! this is done to force the CFL, which is otherwise exceeded in some points
+	! some other criteria is welcome (i.e. like computing the eigenvalues from filtering)
+        UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_f(1,nz,ed)*min(1.0_WP, 2.0_WP*v1/u1)
+        UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_f(2,nz,ed)*min(1.0_WP, 2.0_WP*v1/u1)
+    END DO 
  END DO
 
-END SUBROUTINE momentum_vert_visc
-! ===================================================================================
+ deallocate(UV_f, UV_c)    
+end subroutine viscosity_filt2x

@@ -62,7 +62,7 @@ END DO
 
 end subroutine relative_vorticity
 ! ==========================================================================
-subroutine v_inv_mom_adv !vector invariant
+subroutine compute_vel_rhs_vinv !vector invariant
 USE o_PARAM
 USE o_ARRAYS
 USE o_MESH
@@ -128,29 +128,7 @@ end DO
     END DO
  END DO 
 
- ! ====================
- ! Compute velocity gradients
- ! (to be used in viscosity operator)
- ! ====================
-
- call vel_gradients
  call relative_vorticity 
- call h_viscosity2                      ! Takes into account the Leith parameterization
-                                        ! can also be call h_viscosity
-!call MPI_Barrier(MPI_COMM_WORLD, MPIERR) 
-
- !======
- ! Horizontal viscosity part
- !======
- 
- if(laplacian.and.biharmonic) then    ! Both harmonic and biharmonic 
-  call biPlusharmonic_viscosity
-  elseif(laplacian) then               ! Only harmonic
-  call laplacian_viscosity 
-  else
-  call biharmonic_viscosity            ! Only biharmonic
- end if
-
 ! ====================
 ! Sea level and pressure contribution   -\nabla(g\eta +hpressure/rho_0+V^2/2)
 ! and the Coriolis force (elemental part)
@@ -275,4 +253,4 @@ DO elem=1, myDim_elem2D                    !! P(e) elem=1, elem2D
 END DO
 ! U_rhs contains all contributions to velocity from old time steps   
 
-end subroutine v_inv_mom_adv
+end subroutine compute_vel_rhs_vinv

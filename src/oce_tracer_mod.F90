@@ -39,7 +39,6 @@ del_ttf=0d0
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
 call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
 call exchange_elem(tr_xy)
-
 call fill_up_dn_grad
 END SUBROUTINE init_tracers_AB
 !========================================================================================
@@ -55,7 +54,7 @@ select case (tracer_adv)
    case(1) !MUSCL
       call adv_tracer_muscl(tr_arr(:,:,tr_num), del_ttf, tr_arr_old(:,:,tr_num))
    case(2) !MUSCL+FCT(3D)
-      call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.0_WP)
+      call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.75_WP)
    CASE DEFAULT !unknown
       IF (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'
       call par_ex(1)

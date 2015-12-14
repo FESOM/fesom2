@@ -35,6 +35,7 @@ n_num=0
   allocate(nn_num(myDim_nod2D), nn_pos(n_num,myDim_nod2D))
                     !! These are the same arrays that we also use in quadratic
 		    !! reconstruction
+  !MOVE IT TO SOMEWHERE ELSE
   DO n=1,myDim_nod2d
      nn_num(n)=1
      nn_pos(1,n)=n

@@ -750,8 +750,6 @@ real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)
 !Tracer gradients&RHS      
 real(kind=8), allocatable :: ttrhs(:,:)
 real(kind=8), allocatable :: tr_xy(:,:,:)
-! Auxiliary arrays to store velocity gradients
-real(kind=WP),allocatable,dimension(:,:,:)    ::   vel_grad
 
 ! Auxiliary arrays for vector-invariant form of momentum advection
 real(kind=WP), allocatable,dimension(:,:)   :: vorticity
