@@ -27,7 +27,6 @@ subroutine ice_TG_rhs
      rhs_a(row)=0.
      rhs_ms(row)=0.          
   END DO
-  if(ice_v_n) then
   ! Velocities at nodes
   do elem=1,myDim_elem2D          !assembling rhs over elements
      elnodes=elem2D_nodes(:,elem)
@@ -63,33 +62,6 @@ subroutine ice_TG_rhs
 		rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
 	     END DO
 	  end do  
-	  
-	  else
-	  ! Velocities at elements
-	  do elem=1,myDim_elem2D          !assembling rhs over elements
-	     elnodes=elem2D_nodes(:,elem)
-	      !derivatives
-	     dx=gradient_sca(1:3,elem)
-	     dy=gradient_sca(4:6,elem)
-	     vol=elem_area(elem)
-	     um=U_ice(elem)
-	     vm=v_ice(elem)
-	      !diffusivity
-	     
-	     diff=ice_diff*sqrt(elem_area(elem)/scale_area)
-	     DO n=1,3
-		row=elnodes(n)
-		DO q = 1,3 
-		   entries(q)= vol*ice_dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
-			       diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-			       0.5*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q)))  
-        END DO
-	rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
-        rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
-        rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
-     END DO
-  end do
-  end if   
 end subroutine ice_TG_rhs   
 !
 !----------------------------------------------------------------------------

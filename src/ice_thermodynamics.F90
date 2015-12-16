@@ -57,8 +57,7 @@ subroutine thermodynamics
 
   rsss=ref_sss
 
-  ! u_ice and v_ice are on elements if 
-  ! ice_v_n=.false. and on nodes otherwise
+  ! u_ice and v_ice are at nodes
   ! u_w, v_w is always on elements
   ! u_wind and v_wind are always at nodes
   ! ================
@@ -67,21 +66,9 @@ subroutine thermodynamics
   allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
     DO i=1, myDim_nod2D
        ustar=0.0_WP
-       if(ice_v_n) then ! ice velocity at nodes
            ustar=((u_ice(i)-u_w(i))**2+ &
 	                     (v_ice(i)-v_w(i))**2)
            ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
-
-       !END DO
-       else
-       DO j=1, nod_in_elem2D_num(i)
-           elem=nod_in_elem2D(j,i)
-           ustar=ustar+ ((u_ice(elem)-u_w(elem))**2+ &
-	                     (v_ice(elem)-v_w(elem))**2)*elem_area(elem)
-       END DO
-
-           ustar_aux(i)=sqrt(ustar*Cd_oce_ice/area(1,i)/3.0_WP)
-       end if
     END DO	
   call exchange_nod(ustar_aux) !TODO Why do we need it?
   

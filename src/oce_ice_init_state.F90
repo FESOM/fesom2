@@ -634,7 +634,7 @@ real(kind=WP)  :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
 integer       :: n, elnodes(3)   
    
   coriolis=1.4e-4  ! redefines Coriolis
-  if(ice_v_n) coriolis_node=1.4e-4  
+  coriolis_node=1.4e-4  
    ! Set initial thickness and area coverage:
    m_ice=2.0
    m_snow=0.0
@@ -657,20 +657,10 @@ integer       :: n, elnodes(3)
    a_ice(n)=(coord_nod2d(1,n)-xmin)/Lx      
    END DO
    
-   if(ice_v_n) then
    DO n=1, myDim_nod2D+eDim_nod2D
    U_w(n)=0.1*(2*(coord_nod2d(2,n)-ymin)-Ly)/Ly
    V_w(n)=-0.1*(2*(coord_nod2d(1,n)-xmin)-Lx)/Lx
    END DO
-   else
-   DO n=1, myDim_elem2D
-   elnodes=elem2D_nodes(:,n)
-   U_w(n)=0.1*(2*(sum(coord_nod2d(2,elnodes))/3.0_8-ymin)-Ly)/Ly
-   V_w(n)=-0.1*(2*(sum(coord_nod2d(1,elnodes))/3.0_8-xmin)-Lx)/Lx
-   END DO
-   call exchange_elem(U_w)
-   call exchange_elem(V_w)
-   end if
    m_ice=m_ice*a_ice
   
    ! Elevation computed approximately, from the geostrophy:

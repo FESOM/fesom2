@@ -80,10 +80,9 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.false.
   logical                       :: use_ice=.false.  
-  logical                       :: ice_v_n=.true. ! Ice velocity at nodes
   logical                       :: toy_ocean=.false. ! Erzatz forcing has
                                                    ! to be supplied
-  namelist /run_config/ use_ice, ice_v_n, use_sw_pene, toy_ocean
+  namelist /run_config/ use_ice, use_sw_pene, toy_ocean
   
   ! *** others ***
   real(kind=8)             	:: dt

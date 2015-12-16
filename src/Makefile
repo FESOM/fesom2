@@ -31,12 +31,8 @@ MODULES = oce_modules.o \
           psolve.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
-          oce_split.o \
 	  fort_part.o \
           gen_input.o
-
-#         oce_age_tracer.o \
-#         oce_passive_tracer.o \
 
 OBJECTS=  fvom_main.o \
           oce_setup_step.o \

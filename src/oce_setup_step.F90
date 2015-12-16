@@ -4,9 +4,6 @@ USE o_PARAM
 USE g_PARSUP
 USE o_ARRAYS
 USE g_config
-#ifdef BTR_SPLIT
-USE o_split
-#endif
 IMPLICIT NONE
          
         call array_setup
@@ -40,9 +37,7 @@ IMPLICIT NONE
         end if
 
          if (.not.r_restart) tr_arr_old=tr_arr
-#ifdef BTR_SPLIT
-         call init_split
-#endif        
+
 	 if(mype==0) write(*,*) 'Initial state'
 if (w_split .and. mype==0) then
 	write(*,*) '******************************************************************************'
@@ -121,7 +116,7 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
 ! All auxiliary arrays
 ! =================
  
-if(mom_adv==4) then
+if(mom_adv==3) then
 allocate(vorticity(nl-1,node_size))
 vorticity=0.0_8
 end if
@@ -214,9 +209,6 @@ USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
-#ifdef BTR_SPLIT
-USE o_split
-#endif
 IMPLICIT NONE
 real(kind=8)      :: t1, t2, t3, t4, t5
 
@@ -237,16 +229,11 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
   if (tau_c > 1.e-12) call viscosity_filt2x
   if (i_vert_visc)    call impl_vert_visc ! Probably should be moved for Btr-bcl splitting case
 
-#ifdef BTR_SPLIT
-  t2=MPI_Wtime()
-  call bar_split
-  t3=MPI_Wtime() 
-#else
   call compute_ssh_rhs
   t2=MPI_Wtime()
   call solve_ssh
   t3=MPI_Wtime() 
-#endif
+
   call update_vel
 
   if (Fer_GM) then

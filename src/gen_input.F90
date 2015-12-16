@@ -46,8 +46,7 @@ subroutine oce_input
   ! Sizes: u, v (nl-1, elem_size)
   !        w (nl, nod_size)
   !        T, S, ... (nl-1, nod_size)
-  !        u_ice, v_ice either nod_size (ice_v_n=.true.)
-  !                     or elem_size   
+  !        u_ice, v_ice nod_size
   
   ! open files
   filename=trim(ResultPath)//runid//'.'//cyearold//'.oce.restart.nc'
@@ -242,25 +241,12 @@ subroutine ice_input
   status=nf_get_vara_double(ncid, hsnow_varid, istart, icount, aux2) 
   if (status .ne. nf_noerr) call handle_err(status)
   m_snow=aux2(myList_nod2D)      
-  if(ice_v_n) then
-    status=nf_get_vara_double(ncid, uice_varid, istart, icount, aux2) 
-    if (status .ne. nf_noerr) call handle_err(status)
-    u_ice=aux2(myList_nod2D)      
-    status=nf_get_vara_double(ncid, vice_varid, istart, icount, aux2) 
-    if (status .ne. nf_noerr) call handle_err(status)
-    v_ice=aux2(myList_nod2D) 
-  else
-    deallocate(aux2)
-    allocate(aux2(elem2D))
-    icount=(/elem2d, 1/)
-    n2=myDim_elem2D+eDim_elem2D
-    status=nf_get_vara_double(ncid, uice_varid, istart, icount, aux2) 
-    if (status .ne. nf_noerr) call handle_err(status)
-    u_ice=aux2(myList_elem2D(1:n2))      
-    status=nf_get_vara_double(ncid, vice_varid, istart, icount, aux2) 
-    if (status .ne. nf_noerr) call handle_err(status)
-    v_ice=aux2(myList_elem2D(1:n2)) 
-  end if
+  status=nf_get_vara_double(ncid, uice_varid, istart, icount, aux2) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  u_ice=aux2(myList_nod2D)      
+  status=nf_get_vara_double(ncid, vice_varid, istart, icount, aux2) 
+  if (status .ne. nf_noerr) call handle_err(status)
+  v_ice=aux2(myList_nod2D) 
   status=nf_close(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 

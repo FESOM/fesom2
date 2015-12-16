@@ -49,17 +49,9 @@ n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for variables of ice model      
- if(ice_v_n) then
  allocate(u_ice(n_size), v_ice(n_size))
  if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
- else
- allocate(u_ice(e_size), v_ice(e_size))
- if (use_means) allocate(u_ice_mean(e_size), v_ice_mean(e_size))
- allocate(U_rhs_ice(e_size), V_rhs_ice(e_size))
- allocate(ice_grad_vel(4,e_size))
- ice_grad_vel=0.0_WP 
- end if
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size)) 
  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
@@ -97,13 +89,8 @@ endif
  allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
  allocate(stress_atmoce_x(n_size), stress_atmoce_y(n_size))    
  allocate(elevation(n_size))           ! =ssh  of ocean        
- if(ice_v_n) then
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
- else
- allocate(stress_iceoce_x(e_size), stress_iceoce_y(e_size))    
- allocate(U_w(e_size), V_w(e_size))   ! =uf and vf of ocean at surface nodes
- end if 
 end subroutine ice_array_setup
 !==========================================================================
 subroutine ice_timestep(step)
@@ -118,11 +105,7 @@ integer      :: step
 REAL(kind=8) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
- if(ice_v_n) then
- call EVPdynamics_n
- else
  call EVPdynamics
- end if
  t2=MPI_Wtime()     
  ! ===== Advection part
  call ice_fct_solve

@@ -765,9 +765,7 @@ real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:)
  allocate(metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(coriolis(myDim_elem2D))
- if((mom_adv==4).or. ice_v_n) then
-      allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
- end if
+ allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
@@ -777,12 +775,10 @@ real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:)
  ! ============
  ! coriolis
  ! ============
- if((mom_adv==4).or.(ice_v_n)) then
  DO n=1,myDim_nod2D+eDim_nod2D 
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
  coriolis_node(n)=2*omega*sin(lat)	 
  END DO
- end if
  DO n=1,myDim_nod2D+eDim_nod2D 
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
  geo_coord_nod2D(1,n)=lon

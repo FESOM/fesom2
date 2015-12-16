@@ -40,11 +40,7 @@ logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
 logical                       :: Fer_GM =.true.   !flag for Ferrari et al. (2010) GM scheme
 ! Time stepping                               
-#ifdef BTR_SPLIT
-real(kind=WP)                 :: alpha=0.0_WP, theta=0.0_WP ! implicitness for
-#else 
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
-#endif
                                                  ! elevation and divergence
 real(kind=WP)                 :: epsilon=0.1_WP ! AB2 offset 
 ! Tracers
@@ -63,7 +59,7 @@ integer	                       :: num_tracers=2
 ! Momentum
 logical                       :: free_slip=.false.
                                 ! false=no slip 
-integer                       :: mom_adv=4 
+integer                       :: mom_adv=2
                                 ! 1 vector control volumes
 				! 2 vector c. v., p1 velocities
 				! 3 scalar control volumes  

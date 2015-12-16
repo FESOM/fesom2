@@ -4,7 +4,7 @@
 !  Modules for coupled version 
 !  Only EVP solver is available in this distrib. memory setup
 ! ======================
-! Ice velocity can be on elements, or at nodes (ice_v_n=.true.).
+!  Ice velocity is defined at nodes
 !===========================================================================
 !
 MODULE i_PARAM
