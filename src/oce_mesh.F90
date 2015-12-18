@@ -25,7 +25,8 @@ USE o_PARAM
 USE g_CONFIG
 USE o_MESH
 USE o_ARRAYS
-USE g_PARSUP 
+USE g_PARSUP
+USE g_rotate_grid 
 IMPLICIT NONE
 
  Integer        :: n, m, fileID, ind, nini, nend, n1, n2, n3, n4
@@ -120,6 +121,11 @@ IMPLICIT NONE
          DO n=1,nod2D
 	 read(fileID,*) m, x, y
 	 if (mapping(n)>0) then
+         if (force_rotation) then
+             call g2r(x*rad, y*rad, x, y)
+             x=x/rad
+             y=y/rad
+         end if
 	 coord_nod2D(1,mapping(n))=x*rad
 	 coord_nod2D(2,mapping(n))=y*rad
 	 end if

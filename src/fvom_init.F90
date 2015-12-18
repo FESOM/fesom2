@@ -44,6 +44,7 @@ USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 use g_CONFIG
+use g_rotate_grid
 !
 IMPLICIT NONE
 !
@@ -62,7 +63,11 @@ INTEGER		  :: tag
     
   do n=1,nod2D
      read(20,*) nq, x1, x2, tag
-      
+     if (force_rotation) then
+        call g2r(x1*rad, x2*rad, x1, x2)
+        x1=x1/rad
+        x2=x2/rad
+     end if      
      coord_nod2D(1,nq)=x1*rad
      coord_nod2D(2,nq)=x2*rad
   end do
