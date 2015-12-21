@@ -206,31 +206,31 @@ temp1 = runqq('mkdir',dist_mesh_dir)
 	    file_name=trim(dist_mesh_dir)//'rpart.out'  
             fileID=10+mype  
             open(fileID, file=file_name)
-	 ncount=0;
-	 DO n=1, nod2D
-         m=part(n);
-	 ncount(m+1)=ncount(m+1)+1
-	 END DO
-	 write(fileID,*) npes
-	 write(fileID,*) ncount(1:npes)
+            ncount=0
+            DO n=1, nod2D
+               m=part(n)
+               ncount(m+1)=ncount(m+1)+1
+            END DO
+            write(fileID,*) npes
+            write(fileID,*) ncount(1:npes)
 	 	 
-         ncount=0;
-	 DO n=1, nod2D
-         m=part(n);
-	 ncount(m+2)=ncount(m+2)+1
-	 temp(n)=ncount(m+2)
-	 END DO
-         ncount(1)=1
-         Do n=2,npes+1	  
-           ncount(n)=ncount(n)+ncount(n-1)
-         end do
-	 ! Now count == part in range partitioning   
+            ncount=0
+            DO n=1, nod2D
+               m=part(n)
+               ncount(m+2)=ncount(m+2)+1
+               temp(n)=ncount(m+2)
+            END DO
+            ncount(1)=1
+            Do n=2,npes+1	  
+               ncount(n)=ncount(n)+ncount(n-1)
+            end do
+            ! Now count == part in range partitioning   
 	        
-         do n=1,nod2D
-          temp(n)=temp(n)+ncount(part(n)+1)-1
-	  write(fileID,*) temp(n)  
-         end do
-         close(fileID)
+            do n=1,nod2D
+               temp(n)=temp(n)+ncount(part(n)+1)-1
+               write(fileID,*) temp(n)  
+            end do
+            close(fileID)
 	 end if
 	 
        deallocate(ncount, temp)

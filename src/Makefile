@@ -9,10 +9,7 @@ include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
-MOD_INI =    fort_part.o \
-   	     oce_modules.o \
-	     gen_modules_config.o
-
+MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_rotate_grid.o  
 
 OBJ_INI =  fvom_init.o \
            oce_local.o \
@@ -83,14 +80,14 @@ run:  $(MODULES) $(OBJECTS)
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
-	$(LD)  $(OPT) -o $(EXE_INI) $(FOS_INC) $(MOD_INI) $(OBJ_INI) \
+	$(LD)  $(OPT) -o $(EXE_INI) $(FOS_INC)  $(MOD_INI) $(OBJ_INI) \
 	$(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 
 
 .c.o :
-	$(CC) $(COPT) $(PARMS_DEFS) $(PARMS_INC) $(MPI_INCLUDE) -c $*.c	
+	$(CC) $(COPT) $(METIS_DEFS) $(CPP_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INCLUDE) -c $*.c	
 
 .F90.o :
 	@echo $@

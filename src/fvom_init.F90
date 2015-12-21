@@ -31,7 +31,8 @@ program MAIN
   call find_edges_ini
   call find_elem_neighbors_ini
   call find_levels
-  call stiff_mat_ini
+
+  if (mype==0) call stiff_mat_ini  ! Only the master will call Metis and needs the matrix
   call set_par_support_ini
   call save_dist_mesh
   call par_ex
@@ -458,25 +459,25 @@ allocate(nlevels_nod2D(nod2D))
   END DO
 
 if (mype==0) then
-file_name=trim(meshpath)//'elvls.out'
-open(fileID, file=file_name)
-  do n=1,elem2D
-	write(fileID,*) nlevels(n)
-  enddo
-close(fileID)
+   file_name=trim(meshpath)//'elvls.out'
+   open(fileID, file=file_name)
+   do n=1,elem2D
+      write(fileID,*) nlevels(n)
+   enddo
+   close(fileID)
 
-file_name=trim(meshpath)//'nlvls.out'
-open(fileID, file=file_name)
-  do n=1,nod2D
-        write(fileID,*) nlevels_nod2D(n)
-  enddo
-close(fileID)
+   file_name=trim(meshpath)//'nlvls.out'
+   open(fileID, file=file_name)
+   do n=1,nod2D
+      write(fileID,*) nlevels_nod2D(n)
+   enddo
+   close(fileID)
 
-write(*,*) '========================='
-write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
-write(*,*) '========================='
+   write(*,*) '========================='
+   write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
+   write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+   write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
+   write(*,*) '========================='
 endif
 
 
@@ -587,48 +588,59 @@ END SUBROUTINE find_elem_neighbors_ini
 ! Stiffness matrix for the elevation
 subroutine stiff_mat_ini
   use o_MESH
+  
   !
   implicit none
-  integer                             :: n, n1, n2, i, j,  row, ed
-  integer                             :: enodes(2), elnodes(3), el(2)
-  integer                             :: elem, npos(3), offset
-  integer, allocatable                :: n_num(:), n_pos(:,:)
+  integer                :: n, n1, n2, q, ed
+  integer                :: n_num(nod2D)
   !
-  ! a)
-  ssh_stiff%dim=nod2D
-  allocate(ssh_stiff%rowptr(ssh_stiff%dim+1))
-  ssh_stiff%rowptr(1)=1
-  allocate(n_num(nod2D),n_pos(10,nod2D))
-  n_pos=0
+  ! a) Allocate, initialize fields
+! Only the master does this work (and allocates the memory)
+  ssh_stiff%dim = nod2D   
+  ssh_stiff%nza = 2*edge2D ! Two matrix entries for each edge
+  allocate(ssh_stiff%rowptr(nod2D+1))
+  allocate(ssh_stiff%colind(2*edge2D))
+
+  ssh_stiff%colind(:) = -1
+  n_num(:)=0
+
   ! b) Neighbourhood information
-  DO n=1,nod2d
-     n_num(n)=1
-     n_pos(1,n)=n
-  end do   
-  Do n=1, edge2D
-     n1=edges(1,n)
-     n2=edges(2,n)
-     n_pos(n_num(n1)+1,n1)=n2
-     n_num(n1)=n_num(n1)+1
-     n_pos(n_num(n2)+1,n2)=n1
-     n_num(n2)=n_num(n2)+1
+  !     For Metis, the diagonal (node connected to itself) is not needed 
+  
+  Do ed=1, edge2D
+     ! n_num contains the number of neighbors
+     n_num(edges(1:2,ed)) = n_num(edges(1:2,ed)) + 1
   END DO 
-         ! n_num contains the number of neighbors
-	 ! n_pos -- their indices 
+
+  ssh_stiff%rowptr(1)=1	 
   do n=1,nod2D
-     ssh_stiff%rowptr(n+1)=ssh_stiff%rowptr(n)+n_num(n)
+     ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+n_num(n)
   end do
-  ssh_stiff%nza=ssh_stiff%rowptr(nod2D+1)-1								 
-  ! c) 
-  allocate(ssh_stiff%colind(ssh_stiff%nza))
-  allocate(ssh_stiff%values(ssh_stiff%nza))
-  ssh_stiff%values=0.0
-  ! d) 
-  do n=1,nod2D
-     ssh_stiff%colind(ssh_stiff%rowptr(n):ssh_stiff%rowptr(n+1)-1)= &
-          n_pos(1:n_num(n),n)
+
+  ! c)
+  ! Loop through the edges again, collect the connection information
+  ! in the compact storage ssh_stiff.
+  ! Life is easy, because every pair (n1,n2) is given exactly once by
+  ! the corresponding edge.
+  do ed=1,edge2D
+     n1 = edges(1,ed)
+     n2 = edges(2,ed)
+
+     ! insert (n1,n2)
+     do q = ssh_stiff%rowptr(n1), ssh_stiff%rowptr(n1+1)-1
+        if (ssh_stiff%colind(q) < 0) then
+           ssh_stiff%colind(q) = n2
+           exit
+        end if
+     enddo
+     ! insert (n2,n1)
+     do q = ssh_stiff%rowptr(n2), ssh_stiff%rowptr(n2+1)-1
+        if (ssh_stiff%colind(q) < 0) then
+           ssh_stiff%colind(q) = n1
+           exit
+        end if
+     enddo
   end do
-  deallocate(n_pos)
-  deallocate(n_num)
+
 end subroutine stiff_mat_ini
 

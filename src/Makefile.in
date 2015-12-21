@@ -4,7 +4,8 @@ FC = ftn
 LD = $(FC)
 
 # Optimization specs for compiler
-OPT  = -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xAVX -ip #-g -debug -traceback -check all
+OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise 
+# OPT =  -r8 -i4 -xHost -g -debug -traceback -check all -fpe:0
 COPT = -O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude
 ######################################################
 
@@ -39,8 +40,10 @@ PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DFORTRAN_UNDERSCO
 LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 
 # Definition for Metis library
-METIS_LPATH =../lib/metis-4.0
-LIB_METIS = -L$(METIS_LPATH) -lmetis
+METIS_DIR = ../lib/metis-5.1.0
+LIB_METIS = -L$(METIS_DIR)/lib -lmetis
+METIS_INC = -I$(METIS_DIR)/include 
+METIS_DEFS = -DPART_WEIGHTED
 
 ######################################################
 #

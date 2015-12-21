@@ -286,10 +286,20 @@ subroutine par_ex(abort)       ! finalizes MPI
 end subroutine par_ex
 !=================================================================
 subroutine set_par_support_ini
+
+  use iso_c_binding, only: idx_t=>C_INT32_T
   use o_MESH
   implicit none
 
-  integer   n, j, k, nini, nend
+  integer   n, j, k, nini, nend, ierr
+
+  interface 
+     subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
+       use iso_c_binding, only: idx_t=>C_INT32_T
+       integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*),np
+       integer(idx_t), intent(out) :: part(*)
+     end subroutine partit
+  end interface
 
   ! Construct partitioning vector
   allocate(part(nod2D))
@@ -300,14 +310,16 @@ subroutine set_par_support_ini
   !   if (n==npes-1) nend=nod2D
   !   part(nini:nend)=n
   !end do
-  if(npes>1) then
-#ifdef PART_WEIGHTED
-  call partit2(ssh_stiff%dim,ssh_stiff%rowptr,ssh_stiff%colind,nlevels_nod2D,npes, part)
-#else
-  call partit (ssh_stiff%dim,ssh_stiff%rowptr,ssh_stiff%colind, npes, part)
-#endif
-  if(mype==0) write(*,*) 'partitioning is done'
+  if(npes>1 .and. mype==0) then
+
+     write(*,*) 'Calling partit'
+     call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
+                 nlevels_nod2D, npes, part)
+
+     write(*,*) 'partitioning is done.'
   end if
+  call MPI_BCAST(part,nod2D,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+
   call communication_edgen
   call communication_nodn
   call communication_elemn
