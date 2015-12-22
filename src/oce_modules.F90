@@ -310,15 +310,17 @@ subroutine set_par_support_ini
   !   if (n==npes-1) nend=nod2D
   !   part(nini:nend)=n
   !end do
-  if(npes>1 .and. mype==0) then
+  if(npes>1) then
 
-     write(*,*) 'Calling partit'
-     call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-                 nlevels_nod2D, npes, part)
-
-     write(*,*) 'partitioning is done.'
-  end if
-  call MPI_BCAST(part,nod2D,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+     if (mype==0) then
+        write(*,*) 'Calling partit'
+        call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
+             nlevels_nod2D, npes, part)
+        
+        write(*,*) 'partitioning is done.'
+     end if
+     call MPI_BCAST(part,nod2D,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+  endif
 
   call communication_edgen
   call communication_nodn
