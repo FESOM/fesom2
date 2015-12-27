@@ -45,35 +45,42 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 
   METIS_SetDefaultOptions(opt);
 
+  /* The following values are the result of some tests with mesh_aguv, wgt_type=2. */
+  /* METIS_PartGraphRecursive resulted in a far better partition than Kway. According to */
+  /* forum entries, one should always compare. There is no rule which one works best. */ 
+
   opt[METIS_OPTION_CONTIG]    = 0;  /* 1: contiguous partitions, please */
                                    /* With more weights, this makes the partitions uglier... */
 
-  opt[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_VOL; /* Minimize communication volume =          */
+  opt[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_CUT; /* Minimize communication volume =          */
                                                    /* number of nodes on the interfaces        */
     /* Alternative: METIS_OBJTYPE_CUT, minimize edge cut. It is nearly the same, as the nodes  */
     /* all have weight 1 in this regard (one of the NULL fields in our case). But it does not  */
     /* matter if a node is connected to the other partition by e.g., 1 or 5 edges, thus,       */
-    /* METIS_OBJTYPE_VOL is what we want. */  
+    /* METIS_OBJTYPE_VOL is what we want. */ 
    
+    /* But: _VOL only works with METIS_PartGraphKway*/
 
   opt[METIS_OPTION_NUMBERING] = 1; /* Fortran Numbering */
-  opt[METIS_OPTION_NCUTS]     = 1; /* Build NCUTS partitions, choose the best */
+  opt[METIS_OPTION_NCUTS]     = 2; /* Build NCUTS partitions, choose the best */
   opt[METIS_OPTION_NITER]     = 25; /* higher => better quality, more compute time. Default: 10 */
 
-  opt[METIS_OPTION_UFACTOR]   = 5; /* max. allowed load inbalance in promille */
+  opt[METIS_OPTION_UFACTOR]   = 1; /* max. allowed load inbalance in promille */
   /* Well, somehow relative. Real life inbalance ends up at about 20%, comparing max(#3D-nodes)/min(#3D-nodes) */
   /* But: lower value -> lower maximum number of nodes in all partitions. This it what counts in the end! */
+  /* Far better load balancing with METIS_PartGraphRecursive. */
  
   if (wgt_type == 0) {
     ncon = 1;   
-    printf("Distribution weight: 2D nodes\n");
-    
-    ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,NULL,NULL,NULL,np,NULL,NULL,opt,&ec,part);
+    printf("Distribution weight: 2D nodes\n"); 
+    /* ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,NULL,NULL,NULL,np,NULL,NULL,opt,&ec,part); */
+    ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,NULL,NULL,NULL,np,NULL,NULL,opt,&ec,part);
     
   } else if  (wgt_type == 1) {
     ncon = 1;
     printf("Distribution weight: 3D nodes\n");
-    ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,wgt, NULL,NULL,np,NULL,NULL,opt,&ec,part);
+    /* ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,wgt, NULL,NULL,np,NULL,NULL,opt,&ec,part); */
+    ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt, NULL,NULL,np,NULL,NULL,opt,&ec,part);
     
   } else  {
     /*  quasi Default */
@@ -85,7 +92,8 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
     }
     
     printf("Distribution weight: 2D and 3D nodes\n");
-    ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,wgt_2d3d,NULL,NULL,np,NULL,NULL,opt,&ec,part);
+    /* ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,wgt_2d3d,NULL,NULL,np,NULL,NULL,opt,&ec,part);  */
+    ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,NULL,np,NULL,NULL,opt,&ec,part);
 
     free(wgt_2d3d);
   }
