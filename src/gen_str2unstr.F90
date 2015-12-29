@@ -34,7 +34,7 @@
 	  REAL(kind=8), DIMENSION(2), INTENT(IN) :: pt
 	  
 	  integer                                :: elem, elnodes(3), q
-	  real(kind=8)                           :: alpha, mean_lon, mean_lat, rlon, rlat
+	  real(kind=8)                           :: alph, mean_lon, mean_lat, rlon, rlat
 	  real(kind=8)                           :: xe(4), ye(4), xt1, xt2, yt1, yt2, x1, x2, y1, y2
 	  real(kind=8)                           :: s1, s2, angle
 	  
@@ -112,16 +112,16 @@
 		       if(x2>pi) x2=x2-2*pi 
 		       if(x2<-pi) x2=x2+2*pi 
 
-		       alpha=x1*y2-x2*y1
+		       alph=x1*y2-x2*y1
 		       s1=x1*x1+y1*y1
 		       s2=x2*x2+y2*y2
-		       alpha=alpha/sqrt(s1*s2)
-		       alpha=asin(alpha)
+		       alph=alph/sqrt(s1*s2)
+		       alph=asin(alph)
 		       IF ((xt1-xt2)**2+(yt1-yt2)**2 > max(s1,s2)) THEN
-		       if (alpha>0) alpha=pi-alpha
-		       if (alpha<=0) alpha=-pi-alpha
+		       if (alph>0) alph=pi-alph
+		       if (alph<=0) alph=-pi-alph
 		       END IF
-		       angle=angle+alpha
+		       angle=angle+alph
 		     END DO
 		     IF (abs(angle)>pi) THEN
 		     el2D=elem
@@ -930,8 +930,8 @@ do j=1,ny
 	land=.true.
     endif
   enddo
-  if ((omask(i,j,k)/=0d0) .and. (not(water)) ) omask(i,j,k)=0d0
-  if ((omask(i,j,k)==0d0) .and. (not(land)) ) omask(i,j,k)=1d0
+  if ((omask(i,j,k)/=0d0) .and. (.not. water) ) omask(i,j,k)=0d0
+  if ((omask(i,j,k)==0d0) .and. (.not. land) ) omask(i,j,k)=1d0
 enddo
 enddo
 enddo
