@@ -8,7 +8,7 @@
 #endif 
 #include "protos.h"
 
-void errexit( char *f_str, ... )
+void parms_errexit( char *f_str, ... )
 {
   va_list argp;
   char out1[256], out2[256];
@@ -34,7 +34,7 @@ void *Malloc( int nbytes, char *msg )
 
   ptr = (void *)malloc(nbytes);
   if (ptr == NULL)
-    errexit( "Not enough mem for %s. Requested size: %d bytes", msg, nbytes );
+    parms_errexit( "Not enough mem for %s. Requested size: %d bytes", msg, nbytes );
 
   return ptr;
 }
