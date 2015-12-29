@@ -55,7 +55,6 @@
 #define dgesvd_   dgesvd__
 #elif !defined(FORTRAN_UNDERSCORE)
 #define BLAS_C_INTERFACE
-#include <essl.h>
 #define ddot_     ddot
 #define dcopy_    dcopy
 #define dscal_    dscal
