@@ -13,10 +13,10 @@ psolver solvers[NSOL];
 int solv_id[12] = {0};
 int nsolver = 0;
 
-void psolver_init_(int *id, SOLVERTYPE *stype, PCTYPE *pctype, PCILUTYPE *pcilutype,
-		   int *ilulevel, int *fillin, double *droptol, int *maxits, int *restart, double *soltol, 
-		   int *part, int *rptr, int *cols, double *vals, int *reuse, MPI_Fint *fcomm)
-//		   int *part, int *rptr, int *cols, double *vals, int *reuse, MPI_Comm *comm)
+void psolver_init(int *id, SOLVERTYPE *stype, PCTYPE *pctype, PCILUTYPE *pcilutype,
+		  int *ilulevel, int *fillin, double *droptol, int *maxits, int *restart, double *soltol, 
+		  int *part, int *rptr, int *cols, double *vals, int *reuse, MPI_Fint *fcomm)
+//		  int *part, int *rptr, int *cols, double *vals, int *reuse, MPI_Comm *comm)
 {
   
   parms_Viewer v;
@@ -114,7 +114,7 @@ void psolver_init_(int *id, SOLVERTYPE *stype, PCTYPE *pctype, PCILUTYPE *pcilut
    
 }
 
-void psolver_final_()
+void psolver_final()
 {
 
   int pid, i;
@@ -149,7 +149,7 @@ void psolver_final_()
   }
 }
 
-void psolve_(int *id, double *rhs, double *vals, double *sol, int *new)
+void psolve(int *id, double *rhs, double *vals, double *sol, int *new)
 {
   
   parms_Viewer v;

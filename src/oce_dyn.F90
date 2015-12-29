@@ -41,15 +41,40 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
      part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
      ssh_rhs, d_eta, &
      rinfo, MPI_COMM_WORLD)
+
 #elif defined(PARMS)
+
+  use iso_c_binding, only: C_INT, C_DOUBLE
   implicit none
 #include "fparms.h"
 logical, save        :: lfirst=.true.
-integer              :: ident
-integer              :: n3, comm, reuse
-integer              :: maxiter, restart, lutype, fillin
-real(kind=8)         :: droptol, soltol
-COMM=MPI_COMM_WORLD
+integer(kind=C_INT)  :: ident
+integer(kind=C_INT)  :: n3, reuse
+integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
+real(kind=C_DOUBLE)  :: droptol, soltol
+
+interface
+   subroutine psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+        fillin, droptol, maxiter, restart, soltol, &
+        part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
+     use iso_c_binding, only: C_INT, C_DOUBLE
+     integer(kind=C_INT) :: ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+                            fillin,  maxiter, restart, &
+                            part(*), rowptr(*), colind(*), reuse, MPI_COMM
+     real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
+   end subroutine psolver_init
+end interface
+interface
+   subroutine psolve(ident, ssh_rhs, zero_r, d_eta, zero_i, MPI_COMM) &
+        bind(C)
+
+     use iso_c_binding, only: C_INT, C_DOUBLE
+     integer(kind=C_INT) :: ident, zero_i, MPI_COMM
+     real(kind=C_DOUBLE) :: zero_r, ssh_rhs(*), d_eta(*)
+
+   end subroutine psolve
+end interface
+
 ident=1
 maxiter=2000
 restart=15
@@ -58,6 +83,7 @@ lutype=2
 droptol=1.e-8
 soltol=1.e-10
 reuse=0
+
 if (lfirst) then
    call psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
@@ -65,9 +91,12 @@ if (lfirst) then
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
    lfirst=.false.
 end if
-   call psolve(ident, ssh_rhs, 0., d_eta, 0, MPI_COMM_WORLD)
+
+   call psolve(ident, ssh_rhs, real(0., C_DOUBLE), d_eta, 0, MPI_COMM_WORLD)
 #endif
+
 call exchange_nod(d_eta)
+
 end subroutine solve_ssh
 ! ===================================================================================
 SUBROUTINE vert_vel
@@ -415,7 +444,7 @@ DO ed=1,myDim_edge2D   !! Attention
          if(i==2) fy=-fy
          if(j==2) fy=-fy
          ! 
-         ! In the computation above, I've used rules from ssh_rhs (where it is 
+         ! In the computation above, I have used rules from ssh_rhs (where it is 
          ! on the rhs. So the sign is changed in the expression below.
          !
          npos=n_num(elnodes)

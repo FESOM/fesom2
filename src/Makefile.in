@@ -1,12 +1,12 @@
 # Compiler and Linker
 CC = cc 
-FC = ftn 
+FC = ftn
 LD = $(FC)
 
 # Optimization specs for compiler
 OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise 
 # OPT =  -r8 -i4 -xHost -g -debug -traceback -check all -fpe:0
-COPT = -O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude
+COPT =  -O3 -DMPI2 -Iinclude -xHost
 ######################################################
 
 # Include path for MPI header file
@@ -36,7 +36,7 @@ LIBS =
 # Definition of pARMS include and library
 PARMS_DIR  =   ../lib/parms
 PARMS_INC  = -I$(PARMS_DIR)/include -I$(PARMS_DIR)/src/include
-PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DFORTRAN_UNDERSCORE -DUNDER_ -DVOID_POINTER_SIZE_8  -DSGI
+PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DVOID_POINTER_SIZE_8  -DSGI
 LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 
 # Definition for Metis library
