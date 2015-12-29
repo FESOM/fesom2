@@ -22,6 +22,7 @@
 /* np  : partitioning for np processors */
 /* part : partitioning vector */
 #include <stdio.h>
+#include <stdlib.h>
 #include "metis.h"
 
 void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part)
@@ -52,12 +53,12 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   opt[METIS_OPTION_CONTIG]    = 0;  /* 1: contiguous partitions, please */
                                    /* With more weights, this makes the partitions uglier... */
 
-  opt[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_CUT; /* Minimize communication volume =          */
-                                                   /* number of nodes on the interfaces        */
-    /* Alternative: METIS_OBJTYPE_CUT, minimize edge cut. It is nearly the same, as the nodes  */
-    /* all have weight 1 in this regard (one of the NULL fields in our case). But it does not  */
-    /* matter if a node is connected to the other partition by e.g., 1 or 5 edges, thus,       */
-    /* METIS_OBJTYPE_VOL is what we want. */ 
+  opt[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_CUT; /* Minimize edge cut. */
+
+  /* Alternative: METIS_OBJTYPE_VOL, minimize number of nodes on the interface. */ 
+  /* It is nearly the same, as the nodes all have weight 1 in this regard */
+  /* (one of the NULL fields in our case). But it does not matter if a node is connected */ 
+  /* to the other partition by e.g., 1 or 5 edges, thus, _VOL is what we want. */ 
    
     /* But: _VOL only works with METIS_PartGraphKway*/
 
@@ -66,7 +67,8 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   opt[METIS_OPTION_NITER]     = 25; /* higher => better quality, more compute time. Default: 10 */
 
   opt[METIS_OPTION_UFACTOR]   = 1; /* max. allowed load inbalance in promille */
-  /* Well, somehow relative. Real life inbalance ends up at about 20%, comparing max(#3D-nodes)/min(#3D-nodes) */
+  /* Well, somehow relative. Real life inbalance ends up at about 20%, comparing  */
+  /* max(#3D-nodes)/min(#3D-nodes), with METIS_PartGraphKway. */
   /* But: lower value -> lower maximum number of nodes in all partitions. This it what counts in the end! */
   /* Far better load balancing with METIS_PartGraphRecursive. */
  
