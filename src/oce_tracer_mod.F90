@@ -71,7 +71,7 @@ integer             :: n, nl1
 
 tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num) !DS: check that this is the right place!
 call diff_part_hor
-if (not(i_vert_diff)) call diff_ver_part_expl(tr_num)
+if (.not. i_vert_diff) call diff_ver_part_expl(tr_num)
 !Update tracer berofe implicit operator is applied
 DO n=1, myDim_nod2D
    nl1=nlevels_nod2D(n)-1
@@ -186,7 +186,7 @@ DO n=1, myDim_nod2D
 
    DO nz=2,nl1
       zinv1=1.0_WP/(Z(nz-1)-Z(nz))
-      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + \
+      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
               Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
 
       vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
@@ -220,7 +220,7 @@ DO n=1, myDim_nod2D
    nz=1
    zinv2=1.0_WP/(Z(nz)-Z(nz+1))
    zinv=1.0_WP*dt/(zbar(1)-zbar(2))
-   Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + \
+   Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + &
         Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
    c(1)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(2,n)/area(1,n)
    a(1)=0.0_WP
@@ -234,9 +234,9 @@ DO n=1, myDim_nod2D
 ! regular part of coefficients:
    DO nz=2, nzmax-2
       zinv2=1.0_WP/(Z(nz)-Z(nz+1))
-      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + \
+      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
           Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
-      Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + \
+      Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + &
            Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
         
       zinv=1.0_WP*dt/(zbar(nz)-zbar(nz+1))
@@ -257,7 +257,7 @@ DO n=1, myDim_nod2D
 ! the last row
    nz=nzmax-1
    zinv=1.0_WP*dt/(zbar(nzmax-1)-zbar(nzmax))
-   Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + \
+   Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
        Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
    a(nzmax-1)=-(Kv(nzmax-1,n)+Ty)*zinv1*zinv
    b(nzmax-1)=-a(nzmax-1)+1.0_WP
@@ -322,13 +322,13 @@ integer :: tr_num,n,nz
 
 if ((clim_relax>1.0e-8).and.(tr_num==1)) then
    DO n=1, myDim_nod2D
-      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+\
+      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
   END DO
 END if
 if ((clim_relax>1.0e-8).and.(tr_num==2)) then
    DO n=1, myDim_nod2D
-      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+\
+      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
    END DO
 END IF 
