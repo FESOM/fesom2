@@ -86,9 +86,6 @@ USE g_CONFIG
 USE o_MESH
 USE o_ARRAYS
 USE g_PARSUP 
-#ifndef NO_IFPORT
-USE IFPORT
-#endif
 IMPLICIT NONE
 
  Integer        n, m, fileID, nend, nini,ed(2)
@@ -98,21 +95,17 @@ IMPLICIT NONE
  integer, allocatable, dimension(:)  :: temp, ncount
  integer   n1, n2, flag
  LOGICAL        ::L_EXISTS
-#ifndef NO_IFPORT
- integer(2) :: temp1
-#endif
+
  allocate(temp(nod2D))  ! serves for mapping
  allocate(ncount(npes+1))
  write(mype_string,'(i5.5)') mype  
  write(npes_string,"(I10)") npes
  dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
- INQUIRE(file=dist_mesh_dir, EXIST=L_EXISTS)
- if (not(L_EXISTS)) then
-#ifndef NO_IFPORT
-temp1 = runqq('mkdir',dist_mesh_dir)
-#else
-   CALL system('mkdir '//dist_mesh_dir)
-#endif
+ INQUIRE(file=trim(dist_mesh_dir), EXIST=L_EXISTS)
+ if (.not. L_EXISTS) then
+
+   call system('mkdir '//trim(dist_mesh_dir))
+
  endif
        ! ==============================
        ! rank partitioning:
