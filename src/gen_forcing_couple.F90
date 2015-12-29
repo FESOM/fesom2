@@ -696,7 +696,7 @@ subroutine read_new_atm_forcing
         itime=forcing_rec(runoff_ttp_ind)
 
         file=trim(ForcingDataPath)//'AAOMIP'//'/river_runoff.dat'
-        if(system==1) then
+        if(system_arch==1) then
            readtype=2
         else
            readtype=8

@@ -75,8 +75,8 @@ module g_config
   namelist /calendar/ include_fleapyear
   
    ! *** machine ***
-  integer                       :: system=1    ! XD1 2(byte), HLRN 1(word)
-  namelist /machine/ system
+  integer                       :: system_arch=1    ! XD1 2(byte), HLRN 1(word)
+  namelist /machine/ system_arch
   
   ! *** configuration***
   logical                       :: use_sw_pene=.false.
