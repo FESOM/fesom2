@@ -8,9 +8,9 @@ SUBROUTINE mesh_setup
 USE g_parsup
 USE g_ROTATE_grid
 IMPLICIT NONE
+      call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh
       call set_par_support
-      call set_mesh_transform_matrix  !(rotated grid)
       call find_levels
       call test_tri
       call load_edges
@@ -31,13 +31,13 @@ IMPLICIT NONE
 
  Integer        :: n, m, fileID, ind, nini, nend, n1, n2, n3, n4
  integer        :: vert_nodes(100)
- real(kind=WP)  :: x, y
+ real(kind=WP)  :: x, y, x_in, y_in
  character*10   :: mype_string,npes_string
  character*80   :: file_name
  character*80   :: dist_mesh_dir
  integer, allocatable :: mapping(:)
  
- write(mype_string,'(i5.5)') mype  
+ write(mype_string,'(i3.3)') mype  
  write(npes_string,"(I10)") npes
  dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
  
@@ -62,7 +62,7 @@ IMPLICIT NONE
 	 part(n)=part(n-1)+part(n)
          END DO
 	 close(fileID)
-	 write(*,*) mype,'rpart is read'
+	 if (mype==0) write(*,*) mype,'rpart is read'
 	 !===========================
 	 ! Lists of nodes and elements 
 	 ! in global indexing. Not everything
@@ -92,7 +92,7 @@ IMPLICIT NONE
 	 read(fileID,*) myList_edge2D ! m
 
 	 close(fileID)
-	 write(*,*) 'myLists are read'
+	 if (mype==0) write(*,*) 'myLists are read'
          !==============================
          ! Allocate mapping array
          !==============================
@@ -119,15 +119,17 @@ IMPLICIT NONE
 	 read(fileID,*) n      ! nod2D, we know it already
 	                      
          DO n=1,nod2D
-	 read(fileID,*) m, x, y
-	 if (mapping(n)>0) then
-         if (force_rotation) then
-             call g2r(x*rad, y*rad, x, y)
-             x=x/rad
-             y=y/rad
-         end if
-	 coord_nod2D(1,mapping(n))=x*rad
-	 coord_nod2D(2,mapping(n))=y*rad
+            read(fileID,*) m, x, y
+            if (mapping(n)>0) then
+               if (force_rotation) then
+                  x_in = x*rad
+                  y_in = y*rad
+                  call g2r(x_in, y_in, x, y)
+                  x=x/rad
+                  y=y/rad
+               end if
+               coord_nod2D(1,mapping(n))=x*rad
+               coord_nod2D(2,mapping(n))=y*rad
 	 end if
 	 END DO
          close(fileID)
@@ -194,7 +196,7 @@ IMPLICIT NONE
 	 END DO   
 	 mapping(1:nod2D)=0
 	 
-	 write(*,*) 'elements are read' 
+	 if (mype==0) write(*,*) 'elements are read' 
 	 
 	 ! ==============================
          ! Communication information
@@ -271,7 +273,7 @@ IMPLICIT NONE
 	 ALLOCATE(com_edge2D%slist(n))
 	 read(fileID,*) com_edge2D%slist
 	 close(fileID)
-	 write(*,*) 'communication arrays are read'
+	 if (mype==0) write(*,*) 'communication arrays are read'
 	 deallocate(mapping)
  END subroutine  read_mesh
 !============================================================ 
@@ -321,7 +323,7 @@ ENDDO
 deallocate(mapping)
 close(fileID)
 
-
+if (mype==0) then
 write(*,*) '========================='
 write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
 write(*,*) 'Min/max depth on mype: ', mype, -zbar(minval(nlevels)),-zbar(maxval(nlevels))
@@ -329,7 +331,7 @@ write(*,*) '3D tracer nodes on mype ', mype, sum(nlevels_nod2d)-(myDim_elem2D+eD
 write(*,*) 'Further info on mype (1)', mype, minval(nlevels),maxval(nlevels)
 write(*,*) 'Further info on mype (2)', mype, minval(nlevels_nod2d),maxval(nlevels_nod2d)
 write(*,*) '========================='
-
+endif
 END SUBROUTINE find_levels
 !===========================================================================
 SUBROUTINE test_tri
@@ -653,20 +655,20 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  ! ============
  DO n=1, myDim_elem2D
  !DO n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
- elnodes=elem2D_nodes(:,n)
- ay=sum(coord_nod2D(2,elnodes))/3.0_WP
- ay=cos(ay)
- if (cartesian) ay=1.0_WP
- a=coord_nod2D(:,elnodes(2))-coord_nod2D(:,elnodes(1))
- b=coord_nod2D(:,elnodes(3))-coord_nod2D(:,elnodes(1))
-     if(a(1)>cyclic_length/2.) a(1)=a(1)-cyclic_length
-     if(a(1)<-cyclic_length/2.) a(1)=a(1)+cyclic_length
-     if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
-     if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
- a(1)=a(1)*ay
- b(1)=b(1)*ay
- elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
- END DO 
+    elnodes=elem2D_nodes(:,n)
+    ay=sum(coord_nod2D(2,elnodes))/3.0_WP
+    ay=cos(ay)
+    if (cartesian) ay=1.0_WP
+    a=coord_nod2D(:,elnodes(2))-coord_nod2D(:,elnodes(1))
+    b=coord_nod2D(:,elnodes(3))-coord_nod2D(:,elnodes(1))
+    if(a(1)>cyclic_length/2.) a(1)=a(1)-cyclic_length
+    if(a(1)<-cyclic_length/2.) a(1)=a(1)+cyclic_length
+    if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
+    if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
+    a(1)=a(1)*ay
+    b(1)=b(1)*ay
+    elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
+ END DO
  call exchange_elem(elem_area)
  ! =============
  ! Scalar element 
@@ -695,22 +697,24 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  ! and areas are in m^2
  
 
- allocate(work_array(myDim_nod2d+eDim_nod2D))
+ allocate(work_array(myDim_nod2D))
  mesh_resolution=sqrt(area(1, :)/pi)*2._WP
  DO q=1, 3 !apply mass matrix N times to smooth the field
- DO n=1, myDim_nod2D
-    vol=0._WP
-    work_array(n)=0._WP
-    DO j=1, nod_in_elem2D_num(n)
-       elem=nod_in_elem2D(j, n)
-       elnodes=elem2D_nodes(:,elem)
-       work_array(n)=work_array(n)+sum(mesh_resolution(elnodes))/3._WP*elem_area(elem)
-       vol=vol+elem_area(elem)
+    DO n=1, myDim_nod2D
+       vol=0._WP
+       work_array(n)=0._WP
+       DO j=1, nod_in_elem2D_num(n)
+          elem=nod_in_elem2D(j, n)
+          elnodes=elem2D_nodes(:,elem)
+          work_array(n)=work_array(n)+sum(mesh_resolution(elnodes))/3._WP*elem_area(elem)
+          vol=vol+elem_area(elem)
+       END DO
+       work_array(n)=work_array(n)/vol
     END DO
-    work_array(n)=work_array(n)/vol
- END DO
- mesh_resolution=work_array
- call exchange_nod(mesh_resolution)
+    DO n=1,myDim_nod2D
+       mesh_resolution(n)=work_array(n)
+    ENDDO
+    call exchange_nod(mesh_resolution)
  END DO
  deallocate(work_array)
 
@@ -721,7 +725,7 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  ocean_area=0.0
  call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_WORLD, MPIerr)
-
+if (mype==0) then
  write(*,*)  mype, 'Mesh statistics:'
  write(*,*)  mype, 'maxArea ',maxval(elem_area), '   MinArea ', minval(elem_area)
  write(*,*)  mype, 'maxScArea ',maxval(area(1,:)), &
@@ -730,6 +734,7 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  if (mype==0) then
     write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
  end if
+endif
 END SUBROUTINE mesh_areas
 
 !===================================================================
