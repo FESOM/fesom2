@@ -103,16 +103,19 @@ int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x)
       parms_VecAXPY(x, pt, alpha, is);	
       parms_VecAXPY(s, v, -alpha, is);
       
-      parms_VecDOT(s, s, &omega, is);
-      if(omega < TINY*TINY){
-	its++;
-	continue;
-      }
+      /*NR  Skip this check, it is expensive due to the */
+      /*    MPI_Allreduce in VecDOT */
+      /* parms_VecDOT(s, s, &omega, is); */
+      /* if(omega < TINY*TINY){ */
+      /*    its++; */
+      /*    continue; */
+      /* } */
 
       parms_PCApply(pc, s, st);
       parms_MatVec(A, st, t);
       tmp[0] = GDOT(nloc, t, one, s, one);
       tmp[1] = GDOT(nloc, t, one, t, one);
+            
       if(is->isserial == false)
 	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
       
@@ -124,12 +127,24 @@ int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x)
 	break;
       }
       
-      parms_VecAXPY(x, st, sigma, is);
-      parms_VecAXPY(r, t, -sigma, is);
+      parms_VecAXPY(x, st, sigma, is); 
+      parms_VecAXPY(r, t, -sigma, is); 
+      /* parms_VecDOT( r, r, &omega, is); */
+      /* parms_VecDOT(r0, r, &rho,   is); */
+      /* NR: Combine the dot products */
+      tmp[0] = 0.;
+      tmp[1] = 0.;
+      for (i = 0; i < nloc; i++) 
+	{
+	  tmp[0] +=  r[i] * r[i]; // omega
+	  tmp[1] += r0[i] * r[i]; // rho
+	}
+      if(is->isserial == false)
+	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
 
-      parms_VecDOT( r, r, &omega, is);	
-      parms_VecDOT(r0, r, &rho,   is);
-      
+      omega = tmp[0];
+      rho   = tmp[1];
+
       beta = (rho * alpha) / (rho_alt * sigma);
       rho_alt = rho;
       parms_VecAXPY(p, v, -sigma, is);
