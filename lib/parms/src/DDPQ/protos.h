@@ -21,8 +21,6 @@
 #define csrcsc  csrcsc_
 #define roscal  roscal_
 #define coscal  coscal_
-#else
-#include <essl.h>
 #endif
 
 #ifndef min

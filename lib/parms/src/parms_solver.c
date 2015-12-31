@@ -168,6 +168,8 @@ int parms_SolverSetType(parms_Solver self, SOLVERTYPE stype)
 	gmres_create(self);
   else if(stype == SOLBICGS)
         bicgstab_create(self);
+  else if(stype == SOLCG)
+        cg_create(self);
   else{
 	printf("ERROR: Invalid choice of solver - (Check SOLVERTYPE for parms_SolverSetType(...) \n");
 	PARMS_ABORT(17);

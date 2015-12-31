@@ -18,7 +18,9 @@ LD = $FC
 
 # Optimization specs for compiler
 OPT  = -O3 -xHost -ip -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise
+OPT  = -O3 -xHost
 COPT = 
+# COPT=  -xHost -g -debug -traceback -check=conversions,stack,uninit -check-pointers=rw -fpe:0 
 
 #######################################################
 # for pARMS-Library, archive and options

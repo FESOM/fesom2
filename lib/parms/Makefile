@@ -30,7 +30,7 @@ OBJ1	=    ./src/parms_comm.o  \
              ./src/parms_qsplit.o ./src/parms_solver.o  \
              ./src/parms_table.o ./src/parms_timer.o  \
              ./src/parms_vec.o ./src/parms_viewer.o \
-	     ./src/fgmres.o ./src/bicgstab.o	\
+	     ./src/fgmres.o ./src/bicgstab.o ./src/cg.o \
              ./src/gmres.o ./src/parms_complex.o 
 #$(HYPRE_OBJ) \
 
