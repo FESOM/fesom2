@@ -51,12 +51,6 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     tol     = self->tol * self->tol;
     nloc    = parms_MapGetLocalSize(is);
     comm    = is->comm;
-
-    /* --- first permute x and y for pARMS matrix structure ------*/
-    parms_VecPerm(x, is); 
-    parms_VecPerm(y, is);
-/* ---- set isvecperm to true -----*/
-    is->isvecperm = true;
     
 /*----- allocate memory for working local arrays -------*/
 
@@ -65,6 +59,17 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     PARMS_NEWARRAY(p, nloc);
     PARMS_NEWARRAY(Ap,nloc);
     
+/* --- first permute x and y for pARMS matrix structure ------*/
+    if (is->isperm) { 
+        for (i = 0; i < nloc; i++) {
+	  r[is->perm[i]] = x[i];
+	  z[is->perm[i]] = y[i];
+	}
+	memcpy(x, r, nloc*sizeof(FLOAT));
+	memcpy(y, z, nloc*sizeof(FLOAT));
+	is->isvecperm = true;
+    }
+
     omega = 2.*tol;
 
     /* compute r = A * x */ 
@@ -123,17 +128,23 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     
     if(its == maxits && omega > tol)
       printf("ERROR: no convergence\n");
+    
+    /* reset isvecperm and do inverse permutation*/
+    if (is->isperm) { 
+        for (i = 0; i < nloc; i++) {
+	  r[is->iperm[i]] = x[i];
+	  z[is->iperm[i]] = y[i];
+	}
+	memcpy(x, r, nloc*sizeof(FLOAT));
+	memcpy(y, z, nloc*sizeof(FLOAT));    
+	is->isvecperm = false; 
+    }
 
     free(z);  
     free(r);  
     free(p);
     free(Ap);
-    
-    /* reset isvecperm and do inverse permutation*/
-    is->isvecperm = false; // this comes before inverse permutation
-    /* permutes x and y */
-    parms_VecInvPerm(x, is); 
-    parms_VecInvPerm(y, is);
+
 
     self->its = its;
     return 0;
