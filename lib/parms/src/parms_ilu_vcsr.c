@@ -257,10 +257,10 @@ static int parms_ilu_ascend_vcsr(parms_Operator self, FLOAT *y, FLOAT
 static int parms_ilu_sol_vcsr(parms_Operator self, FLOAT *y,
 			      FLOAT *x)  
 {
-  FLOAT *pa, t, diag;
+  FLOAT *pa;
   parms_ilu_data data;
   parms_vcsr L, U;
-  int i, j, n, nnz, *pj;
+  int i, j, n, *pj, nnz;
 
   data = (parms_ilu_data)self->data;
   L = data->L;
@@ -271,25 +271,22 @@ static int parms_ilu_sol_vcsr(parms_Operator self, FLOAT *y,
     nnz = L->nnzrow[i];
     pj  = L->pj[i];
     pa  = L->pa[i];
-    t = y[i];
+    x[i] = y[i];
 
     for (j = 0; j < nnz; j++) {
-      t -= pa[j] * x[pj[j]];
+      x[i] -= pa[j] * x[pj[j]];
     }
-    x[i] = t;
   }
 
   for (i = n-1; i >= 0; i--) {
     nnz = U->nnzrow[i];
     pj  = U->pj[i];
     pa  = U->pa[i];
-    t = x[i];
-    diag = pa[0];
 
     for (j = 1; j < nnz; j++) {
-      t -= pa[j] * x[pj[j]];
+      x[i] -= pa[j] * x[pj[j]];
     }
-    x[i] = t*diag;
+    x[i] *= pa[0];  // pa[0] = diag
   }
 
   return 0;

@@ -3,10 +3,10 @@
 
 static int MatVec_vcsr(parms_Mat self, FLOAT *x, FLOAT *y)
 {
-  int          lsize, i, j, index, *pj, length;
+  int          lsize, i, j, *pj, length;
   parms_vcsr   matrix;
   parms_Map    is;
-  FLOAT        *pa, s;
+  FLOAT        *pa;
   
   
   /* extract diagonal and off-diagonal matrix */
@@ -15,15 +15,13 @@ static int MatVec_vcsr(parms_Mat self, FLOAT *x, FLOAT *y)
   lsize    = parms_MapGetLocalSize(is);
 
   for (i = 0; i < lsize; i++) {
-    s = 0.0;
+    y[i] = 0.0;
     length = matrix->nnzrow[i];
     pj  = matrix->pj[i];
     pa  = matrix->pa[i];
     for (j = 0; j < length; j++) {
-      index = pj[j];
-      s    += pa[j] * x[index];
+      y[i]   += pa[j] * x[pj[j]];
     }
-    y[i] = s;
   }
 
   return 0;
