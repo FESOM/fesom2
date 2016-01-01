@@ -85,6 +85,8 @@ soltol=1.e-10
 reuse=0
 
 if (lfirst) then
+   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
+   !     SOLBICGS for BiCGstab solver (arbitrary matrices)
    call psolver_init(ident, SOLCG, PCBJ, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
