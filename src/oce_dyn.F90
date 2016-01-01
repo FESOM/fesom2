@@ -52,24 +52,24 @@ integer(kind=C_INT)  :: ident
 integer(kind=C_INT)  :: n3, reuse
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
+integer :: n
 
 interface
-   subroutine psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+   subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
      use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+     integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
                             fillin,  maxiter, restart, &
                             part(*), rowptr(*), colind(*), reuse, MPI_COMM
      real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
    end subroutine psolver_init
 end interface
 interface
-   subroutine psolve(ident, ssh_rhs, zero_r, d_eta, zero_i, MPI_COMM) &
-        bind(C)
+   subroutine psolve(ident, ssh_rhs, zero_r, d_eta, zero_i) bind(C)
 
      use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, zero_i, MPI_COMM
+     integer(kind=C_INT) :: ident, zero_i
      real(kind=C_DOUBLE) :: zero_r, ssh_rhs(*), d_eta(*)
 
    end subroutine psolve
@@ -85,14 +85,14 @@ soltol=1.e-10
 reuse=0
 
 if (lfirst) then
-   call psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+   call psolver_init(ident, SOLCG, PCBJ, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
    lfirst=.false.
 end if
 
-   call psolve(ident, ssh_rhs, real(0., C_DOUBLE), d_eta, 0, MPI_COMM_WORLD)
+   call psolve(ident, ssh_rhs, real(0., C_DOUBLE), d_eta, 0)
 #endif
 
 call exchange_nod(d_eta)
@@ -386,7 +386,7 @@ end do
 !M/dt-alpha*theta*g*dt*\nabla(H\nabla\eta))
 !  
 n_num=0
-factor=g*dt*alpha*theta
+factor = g*dt*alpha*theta
 DO ed=1,myDim_edge2D   !! Attention
    enodes=edges(:,ed)
    el=edge_tri(:,ed)
@@ -438,8 +438,8 @@ DO ed=1,myDim_edge2D   !! Attention
          !
          ! fx, fy are contribution to -velocity from elem   (-h\nabla\eta)
          !
-         fy=fy*(edge_cross_dxdy(2*i-1,ed))- &
-         fx*(edge_cross_dxdy(2*i,ed))
+         fy = fy*(edge_cross_dxdy(2*i-1,ed)) &
+            - fx*(edge_cross_dxdy(2*i  ,ed))
    
          if(i==2) fy=-fy
          if(j==2) fy=-fy
