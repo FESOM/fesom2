@@ -326,8 +326,8 @@ use g_CONFIG
 implicit none
 
 integer                             :: n, n1, n2, i, j,  row, ed
-integer                             :: enodes(2), elnodes(3), el(2)
-integer                             :: elem, npos(3), offset, nini, nend
+integer                             :: elnodes(3), el(2)
+integer                             :: npos(3), offset, nini, nend
 real(kind=WP)                       :: dmean, ff, factor, a 
 real(kind=WP)                       :: fx(3), fy(3), ax, ay
 integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
@@ -366,19 +366,19 @@ END DO
    ! n_num contains the number of neighbors
    ! n_pos -- their indices 
 do n=1,myDim_nod2D
-   ssh_stiff%rowptr(n+1)=ssh_stiff%rowptr(n)+n_num(n)
+   ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+n_num(n)
 end do
-ssh_stiff%nza=ssh_stiff%rowptr(myDim_nod2D+1)-1								 
+ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1								 
 ! c) 
 allocate(ssh_stiff%colind(ssh_stiff%nza))
 allocate(ssh_stiff%values(ssh_stiff%nza))
 ssh_stiff%values=0.0_WP  
 ! d) 
 do n=1,myDim_nod2D
-   nini=ssh_stiff%rowptr(n)-ssh_stiff%rowptr(1)+1
-   nend=ssh_stiff%rowptr(n+1)-ssh_stiff%rowptr(1)
-   ssh_stiff%colind(nini:nend)= &
-        n_pos(1:n_num(n),n)
+   nini = ssh_stiff%rowptr(n)  - ssh_stiff%rowptr(1)+1
+   nend = ssh_stiff%rowptr(n+1)- ssh_stiff%rowptr(1)
+
+   ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
 end do
 ! Thus far everything is in local numbering.
 ! We will update it later when the values are 
@@ -390,75 +390,72 @@ end do
 n_num=0
 factor = g*dt*alpha*theta
 DO ed=1,myDim_edge2D   !! Attention
-   enodes=edges(:,ed)
+
    el=edge_tri(:,ed)
-   DO j=1,2 
-      row=enodes(j)
-      if (row>myDim_nod2D) cycle    !! Attention
-      ! ==========  
-      offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-      DO n=1,SSH_stiff%rowptr(row+1)-SSH_stiff%rowptr(row)
-	 n2=SSH_stiff%colind(offset+n)
-	 n_num(n2)=offset+n
-      END DO
-      ! ==========
-      DO i=1,2  ! Two elements related to the edge
-                ! It should be just grad on elements 
-         elem=el(i)
-         if (elem<1) cycle
-         elnodes=elem2D_nodes(:,elem)
-         call elem_center(elem, ax, ay)
-         ay=cos(ay)
-         if (cartesian) ay=1.0_WP
-         dmean=-zbar(nlevels(elem))
-         dmean=0.5_WP*dmean*r_earth
-         a=dmean*(coord_nod2D(2,elnodes(3))-coord_nod2D(2,elnodes(1)))
-         fx(2)=a
-         fx(1)=-a
-         a=-dmean*(coord_nod2D(2,elnodes(2))-coord_nod2D(2,elnodes(1)))
-         fx(3)=a
-         fx(1)=fx(1)-a
-         a=(coord_nod2D(1,elnodes(3))-coord_nod2D(1,elnodes(1)))
-         if (a>cyclic_length/2.) a=a-cyclic_length
-         if (a<-cyclic_length/2.) a=a+cyclic_length
-         a=-ay*dmean*a
-         fy(2)=a
-         fy(1)=-a
-         a=(coord_nod2D(1,elnodes(2))-coord_nod2D(1,elnodes(1)))
-         if (a>cyclic_length/2.) a=a-cyclic_length
-         if (a<-cyclic_length/2.) a=a+cyclic_length
-         a=ay*dmean*a
-         fy(3)=a
-         fy(1)=fy(1)-a
-      
-         fx=fx/elem_area(elem)
-         fy=fy/elem_area(elem)
-      
-         ! This should work too !!
-         !fx=zbar(nlevels(elem))*gradient_sca(1:3,elem)
-         !fy=zbar(nlevels(elem))*gradient_sca(4:6,elem)
-         !
-         ! fx, fy are contribution to -velocity from elem   (-h\nabla\eta)
-         !
-         fy = fy*(edge_cross_dxdy(2*i-1,ed)) &
-            - fx*(edge_cross_dxdy(2*i  ,ed))
-   
-         if(i==2) fy=-fy
-         if(j==2) fy=-fy
-         ! 
-         ! In the computation above, I have used rules from ssh_rhs (where it is 
-         ! on the rhs. So the sign is changed in the expression below.
-         !
-         npos=n_num(elnodes)
-         SSH_stiff%values(npos)=SSH_stiff%values(npos)- fy*factor
-      END DO
+   ! ==========
+   DO i=1,2  ! Two elements related to the edge
+      ! It should be just grad on elements 
+
+      if (el(i)<1) cycle
+      elnodes=elem2D_nodes(:,el(i))
+      call elem_center(el(i), ax, ay)
+      ay=cos(ay)
+      if (cartesian) ay=1.0_WP
+      dmean = -0.5_WP * r_earth * zbar(nlevels(el(i)))/elem_area(el(i))
+
+      fx(1) = coord_nod2D(2,elnodes(2))-coord_nod2D(2,elnodes(3))
+      fx(2) = coord_nod2D(2,elnodes(3))-coord_nod2D(2,elnodes(1))
+      fx(3) = coord_nod2D(2,elnodes(1))-coord_nod2D(2,elnodes(2))
+
+      fy(1) = coord_nod2D(1,elnodes(2))-coord_nod2D(1,elnodes(3))
+      fy(2) = coord_nod2D(1,elnodes(3))-coord_nod2D(1,elnodes(1))
+      fy(3) = coord_nod2D(1,elnodes(1))-coord_nod2D(1,elnodes(2))
+      if (fy(1) >  cyclic_length*0.5) fy(1) = fy(1)-cyclic_length
+      if (fy(2) >  cyclic_length*0.5) fy(2) = fy(2)-cyclic_length
+      if (fy(3) >  cyclic_length*0.5) fy(3) = fy(3)-cyclic_length
+      if (fy(1) < -cyclic_length*0.5) fy(1) = fy(1)+cyclic_length
+      if (fy(2) < -cyclic_length*0.5) fy(2) = fy(2)+cyclic_length
+      if (fy(3) < -cyclic_length*0.5) fy(3) = fy(3)+cyclic_length         
+
+
+      ! This should work too !!
+      !fx=zbar(nlevels(el(i)))*gradient_sca(1:3,el(i))
+      !fy=zbar(nlevels(el(i)))*gradient_sca(4:6,el(i))
+      !
+      ! fx, fy are contribution to -velocity from el(i)   (-h\nabla\eta)
+      !
+      fy = dmean*( ay*fy*edge_cross_dxdy(2*i-1,ed) &
+                    + fx*edge_cross_dxdy(2*i  ,ed))
+
+      if(i==2) fy=-fy
+
+      row=edges(1,ed)
+      if (row <= myDim_nod2D) then
+         DO n = SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1, SSH_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+            n_num(SSH_stiff%colind(n)) = n
+         END DO
+         npos = n_num(elnodes)
+         SSH_stiff%values(npos) = SSH_stiff%values(npos) + fy*factor
+      endif
+      row=edges(2,ed)
+      if (row <= myDim_nod2D) then
+         DO n = SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1, SSH_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+            n_num(SSH_stiff%colind(n)) = n
+         END DO
+         npos = n_num(elnodes)
+         SSH_stiff%values(npos) = SSH_stiff%values(npos) - fy*factor
+      endif
+
+
+
    END DO
-END DO 
+END DO
+
+
 ! Mass matrix part
 DO row=1, myDim_nod2D
-   offset=ssh_stiff%rowptr(row)
-   SSH_stiff%values(offset)=SSH_stiff%values(offset)+ &
-                            area(1,row)/dt
+   offset = ssh_stiff%rowptr(row)
+   SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
 END DO
 deallocate(n_pos,n_num)
 
