@@ -30,7 +30,8 @@ subroutine init_output_mean(do_init)
   write(*,*) 'initialize new output files'
   filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
 
-  status = nf_create(filename, nf_clobber, ncid)
+! status = nf_create(filename, nf_clobber, ncid)
+  status = nf_create(filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), ncid)
   if (status.ne.nf_noerr) call handle_err(status)
 
   ! Define the dimensions
