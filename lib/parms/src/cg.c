@@ -55,12 +55,12 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     comm    = is->comm;
     
 
-/*----- allocate memory for working local arrays -------*/
+/*----- allocate memory for local working arrays -------*/
 
-    PARMS_NEWARRAY(r, nloc);  
-    PARMS_NEWARRAY(z, nloc);  
-    PARMS_NEWARRAY(p, nloc);
-    PARMS_NEWARRAY(Ap,nloc);
+    r =  malloc(nloc*sizeof(FLOAT));  
+    z =  malloc(nloc*sizeof(FLOAT));  
+    p =  malloc(nloc*sizeof(FLOAT));
+    Ap = malloc(nloc*sizeof(FLOAT));
     
 /* --- first permute x and y for pARMS matrix structure ------*/
     if (is->isperm) { 
@@ -118,8 +118,9 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
       if(is->isserial == false)
 	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
 
+      omega = tmp[0];
       /* Convergence criterion reached? */
-      if (tmp[0] <= tol) break;  
+      if (omega <= tol) break;  
 
       beta = tmp[1] / r2;
       r2   = tmp[1];
@@ -139,7 +140,7 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
 	  z[is->iperm[i]] = y[i];
 	}
 	memcpy(x, r, nloc*sizeof(FLOAT));
-	memcpy(y, z, nloc*sizeof(FLOAT));
+        memcpy(y, z, nloc*sizeof(FLOAT));
 	is->isvecperm = false; 
     }
 
