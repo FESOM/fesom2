@@ -106,6 +106,10 @@ typedef struct parms_vcsr {
   /*! parameter: pa = An indirect pointer to store corresponding nonzero entries.  
   */
   FLOAT    **pa;
+
+  /* NR And the same with straight memory access: */
+  int   *rowptr, *colind;
+  FLOAT *val;
 } *parms_vcsr;
 
 /*! \struct parms_Mat_

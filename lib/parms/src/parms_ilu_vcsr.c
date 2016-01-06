@@ -268,26 +268,41 @@ static int parms_ilu_sol_vcsr(parms_Operator self, FLOAT *y,
   n = L->n;
 
   for (i = 0; i < n; i++) {
-    nnz = L->nnzrow[i];
-    pj  = L->pj[i];
-    pa  = L->pa[i];
     x[i] = y[i];
-
-    for (j = 0; j < nnz; j++) {
-      x[i] -= pa[j] * x[pj[j]];
+    for (j = L->rowptr[i]; j < L->rowptr[i+1]; j++) {    
+           x[i] -= L->val[j] * x[L->colind[j]];
     }
   }
 
   for (i = n-1; i >= 0; i--) {
-    nnz = U->nnzrow[i];
-    pj  = U->pj[i];
-    pa  = U->pa[i];
 
-    for (j = 1; j < nnz; j++) {
-      x[i] -= pa[j] * x[pj[j]];
+    for (j =  U->rowptr[i]+1; j < U->rowptr[i+1]; j++) {
+      x[i] -= U->val[j] * x[U->colind[j]];
     }
-    x[i] *= pa[0];  // pa[0] = diag
+    x[i] *= U->val[U->rowptr[i]];  // pa[0] = diag
   }
+
+/*   for (i = 0; i < n; i++) { */
+/*     nnz = L->nnzrow[i]; */
+/*     pj  = L->pj[i]; */
+/*     pa  = L->pa[i]; */
+/*     x[i] = y[i]; */
+
+/*     for (j = 0; j < nnz; j++) { */
+/*       x[i] -= pa[j] * x[pj[j]]; */
+/*     } */
+/*   } */
+
+/*   for (i = n-1; i >= 0; i--) { */
+/*     nnz = U->nnzrow[i]; */
+/*     pj  = U->pj[i]; */
+/*     pa  = U->pa[i]; */
+
+/*     for (j = 1; j < nnz; j++) { */
+/*       x[i] -= pa[j] * x[pj[j]]; */
+/*     } */
+/*     x[i] *= pa[0];  // pa[0] = diag */
+/*   } */
 
   return 0;
 }
@@ -667,7 +682,7 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
    *------------------------------------------------------------------*/
   parms_Operator newOpt;
   parms_ilu_data data;
-  parms_vcsr     mat_vcsr;
+  parms_vcsr     mat_vcsr, L, U;
   parms_Map      is;
   int n, start, schur_start, m, nnz, lfil, *jw, **levs, n2, *pj, ierr;
   int lenl, lenu, ii, jj, i, j, k, jcol, jpos, jrow, *rowj, *lev, jlev;
@@ -1091,11 +1106,59 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
     data->nnz_mat += mat_vcsr->nnzrow[i];
   }
 
-  /* computer the number of nonzeros in pc */
+  /* compute the number of nonzeros in pc */
   for (i = 0; i < m; i++) {
     data->nnz_prec += data->L->nnzrow[i];
     data->nnz_prec += data->U->nnzrow[i];
   }
+
+  /* NR: Copy data to a second, contiguous memory structure */
+  /* NR: Yes, it is redundant and a waste of memory, but it allows */
+  /* NR: for faster computation later on. */
+
+  L = data->L;
+  U = data->U;
+
+  PARMS_NEWARRAY(L->rowptr, m+1);	
+  PARMS_NEWARRAY(U->rowptr, m+1);
+
+  L->rowptr[0]=0;
+  U->rowptr[0]=0;
+  for (i = 0; i < m; i++){
+    L->rowptr[i+1] = L->rowptr[i] + L->nnzrow[i];
+    U->rowptr[i+1] = U->rowptr[i] + U->nnzrow[i];
+  }
+
+  PARMS_NEWARRAY(L->colind, L->rowptr[m]);	
+  PARMS_NEWARRAY(U->colind, U->rowptr[m]);
+
+  PARMS_NEWARRAY(L->val, L->rowptr[m]);	
+  PARMS_NEWARRAY(U->val, U->rowptr[m]);
+
+  k=0;
+  for (i = 0; i < m; i++){
+    nnz = L->nnzrow[i];
+    pj  = L->pj[i];
+    pa  = L->pa[i];
+    for (j = 0; j < nnz; j++) {
+      L->colind[k] = pj[j];
+      L->val[k]    = pa[j];
+      k++;
+    }
+  }
+  k=0;
+  for (i = 0; i < m; i++){
+    nnz = U->nnzrow[i];
+    pj  = U->pj[i];
+    pa  = U->pa[i];
+    for (j = 0; j < nnz; j++) {
+      U->colind[k] = pj[j];
+      U->val[k]    = pa[j];
+      k++;
+    }
+  }
+
+
 //  printf("nnzmat = %d, nnzprec = %d \n",data->nnz_mat, data->nnz_prec);
   return ierr;
 }

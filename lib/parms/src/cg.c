@@ -30,15 +30,17 @@ typedef struct cg_data {
 #define TINY 1.0e-20
 int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
 {
-    int i, its;
-    int maxits, nloc, one = 1;
+  int i, its, j;
+    int maxits, nloc;
     FLOAT alpha, tmp[2];
     FLOAT *r, *z, *p, *Ap;
-    REAL  tol, rho, omega, beta, r2;
-
+    REAL  tol, omega, beta, r2;
+   
+    
     parms_Mat A;
     parms_PC  pc;
     parms_Map is;
+    parms_vcsr Acsr;
     
     MPI_Comm comm;
     
@@ -52,6 +54,7 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     nloc    = parms_MapGetLocalSize(is);
     comm    = is->comm;
     
+
 /*----- allocate memory for working local arrays -------*/
 
     PARMS_NEWARRAY(r, nloc);  
@@ -62,36 +65,37 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
 /* --- first permute x and y for pARMS matrix structure ------*/
     if (is->isperm) { 
         for (i = 0; i < nloc; i++) {
-	  r[is->perm[i]] = x[i];
-	  z[is->perm[i]] = y[i];
+	  z[is->perm[i]] = x[i];
+	  r[is->perm[i]] = y[i];
 	}
-	memcpy(x, r, nloc*sizeof(FLOAT));
-	memcpy(y, z, nloc*sizeof(FLOAT));
+	memcpy(x, z, nloc*sizeof(FLOAT));
+	memcpy(y, r, nloc*sizeof(FLOAT));
 	is->isvecperm = true;
     }
 
     omega = 2.*tol;
 
-    /* compute r = A * x */ 
-    /* and residual vector r = y - Ax */
+    /* compute residual vector r = y - Ax */
     parms_MatVec(A, x, r);
     for (i = 0; i < nloc; i++)  r[i] = y[i] - r[i];
     
     parms_PCApply(pc, r, z);
-    for (i = 0; i < nloc; i++)  p[i] = z[i];
-         
+
     r2 = 0;
-    for (i = 0; i < nloc; i++) r2 += r[i] * z[i];
+    for (i = 0; i < nloc; i++){
+      p[i] = z[i];
+      r2 += r[i] * z[i];
+    }
+
     if(is->isserial == false)
       MPI_Allreduce(MPI_IN_PLACE, &r2, 1, MPI_DOUBLE, MPI_SUM, comm);
     
 
-    its = 0;   
-    while(its < maxits  && omega > tol){                 
+    for (its = 1; its <= maxits; its++){                 
       
-      parms_MatVec(A,p,Ap);
-      
-      alpha = 0.;
+       parms_MatVec(A,p,Ap);
+
+      alpha = 0.;      
       for (i = 0; i < nloc; i++) alpha += p[i] * Ap[i];            
       if(is->isserial == false)
 	MPI_Allreduce(MPI_IN_PLACE, &alpha, 1, MPI_DOUBLE, MPI_SUM, comm);
@@ -114,16 +118,15 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
       if(is->isserial == false)
 	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
 
-      omega = tmp[0];
-      beta = tmp[1] / r2;
+      /* Convergence criterion reached? */
+      if (tmp[0] <= tol) break;  
 
+      beta = tmp[1] / r2;
       r2   = tmp[1];
       
       for (i = 0; i < nloc; i++){
 	p[i] = z[i] + beta *  p[i];
       }
-
-      its++;
     }
     
     if(its == maxits && omega > tol)
@@ -136,7 +139,7 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
 	  z[is->iperm[i]] = y[i];
 	}
 	memcpy(x, r, nloc*sizeof(FLOAT));
-	memcpy(y, z, nloc*sizeof(FLOAT));    
+	memcpy(y, z, nloc*sizeof(FLOAT));
 	is->isvecperm = false; 
     }
 
