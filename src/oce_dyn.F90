@@ -397,35 +397,12 @@ DO ed=1,myDim_edge2D   !! Attention
       ! It should be just grad on elements 
 
       if (el(i)<1) cycle
+
       elnodes=elem2D_nodes(:,el(i))
-      call elem_center(el(i), ax, ay)
-      ay=cos(ay)
-      if (cartesian) ay=1.0_WP
-      dmean = -0.5_WP * r_earth * zbar(nlevels(el(i)))/elem_area(el(i))
 
-      fx(1) = coord_nod2D(2,elnodes(2))-coord_nod2D(2,elnodes(3))
-      fx(2) = coord_nod2D(2,elnodes(3))-coord_nod2D(2,elnodes(1))
-      fx(3) = coord_nod2D(2,elnodes(1))-coord_nod2D(2,elnodes(2))
-
-      fy(1) = coord_nod2D(1,elnodes(2))-coord_nod2D(1,elnodes(3))
-      fy(2) = coord_nod2D(1,elnodes(3))-coord_nod2D(1,elnodes(1))
-      fy(3) = coord_nod2D(1,elnodes(1))-coord_nod2D(1,elnodes(2))
-      if (fy(1) >  cyclic_length*0.5) fy(1) = fy(1)-cyclic_length
-      if (fy(2) >  cyclic_length*0.5) fy(2) = fy(2)-cyclic_length
-      if (fy(3) >  cyclic_length*0.5) fy(3) = fy(3)-cyclic_length
-      if (fy(1) < -cyclic_length*0.5) fy(1) = fy(1)+cyclic_length
-      if (fy(2) < -cyclic_length*0.5) fy(2) = fy(2)+cyclic_length
-      if (fy(3) < -cyclic_length*0.5) fy(3) = fy(3)+cyclic_length         
-
-
-      ! This should work too !!
-      !fx=zbar(nlevels(el(i)))*gradient_sca(1:3,el(i))
-      !fy=zbar(nlevels(el(i)))*gradient_sca(4:6,el(i))
-      !
-      ! fx, fy are contribution to -velocity from el(i)   (-h\nabla\eta)
-      !
-      fy = dmean*( ay*fy*edge_cross_dxdy(2*i-1,ed) &
-                    + fx*edge_cross_dxdy(2*i  ,ed))
+      fy(1:3) = zbar(nlevels(el(i)))* &
+               (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)  &
+              - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
 
       if(i==2) fy=-fy
 
