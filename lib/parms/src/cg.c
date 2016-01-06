@@ -76,10 +76,10 @@ int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x)
     omega = 2.*tol;
 
     /* compute residual vector r = y - Ax */
-    parms_MatVec(A, x, r);
+    parms_MatVec(A,x,r);
     for (i = 0; i < nloc; i++)  r[i] = y[i] - r[i];
     
-    parms_PCApply(pc, r, z);
+    parms_PCApply(pc,r,z);
 
     r2 = 0;
     for (i = 0; i < nloc; i++){
