@@ -375,8 +375,8 @@ allocate(ssh_stiff%values(ssh_stiff%nza))
 ssh_stiff%values=0.0_WP  
 ! d) 
 do n=1,myDim_nod2D
-   nini = ssh_stiff%rowptr(n)  - ssh_stiff%rowptr(1)+1
-   nend = ssh_stiff%rowptr(n+1)- ssh_stiff%rowptr(1)
+   nini = ssh_stiff%rowptr(n) 
+   nend = ssh_stiff%rowptr(n+1)- 1
 
    ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
 end do
@@ -408,7 +408,7 @@ DO ed=1,myDim_edge2D   !! Attention
 
       row=edges(1,ed)
       if (row <= myDim_nod2D) then
-         DO n = SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1, SSH_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+         DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
             n_num(SSH_stiff%colind(n)) = n
          END DO
          npos = n_num(elnodes)
@@ -416,7 +416,7 @@ DO ed=1,myDim_edge2D   !! Attention
       endif
       row=edges(2,ed)
       if (row <= myDim_nod2D) then
-         DO n = SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1, SSH_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+         DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
             n_num(SSH_stiff%colind(n)) = n
          END DO
          npos = n_num(elnodes)
