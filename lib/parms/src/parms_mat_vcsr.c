@@ -14,21 +14,13 @@ static int MatVec_vcsr(parms_Mat self, FLOAT *x, FLOAT *y)
   is       = self->is;
   lsize    = parms_MapGetLocalSize(is);
 
-/*   for (i = 0; i < lsize; i++) { */
-/*     y[i] = 0.0; */
-/*     length = matrix->nnzrow[i]; */
-/*     pj  = matrix->pj[i]; */
-/*     pa  = matrix->pa[i]; */
-/*     for (j = 0; j < length; j++) { */
-/*       y[i]   += pa[j] * x[pj[j]]; */
-/*     } */
-/*   } */
-
-
   for (i = 0; i < lsize; i++) {
     y[i] = 0.0;
-    for (j = matrix->rowptr[i]; j < matrix->rowptr[i+1]; j++) {
-      y[i]   += matrix->val[j] * x[matrix->colind[j]];
+    length = matrix->nnzrow[i];
+    pj  = matrix->pj[i];
+    pa  = matrix->pa[i];
+    for (j = 0; j < length; j++) {
+      y[i]   += pa[j] * x[pj[j]];
     }
   }
 

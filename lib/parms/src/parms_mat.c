@@ -264,8 +264,6 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
   int *perm, *rp, *cp, *odp,inc, lsize, size;
   FLOAT *ra;
   BOOL found;
-  int *pj, nnz;
-  FLOAT *pa;
 
   isalloc  = self->isalloc;
   is       = self->is;
@@ -484,33 +482,6 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
     }
   }
 
-  /* NR: Copy data to a second, contiguous memory structure */
-  /* NR: Yes, it is redundant and a waste of memory, but it allows */
-  /* NR: for faster computation later on. */
-
-
-
-  PARMS_NEWARRAY(aux_data->rowptr, m+1);	
-
-  aux_data->rowptr[0]=0;
-  for (i = 0; i < m; i++){
-    aux_data->rowptr[i+1] = aux_data->rowptr[i] + aux_data->nnzrow[i];
-  }
-
-  PARMS_NEWARRAY(aux_data->colind, aux_data->rowptr[m]);	
-  PARMS_NEWARRAY(aux_data->val, aux_data->rowptr[m]);	
-
-  k=0;
-  for (i = 0; i < m; i++){
-    nnz = aux_data->nnzrow[i];
-    pj  = aux_data->pj[i];
-    pa  = aux_data->pa[i];
-    for (j = 0; j < nnz; j++) {
-      aux_data->colind[k] = pj[j];
-      aux_data->val[k]    = pa[j];
-      k++;
-    }
-  }
   return 0;
 }
 
