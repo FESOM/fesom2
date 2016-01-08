@@ -30,11 +30,13 @@ typedef struct bicgs_data {
 #define TINY 1.0e-20
 int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x)
 {
+
     int i, its;
     int maxits, nloc, size, one = 1;
     FLOAT alpha, t1, tmp[2];
-    FLOAT *r0, *r, *p, *s, *st, *v, *t, *pt;
+    FLOAT *r0, *r, *p, *st, *v, *t, *pt;
     REAL  tol, rho, rho_alt, omega, sigma, beta;
+    MPI_Request req;
 
     parms_Mat A;
     parms_PC  pc;
@@ -54,120 +56,155 @@ int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x)
     tol     = self->tol*self->tol;
     nloc    = parms_MapGetLocalSize(is);
     comm    = is->comm;
-
-    /* --- first permute x and y for pARMS matrix structure ------*/
-    parms_VecPerm(x, is); 
-    parms_VecPerm(y, is);
-/* ---- set isvecperm to true -----*/
-    is->isvecperm = true;
     
 /*----- allocate memory for working local arrays -------*/
     size = nloc;
-    PARMS_NEWARRAY(r0, size);  
-    PARMS_NEWARRAY(r,  size);  
-    s = r;
+    /*    PARMS_NEWARRAY(r0, size);  */
+    PARMS_NEWARRAY(r,  size); 
+    PARMS_NEWARRAY(r0,  size);   
     PARMS_NEWARRAY(st, size);
     PARMS_NEWARRAY(t, size);
-    PARMS_NEWARRAY0(v, size);
-    PARMS_NEWARRAY0(p,  size);
+    PARMS_NEWARRAY(v, size);
+    PARMS_NEWARRAY(p,  size);
     PARMS_NEWARRAY(pt, size);
+
+/* --- first permute x and y for pARMS matrix structure ------*/
+    if (is->isperm) { 
+      for (i = 0; i < nloc; i++) {
+	t[is->perm[i]] = x[i];
+	r0[is->perm[i]] = y[i];
+      }
+      memcpy(x, t, nloc*sizeof(FLOAT));
+      is->isvecperm = true;
+    }
+   
+   
     
-   
-    /*"Knoll trick:"
-      parms_PCApply(pc, y, r);*/
-   
-    /*compute r = A * x */ 
-    parms_MatVec(A, x, r);
-
     /* compute residual vector r = y - Ax */
-    parms_VecAYPX(r, y, -1.0, is);    
-    PARMS_MEMCPY(p,  r, nloc);
-    parms_VecDOT(r, r, &omega, is);
+    /* r0 = y  (permuted) */
+    parms_MatVec(A, x, r);
+    parms_VecAYPX(r, r0, -1.0, is);    
+    
+    /* choose r0 (arbitrary), e.g., PARMS_MEMCPY(r0,r,nloc); or: */    
+    /* PARMS_MEMCPY(r0, y, nloc); */
+    /* As r0 and y are never changed, we can simply set */
+    /* r0=y; */
+    /* Do this already above, use r0 as permuted y! */
 
-    /* choose r0 (arbitrary) */
-    /*PARMS_MEMCPY(r0,r,nloc);*/
-    PARMS_MEMCPY(r0, y, nloc);
-    parms_VecDOT(r0,r,&rho, is);  
-   
+    tmp[0] = 0.;
+    tmp[1] = 0.;
+    for (i = 0; i < nloc; i++) 
+      {
+	tmp[0] +=  r[i] * r[i]; // omega
+	tmp[1] += r0[i] * r[i]; // rho
+      }
+     if(is->isserial == false)
+       MPI_Iallreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm, &req); 
+     
+
+    PARMS_MEMCPY(p, r, nloc);
     alpha = 0.;
     sigma = rho_alt = 1.0;
+
+    if(is->isserial == false) MPI_Wait(&req, MPI_STATUS_IGNORE);
+    
+    omega = tmp[0];
+    rho   = tmp[1];
+   
  
-    its = 0;   
-    while(its < maxits  && omega > tol){                 
+    if (omega > tol){
+      for (its = 0; its < maxits; its++){                 
 
-      parms_PCApply(pc, p, pt);
-      parms_MatVec(A, pt, v);
-      parms_VecDOT(r0,v,&alpha,is);
+	parms_PCApply(pc, p, pt);
+	parms_MatVec(A, pt, v);
+	parms_VecDOT(r0,v,&alpha,is);
 
-      alpha = rho/alpha;
-      parms_VecAXPY(x, pt, alpha, is);	
-      parms_VecAXPY(s, v, -alpha, is);
+	alpha = rho/alpha;
+
+	for (i = 0; i < nloc; i++) r[i] -= alpha * v[i]; 
       
-      /*NR  Skip this check, it is expensive due to the */
-      /*    MPI_Allreduce in VecDOT */
-      /* parms_VecDOT(s, s, &omega, is); */
-      /* if(omega < TINY*TINY){ */
-      /*    its++; */
-      /*    continue; */
-      /* } */
+	parms_PCApply(pc, r, st);
+	parms_MatVec(A, st, t);
 
-      parms_PCApply(pc, s, st);
-      parms_MatVec(A, st, t);
-      tmp[0] = GDOT(nloc, t, one, s, one);
-      tmp[1] = GDOT(nloc, t, one, t, one);
+	tmp[0] = 0.;
+	tmp[1] = 0.;
+	for (i = 0; i < nloc; i++) 
+	  {
+	    tmp[0] += t[i] * r[i]; 
+	    tmp[1] += t[i] * t[i]; 
+	  }
             
-      if(is->isserial == false)
-	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
+	
+	if(is->isserial == false) 
+	  MPI_Iallreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm, &req);
+    	
+	for (i = 0; i < nloc; i++) x[i] += alpha * pt[i];
+    
+	if(is->isserial == false) MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+	sigma = tmp[0]/tmp[1];
       
-      sigma = tmp[0]/tmp[1];
-      
-      if(ABS_VALUE(sigma) < TINY){
-	if(rank == 0)
-	  printf("ERROR: sigma = 0\n");
-	break;
-      }
-      
-      parms_VecAXPY(x, st, sigma, is); 
-      parms_VecAXPY(r, t, -sigma, is); 
-      /* parms_VecDOT( r, r, &omega, is); */
-      /* parms_VecDOT(r0, r, &rho,   is); */
-      /* NR: Combine the dot products */
-      tmp[0] = 0.;
-      tmp[1] = 0.;
-      for (i = 0; i < nloc; i++) 
-	{
-	  tmp[0] +=  r[i] * r[i]; // omega
-	  tmp[1] += r0[i] * r[i]; // rho
+	if(ABS_VALUE(sigma) < TINY){
+	  if(rank == 0)
+	    printf("ERROR: sigma = 0\n");
+	  break;
 	}
-      if(is->isserial == false)
-	MPI_Allreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm);
+      
+	for (i = 0; i < nloc; i++) r[i] -= sigma * t[i];
+     
+	tmp[0] = 0.;
+	tmp[1] = 0.;
+	for (i = 0; i < nloc; i++) 
+	  {
+	    tmp[0] +=  r[i] * r[i]; // omega
+	    tmp[1] += r0[i] * r[i]; // rho
+	  }
+	
+	if(is->isserial == false) 
+	  MPI_Iallreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm, &req);
 
-      omega = tmp[0];
-      rho   = tmp[1];
+	for (i = 0; i < nloc; i++) x[i] += sigma * st[i];
 
-      beta = (rho * alpha) / (rho_alt * sigma);
-      rho_alt = rho;
-      parms_VecAXPY(p, v, -sigma, is);
-      parms_VecAYPX(p, r, beta,   is);       
+	
+	 if(is->isserial == false) MPI_Wait(&req, MPI_STATUS_IGNORE);
 
-      its++;
+	omega = tmp[0];
+
+	if (omega < tol) break;
+
+	rho   = tmp[1];
+
+	beta = (rho * alpha) / (rho_alt * sigma);
+	rho_alt = rho;
+      
+	for (i = 0; i < nloc; i++) 
+	  {
+	    p[i] = r[i] + beta*(p[i] - sigma* v[i]);
+	  }
+      }
     }
     
+
+    its++;
+
     if(its == maxits && omega > tol)
       printf("ERROR: no convergence\n");
     
-    free(r0);
+    /* reset isvecperm and do inverse permutation*/
+    if (is->isperm) { 
+        for (i = 0; i < nloc; i++) {
+	  r[is->iperm[i]] = x[i];
+	}
+	memcpy(x, r, nloc*sizeof(FLOAT));
+	is->isvecperm = false; 
+    }
+    free(r0); 
     free(r);
     free(p);
     free(st);
     free(t);
     free(v);
     
-    /* reset isvecperm and do inverse permutation*/
-    is->isvecperm = false; // this comes before inverse permutation
-    /* permutes x and y */
-    parms_VecInvPerm(x, is); 
-    parms_VecInvPerm(y, is);
 
     self->its = its;
     return 0;

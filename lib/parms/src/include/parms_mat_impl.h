@@ -106,6 +106,9 @@ typedef struct parms_vcsr {
   /*! parameter: pa = An indirect pointer to store corresponding nonzero entries.  
   */
   FLOAT    **pa;
+
+  int      *pj_data;
+  FLOAT    *pa_data;
 } *parms_vcsr;
 
 /*! \struct parms_Mat_

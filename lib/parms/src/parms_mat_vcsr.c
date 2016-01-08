@@ -16,10 +16,9 @@ static int MatVec_vcsr(parms_Mat self, FLOAT *x, FLOAT *y)
 
   for (i = 0; i < lsize; i++) {
     y[i] = 0.0;
-    length = matrix->nnzrow[i];
     pj  = matrix->pj[i];
     pa  = matrix->pa[i];
-    for (j = 0; j < length; j++) {
+    for (j = 0; j <  matrix->nnzrow[i]; j++) {
       y[i]   += pa[j] * x[pj[j]];
     }
   }

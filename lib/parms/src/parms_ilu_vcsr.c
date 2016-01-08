@@ -268,22 +268,22 @@ static int parms_ilu_sol_vcsr(parms_Operator self, FLOAT *y,
   n = L->n;
 
   for (i = 0; i < n; i++) {
-    nnz = L->nnzrow[i];
+    // nnz = L->nnzrow[i];
     pj  = L->pj[i];
     pa  = L->pa[i];
     x[i] = y[i];
 
-    for (j = 0; j < nnz; j++) {
+    for (j = 0; j < L->nnzrow[i]; j++) {
       x[i] -= pa[j] * x[pj[j]];
     }
   }
 
   for (i = n-1; i >= 0; i--) {
-    nnz = U->nnzrow[i];
+    //    nnz = U->nnzrow[i];
     pj  = U->pj[i];
     pa  = U->pa[i];
 
-    for (j = 1; j < nnz; j++) {
+    for (j = 1; j < U->nnzrow[i]; j++) {
       x[i] -= pa[j] * x[pj[j]];
     }
     x[i] *= pa[0];  // pa[0] = diag
@@ -647,7 +647,7 @@ int parms_ilu0_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 }
 
 #define MIN(a, b) (a) > (b) ? (b) : (a)
-
+#define MAX_ROWS_PER_COL 20
 int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 		    parms_Operator *op) 
 {
@@ -675,6 +675,7 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 //  int flag;
 //  BOOL found;
   int rank;
+  int lenl_all, lenu_all, max_entr;
   
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -686,7 +687,9 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
     schur_start = n;
   }
 
-  if (!param->isalloc) {
+  if (!param->isalloc) {			
+// global data arrays, F77 maximum size... 
+    max_entr = n*MAX_ROWS_PER_COL;
     parms_OperatorCreate(&newOpt);
     PARMS_MEMCPY(newOpt->ops, &parms_ilu_sol_vptr, 1);		
     PARMS_NEW(data);						
@@ -695,11 +698,17 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
     PARMS_NEWARRAY(data->L->nnzrow, n);			
     PARMS_NEWARRAY(data->L->pj,     n);				
     PARMS_NEWARRAY(data->L->pa,     n);				
+// allocate global data arrays 
+    PARMS_NEWARRAY(data->L->pj_data, max_entr);				
+    PARMS_NEWARRAY(data->L->pa_data, max_entr);					
     PARMS_NEW(data->U);					
     data->U->n = n;						
     PARMS_NEWARRAY(data->U->nnzrow, n);			
     PARMS_NEWARRAY(data->U->pj,     n);			
     PARMS_NEWARRAY(data->U->pa,     n);
+// allocate global data arrays 
+    PARMS_NEWARRAY(data->U->pj_data, max_entr);				
+    PARMS_NEWARRAY(data->U->pa_data, max_entr);		
     data->nnz_mat  = 0;
     data->nnz_prec = 0;
     param->isalloc = true;
@@ -734,6 +743,8 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
   }
   m = mat_vcsr->n;
   ierr = 0;
+  lenl_all = 0;
+  lenu_all = 0;
   for(ii = 0; ii < m; ii++) {
     lenl = 0;
     lenu = 0;
@@ -970,8 +981,11 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
     }
     data->L->nnzrow[ii+start] = j;
     if(j > 0) {
-      PARMS_NEWARRAY(data->L->pj[ii+start], j);
-      PARMS_NEWARRAY(data->L->pa[ii+start], j);
+      // PARMS_NEWARRAY(data->L->pj[ii+start], j);
+      // PARMS_NEWARRAY(data->L->pa[ii+start], j);
+      data->L->pj[ii+start] = data->L->pj_data + lenl_all;
+      data->L->pa[ii+start] = data->L->pa_data + lenl_all;
+      lenl_all += j;
     }
     rowj = data->L->pj[ii+start];
     rowm = data->L->pa[ii+start];
@@ -1011,10 +1025,14 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
      }
 
     data->U->nnzrow[ii+start] = j;
-    PARMS_NEWARRAY(data->U->pj[ii+start], j);
+    // PARMS_NEWARRAY(data->U->pj[ii+start], j);
+    data->U->pj[ii+start] = data->U->pj_data + lenu_all;
     rowj = data->U->pj[ii+start];
-    PARMS_NEWARRAY(data->U->pa[ii+start], j);
+    // PARMS_NEWARRAY(data->U->pa[ii+start], j);
+    data->U->pa[ii+start] = data->U->pa_data + lenu_all;
     rowm = data->U->pa[ii+start];
+    lenu_all += j;
+
     PARMS_NEWARRAY(levs[ii+start], j);
     lev = levs[ii+start];
     if (ii+start < schur_start) {
