@@ -31,13 +31,13 @@ IMPLICIT NONE
 
  Integer        :: n, m, fileID, ind, nini, nend, n1, n2, n3, n4
  integer        :: vert_nodes(100)
- real(kind=WP)  :: x, y, x_in, y_in
+ real(kind=WP)  :: x, y
  character*10   :: mype_string,npes_string
  character*80   :: file_name
  character*80   :: dist_mesh_dir
  integer, allocatable :: mapping(:)
  
- write(mype_string,'(i3.3)') mype  
+ write(mype_string,'(i5.5)') mype  
  write(npes_string,"(I10)") npes
  dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
  
@@ -122,9 +122,7 @@ IMPLICIT NONE
             read(fileID,*) m, x, y
             if (mapping(n)>0) then
                if (force_rotation) then
-                  x_in = x*rad
-                  y_in = y*rad
-                  call g2r(x_in, y_in, x, y)
+                  call g2r(x*rad, y*rad, x, y)
                   x=x/rad
                   y=y/rad
                end if

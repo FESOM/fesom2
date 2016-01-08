@@ -51,19 +51,16 @@ integer                       :: tracer_adv=1
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_exp_max=1.e-5_WP
 
-                                ! 1 Muira
-				! 2 quadratic reconstruction Miura
-				! 3 MUSCL
-				! 4 MUSCL-FCT
+				! 1 MUSCL
+				! 2 MUSCL-FCT
 integer	                       :: num_tracers=2
 ! Momentum
 logical                       :: free_slip=.false.
                                 ! false=no slip 
 integer                       :: mom_adv=2
-                                ! 1 vector control volumes
-				! 2 vector c. v., p1 velocities
-				! 3 scalar control volumes  
-				! 4 vector invariant 
+                                ! 1 vector control volumes, p1 velocities
+				! 2 scalar control volumes  
+				! 3 vector invariant 
 
 logical                       :: open_b=.false.   ! Reserved    
 

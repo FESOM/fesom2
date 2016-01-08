@@ -78,8 +78,8 @@ end interface
 ident=1
 maxiter=2000
 restart=15
-fillin=2 !3
-lutype=1 !2
+fillin=3
+lutype=2
 droptol=1.e-8
 soltol=1.e-10
 reuse=0
@@ -87,7 +87,8 @@ reuse=0
 if (lfirst) then
    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-   call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
+   ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
+   call psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
@@ -186,7 +187,7 @@ Do n=1, myDim_nod2D
 END DO
 
 call exchange_nod(Wvel)
-call exchange_nod(fer_Wvel)
+if (Fer_GM) call exchange_nod(fer_Wvel)
 
 ! Split implicit vertical velocity onto implicit and explicit components
 if (w_split) then
