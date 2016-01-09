@@ -338,13 +338,17 @@ int parms_CommDataEnd(parms_Comm self)
 
   npsend = self->npsend;
   nprecv = self->nprecv;
-  status_send = self->status_send;
-  status_recv = self->status_recv;
+  // status_send = self->status_send;
+  // status_recv = self->status_recv;
   req_send = self->req_send;
   req_recv = self->req_recv;
 
-  MPI_Waitall(nprecv, req_recv, status_recv);
-  MPI_Waitall(npsend, req_send, status_send);
+  //  MPI_Waitall(nprecv, req_recv, status_recv);
+  // MPI_Waitall(npsend, req_send, status_send);
+
+  MPI_Waitall(nprecv, req_recv, MPI_STATUSES_IGNORE);
+  MPI_Waitall(npsend, req_send, MPI_STATUSES_IGNORE);
+  
   return 0;
 }
 
