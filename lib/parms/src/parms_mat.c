@@ -451,7 +451,7 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
 	  else { /* insert the new entry */
 	    if (space == aux_data->nnzrow[lrindex]) {
 	      /* reallocate memory for holding new entry */
-	      space += 10;
+	      space += 8;
 	      PARMS_RESIZE(aux_data->pa[lrindex], space);
 	      PARMS_RESIZE(aux_data->pj[lrindex], space);
 	      aux_data->space[lrindex] = space;
@@ -484,6 +484,8 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
 
   return 0;
 }
+
+
 
 /** 
  * Insert/add values to the parms_Mat object self. This assumes matrix 
@@ -545,7 +547,7 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
         PARMS_NEWARRAY(ext_data->pa,      ext_data->n);
         PARMS_NEWARRAY(ext_im,      ext_data->n);
         for (i = 0; i < ext_data->n; i++) {
-          ext_data->space[i] = 30;
+          ext_data->space[i] = 8;
           PARMS_NEWARRAY(ext_data->pj[i], ext_data->space[i]); 
           PARMS_NEWARRAY(ext_data->pa[i], ext_data->space[i]);      
         }
@@ -570,7 +572,7 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
       PARMS_NEWARRAY(aux_data->pj,      aux_data->n);
       PARMS_NEWARRAY(aux_data->pa,      aux_data->n);
       for (i = 0; i < aux_data->n; i++) {
-        aux_data->space[i] = 30;
+        aux_data->space[i] = 8;
         PARMS_NEWARRAY(aux_data->pj[i], aux_data->space[i]); 
         PARMS_NEWARRAY(aux_data->pa[i], aux_data->space[i]);      
       }
@@ -588,7 +590,7 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
       PARMS_NEWARRAY(ext_data->pa,      ext_data->n);
       PARMS_NEWARRAY(ext_im,      ext_data->n);
       for (i = 0; i < ext_data->n; i++) {
-        ext_data->space[i] = 30;
+        ext_data->space[i] = 8;
         PARMS_NEWARRAY(ext_data->pj[i], ext_data->space[i]); 
         PARMS_NEWARRAY(ext_data->pa[i], ext_data->space[i]);      
       }
@@ -622,43 +624,24 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
 	    /* local column index */
 	    lcindex = perm[*cp];
 
-	    found = false;
 	    for (k = 0; k < aux_data->nnzrow[lrindex]; k++) {
 	      if (rja[k] == lcindex) {
-	        found = true;
-	        index = k;
+		ra[k] = values[j];
 	        break;
 	      }
-	     }
-	     if (found) {
-	       if (mode == INSERT) {
-	         ra[index] = values[j];
-	       }
-	       else if (mode == ADD) {
-	         ra[index] += values[j];
-	       }
 	     }
 	  }
 	  else {
 	    if(cp != NULL){
 	      lcindex = *cp;
 	    
-	      found = false;
 	      for (k = 0; k < aux_data->nnzrow[lrindex]; k++) {
 	        if (rja[k] == lcindex) {
-	          found = true;
-	          index = k;
-	          break;
+		  ra[k] = values[j];
+		  break;
 	        }
 	       }
-	       if (found) {
-	         if (mode == INSERT) {
-	           ra[index] = values[j];
-	         }
-	         else if (mode == ADD) {
-	           ra[index] += values[j];
-	         }
-	       }
+	      
 	    }
 	  }
 	}
@@ -670,14 +653,14 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
       space = ext_data->n;
       if(is->n_ext == space){
 	  /* reallocate memory for holding new entry */
-	  space += 10;
+	  space += 8;
         PARMS_RESIZE(ext_data->space,   space);
         PARMS_RESIZE(ext_data->nnzrow, space);
         PARMS_RESIZE(ext_data->pj,      space);
         PARMS_RESIZE(ext_data->pa,      space);
         PARMS_RESIZE(is->ext_im,      space);
         for (k = ext_data->n; k < space; k++) {
-          ext_data->space[k] = 30;
+          ext_data->space[k] = 8;
           ext_data->nnzrow[k] = 0;
           PARMS_NEWARRAY(ext_data->pj[k], ext_data->space[k]); 
           PARMS_NEWARRAY(ext_data->pa[k], ext_data->space[k]);      
@@ -722,7 +705,7 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
 	    space   = ext_data->space[rindex];
 	    if (space == ext_data->nnzrow[rindex]) {
 	      /* reallocate memory for holding new entry */
-	      space += 10;
+	      space += 8;
 	      PARMS_RESIZE(ext_data->pa[rindex], space);
 	      PARMS_RESIZE(ext_data->pj[rindex], space);
 	      ext_data->space[rindex] = space;
@@ -774,22 +757,14 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
 	    for (k = 0; k < aux_data->nnzrow[lrindex]; k++) {
 	      if (rja[k] == lcindex) {
 	        found = true;
-	        index = k;
+		ra[k] = values[j];
 	        break;
 	      }
 	    }
-	    if (found) {
-	     if (mode == INSERT) {
-	      ra[index] = values[j];
-	     }
-	     else if (mode == ADD) {
-	      ra[index] += values[j];
-	     }   
-	   }
-	   else { /* insert the new entry */
+	    if (found == false) { /* insert the new entry */
 	    if (space == aux_data->nnzrow[lrindex]) {
 	      /* reallocate memory for holding new entry */
-	      space += 10;
+	      space += 8;
 	      PARMS_RESIZE(aux_data->pa[lrindex], space);
 	      PARMS_RESIZE(aux_data->pj[lrindex], space);
 	      aux_data->space[lrindex] = space;
@@ -822,14 +797,14 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
       space = ext_data->n;
       if(is->n_ext == space){
 	  /* reallocate memory for holding new entry */
-	  space += 10;
+	  space += 8;
         PARMS_RESIZE(ext_data->space,   space);
         PARMS_RESIZE(ext_data->nnzrow, space);
         PARMS_RESIZE(ext_data->pj,      space);
         PARMS_RESIZE(ext_data->pa,      space);
         PARMS_RESIZE(is->ext_im,      space);
         for (k = ext_data->n; k < space; k++) {
-          ext_data->space[k] = 30;
+          ext_data->space[k] = 8;
           ext_data->nnzrow[k] = 0;
           PARMS_NEWARRAY(ext_data->pj[k], ext_data->space[k]); 
           PARMS_NEWARRAY(ext_data->pa[k], ext_data->space[k]);      
@@ -874,7 +849,7 @@ int parms_MatSetElementMatrix(parms_Mat self, int m, int *im, int *ia,
 	    space   = ext_data->space[rindex];
 	    if (space == ext_data->nnzrow[rindex]) {
 	      /* reallocate memory for holding new entry */
-	      space += 10;
+	      space += 8;
 	      PARMS_RESIZE(ext_data->pa[rindex], space);
 	      PARMS_RESIZE(ext_data->pj[rindex], space);
 	      ext_data->space[rindex] = space;
