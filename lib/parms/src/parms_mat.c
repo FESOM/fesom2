@@ -283,7 +283,7 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
     PARMS_NEWARRAY(aux_data->pj,      aux_data->n);
     PARMS_NEWARRAY(aux_data->pa,      aux_data->n);
     for (i = 0; i < aux_data->n; i++) {
-      aux_data->space[i] = 30;
+      aux_data->space[i] = 8;
       PARMS_NEWARRAY(aux_data->pj[i], aux_data->space[i]); 
       PARMS_NEWARRAY(aux_data->pa[i], aux_data->space[i]);      
     }
@@ -321,7 +321,7 @@ int parms_MatSetValues(parms_Mat self, int m, int *im, int *ia,
 	else { /* insert a new entry */
 	  if (space == aux_data->nnzrow[rindex]) {
 	    /* reallocate memory for holding new entry */
-	    space += 10;
+	    space += 8;
 	    PARMS_RESIZE(aux_data->pa[rindex], space);
 	    PARMS_RESIZE(aux_data->pj[rindex], space);
 	    aux_data->space[rindex] = space;	    
