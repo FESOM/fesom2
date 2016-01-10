@@ -647,7 +647,7 @@ int parms_ilu0_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 }
 
 #define MIN(a, b) (a) > (b) ? (b) : (a)
-#define MAX_ROWS_PER_COL 20
+#define MAX_ROWS_PER_COL 20 
 int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
 		    parms_Operator *op) 
 {
@@ -986,6 +986,10 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
       data->L->pj[ii+start] = data->L->pj_data + lenl_all;
       data->L->pa[ii+start] = data->L->pa_data + lenl_all;
       lenl_all += j;
+      if (lenl_all > max_entr) {
+	printf("parms_ilu_vcsr.c, parms_iluk_vcsr: set larger MAX_ROWS_PER_COL and recompile\n");
+	MPI_Abort(MPI_COMM_WORLD, 13);
+      }
     }
     rowj = data->L->pj[ii+start];
     rowm = data->L->pa[ii+start];
@@ -1032,6 +1036,11 @@ int parms_iluk_vcsr(parms_Mat self, parms_FactParam param, void *mat,
     data->U->pa[ii+start] = data->U->pa_data + lenu_all;
     rowm = data->U->pa[ii+start];
     lenu_all += j;
+
+    if (lenu_all > max_entr) {
+      printf("parms_ilu_vcsr.c, parms_iluk_vcsr: set larger MAX_ROWS_PER_COL and recompile\n");
+      MPI_Abort(MPI_COMM_WORLD, 13);
+    }
 
     PARMS_NEWARRAY(levs[ii+start], j);
     lev = levs[ii+start];

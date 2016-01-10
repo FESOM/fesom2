@@ -44,30 +44,25 @@ static int MatVec_dvcsr(parms_Mat self, FLOAT *x, FLOAT *y)
 
   /* perform local matrix vector product */
   for (i = 0; i < lsize; i++) {
-    s = 0.0;
-    length = diag_mat->nnzrow[i];
+    y[i] = 0.0;
     pj = diag_mat->pj[i];
     pa = diag_mat->pa[i];
-    for (j = 0; j < length; j++) {
+    for (j = 0; j < diag_mat->nnzrow[i]; j++) {
       index = pj[j];
-      s    += pa[j] * x[index];
+      y[i]    += pa[j] * x[index];
     }
-    y[i] = s;
   }
 
   /* off-diagonal part matrix-vector product */
   parms_CommDataEnd(handler);
   offsetptr = handler->buf_recv - lsize;
   for (i = 0; i < is->ninf; i++) {
-    length = offd_mat->nnzrow[i];
     pj     = offd_mat->pj[i];
     pa     = offd_mat->pa[i];
-    s      = y[i+is->nint];
 
-    for (j = 0; j < length; j++) 
-      s   += pa[j] * offsetptr[pj[j]];
+    for (j = 0; j < offd_mat->nnzrow[i]; j++) 
+      y[i+is->nint]   += pa[j] * offsetptr[pj[j]];
 
-    y[i+is->nint] = s;
   }
   parms_VecInvPerm(x, self->is);
   parms_VecInvPerm(y, self->is);

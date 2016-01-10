@@ -429,7 +429,6 @@ int parms_VecInvPerm(FLOAT *self, parms_Map map)
   int          size, i, k, rank;
   FLOAT        *newvec;
   
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   size = parms_MapGetLocalSize(map);
   if (map->isperm && (map->isvecperm == false)) { 
     perm = map->iperm;
