@@ -88,7 +88,7 @@ if (lfirst) then
    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
    ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
-   call psolver_init(ident, SOLBICGS, PCBJ, PCILUK, lutype, &
+   call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
