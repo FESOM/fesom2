@@ -61,6 +61,7 @@ integer     :: elem_size, node_size
 elem_size=myDim_elem2D+eDim_elem2D
 node_size=myDim_nod2D+eDim_nod2D
 
+
 ! ================
 ! Velocities
 ! ================     
@@ -125,7 +126,7 @@ allocate(Av(nl,elem_size),Kv(nl,node_size))
 Av=0d0
 Kv=0d0
 !Velocities at nodes
-allocate(Unode(2,nl,node_size))
+allocate(Unode(2,nl-1,node_size))
 
 !Tracer gradients&RHS  
 allocate(ttrhs(nl-1,node_size))
