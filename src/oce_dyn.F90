@@ -696,7 +696,7 @@ END DO
  
 DO ed=1, myDim_elem2D
    DO nz=1, nlevels(ed)-1 
-      u1=sqrt(UV_f(1,nz,ed)**2+UV_f(2,nz,ed)**2)+1.e-5
+      u1=sqrt(UV_f(1,nz,ed)**2+UV_f(2,nz,ed)**2)
       v1=sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2)
    ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
    ! this is done to force the CFL, which is otherwise exceeded in some points

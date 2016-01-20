@@ -45,7 +45,7 @@ DO elem=1, myDim_elem2D
 END DO
 t2=MPI_Wtime() 
 ! ====================
-! Horizontal advection
+! advection
 ! ====================
 if (mom_adv==1) then
    call momentum_adv_p1

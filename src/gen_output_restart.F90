@@ -30,8 +30,12 @@ subroutine init_output_restart(do_init)
   write(*,*) 'initialize new output files'
   filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.restart.nc'
 
-! status = nf_create(filename, nf_clobber, ncid)
-  status = nf_create(filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), ncid)
+  if (restart_offset==32) then
+     status = nf_create(filename, nf_clobber, ncid)
+  else
+     status = nf_create(filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), ncid)
+  end if
+
   if (status.ne.nf_noerr) call handle_err(status)
 
   ! Define the dimensions
@@ -528,15 +532,15 @@ subroutine restart(directionflag, istep)
   logical :: do_restart=.false.
   integer :: directionflag,istep
   !check whether we want to do output
-  if (output_length_unit.eq.'y') then
+  if (restart_length_unit.eq.'y') then
      call annual_event(do_restart)
-  else if (output_length_unit.eq.'m') then 
+  else if (restart_length_unit.eq.'m') then 
      call monthly_event(do_restart) 
-  else if (output_length_unit.eq.'d') then
+  else if (restart_length_unit.eq.'d') then
      call daily_event(do_restart, restart_length)
-  else if (output_length_unit.eq.'h') then
+  else if (restart_length_unit.eq.'h') then
      call hourly_event(do_restart, restart_length)
-  else if (output_length_unit.eq.'s') then
+  else if (restart_length_unit.eq.'s') then
      call step_event(do_restart, istep, restart_length)
   else
      write(*,*) 'You did not specify a supported outputflag.'

@@ -17,12 +17,12 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.true.
-w_exp_max=5.e-3
+w_exp_max=1.e-4
 /
 
 &oce_tra 
 K_ver=1.0e-5
-K_hor=0.
+K_hor=10.
 surf_relax_T=0.0    ! 
 surf_relax_S=6.43e-07   ! m/s 10./(180.*86400.)
 clim_relax=0.0	    ! 1/s, geometrical information has to be supplied

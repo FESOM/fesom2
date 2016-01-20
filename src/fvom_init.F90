@@ -15,6 +15,7 @@ program MAIN
   use o_MESH
   use g_PARSUP
   use g_CONFIG
+  use g_rotate_grid
   implicit none
   character(len=100)   :: nmlfile  !> name of configuration namelist file
   
@@ -24,7 +25,7 @@ program MAIN
   read (20,NML=geometry)      ! We need cyclic_length and cartesian
   close (20)
   cyclic_length=cyclic_length*rad 
-   
+  call set_mesh_transform_matrix  !(rotated grid) 
   call par_init
   call read_mesh_ini
   call test_tri_ini
