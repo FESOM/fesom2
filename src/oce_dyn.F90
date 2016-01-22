@@ -697,13 +697,14 @@ END DO
 DO ed=1, myDim_elem2D
    DO nz=1, nlevels(ed)-1 
       u1=sqrt(UV_f(1,nz,ed)**2+UV_f(2,nz,ed)**2)
+      u1=u1+tiny(u1)
       v1=sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2)
    ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
    ! this is done to force the CFL, which is otherwise exceeded in some points
    ! some other criteria is welcome (i.e. like computing the eigenvalues from filtering)
-      UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_f(1,nz,ed)*min(1.0_WP, 2.0_WP*v1/u1)
-      UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_f(2,nz,ed)*min(1.0_WP, 2.0_WP*v1/u1)
+      UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_f(1,nz,ed)!*min(1.0_WP, 2.0_WP*v1/u1)
+      UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_f(2,nz,ed)!*min(1.0_WP, 2.0_WP*v1/u1)
    END DO 
 END DO
-deallocate(UV_f, UV_c)    
+deallocate(UV_f, UV_c)
 end subroutine viscosity_filt2x

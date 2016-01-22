@@ -228,6 +228,7 @@ real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
     call compute_vel_rhs_vinv
   end if
   if (tau_c > 1.e-12) call viscosity_filt2x
+
   if (i_vert_visc)    call impl_vert_visc ! Probably should be moved for Btr-bcl splitting case
 
   call compute_ssh_rhs

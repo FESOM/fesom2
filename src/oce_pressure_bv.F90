@@ -29,6 +29,11 @@ real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit
  if(a<0.) then
    write (*,*)'s<0 happens!', a
    pe_status=1
+   DO node=1, myDim_nod2D+eDim_nod2D
+      DO nz=1, nlevels_nod2d(node)-1
+         if (tr_arr(nz, node, 2) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+      END DO
+   END DO	
  endif
  DO node=1, myDim_nod2D+eDim_nod2D
      nl1=nlevels_nod2d(node)-1

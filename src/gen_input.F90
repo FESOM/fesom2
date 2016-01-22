@@ -412,10 +412,10 @@ subroutine read_init_ts
 
   close(19) 
 
-! This is recommended cutoff for the cold start initialization. Uncomment if the model explodes!!!
-  where (tr_arr(:,:,2)<=30._WP)
-        tr_arr(:,:,2)=30._WP
-  end where
+! This is recommended cutoff for the cold start initialization. Uncomment if the model explodes !!!
+! where (tr_arr(:,:,2)<=28._WP)
+!       tr_arr(:,:,2)=28._WP
+! end where
 
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
