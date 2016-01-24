@@ -1,11 +1,10 @@
 
 # Compiler and Linker
-# Use gcc here, for a library as portable as possible
-CC = gcc 
+CC = icc 
 LD = $(CC)
 
 # Optimization specs for compiler
-OPT = -O2
+OPT = -O2 -xHost
 
 # What archiving to use
 # Do not use option "r" - util.o comes twice from GKlib and libmetis!
