@@ -18,16 +18,28 @@ implicit none
 contains
 
 subroutine exchange_nod2D_i(nod_array2D)
+
+USE g_PARSUP
+IMPLICIT NONE
+ 
+ integer, intent(inout)  :: nod_array2D(:)
+
+ if (npes > 1) then
+    call exchange_nod2D_i_begin(nod_array2D)
+    call exchange_nod_end  
+endif
+END SUBROUTINE exchange_nod2D_i
+
+!=============================================================================
+
+subroutine exchange_nod2D_i_begin(nod_array2D)
 USE o_MESH
 USE g_PARSUP
-USE o_PARAM 
 IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
  integer, intent(inout)  :: nod_array2D(:)
-
- INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
  integer  :: n, sn, rn
 
  if (npes > 1) then
@@ -38,32 +50,45 @@ IMPLICIT NONE
   DO n=1,rn    
      
      call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+               com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
   END DO 
  
   DO n=1, sn
      
      call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
-                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                    mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
-  
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-  
+    
 endif
-END SUBROUTINE exchange_nod2D_i
+END SUBROUTINE exchange_nod2D_i_begin
 
 ! ========================================================================
 subroutine exchange_nod2D(nod_array2D)
-USE o_MESH
+
 USE g_PARSUP
-USE o_PARAM 
 IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
  real*8, intent(inout)  :: nod_array2D(:)
 
- INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
+ if (npes > 1) then
+    call exchange_nod2D_begin(nod_array2D)  
+    call exchange_nod_end
+ end if
+ 
+END SUBROUTINE exchange_nod2D
+
+! ========================================================================
+subroutine exchange_nod2D_begin(nod_array2D)
+USE o_MESH
+USE g_PARSUP
+IMPLICIT NONE
+
+! General version of the communication routine for 2D nodal fields
+ 
+ real*8, intent(inout)  :: nod_array2D(:)
+
  integer  :: n, sn, rn
 
  if (npes > 1) then
@@ -73,23 +98,37 @@ IMPLICIT NONE
 
   DO n=1,rn         
      call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+               com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
   END DO  
   DO n=1, sn
      call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                    mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
   
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 end if
  
-END SUBROUTINE exchange_nod2D
+END SUBROUTINE exchange_nod2D_begin
 
 ! ========================================================================
 subroutine exchange_nod3D(nod_array3D)
+
+USE g_PARSUP
+IMPLICIT NONE
+
+real(kind=WP), intent(inout) :: nod_array3D(:,:) 
+! General version of the communication routine for 3D nodal fields
+! stored in (vertical, horizontal) format
+ 
+if (npes > 1) then
+   call exchange_nod3D_begin(nod_array3D)
+   call exchange_nod_end
+endif
+END SUBROUTINE exchange_nod3D
+
+! ========================================================================
+subroutine exchange_nod3D_begin(nod_array3D)
 USE o_MESH
 USE g_PARSUP
-USE o_PARAM 
 IMPLICIT NONE
 
 
@@ -97,10 +136,8 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:)
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
- INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
  integer  :: n, sn, rn
  integer  :: nz, nl1
- !real(kind=WP) :: nod_array3D(:,myDim_nod2D+eDim_nod2D) 
 
 if (npes > 1) then
   sn=com_nod2D%sPEnum
@@ -118,31 +155,43 @@ if (npes > 1) then
 
   DO n=1,rn    
      call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-          com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+          com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
   END DO
  
   DO n=1, sn
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-          mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+          mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
 
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 endif
-END SUBROUTINE exchange_nod3D
+END SUBROUTINE exchange_nod3D_begin
 
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D)
 USE o_MESH
 USE g_PARSUP
-USE o_PARAM 
 IMPLICIT NONE
 
+real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+ 
+if (npes>1) then
+   call exchange_nod3D_n_begin(nod_array3D)
+   call exchange_nod_end
+endif
+
+END SUBROUTINE exchange_nod3D_n
+
+!=================================================
+
+subroutine exchange_nod3D_n_begin(nod_array3D)
+USE o_MESH
+USE g_PARSUP
+IMPLICIT NONE
 
 real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
- INTEGER  :: req(com_nod2D%rPEnum + com_nod2D%sPEnum)
  integer  :: n, sn, rn
  integer  :: nz, nl1, n_val
 
@@ -171,18 +220,45 @@ if (npes>1) then
 
   DO n=1,rn    
      call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
-          com_nod2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+          com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
   END DO
  
   DO n=1, sn
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
-          mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+          mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
-  
+ endif
 
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
-endif
-END SUBROUTINE exchange_nod3D_n
+
+END SUBROUTINE exchange_nod3D_n_begin
+
+!=======================================
+! AND WAITING
+!=======================================
+ 
+SUBROUTINE exchange_nod_end
+  USE g_PARSUP
+
+if (npes > 1) &
+  call MPI_WAITALL(com_nod2D%rPEnum + com_nod2D%sPEnum, com_nod2D%req, &
+       MPI_STATUSES_IGNORE, MPIerr)
+
+END SUBROUTINE exchange_nod_end
+
+SUBROUTINE exchange_elem_end
+
+  USE g_PARSUP
+
+  if (npes > 1) then
+     if (elem_full_flag) then
+        call MPI_WAITALL(com_elem2D_full%rPEnum + com_elem2D_full%sPEnum, &
+             com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)     
+     else
+        call MPI_WAITALL(com_elem2D%rPEnum + com_elem2D%sPEnum, &
+             com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)     
+     endif
+  end if
+END SUBROUTINE exchange_elem_end
 ! ========================================================================
 
 !nr  Not used, no MPI datatype built (yet)
@@ -263,10 +339,9 @@ subroutine exchange_edge2D(edge_array2D)
   implicit none
 
 ! General version of the communication routine for 2D edge fields
- 
+! This routine is not split, it is used only once during setup. 
  real*8, intent(inout)  :: edge_array2D(:)
 
- INTEGER  :: req(com_edge2D%rPEnum + com_edge2D%sPEnum)
  integer  :: n, sn, rn
 
  if (npes> 1) then
@@ -275,20 +350,32 @@ subroutine exchange_edge2D(edge_array2D)
 
   DO n=1,rn         
      call MPI_IRECV(edge_array2D, 1, r_mpitype_edge2D(n), com_edge2D%rPE(n), &
-               com_edge2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+               com_edge2D%rPE(n), MPI_COMM_WORLD, com_edge2D%req(n), MPIerr) 
   END DO  
   DO n=1, sn
      call MPI_ISEND(edge_array2D, 1, s_mpitype_edge2D(n), com_edge2D%sPE(n), &
-                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                    mype, MPI_COMM_WORLD, com_edge2D%req(rn+n), MPIerr)
   END DO
   
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
+  call MPI_WAITALL(rn+sn,com_edge2D%req,MPI_STATUSES_IGNORE, MPIerr)
 
   endif
 
 end subroutine exchange_edge2D
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D)
+
+USE g_PARSUP 
+IMPLICIT NONE
+
+ real(kind=WP), intent(inout) :: elem_array3D(:,:) 
+
+ call exchange_elem3D_begin(elem_array3D)
+ call exchange_elem_end
+
+END SUBROUTINE exchange_elem3D
+!===========================================
+subroutine exchange_elem3D_begin(elem_array3D)
 USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
@@ -297,49 +384,85 @@ IMPLICIT NONE
 ! stored in (vertical, horizontal) format
  
  real(kind=WP), intent(inout) :: elem_array3D(:,:) 
- INTEGER  :: req(2*maxPEnum)
  integer  :: n, sn, rn, nl1
- integer, pointer :: r_mpitype(:), s_mpitype(:)
- integer, pointer :: r_PE(:), s_PE(:)
 
  if (npes> 1) then
 
- nl1=ubound(elem_array3D,1)
+    nl1=ubound(elem_array3D,1)
  
  if (ubound(elem_array3D,2)<=myDim_elem2D+eDim_elem2D) then
+
+    elem_full_flag = .false.
 
      sn=com_elem2D%sPEnum
      rn=com_elem2D%rPEnum
 
-     s_PE => com_elem2D%sPE(1:sn)
-     r_PE => com_elem2D%rPE(1:rn)
-
      if (nl1==nl .or. nl1==nl-1) then
-        r_mpitype =>  r_mpitype_elem3D(:,nl1,1)
-        s_mpitype =>  s_mpitype_elem3D(:,nl1,1)
+
+        DO n=1,rn         
+           call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,1), com_elem2D%rPE(n), &
+                com_elem2D%rPE(n), MPI_COMM_WORLD, &
+                com_elem2D%req(n), MPIerr) 
+        END DO
+        DO n=1, sn
+           call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,1), com_elem2D%sPE(n), &
+                mype,    MPI_COMM_WORLD, &
+                com_elem2D%req(rn+n), MPIerr)
+        END DO
+
      elseif (nl1 <= 4) then
         ! In fact, this is a 2D-array with up to 4 values, e.g. derivatives
-        r_mpitype =>  r_mpitype_elem2D(:,nl1)
-        s_mpitype =>  s_mpitype_elem2D(:,nl1)
+
+        DO n=1,rn         
+           call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D(n,nl1), com_elem2D%rPE(n), &
+                com_elem2D%rPE(n), MPI_COMM_WORLD, &
+                com_elem2D%req(n), MPIerr) 
+        END DO
+        DO n=1, sn
+           call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D(n,nl1), com_elem2D%sPE(n), &
+                mype,    MPI_COMM_WORLD, &
+                com_elem2D%req(rn+n), MPIerr)
+        END DO
      else
         if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
         call par_ex(1)
      endif
 
+
   else
+
+     elem_full_flag = .true.
+
      sn=com_elem2D_full%sPEnum
      rn=com_elem2D_full%rPEnum
 
-     s_PE => com_elem2D_full%sPE(1:sn)
-     r_PE => com_elem2D_full%rPE(1:rn)
-
      if (nl1==nl .or. nl1==nl-1) then
-        r_mpitype =>  r_mpitype_elem3D_full(:,nl1,1)
-        s_mpitype =>  s_mpitype_elem3D_full(:,nl1,1)
+        DO n=1,rn         
+           call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,1), &
+                com_elem2D_full%rPE(n), &
+                com_elem2D_full%rPE(n), MPI_COMM_WORLD, &
+                com_elem2D_full%req(n), MPIerr) 
+        END DO
+        DO n=1, sn
+           call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,1), &
+                com_elem2D_full%sPE(n), & 
+                mype,    MPI_COMM_WORLD, &
+                com_elem2D_full%req(rn+n), MPIerr)
+        END DO
      elseif (nl1 <= 4) then
         ! In fact, this is a 2D-array with up to 4 values, e.g. derivatives
-        r_mpitype =>  r_mpitype_elem2D_full(:,nl1)
-        s_mpitype =>  s_mpitype_elem2D_full(:,nl1)
+        DO n=1,rn         
+           call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D_full(n,nl1), &
+                com_elem2D_full%rPE(n), &
+                com_elem2D_full%rPE(n), MPI_COMM_WORLD, &
+                com_elem2D_full%req(n), MPIerr) 
+        END DO
+        DO n=1, sn
+           call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D_full(n,nl1), &
+                com_elem2D_full%sPE(n), & 
+                mype,    MPI_COMM_WORLD, &
+                com_elem2D_full%req(rn+n), MPIerr)
+        END DO
      else
         if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
         call par_ex(1)
@@ -347,18 +470,9 @@ IMPLICIT NONE
 
   endif
 
-  DO n=1,rn         
-     call MPI_IRECV(elem_array3D, 1, r_mpitype(n), r_PE(n), r_PE(n), MPI_COMM_WORLD, req(n), MPIerr) 
-  END DO
-  DO n=1, sn
-     call MPI_ISEND(elem_array3D, 1, s_mpitype(n), s_PE(n), mype,    MPI_COMM_WORLD, req(rn+n), MPIerr)
-  END DO
-
-  
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 endif
 
-END SUBROUTINE exchange_elem3D
+END SUBROUTINE exchange_elem3D_begin
 
 !=============================================================================
 subroutine exchange_elem3D_n(elem_array3D)
@@ -370,7 +484,22 @@ IMPLICIT NONE
 ! stored in (vertical, horizontal) format
  
  real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
- INTEGER  :: req(2*maxPEnum)
+
+ if (npes> 1) then
+    call exchange_elem3D_n_begin(elem_array3D)
+    call exchange_elem_end
+ endif
+END SUBROUTINE exchange_elem3D_n
+!=============================================================================
+subroutine exchange_elem3D_n_begin(elem_array3D)
+USE o_MESH
+USE g_PARSUP 
+IMPLICIT NONE
+
+! General version of the communication routine for 3D elemental fields
+! stored in (vertical, horizontal) format
+ 
+ real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
  integer  :: n, sn, rn, n_val, nl1
 
  if (npes> 1) then
@@ -395,36 +524,41 @@ IMPLICIT NONE
 
  if (ubound(elem_array3D,3)<=myDim_elem2D+eDim_elem2D) then
 
+    elem_full_flag = .false.
+
      sn=com_elem2D%sPEnum
      rn=com_elem2D%rPEnum
 
      DO n=1,rn         
         call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,n_val), com_elem2D%rPE(n), &
-                       com_elem2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+                       com_elem2D%rPE(n), MPI_COMM_WORLD, com_elem2D%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,n_val), com_elem2D%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                       mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
      END DO
 
   else
+     
+     elem_full_flag = .true.
+
      sn=com_elem2D_full%sPEnum
      rn=com_elem2D_full%rPEnum
 
      DO n=1,rn         
         call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%rPE(n), &
-                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                       mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
      END DO
+
   end if     
   
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 
 endif  
-END SUBROUTINE exchange_elem3D_n
+END SUBROUTINE exchange_elem3D_n_begin
 !========================================================================
 subroutine exchange_elem2D(elem_array2D)
 USE o_MESH
@@ -435,44 +569,62 @@ IMPLICIT NONE
 ! stored in (vertical, horizontal) format
  
  real(kind=WP), intent(inout) :: elem_array2D(:) 
- INTEGER  :: req(2*maxPEnum)
+
+ if (npes> 1) then
+    call exchange_elem2D_begin(elem_array2D)
+    call exchange_elem_end
+ end if
+  
+END SUBROUTINE exchange_elem2D
+!========================================================================
+subroutine exchange_elem2D_begin(elem_array2D)
+USE o_MESH
+USE g_PARSUP 
+IMPLICIT NONE
+
+! General version of the communication routine for 3D elemental fields
+! stored in (vertical, horizontal) format
+ 
+ real(kind=WP), intent(inout) :: elem_array2D(:) 
  integer  :: n, sn, rn
 
  if (npes> 1) then
 
   if (ubound(elem_array2D,1)<=myDim_elem2D+eDim_elem2D) then
 
+     elem_full_flag = .false.
+
      sn=com_elem2D%sPEnum
      rn=com_elem2D%rPEnum
 
      DO n=1,rn         
         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n,1), com_elem2D%rPE(n), &
-                       com_elem2D%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+                       com_elem2D%rPE(n), MPI_COMM_WORLD, com_elem2D%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                       mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
      END DO
-
   else
+     elem_full_flag = .true.
+
      sn=com_elem2D_full%sPEnum
      rn=com_elem2D_full%rPEnum
 
      DO n=1,rn         
         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n,1), com_elem2D_full%rPE(n), &
-                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
+                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
-                       mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
+                       mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
      END DO
+
   end if     
-  
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 
 end if
   
-END SUBROUTINE exchange_elem2D
+END SUBROUTINE exchange_elem2D_begin
 ! ========================================================================
 subroutine exchange_elem2D_i(elem_array2D)
 !Exchange with ALL(!) the neighbours
@@ -482,29 +634,46 @@ IMPLICIT NONE
 
  integer, intent(inout)  :: elem_array2D(:)
 
- INTEGER  :: req(2*maxPEnum)
+ integer  :: n, sn, rn
+
+ if (npes> 1) then
+    call exchange_elem2D_i_begin(elem_array2D)
+    call exchange_elem_end
+end if
+
+END SUBROUTINE exchange_elem2D_i
+!=============================================================================
+subroutine exchange_elem2D_i_begin(elem_array2D)
+!Exchange with ALL(!) the neighbours
+USE o_MESH
+USE g_PARSUP 
+IMPLICIT NONE
+
+ integer, intent(inout)  :: elem_array2D(:)
+
  integer  :: n, sn, rn
 
  if (npes> 1) then
 
-  sn=com_elem2D_full%sPEnum
-  rn=com_elem2D_full%rPEnum
+    elem_full_flag = .true.
 
-  DO n=1,rn       
-     call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full_i(n), com_elem2D_full%rPE(n), &
-               com_elem2D_full%rPE(n), MPI_COMM_WORLD, req(n), MPIerr) 
-  END DO 
+    sn=com_elem2D_full%sPEnum
+    rn=com_elem2D_full%rPEnum
+
+    DO n=1,rn       
+       call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full_i(n), com_elem2D_full%rPE(n), &
+            com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
+    END DO
  
-  DO n=1, sn
+    DO n=1, sn
      
-     call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
-                    mype, MPI_COMM_WORLD, req(rn+n), MPIerr)
-  END DO
+       call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
+            mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
+    END DO
   
-  call MPI_WAITALL(rn+sn,req,MPI_STATUSES_IGNORE, MPIerr)
 end if
 
-END SUBROUTINE exchange_elem2D_i
+END SUBROUTINE exchange_elem2D_i_begin
 !=============================================================================
 
 
@@ -1332,6 +1501,13 @@ interface exchange_nod
       module procedure exchange_nod3D_n
 end interface exchange_nod
 
+interface exchange_nod_begin
+      module procedure exchange_nod2D_begin
+      module procedure exchange_nod2D_i_begin
+      module procedure exchange_nod3D_begin
+      module procedure exchange_nod3D_n_begin
+end interface exchange_nod_begin
+
 interface exchange_edge
       module procedure exchange_edge2D
 !      module procedure exchange_edge3D  ! not available, not used
@@ -1343,6 +1519,14 @@ interface exchange_elem
       module procedure exchange_elem2d
       module procedure exchange_elem2d_i
 end interface exchange_elem
+
+interface exchange_elem_begin
+      module procedure exchange_elem3D_begin
+      module procedure exchange_elem3D_n_begin
+      module procedure exchange_elem2d_begin
+      module procedure exchange_elem2d_i_begin
+end interface exchange_elem_begin
+
 
 interface broadcast_nod
       module procedure broadcast_nod3D
@@ -1371,5 +1555,6 @@ end interface gather_elem
 
 private  ! hides items not listed on public statement 
 public :: exchange_nod,exchange_edge,exchange_elem,broadcast_nod,broadcast_elem, &
-          gather_nod, gather_elem
+          gather_nod, gather_elem, exchange_nod_begin, exchange_nod_end, exchange_elem_begin, &
+          exchange_elem_end
 end module g_comm_auto

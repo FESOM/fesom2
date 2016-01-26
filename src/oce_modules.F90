@@ -205,6 +205,7 @@ save
      integer, dimension(:), allocatable :: sPE
      integer, dimension(:), allocatable :: sptr
      integer, dimension(:), allocatable :: slist
+     integer, dimension(:), allocatable :: req  ! request for MPI_Wait
   end type com_struct
 
   type(com_struct)   :: com_nod2D
@@ -250,6 +251,7 @@ save
    integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
    integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
+   logical :: elem_full_flag  
 contains
 subroutine par_init    ! initializes MPI
 
@@ -340,10 +342,22 @@ subroutine set_par_support
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
-  ! routine. Here only MPI datatypes are set. 
+  ! routine. Here, MPI datatypes are built and buffers for MPI wait requests
+  ! are allocated. 
 
    if (npes > 1) then
 
+!================================================
+! MPI REQUEST BUFFERS
+!================================================
+      allocate(com_edge2D%req(          com_edge2D%rPEnum +      com_edge2D%sPEnum))
+      allocate(com_nod2D%req(            com_nod2D%rPEnum +       com_nod2D%sPEnum))
+      allocate(com_elem2D%req(          com_elem2D%rPEnum +      com_elem2D%sPEnum))
+      allocate(com_elem2D_full%req(com_elem2D_full%rPEnum + com_elem2D_full%sPEnum))
+
+!================================================
+! MPI DATATYPES
+!================================================
       ! Build MPI Data types for halo exchange: Edges
       allocate(r_mpitype_edge2D(com_edge2D%rPEnum))  ! 2D
       allocate(s_mpitype_edge2D(com_edge2D%sPEnum))  
