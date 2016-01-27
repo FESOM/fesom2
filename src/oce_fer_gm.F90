@@ -223,16 +223,19 @@ subroutine fer_gamma2vel
 
    integer                         :: nz, el, elnod(3)
    real*8                          :: zinv
-   DO el=1,myDim_elem2D
+   real*8                          :: onethird=1._WP/3._WP
+
+   DO el=1, myDim_elem2D
       elnod=elem2D_nodes(:,el)
-      DO nz=1, nlevels(el)-1
-	 zinv=1.0_WP/(zbar(nz)-zbar(nz+1))
-         fer_uv(:,nz,el)=sum(fer_gamma(:,nz,elnod)-fer_gamma(:,nz+1,elnod), 2)*zinv/3._WP
+      DO nz=1, nlevels(el)-1 !nl-1
+         zinv=onethird/(zbar(nz)-zbar(nz+1))
+         fer_uv(1,nz,el)=sum(fer_gamma(1,nz,elnod)-fer_gamma(1,nz+1,elnod))*zinv
+         fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
       END DO
    END DO
    call exchange_elem(fer_uv)
-!   call exchange_elem(fer_uv(1,:,:))
-!   call exchange_elem(fer_uv(2,:,:))
+!  call exchange_elem(fer_uv(1,:,:))
+!  call exchange_elem(fer_uv(2,:,:))
 end subroutine fer_gamma2vel
 !====================================================================
 subroutine fer_compute_C_K
