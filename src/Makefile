@@ -43,6 +43,7 @@ OBJECTS=  fvom_main.o \
           oce_fct_muscl_adv.o \
           oce_mixing.o \
           oce_ice_init_state.o \
+          oce_shortwave_pene.o \
           ice_setup_step.o \
           ice_evp.o \
           ice_fct.o \

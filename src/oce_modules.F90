@@ -42,7 +42,7 @@ logical                       :: Fer_GM =.true.   !flag for Ferrari et al. (2010
 ! Time stepping                               
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence
-real(kind=WP)                 :: epsilon=0.1_WP ! AB2 offset 
+real(kind=WP)                 :: epsilon=0.01_WP ! AB2 offset 
 ! Tracers
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.

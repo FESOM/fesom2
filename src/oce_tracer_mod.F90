@@ -168,7 +168,7 @@ DO n=1, myDim_nod2D
    nl1=nlevels_nod2D(n)-1
    vd_flux=0d0
    IF (tr_num==1) then
-      flux  = -heat_flux(n)/density_0/4200.0
+      flux  = -heat_flux(n)/vcpw
       rdata =  Tsurf(n)
       rlx   =  surf_relax_T
    ELSEIF (tr_num==2) then
@@ -205,6 +205,7 @@ USE o_PARAM
 USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG
+use g_forcing_arrays
 IMPLICIT NONE
 integer, intent(in)   :: tr_num
 real(kind=WP)         :: a(nl), b(nl), c(nl), tr(nl)
@@ -274,13 +275,21 @@ DO n=1, myDim_nod2D
    END DO
    nz=nzmax-1
    tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-1.0_WP)*tr_arr(nz,n,tr_num)
-! the first row CONTAINS also surface forcing
+
    tr(1)=-(b(1)-1.0_WP)*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 
+   IF (use_sw_pene .and. tr_num==1) THEN
+      DO nz=1, nzmax-1
+         zinv=1.0_WP*dt/(zbar(nz)-zbar(nz+1))
+         tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
+      END DO
+   END IF
+
+! the first row CONTAINS also surface forcing
    zinv=1.0_WP*dt/(zbar(1)-zbar(2))
    IF (tr_num==1) then
       tr(1)= tr(1)  -  &
-             zinv*(1d-3*heat_flux(n)/(4.2_WP)/density_0 - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
+             zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
    ELSEIF (tr_num==2) then
       rsss=ref_sss
       IF (ref_sss_local) rsss = tr_arr(1,n,2)
@@ -307,7 +316,6 @@ DO n=1, myDim_nod2D
       DO nz=1,nzmax-1
          tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
       END DO
-        
 END DO   !!! cycle over nodes
 END SUBROUTINE diff_ver_part_impl
 !========================================================================================

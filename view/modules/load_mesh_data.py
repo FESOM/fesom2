@@ -48,6 +48,8 @@ def read_fesom_mesh(path, alpha, beta, gamma, read_diag=True):
 		mesh.nlev=int(f.next())
 		mesh.zlev=np.array([f.next().rstrip() for x in xrange(mesh.nlev)]).astype(float)
 
+	mesh.zbars=(mesh.zlev[:-1]+mesh.zlev[1:])/2.
+
 	###########################################	
 	#here we compute the volumes of the triangles
 	#this should be moved into fesom generan mesh output netcdf file
@@ -102,6 +104,7 @@ def read_fesom_mesh(path, alpha, beta, gamma, read_diag=True):
 def read_fesom_3d(str_id, months, years, mesh, result_path, runid, ext, ind, how='mean', ncfile=''): 
 	import numpy as np
 	from scipy.io import netcdf
+	from netCDF4 import Dataset
 	str_id		=str_id
 	ext		=ext
 	runid		=runid
@@ -113,24 +116,56 @@ def read_fesom_3d(str_id, months, years, mesh, result_path, runid, ext, ind, how
 	data3		=np.zeros(shape=(mesh.n2d))
 	while y<=years[1]:
 		print ['reading year '+str(y)+':']
-		if ncfile=='':
+		if ((ncfile=='') | (y>years[0])):
 			ncfile =result_path+runid+'.'+str(y)+ext
 		else:
 			ncfile =result_path+ncfile
 
-		f = netcdf.netcdf_file(ncfile, 'r')
+		f = Dataset(ncfile, 'r', format='NETCDF4_CLASSIC')
 		if how=='mean':
-			data3 = data3+f.variables[str_id].data[months,:,ind].mean(axis=0)
+			data3 = data3+f[str_id][months,:,ind].mean(axis=0)
 		elif how=='max':
-			data3 = data3+f.variables[str_id].data[months,:,ind].max(axis=0)
+			data3 = data3+f[str_id][months,:,ind].max(axis=0)
 		f.close()
 		y=y+1
 	data3=data3/(years[1]-years[0]+1)
 	return data3
 
+def read_fesom_3d_full(str_id, months, years, mesh, result_path, runid, ext, how='mean', ncfile=''): 
+	import numpy as np
+	from scipy.io import netcdf
+	from netCDF4 import Dataset
+	str_id		=str_id
+	ext		=ext
+	runid		=runid
+	years		=years
+	months		=months
+	result_path	=result_path
+
+	y			=years[0]
+	data3		=np.zeros(shape=(mesh.n2d, mesh.nlev-1))
+	while y<=years[1]:
+		print ['reading year '+str(y)+':']
+		if ((ncfile=='') | (y>years[0])):
+			ncfile =result_path+runid+'.'+str(y)+ext
+		else:
+			ncfile =result_path+ncfile
+
+		f = Dataset(ncfile, 'r', format='NETCDF4_CLASSIC')
+		if how=='mean':
+			data3 = data3+f[str_id][months,:,:].mean(axis=0)
+		elif how=='max':
+			data3 = data3+f[str_id][months,:,:].max(axis=0)
+		f.close()
+		y=y+1
+	data3=data3/(years[1]-years[0]+1)
+	return data3
+
+
 def read_fesom_3del(str_id, months, years, mesh, result_path, runid, ext, ind, how='mean', ncfile=''): 
 	import numpy as np
 	from scipy.io import netcdf
+	from netCDF4 import Dataset
 	str_id		=str_id
 	ext		=ext
 	runid		=runid
@@ -142,16 +177,19 @@ def read_fesom_3del(str_id, months, years, mesh, result_path, runid, ext, ind, h
 	data3		=np.zeros(shape=(mesh.e2d))
 	while y<=years[1]:
 		print ['reading year '+str(y)+':']
-		if ncfile=='':
+		if ((ncfile=='') | (y>years[0])):
 			ncfile =result_path+runid+'.'+str(y)+ext
 		else:
 			ncfile =result_path+ncfile
 
-		f = netcdf.netcdf_file(ncfile, 'r')
+#		f = netcdf.netcdf_file(ncfile, 'r')
+		f = Dataset(ncfile, 'r', format='NETCDF4_CLASSIC')
 		if how=='mean':
-			data3 = data3+f.variables[str_id].data[months,:,ind].mean(axis=0)
+			data3 = data3+f[str_id][months,:,ind].mean(axis=0)
+#			data3 = data3+f.variables[str_id].data[months,:,ind].mean(axis=0)
 		elif how=='max':
-			data3 = data3+f.variables[str_id].data[months,:,ind].max(axis=0)
+			data3 = data3+f[str_id][months,:,ind].max(axis=0)
+#			data3 = data3+f.variables[str_id].data[months,:,ind].max(axis=0)
 		f.close()
 		y=y+1
 	data3=data3/(years[1]-years[0]+1)
@@ -160,20 +198,23 @@ def read_fesom_3del(str_id, months, years, mesh, result_path, runid, ext, ind, h
 def read_fesom_2d(str_id, months, years, mesh, result_path, runid, ext, how='mean', ncfile=''): 
 	import numpy as np
 	from scipy.io import netcdf
+	from netCDF4 import Dataset
 	y=years[0]
 	data2=np.zeros(shape=(mesh.n2d))
 	while y<=years[1]:
 		print ['reading year '+str(y)+':']
-		if ncfile=='':
+		if ((ncfile=='') | (y>years[0])):
 			ncfile =result_path+runid+'.'+str(y)+ext
 		else:
 			ncfile =result_path+ncfile
-
-		f = netcdf.netcdf_file(ncfile, 'r')
+#		f = netcdf.netcdf_file(ncfile, 'r')
+		f = Dataset(ncfile, 'r', format='NETCDF4_CLASSIC')
 		if how=='mean':
-			data2 = data2+f.variables[str_id].data[months,:].mean(axis=0)
+			data2 = data2+f[str_id][months,:].mean(axis=0)
+#			data2 = data2+f.variables[str_id].data[months,:].mean(axis=0)
 		elif how=='max':
-			data2 = data2+f.variables[str_id].data[months,:].max(axis=0)
+			data2 = data2+f[str_id][months,:].max(axis=0)
+#			data2 = data2+f.variables[str_id].data[months,:].max(axis=0)
 		f.close()
 		y=y+1
 	data2=data2/(years[1]-years[0]+1)

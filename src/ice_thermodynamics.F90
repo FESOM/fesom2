@@ -119,102 +119,10 @@ subroutine thermodynamics
        lid_clo=1.
      endif
 
-
-#ifdef false
-if (myList_nod2D(i)==103168) then
-ustar=0.0004_8
-ug=0.7_8
-h=1.0_8
-hsn=0.1_8
-A=0.9_8
-T_oc=-1.7056_8    +1.e-3_8
-S_oc=31.2_8
-rsss = S_oc
-t=-29.8_8
-end if
-#endif
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
-#ifdef false
-if (myList_nod2D(i)==103168) then
-write(*,*) '*****************************************'
-write(*,*) 'Ice Thermo statistics for n=103168'
-write(*,*) 'h         =', h
-write(*,*) 'hsn       =', hsn
-write(*,*) 'A         =', A
-write(*,*) 'fsh       =', fsh
-write(*,*) 'flo       =', flo
-write(*,*) 'Ta        =', Ta
-write(*,*) 'qa        =', qa
-write(*,*) 'rain      =', rain
-write(*,*) 'snow      =', snow
-write(*,*) 'runo      =', runo
-write(*,*) 'rsss      =', rsss
-write(*,*) 'ug        =', ug
-write(*,*) 'ustar     =', ustar
-write(*,*) 'T_oc      =', T_oc
-write(*,*) 'S_oc      =', S_oc
-write(*,*) 'h_ml      =', h_ml
-write(*,*) 't         =', t
-write(*,*) 'ice_dt    =', ice_dt
-write(*,*) 'ch        =', ch
-write(*,*) 'ce        =', ce
-write(*,*) 'ch_i      =', ch_i
-write(*,*) 'ce_i      =', ce_i
-write(*,*) 'fw        =', fw
-write(*,*) 'ehf       =', ehf
-write(*,*) 'evap      =', evap
-write(*,*) 'rsf       =', rsf
-write(*,*) 'ithdgr    =', ithdgr
-write(*,*) 'ithdgrsn  =', ithdgrsn
-write(*,*) 'iflice    =', iflice
-write(*,*) 'hflatow   =', hflatow
-write(*,*) 'hfsenow   =', hfsenow
-write(*,*) 'hflwrdout =', hflwrdout
-write(*,*) 'lid_clo   =', lid_clo
-write(*,*) 'evap_in   =', evap_in
-end if
 
-if (myList_nod2D(i)==84681) then
-write(*,*) '*****************************************'
-write(*,*) 'Ice Thermo statistics for n=84681'
-write(*,*) 'h         =', h
-write(*,*) 'hsn       =', hsn
-write(*,*) 'A         =', A
-write(*,*) 'fsh       =', fsh
-write(*,*) 'flo       =', flo
-write(*,*) 'Ta        =', Ta
-write(*,*) 'qa        =', qa
-write(*,*) 'rain      =', rain
-write(*,*) 'snow      =', snow
-write(*,*) 'runo      =', runo
-write(*,*) 'rsss      =', rsss
-write(*,*) 'ug        =', ug
-write(*,*) 'ustar     =', ustar
-write(*,*) 'T_oc      =', T_oc
-write(*,*) 'S_oc      =', S_oc
-write(*,*) 'h_ml      =', h_ml
-write(*,*) 't         =', t
-write(*,*) 'ice_dt    =', ice_dt
-write(*,*) 'ch        =', ch
-write(*,*) 'ce        =', ce
-write(*,*) 'ch_i      =', ch_i
-write(*,*) 'ce_i      =', ce_i
-write(*,*) 'fw        =', fw
-write(*,*) 'ehf       =', ehf
-write(*,*) 'evap      =', evap
-write(*,*) 'rsf       =', rsf
-write(*,*) 'ithdgr    =', ithdgr
-write(*,*) 'ithdgrsn  =', ithdgrsn
-write(*,*) 'iflice    =', iflice
-write(*,*) 'hflatow   =', hflatow
-write(*,*) 'hfsenow   =', hfsenow
-write(*,*) 'hflwrdout =', hflwrdout
-write(*,*) 'lid_clo   =', lid_clo
-write(*,*) 'evap_in   =', evap_in
-end if
-#endif
      m_ice(i)         = h
      m_snow(i)        = hsn
      a_ice(i)         = A

@@ -55,6 +55,7 @@ USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 use g_config
+use g_forcing_arrays
 IMPLICIT NONE
 integer     :: elem_size, node_size
 
@@ -154,7 +155,6 @@ if (Fer_GM) then
    fer_K=500.
    fer_c=1.
 end if
-
 
 ! =================
 ! Initialize with zeros 

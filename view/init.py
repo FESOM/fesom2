@@ -1,14 +1,12 @@
 # set the paths to the mesh & results
 result_path='../results/'
-meshpath  ='../input/mesh/mesh_CORE2_final/'
-
-#result_path='../results/expl/'
-#meshpath  ='../input/mesh/mesh_ref/'
-
+meshpath  ='/gfs2/work/hbkdsido/input/mesh/glob_15km/'
+meshpath  ='/gfs2/work/hbkdsido/input/mesh/mesh_CORE2_final/'
 runid='fvsom'
 
 # read the mesh
-alpha, beta, gamma=[50, 15, -90]
+alpha, beta, gamma=[50, 15, -90] # rotated mesh
+#alpha, beta, gamma=[0., 0., 0.]  # not rotated mesh
 try:
 	mesh
 except NameError:

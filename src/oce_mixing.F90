@@ -24,23 +24,21 @@ use i_arrays
 IMPLICIT NONE
 
 real(kind=WP)         :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s
-integer               :: node, nz, elem, elnodes(3) ,i
+integer               :: node, nz, elem, elnodes(3), i
 real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl)
 real(kind=WP)         :: bulk_up, bulk_dn
+real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=1._WP, av_conv=1._WP
+
 
   DO node=1, myDim_nod2D+eDim_nod2D
      DO nz=2,nlevels_nod2d(node)-1
-        !if (bvfreq(nz,node) < 0) then
-        !   Kv(nz,node)=1.0_WP   
-        !else
            dz_inv=1.0_WP/(Z(nz-1)-Z(nz))
            shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
 	           (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
            shear = shear*dz_inv*dz_inv
 	   Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_8)+1.0e-14)  ! To avoid NaNs at start
-        !end if
     END DO	
-   END DO
+  END DO
 
    if (use_ice .and. mo_on) then !stress is only partial!!
       DO node=1, myDim_nod2D+eDim_nod2D
@@ -62,6 +60,7 @@ real(kind=WP)         :: bulk_up, bulk_dn
                           + sum(mo(nz,elnodes))/3.0 
          END DO
       END DO
+
       DO node=1,myDim_nod2D+eDim_nod2D
          DO nz=2,nlevels_nod2d(node)-1 
             Kv(nz,node)= mix_coeff_PP*Kv(nz,node)**3 + K_ver &
@@ -70,20 +69,39 @@ real(kind=WP)         :: bulk_up, bulk_dn
       END DO
       
    else ! .not.  (use_ice .and. mo_on)
-      
-      DO elem=1, myDim_elem2D
-         elnodes=elem2D_nodes(:,elem)
-         DO nz=2,nlevels(elem)-1
-            Av(nz,elem)= mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP+A_ver
-         END DO
-      END DO
-      DO node=1,myDim_nod2D+eDim_nod2D
-         DO nz=2,nlevels_nod2d(node)-1 
-            Kv(nz,node)= mix_coeff_PP*Kv(nz,node)**3+K_ver
-         END DO
-      END DO
 
+     DO elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        DO nz=2,nlevels(elem)-1
+           Av(nz,elem)= mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP+A_ver
+        END DO
+     END DO
+
+     DO node=1,myDim_nod2D+eDim_nod2D
+        DO nz=2,nlevels_nod2d(node)-1 
+           Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+K_ver
+        END DO
+     END DO
    end if
+
+   DO node=1, myDim_nod2D+eDim_nod2D
+      DO nz=2, nlevels_nod2d(node)-1
+         if (bvfreq(nz,node) < 0.) Kv(nz,node)=kv_conv
+         if (nz<=wndnl+1) then
+            Kv(nz,node)=max(Kv(nz,node), wndmix)
+         end if
+      END DO
+   END DO
+
+   DO elem=1, myDim_elem2D
+      elnodes=elem2D_nodes(:,elem)
+      DO nz=2,nlevels(elem)-1
+         if (any(bvfreq(nz, elnodes) < 0.)) Av(nz,elem)=av_conv
+         if (nz<=wndnl+1) then
+            Av(nz,elem)=max(Av(nz,elem), wndmix)
+         end if
+      END DO
+  END DO
 end subroutine oce_mixing_pp
 ! ========================================================================
 subroutine mo_length(water_flux,heat_flux,stress_x,stress_y,  &

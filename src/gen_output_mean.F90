@@ -580,6 +580,7 @@ subroutine output(directionflag,istep)
   use g_config
   use g_clock
   use g_parsup
+  use o_arrays
   implicit none
 
   logical :: do_output=.false.

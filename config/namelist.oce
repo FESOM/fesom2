@@ -8,7 +8,7 @@ A_hor=0.               ! 500.      ! Background horizontal viscosity
 A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
 Div_c=0.  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
 Leith_c=0.	       ! The strength of the Leith viscosity
-tau_c=.2	       ! Controls the strength of filters (1.0 and 0.1 for dt=1min and 15min, respectively)
+tau_c=0.1	       ! Controls the strength of filters (1.0 and 0.2 for dt=1min and 15min, respectively)
 Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
 biharmonic=.false.     ! Use biharmonic viscosity
 Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s
@@ -17,14 +17,14 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.true.
-w_exp_max=1.e-4
+w_exp_max=5.e-3
 /
 
 &oce_tra 
 K_ver=1.0e-5
 K_hor=10.
 surf_relax_T=0.0    ! 
-surf_relax_S=6.43e-07   ! m/s 10./(180.*86400.)
+surf_relax_S=1.929e-06 ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
 clim_relax=0.0	    ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
 ref_sss=34.

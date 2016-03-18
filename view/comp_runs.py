@@ -4,8 +4,8 @@ execfile("include.py")
 # 	define the paths where the mesh & data are stored
 execfile("init.py")
 #	set the years & months for the average
-months1, years1=np.linspace(0,11,12).astype(int), [1975, 1975]
-months2, years2=np.linspace(0,11,12).astype(int), [1948, 1948]
+months1, years1=np.linspace(0,11,12).astype(int), [2006, 2010]
+months2, years2=np.linspace(0,11,12).astype(int), [1948, 1952]
 
 lev=20
 #######################################

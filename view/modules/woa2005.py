@@ -28,18 +28,37 @@ class woa2005:
 		self.Tyz=nanmean(self.T, 2)
 		self.Syz=nanmean(self.S, 2)
 
-def fesom_2_woa2005(data, mesh, woa05):
+def fesom_2_woa2005(str_id, months, years, mesh, result_path, runid, ext, woa05):
 	xx,yy = np.meshgrid(woa05.x, woa05.y)
 	zz=np.copy(woa05.T)
+# Preload the 3D whole field if fits into the memory
+	data = read_fesom_3d_full(str_id, months, years, mesh, result_path, runid, ext)
 	for dep_ind in range(len(woa05.z)):
 		print 'interpolating level: ', dep_ind
-		wdep=woa05.z[dep_ind]	
-		dep_up=[z for z in abs(mesh.zlevs) if z<=wdep][-1]
-		dep_lo=[z for z in abs(mesh.zlevs) if z>wdep][0]
-		i_up=1-abs(wdep-dep_up)/(dep_lo-dep_up)
-		i_lo=1-abs(wdep-dep_lo)/(dep_lo-dep_up)
-		data2=i_up*fesom2depth(dep_up, data, mesh)
-		data2=data2+i_lo*fesom2depth(dep_lo, data, mesh)		
+		wdep=woa05.z[dep_ind]
+# find indicies and depth of the nodes below and above the target			
+		iz_up=[(i,z) for (i,z) in enumerate(abs(mesh.zbars)) if z <= wdep]
+		iz_lo=[(i,z) for (i,z) in enumerate(abs(mesh.zbars)) if z >  wdep]
+		if (not iz_up):
+			iz_up=[(0, 0.)]
+		if (not iz_lo):
+			iz_lo=[(len(mesh.zbars), wdep)]	# the wdep and not mesh.zbars[-1] is chosen in order to 
+                                                        # extrapolate the last column with the weight of 1
+		dep_up=iz_up[-1][1]
+		dep_lo=iz_lo[0][1]
+		i_up=iz_up[-1][0]
+		i_lo=iz_lo[0][0]
+		c_up=1.-abs(wdep-dep_up)/(dep_lo-dep_up)
+		c_lo=1.-abs(wdep-dep_lo)/(dep_lo-dep_up)
+		print "i_up, i_lo=", i_up, i_lo
+		print "c_up, c_lo=", c_up, c_lo
+# Slow but less memory consuming technique
+#		data_up	=read_fesom_3d(str_id, months, years, mesh, result_path, runid, ext, i_up)
+#		data_lo	=read_fesom_3d(str_id, months, years, mesh, result_path, runid, ext, i_lo)
+#		data2=c_up*data_up+c_lo*data_lo
+# We preloaded the whole 3D field 'data' instead
+		data2=c_up*data[:, i_up]+c_lo*data[:, i_lo]
 		zz[dep_ind,:,:] = griddata((mesh.x2,mesh.y2), data2, (xx,yy), method='linear')
+	
 	zz[np.isnan(woa05.T)]=np.nan
 	return xx, yy, zz

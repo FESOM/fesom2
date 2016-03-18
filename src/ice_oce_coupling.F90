@@ -43,6 +43,7 @@ subroutine ice2ocean
   END DO
   call exchange_nod(heat_flux)
   call exchange_nod(water_flux)
+  if (use_sw_pene) call cal_shortwave_rad
 end subroutine ice2ocean
 !=======================================================================================
 subroutine ocean2ice

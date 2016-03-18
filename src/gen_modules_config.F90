@@ -63,7 +63,7 @@ module g_config
 	                                 ! value which is larger than maximum 
 			                 ! triangle size.
   logical                :: rotated_grid=.true. ! not used
-  logical                :: force_rotation=.true.
+  logical                :: force_rotation=.false.
   real(kind=WP)          :: alphaEuler=50. 	! [degree] Euler angles, convention:
   real(kind=WP)          :: betaEuler=15.  	! first around z, then around new x,
   real(kind=WP)		 :: gammaEuler=-90.	! then around new z.
@@ -81,7 +81,7 @@ module g_config
   namelist /machine/ system_arch
   
   ! *** configuration***
-  logical                       :: use_sw_pene=.false.
+  logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
   logical                       :: toy_ocean=.false. ! Erzatz forcing has
                                                    ! to be supplied

@@ -24,7 +24,7 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
    
   dte=ice_dt/(1.0_WP*evp_rheol_steps)
   det1=1.0_WP+0.5_WP*Tevp_inv*dte
-  det2=1.0_WP+0.5_WP*Tevp_inv*dte*ellipse**2 
+  det2=1.0_WP+0.5_WP*Tevp_inv*dte!*ellipse**2 
      
   det1=1.0_WP/det1
   det2=1.0_WP/det2
@@ -87,8 +87,8 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
       zeta=zeta*Tevp_inv
       				     
      r1=zeta*(eps11+eps22) - ice_strength
-     r2=zeta*(eps11-eps22)
-     r3=zeta*eps12
+     r2=zeta*(eps11-eps22)*vale
+     r3=zeta*eps12*vale
      si1=sigma11(elem)+sigma22(elem)
      si2=sigma11(elem)-sigma22(elem)
      

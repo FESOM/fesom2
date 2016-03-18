@@ -8,13 +8,13 @@ execfile("init.py")
 d=mesh.x2[mesh.elem].max(axis=1)-mesh.x2[mesh.elem].min(axis=1)
 ind=(d < 2)
 
-n=642155-1
+n=1190238-1
 elvls=np.loadtxt(mesh.path+'elvls.out')
 
 ind=[];
 #indexies for the box
 #box=[-20, 40, 40, 80]
-box=[mesh.x2[n]-5, mesh.x2[n]+5, mesh.y2[n]-5, mesh.y2[n]+5]
+box=[mesh.x2[n]-3, mesh.x2[n]+3, mesh.y2[n]-3, mesh.y2[n]+3]
 
 i1=mesh.x2[mesh.elem].max(axis=1)>=box[0]
 i2=mesh.x2[mesh.elem].max(axis=1)<=box[1]
@@ -26,8 +26,8 @@ ind=i1&i2&i3&i4
 
 fig = plt.figure()
 #ax=plt.triplot(mesh.x2, mesh.y2, mesh.elem[ind,:], color='b', facecolors=elvls[ind])
-elvls[elvls>25]=25
-elvls[elvls<15]=15
+#elvls[elvls>25]=25
+#elvls[elvls<15]=15
 ax=plt.tripcolor(mesh.x2, mesh.y2, mesh.elem[ind,:], color='w', facecolors=elvls[ind])
 plt.grid()
 fig.gca().set_xlim(box[0:2])

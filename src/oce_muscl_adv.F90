@@ -436,7 +436,7 @@ ttrhs=0d0
  END DO
 
 ! =================
-! Update ttfold (to be used on the next time level)
+! Update dttf (will be also used on the next time level)
 ! and compute new ttf
 ! =================          
   

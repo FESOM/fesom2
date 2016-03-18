@@ -82,8 +82,8 @@ subroutine forcing_array_setup
   ! shortwave penetration
   if(use_sw_pene) then
     allocate(chl(n2))
-    allocate(sw_3d(nl-1,n2))
-    chl=0.0
+    allocate(sw_3d(nl,n2))
+    chl=.1
   endif
 
   !for ice diagnose
