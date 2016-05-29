@@ -1,7 +1,9 @@
 # set the paths to the mesh & results
-result_path='../results/'
-meshpath  ='/gfs2/work/hbkdsido/input/mesh/glob_15km/'
+#result_path='../results/core2_noGM/'
+#meshpath    ='/gfs2/work/hbkdsido/input/mesh/glob_15km/'
+#result_path ='../results/glob15km_sw_chl0.01_noGM/'
 meshpath  ='/gfs2/work/hbkdsido/input/mesh/mesh_CORE2_final/'
+result_path ='../results/core2_nsw/'
 runid='fvsom'
 
 # read the mesh

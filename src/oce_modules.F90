@@ -38,7 +38,7 @@ real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
-logical                       :: Fer_GM =.true.   !flag for Ferrari et al. (2010) GM scheme
+logical                       :: Fer_GM =.false.   !flag for Ferrari et al. (2010) GM scheme
 ! Time stepping                               
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence

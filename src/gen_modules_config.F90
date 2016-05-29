@@ -63,7 +63,7 @@ module g_config
 	                                 ! value which is larger than maximum 
 			                 ! triangle size.
   logical                :: rotated_grid=.true. ! not used
-  logical                :: force_rotation=.false.
+  logical                :: force_rotation=.true.
   real(kind=WP)          :: alphaEuler=50. 	! [degree] Euler angles, convention:
   real(kind=WP)          :: betaEuler=15.  	! first around z, then around new x,
   real(kind=WP)		 :: gammaEuler=-90.	! then around new z.

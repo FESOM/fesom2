@@ -252,7 +252,7 @@ subroutine fer_compute_C_K
    real*8                          :: d, dz
    real*8                          :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
    real*8                          :: c_min=0.5, f_min=1.e-6, r_max=200000.
-   DO n=1,myDim_nod2D
+   DO n=1, myDim_nod2D
       c1=0._wp
       nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
 !     reso=sqrt(area(1, n)/pi)*2._WP
@@ -263,7 +263,7 @@ subroutine fer_compute_C_K
          d=d+dz
          c1=c1+dz*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
       END DO
-      c1=max(c_min, c1/pi)
+      c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
       rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
       rr_ratio=min(reso/rosb, 5._WP)
       scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))

@@ -88,7 +88,7 @@ def ftriplot(mesh, data2, contours, cmap=[], oce='global', do_cbar=True, mlabels
 			cbar.set_ticks([round(i,1) for i in np.linspace(cont[0], cont[1], 5)])
 	return(im, cbar if (do_cbar) else False)
 
-def wplot_xy(xx,yy,zz,contours, cmap=[]):
+def wplot_xy(xx,yy,zz,contours, cmap=[], do_cbar=True):
 	import numpy as np
 	import matplotlib.pyplot as plt
 	from mpl_toolkits.basemap import Basemap
@@ -100,18 +100,23 @@ def wplot_xy(xx,yy,zz,contours, cmap=[]):
 	zz[zz<=contours.min()]=contours.min()+eps
 	zz[zz>=contours.max()]=contours.max()-eps
 
-	map = Basemap(projection='robin',lon_0=0)
+	map = Basemap(projection='robin',lon_0=0, llcrnrlon=-180.,urcrnrlon=180.)
 	xxx, yyy = map(xx, yy)
 
 	map.drawmapboundary(fill_color='0.9')
 	map.drawcoastlines()
 	map.fillcontinents(color='.7',lake_color='.7')
-	map.drawparallels(np.arange(-90,90,30),labels=[1,0,0,0])
-	map.drawmeridians(np.arange(map.lonmin,map.lonmax+30,60),labels=[0,0,0,1])
+#	map.drawparallels(np.arange(-90, 90, 30),labels=[1,0,0,0])
+#	map.drawmeridians(np.arange(map.lonmin,map.lonmax+30,60),labels=[0,0,0,1])
+        map.drawparallels(np.arange(-90,90,45),labels=[1,0,0,0])
+        map.drawmeridians([-120.0, 0., 120.0], labels=[0,0,0,1])
 
 	im=plt.contourf(xxx, yyy, zz, levels=contours, cmap=cmap, extend='both')
-	cbar=map.colorbar(im,"bottom", size="5%", pad="2%")
-	return(im, cbar)
+        if do_cbar:
+        	cbar=map.colorbar(im,"bottom", size="5%", pad="2%")
+        	return(im, map, cbar)
+        else:
+                return(im, map)
 
 def wplot_yz(y,z,v,contours, cmap=[]):
 	import numpy as np
