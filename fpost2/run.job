@@ -1,0 +1,11 @@
+#PBS -l walltime=240:00:00
+#PBS -l select=1
+
+eval `$MODULESHOME/bin/modulesinit`
+module load intel.compiler
+
+cd $PBS_O_WORKDIR
+
+./do_work.x
+
+qstat -f $PBS_JOBID
