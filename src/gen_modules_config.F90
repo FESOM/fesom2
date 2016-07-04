@@ -70,7 +70,7 @@ module g_config
   				                ! Set to zeros to work with
 						! geographical coordinates
   namelist /geometry/  cartesian, fplane, betaplane, f_fplane, beta_betaplane, &
-       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler
+       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation
 
   ! *** fleap_year ***
   logical                       :: include_fleapyear=.false.

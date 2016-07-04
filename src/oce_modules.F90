@@ -79,7 +79,8 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
-                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max
+                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
+                    Fer_GM
  NAMELIST /oce_tra/ K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
