@@ -335,7 +335,7 @@ integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
 integer, allocatable                :: mapping(:)
 logical                             :: flag
 character*10                        :: mype_string,npes_string
-character*80                        :: dist_mesh_dir,file_name
+character*200                       :: dist_mesh_dir,file_name
 !
 ! a)
 ssh_stiff%dim=nod2D

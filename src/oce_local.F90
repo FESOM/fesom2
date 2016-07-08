@@ -90,8 +90,8 @@ IMPLICIT NONE
 
  Integer        n, m, fileID, nend, nini,ed(2)
  character*10   mype_string,npes_string
- character*80   file_name
- character*80   dist_mesh_dir
+ character*200   file_name
+ character*200   dist_mesh_dir
  integer, allocatable, dimension(:)  :: temp, ncount
  integer   n1, n2, flag
  LOGICAL        ::L_EXISTS

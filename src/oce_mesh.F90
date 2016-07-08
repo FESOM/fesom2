@@ -33,8 +33,8 @@ IMPLICIT NONE
  integer        :: vert_nodes(100)
  real(kind=WP)  :: x, y
  character*10   :: mype_string,npes_string
- character*80   :: file_name
- character*80   :: dist_mesh_dir
+ character*200   :: file_name
+ character*200   :: dist_mesh_dir
  integer, allocatable :: mapping(:)
  
  write(mype_string,'(i5.5)') mype  
@@ -283,7 +283,7 @@ USE g_PARSUP
 !
 IMPLICIT NONE
 !
-character*80 :: file_name
+character*200 :: file_name
 integer :: n,fileID=111,x
 integer, allocatable                  :: mapping(:)
 allocate(nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))

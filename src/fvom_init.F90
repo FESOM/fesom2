@@ -372,7 +372,7 @@ INTEGER           :: nodes(3),elems(3)
 integer :: elem, eledges(3), elem1, j, n, node, enum,count1,count2,exit_flag,i,nz,fileID=111
 real*8 :: x,dmean
 integer :: thers_lev=5
-character*80 :: file_name
+character*200 :: file_name
 ALLOCATE(depth(nod2D))
         
 file_name=trim(meshpath)//'aux3d.out'

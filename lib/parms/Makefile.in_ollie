@@ -1,0 +1,29 @@
+# Include path for MPI header file
+MPIROOT            = 
+MPI_INC            = 
+
+PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DFORTRAN_UNDERSCORE -DVOID_POINTER_SIZE_8 -DHAS_BLAS 
+
+######################################################
+
+# Preprocessor
+CPP = /usr/bin/cpp -P -C
+
+######################################################
+
+# Compiler and Linker
+CC = mpiicc 
+FC = mpiifort -r8
+LD = $FC
+
+# Optimization specs for compiler
+OPT  = -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise
+COPT = 
+
+#######################################################
+# for pARMS-Library, archive and options
+
+AR       = ar
+ARFLAGS  = -cr
+EXTFLAGS = 
+
