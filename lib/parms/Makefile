@@ -3,7 +3,7 @@
 # this makefile will make the library -- for testing PARARMS -- go to
 # examples/grid or examples/general and see README files..
 
-include Makefile.in_ollie
+include Makefile.in_hlrn
 
 # path of the header files of pARMS
 ICFLAGS			=	-I./include $(MPI_INC)
