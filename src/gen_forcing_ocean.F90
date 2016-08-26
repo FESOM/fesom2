@@ -27,7 +27,7 @@ subroutine init_atm_forcing_OnlyOcean
   integer, parameter        		:: nci=192, ncj=94 ! T62 grid
   integer                   		:: itime, i, k, n2
   integer                               :: readtype
-  character(80)             		:: file
+  character(500)             		:: file
   character(15)             		:: vari, filevari
   character(4)				:: fileyear
   real(kind=8), dimension(nci,ncj)	:: array_nc, array_nc2
@@ -138,7 +138,7 @@ subroutine read_new_atm_forcing_OnlyOcean
   integer, parameter        		:: nci=192, ncj=94 ! T62 grid
   integer                   		:: itime, m, i, k, n2
   integer                               :: readtype
-  character(80)             		:: file
+  character(500)             		:: file
   character(15)             		:: vari, filevari
   character(4)				:: fileyear
   real(kind=8), dimension(nci,ncj)	:: array_nc, array_nc2

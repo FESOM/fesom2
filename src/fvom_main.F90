@@ -31,14 +31,16 @@ integer :: n, nsteps,offset,row,i
         call clock_init           ! read the clock file 
 	call get_run_steps(nsteps)
 	call mesh_setup
-
+write(*,*) 'mesh_setup... complete'
    	!=====================
 	! Allocate field variables 
 	! and additional arrays needed for 
 	! fancy advection etc.  
 	!=====================
         call check_mesh_consistency
+write(*,*) 'check_mesh_consistency... complete'
 	call ocean_setup
+write(*,*) 'ocean_setup... complete'
 	call forcing_setup
 	if (use_ice) then 
 	  call ice_setup
@@ -51,7 +53,9 @@ integer :: n, nsteps,offset,row,i
 	!=====================
 	! Time stepping
 	!=====================
+write(*,*) 'start interation before the barrier...'
         call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
+write(*,*) 'start interation after the barrier...'
 	do n=1, nsteps
 	   if (mype==0) write(*,*) 'DAY  ', n*dt/24./3600.
 	   call init_output_mean(yearnew/=yearold)

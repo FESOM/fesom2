@@ -21,7 +21,7 @@ contains
     integer                             :: i, j, itime
     real(kind=8), dimension (nci,ncj)   :: ncdata
     character(15)                       :: vari
-    character(80)                      	:: file
+    character(500)                     	:: file
 
     istart = (/1,1,itime/)
     icount= (/nci,ncj,1/)
@@ -69,7 +69,7 @@ contains
     real(kind=4)                        :: xscale, xoff, miss
     real(kind=8), dimension(nci,ncj)    :: ncdata
     character(15)                       :: vari
-    character(80)                      	:: file
+    character(500)                     	:: file
 
     istart = (/1,1,itime/)
     icount= (/nci,ncj,1/)
@@ -126,7 +126,7 @@ contains
     real(kind=4)                        :: xscale, xoff, miss
     real(kind=8), dimension(nci,ncj)    :: ncdata
     character(15)                       :: vari
-    character(80)                      	:: file
+    character(500)                     	:: file
 
     istart = (/1,1,1,itime/)
     icount= (/nci,ncj,1,1/)
@@ -227,7 +227,7 @@ contains
     real(kind=8), allocatable	:: temp_x(:), temp_y(:)
     real(kind=8)		:: model_2Darray(myDim_nod2d+eDim_nod2D)   
     character(15)		:: vari
-    character(80)              	:: file
+    character(500)             	:: file
     logical                     :: check_dummy
 
     ! open file
@@ -346,7 +346,7 @@ contains
     real(kind=8), allocatable	:: temp_x(:), temp_y(:)
     real(kind=8)		:: model_2Darray(myDim_nod2d+eDim_nod2D)   
     character(15)		:: vari
-    character(80)              	:: file
+    character(500)             	:: file
     logical                     :: check_dummy
 
     ! open file
@@ -433,7 +433,7 @@ contains
     integer			:: istart(2), icount(2)
     real(kind=8)           	:: ncdata(nod2D)
     real(kind=8), intent(out)	:: model_2Darray(myDim_nod2d+eDim_nod2D)
-    character(80), intent(in) 	:: file
+    character(500), intent(in) 	:: file
     character(15), intent(in)  :: vari
 
     ! open file
