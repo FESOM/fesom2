@@ -82,11 +82,17 @@ fillin=3
 lutype=2
 droptol=1.e-8
 soltol=1.e-10
-reuse=0      ! For varying coefficients, set reuse=1
-new_values=0 ! and new_values=1, as soon as the coefficients have changed
+reuse=1      ! For varying coefficients, set reuse=1
+new_values=1 ! and new_values=1, as soon as the coefficients have changed
 
-! "reuse" keeps a copy of the matrix structure to apply scaling of the matrix fast
-! "new_values" replaces the matrix values (and recomputes the preconditioner)
+! reuse=0: matrix remains static
+! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
+
+! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
+! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
+! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
+
+! new_values>0 requires reuse=1 in psolver_init!
 
 if (lfirst) then
    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)

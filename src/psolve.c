@@ -86,16 +86,16 @@ void psolver_init(int *id, SOLVERTYPE *stype, PCTYPE *pctype, PCILUTYPE *pciluty
         r[i] = idxn[i];    
       solver->rows = r;
 
-  rp = malloc((nloc+1)*sizeof(int));
-  for(i = 0; i < nloc+1; i++)
-      rp[i] = rptr[i];
+      rp = malloc((nloc+1)*sizeof(int));
+      for(i = 0; i < nloc+1; i++)
+	rp[i] = rptr[i];
       solver->rptr = rp;
   
-  c = malloc(rptr[nloc]*sizeof(int));
-  for(i = 0; i < rptr[nloc]; i++)
-    c[i] = cols[i];
-  solver->cols = c;
-  solver->vals = values;
+      c = malloc(rptr[nloc]*sizeof(int));
+      for(i = 0; i < rptr[nloc]; i++)
+	c[i] = cols[i];
+      solver->cols = c;
+      solver->vals = values;
   }
   else{
      if(!r)
@@ -197,7 +197,7 @@ void psolve(int *id, double *rhs, double *vals, double *sol, int *new)
       parms_MatSetValues(A, nloc, solver->rows, rptr, cols, values, INSERT);
       parms_MatSetup(A); 
     
-      parms_PCSetup(pc);
+      if (*new==2) parms_PCSetup(pc);
     }
     else
       printf("ERROR: matrix data is static\n");
