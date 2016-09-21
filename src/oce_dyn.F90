@@ -49,7 +49,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
 #include "fparms.h"
 logical, save        :: lfirst=.true.
 integer(kind=C_INT)  :: ident
-integer(kind=C_INT)  :: n3, reuse
+integer(kind=C_INT)  :: n3, reuse, new_values
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
 integer :: n
@@ -66,11 +66,11 @@ interface
    end subroutine psolver_init
 end interface
 interface
-   subroutine psolve(ident, ssh_rhs, zero_r, d_eta, zero_i) bind(C)
+   subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
 
      use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, zero_i
-     real(kind=C_DOUBLE) :: zero_r, ssh_rhs(*), d_eta(*)
+     integer(kind=C_INT) :: ident, newvalues
+     real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
 
    end subroutine psolve
 end interface
@@ -82,7 +82,11 @@ fillin=3
 lutype=2
 droptol=1.e-8
 soltol=1.e-10
-reuse=0
+reuse=0      ! For varying coefficients, set reuse=1
+new_values=0 ! and new_values=1, as soon as the coefficients have changed
+
+! "reuse" keeps a copy of the matrix structure to apply scaling of the matrix fast
+! "new_values" replaces the matrix values (and recomputes the preconditioner)
 
 if (lfirst) then
    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
@@ -95,7 +99,8 @@ if (lfirst) then
    lfirst=.false.
 end if
 
-   call psolve(ident, ssh_rhs, real(0., C_DOUBLE), d_eta, 0)
+   call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)
+
 #endif
 
 call exchange_nod(d_eta)
