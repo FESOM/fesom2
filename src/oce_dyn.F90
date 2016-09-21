@@ -82,8 +82,8 @@ fillin=3
 lutype=2
 droptol=1.e-8
 soltol=1.e-10
-reuse=1      ! For varying coefficients, set reuse=1
-new_values=1 ! and new_values=1, as soon as the coefficients have changed
+reuse=0      ! For varying coefficients, set reuse=1
+new_values=0 ! and new_values=1, as soon as the coefficients have changed
 
 ! reuse=0: matrix remains static
 ! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
