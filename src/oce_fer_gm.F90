@@ -113,7 +113,7 @@ subroutine compute_sigma_xy(TF1,SF1)
   integer                     :: n, nz, elnodes(3),elem, k
   !
   ! calculate alpha and beta(elementwise)
-  call sw_alpha_beta(TF1, SF1)
+  call sw_alpha_beta(TF1, SF1) ! this is already called under oce_mixing_kpp if you are not calling KPP it should be here
 
   DO n=1, myDim_nod2D
      DO nz=1, nlevels_nod2D(n)-1

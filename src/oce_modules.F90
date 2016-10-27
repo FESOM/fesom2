@@ -39,6 +39,14 @@ real(kind=WP)                 :: clim_decay, clim_growth
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
 logical                       :: Fer_GM =.false.   !flag for Ferrari et al. (2010) GM scheme
+real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
+real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
+logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
+logical                       :: double_diffusion=.false.  !for KPP,dd switch
+ character(5)                 :: mix_scheme='KPP'	   !'KPP','PP'
+logical                       :: AvKv =.false.   ! write Av, Kv
+logical                       :: hbl_diag =.false.   ! write boundary layer depth
+
 ! Time stepping                               
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence
@@ -80,8 +88,8 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
-                    Fer_GM
- NAMELIST /oce_tra/ K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
+                    Fer_GM, visc_sh_limit, mix_scheme, AvKv,hbl_diag
+ NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
 END MODULE o_PARAM  
@@ -778,6 +786,8 @@ real(kind=WP), allocatable,dimension(:,:)   :: vorticity
 
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
+real(kind=WP), allocatable,dimension(:,:,:)   :: Kv2 !_OG_
+!real(kind=WP), allocatable,dimension(:)   :: hbl
 !Velocities interpolated to nodes
 real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 
@@ -796,6 +806,8 @@ real(kind=WP), allocatable    :: UV_mean(:,:,:)
 real(kind=WP), allocatable    :: eta_n_mean(:),Wvel_mean(:,:)
 real(kind=WP), allocatable    :: tr_arr_mean(:,:,:)
 real(kind=WP), allocatable    :: fer_UV_mean(:,:,:), fer_wvel_mean(:,:)
+real(kind=WP), allocatable    :: Av_mean(:,:),Kv_mean(:,:,:) !_OG_
+real(kind=WP), allocatable    :: hbl_mean(:)
 
 !Monin-Obukhov correction
 real*8,allocatable :: mo(:,:),mixlength(:)

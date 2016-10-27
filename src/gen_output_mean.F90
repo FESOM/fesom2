@@ -20,7 +20,7 @@ subroutine init_output_mean(do_init)
   character(100)            :: longname
   character(100)            :: filename
   character(100)            :: trname, units
-
+  integer                   :: av_varid, kv_varid(num_tracer), hbl_varid
 
   if (.not. do_init) return
   ! Serial output implemented so far
@@ -65,6 +65,11 @@ subroutine init_output_mean(do_init)
   status = nf_def_var(ncid, 'ssh', NF_FLOAT, 2, dimids, ssh_varid)
   if (status .ne. nf_noerr) call handle_err(status)
 
+  if (hbl_diag) then
+   status = nf_def_var(ncid, 'hbl', NF_FLOAT, 2, dimids, hbl_varid)
+   if (status .ne. nf_noerr) call handle_err(status)
+  endif
+
   ! Define the netCDF variables for 3D fields
   ! ocean horizontal velocity u, v
   dimid3(1) = dimid_nl1
@@ -83,7 +88,12 @@ subroutine init_output_mean(do_init)
      status = nf_def_var(ncid, 'GM_v', NF_FLOAT, 3, dimid3, gmv_varid)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
-
+  
+  ! vertical viscosity coefficient
+  if (AvKv) then 
+     status = nf_def_var(ncid, 'Av', NF_FLOAT, 3, dimid3, av_varid)
+     if (status .ne. nf_noerr) call handle_err(status)
+  endif
      
   ! ocean vertical velocity w
   dimid3(1) = dimid_nl
@@ -92,6 +102,22 @@ subroutine init_output_mean(do_init)
 
   status = nf_def_var(ncid, 'w', NF_FLOAT, 3, dimid3, w_varid)
   if (status .ne. nf_noerr) call handle_err(status)
+
+  ! vertical diffusivity coefficient
+  if (AvKv) then 
+    do j=1,num_tracers
+       SELECT CASE (j) 
+          CASE(1)
+            trname='Kvt'
+          CASE(2)
+            trname='Kvs'
+          CASE DEFAULT
+            write(trname,'(A3,i1)') 'ptr', j
+       END SELECT
+       status = nf_def_var(ncid, trim(trname), NF_FLOAT, 3, dimid3, kv_varid(j))
+       if (status .ne. nf_noerr) call handle_err(status)
+    end do
+  endif
 
   if (Fer_GM) then
      status = nf_def_var(ncid, 'GM_w', NF_FLOAT, 3, dimid3, gmw_varid)
@@ -131,6 +157,13 @@ subroutine init_output_mean(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, ssh_varid, 'units', 1, 'm')
   if (status .ne. nf_noerr) call handle_err(status)
+  if(hbl_diag) then
+     longname='boundary layer depth'
+     status = nf_put_att_text(ncid, hbl_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, hbl_varid, 'units', 1, 'm')
+     if (status .ne. nf_noerr) call handle_err(status)
+  endif
   longname='zonal velocity'
   status = nf_put_att_text(ncid, u_varid, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
@@ -146,6 +179,30 @@ subroutine init_output_mean(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, w_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
+  if(AvKv) then
+     longname='vertical eddy viscosity coefficient'
+     status = nf_put_att_text(ncid, av_varid, 'description', len_trim(longname), trim(longname)) 
+     if (status .ne. nf_noerr) call handle_err(status)
+     status = nf_put_att_text(ncid, av_varid, 'units', 4, 'm2/s')
+     if (status .ne. nf_noerr) call handle_err(status)
+     do j=1,num_tracers
+        SELECT CASE (j) 
+          CASE(1)
+            longname='vertical eddy diffusion coefficient (temperature)'
+            units='m2/s'
+          CASE(2)
+            longname='vertical eddy diffusion coefficient (salinity)'
+            units='m2/s'
+          CASE DEFAULT
+            write(longname,'(A15,i1)') 'passive tracer ', j
+            units='none'
+        END SELECT
+        status = nf_put_att_text(ncid, kv_varid(j), 'description', len_trim(longname), trim(longname))
+        if (status .ne. nf_noerr) call handle_err(status)
+        status = nf_put_att_text(ncid, kv_varid(j), 'units', len_trim(units), trim(units))
+        if (status .ne. nf_noerr) call handle_err(status)
+     end do
+  end if 
   if (Fer_GM) then
      longname='subgrid zonal velocity'
      status = nf_put_att_text(ncid, gmu_varid, 'description', len_trim(longname), trim(longname)) 
@@ -293,6 +350,7 @@ subroutine write_means(istep)
   character(100)            :: filename
   character(100)            :: trname
   real(kind=4), allocatable :: aux2(:), aux3(:,:) 
+  integer                   :: av_varid, kv_varid(num_tracer), hbl_varid
 
   ! ocean part
   if (mype==0) then ! Serial output implemented so far
@@ -314,6 +372,26 @@ subroutine write_means(istep)
      if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'w', w_varid)
      if (status .ne. nf_noerr) call handle_err(status)
+     if (hbl_diag) then
+        status=nf_inq_varid(ncid, 'hbl', hbl_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+     endif     
+     if(AvKv) then
+        status=nf_inq_varid(ncid, 'Av', av_varid)
+        if (status .ne. nf_noerr) call handle_err(status)
+        do j=1,num_tracers
+           SELECT CASE (j) 
+             CASE(1)
+               trname='Kvt'
+             CASE(2)
+               trname='Kvs'
+             CASE DEFAULT
+               write(trname,'(A3,i1)') 'ptr', j
+           END SELECT
+           status = nf_inq_varid(ncid, trim(trname), kv_varid(j))
+           if (status .ne. nf_noerr) call handle_err(status)
+        end do
+     endif
 
      if (Fer_GM) then
         status=nf_inq_varid(ncid, 'GM_u', gmu_varid)
@@ -359,6 +437,15 @@ subroutine write_means(istep)
      status=nf_put_vara_real(ncid, ssh_varid, start, count, aux2) 
      if (status .ne. nf_noerr) call handle_err(status)
   end if
+  if (hbl_diag) then
+     call gather_nod(hbl_mean, aux2)
+     if(mype==0) then            
+        start=(/1,save_count_mean/)
+        count=(/nod2d, 1/)
+        status=nf_put_vara_real(ncid, hbl_varid, start, count, aux2) 
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+  endif
 
   ! 3d fields
   call gather_elem(UV_mean(1,:,:), aux3)
@@ -374,7 +461,7 @@ subroutine write_means(istep)
      status=nf_put_vara_real(ncid, v_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
-
+  
   if (Fer_GM) then
      call gather_elem(fer_UV_mean(1,:,:), aux3)
      if (mype==0) then                  
@@ -391,6 +478,16 @@ subroutine write_means(istep)
      end if     
    end if
 
+  if(AvKv) then
+     call gather_elem(Av_mean,aux3)
+     if(mype==0) then                        
+        start3=(/1, 1, save_count_mean/)
+        count3=(/nl-1, elem2D, 1/)
+        status=nf_put_vara_real(ncid, av_varid, start3, count3, aux3)
+        if (status .ne. nf_noerr) call handle_err(status)
+     end if
+  endif
+
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
 
@@ -399,6 +496,18 @@ subroutine write_means(istep)
      count3=(/nl, nod2D, 1/)
      status=nf_put_vara_real(ncid, w_varid, start3, count3, aux3)
      if (status .ne. nf_noerr) call handle_err(status)
+  end if
+
+! _OG_
+  if(AvKv) then
+     count3=(/nl, nod2D, 1/)
+     do j=1,num_tracers
+        call gather_nod(Kv_mean(:,:,j),aux3)
+        if(mype==0) then                        
+           status=nf_put_vara_real(ncid, kv_varid(j), start3, count3, aux3)
+           if (status .ne. nf_noerr) call handle_err(status)
+        end if 
+     end do
   end if
 
   if (Fer_GM) then
@@ -506,6 +615,7 @@ use g_config
 use o_arrays
 use i_arrays
 use g_clock
+use o_mixing_KPP_mod !_OG_
 implicit none
 logical, intent(IN)       :: do_output
 integer                   :: nsteps
@@ -523,6 +633,9 @@ ndpyr=365+fleapyear
    UV_mean=UV_mean+UV ; if (do_output) UV_mean=UV_mean/dble(nsteps)                              
    Wvel_mean=Wvel_mean+Wvel; if (do_output) Wvel_mean=Wvel_mean/dble(nsteps)
    eta_n_mean=eta_n_mean+eta_n; if (do_output) eta_n_mean=eta_n_mean/dble(nsteps)
+   if(hbl_diag) then
+      hbl_mean=hbl_mean+hbl; if (do_output) hbl_mean=hbl_mean/dble(nsteps)
+   endif
    do j=1, num_tracers
       tr_arr_mean(:,:,j)=tr_arr_mean(:,:,j)+tr_arr(:,:,j)
    end do
@@ -533,6 +646,13 @@ ndpyr=365+fleapyear
    m_ice_mean=m_ice_mean+m_ice ; if (do_output) m_ice_mean=m_ice_mean/dble(nsteps)
    a_ice_mean=a_ice_mean+a_ice ; if (do_output) a_ice_mean=a_ice_mean/dble(nsteps)
    m_snow_mean=m_snow_mean+m_snow ; if (do_output) m_snow_mean=m_snow_mean/dble(nsteps)
+   endif
+   if (AvKv) then
+      Av_mean=Av_mean+Av; if (do_output) Av_mean=Av_mean/dble(nsteps)
+      do j=1, num_tracers
+         Kv_mean(:,:,j)=Kv_mean(:,:,j)+Kv2(:,:,j)
+      end do
+      if (do_output) Kv_mean=Kv_mean/dble(nsteps)
    endif
    if (Fer_GM) then
       fer_UV_mean=fer_UV_mean+fer_UV ; if (do_output) fer_UV_mean=fer_UV_mean/dble(nsteps)
@@ -553,6 +673,9 @@ logical do_output
    UV_mean=0d0
    Wvel_mean=0d0
    eta_n_mean=0d0
+   if (hbl_diag) then
+      hbl_mean=0d0
+   endif
    tr_arr_mean(:,:,:)=0d0
    if (use_ice) then! ice has different update rate, so this is extra work
       U_ice_mean=0d0
@@ -560,6 +683,10 @@ logical do_output
       m_ice_mean=0d0
       a_ice_mean=0d0
       m_snow_mean=0d0
+   endif
+   if(AvKv) then
+      Av_mean=0d0
+      Kv_mean=0d0
    endif
    if (Fer_GM) then
       fer_UV_mean=0.0_WP

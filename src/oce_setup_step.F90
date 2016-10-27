@@ -56,6 +56,7 @@ USE o_PARAM
 USE g_PARSUP
 use g_config
 use g_forcing_arrays
+use o_mixing_kpp_mod ! KPP
 IMPLICIT NONE
 integer     :: elem_size, node_size
 
@@ -123,9 +124,30 @@ allocate(vorticity(nl-1,node_size))
 vorticity=0.0_8
 end if
 !Visc and Diff coefs
-allocate(Av(nl,elem_size),Kv(nl,node_size))
-Av=0d0
-Kv=0d0
+
+if (trim(mix_scheme)=='KPP') then
+   allocate(Av(nl,elem_size), Kv(nl,node_size), Kv2(nl,node_size,num_tracers))
+else if(trim(mix_scheme)=='PP') then
+   allocate(Av(nl,elem_size), Kv(nl,node_size))
+   if (AvKv) then
+      allocate(Kv2(nl,node_size,2))
+      Kv2=0d0 
+   end if 
+else
+   stop("!not existing mixing scheme!")
+   call par_ex
+end if
+if (use_means .and. hbl_diag) then
+   allocate(hbl_mean(node_size)) 
+end if
+if (use_means .and. AvKv) then
+   allocate(Av_mean(nl,elem_size),Kv_mean(nl,node_size,num_tracers)) 
+end if
+Av=0.0_WP
+Kv=0.0_WP
+if (trim(mix_scheme)=='KPP') Kv2=0d0 
+if (trim(mix_scheme)=='KPP') call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+
 !Velocities at nodes
 allocate(Unode(2,nl-1,node_size))
 
@@ -140,15 +162,19 @@ allocate(sigma_xy(2, nl-1, node_size))
 sigma_xy=0.0_WP
 Kd=0.0_WP
 
+allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
+sw_beta=0.0_WP
+sw_alpha=0.0_WP
+
 if (Fer_GM) then
    allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(node_size))
    allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
    if (use_means) then
       allocate(fer_UV_mean(2, nl-1, elem_size), fer_wvel_mean(nl, node_size))
    end if
-   allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
-   sw_beta=0.0_WP
-   sw_alpha=0.0_WP
+!   allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))  KPP needs this even if Fer_GM is not called
+!   sw_beta=0.0_WP
+!   sw_alpha=0.0_WP
    fer_gamma=0.0_WP
    fer_uv=0.0_WP
    fer_wvel=0.0_WP
@@ -202,6 +228,13 @@ end if
           fer_UV_mean=0.0_WP
           fer_wvel_mean=0.0_WP
        end if
+       if(AvKv) then
+          Av_mean=0d0
+          Kv_mean=0d0
+       endif
+       if (hbl_diag) then
+          hbl_mean=0d0
+       endif
     endif
 END SUBROUTINE array_setup
 !==========================================================================
@@ -210,17 +243,42 @@ USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
+use o_mixing_kpp_mod ! _OG_
 IMPLICIT NONE
 real(kind=8)      :: t1, t2, t3, t4, t5
 
 integer i,elem,nz,n
 real*8,external:: dnrm2
 real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:)
+integer tr_num
+
   t1=MPI_Wtime() 
   call pressure_bv
 
   call status_check
+
+if (trim(mix_scheme)=='KPP') then
+  call oce_mixing_KPP(Av, Kv2)
+! oce_mixing_kpp.F90 should be modified in a way that works for each tracer when it is called
+! tr_num = 1 temp
+! tr_num = 2 salt 
+!   if (tr_num==1) then 
+!      Kv(:,:)=Kv2(:,:,1)
+!   elseif (tr_num==2) then 
+!      Kv(:,:)=Kv2(:,:,2)
+!   endif
+
+else if(trim(mix_scheme)=='PP') then
   call oce_mixing_PP
+!  if (AvKv) then
+!     Kv2(:,:,1)=Kv(:,:)
+!     Kv2(:,:,2)=Kv(:,:)
+!  end if 
+else
+   stop("!not existing mixing scheme!")
+   call par_ex
+
+end if  
 
   if(mom_adv/=3) then
     call compute_vel_rhs

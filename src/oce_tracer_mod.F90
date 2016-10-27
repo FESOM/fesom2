@@ -157,6 +157,7 @@ use o_ARRAYS
 use o_MESH
 use g_PARSUP
 use g_config,only: dt
+
 IMPLICIT NONE
 
 real(kind=WP) :: vd_flux(nl-1)
@@ -206,13 +207,15 @@ USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG
 use g_forcing_arrays
+use o_mixing_KPP_mod !_OG_
+
 IMPLICIT NONE
 integer, intent(in)   :: tr_num
 real(kind=WP)         :: a(nl), b(nl), c(nl), tr(nl)
 real(kind=WP)         ::  cp(nl), tp(nl)
 integer               ::  nz, n, nzmax
 real(kind=WP)         ::  m, zinv, dt_inv
-real(kind=WP)         ::  rsss, Ty,Ty1,c1,zinv1,zinv2, v_adv
+real(kind=WP)         ::  rsss, c1,zinv1,zinv2, v_adv
 
 dt_inv=1.0_WP/dt
 DO n=1, myDim_nod2D
@@ -221,9 +224,8 @@ DO n=1, myDim_nod2D
    nz=1
    zinv2=1.0_WP/(Z(nz)-Z(nz+1))
    zinv=1.0_WP*dt/(zbar(1)-zbar(2))
-   Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + &
-        Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
-   c(1)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(2,n)/area(1,n)
+
+   c(1)=-Kv(2,n)*zinv2*zinv*area(2,n)/area(1,n)
    a(1)=0.0_WP
    b(1)=-c(1)+1.0_WP
 ! update from the vertical advection
@@ -235,14 +237,10 @@ DO n=1, myDim_nod2D
 ! regular part of coefficients:
    DO nz=2, nzmax-2
       zinv2=1.0_WP/(Z(nz)-Z(nz+1))
-      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-          Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
-      Ty1= Kd(4,nz,n)*(Z(nz)-zbar(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + &
-           Kd(4,nz+1,n)*(zbar(nz+1)-Z(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
         
       zinv=1.0_WP*dt/(zbar(nz)-zbar(nz+1))
-      a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
-      c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
+      a(nz)=-Kv(nz,n)*zinv1*zinv
+      c(nz)=-Kv(nz+1,n)*zinv2*zinv*area(nz+1,n)/area(nz,n)
       b(nz)=-a(nz)-c(nz)+1.0_WP
       zinv1=zinv2
 
@@ -258,9 +256,8 @@ DO n=1, myDim_nod2D
 ! the last row
    nz=nzmax-1
    zinv=1.0_WP*dt/(zbar(nzmax-1)-zbar(nzmax))
-   Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-       Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
-   a(nzmax-1)=-(Kv(nzmax-1,n)+Ty)*zinv1*zinv
+
+   a(nzmax-1)=-Kv(nzmax-1,n)*zinv1*zinv
    b(nzmax-1)=-a(nzmax-1)+1.0_WP
    c(nzmax-1)=0.0_WP
 
@@ -270,9 +267,29 @@ DO n=1, myDim_nod2D
    b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
 
 ! the rhs:
+! rsss will be used later to compute:
+! 1. the virtual salinity flux 
+! 2. the contribution from the nonlocal term in KPP for salinity
+   if (tr_num==2) then 
+      rsss=ref_sss
+      IF (ref_sss_local) rsss = tr_arr(1,n,2)
+   end if
    DO nz=2,nzmax-2
       tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-1.0_WP)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+
+if (trim(mix_scheme)=='KPP') then
+!      *******************************************************************
+!       nonlocal transport to the rhs (only T and S currently)
+!      *******************************************************************
+      if (tr_num==1) then ! T
+         tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+      elseif (tr_num==2) then ! S
+         tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+      end if
+end if 
+
    END DO
+
    nz=nzmax-1
    tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-1.0_WP)*tr_arr(nz,n,tr_num)
 
@@ -291,11 +308,10 @@ DO n=1, myDim_nod2D
       tr(1)= tr(1)  -  &
              zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
    ELSEIF (tr_num==2) then
-      rsss=ref_sss
-      IF (ref_sss_local) rsss = tr_arr(1,n,2)
       tr(1)= tr(1)  +  &
              zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
    END IF
+
 ! the sweep algorithm
 ! initialize c-prime and s,t-prime
       cp(1) = c(1)/b(1)
