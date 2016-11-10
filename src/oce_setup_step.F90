@@ -123,12 +123,17 @@ if(mom_adv==3) then
 allocate(vorticity(nl-1,node_size))
 vorticity=0.0_8
 end if
-!Visc and Diff coefs
 
+! =================
+! Visc and Diff coefs
+! =================
+
+allocate(Av(nl,elem_size), Kv(nl,node_size))
+ 
 if (trim(mix_scheme)=='KPP') then
-   allocate(Av(nl,elem_size), Kv(nl,node_size), Kv2(nl,node_size,num_tracers))
-else if(trim(mix_scheme)=='PP') then
-   allocate(Av(nl,elem_size), Kv(nl,node_size))
+   allocate(Kv2(nl,node_size,num_tracers))
+   Kv2=0d0 
+else if(trim(mix_scheme)=='PP') then   
    if (AvKv) then
       allocate(Kv2(nl,node_size,2))
       Kv2=0d0 
@@ -137,15 +142,18 @@ else
    stop("!not existing mixing scheme!")
    call par_ex
 end if
+
 if (use_means .and. hbl_diag) then
    allocate(hbl_mean(node_size)) 
 end if
+
 if (use_means .and. AvKv) then
    allocate(Av_mean(nl,elem_size),Kv_mean(nl,node_size,num_tracers)) 
 end if
+
 Av=0.0_WP
 Kv=0.0_WP
-if (trim(mix_scheme)=='KPP') Kv2=0d0 
+
 if (trim(mix_scheme)=='KPP') call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 
 !Velocities at nodes
@@ -257,27 +265,26 @@ integer tr_num
 
   call status_check
 
+
+
 if (trim(mix_scheme)=='KPP') then
   call oce_mixing_KPP(Av, Kv2)
-! oce_mixing_kpp.F90 should be modified in a way that works for each tracer when it is called
+! oce_mixing_kpp.F90 should be modified in a way that works for each tracer for the case double diffusion
 ! tr_num = 1 temp
 ! tr_num = 2 salt 
 !   if (tr_num==1) then 
-!      Kv(:,:)=Kv2(:,:,1)
-!   elseif (tr_num==2) then 
-!      Kv(:,:)=Kv2(:,:,2)
-!   endif
+!      Kv2(:,:,1)=Kv2(:,:,2)
+      Kv(:,:)=Kv2(:,:,1)
 
 else if(trim(mix_scheme)=='PP') then
   call oce_mixing_PP
-!  if (AvKv) then
-!     Kv2(:,:,1)=Kv(:,:)
-!     Kv2(:,:,2)=Kv(:,:)
-!  end if 
+  if (AvKv) then
+     Kv2(:,:,1)=Kv(:,:)  ! for the output 
+     Kv2(:,:,2)=Kv(:,:)  ! for the output
+  end if 
 else
    stop("!not existing mixing scheme!")
    call par_ex
-
 end if  
 
   if(mom_adv/=3) then

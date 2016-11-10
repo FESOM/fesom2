@@ -21,7 +21,7 @@ subroutine init_output_restart(do_init)
   character(100)            :: longname
   character(100)            :: filename
   character(100)            :: trname, units
-  integer                   :: av_varid, kv_varid(num_tracer), hbl_varid
+!  integer                   :: av_varid, kv_varid(num_tracer)!, hbl_varid
 
   if (.not. do_init) return
   ! Serial output implemented so far
@@ -66,10 +66,10 @@ subroutine init_output_restart(do_init)
   status = nf_def_var(ncid, 'ssh', NF_DOUBLE, 2, dimids, ssh_varid)
   if (status .ne. nf_noerr) call handle_err(status)
   
-  if (hbl_diag) then
-   status = nf_def_var(ncid, 'hbl', NF_FLOAT, 2, dimids, hbl_varid)
-   if (status .ne. nf_noerr) call handle_err(status)
-  endif
+!  if (hbl_diag) then
+!   status = nf_def_var(ncid, 'hbl', NF_FLOAT, 2, dimids, hbl_varid)
+!   if (status .ne. nf_noerr) call handle_err(status)
+!  endif
 
   ! Define the netCDF variables for 3D fields
   ! ocean horizontal velocity u, v
@@ -88,10 +88,10 @@ subroutine init_output_restart(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
 
   ! vertical viscosity coefficient
-  if (AvKv) then 
-     status = nf_def_var(ncid, 'Av', NF_FLOAT, 3, dimid3, av_varid)
-     if (status .ne. nf_noerr) call handle_err(status)
-  endif
+!  if (AvKv) then 
+!     status = nf_def_var(ncid, 'Av', NF_FLOAT, 3, dimid3, av_varid)
+!     if (status .ne. nf_noerr) call handle_err(status)
+!  endif
      
   ! ocean vertical velocity w
   dimid3(1) = dimid_nl
@@ -105,20 +105,20 @@ subroutine init_output_restart(do_init)
   status = nf_def_var(ncid, 'w_impl', NF_DOUBLE, 3, dimid3, wi_varid)
   if (status .ne. nf_noerr) call handle_err(status)
 
-  if (AvKv) then 
-     do j=1,num_tracers
-        SELECT CASE (j) 
-          CASE(1)
-            trname='Kvt'
-          CASE(2)
-            trname='Kvs'
-          CASE DEFAULT
-            write(trname,'(A3,i1)') 'ptr', j
-        END SELECT
-        status = nf_def_var(ncid, trim(trname), NF_FLOAT, 3, dimid3, kv_varid(j))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  endif
+!  if (AvKv) then 
+!     do j=1,num_tracers
+!        SELECT CASE (j) 
+!          CASE(1)
+!            trname='Kvt'
+!          CASE(2)
+!            trname='Kvs'
+!          CASE DEFAULT
+!            write(trname,'(A3,i1)') 'ptr', j
+!        END SELECT
+!        status = nf_def_var(ncid, trim(trname), NF_FLOAT, 3, dimid3, kv_varid(j))
+!        if (status .ne. nf_noerr) call handle_err(status)
+!     end do
+!  endif
 
   ! scalar fields like T, S
   dimid3(1) = dimid_nl1
@@ -158,13 +158,13 @@ subroutine init_output_restart(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, ssh_varid, 'units', 1, 'm')
   if (status .ne. nf_noerr) call handle_err(status)
-  if(hbl_diag) then
-     longname='boundary layer depth'
-     status = nf_put_att_text(ncid, hbl_varid, 'description', len_trim(longname), trim(longname)) 
-     if (status .ne. nf_noerr) call handle_err(status)
-     status = nf_put_att_text(ncid, hbl_varid, 'units', 1, 'm')
-     if (status .ne. nf_noerr) call handle_err(status)
-  endif
+!  if(hbl_diag) then
+!     longname='boundary layer depth'
+!     status = nf_put_att_text(ncid, hbl_varid, 'description', len_trim(longname), trim(longname)) 
+!     if (status .ne. nf_noerr) call handle_err(status)
+!     status = nf_put_att_text(ncid, hbl_varid, 'units', 1, 'm')
+!     if (status .ne. nf_noerr) call handle_err(status)
+!  endif
   longname='zonal velocity'
   status = nf_put_att_text(ncid, u_varid, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
@@ -201,30 +201,30 @@ subroutine init_output_restart(do_init)
   status = nf_put_att_text(ncid, wi_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
   
-  if(AvKv) then
-     longname='vertical eddy viscosity coefficient'
-     status = nf_put_att_text(ncid, av_varid, 'description', len_trim(longname), trim(longname)) 
-     if (status .ne. nf_noerr) call handle_err(status)
-     status = nf_put_att_text(ncid, av_varid, 'units', 4, 'm2/s')
-     if (status .ne. nf_noerr) call handle_err(status)
-     do j=1,num_tracers
-        SELECT CASE (j) 
-          CASE(1)
-            longname='vertical eddy diffusion coefficient (temperature)'
-            units='m2/s'
-          CASE(2)
-            longname='vertical eddy diffusion coefficient (salinity)'
-            units='m2/s'
-          CASE DEFAULT
-            write(longname,'(A15,i1)') 'passive tracer ', j
-            units='none'
-        END SELECT
-        status = nf_put_att_text(ncid, kv_varid(j), 'description', len_trim(longname), trim(longname))
-        if (status .ne. nf_noerr) call handle_err(status)
-        status = nf_put_att_text(ncid, kv_varid(j), 'units', len_trim(units), trim(units))
-        if (status .ne. nf_noerr) call handle_err(status)
-     end do
-  end if 
+!  if(AvKv) then
+!     longname='vertical eddy viscosity coefficient'
+!     status = nf_put_att_text(ncid, av_varid, 'description', len_trim(longname), trim(longname)) 
+!     if (status .ne. nf_noerr) call handle_err(status)
+!     status = nf_put_att_text(ncid, av_varid, 'units', 4, 'm2/s')
+!     if (status .ne. nf_noerr) call handle_err(status)
+!     do j=1,num_tracers
+!        SELECT CASE (j) 
+!          CASE(1)
+!            longname='vertical eddy diffusion coefficient (temperature)'
+!            units='m2/s'
+!          CASE(2)
+!            longname='vertical eddy diffusion coefficient (salinity)'
+!            units='m2/s'
+!          CASE DEFAULT
+!            write(longname,'(A15,i1)') 'passive tracer ', j
+!            units='none'
+!        END SELECT
+!        status = nf_put_att_text(ncid, kv_varid(j), 'description', len_trim(longname), trim(longname))
+!        if (status .ne. nf_noerr) call handle_err(status)
+!        status = nf_put_att_text(ncid, kv_varid(j), 'units', len_trim(units), trim(units))
+!        if (status .ne. nf_noerr) call handle_err(status)
+!     end do
+!  end if 
 
   do j=1,num_tracers
      SELECT CASE (j) 
@@ -344,7 +344,7 @@ subroutine write_restarts(istep)
   use g_clock
   use g_parsup
   use g_comm_auto
-  use o_mixing_KPP_mod !_OG_
+!  use o_mixing_KPP_mod !_OG_
   implicit none
 
 #include "netcdf.inc" 
@@ -362,7 +362,7 @@ subroutine write_restarts(istep)
   character(100)            :: filename
   character(100)            :: trname
   real(kind=8), allocatable :: aux2(:), aux3(:,:) 
-  integer                   :: av_varid, kv_varid(num_tracer), hbl_varid
+  integer                   :: av_varid, kv_varid(num_tracer)!, hbl_varid
 
   ! ocean part
   if (mype==0) then ! Serial output implemented so far
@@ -394,27 +394,27 @@ subroutine write_restarts(istep)
      status=nf_inq_varid(ncid, 'w_impl', wi_varid)
      if (status .ne. nf_noerr) call handle_err(status)
 
-     if (hbl_diag) then
-        status=nf_inq_varid(ncid, 'hbl', hbl_varid)
-        if (status .ne. nf_noerr) call handle_err(status)
-     endif
+!     if (hbl_diag) then
+!        status=nf_inq_varid(ncid, 'hbl', hbl_varid)
+!        if (status .ne. nf_noerr) call handle_err(status)
+!     endif
  
-     if(AvKv) then
-        status=nf_inq_varid(ncid, 'Av', av_varid)
-        if (status .ne. nf_noerr) call handle_err(status)
-        do j=1,num_tracers
-           SELECT CASE (j) 
-             CASE(1)
-               trname='Kvt'
-             CASE(2)
-               trname='Kvs'
-             CASE DEFAULT
-               write(trname,'(A3,i1)') 'ptr', j
-           END SELECT
-           status = nf_inq_varid(ncid, trim(trname), kv_varid(j))
-           if (status .ne. nf_noerr) call handle_err(status)
-        end do
-     endif
+!     if(AvKv) then
+!        status=nf_inq_varid(ncid, 'Av', av_varid)
+!        if (status .ne. nf_noerr) call handle_err(status)
+!        do j=1,num_tracers
+!           SELECT CASE (j) 
+!             CASE(1)
+!               trname='Kvt'
+!             CASE(2)
+!               trname='Kvs'
+!             CASE DEFAULT
+!               write(trname,'(A3,i1)') 'ptr', j
+!           END SELECT
+!           status = nf_inq_varid(ncid, trim(trname), kv_varid(j))
+!           if (status .ne. nf_noerr) call handle_err(status)
+!        end do
+!     endif
 
       do j=1,num_tracers
         SELECT CASE (j) 
@@ -457,15 +457,15 @@ subroutine write_restarts(istep)
      status=nf_put_vara_double(ncid, ssh_varid, start, count, aux2, 4)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
-  if (hbl_diag) then
-     call gather_nod(hbl, aux2)
-     if(mype==0) then            
-        start=(/1,save_count_mean/)
-        count=(/nod2d, 1/)
-        status=nf_put_vara_real(ncid, hbl_varid, start, count, aux2) 
-        if (status .ne. nf_noerr) call handle_err(status)
-     end if
-  endif
+!  if (hbl_diag) then
+!     call gather_nod(hbl, aux2)
+!     if(mype==0) then            
+!        start=(/1,save_count_mean/)
+!        count=(/nod2d, 1/)
+!        status=nf_put_vara_real(ncid, hbl_varid, start, count, aux2) 
+!        if (status .ne. nf_noerr) call handle_err(status)
+!     end if
+!  endif
 
   ! 3d fields U, V
   call gather_elem(UV(1,:,:), aux3)
@@ -495,15 +495,15 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
 
-  if(AvKv) then
-     call gather_elem(Av,aux3)
-     if(mype==0) then                        
-        start3=(/1, 1, save_count_mean/)
-        count3=(/nl-1, elem2D, 1/)
-        status=nf_put_vara_real(ncid, av_varid, start3, count3, aux3)
-        if (status .ne. nf_noerr) call handle_err(status)
-     end if
-  endif
+!  if(AvKv) then
+!     call gather_elem(Av,aux3)
+!     if(mype==0) then                        
+!        start3=(/1, 1, save_count_mean/)
+!        count3=(/nl-1, elem2D, 1/)
+!        status=nf_put_vara_real(ncid, av_varid, start3, count3, aux3)
+!        if (status .ne. nf_noerr) call handle_err(status)
+!     end if
+!  endif
 
   deallocate(aux3) !reallocate for w
   allocate(aux3(nl,nod2D))
@@ -530,16 +530,16 @@ subroutine write_restarts(istep)
   end if
 
 ! _OG_
-  if(AvKv) then
-     count3=(/nl, nod2D, 1/)
-     do j=1,num_tracers
-        call gather_nod(Kv2(:,:,j),aux3)
-        if(mype==0) then                        
-           status=nf_put_vara_real(ncid, kv_varid(j), start3, count3, aux3)
-           if (status .ne. nf_noerr) call handle_err(status)
-        end if 
-     end do
-  end if
+!  if(AvKv) then
+!     count3=(/nl, nod2D, 1/)
+!     do j=1,num_tracers
+!        call gather_nod(Kv2(:,:,j),aux3)
+!        if(mype==0) then                        
+!           status=nf_put_vara_real(ncid, kv_varid(j), start3, count3, aux3)
+!           if (status .ne. nf_noerr) call handle_err(status)
+!        end if 
+!     end do
+!  end if
 
   deallocate(aux3) !reallocate for scalar variables
   allocate(aux3(nl-1,nod2D))

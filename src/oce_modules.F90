@@ -7,6 +7,7 @@ integer, parameter            :: WP=8        ! Working precision
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
+real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
@@ -43,7 +44,11 @@ real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc du
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
+                                 ! KPP parametrization
  character(5)                 :: mix_scheme='KPP'	   !'KPP','PP'
+real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
+real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+
 logical                       :: AvKv =.false.   ! write Av, Kv
 logical                       :: hbl_diag =.false.   ! write boundary layer depth
 
@@ -88,7 +93,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
-                    Fer_GM, visc_sh_limit, mix_scheme, AvKv,hbl_diag
+                    Fer_GM, visc_sh_limit, mix_scheme, Ricr, concv, AvKv,hbl_diag
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
@@ -786,8 +791,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: vorticity
 
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
-real(kind=WP), allocatable,dimension(:,:,:)   :: Kv2 !_OG_
-!real(kind=WP), allocatable,dimension(:)   :: hbl
+real(kind=WP), allocatable,dimension(:,:,:)   :: Kv2 
 !Velocities interpolated to nodes
 real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 
@@ -806,7 +810,7 @@ real(kind=WP), allocatable    :: UV_mean(:,:,:)
 real(kind=WP), allocatable    :: eta_n_mean(:),Wvel_mean(:,:)
 real(kind=WP), allocatable    :: tr_arr_mean(:,:,:)
 real(kind=WP), allocatable    :: fer_UV_mean(:,:,:), fer_wvel_mean(:,:)
-real(kind=WP), allocatable    :: Av_mean(:,:),Kv_mean(:,:,:) !_OG_
+real(kind=WP), allocatable    :: Av_mean(:,:),Kv_mean(:,:,:) 
 real(kind=WP), allocatable    :: hbl_mean(:)
 
 !Monin-Obukhov correction
