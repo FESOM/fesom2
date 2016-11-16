@@ -26,6 +26,7 @@ MODULES = oce_modules.o \
           gen_modules_forcing.o \
           gen_halo_exchange.o \
           psolve.o \
+          oce_mixing_kpp.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
 	  fort_part.o \
