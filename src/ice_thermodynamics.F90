@@ -495,7 +495,7 @@ subroutine obudget (qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)
   real*8 hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
   real*8 q1, q2 		! coefficients for saturated specific humidity
   real*8 c1, c4, c5
-  logical :: standard_saturation_shum_formula=.true.
+  logical :: standard_saturation_shum_formula = .true.
 
 
   !data c1, c4, c5 /3.8e-3, 17.67, 243.5/
