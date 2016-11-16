@@ -3,6 +3,11 @@
  *
  */
 
+#ifndef METIS_VERSION
+#define METIS_VERSION 4
+#endif
+
+
 /* 
 
  a Fortran interface to METIS-5.1 derived from a metis-4.0-interface
@@ -14,6 +19,8 @@
 
 /* SF 06/2001: The partitioner Interface to METIS-4.0 */
 /* NR 12/2015: The partitioner Interface to METIS-5.1.0 */
+/* NR 11/2016: Combined Interface to Metis 4.0 and 5.1.0, */
+/*             switch at compile time with e.g. -DMETISVERISON=4 */
 /* n: dimension of system (number of equations=number of variables) */
 /*    compressed matrix on input: */
 /* ptr : rowptr or colptr */
@@ -23,12 +30,11 @@
 /* part : partitioning vector */
 #include <stdio.h>
 #include <stdlib.h>
+#if METIS_VERSION == 5
 #include "metis.h"
 
 void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part)
 {
-
-
   int i, wgt_type ;
   idx_t opt[METIS_NOPTIONS];  
   idx_t ncon, ec;
@@ -36,6 +42,8 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   int ierr;
 
   if (*np==1) { for(i=0;i<*n;i++) part[i]=0; return;}
+
+  printf("Start partitioning with Metis version %d.%d.%d\n",METIS_VER_MAJOR,METIS_VER_MINOR,METIS_VER_SUBMINOR);
 
 #ifdef PART_WEIGHTED
   wgt_type = 2;  /* 3D and 2D equally distributed */
@@ -129,3 +137,69 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
     for(i=0;i<*n;i++) part[i]--;
   }
 }
+
+#elif METIS_VERSION == 4
+
+void partit(int *n, int *ptr, int *adj, int *wgt, int *np, int *part)
+{
+  int opt[5];
+  int numfl=1; /* 0: C-numbering ; 1: F-numbering*/
+  int vflg=2; /* weights on vertices */
+  int i, wgt_type ;
+  int ncon, ec;
+  int *wgt_2d3d;
+
+
+  if (*np==1) { for(i=0;i<*n;i++) part[i]=0; return;}
+
+  printf("Start partitioning with Metis version 4 \n");
+
+#ifdef PART_WEIGHTED
+  wgt_type = 2;  /* 3D and 2D equally distributed */
+  /* wgt_type = 1; /* only 3D equally distributed, like old partit2  */
+#else
+  wgt_type = 0; /* only 2D nodes equally distributed */
+#endif
+
+opt[0]=0; /* default options */
+
+
+
+  if (wgt_type == 0) {
+    printf("Distribution weight: 2D nodes\n"); 
+    vflg=0; /* no weights */
+        METIS_PartGraphKway(n,ptr,adj,NULL,NULL,&vflg,&numfl,np,opt,&ec,part); 
+/* METIS_PartGraphRecursive(n,ptr,adj,NULL,NULL,&vflg,&numfl,np,opt,&ec,part); */
+    
+  } else if  (wgt_type == 1) {
+    vflg=2; /* weights on vertices*/
+    printf("Distribution weight: 3D nodes\n");
+        METIS_PartGraphKway(n,&ncon,ptr,adj,wgt,NULL,&vflg,&numfl,np,opt,&ec,part); 
+/* METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt,NULL,&vflg,&numfl,np,opt,&ec,part); */
+    
+  } else  {
+    /*    quasi Default */
+    ncon=2;
+    vflg=2; /* weights on vertices*/
+    wgt_2d3d = (int*) malloc(2* *n *sizeof(int));
+    for (i=0; i<*n; i++){
+      wgt_2d3d[2*i]   = 1;
+      wgt_2d3d[2*i+1] = wgt[i]+100; /* soften the 3D-criteria to allow for better general quality */
+    }
+    
+    printf("Distribution weight: 2D and 3D nodes\n");
+        METIS_mCPartGraphKway(n,&ncon,ptr,adj,wgt_2d3d,NULL,&vflg,&numfl,np,opt,&ec,part);  
+/* METIS_mCPartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,&vflg,&numfl,np,opt,&ec,part); */
+
+    free(wgt_2d3d);
+  }
+   
+  if (ec < 0) {
+    printf("METIS finished with error, edgecut=%d\n", ec);
+  } else { 
+    printf("METIS edgecut %d\n", ec);
+    for(i=0;i<*n;i++) part[i]--;    
+  }
+
+}
+#endif
