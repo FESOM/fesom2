@@ -143,10 +143,10 @@ contains
        yearnew=yearold+1
     endif
 
-    open(99,file=trim(ResultPath)//runid//'.clock',status='unknown')
-    write(99,*) timeold, dayold, yearold
-    write(99,*) timenew, daynew, yearnew
-    close(99)
+!    open(99,file=trim(ResultPath)//runid//'.clock',status='unknown')
+!    write(99,*) timeold, dayold, yearold
+!    write(99,*) timenew, daynew, yearnew
+!    close(99)
   end subroutine clock_finish
   !
   !----------------------------------------------------------------------------

@@ -28,8 +28,9 @@ MODULES = oce_modules.o \
           psolve.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
-	  fort_part.o \
-          gen_input.o
+		    fort_part.o \
+          gen_input.o \
+			 time_measures.o
 
 OBJECTS=  fvom_main.o \
           oce_setup_step.o \
@@ -37,8 +38,8 @@ OBJECTS=  fvom_main.o \
           oce_dyn.o \
           oce_vel_rhs.o \
           oce_vel_rhs_vinv.o \
-	  oce_pressure_bv.o \
-	  oce_fer_gm.o \
+          oce_pressure_bv.o \
+          oce_fer_gm.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \
           oce_mixing.o \
@@ -57,7 +58,8 @@ OBJECTS=  fvom_main.o \
           gen_forcing_ocean.o \
           gen_interpolation.o \
           gen_output_mean.o \
-          gen_output_restart.o
+          gen_output_restart.o \
+          checksums.o
 
 
 
@@ -65,21 +67,21 @@ OBJECTS=  fvom_main.o \
 #          oce_redi_gm.o \
 # Name of executables
 
-EXE     = fvom.x
-EXE_INI = fvom_ini.x
+EXE     = fesom
+EXE_INI = fesom_ini
 
 # TARGETS
 
-default: run
+default: $(EXE)
 
-run:  $(MODULES) $(OBJECTS)
+$(EXE):  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
 	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB) 
 	cp -pf $(EXE) ../bin/.
 
-run_ini: CPP_DEFS+=-DFVOM_INIT
-run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
+$(EXE_INI): CPP_DEFS+=-DFVOM_INIT
+$(EXE_INI): cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
 	$(MPI_LIB) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB)
@@ -97,7 +99,7 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 
 clean :
-	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x
+	rm -f *.o *.mod *~ *.f90 fesom fesom_ini
 
 cleanomod:
 	rm -f *.o *.mod

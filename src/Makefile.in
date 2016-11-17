@@ -4,9 +4,8 @@ FC = ftn
 LD = $(FC)
 
 # Optimization specs for compiler
-OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise -traceback #-g -debug -check all
-# OPT =  -r8 -i4 -xHost -g -debug -traceback -check all -fpe:0
-COPT =  -O3 -DMPI2 -Iinclude -xHost
+OPT  = -r8 -i4 -O3 -xHost -ip -fp-model precise
+COPT =  -O3 -DMPI2 -DUNDER_ -Iinclude -xHost
 ######################################################
 
 # Include path for MPI header file
@@ -22,13 +21,7 @@ NCLIB   = -L$(NCDIR)/lib -lnetcdff -lnetcdf
 NCINC   = -I$(NCDIR)/include
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
-LIB_LAP = #-L/opt/intel/mkl/lib/intel64 -lmkl_blas95_lp64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
-
-# Definition of X11 library (required for PETSC)
-LIB_X11 =  $(X11_PATH) -lX11
-
-# Definition of X11 library (required for PETSC)
-LIB_DDT = #-L/opt/cray/ddt/default/lib/64/ -ldmallocxx
+LIB_LAP = -mkl #-L/opt/intel/mkl/lib/intel64 -lmkl_blas95_lp64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
 
 # Further libraries
 LIBS = 
@@ -40,10 +33,12 @@ PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DVOID_POINTER_SIZ
 LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 
 # Definition for Metis library
+#METIS_LPATH =../lib/metis-4.0
+#LIB_METIS = -L$(METIS_LPATH) -lmetis
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include 
-METIS_DEFS = #-DPART_WEIGHTED
+
 
 ######################################################
 #

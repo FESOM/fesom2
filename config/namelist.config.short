@@ -5,10 +5,10 @@ runid='fesom'
 /
 
 &timestep
-step_per_day=96                 ! 1440 for spin up; 96 later
+step_per_day=96                 ! 1440 for spin up; 96 later 
 
 run_length=20
-run_length_unit='d'		! y, m, d, s
+run_length_unit='s'		! y, m, d, s
 /
 
 &clockinit			! the model starts at

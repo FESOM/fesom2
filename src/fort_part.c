@@ -46,59 +46,33 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 
   METIS_SetDefaultOptions(opt);
 
-  /* The following values are the result of some tests with mesh_aguv, wgt_type=2. */
-  /* METIS_PartGraphRecursive resulted in a far better partition than Kway. According to */
-  /* forum entries, one should always compare. There is no rule which one works best. */ 
 
   opt[METIS_OPTION_CONTIG]    = 0;  /* 1: contiguous partitions, please */
                                    /* With more weights, this makes the partitions uglier... */
                                    /* Ignored by METIS_PartGraphRecursive */
 
   opt[METIS_OPTION_OBJTYPE]   = METIS_OBJTYPE_CUT; /* Minimize edge cut. */
-
-  /* Alternative: METIS_OBJTYPE_VOL, minimize number of nodes on the interface. */ 
-  /* It is nearly the same, as the nodes all have weight 1 in this regard */
-  /* (one of the NULL fields in our case). But it does not matter if a node is connected */ 
-  /* to the other partition by e.g., 1 or 5 edges, thus, _VOL is what we want. */ 
-   
-    /* But: _VOL only works with METIS_PartGraphKway*/
-
   opt[METIS_OPTION_NUMBERING] = 1; /* Fortran Numbering */
   opt[METIS_OPTION_NCUTS]     = 2; /* Build NCUTS partitions, choose the best */
   opt[METIS_OPTION_NITER]     = 25; /* higher => better quality, more compute time. Default: 10 */
 
   opt[METIS_OPTION_UFACTOR]   = 1; /* max. allowed load inbalance in promille */
-  /* Well, somehow relative. Real life inbalance ends up at about 20%, comparing  */
-  /* max(#3D-nodes)/min(#3D-nodes), with METIS_PartGraphKway. */
-  /* But: lower value -> lower maximum number of nodes in all partitions. This it what counts in the end! */
-  /* Far better load balancing with METIS_PartGraphRecursive. */
 
-/*   opt[METIS_OPTION_CTYPE] = METIS_CTYPE_SHEM; */
-/*   opt[METIS_OPTION_IPTYPE] = METIS_IPTYPE_RANDOM; */
-/*   opt[METIS_OPTION_RTYPE] = METIS_RTYPE_SEP2SIDED; */
+
+
   
-  /* Available Options: */
-  /* METIS PartGraphRecursive   METIS PartGraphKway */
-  /* METIS_OPTION_OBJTYPE,  -           x */
-  /* METIS_OPTION_CTYPE,    x           x */
-  /* METIS_OPTION_IPTYPE,   x           x */
-  /* METIS_OPTION_RTYPE,    x           x */
-  /* METIS_OPTION_NO2HOP,   x           x */
-  /* METIS_OPTION_NCUTS,    x           x */
-  /* METIS_OPTION_NITER,    x           x */
-  /* METIS_OPTION_SEED,     x           x */
-  /* METIS_OPTION_UFACTOR,  x           x */
-  /* METIS_OPTION_MINCONN,  -           x */
-  /* METIS_OPTION_CONTIG,   -           x */
-  /* METIS_OPTION_NUMBERING x           x */
-  /* METIS_OPTION_DBGLVL    x           x */
+  /* This is optional, but required if the partioned mesh is not compatible with FESOM   */
+  /* If a FESOM run stops at '0 mesh_setup... complete' the partitioning is incompatible */
+  opt[METIS_OPTION_SEED] = 20;
+  
 
+
+  
   if (wgt_type == 0) {
     ncon = 1;   
     printf("Distribution weight: 2D nodes\n"); 
     /* ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,NULL,NULL,NULL,np,NULL,NULL,opt,&ec,part); */
     ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,NULL,NULL,NULL,np,NULL,NULL,opt,&ec,part);
-    
   } else if  (wgt_type == 1) {
     ncon = 1;
     printf("Distribution weight: 3D nodes\n");

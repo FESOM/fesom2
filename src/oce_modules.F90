@@ -318,6 +318,7 @@ subroutine set_par_support_ini
              nlevels_nod2D, npes, part)
         
         write(*,*) 'partitioning is done.'
+        write(*,*) '========================='
      end if
      call MPI_BCAST(part,nod2D,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
   endif

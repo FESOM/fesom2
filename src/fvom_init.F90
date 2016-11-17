@@ -36,6 +36,12 @@ program MAIN
   if (mype==0) call stiff_mat_ini  ! Only the master will call Metis and needs the matrix
   call set_par_support_ini
   call save_dist_mesh
+
+if (mype==0) then
+  write(*,*) '========================='
+  write(*,*) 'Partitioning completed'
+  write(*,*) '========================='
+endif
   call par_ex
 end program MAIN
 !=============================================================================
@@ -55,6 +61,12 @@ INTEGER           :: n1,n2,n3
 INTEGER           :: n, nz, exit_flag
 REAL(kind=WP)     :: x1, x2
 INTEGER		  :: tag
+
+if (mype==0) then
+  write(*,*) '==========================='
+  write(*,*) 'Initialize mesh information'
+endif
+
 ! ===================
 ! Surface mesh
 ! ===================
@@ -86,10 +98,7 @@ INTEGER		  :: tag
   end do
   !
   CLOSE(21)
-   	   	 
-write(*,*) '========================='
-write(*,*) 'Mesh is read'
-write(*,*) '========================='
+ 
 END SUBROUTINE read_mesh_ini
 !=======================================================================
 !> @brief 
@@ -150,6 +159,8 @@ real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
 ! ====================
+
+if (mype==0) write(*,*) 'Find edges and write edges.out'
 
 allocate(aux(nod2d), aux1(nod2D), aux2(nod2D))
 aux=0
@@ -373,6 +384,10 @@ integer :: elem, eledges(3), elem1, j, n, node, enum,count1,count2,exit_flag,i,n
 real*8 :: x,dmean
 integer :: thers_lev=5
 character*200 :: file_name
+
+if (mype==0) write(*,*) 'Find levels'
+
+
 ALLOCATE(depth(nod2D))
         
 file_name=trim(meshpath)//'aux3d.out'
@@ -530,6 +545,9 @@ USE o_MESH
 USE g_PARSUP
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
+
+if (mype==0) write(*,*) 'Find element neighbors'
+
 allocate(elem_neighbors(3,elem2D))
 elem_neighbors=0
 DO elem=1,elem2D

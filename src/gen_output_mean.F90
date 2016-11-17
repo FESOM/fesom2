@@ -612,8 +612,8 @@ subroutine output(directionflag,istep)
   ! write results
 
   if (use_means) then
-     if(mype==0) write(*,*)'Do output (netCDF, mean) ...'
-     call write_means(istep)
+!     if(mype==0) write(*,*)'Do output (netCDF, mean) ...'
+!     call write_means(istep)
      call clean_means
   endif
 end subroutine output

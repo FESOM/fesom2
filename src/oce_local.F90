@@ -227,6 +227,6 @@ IMPLICIT NONE
 	 end if
 	 
        deallocate(ncount, temp)
-       write(*,*) 'Distributed mesh is saved'
+       if (mype==0) write(*,*) 'Distributed mesh is saved'
  END subroutine  save_dist_mesh
        	  

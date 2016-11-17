@@ -43,7 +43,7 @@ allocate(fct_plus(nl-1, my_size),fct_minus(nl-1, my_size))
  fct_plus=0.0
  fct_minus=0.0
  
- write(*,*) 'FCT is initialized'
+if (mype==0) write(*,*) 'FCT is initialized'
  
 END SUBROUTINE fct_init
 !===========================================================================

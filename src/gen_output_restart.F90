@@ -142,12 +142,12 @@ subroutine init_output_restart(do_init)
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, v_varid, 'units', 3, 'm/s')
   if (status .ne. nf_noerr) call handle_err(status)
-  longname='Adams–Bashforth RHS for zonal velocity'
+  longname='Adams-Bashforth RHS for zonal velocity'
   status = nf_put_att_text(ncid, urhs_varid_AB, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, urhs_varid_AB, 'units', 3, 'm3/s2')
   if (status .ne. nf_noerr) call handle_err(status)
-  longname='Adams–Bashforth RHS for meridional velocity'
+  longname='Adams-Bashforth RHS for meridional velocity'
   status = nf_put_att_text(ncid, vrhs_varid_AB, 'description', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status)
   status = nf_put_att_text(ncid, vrhs_varid_AB, 'units', 3, 'm3/s2')
@@ -184,7 +184,7 @@ subroutine init_output_restart(do_init)
      if (status .ne. nf_noerr) call handle_err(status)
      status = nf_put_att_text(ncid, tra_varid(j), 'units', len_trim(units), trim(units))
      if (status .ne. nf_noerr) call handle_err(status)
-     ! Adams–Bashforth part
+     ! Adams-Bashforth part
      longname=trim(longname)//', Adams–Bashforth'
      status = nf_put_att_text(ncid, tra_varid_ab(j), 'description', len_trim(longname), trim(longname))
      if (status .ne. nf_noerr) call handle_err(status)
@@ -554,6 +554,7 @@ subroutine restart(directionflag, istep)
   if (.not.do_restart) return
 
   ! write results
-  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call write_restarts(istep)
+if (mype==0) write (*,*) 'Writing of restart files is disabled!'
+!  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
+!  call write_restarts(istep)
 end subroutine restart
