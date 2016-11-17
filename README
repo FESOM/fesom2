@@ -75,9 +75,7 @@ in this package.
   and runs into a deadlock. If this happens, you can try a different number of processes
   or change the random number for Metis. For this edit in the file FESOMROOT/src/fort_part.c
   the line 66:
-       opt[Metis_Option_Seed] = 7;  
-  In the provided code, this line is commented out. So remove the comments to set the value
-  for the random number seed. i
+       opt[METIS_OPTION_SEED] = 20;
 
   Please also note, that the compute performance can depend on the partitioning. Thus, it
   might be useful to try difference values of the random number seed.
