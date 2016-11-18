@@ -60,9 +60,9 @@ in this package.
 - Run the benchmark
   
   + Using jobscripts
-    The subdirectory run provides an example jobscript to copute the 
-    mesh partitioning  (job_combined.sh). 
-    It can serve a starting point to run the benchmark.
+    The subdirectory run provides an example jobscript to compute the 
+    mesh partitioning followed by the model  (job_combined.sh). 
+    It can serve a starting point to run the benchmark. 
 
   + Run the application using different numbers of CPUs.
 
@@ -117,14 +117,11 @@ in this package.
  has to be reached.
   
   
-- Performance and performance rates
+- Performance measurement
 
-  The benchmark is designed to perform 400 time steps (defined by the variables
+  The benchmark is designed to perform 1920 time steps (defined by the variables
   'run_length' and 'step_per_day') in namelist.config
   (These parameters must not be changed to keep the benchmarks comparable!)
-  
-  Within the time loop, a estimated amount of 554 000 000 000 000 (554 TFLOP)
-  floating point operations (FLOP) will be performed.
   
   For evaluating the performance of this benchmark you will find time measurement
   informations at the end of the standard output file fesom.out like this
@@ -157,14 +154,8 @@ in this package.
   E.G. the part no. 1 "Total" nearly represents the over all time consumption of 
   the model run (something like the wall clock time). 
   
-  !!  To evaluate the performance rate please devide the predetermined number of FLOP  !!
-  !!  by the value given for the "Time stepping" part (No. 3) to evaluate the floating !!
-  !!  point operations per seconds for the time stepping part.                         !!
-  
-  (for the example given above you will get
-   554,000,000,000,000 Flop / 215.52 s = 2.57 TFlop/s)
-    
-- Minimum performance requirement
 
-  A mimimum performance of 3.0 TFlop/s should be achieved. 
+- Maximum run time requirement
+
+  the value of timer 3 (Time stepping) should not exceed 180 second.
 
