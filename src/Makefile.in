@@ -33,8 +33,6 @@ PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DVOID_POINTER_SIZ
 LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 
 # Definition for Metis library
-#METIS_LPATH =../lib/metis-4.0
-#LIB_METIS = -L$(METIS_LPATH) -lmetis
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include 
