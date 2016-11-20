@@ -647,6 +647,7 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  !allocate(elem_area(myDim_elem2D))
  allocate(area(nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
                                              !! in some further routines
+ allocate(area_inv(nl,myDim_nod2d+eDim_nod2D)) 
  allocate(mesh_resolution(myDim_nod2d+eDim_nod2D))
  ! ============
  ! The areas of triangles:
@@ -690,7 +691,18 @@ real(kind=WP), allocatable,dimension(:)   :: work_array
  ! ===========
  elem_area=elem_area*r_earth*r_earth
  area=area*r_earth*r_earth
+ 
  call exchange_nod(area)
+
+do n=1,myDim_nod2d+eDim_nod2D
+   do nz=1,nl
+      if (area(nz,n) > 0._WP) then
+         area_inv(nz,n) = 1._WP/area(nz,n)
+      else
+         area_inv(nz,n) = 0._WP
+      end if
+   end do
+end do
  ! coordinates are in radians, edge_dxdy are in meters,
  ! and areas are in m^2
  

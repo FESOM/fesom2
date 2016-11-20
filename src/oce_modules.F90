@@ -147,7 +147,7 @@ real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
 integer                                    :: nl
 real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
 integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
-real(kind=8), allocatable, dimension(:,:)  :: area
+real(kind=8), allocatable, dimension(:,:)  :: area, area_inv
 real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
 
 
