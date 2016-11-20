@@ -47,6 +47,8 @@ LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 ## may happen for Metis-5-partitioning. 
 ## Rule of thumb: most robust partitioning with Metis 4, no PART_WEIGHTED;
 ## fastest parallel FESOM with Metis 5 and -DPART_WEIGHTED, if it works for FESOM at all.   
+## You can start Metis 5 with different random seeds -> different partitions, 
+## until you find one that works.
 
 # METIS_DIR = ../lib/metis-4.0
 # LIB_METIS = -L$(METIS_DIR) -lmetis
@@ -56,7 +58,8 @@ LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include
-METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED
+METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
+# METISRANDDOMSEED: any integer
 
 ######################################################
 #

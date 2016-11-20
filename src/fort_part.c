@@ -81,6 +81,12 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   /* But: lower value -> lower maximum number of nodes in all partitions. This it what counts in the end! */
   /* Far better load balancing with METIS_PartGraphRecursive. */
 
+#ifdef METISRANDOMSEED
+  opt[METIS_OPTION_SEED] = METISRANDOMSEED; /* Set in the Makefile */
+  /* Useful, if the first partition did not work in FESOM */
+  /* Try different seeds until the partition is ok. */ 
+#endif
+
 /*   opt[METIS_OPTION_CTYPE] = METIS_CTYPE_SHEM; */
 /*   opt[METIS_OPTION_IPTYPE] = METIS_IPTYPE_RANDOM; */
 /*   opt[METIS_OPTION_RTYPE] = METIS_RTYPE_SEP2SIDED; */

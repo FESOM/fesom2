@@ -56,7 +56,9 @@ LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include
-METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED
+METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
+# METISRANDDOMSEED: any integer
+
 ######################################################
 #
 # Preprocessor
