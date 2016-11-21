@@ -157,5 +157,5 @@ in this package.
 
 - Maximum run time requirement
 
-  the value of timer 3 (Time stepping) should not exceed 180 second.
+  The value of timer 3 (Time stepping) should not exceed 180 seconds.
 
