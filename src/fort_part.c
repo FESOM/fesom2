@@ -65,7 +65,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   /* If a FESOM run stops at '0 mesh_setup... complete' the partitioning is incompatible */
   opt[METIS_OPTION_SEED] = 20;
   
-
+  printf("Seed for METIS: %d\n", opt[METIS_OPTION_SEED]);
 
   
   if (wgt_type == 0) {
