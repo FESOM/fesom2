@@ -11,6 +11,7 @@
  3D tracer nodes on mype     73597879
  =========================
  Calling partit
+Seed for METIS: 20
 Distribution weight: 2D nodes
 METIS edgecut 256262
  partitioning is done.
@@ -20,4 +21,4 @@ METIS edgecut 256262
  =========================
  Partitioning completed
  =========================
-Application 3075560 resources: utime ~3182401s, stime ~25571s, Rss ~1106812, inblocks ~3388191518, outblocks ~3356031
+Application 3087753 resources: utime ~3386872s, stime ~29384s, Rss ~1106804, inblocks ~3388195298, outblocks ~3356032
