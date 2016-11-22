@@ -73,9 +73,10 @@ in this package.
   and compiler). In this case when one runs FESOM2 the model runs until the line
            0 mesh_setup... complete  
   and runs into a deadlock. If this happens, you can try a different number of processes
-  or change the random number for Metis. For this edit in the file FESOMROOT/src/fort_part.c
-  the line 66:
-       opt[METIS_OPTION_SEED] = 20;
+  or change the random number for Metis. The random number is specified as a preprocessor
+  definition METISRANDOMSEED in the compilation and set to a default value of 20. It is 
+  specified in FESOMROOT/src/Makefile.in in the line
+      METIS_DEFS = -DMETISRANDOMSEED=20
 
   Please also note, that the compute performance can depend on the partitioning. Thus, it
   might be useful to try difference values of the random number seed.
@@ -83,9 +84,9 @@ in this package.
 - Job output
 
   The program is configured to write no model output files.
-  The standard output of the FEOM benchmark is redirected into files, one file
-  per CPU used by the benchmark (feom.stdout_$MYID, with $MYID as the
-  number of the CPU which has been written to the file). 
+  The standard output of the FEOM benchmark is redirected into files. For the 
+  partitioning run this is fesom_ini.out, while it is fesom.out for the actual
+  model run.
   
 - Validating the results
 

@@ -61,11 +61,13 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 
 
   
+#ifdef METISRANDOMSEED
   /* This is optional, but required if the partioned mesh is not compatible with FESOM   */
   /* If a FESOM run stops at '0 mesh_setup... complete' the partitioning is incompatible */
-  opt[METIS_OPTION_SEED] = 20;
+  opt[METIS_OPTION_SEED] = METISRANDOMSEED;
   
   printf("Seed for METIS: %d\n", opt[METIS_OPTION_SEED]);
+#endif
 
   
   if (wgt_type == 0) {
