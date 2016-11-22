@@ -21,10 +21,7 @@ NCLIB   = -L$(NCDIR)/lib -lnetcdff -lnetcdf
 NCINC   = -I$(NCDIR)/include
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
-LIB_LAP = -mkl #-L/opt/intel/mkl/lib/intel64 -lmkl_blas95_lp64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
-
-# Further libraries
-LIBS = 
+LIB_LAP = -mkl 
 
 # Definition of pARMS include and library
 PARMS_DIR  =   ../lib/parms
