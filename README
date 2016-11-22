@@ -6,22 +6,22 @@ to run the HLRN benchmark for the FESOM2 application software.
 
 This README file explains the benchmark procedure.
 
-For a brief description of the FESOM application software we refere to 
+For a brief description of the FESOM application software we refer to 
 the specification guide.
 
 
 1. Prerequisites:
 -----------------
 
-To be able to run the benchmark the following libraries must be installed 
+To be able to run the benchmark, the following libraries must be installed 
 on your system:
 
 Library   Version  Further information
-metis     5.1.0    http://glaros.dtc.umn.edu/gkhome/views/metis
+Metis     5.1.0    http://glaros.dtc.umn.edu/gkhome/views/metis
 pARMS     3.2      http://www-users.cs.umn.edu/~saad/software/pARMS/
 NetCDF    >=4.0    http://www.unidata.ucar.edu/software/netcdf/index.html
 
-The source codes of metis and pARMS are provided in the lib/ subdirectory. 
+The source codes of Metis and pARMS are provided in the lib/ subdirectory. 
 Makefiles and machine-specific include files (Makefile.in) are in the
 respective subdirectories.
 As NetCDF should also be required for other benchmarks, it is not included
@@ -33,29 +33,30 @@ in this package.
 
 - You need to build the executable for your hardware yourself!
 
-
 - Building the executables
 
-  The provided script  build_all.sh  lets you build the libraries
-  and the model executables in one step. However, the file
+  The provided script  build_all.sh  lets you build the libraries Metis
+  and pARMS and the model executables in one step. However, the files
   Makefile.in, in the two library directories and the model directory
   src/ need to be adapted to the specific computer.
 
-  1a. Build the required libraries
+  The step-wise build of he application needs the following steps
+  1. Build the required libraries in teh 
       cd FESOMROOT/lib/metis-5.1.0; make
       cd FESOMROOT/lib/parms; make
-  2.  cd FESOMROOT/src/; make fesom 
-  3.  make clean; make fesom_ini
-      This builds the executables 'fesom' and 'fesom_ini' in bin/
+  2. Build the two model excutables 
+      cd FESOMROOT/src/; make fesom 
+      make clean; make fesom_ini
+  This builds the executables 'fesom' and 'fesom_ini' in bin/
 
-  For both libraries as well as for the model in src/, there is a
-  file Makefile.in, which needs to be apated to the specific computer.
+  The program 'fesom_ini' is used to compute the partitioning of
+  the model mesh and to write the partitioned mesh information into files.
+  It needs to be executed with the same number of processes as the model.
 
-  The program 'fesom_ini' is used to prepare the partitioning of
-  the model mesh. The executable 'fesom' is the model performing
-  the time stepping that is to be benchmarked. Thus, running FESOM2
-  is a two-step procedure: First generate the mesh partitioning and
-  second run the model with the generated partitioned mesh. 
+  The executable 'fesom' is the model performing the time stepping that
+  is to be benchmarked. Thus, running FESOM2 is a two-step procedure: First
+  generate the mesh partitioning and second run the model with the
+  generated partitioned mesh. 
 
 - Run the benchmark
   
@@ -69,29 +70,29 @@ in this package.
 - NOTICE
 
   Sometimes it can happen that Metis generates a mesh partitioning that is incompatible
-  with FESOM (we had this case e.g. for 2400 cores, but it can depend on the processor
-  and compiler). In this case when one runs FESOM2 the model runs until the line
+  with FESOM (This will depend on the processor and compiler). When one executes 'fesom'
+  with an incompatible mesh, the model stops after the line
            0 mesh_setup... complete  
-  and runs into a deadlock. If this happens, you can try a different number of processes
-  or change the random number for Metis. The random number is specified as a preprocessor
-  definition METISRANDOMSEED in the compilation and set to a default value of 20. It is 
-  specified in FESOMROOT/src/Makefile.in in the line
+  If this happens, you can try a different number of processes or change the random
+  number seed for Metis. The random number is specified as the preprocessor
+  definition METISRANDOMSEED in the compilation and set to a default value of 20.
+  It is specified in FESOMROOT/src/Makefile.in in the line
       METIS_DEFS = -DMETISRANDOMSEED=20
 
-  Please also note, that the compute performance can depend on the partitioning. Thus, it
-  might be useful to try difference values of the random number seed.
+  Please also note, that the compute performance can depend on the partitioning.
+  Thus, it might be useful to try difference values of the random number seed.
 
 - Job output
 
-  The program is configured to write no model output files.
+  The program is configured so that no model output files are written.
   The standard output of the FEOM benchmark is redirected into files. For the 
   partitioning run this is fesom_ini.out, while it is fesom.out for the actual
   model run.
   
 - Validating the results
 
-  The standard output of CPU 0 generated by running the FESOM application
-  benchmark contains the lines (near the end of the file )
+  The output file 'fesom.out' contains near the end of the file lines providing
+  check sum information like
 
  ...
  ======== CHECKSUMS =========
@@ -100,7 +101,7 @@ in this package.
  Salinity:       2630094573.54246
  ...
 
- You will find the reference output in "out/fesom.out.reference"
+ You will find the reference output in "data/fesom.out.reference"
  It is required that the absolute value of the difference between your 
  result of the checksums and the reference values does not exceed 
  
@@ -125,7 +126,7 @@ in this package.
   (These parameters must not be changed to keep the benchmarks comparable!)
   
   For evaluating the performance of this benchmark you will find time measurement
-  informations at the end of the standard output file fesom.out like this
+  information at the end of the standard output file fesom.out like this
 
 #-----------------------------------------------------------------------------------------------#
 | FESOM2 time measurements                                                                      |
