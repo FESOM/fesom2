@@ -105,7 +105,7 @@ in this package.
  It is required that the absolute value of the difference between your 
  result of the checksums and the reference values does not exceed 
  
- 2.0    for ssh,
+ 2.5    for ssh,
  400.0  for Temperature and
  200.0  for Salinity
  
