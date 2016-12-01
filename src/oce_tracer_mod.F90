@@ -52,8 +52,10 @@ integer :: tr_num
 
 select case (tracer_adv)
    case(1) !MUSCL
-      call adv_tracer_muscl(tr_arr(:,:,tr_num), del_ttf, tr_arr_old(:,:,tr_num))
-   case(2) !MUSCL+FCT(3D)
+      call adv_tracer_muscl(del_ttf, tr_arr_old(:,:,tr_num))
+   case(2) !MUSCL+3/4
+      call  adv_tracer_muscl34(del_ttf,tr_arr_old(:,:,tr_num), 0.75_WP)
+   case(3) !MUSCL+3/4+FCT(3D)
       call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.75_WP)
    CASE DEFAULT !unknown
       IF (mype==0) write(*,*) 'Unknown advection type. Check your namelists.'

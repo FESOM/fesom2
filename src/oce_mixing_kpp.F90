@@ -5,7 +5,7 @@ MODULE o_mixing_KPP_mod
   ! Modified from FESOM1.4 (Qiang's code) to FESOM2.0 by ozgur 
   !                                                  Oct. 2016
   ! checked by ??
-  !---------------------------------------------------------------  
+  !---------------------------------------------------------------
   USE o_PARAM
   USE o_MESH
   USE o_ARRAYS

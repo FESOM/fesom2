@@ -12,7 +12,7 @@ IMPLICIT NONE
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	if (tracer_adv==2) call fct_init
+	if (tracer_adv==3) call fct_init
         call muscl_adv_init
 	!=====================
 	! Initialize fields

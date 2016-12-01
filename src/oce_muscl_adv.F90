@@ -25,8 +25,8 @@ use g_config
 IMPLICIT NONE
 integer     :: n, k, n1, n2, n_num
 
-call find_up_downwind_triangles
-n_num=0
+  call find_up_downwind_triangles
+  n_num=0
   DO n=1, myDim_nod2D
   k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
   if(k>n_num) n_num=k
@@ -209,8 +209,10 @@ edge_up_dn_grad=0.0
 end SUBROUTINE find_up_downwind_triangles
 !=======================================================================
 SUBROUTINE fill_up_dn_grad
-
-! ttx, tty  elemental gradient of tracer 
+! tr_xy is the array with tracer gradient on elements
+! These values are filled in into edge_up_dn array where
+! possible. Otherwise gradients averaged over some vicinity 
+! are used. 
 USE o_PARAM
 USE o_MESH
 USE o_ARRAYS
@@ -218,15 +220,18 @@ USE g_PARSUP
 IMPLICIT NONE
 integer        :: n, nz, elem, k, edge, ednodes(2)
 real(kind=8)   :: tvol, tx, ty
-
+  
   DO edge=1,myDim_edge2D
      ednodes=edges(:,edge)
-    if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
+    if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then !both up/dn triangles exist
     
      DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-        edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
-	edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
+        edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge)) ! up/dn x derivatives
+	edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge)) ! up/dn y derivatives
      END DO
+     ! in case the topography was reached, the up/dn gradients are replaced by mean
+     ! gradients which are computed as mean over all elements to which a node of an edge belongs
+     ! proceed with the first node of an edge:
      DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
         tvol=0.0
 	tx=0.0
@@ -241,6 +246,7 @@ real(kind=8)   :: tvol, tx, ty
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
      END DO
+     ! proceed with the second node of an edge:
      DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
         tvol=0.0
 	tx=0.0
@@ -255,16 +261,16 @@ real(kind=8)   :: tvol, tx, ty
 	edge_up_dn_grad(2,nz,edge)=tx/tvol
 	edge_up_dn_grad(4,nz,edge)=ty/tvol
      END DO
-    else
-    
-      ! Only linear reconstruction part
+    else ! up or dn triangle does not exist    
+         ! linear reconstruction will be used
+         ! proceed with the first node of an edge:
      DO nz=1,nlevels_nod2D(ednodes(1))-1
         tvol=0.0
 	tx=0.0
 	ty=0.0
 	DO k=1, nod_in_elem2D_num(ednodes(1))
            elem=nod_in_elem2D(k,ednodes(1))
-           if(nlevels(elem)-1<nz) cycle
+           if (nlevels(elem)-1<nz) cycle
            tvol=tvol+elem_area(elem)
            tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -272,6 +278,7 @@ real(kind=8)   :: tvol, tx, ty
 	edge_up_dn_grad(1,nz,edge)=tx/tvol
 	edge_up_dn_grad(3,nz,edge)=ty/tvol
      END DO
+         ! proceed with the second node of an edge:
      DO nz=1,nlevels_nod2D(ednodes(2))-1
         tvol=0.0
 	tx=0.0
@@ -293,7 +300,7 @@ END SUBROUTINE fill_up_dn_grad
 !===========================================================================
 ! It is assumed that velocity is at n+1/2, hence only tracer field 
 ! is AB2 interpolated to n+1/2. 
-SUBROUTINE adv_tracer_muscl(ttf, dttf, ttfold)
+SUBROUTINE adv_tracer_muscl(dttf, ttfold)
 USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
@@ -306,7 +313,7 @@ IMPLICIT NONE
  real(kind=8) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, flux=0.0 
  real(kind=8) :: tvert(nl), a, b, c, d, da, db, dg
  real(kind=8) :: Tx, Ty, Tmean, rdata=0.0
- real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
+ real(kind=8) :: dttf(nl-1, myDim_nod2D+eDim_nod2D)
  real(kind=8) :: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
 
 ! Clean the rhs
@@ -388,7 +395,7 @@ ttrhs=0d0
   ! Fluxes in the column
   ! ===========
  
-   tvert(1)= -Wvel(1,n)*ttfold(1,n)*area(1,n)
+   tvert(1)= -Wvel_e(1,n)*ttfold(1,n)*area(1,n)
 		    
   ! Bottom conditions	  
    tvert(nlevels_nod2D(n))=0.	    
@@ -397,7 +404,7 @@ ttrhs=0d0
       ! ============
       ! QUICK upwind (3rd order)
       ! ============
-      if(Wvel(nz,n)>0) then
+      if(Wvel_e(nz,n)>0) then
         if(nz==nlevels_nod2D(n)-1) then
 	  Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))  ! or replace this with 
 	                                             ! the first order 
@@ -413,7 +420,7 @@ ttrhs=0d0
 	end if
       end if
 
-      if(Wvel(nz,n)<0) then
+      if(Wvel_e(nz,n)<0) then
         if(nz==2) then
 	  Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))        ! or ttfold(nz-1,n)
 	else  
@@ -426,7 +433,7 @@ ttrhs=0d0
 	Tmean=ttfold(nz,n)*da+ttfold(nz-1,n)*db+ttfold(nz-2,n)*dg
 	end if
       end if
-      tvert(nz)= -Tmean*Wvel(nz,n)*area(nz,n)
+      tvert(nz)= -Tmean*Wvel_e(nz,n)*area(nz,n)
    END DO
  
    DO nz=1,nlevels_nod2D(n)-1

@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in_ollie
+include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -26,7 +26,6 @@ MODULES = oce_modules.o \
           gen_modules_forcing.o \
           gen_halo_exchange.o \
           psolve.o \
-          oce_mixing_kpp.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
 	  fort_part.o \
@@ -41,7 +40,8 @@ OBJECTS=  fvom_main.o \
 	  oce_pressure_bv.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
-          oce_fct_muscl_adv.o \
+          oce_muscl_adv34.o \
+          oce_muscl_adv34_fct.o\
           oce_mixing.o \
           oce_ice_init_state.o \
           oce_shortwave_pene.o \
@@ -76,14 +76,14 @@ default: run
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) 
+	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB) 
 	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
-	$(MPI_LIB) $(LIB_METIS) $(NCLIB)
+	$(MPI_LIB) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 
@@ -93,8 +93,9 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 
 .F90.o :
 	@echo $@
-	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) \
-	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
+	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
+	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
+	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 
 clean :
 	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x

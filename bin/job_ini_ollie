@@ -14,7 +14,7 @@ ulimit -a
 
 
 module purge
-module load intel.compiler
+module load  intel.compiler/17.0.0
 module load intel.mpi
 module load netcdf/4.4.0_intel
 

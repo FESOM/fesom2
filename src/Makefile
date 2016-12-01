@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in_ollie
+include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -41,7 +41,8 @@ OBJECTS=  fvom_main.o \
 	  oce_pressure_bv.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
-          oce_fct_muscl_adv.o \
+          oce_muscl_adv34.o \
+          oce_muscl_adv34_fct.o\
           oce_mixing.o \
           oce_ice_init_state.o \
           oce_shortwave_pene.o \
