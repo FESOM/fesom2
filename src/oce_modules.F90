@@ -220,6 +220,7 @@ save
      integer, dimension(:), allocatable :: sptr
      integer, dimension(:), allocatable :: slist
      integer, dimension(:), allocatable :: req  ! request for MPI_Wait
+     integer   :: nreq ! Number of MPI_Wait requests 
   end type com_struct
 
   type(com_struct)   :: com_nod2D
@@ -364,10 +365,10 @@ subroutine set_par_support
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
-      allocate(com_edge2D%req(          com_edge2D%rPEnum +      com_edge2D%sPEnum))
-      allocate(com_nod2D%req(            com_nod2D%rPEnum +       com_nod2D%sPEnum))
-      allocate(com_elem2D%req(          com_elem2D%rPEnum +      com_elem2D%sPEnum))
-      allocate(com_elem2D_full%req(com_elem2D_full%rPEnum + com_elem2D_full%sPEnum))
+      allocate(com_edge2D%req(          3*com_edge2D%rPEnum +      3*com_edge2D%sPEnum))
+      allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum))
+      allocate(com_elem2D%req(          3*com_elem2D%rPEnum +      3*com_elem2D%sPEnum))
+      allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum + 3*com_elem2D_full%sPEnum))
 
 !================================================
 ! MPI DATATYPES

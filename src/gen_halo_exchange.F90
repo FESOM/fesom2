@@ -58,7 +58,9 @@ IMPLICIT NONE
      call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
                     mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
-    
+  
+  com_nod2D%nreq = rn+sn
+
 endif
 END SUBROUTINE exchange_nod2D_i_begin
 
@@ -104,10 +106,134 @@ IMPLICIT NONE
      call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
                     mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
-  
+
+  com_nod2D%nreq = rn+sn
+
 end if
  
 END SUBROUTINE exchange_nod2D_begin
+!===============================================
+subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D)
+
+USE g_PARSUP
+IMPLICIT NONE
+
+! General version of the communication routine for 2D nodal fields
+ 
+ real*8, intent(inout)  :: nod1_array2D(:)
+ real*8, intent(inout)  :: nod2_array2D(:)
+
+ if (npes > 1) then
+    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)  
+    call exchange_nod_end
+ end if
+ 
+END SUBROUTINE exchange_nod2D_2fields
+
+! ========================================================================
+subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)
+USE o_MESH
+USE g_PARSUP
+IMPLICIT NONE
+
+! General version of the communication routine for 2D nodal fields
+ 
+ real*8, intent(inout)  :: nod1_array2D(:)
+ real*8, intent(inout)  :: nod2_array2D(:)
+
+ integer  :: n, sn, rn
+
+ if (npes > 1) then
+
+  sn=com_nod2D%sPEnum
+  rn=com_nod2D%rPEnum
+
+  DO n=1,rn         
+     call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n),      MPI_COMM_WORLD, com_nod2D%req(2*n-1), MPIerr) 
+ 
+     call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n)+npes, MPI_COMM_WORLD, com_nod2D%req(2*n),   MPIerr) 
+  END DO  
+  DO n=1, sn
+     call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype,      MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n-1), MPIerr)
+
+     call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype+npes, MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n),   MPIerr)
+  END DO
+
+   com_nod2D%nreq = 2*(rn+sn)
+
+end if
+ 
+END SUBROUTINE exchange_nod2D_2fields_begin
+
+!===============================================
+subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D)
+
+USE g_PARSUP
+IMPLICIT NONE
+
+! General version of the communication routine for 2D nodal fields
+ 
+ real*8, intent(inout)  :: nod1_array2D(:)
+ real*8, intent(inout)  :: nod2_array2D(:)
+ real*8, intent(inout)  :: nod3_array2D(:)
+
+ if (npes > 1) then
+    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)  
+    call exchange_nod_end
+ end if
+ 
+END SUBROUTINE exchange_nod2D_3fields
+
+! ========================================================================
+subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)
+USE o_MESH
+USE g_PARSUP
+IMPLICIT NONE
+
+! General version of the communication routine for 2D nodal fields
+ 
+ real*8, intent(inout)  :: nod1_array2D(:)
+ real*8, intent(inout)  :: nod2_array2D(:)
+ real*8, intent(inout)  :: nod3_array2D(:)
+
+
+ integer  :: n, sn, rn
+
+ if (npes > 1) then
+
+  sn=com_nod2D%sPEnum
+  rn=com_nod2D%rPEnum
+
+  DO n=1,rn         
+     call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n),        MPI_COMM_WORLD, com_nod2D%req(3*n-2), MPIerr) 
+ 
+     call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n)+npes,   MPI_COMM_WORLD, com_nod2D%req(3*n-1), MPIerr) 
+
+     call MPI_IRECV(nod3_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
+               com_nod2D%rPE(n)+2*npes, MPI_COMM_WORLD, com_nod2D%req(3*n),   MPIerr) 
+  END DO  
+  DO n=1, sn
+     call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype,        MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n-2), MPIerr)
+
+     call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype+npes,   MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n-1), MPIerr)
+
+     call MPI_ISEND(nod3_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
+                    mype+2*npes, MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n),   MPIerr)
+  END DO
+
+   com_nod2D%nreq = 3*(rn+sn)
+
+end if
+ 
+END SUBROUTINE exchange_nod2D_3fields_begin
 
 ! ========================================================================
 subroutine exchange_nod3D(nod_array3D)
@@ -162,6 +288,8 @@ if (npes > 1) then
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
           mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
+
+ com_nod2D%nreq = rn+sn
 
 endif
 END SUBROUTINE exchange_nod3D_begin
@@ -227,6 +355,9 @@ if (npes>1) then
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
           mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
   END DO
+
+  com_nod2D%nreq = rn+sn
+
  endif
 
 
@@ -240,8 +371,7 @@ SUBROUTINE exchange_nod_end
   USE g_PARSUP
 
 if (npes > 1) &
-  call MPI_WAITALL(com_nod2D%rPEnum + com_nod2D%sPEnum, com_nod2D%req, &
-       MPI_STATUSES_IGNORE, MPIerr)
+  call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
 
 END SUBROUTINE exchange_nod_end
 
@@ -251,10 +381,10 @@ SUBROUTINE exchange_elem_end
 
   if (npes > 1) then
      if (elem_full_flag) then
-        call MPI_WAITALL(com_elem2D_full%rPEnum + com_elem2D_full%sPEnum, &
+        call MPI_WAITALL(com_elem2D_full%nreq, &
              com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)     
      else
-        call MPI_WAITALL(com_elem2D%rPEnum + com_elem2D%sPEnum, &
+        call MPI_WAITALL(com_elem2D%nreq, &
              com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)     
      endif
   end if
@@ -428,6 +558,7 @@ IMPLICIT NONE
         call par_ex(1)
      endif
 
+     com_elem2D%nreq = rn+sn
 
   else
 
@@ -467,6 +598,8 @@ IMPLICIT NONE
         if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
         call par_ex(1)
      endif     
+
+     com_elem2D_full%nreq = rn+sn
 
   endif
 
@@ -538,6 +671,8 @@ IMPLICIT NONE
                        mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
      END DO
 
+     com_elem2D%nreq = rn+sn
+
   else
      
      elem_full_flag = .true.
@@ -553,6 +688,8 @@ IMPLICIT NONE
         call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%sPE(n), &
                        mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
      END DO
+
+     com_elem2D_full%nreq = rn+sn
 
   end if     
   
@@ -605,6 +742,9 @@ IMPLICIT NONE
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
                        mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
      END DO
+
+     com_elem2D%nreq = rn+sn
+
   else
      elem_full_flag = .true.
 
@@ -619,6 +759,8 @@ IMPLICIT NONE
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
                        mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
      END DO
+
+     com_elem2D_full%nreq = rn+sn
 
   end if     
 
@@ -670,6 +812,8 @@ IMPLICIT NONE
        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
             mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
     END DO
+
+    com_elem2D_full%nreq = rn+sn
   
 end if
 
@@ -1497,6 +1641,8 @@ implicit none
 interface exchange_nod
       module procedure exchange_nod2D
       module procedure exchange_nod2D_i
+      module procedure exchange_nod2D_2fields
+      module procedure exchange_nod2D_3fields
       module procedure exchange_nod3D
       module procedure exchange_nod3D_n
 end interface exchange_nod
@@ -1504,6 +1650,8 @@ end interface exchange_nod
 interface exchange_nod_begin
       module procedure exchange_nod2D_begin
       module procedure exchange_nod2D_i_begin
+      module procedure exchange_nod2D_2fields_begin
+      module procedure exchange_nod2D_3fields_begin
       module procedure exchange_nod3D_begin
       module procedure exchange_nod3D_n_begin
 end interface exchange_nod_begin
