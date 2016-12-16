@@ -299,8 +299,7 @@ do shortstep=1, evp_rheol_steps
    V_ice(ednodes(2))=0.0_WP
  end do  
  
- call exchange_nod(U_ice)
- call exchange_nod(V_ice)    
+ call exchange_nod(U_ice,V_ice)    
  END DO
  
 end subroutine EVPdynamics
