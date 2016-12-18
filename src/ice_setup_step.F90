@@ -116,8 +116,8 @@ t0=MPI_Wtime()
  call thermodynamics
  t1=MPI_Wtime()
 if (mype==0) then
- write(*,*) 'Ice Model step took ', 1000.*real(t1-t0,4), sum(v_ice)
- write(*,*) 'Ice Model dynamics  ', 1000.*real(t2-t0,4), sum(u_ice)
+ write(*,*) 'Ice Model step took ', 1000.*real(t1-t0,4)
+ write(*,*) 'Ice Model dynamics  ', 1000.*real(t2-t0,4)
 endif
 
 end subroutine ice_timestep
