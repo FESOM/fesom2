@@ -81,6 +81,8 @@ save
 ! Mean arrays
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean,m_snow_mean
+
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ice_strength
   END MODULE i_ARRAYS
 !=====================================================================
 module i_therm_param

@@ -58,7 +58,8 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
 
- 
+allocate(ice_strength(myDim_elem2D)) 
+
  rhs_m=0.0_WP
  rhs_ms=0.0_WP
  rhs_a=0.0_WP
@@ -100,6 +101,7 @@ subroutine ice_timestep(step)
 use o_param
 use g_parsup
 USE g_CONFIG
+  use i_ARRAYs
 implicit none
 integer      :: step 
 REAL(kind=8) :: t0,t1, t2, t3
@@ -114,8 +116,8 @@ t0=MPI_Wtime()
  call thermodynamics
  t1=MPI_Wtime()
 if (mype==0) then
- write(*,*) 'Ice Model step took ', t1-t0
- write(*,*) 'Ice Model dynamics  ', t2-t0
+ write(*,*) 'Ice Model step took ', 1000.*real(t1-t0,4), sum(v_ice)
+ write(*,*) 'Ice Model dynamics  ', 1000.*real(t2-t0,4), sum(u_ice)
 endif
 
 end subroutine ice_timestep

@@ -14,7 +14,7 @@ use g_parsup
 USE g_CONFIG
 implicit none
 
-real(kind=WP)   :: eps11, eps12, eps22, eta, xi, ice_strength, delta, aa
+real(kind=WP)   :: eps11, eps12, eps22, eta, xi, ice_streng, delta, aa
 integer         :: elem, elnodes(3)
 real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
@@ -50,15 +50,12 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
      delta=(eps11**2+eps22**2)*(1.0_WP+vale)+4.0_WP*vale*eps12**2 + &
             2.0_WP*eps11*eps22*(1.0_WP-vale)
      delta=sqrt(delta)
-     msum=sum(m_ice(elnodes))/3.0_WP
-     asum=sum(a_ice(elnodes))/3.0_WP
      
-      ! ===== Hunke and Dukowicz c*h*p*
-     ice_strength=pstar*(msum)*exp(-c_pressure*(1.0_WP-asum))
+
       ! =======================================
       ! ===== Here the EVP rheology piece starts
       ! =======================================
-     ice_strength=0.5_WP*ice_strength
+
       ! ===== viscosity zeta should exceed zeta_min
       ! (done via limiting delta from above)
       
@@ -70,7 +67,7 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
       ! ===== if delta is too small or zero, viscosity will too large (unlimited)
       ! (limit delta_inv)
      delta_inv=1.0_WP/max(delta,delta_min) 
-     zeta=ice_strength*delta_inv			     
+
       ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
       ! is too large in some regions and CFL criterion is violated.
       ! The regularization below was introduced by Hunke, 
@@ -83,20 +80,20 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
       !zeta=Clim_evp*voltriangle(elem)
       !end if 
       
-      ice_strength=ice_strength*Tevp_inv
-      zeta=zeta*Tevp_inv
-      				     
-     r1=zeta*(eps11+eps22) - ice_strength
-     r2=zeta*(eps11-eps22)*vale
-     r3=zeta*eps12*vale
-     si1=sigma11(elem)+sigma22(elem)
-     si2=sigma11(elem)-sigma22(elem)
+      zeta = ice_strength(elem) * delta_inv
+      zeta = zeta *Tevp_inv
+
+     r1 = zeta*(eps11+eps22) - ice_strength(elem)*Tevp_inv
+     r2 = zeta*(eps11-eps22)*vale
+     r3 = zeta*eps12*vale
+     si1 = sigma11(elem)+sigma22(elem)
+     si2 = sigma11(elem)-sigma22(elem)
      
-     si1=det1*(si1+dte*r1)
-     si2=det2*(si2+dte*r2)
-     sigma12(elem)=det2*(sigma12(elem)+dte*r3)
-     sigma11(elem)=0.5_WP*(si1+si2)
-     sigma22(elem)=0.5_WP*(si1-si2)
+     si1 = det1*(si1+dte*r1)
+     si2 = det2*(si2+dte*r2)
+     sigma12(elem) = det2*(sigma12(elem)+dte*r3)
+     sigma11(elem) = 0.5_WP*(si1+si2)
+     sigma22(elem) = 0.5_WP*(si1-si2)
     end do
     
 end subroutine stress_tensor
@@ -191,8 +188,6 @@ val3=1/3.0_WP
  DO  n=1, myDim_nod2D
      U_rhs_ice(n)=0.0
      V_rhs_ice(n)=0.0
-     rhs_a(n)=0.0       ! these are used as temporal storage here
-     rhs_m(n)=0.0       ! for the contribution due to ssh
  END DO
  
  do elem=1,myDim_elem2D
@@ -204,7 +199,6 @@ val3=1/3.0_WP
 
      dx=gradient_sca(1:3,elem)
      dy=gradient_sca(4:6,elem)
-     elevation_elem=elevation(elnodes)
      
      DO k=1,3
         n=elnodes(k)
@@ -215,24 +209,17 @@ val3=1/3.0_WP
              (sigma12(elem)*dx(k)+sigma22(elem)*dy(k) &   
              -sigma11(elem)*val3*metric_factor(elem))
      END DO
-      ! use rhs_m and rhs_a for storing the contribution from elevation:
-     aa=9.81*elem_area(elem)/3.0_WP
-     DO k=1,3
-        n=elnodes(k)
-        rhs_a(n)=rhs_a(n)-aa*sum(dx*elevation_elem)	    
-        rhs_m(n)=rhs_m(n)-aa*sum(dy*elevation_elem)
-     END DO     
  end do 
  
   DO n=1, myDim_nod2D
      mass=area(1,n)*(m_ice(n)*rhoice+m_snow(n)*rhosno)
      
-     if (mass.ne.0) then
-     U_rhs_ice(n)=U_rhs_ice(n)/mass + rhs_a(n)/area(1,n) 
-     V_rhs_ice(n)=V_rhs_ice(n)/mass + rhs_m(n)/area(1,n)
+     if (mass > 0) then
+        U_rhs_ice(n)=U_rhs_ice(n)/mass + rhs_a(n)/area(1,n)
+        V_rhs_ice(n)=V_rhs_ice(n)/mass + rhs_m(n)/area(1,n)
      else
-     U_rhs_ice(n)=0.  
-     V_rhs_ice(n)=0.
+        U_rhs_ice(n)=0.  
+        V_rhs_ice(n)=0.
      end if
   END DO 
   
@@ -255,12 +242,45 @@ IMPLICIT NONE
 integer          :: steps, shortstep
 real(kind=WP)    :: rdt, am, sm, mm
 real(kind=WP)    :: drag, inv_mass, det, umod, rhsu, rhsv
-integer          :: n, ed, ednodes(2)
-real(kind=WP)    :: ax, ay, yx, tx, ty
-    rdt=ice_dt/(1.0*evp_rheol_steps)
-    ax=cos(theta_io)
-    ay=sin(theta_io)
+integer          :: n, ed, ednodes(2), k, elem, elnodes(3)
+real(kind=WP)    :: ax, ay, yx, tx, ty, aa, asum, msum
+
+! Precompute fields and values that remain constant during the iteration
+
+rdt=ice_dt/(1.0*evp_rheol_steps)
+ax=cos(theta_io)
+ay=sin(theta_io)
     
+DO  n=1, myDim_nod2D
+   rhs_a(n)=0.0       ! these are used as temporal storage here
+   rhs_m(n)=0.0       ! for the contribution due to ssh
+END DO
+ 
+ do elem=1,myDim_elem2D
+     elnodes=elem2D_nodes(:,elem)
+      ! ===== Skip if ice is absent
+     if (product(m_ice(elnodes))*product(a_ice(elnodes))==0._WP) CYCLE
+      ! =====
+     
+       ! use rhs_m and rhs_a for storing the contribution from elevation:
+     aa=9.81*elem_area(elem)/3.0_WP
+     DO k=1,3
+        n=elnodes(k)
+        rhs_a(n) = rhs_a(n)-aa*sum(gradient_sca(1:3,elem)*elevation(elnodes))
+        rhs_m(n) = rhs_m(n)-aa*sum(gradient_sca(4:6,elem)*elevation(elnodes))
+     END DO     
+
+
+     msum=sum(m_ice(elnodes))/3.0_WP
+     asum=sum(a_ice(elnodes))/3.0_WP
+      ! ===== Hunke and Dukowicz c*h*p*
+     ice_strength(elem) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+     ice_strength(elem) = 0.5_WP*ice_strength(elem)
+
+ end do 
+
+
+! Start the iteration
     
 do shortstep=1, evp_rheol_steps 
  
