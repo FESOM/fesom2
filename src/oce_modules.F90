@@ -7,7 +7,7 @@ integer, parameter            :: WP=8        ! Working precision
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
-real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
+real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]  
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
@@ -223,7 +223,7 @@ save
      integer   :: nreq ! Number of MPI_Wait requests 
   end type com_struct
 
-  type(com_struct)   :: com_nod2D
+  type(com_struct)   :: com_nod2D, com_ice2D
   type(com_struct)   :: com_edge2D
   type(com_struct), target :: com_elem2D
   type(com_struct), target :: com_elem2D_full
@@ -243,6 +243,7 @@ save
 
   ! Nodal fields (2D; 2D integer; 3D with nl-1 or nl levels, one, two, or three values)
   integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:) 
+  integer, allocatable       :: s_mpitype_ice2D(:),     r_mpitype_ice2D(:) 
   integer, allocatable       :: s_mpitype_nod2D_i(:),   r_mpitype_nod2D_i(:)
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:) 
 
@@ -267,6 +268,9 @@ save
    integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
    logical :: elem_full_flag  
+
+   ! auxilliary fields to set up reduced halos for ice
+   integer, allocatable :: n_recv_nod(:), n_send_nod(:)
 contains
 subroutine par_init    ! initializes MPI
 
@@ -305,12 +309,13 @@ subroutine set_par_support_ini
   use o_MESH
   implicit none
 
-  integer   n, j, k, nini, nend, ierr
+  integer :: n, j, k, nini, nend, ierr
+  integer :: iceflag_nod2D(nod2D)
 
   interface 
-     subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
+     subroutine partit(n,ptr,adj,wgt1,wgt2,np,part) bind(C)
        use iso_c_binding, only: idx_t=>C_INT32_T
-       integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*),np
+       integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt1(*),wgt2(*),np
        integer(idx_t), intent(out) :: part(*)
      end subroutine partit
   end interface
@@ -327,9 +332,17 @@ subroutine set_par_support_ini
   if(npes>1) then
 
      if (mype==0) then
+        do n=1,nod2D
+           if (abs(coord_nod2D(1,n)) > 45._WP*180._WP/pi) then
+              iceflag_nod2D(n) = 1
+           else
+              iceflag_nod2D(n) = 0
+           endif
+        enddo
+
         write(*,*) 'Calling partit'
         call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-             nlevels_nod2D, npes, part)
+             nlevels_nod2D, iceflag_nod2D, npes, part)
         
         call check_partitioning
 
@@ -344,11 +357,9 @@ subroutine set_par_support_ini
   call communication_elem_fulln
   call mymesh
   if(mype==0) write(*,*) 'Communication arrays have been set up'   
-end subroutine set_par_support_ini
 
-!=======================================================================
-
-subroutine check_partitioning
+contains
+  subroutine check_partitioning
 
 ! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
 !   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
@@ -363,9 +374,9 @@ subroutine check_partitioning
 
   use o_MESH
   integer :: i, j, k, n, node, n_iso, n_iter, is, ie, kmax, np
-  integer :: nod_per_partition(2,0:npes-1)
-  integer :: max_nod_per_part(2), min_nod_per_part(2)
-  integer :: average_nod_per_part(2)
+  integer :: nod_per_partition(3,0:npes-1)
+  integer :: max_nod_per_part(3), min_nod_per_part(3)
+  integer :: average_nod_per_part(3)
   logical :: already_counted, found_part
   
   integer :: max_adjacent
@@ -379,16 +390,20 @@ subroutine check_partitioning
   do n=1,nod2D
      nod_per_partition(1,part(n)) = nod_per_partition(1,part(n)) +1
      nod_per_partition(2,part(n)) = nod_per_partition(2,part(n)) +nlevels_nod2D(n)
+     nod_per_partition(3,part(n)) = nod_per_partition(3,part(n)) +iceflag_nod2D(n)
   enddo
 
   min_nod_per_part(1) = minval( nod_per_partition(1,:))
   min_nod_per_part(2) = minval( nod_per_partition(2,:))
+  min_nod_per_part(3) = minval( nod_per_partition(3,:))
 
   max_nod_per_part(1) = maxval( nod_per_partition(1,:))
   max_nod_per_part(2) = maxval( nod_per_partition(2,:))
+  max_nod_per_part(3) = maxval( nod_per_partition(3,:))
 
   average_nod_per_part(1) = nod2D / npes
   average_nod_per_part(2) = sum(nlevels_nod2D(:)) / npes
+  average_nod_per_part(3) = sum(iceflags(:)) / npes
   
 ! Now check for isolated nodes (connect by one or even no edge to other
 ! nodes of its partition) and repair, if possible
@@ -416,6 +431,7 @@ subroutine check_partitioning
            ne_part_num(1) = 1
            ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
            ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
+           ne_part_load(3,1) = nod_per_partition(3,ne_part(1)) + iceflag_nod2D(n)
            
            do i=is+1,ie
               node = ssh_stiff%colind(i)
@@ -432,8 +448,9 @@ subroutine check_partitioning
                  np = np+1
                  ne_part(np) = part(node)
                  ne_part_num(np) = 1
-                 ne_part_load(1,1) = nod_per_partition(1,ne_part(np)) + 1
-                 ne_part_load(2,1) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+                 ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
+                 ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+                 ne_part_load(3,np) = nod_per_partition(3,ne_part(np)) + iceflag_nod2D(n)
               endif
            enddo
         
@@ -524,6 +541,9 @@ end do isolated_nodes_check
 
 
 end subroutine check_partitioning
+end subroutine set_par_support_ini
+
+!=======================================================================
 
 !=======================================================================
 
@@ -531,7 +551,7 @@ subroutine set_par_support
   use o_MESH
   implicit none
 
-  integer   n, offset
+  integer   n, offset, ii, k, nod
   integer :: i, max_nb, nb, nini, nend, nl1, n_val
   integer, allocatable :: blocklen(:),     displace(:)
 
@@ -864,6 +884,172 @@ subroutine set_par_support
          ENDDO
       enddo
 
+! And now a special case: The ice model does not need to communicate halos "close"
+! to the equator. Let's start with a very conservative guess, 45 degress N and S.
+! To be done: flag the nodes with "ice possible" t/f. Or go for a runtime check in 
+! ice_setup_step
+! Only nod2D double precision is needed.
+
+      allocate(n_recv_nod(com_nod2D%rPEnum))
+      allocate(n_send_nod(com_nod2D%sPEnum))
+      
+      n_recv_nod(:) = 0
+      n_send_nod(:) = 0
+
+      do n=1,com_nod2D%rPEnum
+         nini = com_nod2D%rptr(n)
+         nend = com_nod2D%rptr(n+1) - 1
+         do i=nini, nend
+            nod = com_nod2D%rlist(i)
+            if (abs(coord_nod2D(2,nod)) > 45._WP*rad) then
+               n_recv_nod(n) = n_recv_nod(n)+1
+            endif
+         end do
+      enddo      
+
+      com_ice2D%rPEnum = sum(min(n_recv_nod(1:com_nod2D%rPEnum),1))
+      
+      if (com_ice2D%rPEnum > 0) then
+         allocate(com_ice2D%rPE( com_ice2D%rPEnum))
+         allocate(com_ice2D%rptr(com_ice2D%rPEnum+1))
+         com_ice2D%rptr(1) = 1
+         allocate(com_ice2D%rlist(sum(n_recv_nod(1:com_nod2D%rPEnum))))
+         k=0
+         ii=0
+         do n=1,com_nod2D%rPEnum
+            if (n_recv_nod(n) > 0) then
+               k=k+1
+               com_ice2D%rPE(k)  = com_nod2D%rPE(n)
+               com_ice2D%rptr(k+1) = com_ice2D%rptr(k) + n_recv_nod(n)
+               
+               nini = com_nod2D%rptr(n)
+               nend = com_nod2D%rptr(n+1) - 1
+               do i=nini, nend
+                  nod = com_nod2D%rlist(i)
+                  if (abs(coord_nod2D(2,nod)) > 45._WP*rad) then
+                     ii = ii+1
+                     com_ice2D%rlist(ii) = nod
+                  endif
+               end do
+
+               print *,'ice recv',mype, com_ice2D%rPE(k), n_recv_nod(n), ii- com_ice2D%rptr(k)+1 
+            end if
+   
+         end do
+
+      endif
+
+
+      do n=1,com_nod2D%sPEnum
+         nini = com_nod2D%sptr(n)
+         nend = com_nod2D%sptr(n+1) - 1
+         do i=nini, nend
+            nod = com_nod2D%slist(i)
+            if (abs(coord_nod2D(2,nod)) > 45._WP*rad) then
+               n_send_nod(n) = n_send_nod(n)+1
+            endif
+         end do
+      enddo
+      
+      print *,'ice-nod send',mype, n_send_nod(:)
+
+      com_ice2D%sPEnum = sum(min(n_send_nod(1:com_nod2D%sPEnum),1))
+
+      if (com_ice2D%sPEnum > 0) then
+         allocate(com_ice2D%sPE( com_ice2D%sPEnum))
+         allocate(com_ice2D%sptr(com_ice2D%sPEnum+1))
+         com_ice2D%sptr(1) = 1
+         allocate(com_ice2D%slist(sum(n_send_nod(1:com_nod2D%sPEnum))))
+         k=0
+         ii=0
+         do n=1,com_nod2D%sPEnum
+            if (n_send_nod(n) > 0) then
+               k=k+1
+               com_ice2D%sPE(k)  = com_nod2D%sPE(n)
+               com_ice2D%sptr(k+1) = com_ice2D%sptr(k) + n_send_nod(n)
+               
+               nini = com_nod2D%sptr(n)
+               nend = com_nod2D%sptr(n+1) - 1
+               do i=nini, nend
+                  nod = com_nod2D%slist(i)
+                  if (abs(coord_nod2D(2,nod)) > 45._WP*rad) then
+                     ii = ii+1
+                     com_ice2D%slist(ii) = nod
+                  endif
+               end do
+
+               print *,'ice send',com_ice2D%sPE(k), mype, n_send_nod(n), ii- com_ice2D%sptr(k)+1           
+            endif
+         enddo
+         
+      endif 
+
+      deallocate(n_send_nod, n_recv_nod)
+
+!================================================
+! MPI REQUEST BUFFER
+!================================================
+      allocate(com_ice2D%req(3*com_ice2D%rPEnum + 3*com_ice2D%sPEnum))
+
+!================================================
+! MPI DATATYPES
+!================================================
+      ! Build MPI Data types for halo exchange: Ice halo (nodes)
+      allocate(r_mpitype_ice2D(com_ice2D%rPEnum))  ! 2D
+      allocate(s_mpitype_ice2D(com_ice2D%sPEnum))  
+
+      do n=1,com_ice2D%rPEnum
+         nb = 1
+         nini = com_ice2D%rptr(n)
+         nend = com_ice2D%rptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_ice2D%rlist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_ice2D%rlist(i) /= com_ice2D%rlist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_ice2D%rlist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+              r_mpitype_ice2D(n),     MPIerr)
+
+         call MPI_TYPE_COMMIT(r_mpitype_ice2D(n),     MPIerr)  
+
+      enddo
+
+      if (com_ice2D%rPEnum > 0) print *,'nod-ice C'
+      do n=1,com_ice2D%sPEnum
+         nb = 1
+         nini = com_ice2D%sptr(n)
+         nend = com_ice2D%sptr(n+1) - 1
+         displace(:) = 0
+         displace(1) = com_ice2D%slist(nini) -1  ! C counting, start at 0
+         blocklen(:) = 1
+         do i=nini+1, nend
+            if (com_ice2D%slist(i) /= com_ice2D%slist(i-1) + 1) then  
+               ! New block
+               nb = nb+1
+               displace(nb) = com_ice2D%slist(i) -1
+            else
+               blocklen(nb) = blocklen(nb)+1
+            endif
+         enddo
+
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+              s_mpitype_ice2D(n),     MPIerr)
+
+         call MPI_TYPE_COMMIT(s_mpitype_ice2D(n),     MPIerr)   
+
+      enddo
+
+
+      if (com_ice2D%rPEnum > 0) print *,'nod-ice D'
+
       deallocate(blocklen,     displace)
 
    endif
@@ -885,6 +1071,8 @@ subroutine init_gatherLists
   integer :: n, estart, nstart
 
   if (mype==0) then
+
+     ! Master tasks collects information for the gathering of global fields from the other tasks 
 
      if (npes > 1) then
 
