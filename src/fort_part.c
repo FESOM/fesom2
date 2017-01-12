@@ -39,6 +39,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
   idx_t opt[METIS_NOPTIONS];  
   idx_t ncon, ec;
   idx_t *wgt_2d3d;
+  idx_t *wgt_2d3dice;
   int ierr;
 
   if (*np==1) { for(i=0;i<*n;i++) part[i]=0; return;}
@@ -125,7 +126,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
     wgt_2d3d = (idx_t*) malloc(2* *n *sizeof(idx_t));
     for (i=0; i<*n; i++){
       wgt_2d3d[2*i]   = 1;
-      wgt_2d3d[2*i+1] = wgt[i]+100; /* soften the 3D-criteria to allow for better general quality */
+      wgt_2d3d[2*i+1] = wgt[i]+20; /* soften the 3D-criteria to allow for better general quality */
     }
     
     printf("Distribution weight: 2D and 3D nodes\n");
@@ -133,7 +134,25 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
     ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,NULL,np,NULL,NULL,opt,&ec,part);
 
     free(wgt_2d3d);
-  }
+
+  } 
+  /* else { */
+  /*   /\*    nodes with (potential for) ice as a third weight *\/ */
+  /*   ncon=3; */
+  /*   wgt_2d3dice = (idx_t*) malloc(3* *n *sizeof(idx_t)); */
+  /*   for (i=0; i<*n; i++){ */
+  /*     wgt_2d3dice[3*i]   = 1; */
+  /*     wgt_2d3dice[3*i+1] = wgt[i]+50; /\* soften the 3D-criterion to allow for better general quality *\/ */
+  /*     wgt_2d3dice[3*i+2] = wgt2[i]+1; /\* soften  *\/ */
+  /*   } */
+    
+  /*   printf("Distribution weight: 2D, 3D and ice nodes\n"); */
+  /*   /\* ierr = METIS_PartGraphKway(n,&ncon,ptr,adj,wgt_2d3dice,NULL,NULL,np,NULL,NULL,opt,&ec,part);  *\/ */
+  /*   ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3dice,NULL,NULL,np,NULL,NULL,opt,&ec,part); */
+
+  /*   free(wgt_2d3dice); */
+
+  /* } */
    
   if (ierr != METIS_OK) {
     printf("MEITS finished with error, code=%d\n", ierr);

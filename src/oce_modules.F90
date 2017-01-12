@@ -447,6 +447,12 @@ subroutine check_partitioning
         !         nodes. Don't care about this here)
 
            kmax = maxloc(ne_part_num(1:np),1)
+
+           if (ne_part_num(kmax) <= 1) then
+              print *,'Sorry, no chance to solve an isolated node problem'
+              exit isolated_nodes_check
+           endif
+
            if  (ne_part_load(1,kmax) <= max_nod_per_part(1) .and. &
                 ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
               k = kmax
@@ -466,10 +472,6 @@ subroutine check_partitioning
               enddo
 
               if (.not. found_part) then
-                 if (maxval(ne_part_num(1:np)) <= 1) then
-                    print *,'Sorry, no chance to solve an isolated node problem'
-                    exit isolated_nodes_check
-                 endif
               ! Ok, don't think to much. Simply go for minimized edge cut.
                  k = kmax
               endif
