@@ -1,0 +1,6 @@
+#!/bin/bash
+#PBS -l ncpus=4,mem=6gb,walltime=00:20:00
+#PBS -m abe
+cd /home/altb/lizhongz/parms/examples/grid
+mpirun -np 4 dd-grid.ex
+# end of example script

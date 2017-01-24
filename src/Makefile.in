@@ -1,0 +1,79 @@
+# Compiler and Linker
+CC = mpiicc 
+FC = mpiifort
+LD = $(FC)
+
+# Optimization specs for compiler
+OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise -traceback #-g -debug -check all
+# OPT =  -r8 -i4 -xHost -g -debug -traceback -check all -fpe:0
+COPT =  -O3 -DMPI2 -Iinclude -xHost
+######################################################
+
+# Include path for MPI header file
+
+MPIROOT            = # $(MPICH_DIR)
+MPI_LIB            = # -L$(MPIROOT)/lib -lmpich_intel -lmpl -lmpichf90_intel
+MPI_INCLUDE        = # -I$(MPIROOT)/include
+
+# NetCDF library and include definitions
+#    (use 'module load netcdf')
+NCDIR   = $(NETCDF_DIR)
+NCLIB   = -L$(NCDIR)/lib -lnetcdff -lnetcdf 
+NCINC   = -I$(NCDIR)/include
+
+# Definition of LAPACK include and library (if not provided by FoSSI)
+LIB_LAP = #-L/opt/intel/mkl/lib/intel64 -lmkl_blas95_lp64 -lmkl_lapack95_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
+
+# Definition of X11 library (required for PETSC)
+LIB_X11 =  $(X11_PATH) -lX11
+
+# Definition of X11 library (required for PETSC)
+LIB_DDT = #-L/opt/cray/ddt/default/lib/64/ -ldmallocxx
+
+# Further libraries
+LIBS = 
+
+# Definition of pARMS include and library
+PARMS_DIR  =   ../lib/parms
+PARMS_INC  = -I$(PARMS_DIR)/include -I$(PARMS_DIR)/src/include
+PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS -DVOID_POINTER_SIZE_8  -DSGI
+LIB_PARMS  = -L$(PARMS_DIR)/lib -lparms
+
+
+## For partitioning, the FESOM initialization offers interfaces to Metis 4 
+## and Metis 5. Choose here which one to use. 
+## -DPART_WEIGHTED distributes 2D _and_ 3D-nodes equally, but the partitioning might 
+## be too irregular and not suitable for FESOM's MPI communication setup. The same
+## may happen for Metis-5-partitioning. 
+## Rule of thumb: most robust partitioning with Metis 4, no PART_WEIGHTED;
+## fastest parallel FESOM with Metis 5 and -DPART_WEIGHTED, if it works for FESOM at all.  
+## You can start Metis 5 with different random seeds -> different partitions, 
+## until you find one that works. 
+
+# METIS_DIR = ../lib/metis-4.0
+# LIB_METIS = -L$(METIS_DIR) -lmetis
+# METIS_INC = 
+# METIS_DEFS = # -DPART_WEIGHTED
+
+METIS_DIR = ../lib/metis-5.1.0
+LIB_METIS = -L$(METIS_DIR)/lib -lmetis
+METIS_INC = -I$(METIS_DIR)/include
+METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
+# METISRANDDOMSEED: any integer
+
+######################################################
+#
+# Preprocessor
+CPP = /usr/bin/cpp -P -C
+
+# Define solver library
+# Options:
+#   -DPARMS  - Define that pARMS solver is used
+#   -DPETSC  - Define that PETSC is used
+
+CPP_SOL = -DPARMS
+
+######################################################
+# Preprocessor definition
+
+CPP_DEFS= 

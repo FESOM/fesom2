@@ -1,0 +1,18 @@
+
+2015/12/17 
+
+This version of metis is modified for simple use with FVOM init routines.
+Only the library will be built with an oldfashioned Makefile.in approach.
+Changes to the original distribution:
+
+*) original Makefile copied to Makefile_orig
+
+*) new Makefile to build only lib/libmetis.a, using Makefile.in
+
+*) new file: Makefile.in 
+
+*) new libmetis/Makefile
+
+*) new GKlib/Makefile
+
+*) new directory lib/ to place libmetis.a

@@ -1,0 +1,65 @@
+SHELL			=	/bin/sh
+
+
+include ${PETSC_DIR}/conf/rules
+include ${PETSC_DIR}/conf/variables
+
+# path of the header files of pARMS
+ICFLAGS			=	-I../../include ${PETSC_INCLUDE}
+
+# path of the header files for implmentaion of pARMS
+ISRCINC	                = -I../../src/include ${PETSC_INCLUDE}	
+
+# optimization flags
+COPTFLAGS		=	-g 
+
+# other compile options
+CFLAGS			=       -DUSE_MPI -DREAL=double -DDBL -DHAS_BLAS ${PETSC_CCPPFLAGS}
+CFFLAGS			=	-DFORTRAN_UNDERSCORE -DVOID_POINTER_SIZE_8 ${PETSC_FCPPFLAGS}
+
+# FORTRAN compiler
+FC			=	mpif77
+
+F90			= 	mpif90
+
+# path of the header files
+IFFLAGS			=  -I../../include ${PETSC_INCLUDE}
+
+# FORTRAN compile options
+FFLAGS			=	-O3 -g -DVOID_POINTER_SIZE_8 ${PETSC_FCPPFLAGS}
+
+# linker and options
+F90LINKER		= 	${F90}
+LINKER			=	${FC}
+CLINKFLAGS		=	${FFLAGS} 
+FLINKFLAGS		=	${FFLAGS} 
+
+# archive and options
+AR			=	ar
+ARFLAGS			=	-cr
+EXTFLAGS		=	-x
+
+PARMS_LIBS		=	-L../../lib -lparms
+
+# MPI library
+MPI_LIB_DIR		=
+MPI_LIB			=
+
+# LAPACK, BLAS library
+LAPACK_BLAS_LIB_DIR	=
+LAPACK_BLAS_LIB		=	-llapack -lblas
+
+# general math libary
+MATH_LIB_DIR		=     
+MATH_LIB		=     -lm
+
+.c.o:
+	${CC} ${ICFLAGS} ${ISRCINC} ${XIFLAGS} $(COPTFLAGS) \
+	${CFLAGS} ${CFFLAGS} $< -c -o $@
+
+.F.o:
+	${F90} -FI ${IFFLAGS} ${FFLAGS} $< -c -o $(@F)
+
+.f.o:
+	${FC} ${FFLAGS} $< -c -o $(@F)
+

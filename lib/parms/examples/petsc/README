@@ -1,0 +1,77 @@
+=========================================
+README FILE for PETSc Interface to pARMS
+=========================================
+
+USAGE:
+======
+1. Install pARMS3 and PETSc. 
+   (The version of PETSc used to test this interface is petsc-3.1)
+
+2. If you have your own makefile, edit it accordingly using the sample makefile (and makefile.in)
+   in this directory as a guide. 
+
+TESTING:
+========
+
+A. To make the examples in this directory, do a:
+
+   1. "make test.ex" to make the test.c code. This code is an adaptation of ex15.c from the PETSc examples
+      to use pARMS as the user defined preconditioner.
+  
+   2. "make dd-petsc.ex" to make the dd-petsc.c code. This is an adaptation of the dd-HB-dse.c code in the 
+      pARMS ./examples/general/ directory. It simply reads a Harwell-Boeing matrix and solves it using PETSc.
+
+   3. "make allexe" to generate both executables described above.
+
+B. The above executables can then be run by invoking the executable name. To run the test using preconditioners 
+   in PETSc, simple invoking the executable name is enough. To use the pARMS preconditioners, the directive "-user_defined_precon"
+   should be added to the calling syntax for the executable. For example:
+
+   1. "mpiexec -np 1 ./test.ex" will simply run ./test.ex using the PETSc solver and preconditioners
+
+   2. "mpiexec -np 1 ./test.ex -user_defined_pc" will run ./test.ex using a PETSc linear solver with pARMS preconditioners.
+
+
+FILE DETAILS:
+=============
+Below are some details about the files contained in this directory.
+
+1. parms.c: this is the main interface file. It contains the interface calls to create, setup, apply, and destroy the 
+            pARMS preconditioners that are called by PETSc via PETSc's PCSHELL context. For PETSc versions 3.0 or older 
+            use parms.c_petsc_3.0, else use parms.c_petsc_3.1. A fortran wrapper to this interface file is also 
+            provided as fparms.c (fparms.c_petsc_3.0 and fparms.c_petsc_3.1 accordingly) for use with the fortran test case.
+
+2. protos.h: this file contains the function prototypes and structs used in parms.c
+
+3. parms_opts: this file contains the input parameters or options for the pARMS preconditioners. It is read during
+               the setup phase of the pARMS preconditioner. Changes to the choice of pARMS preconditioner and the 
+               corresponding preconditioner parameters should be made here. It is analogous to PETSc's options file.
+
+4. readmat.c   this file reads a single Harwell-Boeing matrix from the directory /examples/matrices/. to be used for testing.
+               It uses the matrix file matfileReal and matfileCmplx for the real and complex versions of the code respectively.
+               It is called by dd-petsc.c to read a single test matrix.  
+   
+5. dd-petsc.c: this file contains an example program to read a matrix in Harwell-Boeing format and solve a corresponding 
+               linear system using solvers from PETSc.
+
+6a. test.c: this is example ex15.c from the PETSc examples, adapted to use pARMS as the user defined preconditioner. It solves
+           a simple linear system derived from a 2D 5pt stencil.
+
+6b. ftest.F: this is example ex15f.F from the PETSc (version 3.1-p3) examples, adapted to use pARMS as the user defined preconditioner. It solves
+           a simple linear system derived from a 2D 5pt stencil. The fortran version of test.c
+
+7. skit.f: this is a fortran file containing auxilliary functions used by dd-petsc.c.
+
+8. makefile: the sample makefile to make the executables.
+
+9. makefile.in: input file for the makefile containing compiler and linker flags for PETSc and pARMS.
+
+10a. matfileReal: input file to read list of matrices. This file contains a list of the real-valued matrices used for testing by dd-petsc.c.
+                  This list is terminated by ##.
+10b. matfileCmplx: input file to read list of matrices. This file contains a list of the complex-valued matrices used for testing by dd-petsc.c
+                  This list is terminated by ##.
+                  
+CLEAN:
+======
+To clean the directory after a make, simple do a "make cleanall"
+   

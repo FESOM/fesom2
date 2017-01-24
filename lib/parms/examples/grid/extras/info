@@ -1,0 +1,8 @@
+
+
+module load intelmpi
+
+mpirun -np 4 -hostfile procfile ./dd-grid.ex 
+
+                               ^^^^^
+
