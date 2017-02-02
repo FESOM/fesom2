@@ -22,17 +22,18 @@ IMPLICIT NONE
 
 integer :: n, nsteps,offset,row,i
 	call par_init 
-        !=====================
+	!=====================
 	! Read configuration data,  
 	! load the mesh and fill in 
 	! auxiliary mesh arrays
 	!=====================
 	call setup_model          ! Read Namelists, always before clock_init
-        call clock_init           ! read the clock file 
+	call clock_init           ! read the clock file 
 	call get_run_steps(nsteps)
 	call mesh_setup
 	if (mype==0) write(*,*) 'mesh_setup... complete'
-   	!=====================
+	
+	!=====================
 	! Allocate field variables 
 	! and additional arrays needed for 
 	! fancy advection etc.  
@@ -40,69 +41,78 @@ integer :: n, nsteps,offset,row,i
 	call check_mesh_consistency
 	if (mype==0) write(*,*) 'check_mesh_consistency... complete'
 	call ocean_setup
+	
 	if (mype==0) write(*,*) 'ocean_setup... complete'
 	call forcing_setup
+	
 	if (use_ice) then 
-	  call ice_setup
-          ice_steps_since_upd = ice_ave_steps-1
-          ice_update=.true.
-        endif
+		call ice_setup
+		ice_steps_since_upd = ice_ave_steps-1
+		ice_update=.true.
+	endif
+	
 	call clock_newyear                    	! check if it is a new year
-        call init_output_mean(.not. r_restart)  ! create new output files
-        call init_output_restart(.not. r_restart)
+	call init_output_mean(.not. r_restart)  ! create new output files
+	call init_output_restart(.not. r_restart)
+	
 	!=====================
 	! Time stepping
 	!=====================
 	if (mype==0) write(*,*) 'start interation before the barrier...'
-        call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
+		call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
 	if (mype==0) write(*,*) 'start interation after the barrier...'
-	do n=1, nsteps
 	
+	!___MODEL TIME STEPPING LOOP________________________________________________
+	do n=1, nsteps
+		
 		mstep = n
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*) '======================================================='
 ! 			write(*,*) 'step:',n,' day:', n*dt/24./3600.,
 			write(*,*) 'step:',n,' day:', daynew,' year:',yearnew 
 			write(*,*)
-		end	if
+		end if
 		
-	   call init_output_mean(yearnew/=yearold)
-	   call init_output_restart(yearnew/=yearold)
-           call clock
-	   call forcing_index
-           call compute_vel_nodes 
-	   if(use_ice) then
-	     call ocean2ice
-             call update_atm_forcing(n)
-             if (ice_steps_since_upd>=ice_ave_steps-1) then
-              ice_update=.true.
-              ice_steps_since_upd = 0
-             else
-              ice_update=.false.
-              ice_steps_since_upd=ice_steps_since_upd+1
-             endif
-
-	   if (ice_update) call ice_timestep(n)
-             call ice2ocean
-	   else
-	     if(.not.toy_ocean) call update_atm_forcing_OnlyOcean(n)  
-	   end if  
-
+		call init_output_mean(yearnew/=yearold)
+		call init_output_restart(yearnew/=yearold)
+		call clock
+		call forcing_index
+		call compute_vel_nodes 
+		
+		!___model sea-ice step__________________________________________________
+		if(use_ice) then
+			call ocean2ice
+			
+			call update_atm_forcing(n)
+			
+			if (ice_steps_since_upd>=ice_ave_steps-1) then
+				ice_update=.true.
+				ice_steps_since_upd = 0
+			else
+				ice_update=.false.
+				ice_steps_since_upd=ice_steps_since_upd+1
+			endif
+			
+			if (ice_update) call ice_timestep(n)
+			
+			call ice2ocean
+		else
+			if(.not.toy_ocean) call update_atm_forcing_OnlyOcean(n)  
+		end if  
+		
+		!___model ocean step____________________________________________________
 		if(.not.use_ALE) then
 			call oce_timestep(n)
 		else
-			if(mod(n,logfile_outfreq)==0 .and. mype==0) then
-				write(*,*) '____________________________________________________________'
-				write(*,*) 'call oce_timestep_ale(n)'
-				write(*,*)
-			end if	
 			call oce_timestep_ale(n)
 		end if 	
-
-	   !call output (0,n)        ! save (NetCDF)
-	   !call restart(0,n)        ! save (NetCDF)
+		
+		!___prepare output______________________________________________________
+! 		call output (0,n)        ! save (NetCDF)
+! 		call restart(0,n)        ! save (NetCDF)
 	end do
-
+	
+	!___FINISH MODEL RUN________________________________________________________
 	if (mype==0) write(*,*) 'Run is finished, updating clock'
 	!call clock_finish  
 	call par_ex

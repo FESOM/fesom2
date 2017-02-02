@@ -75,12 +75,12 @@ END DO
 ! U_rhs contains all contributions to velocity from old time steps   
 ! =======================
 t4=MPI_Wtime() 
-if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
-   write(*,*) 'Momentum:   ', t4-t1
-   write(*,*) 'pres., Cor: ', t2-t1
-   write(*,*) 'h adv       ', t3-t2
-   write(*,*) 'vert. part  ', t4-t3
-end if     
+! if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
+!    write(*,*) 'Momentum:   ', t4-t1
+!    write(*,*) 'pres., Cor: ', t2-t1
+!    write(*,*) 'h adv       ', t3-t2
+!    write(*,*) 'vert. part  ', t4-t3
+! end if     
 END SUBROUTINE compute_vel_rhs
 ! ===========================================================================
 SUBROUTINE momentum_adv_p1

@@ -121,73 +121,7 @@ subroutine thermodynamics
 
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-          rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,i)
-	
-! 	ehf=0.0_WP
-! 	fw=0.0_WP
-! 	if (abs(ehf)>1.5e6 .and. mstep>60) then
-! ! 	if (abs(ehf)>1.5e6 .and. mstep>60) then
-! 		write(*,*) ' FOUND HEATFLUX> 0.7e6'
-! 		write(*,*) ' mype            = ',mype
-! 		write(*,*) ' mstep           = ',mstep
-! 		write(*,*) ' i               = ',i
-! 		write(*,*) ' lon/lat         =',coord_nod2D(:,i)/rad
-! 		write(*,*)
-! 		write(*,*) '___INPUT_FORCING______________________________'
-! 		write(*,*) ' Ta              =',Ta
-! 		write(*,*) ' qa              =',qa
-! 		write(*,*) ' ug              =',ug
-! 		write(*,*) ' ustar           =',ustar
-! 		write(*,*) ' rain            =',rain
-! 		write(*,*) ' snow            =',snow
-! 		write(*,*) ' runo            =',runo
-! 		write(*,*) ' evap            =',evap_in
-! 		write(*,*) ' fsh             =',fsh
-! 		write(*,*) ' flo             =',flo
-! 		write(*,*)
-! 		write(*,*) '___OUTPUT_FORCING__________________________'
-! 		write(*,*) ' fw              =',fw
-! 		write(*,*) ' fresh_wa_flux   =',fresh_wa_flux(i)
-! 		write(*,*) ' ehf             =',ehf
-! 		write(*,*) ' net_heat_flux   =',net_heat_flux(i)
-! 		write(*,*) ' evap            =',-evap
-! 		write(*,*)
-! 		write(*,*) '___INPUT_OCEAN______________________________'
-! 		write(*,*) ' T_oc            =',T_oc
-! 		write(*,*) ' S_oc            =',S_oc
-! 		write(*,*) ' ch              =',ch
-! 		write(*,*) ' ce              =',ce
-! 		write(*,*) ' ch_i            =',ch_i
-! 		write(*,*) ' ce_i            =',ce_i
-! 		write(*,*) ' t_skin          =',t_skin(i)
-! 		write(*,*)
-! 		write(*,*) '___OUTPUT_OCEAN______________________________'
-! 		write(*,*) ' t_skin          =',t
-! 		write(*,*)
-! 		write(*,*) '___INPUT_ICE________________________________'
-! 		write(*,*) ' h_old           =', m_ice(i)
-! 		write(*,*) ' hsn_old         =', m_snow(i)
-! 		write(*,*) ' A_old           =', a_ice(i)
-! 		write(*,*) ' thdgr_old       =', thdgr(i)
-! 		write(*,*) ' thdgrsn_old     =', thdgrsn(i)
-! 		write(*,*) ' flice_old       =', flice(i)
-! 		write(*,*) ' olat_heat_old   =', olat_heat(i)
-! 		write(*,*) ' osen_heat_old   =', osen_heat(i)
-! 		write(*,*) ' olwout_old      =', olwout(i)
-! 		write(*,*)
-! 		write(*,*) '___OUTPUT_ICE_______________________________'
-! 		write(*,*) ' h_new           =', h
-! 		write(*,*) ' hsn_new         =', hsn
-! 		write(*,*) ' A_new           =', A
-! 		write(*,*) ' thdgr_new       =', ithdgr
-! 		write(*,*) ' thdgrsn_new     =', ithdgrsn
-! 		write(*,*) ' flice_new       =', iflice
-! 		write(*,*) ' olat_heat_new   =', hflatow
-! 		write(*,*) ' osen_heat_new   =', hfsenow
-! 		write(*,*) ' olwout_new      =', hflwrdout
-! 		write(*,*)
-! 		call par_ex(1)	
-! 	end if
+          rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
 
      m_ice(i)         = h
      m_snow(i)        = hsn
@@ -212,7 +146,7 @@ end subroutine thermodynamics
 !
 subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
      ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-     rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,n)
+     rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
   ! Ice Thermodynamic growth model     
   !
   ! Input parameters:
@@ -255,7 +189,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   
   implicit none
 
-  integer k,n
+  integer k
   real*8  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
   real*8  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
   real*8  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
@@ -393,20 +327,10 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
 
   ! Update snow and ice depth
   hsn=sn
-  h=max(qhst,0.0_WP)     
+  h=max(qhst,0.0_WP)   
   if (h.lt.1E-6) h=0.        ! Avoid very small ice thicknesses
 
   ! heat and fresh water fluxes
-  if (mype==32 .and. mstep>=50 .and. n==1529) then
-		write(*,*) ' --CHECK (B)--> heatflux in subroutine therm_ice()'
-		write(*,*) 'h_new      = ',h
-		write(*,*) 'h_old      = ',dhgrowth
-		write(*,*) 'dhgrowth   =', h-dhgrowth
-		write(*,*) 'hsn_new    = ',hsn
-		write(*,*) 'hsn_old    = ',dhsngrowth
-		write(*,*) 'dhsngrowth =', hsn-dhsngrowth
-		
-  endif
   dhgrowth=h-dhgrowth        ! Change in ice thickness due to thermodynamic effects
   dhsngrowth=hsn-dhsngrowth  ! Change in snow thickness due to thermodynamic melting
 
@@ -415,32 +339,9 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   dhgrowth=dhgrowth/ice_dt       ! Conversion: 'per time step' -> 'per second'
   dhsngrowth=dhsngrowth/ice_dt   ! Conversion: 'per time step' -> 'per second'
   ! (radiation+turbulent) + freezing(-melting) sea-ice&snow 
-  
-!   if (mype==32 .and. mstep==247 .and. n==1529) then
-  if (mype==32 .and. mstep>=50 .and. n==1529) then
-		write(*,*) ' --CHECK (A)--> heatflux in subroutine therm_ice()'
-		write(*,*) 'ahf        = ',ahf
-		write(*,*) 'cl         = ',cl
-		write(*,*) 'dhgrowth   = ',dhgrowth
-		write(*,*) 'dhsngrowth = ',dhsngrowth
-		write(*,*) 'rhosno     = ',rhosno
-		write(*,*) 'rhoice     = ',rhoice
-		write(*,*) 'ice_dt     = ',ice_dt
-		write(*,*) 'cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth)=',cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth) 
-		
-  endif
+
   ehf = ahf + cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth) 
-  
-  
-  if (mype==32 .and. mstep==247 .and. n==1529) then
-		write(*,*) ' --CHECK--> heatflux in subroutine therm_ice()'
-		write(*,*) 'ehf = ',ehf
-! 		call par_ex(1)
-  endif
-  
-  
-  
-  
+    
   ! (prec+runoff)+evap - freezing(+melting) ice&snow
 #ifdef use_fullfreesurf
   fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat 

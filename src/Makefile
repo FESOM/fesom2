@@ -35,6 +35,7 @@ MODULES = oce_modules.o \
 OBJECTS=  fvom_main.o \
           oce_ale.o \
           oce_ale_tracer.o \
+          oce_ale_mixing_pp.o \
           oce_setup_step.o \
           oce_mesh.o \
           oce_dyn.o \
@@ -44,7 +45,6 @@ OBJECTS=  fvom_main.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \
-          oce_mixing.o \
           oce_ice_init_state.o \
           oce_shortwave_pene.o \
           ice_setup_step.o \

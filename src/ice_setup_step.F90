@@ -106,16 +106,20 @@ REAL(kind=8) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
  call EVPdynamics
- t2=MPI_Wtime()     
+ t1=MPI_Wtime()     
  ! ===== Advection part
  call ice_fct_solve
  call cut_off
  ! ===== Thermodynamic part
  call thermodynamics
- t1=MPI_Wtime()
+ t2=MPI_Wtime()
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
- write(*,*) 'Ice Model step took ', t1-t0
- write(*,*) 'Ice Model dynamics  ', t2-t0
+		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
+		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t1-t0
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t2-t1
+		write(*,*) '   _______________________________'
+		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t2-t0
+		write(*,*)
 endif
 
 end subroutine ice_timestep

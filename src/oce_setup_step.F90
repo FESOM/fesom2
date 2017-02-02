@@ -288,6 +288,7 @@ integer i,elem,nz,n
 real*8,external:: dnrm2 
 real*8         :: global_max_hf ,global_min_hf
 real(kind=8), allocatable :: u_aux3(:,:), v_aux3(:,:), aux1(:)
+real(kind=8)      :: global_vol_eta ,local_vol_eta ,global_max_eta ,global_min_eta ,local_max_eta ,local_min_eta
 integer tr_num
 integer           :: el !??????????????????????????????
 CHARACTER(LEN=80) :: fmt   !??????????????????????????????
@@ -378,31 +379,49 @@ end if
 	!___________________________________________________________________________
 	! check integral of global ssh
 	if (mod(n,logfile_outfreq)==0) then
-		global_max_hf=0.0_WP
-		global_min_hf=0.0_WP
-		call MPI_AllREDUCE(maxval(heat_flux), global_max_hf, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+		global_max_eta=0.0_WP
+		global_min_eta=0.0_WP
+		local_max_eta=maxval(heat_flux)
+		local_min_eta=minval(heat_flux)
+		
+		call MPI_AllREDUCE(local_max_eta, global_max_eta, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
 							MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(heat_flux), global_min_hf, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
+		call MPI_AllREDUCE(local_min_eta, global_min_eta, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
 							MPI_COMM_WORLD, MPIerr)
+							
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-! 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") ' --CHECK--> global mean/max/min Wvel           : ',sum(aux1)/nod2d,' / ',maxval(aux1),' / ',minval(aux1)
-			write(*,"(A, ES10.3, A, ES10.3)") ' --CHECK--> global min/max hflux      : ',global_min_hf,' / ',global_max_hf		
+			write(*,"(A, I, A, ES10.3, A, ES10.3)") ' --mstep=',mstep,'--> global min/max hflux      : ',global_min_eta,' / ',global_max_eta		
 			write(*,*)
 		endif
-	endif 
 	
-	allocate(aux1(nod2D))
-	call gather_nod(eta_n,aux1)
-	if (mype==0) then
-		write(*,*) ' --CHECK--> global eta_n integral: ',sum(aux1)
-	endif
-	call gather_nod(Wvel(1,:),aux1)
-	if (mype==0) then
-		write(*,*) ' --CHECK--> global mean Wvel: ',sum(aux1)/nod2d
-		write(*,*) ' --CHECK--> global max  Wvel: ',maxval(aux1)
-		write(*,*) ' --CHECK--> global mean Wvel: ',minval(aux1)
-		write(*,*)
-	endif
+		local_vol_eta  = local_vol_eta/myDim_elem2D
+		local_max_eta  = maxval(eta_n)
+		local_min_eta  = minval(eta_n)
+		global_vol_eta=0.0_WP
+		global_max_eta=0.0_WP
+		global_min_eta=0.0_WP
+		call MPI_AllREDUCE(local_vol_eta, global_vol_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+							MPI_COMM_WORLD, MPIerr)
+		global_vol_eta = global_vol_eta/npes
+		call MPI_AllREDUCE(local_max_eta, global_max_eta, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+							MPI_COMM_WORLD, MPIerr)
+		call MPI_AllREDUCE(local_min_eta, global_min_eta, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
+							MPI_COMM_WORLD, MPIerr)
+		
+		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
+			write(*,*)
+			write(*,"(A, I, A, ES10.3, A, ES10.3, A, ES10.3)") ' --mstep=',n,'--> global max/min/int eta_n : ',global_max_eta,' / ',global_min_eta,' / ',global_vol_eta
+		endif
+	endif 
+		
+	
+! 	call gather_nod(Wvel(1,:),aux1)
+! 	if (mype==0) then
+! 		write(*,*) ' --CHECK--> global mean Wvel: ',sum(aux1)/nod2d
+! 		write(*,*) ' --CHECK--> global max  Wvel: ',maxval(aux1)
+! 		write(*,*) ' --CHECK--> global mean Wvel: ',minval(aux1)
+! 		write(*,*)
+! 	endif
 	!___________________________________________________________________________
 	! check tracerfor nan
 	do el=1,myDim_nod2d

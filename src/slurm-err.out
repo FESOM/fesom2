@@ -159,10 +159,15 @@ Module for netcdf version 4.4.0_intel loaded
 ++ export PATH
 ++ _LMFILES_=/global/AWImodules//intel.compiler/17.0.1:/global/AWImodules//intel.mpi/17.0.1_ofi:/global/AWImodules//netcdf/4.4.0_intel
 ++ export _LMFILES_
-++ echo 241252
+++ echo 280248
 ++ cut -d. -f1
-+ JOBID=241252
-+ cd /home/ollie/pscholz/trunk/bin
++ JOBID=280248
++ cd /home/ollie/pscholz/fvom_ALE/bin
 + date
 + srun --mpi=pmi2 --ntasks=72 ./fvom.x
+application called MPI_Abort(MPI_COMM_WORLD, 1) - process 24
+slurmstepd: *** STEP 280248.0 ON prod-0126 CANCELLED AT 2017-02-02T13:36:25 ***
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+srun: error: prod-0126: tasks 0-35: Killed
+srun: error: prod-0127: tasks 36-71: Killed
 + date

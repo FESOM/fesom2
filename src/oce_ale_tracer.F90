@@ -10,8 +10,6 @@ subroutine solve_tracers_ale
 	use g_comm_auto
 	use o_tracers
 	
-	use ieee_arithmetic
-	
 	implicit none
 	integer :: tr_num, nz, el
 	
@@ -19,7 +17,8 @@ subroutine solve_tracers_ale
 	! loop over all tracers 
 	do tr_num=1,num_tracers
 	
-		! do tracer AB interpolation to T^(n+0.5)
+		! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
+		! needed
 		call init_tracers_AB(tr_num)
 		
 		! advect tracers
@@ -32,7 +31,9 @@ subroutine solve_tracers_ale
 		call relax_to_clim(tr_num)
 		
 		call exchange_nod(tr_arr(:,:,tr_num))
+		
 	end do
+	
 end subroutine solve_tracers_ale
 !
 !
@@ -40,16 +41,11 @@ end subroutine solve_tracers_ale
 subroutine adv_tracers_ale(tr_num)
 	use g_parsup
 	use g_config
-	use o_mesh,only: nl,nod2D,nlevels_nod2D,area
 	use o_PARAM, only: tracer_adv
 	use o_arrays
 	
-	use ieee_arithmetic        !??????????????????????????????
-	 
-	
 	implicit none
-	integer :: tr_num, n, nz
-	integer :: el !???????????????????????????????????????
+	integer :: tr_num
 	
 	! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
 	! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
@@ -58,11 +54,12 @@ subroutine adv_tracers_ale(tr_num)
 	! del_ttf=0d0
 	!___________________________________________________________________________
 	! horizontal ale tracer advection 
+	! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
 	select case (tracer_adv)
 		case(1) !MUSCL
 			! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.85)
-			! call adv_tracer_muscl_ale(tr_arr_old(:,:,tr_num), del_ttf, 0.85 )
+! 			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.85)
+			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0) ! use only third order
 			! case(2) !MUSCL+FCT(3D)
 			!	call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.75_WP)
 		case default !unknown
@@ -72,17 +69,8 @@ subroutine adv_tracers_ale(tr_num)
 	
 	!___________________________________________________________________________
 	! vertical ale tracer advection --> piecewise parabolic method (ppm)
+	! here --> add vertical advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
 	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
-	
-	!___________________________________________________________________________
-	! add horizontal and vertixal advection part to del_ttf (R_T^n)
-	! to compute T*
-	
-	do n=1, myDim_nod2D+eDim_nod2D      !! P (h)  n=1, nod2D, n=myList_nod2D(m)
-		do nz=1,nlevels_nod2D(n)-1
-			del_ttf(nz,n)=del_ttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
-		end do
-	end do	
 	
 end subroutine adv_tracers_ale
 !
@@ -110,11 +98,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 	integer      :: nl1, nl2, n2
 	real(kind=8) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0 
 	real(kind=8) :: Tmean1, Tmean2, a
-	real(kind=8) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=8) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
 	real(kind=8) :: num_ord
-
-	! Clean the rhs
-	ttrhs=0d0  
 	
 	!___________________________________________________________________________
 	! Horizontal advection
@@ -249,9 +234,10 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			
 			!___________________________________________________________________
 			! write horizontal ale advection into rhs
-			ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-			ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
-		end do
+			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+			del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
+			
+		end do ! --> do nz=1, n2
 		
 		!_______________________________________________________________________
 		! remaining segments on the left or on the right
@@ -287,9 +273,9 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
-				ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-				ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
-			end do
+				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2)) 
+			end do ! --> do nz=1+n2,nl1
 		else
 			do nz=n2+1,nl2
 				Tmean2=ttfAB(nz, enodes(2))- &
@@ -318,11 +304,12 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
-				ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-				ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
-			end do
+				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
+				
+			end do ! --> do nz=n2+1,nl2
 		end if ! --> if(nl1>nl2) then 
-	end do
+	end do ! --> do ed=1, myDim_edge2D
 end subroutine adv_tracers_muscle_ale
 !
 !
@@ -386,7 +373,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
-! 			tv(nz)=(7.0_8*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_8
+			! tv(nz)=(7.0_8*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_8
 			
 			!___________________________________________________________________
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
@@ -419,7 +406,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 					   - dzj*(dzjm1+dzj)/(2*dzj+dzjp1)*deltajp1 &
 					   + dzjp1*(dzjp1+dzjp2)/(dzj+2*dzjp1)*deltaj &
 					)
-		end do
+		end do ! --> do nz=3,nzmax-2
 		
 		!_______________________________________________________________________
 		! Surface flux
@@ -438,10 +425,12 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
 		do nz=1,nlevels_nod2D(n)-1
-			ttrhs(nz,n)=ttrhs(nz,n)+ &
-						dt*(tvert(nz)-tvert(nz+1))/area(nz,n)   ! no division over thickness!!
-		end do                                                 ! in ale!!
-	end do
+			! no division over thickness in ALE !!!
+			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
+		end do         
+		
+	end do ! --> do n=1, myDim_nod2D
+	
 end subroutine adv_tracers_vert_ppm_ale  
 !
 !
@@ -452,59 +441,29 @@ subroutine diff_tracers_ale(tr_num)
 	use o_arrays
 	use o_tracers
 	
-	use ieee_arithmetic        !??????????????????????????????
-	
 	implicit none
 	integer, intent(in) :: tr_num
 	integer             :: n, nl1, nzmax
-	integer             :: el,nz !??????????????????????????????
 	
+	!___________________________________________________________________________
+	! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
+	! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
+	! tracer advection. For diffusion only need tracer from previouse time step
+	tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num) !DS: check that this is the right place!
 	
 	!___________________________________________________________________________
 	! do horizontal diffusiion
 	! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
 	! in danilovs srcipt
-	
-	do n=1, myDim_nod2D 
-		if ( any(ieee_is_nan(tr_arr(:, n,tr_num)))) then
-			write(*,*) ' --STOP--> found tracer become before call diff_part_hor'
-			write(*,*) 'mype          = ',mype
-			write(*,*) 'tr_num        = ',tr_num
-			write(*,*) 'el            = ',el
-			write(*,*) 'nz            = ',nz
-			write(*,*) 'tr_arr(nz, el,1)) = ',tr_arr(:, n,tr_num)
-			write(*,*)
-			call par_ex(1)
-		endif 
-	end do
-	
 	call diff_part_hor
-	
-	do n=1, myDim_nod2D 
-		if ( any(ieee_is_nan(tr_arr(:, n,tr_num)))) then
-			write(*,*) ' --STOP--> found tracer become after call diff_part_hor'
-			write(*,*) 'mype          = ',mype
-			write(*,*) 'tr_num        = ',tr_num
-			write(*,*) 'el            = ',el
-			write(*,*) 'nz            = ',nz
-			write(*,*) 'tr_arr(nz, el,1)) = ',tr_arr(:, n,tr_num)
-			write(*,*)
-			call par_ex(1)
-		endif 
-	end do
-	
-	!___________________________________________________________________________
-	! save copy of tracer 
-	! convert ttr_n-0.5 = tr_arr(:,:,tr_num) --> prepare to calc ttr_n+0.5
-! 	tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num) !DS: check that this is the right place!
-	
+		
 	!___________________________________________________________________________
 	! do vertical diffusion: explicite 
-	if (.not. i_vert_diff) call diff_ver_part_expl(tr_num)
+	if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
 		
 	!___________________________________________________________________________
 	! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
-	! tofinite volume" 
+	! to finite volume" 
 	! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
 	do n=1, myDim_nod2D 
 		nzmax=nlevels_nod2D(n)-1
@@ -515,51 +474,85 @@ subroutine diff_tracers_ale(tr_num)
 		! WHY NOT ??? --> whats advantage of above
 		!tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
 		!                          del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
-		
-		if ( any(ieee_is_nan(tr_arr(1:nzmax, n,tr_num)))) then
-			write(*,*) ' --STOP--> found tracer become after update tracer'
-			write(*,*) 'mype          = ',mype
-			write(*,*) 'tr_num        = ',tr_num
-			write(*,*) 'el            = ',el
-			write(*,*) 'nz            = ',nz
-			write(*,*) 'tr_arr(nz, el,1)) = ',tr_arr(:, n,tr_num)
-			write(*,*) 'del_ttf(nz, el)) = ',del_ttf(:, n)
-			
-			call par_ex(1)
-		endif 
-		
 	end do
-	
 	
 	!___________________________________________________________________________
 	if (i_vert_diff) then
 		! do vertical diffusion: implicite 
 		call diff_ver_part_impl_ale(tr_num)
 		
-		do el=1,myDim_nod2d
-			do nz=1,nl
-				if ( ieee_is_nan(tr_arr(nz, el,tr_num)) .or. tr_arr(nz,el,2)<0.0 .or. tr_arr(nz,el,1)<-5.0 ) then
-					write(*,*) ' --STOP--> found tracer become NaN in diff_tracers_ale'
-					write(*,*) '           after call diff_ver_part_impl_ale'
-					write(*,*) 'mype=',mype
-					write(*,*) 'tr_num        = ',tr_num
-					write(*,*) 'el            = ',el
-					write(*,*) 'nz            = ',nz
-					write(*,*) 'del_ttf(nz, el)) = ',del_ttf(nz, el)
-					write(*,*) 'tr_arr(nz, el,1)) = ',tr_arr(nz, el,1)
-					write(*,*) 'tr_arr(nz, el,2)) = ',tr_arr(nz, el,2)
-					call par_ex(1)
-				endif 
-			end do
-		end do
-		
 	end if
-	
 	
 	!We DO not set del_ttf to zero because it will not be used in this timestep anymore
 	!init_tracers will set it to zero for the next timestep
 	
 end subroutine diff_tracers_ale
+!
+!
+!===============================================================================
+!Vertical diffusive flux(explicit scheme):                                                                            
+subroutine diff_ver_part_expl_ale(tr_num)
+	use o_ARRAYS
+	use o_MESH
+	use g_PARSUP
+	use g_config,only: dt
+	
+	implicit none 
+	
+	real(kind=WP) :: vd_flux(nl-1)
+	real(kind=WP) :: rdata,flux,rlx
+	integer       :: nz,nl1,tr_num,n
+	real(kind=WP) :: zinv1,Ty
+	
+	do n=1, myDim_nod2D
+		nl1=nlevels_nod2D(n)-1
+		vd_flux=0d0
+		if (tr_num==1) then
+			flux  = -heat_flux(n)/vcpw
+			rdata =  Tsurf(n)
+			rlx   =  surf_relax_T
+		elseif (tr_num==2) then
+			flux  =  water_flux(n)*tr_arr(1,n,2)
+			rdata =  Ssurf(n)
+			rlx   =  surf_relax_S
+		else
+			flux  = 0d0
+			rdata = 0d0
+			rlx=0d0
+		endif
+		
+		!_______________________________________________________________________
+		!Surface forcing
+		vd_flux(1)= flux + rlx*(rdata-tr_arr(1,n,tr_num))
+		
+		!_______________________________________________________________________
+		zbar_n=0.0_WP
+		Z_n=0.0_WP
+		zbar_n(1)=zbar(1)
+		Z_n(1)=zbar_n(1) - hnode_new(1,n)/2.0_WP
+		do nz=2,nl1
+			!___________________________________________________________________
+			zbar_n(nz)=zbar_n(nz-1) - hnode_new(nz-1,n)
+			Z_n(nz)=zbar_n(nz) - hnode_new(nz,n)/2.0_WP
+			zinv1=1.0_WP/(Z_n(nz-1)-Z_n(nz))
+			
+			!___________________________________________________________________
+			Ty= Kd(4,nz-1,n)*(Z_n(nz-1)-zbar_n(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
+				Kd(4,nz,n)*(zbar_n(nz)-Z_n(nz))*zinv1 *neutral_slope(3,nz,n)**2
+			
+			vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
+			
+		end do
+		
+		!_______________________________________________________________________
+		do nz=1,nl1-1
+			del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_n(nz)-zbar_n(nz+1))*dt/area(nz,n)
+		end do
+		del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_n(nl1)-zbar_n(nl1+1)))*dt/area(nl1,n)
+		
+	end do ! --> do n=1, myDim_nod2D
+	
+end subroutine diff_ver_part_expl_ale
 !
 !
 !===============================================================================
@@ -570,8 +563,6 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
-	
-	use ieee_arithmetic !?????????????????????????????????????????
 	
 	implicit none
 	
@@ -616,7 +607,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	!___________________________________________________________________________
 	! loop over local nodes
 	do n=1,myDim_nod2D  
-	
+		
 		tr=0.0_WP
 		
 		! max. number of levels at node n
@@ -639,7 +630,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! 1/dz(nz)
 		zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
-		zinv=1.0_WP*dt    !no .../(zbar(1)-zbar(2)) because of  ALE
+		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 ! 		Ty1= Kd(4,nz,n)  *(Z_n(nz)     -zbar_n(nz+1))*zinv2 *neutral_slope(3,nz,n  )**2 + &
@@ -659,7 +650,6 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! backup zinv2 for next depth level
 		zinv1=zinv2
 		
-			
 		!_______________________________________________________________________
 		! Regular part of coefficients: --> 2nd...nl-2 layer
 		do nz=2, nzmax-2
@@ -689,13 +679,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 ! 			v_adv=v_adv*area(nz+1,n)/area(nz,n)
 ! 			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
 ! 			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
-		end do
+		end do ! --> do nz=2, nzmax-2
 		
 		!_______________________________________________________________________
-		! Regular part of coefficients: --> 2nd...nl-1 layer
+		! Regular part of coefficients: --> nl-1 layer
 		nz=nzmax-1 
 		
-		zinv=1.0_WP*dt   !/(zbar(nzmax-1)-zbar(nzmax)) ! ale
+		zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 ! 		Ty= Kd(4,nz-1,n)*(Z_n(nz-1)-zbar_n(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
@@ -721,19 +711,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		end do
 		nz=nzmax-1
 		tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
-		! tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
+		! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
+		!  |--> a(1)=0
 		tr(1)=c(1)*(tr_arr(1,n,tr_num) - tr_arr(2,n,tr_num))
-		
-		if ( mype==54 .and. mstep==340 .and. tr_num==1 .and. n==283 ) then
-			write(*,*) ' --STOP--> C'
-			write(*,*) 'tr(:, el))         = ',tr(:)
-			write(*,*) 'tr_arr(:,n,tr_num) = ',tr_arr(:,n,tr_num)
-			write(*,*) 'a(:)               = ',a(:)
-			write(*,*) 'b(:)               = ',b(:)
-			write(*,*) 'c(:)               = ',c(:)
-			write(*,*)
-			write(*,*)
-		endif 
 		
 		!_______________________________________________________________________
 		! case of activated shortwave penetration into the ocean, ad 3d contribution
@@ -743,34 +723,29 @@ subroutine diff_ver_part_impl_ale(tr_num)
 				tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
 			end do
 		end if
-		if ( mype==54 .and. mstep==340 .and. tr_num==1 .and. n==283 ) then
-			write(*,*) ' --STOP--> B'
-			write(*,*) 'tr(:, el))   = ',tr(:)
-			write(*,*)
-			write(*,*)
-		endif 
 		
 		!_______________________________________________________________________
 		!  The first row contains also the boundary condition from heatflux, 
 		!  freshwaterflux and relaxation terms
 		zinv=1.0_WP*dt    !/(zbar(1)-zbar(2))  ! ale
-! 		zinv=1.0_WP*dt/(zbar_n(1)-zbar_n(2))  ! ale
 		if (tr_num==1) then
 			tr(1)= tr(1)  -  &
 					zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
 		elseif (tr_num==2) then
+			!___________________________________________________________________
+			! set reference surface salinity if local or global
 			rsss=ref_sss
 			if(ref_sss_local) rsss = tr_arr(1,n,2)
+			
+			!___________________________________________________________________
+			! for zlevel & zstar ... water_flux is twice used as boundary 
+			! condition. Once in the update of the ssh matrix to preserve the 
+			! continuity of the surface layer volume and another time here in 
+			! the solving of the salt tracer equation to adapt the salinity 
+			! concentration of the first layer due to freshwater inflow/outflow
 			tr(1)= tr(1)  +  &
 					zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif
-		
-		if ( mype==54 .and. mstep==340 .and. tr_num==1 .and. n==283 ) then
-			write(*,*) ' --STOP--> A'
-			write(*,*) 'tr(:, el))   = ',tr(:)
-			write(*,*) 'zinv*(heat_flux(n)/vcpw) = ',zinv*(heat_flux(n)/vcpw)
-			write(*,*)
-		endif 
 		
 		!_______________________________________________________________________
 		! The forward sweep algorithm to solve the three-diagonal matrix 
@@ -815,38 +790,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		do nz=1,nzmax-1
 			! tr_arr - before ... T*
 			tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
-			! tr_arr - after ... T^(n+0.5) = dTnew + T*
-			
-			if ( ieee_is_nan(tr_arr(nz, n,tr_num)) .or. tr_arr(nz,n,2)<0.0 .or. tr_arr(nz,n,1)<-5.0 .or. abs(heat_flux(n)>1.5e6)) then
-! 			if (mype==54 .and. (mstep==339 .or. mstep==340) .and. n==283 .and. nz==1 ) then
-				write(*,*) ' --STOP--> found tracer become NaN or temp<-5 or salt<0' 
-				write(*,*) '           in diff_ver_part_impl_ale update tracer'
-				write(*,*) 'mype          = ',mype
-				write(*,*) 'mstep          = ',mstep
-				write(*,*) 'tr_num        = ',tr_num
-				write(*,*) 'n             = ',n
-				write(*,*) 'nz            = ',nz
-				write(*,*)
-				write(*,*) 'tr(nz, el))   = ',tr(nz)
-				write(*,*) 'tr_arr(nz, n,1)) 		= ',tr_arr(nz, n,1)
-				write(*,*) 'tr_arr_old(nz, n,1)) 	= ',tr_arr_old(nz, n,1)
-				write(*,*)
-				write(*,*) 'tr(:, el))   = ',tr(:)
-				write(*,*) 'tr_arr(:, n,tr_num)) 		= ',tr_arr(:, n,tr_num)
-				write(*,*) 'tr_arr_old(:, n,tr_num)) 	= ',tr_arr_old(:, n,tr_num)
-				write(*,*)
-				write(*,*) 'zbar_n(nz) = ',zbar_n(nz)
-				write(*,*) 'Z_n(nz) = ',Z_n(nz)
-				write(*,*) 'zbar(nz) = ',zbar(nz)
-				write(*,*) 'Z(nz) = ',Z(nz)
-				write(*,*) 'hnode_new(nz,n)=',hnode_new(nz,n)
-				write(*,*) 'hnode(nz,n)=',hnode(nz,n)
-				write(*,*) 'heat_flux(n)=',heat_flux(n)
-				write(*,*)
-				write(*,*)
-				call par_ex(1)
-			endif 
-		
+			! tr_arr - after ... T^(n+0.5) = dTnew + T* = T^(n+0.5) - T* + T*
 		end do
-	end do   !!! cycle over nodes
+		
+	end do ! --> do n=1,myDim_nod2D   
+	
 end subroutine diff_ver_part_impl_ale
