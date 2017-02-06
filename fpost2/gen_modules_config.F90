@@ -10,10 +10,17 @@ module g_config
   CHARACTER*100	:: outpath  ='/home/h/hbkdsido/fvom/results/'
 namelist /config/ runid, datapath, outpath, year_start, year_end, snap_per_year
 
+  logical                                       :: use_mask=.false.
+  character(500)                                :: mask_file='/uv/user/dsidoren/mask_NA.dat'
+  real(kind=8), dimension(:),   allocatable     :: mask_n2
+namelist /mask/ use_mask, mask_file
+
+
   logical                  	:: do_UVnorm=.true.
   logical                  	:: do_MOC=.true.
   logical                  	:: do_UVcurl=.true.
-namelist /todo/ do_UVcurl, do_UVnorm, do_MOC
+  logical                  	:: do_TS3=.true.
+namelist /todo/ do_UVcurl, do_UVnorm, do_MOC, do_TS3
 
   ! *** model geometry
   logical                  	:: cartesian=.false.

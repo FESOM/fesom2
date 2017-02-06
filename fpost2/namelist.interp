@@ -1,22 +1,28 @@
 &config
 runid ='fesom'
-datapath ='/home/h/hbkdsido/fvom/results/core2_sw_chl0.1/'
-outpath  ='/home/h/hbkdsido/fvom/results/'
-year_start=2001
+datapath ='/work/ollie/dsidoren/results/fesom2.0/'
+outpath  ='/work/ollie/dsidoren/results/fesom2.0/'
+year_start=2007
 year_end=2007
 snap_per_year=12
+/
+
+&mask !this namespace will be reserved for future purposes
+use_mask=.false.
+mask_file='/work/ollie/dsidoren/users/dsein/aguv/mask_NA.dat'
 /
 
 &todo
 do_UVnorm=.false.
 do_MOC=.false.
 do_UVcurl=.false.
+do_TS3=.true.
 /
 
 &fesom_mesh
-meshpath ='/work/ollie/dsidoren/input/meshes/mesh_g15/'
-rotated_grid=.false.
-rotated_rslt=.false.
+meshpath ='/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/'
+rotated_grid=.true.
+rotated_rslt=.true.
 alphaEuler=50.
 betaEuler=15.
 gammaEuler=-90.
@@ -27,8 +33,8 @@ LonMin= -180.
 LonMax=  180.
 LatMin=  -81.
 LatMax=   90.
-RegDx=1.
-RegDy=1.
-o2r_filename='oce_2_reg_g15_0.25'
-do_mesh=.true.
+RegDx=2.
+RegDy=2.
+o2r_filename='oce_2_reg_core2_2.0'
+do_mesh=.false.
 /

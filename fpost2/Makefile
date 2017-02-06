@@ -8,6 +8,7 @@ OBJECTS = oce_read_mesh.o \
 	make_diag_uv_norm3.o \
 	make_diag_moc_w.o \
 	make_diag_uv_curl3.o \
+	make_diag_ts3.o \
 	do_work.o
 
 MODULES = oce_modules.o             \
@@ -26,7 +27,7 @@ EXE = do_work.x
 CC = cc
 CCFLAGS = -g
 FC = ifort #/opt/intel/fc/9.1.033/bin/ifort
-FC_OPT = -r8 -i4 -g -fpp -bc
+FC_OPT = -r8 -i4 -g -fpp -bc -traceback
 LD = $(FC)
 
 CPP = cpp
@@ -37,7 +38,7 @@ $(EXE): $(MODULES) $(OBJECTS)
 .F90.o :
 	$(CPP) -P -C $(CPP_DEFS) -I$(NCINC) < $*.F90 > $*.f90
 	$(FC) $(FC_OPT) -c $*.f90 #-I$(INC_SLV) -I$(NCINC)
-	rm -f  $*.f90
+#	rm -f  $*.f90
 
 .f.o :
 	$(FC) -c $*.f
