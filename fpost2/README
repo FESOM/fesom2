@@ -30,4 +30,7 @@ FPost is controlled via namelist.interp file which is placed in the root folder 
 
 Have a nice day!
    
+News:
+06.01.2017 Computation of AMOC etc. is now supported via using mask option in the namelist.interp. The mask file needs to be specified.
+06.01.2017 do_TS3 option for interpolating hydrography has been added to namelist.interp
 

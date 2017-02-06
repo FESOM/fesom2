@@ -38,7 +38,7 @@ $(EXE): $(MODULES) $(OBJECTS)
 .F90.o :
 	$(CPP) -P -C $(CPP_DEFS) -I$(NCINC) < $*.F90 > $*.f90
 	$(FC) $(FC_OPT) -c $*.f90 #-I$(INC_SLV) -I$(NCINC)
-#	rm -f  $*.f90
+	rm -f  $*.f90
 
 .f.o :
 	$(FC) -c $*.f
