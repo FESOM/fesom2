@@ -417,13 +417,6 @@ subroutine stiff_mat_update
 		end do
 	end do 
 	deallocate(n_num)
-!DS do row=1, myDim_nod2D+1
-!DS    nini=SSH_stiff%colind(row)
-!DS    nend=SSH_stiff%colind(row+1)-1
-!DS    if (mype==0) write(*,*) 'ssh_stiff mype/row/sum(vals)=', mylist_nod2D(row), sum(SSH_stiff%values(nini:nend))/area(1,row)*dt
-!DS end do
-!DS call par_ex
-!DS stop
 end subroutine stiff_mat_update
 !
 !
