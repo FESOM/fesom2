@@ -417,6 +417,13 @@ subroutine stiff_mat_update
 		end do
 	end do 
 	deallocate(n_num)
+!DS do row=1, myDim_nod2D+1
+!DS    nini=SSH_stiff%colind(row)
+!DS    nend=SSH_stiff%colind(row+1)-1
+!DS    if (mype==0) write(*,*) 'ssh_stiff mype/row/sum(vals)=', mylist_nod2D(row), sum(SSH_stiff%values(nini:nend))/area(1,row)*dt
+!DS end do
+!DS call par_ex
+!DS stop
 end subroutine stiff_mat_update
 !
 !
@@ -749,110 +756,126 @@ end subroutine vert_vel_ale
 !
 !===============================================================================
 subroutine solve_ssh_ale
-	use o_PARAM
-	use o_MESH
-	use o_ARRAYS
-	use g_PARSUP
-	use g_comm_auto
-	
+use o_PARAM
+use o_MESH
+use o_ARRAYS
+use g_PARSUP
+use g_comm_auto
+use g_config, only: which_ale
 	!
 	!
 	!___USE PETSC SOLVER________________________________________________________
+        ! this is not longer used but is still kept in the code
 #ifdef PETSC
-	implicit none
-#include "petscf.h" 
-	integer                    :: myrows
-	integer                    :: Pmode
-	real(kind=8)               :: rinfo(20,20)
-	integer                    :: maxiter=2000
-	integer                    :: restarts=15
-	integer                    :: fillin=3
-	integer                    :: lutype=2
-	integer                    :: nrhs=1
-	real(kind=8)               :: droptol=1.e-8
-	real(kind=8)               :: soltol =1.e-10
-	logical, save              :: lfirst=.true.
-	real(kind=WP), allocatable :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
-	real(kind=8)               :: cssh1,cssh2,crhs
-	integer                    :: i
-	
-	Pmode = PET_BLOCKP+PET_SOLVE+PET_PMVALS + PET_BICGSTAB +PET_REPORT + PET_QUIET
-	
-	if (lfirst) then   
-		Pmode = Pmode+PET_STRUCT + PET_PCASM+PET_OVL_2 !+PET_PCBJ+PET_ILU
-		lfirst=.false.
-	end if
-	
-	call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
-				maxiter, & 
-				restarts, &
-				fillin,  &
-				droptol, &  
-				soltol,  &
-				part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
-				ssh_rhs, d_eta, &
-				rinfo, MPI_COMM_WORLD)
-	
+implicit none
+#include "petscf.h"
+integer                         :: myrows
+integer                         :: Pmode
+real(kind=8)                    :: rinfo(20,20)
+integer                         :: maxiter=2000
+integer                         :: restarts=15
+integer                         :: fillin=3
+integer                         :: lutype=2
+integer                         :: nrhs=1
+real(kind=8)                    :: droptol=1.e-7
+real(kind=8)                    :: soltol =1e-10  !1.e-10
+logical, save                   :: lfirst=.true.
+real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
+real(kind=8)                    :: cssh1,cssh2,crhs
+integer                         :: i
+Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
+if (lfirst) then   
+   Pmode = Pmode+PET_STRUCT+PET_PMVALS + PET_PCASM+PET_OVL_2 !+PET_PCBJ+PET_ILU
+   lfirst=.false.
+end if
+call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
+     maxiter,  & 
+     restarts, &
+     fillin,   &
+     droptol,  &  
+     soltol,   &
+     part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
+     ssh_rhs, d_eta, &
+     rinfo, MPI_COMM_WORLD)
 	!
 	!
 	!___USE PARMS SOLVER (recommended)__________________________________________
 #elif defined(PARMS)
-	use iso_c_binding, only: C_INT, C_DOUBLE
-	implicit none
+
+  use iso_c_binding, only: C_INT, C_DOUBLE
+  implicit none
 #include "fparms.h"
-	logical, save        :: lfirst=.true.
-	integer(kind=C_INT)  :: ident
-	integer(kind=C_INT)  :: n3, reuse
-	integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
-	real(kind=C_DOUBLE)  :: droptol, soltol
-	integer :: n
-	
+logical, save        :: lfirst=.true.
+integer(kind=C_INT)  :: ident
+integer(kind=C_INT)  :: n3, reuse, new_values
+integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
+real(kind=C_DOUBLE)  :: droptol, soltol
+integer :: n
+
 interface
-	subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
-			fillin, droptol, maxiter, restart, soltol, &
-			part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
-		use iso_c_binding, only: C_INT, C_DOUBLE
-		integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
-								fillin,  maxiter, restart, &
-								part(*), rowptr(*), colind(*), reuse, MPI_COMM
-		real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
-	end subroutine psolver_init
+   subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
+        fillin, droptol, maxiter, restart, soltol, &
+        part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
+     use iso_c_binding, only: C_INT, C_DOUBLE
+     integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
+                            fillin,  maxiter, restart, &
+                            part(*), rowptr(*), colind(*), reuse, MPI_COMM
+     real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
+   end subroutine psolver_init
 end interface
-	
 interface
-	subroutine psolve(ident, ssh_rhs, zero_r, d_eta, zero_i) bind(C)
-		use iso_c_binding, only: C_INT, C_DOUBLE
-		integer(kind=C_INT) :: ident, zero_i
-		real(kind=C_DOUBLE) :: zero_r, ssh_rhs(*), d_eta(*)
-	end subroutine psolve
+   subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
+
+     use iso_c_binding, only: C_INT, C_DOUBLE
+     integer(kind=C_INT) :: ident, newvalues
+     real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
+
+   end subroutine psolve
 end interface
-	
-	ident=1
-	maxiter=2000
-	restart=15
-	fillin=3
-	lutype=2
-	droptol=1.e-8
-	soltol=1.e-10
-	reuse=0
-	
-	if (lfirst) then
-		! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
-		!     SOLBICGS for BiCGstab solver (arbitrary matrices)
-		! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
-		call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
-				fillin, droptol, maxiter, restart, soltol, &
-				part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-				ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
-		lfirst=.false.
-	end if
-	
-	call psolve(ident, ssh_rhs, real(0., C_DOUBLE), d_eta, 0)
+
+ident=1
+maxiter=4000
+restart=15
+fillin=3
+lutype=2
+droptol=1.e-12
+soltol=1.e-15
+
+if  (trim(which_ale)=='linfs') then
+    reuse=0
+    new_values=0
+else
+    reuse=1      ! For varying coefficients, set reuse=1
+    new_values=1 ! and new_values=1, as soon as the coefficients have changed
+end if
+
+! reuse=0: matrix remains static
+! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
+
+! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
+! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
+! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
+
+! new_values>0 requires reuse=1 in psolver_init!
+
+if (lfirst) then
+   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
+   !     SOLBICGS for BiCGstab solver (arbitrary matrices)
+   ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
+   call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
+        fillin, droptol, maxiter, restart, soltol, &
+        part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
+        ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
+   lfirst=.false.
+end if
+
+   call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)
+
 #endif
 	!
 	!
 	!___________________________________________________________________________
-	call exchange_nod(d_eta)
+call exchange_nod(d_eta) !is this required after calling psolve ?
 end subroutine solve_ssh_ale
 !
 !
@@ -876,6 +899,7 @@ subroutine oce_timestep_ale(n)
 	real(kind=8)      :: global_vol_hbar,local_vol_hbar,global_max_hbar,global_min_hbar,local_max_hbar,local_min_hbar
 	real(kind=8)      :: global_vol_wflux,local_vol_wflux,global_max_wflux,global_min_wflux,local_max_wflux,local_min_wflux
 	real(kind=8)      :: global_vol_hflux,local_vol_hflux,global_max_hflux,global_min_hflux,local_max_hflux,local_min_hflux
+!DS 	real(kind=8)      :: global_d_eta, global_wflux, local_d_eta, local_wflux, local_vol, global_vol
 	real(kind=8),allocatable  :: aux1(:),aux2(:)
 	t1=MPI_Wtime()
 	
@@ -997,12 +1021,18 @@ subroutine oce_timestep_ale(n)
 		local_vol_hbar=0.0_WP
 		local_vol_wflux=0.0_WP
 		local_vol_hflux=0.0_WP
+!DS		local_vol=0.0_WP
+!DS		local_d_eta=0.0_WP
+!DS		local_wflux=0.0_WP
 		do el=1, myDim_elem2D
 			elnodes=elem2D_nodes(:, el)
 			local_vol_eta=local_vol_eta+sum(eta_n(elnodes))/3.0_WP !*elem_area(el)
 			local_vol_hbar=local_vol_hbar+sum(hbar(elnodes))/3.0_WP !*elem_area(el)
 			local_vol_wflux=local_vol_wflux+sum(water_flux(elnodes))/3.0_WP !*elem_area(el)
 			local_vol_hflux=local_vol_wflux+sum(heat_flux(elnodes))/3.0_WP !*elem_area(el)
+!DS 			local_vol=local_vol+elem_area(el)
+!DS 			local_d_eta=local_d_eta+sum(d_eta(elnodes))/3.0_WP*elem_area(el)
+!DS 			local_wflux=local_wflux+sum(water_flux(elnodes))/3.0_WP*elem_area(el)
 		end do
 		
 		local_vol_eta  = local_vol_eta/myDim_elem2D
@@ -1060,6 +1090,22 @@ subroutine oce_timestep_ale(n)
 							MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(local_min_hflux, global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
 							MPI_COMM_WORLD, MPIerr)
+
+!DS             ! integrate d_eta and ssh_rhs over the ocean surface and compute their means
+!DS 		global_vol   = 0.0_WP
+!DS 		global_d_eta = 0.0_WP
+!DS 		global_wflux = 0.0_WP
+!DS 		call MPI_AllREDUCE(local_vol, global_vol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+!DS 							MPI_COMM_WORLD, MPIerr)
+!DS 		call MPI_AllREDUCE(local_d_eta, global_d_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+!DS 							MPI_COMM_WORLD, MPIerr)
+!DS 		call MPI_AllREDUCE(local_wflux, global_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+!DS 							MPI_COMM_WORLD, MPIerr)
+!DS 		global_wflux=global_wflux/global_vol
+!DS 		global_d_eta=global_d_eta/global_vol
+!DS             if (mype==0) then
+!DS                write(*,*) 'int. d_eta and water_flux =', global_d_eta, global_wflux
+!DS             end if
 							
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*) '	___global max/min/mean --> mstep=',mstep,'_________'
