@@ -182,11 +182,10 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
 
   use i_therm_param
-  use g_forcing_param,  only: precip_data_source
+  use g_forcing_param,  only: precip_data_source, use_virt_salt
   
   use o_param
   use g_parsup
-  
   implicit none
 
   integer k
@@ -343,12 +342,12 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ehf = ahf + cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth) 
     
   ! (prec+runoff)+evap - freezing(+melting) ice&snow
-#ifdef use_fullfreesurf
-  fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat 
-  rsf= -dhgrowth*rhoice*inv_rhowat*Sice
-#else
-  fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
-#endif
+  if (.not. use_virt_salt) then
+     fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat 
+     rsf= -dhgrowth*rhoice*inv_rhowat*Sice
+  else
+     fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
+  end if
 
   ! Changes in compactnesses (equation 16 of Hibler 1979)
   rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
@@ -367,11 +366,11 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
 
   ! to maintain salt conservation for the current model version
   !(a way to avoid producing net salt from snow-type-ice) 
-#ifdef use_fullfreesurf
-  rsf=rsf-iflice*rhoice*inv_rhowat*Sice
-#else
-  fw=fw+iflice*rhoice*inv_rhowat*Sice/rsss
-#endif   
+  if (.not. use_virt_salt) then
+     rsf=rsf-iflice*rhoice*inv_rhowat*Sice
+  else
+     fw=fw+iflice*rhoice*inv_rhowat*Sice/rsss
+  end if
 
 evap=evap+subli
 end subroutine therm_ice

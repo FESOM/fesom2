@@ -33,7 +33,7 @@ real(kind=WP)  :: Cd_atm_ice=1.32e-3 ! drag coeff. between atmosphere and ice
   integer                       :: precip_ttp_ind=3
   integer                       :: runoff_ttp_ind=0
   integer                       :: sss_ttp_ind=4
-
+  logical                       :: use_virt_salt ! will be set TRUE in case of which_ALE='linfs', otherwise FALSE
 
   namelist /forcing_source/ wind_data_source, rad_data_source, &
        precip_data_source, runoff_data_source, sss_data_source, &

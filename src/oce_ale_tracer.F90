@@ -571,20 +571,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	integer             :: nz, n, nzmax,tr_num
 	real*8              :: m, zinv, dt_inv
 	real*8              :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
-	real*8              :: virt_salt
 
-	! Virtual salt coefficient is 1.0 in case of 'linfs' and 0.0 otherwise.
-	! It is introduced here in order to avoid 'if' condition in the loops below.
-	! One could use "rsss=0. and ref_sss_local=.false." instead of setting 
-	! vitrual sult to zero, but it can lead to discrepancies with ice_thermodynamics.
-
-	if ( .not. trim(which_ALE)=='linfs') then
-		virt_salt=0._WP
-	else
-		virt_salt=1._WP
-	end if
-		
-	
 	dt_inv=1.0_WP/dt
 	Ty=0.0_WP
 	Ty1=0.0_WP
@@ -751,16 +738,18 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			if(ref_sss_local) rsss = tr_arr(1,n,2)
 			
 			!___________________________________________________________________
-			! on freshwater inflow/outflow and virt_salt:
-			! in zlevel & zstar the freshwater flux is applied in the update of the 
+			! on freshwater inflow/outflow or virtual salinity:
+			! 1. In zlevel & zstar the freshwater flux is applied in the update of the 
 			! ssh matrix when solving the continuity equation of vertically 
 			! integrated flow. The salt concentration in the first layer will 
 			! be then adjusted according to the change in volume.
-			! in linfs case the volume of the upper layer is fixed and the freshwater flux 
-			! is applied as a virtual salt boundary condition via the vertical diffusion 
-			! operator.
+                        ! In this case rsss is forced to be zero by setting ref_sss=0. and ref_sss_local=.false.
+			! in routines above.
+			! 2. In cases where the volume of the upper layer is fixed (i.e. linfs)  the freshwater flux 
+                        ! 'rsss*water_flux(n)' is applied as a virtual salt boundary condition via the vertical 
+                        ! diffusion operator.
 			tr(1)= tr(1)  +  &
-					 zinv*(rsss*water_flux(n)*virt_salt + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
+					 zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif
 		
 		!_______________________________________________________________________

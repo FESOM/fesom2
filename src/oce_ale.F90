@@ -19,6 +19,8 @@ subroutine ale_init
 	USE o_MESH
 	USE g_PARSUP
 	USE o_ARRAYS
+	USE g_config, only: which_ale
+        USE g_forcing_param, only: use_virt_salt
 	Implicit NONE
 	
 	
@@ -57,7 +59,16 @@ subroutine ale_init
 	
 	! calculate thinkness of partial bottom layer cells
 	call init_bottom_elem_thickness
-	
+        ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual salinity flux need to be used
+        ! otherwise we set the reference salinity to zero
+	if ( .not. trim(which_ALE)=='linfs') then
+           use_virt_salt=.false.
+        ! this will force the virtual saltinity flux to be zero
+           ref_sss_local=.false.
+           ref_sss=0._WP
+        else
+           use_virt_salt=.true.
+        end if
 end subroutine ale_init
 !
 !
@@ -417,6 +428,16 @@ subroutine stiff_mat_update
 		end do
 	end do 
 	deallocate(n_num)
+! DS !this check failed! whiy?
+!do row=1, myDim_nod2D
+!   nini=SSH_stiff%rowptr(row)
+!   nend=SSH_stiff%rowptr(row+1)-1
+!   factor=sum(SSH_stiff%values(nini:nend))/area(1,row)*dt
+!   if (abs(factor-1._WP)>1.e-10) then
+!      write(*,*) 'ssh_stiff mype/row/sum(vals)=', mylist_nod2D(row), factor
+!   end if
+!end do
+! DS
 end subroutine stiff_mat_update
 !
 !
@@ -827,12 +848,12 @@ interface
 end interface
 
 ident=1
-maxiter=4000
+maxiter=2000
 restart=15
 fillin=3
 lutype=2
-droptol=1.e-12
-soltol=1.e-15
+droptol=1.e-8
+soltol=1.e-10
 
 if  (trim(which_ale)=='linfs') then
     reuse=0
