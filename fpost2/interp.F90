@@ -11,12 +11,12 @@
         use g_config
         implicit none
       
-        integer                                :: i,j 
+        integer                                :: i,j
+        real(kind=8)                           :: eps=1.e-40
 
+        reg_nx  = int((LonMax - LonMin+eps)/RegDx)
+        reg_ny  = int((LatMax - LatMin+eps)/RegDy)
 
-        reg_nx  = int((LonMax - LonMin)/RegDx)
-        reg_ny  = int((LatMax - LatMin)/RegDy)
-     
         allocate(reg_lon(reg_nx), reg_lat(reg_ny))   ! discrete longitude and latitude
         reg_lon(:) = 0.0
         reg_lat(:) = 0.0
@@ -24,7 +24,7 @@
         do i=1,reg_nx
           reg_lon(i)=min(LonMin+(i-1)*RegDx,LonMax)+RegDx/2.
         end do
-	
+
         do i=1,reg_ny
           reg_lat(i)=min(LatMin+(i-1)*RegDy,LatMax)+RegDy/2.
         end do	
@@ -38,15 +38,29 @@
 
         RegDx=RegDx*rad
         RegDy=RegDy*rad
-
-        !do i=1,reg_nx
-        !if((reg_lon(i) > pi).OR.(reg_lon(i) < -pi)) then
-        !   write(*,*) 'The regular mesh longitude should be inside -180 +180 interval ->',reg_lon(i) 
-	!   stop
-        !end if
-        !end do
 	write(*,*) 'def_exchange_mesh: DONE'
     end subroutine def_exchange_mesh
+! =======================================================================
+subroutine def_mask
+   use o_mesh	
+   use g_config
+   implicit none
+
+   integer                         :: i, k, n
+
+   allocate(mask_n2(nod2D))
+   mask_n2=1.
+   if (use_mask) then
+      mask_n2=0.
+      open(20,file=trim(mask_file),  status='old')
+      read(20,*) n
+      do i=1, n
+         read(20,*) k
+         mask_n2(k)=1.
+      end do
+      close(20)
+   end if
+end subroutine def_mask
 ! =======================================================================
     subroutine build_oce_2_reg    
         use g_oce_2_reg
@@ -57,14 +71,11 @@
         use g_config
         implicit none
 
-        integer                   :: n, nij, i, j, pos, el
+        integer                   :: n, nij, i, j, pos, el, is, ie
         real(kind=8)              :: x, y, xr, yr, xx, yy, p(2), dx, dy, rlon, rlat
-        real(kind=8), allocatable :: xcoord(:), ycoord(:)
         integer, allocatable      :: do_lin_int(:), my_count(:)
+        real(kind=8)              :: eps=1.e-40
 	
-! global arrays of the coordinates are required
-	allocate(xcoord(nod2d))
-	allocate(ycoord(nod2d))
 	allocate(do_lin_int(reg_nx*reg_ny))
 	allocate(my_count  (reg_nx*reg_ny))
 	
@@ -73,22 +84,7 @@
 
 	do_lin_int=0
 	my_count  =0
-	
-	
-	xcoord=0.
-	ycoord=0.
-
-	do n=1, nod2d
-	   x=coord_nod2D(1, n)
-	   y=coord_nod2D(2, n)
-           if (rotated_grid) then 
-	      call r2g(xcoord(n), ycoord(n), x, y)
-           else
-              xcoord(n)=x
-              ycoord(n)=y
-           end if
-	end do
-
+		
 ! start building the atm_2_oce operator
 !1. Dimension=[reg_nx*reg_ny x nod2d]
 
@@ -98,18 +94,24 @@
 	oce_2_reg%rowptr(:)=0
 	oce_2_reg%rowptr(1)=1
 !2. rowptr
-	do i=1, reg_nx	 
+	do i=1, reg_nx
 	write(*,*) 'rowptr, i=', i, ' of ', reg_nx	 
 	   do j=1, reg_ny
 	      nij=(i-1)*reg_ny+j
 	      pos=nij+1
-	      xr=reg_lon(i)/rad
+              xr=reg_lon(i)
+              yr=reg_lat(j)
+              if (rotated_grid) then
+                 call g2r(reg_lon(i), reg_lat(j), xr, yr)
+              endif
+	      xr=xr/rad
+              yr=yr/rad
               if (xr < -180) xr=xr+360
-              if (xr >  180) xr=xr-360	      
-              yr=reg_lat(j)/rad
+              if (xr >  180) xr=xr-360
+
  	      do n=1, nod2d
-	         x=xcoord(n)/rad
-  	         y=ycoord(n)/rad
+	         x=coord_nod2D(1,n)/rad
+  	         y=coord_nod2D(2,n)/rad
 	         if (x < -180) x=x+360
 	         if (x >  180) x=x-360		 
 		 xx=abs(xr-x)
@@ -124,8 +126,8 @@
 		 oce_2_reg%rowptr(pos)=oce_2_reg%rowptr(pos-1)+my_count(nij)
  	      else		 
 	         p(1)=xr*rad
-  	         p(2)=yr*rad      
- 	         call point_in_triangle(el,   p)
+  	         p(2)=yr*rad
+ 	         call point_in_triangle(el, p)
 	         if ((el > 0)) then
 ! we will do a linear interpolation to this point
 		    oce_2_reg%rowptr(pos)=oce_2_reg%rowptr(pos-1)+3
@@ -136,6 +138,7 @@
 	      end if	      
 	    end do
          end do
+
 	write(*,*) 'build_oce_2_reg/rowptr: DONE'
 !3. colind & values
         n=oce_2_reg%rowptr(oce_2_reg%dim+1)-1
@@ -148,19 +151,27 @@
 	write(*,*) 'values, i=', i, ' of ', reg_nx
 	   do j=1, reg_ny
    	      nij=(i-1)*reg_ny+j
+
               if (do_lin_int(nij)==0 .AND. my_count(nij)==0) CYCLE !do nothing
               pos=oce_2_reg%rowptr(nij)	      
-              xr=reg_lon(i)/rad
-	      yr=reg_lat(j)/rad	      
+
+              xr=reg_lon(i)
+              yr=reg_lat(j)
+              if (rotated_grid) then
+                 call g2r(reg_lon(i), reg_lat(j), xr, yr)
+              endif
+	      xr=xr/rad
+              yr=yr/rad
               if (xr < -180) xr=xr+360
               if (xr >  180) xr=xr-360
+
 !fill colind and values, CASE 1	      
 	      if (my_count(nij) > 0) then
 !	         write(*,*) 'oce_2_reg: filling the values, CASE 1'	      	      
 !local loop to fill the operator
                  do n=1, nod2d
-      	              x=xcoord(n)/rad
-  	              y=ycoord(n)/rad
+	              x=coord_nod2D(1,n)/rad
+      	              y=coord_nod2D(2,n)/rad
 	              if (x < -180) x=x+360
   	              if (x >  180) x=x-360		 
 		      xx=abs(xr-x)
@@ -168,30 +179,26 @@
 	  	      yy=abs(yr-y)
 		      if (xx > dx .OR. yy > dy) CYCLE
 		      oce_2_reg%colind(pos)=n
-		      oce_2_reg%values(pos)=1./real(my_count(nij))		      
+                      !inverse distance weighting will be used
+		      oce_2_reg%values(pos)=1./sqrt((xx*cos(yy*rad))**2 + yy**2+eps) !1./real(my_count(nij))		      
 		      pos=pos+1
- 	         end do		 
+ 	         end do
+                 is=oce_2_reg%rowptr(nij)
+                 ie=oce_2_reg%rowptr(nij+1)-1
+                 !normalize inverse distance to sum into one
+                 oce_2_reg%values(ie:ie)=oce_2_reg%values(ie:ie)/sum(oce_2_reg%values(ie:ie))
               else if (do_lin_int(nij)>0) then !do linear interpolation to [i, j]
 !fill colind and values, CASE 2
 !	         write(*,*) 'oce_2_reg: filling the values, CASE 2'
       		 el=do_lin_int(nij)
-
-                 if (rotated_grid) then 
-                    call g2r(xr*rad, yr*rad, rlon, rlat)                   
-  		    p(1)=rlon/rad
-		    p(2)=rlat/rad
-                 else
-                    p(1)=xr
-                    p(2)=yr
-                 end if
+                 p(1)=xr
+                 p(2)=yr
                  oce_2_reg%colind(pos:pos+2)=elem2D_nodes(:, el)
                  call locbafu_2D(oce_2_reg%values(pos:pos+2), el, p)
 	      end if
         end do
         end do
 write(*,*) 'oce_2_reg:', minval(oce_2_reg%values), maxval(oce_2_reg%values)
-	deallocate(xcoord)
-	deallocate(ycoord)
 	deallocate(do_lin_int)
 	deallocate(my_count)
     end  subroutine build_oce_2_reg
@@ -211,33 +218,39 @@ SUBROUTINE point_in_triangle(el2D,   pt)
   real(kind=8)                           :: alpha, mean_lon, mean_lat, rlon, rlat
   real(kind=8)                           :: xe(4), ye(4), xt1, xt2, yt1, yt2, x1, x2, y1, y2
   real(kind=8)                           :: s1, s2, angle
-  
+  real(kind=8)                           :: dx(3), dy(3)
   el2D=0
+
   DO elem=1, elem2D
      elnodes(1:3)=elem2D_nodes(:, elem)
-     ! ========
-     ! Very rough criteria to reduce the work
-     ! ========
-     if (rotated_grid) then 
-	do q=1,3	
-	   rlon=coord_nod2D(1, elnodes(q))
-	   rlat=coord_nod2D(2, elnodes(q))
-	   call r2g(xe(q), ye(q), rlon, rlat)
-	end do
-     else
-	xe(1:3)=coord_nod2D(1, elnodes(1:3))
-	ye(1:3)=coord_nod2D(2, elnodes(1:3))
-     endif
+
+     xe(1:3)=coord_nod2D(1, elnodes(1:3))
+     ye(1:3)=coord_nod2D(2, elnodes(1:3))
+
+     dx=pt(1)-xe(1:3)
+     dy=pt(2)-ye(1:3)
+    
+     where (dx> pi) 
+           dx=(dx-2.*pi)
+     end where
+
+     where (dx<-pi) 
+           dx=(dx+2.*pi)
+     end where
+
+     if (all(dx*dx(1) > 0.)) cycle
+     if (all(dy*dy(1) > 0.)) cycle
+
 	    !=====
             ! Cyclicity:
-	    ! Remove 2*pi jumps in x-coordinate
+	    ! Remove 2.*pi jumps in x-coordinate
 	    ! of nodes in triangle  
             ! =====
 	    xe(2)=xe(2)-xe(1)
 	    xe(3)=xe(3)-xe(1)
             DO q=2,3
-	     if(xe(q)> pi) xe(q)=xe(q)-2*pi 
-             if(xe(q)<-pi) xe(q)=xe(q)+2*pi  
+	     if(xe(q)> pi) xe(q)=xe(q)-2.*pi
+             if(xe(q)<-pi) xe(q)=xe(q)+2.*pi
 	    END DO
 	    xe(2)=xe(2)+xe(1)
 	    xe(3)=xe(3)+xe(1)
@@ -250,12 +263,12 @@ SUBROUTINE point_in_triangle(el2D,   pt)
 	    ! =====
 	    ! Cyclicity
 	    ! =====
-	    if(xt1> pi) xt1=xt1-2*pi 
-            if(xt1<-pi) xt1=xt1+2*pi  
+	    if(xt1> pi) xt1=xt1-2.*pi 
+            if(xt1<-pi) xt1=xt1+2.*pi  
             
 	    x1=pt(1)-mean_lon
-	    if(x1>pi) x1=x1-2*pi 
-            if(x1<-pi) x1=x1+2*pi  
+	    if(x1>pi) x1=x1-2.*pi 
+            if(x1<-pi) x1=x1+2.*pi  
 	    
 	    if((abs(x1)>xt1).or.(abs(pt(2)-mean_lat)>yt1)) cycle
 	    
@@ -277,10 +290,10 @@ SUBROUTINE point_in_triangle(el2D,   pt)
                ! =====
                ! Cyclicity check
                ! =====
-               if(x1>pi) x1=x1-2*pi 
-               if(x1<-pi) x1=x1+2*pi 
-               if(x2>pi) x2=x2-2*pi 
-               if(x2<-pi) x2=x2+2*pi 
+               if(x1>pi) x1=x1-2.*pi 
+               if(x1<-pi) x1=x1+2.*pi 
+               if(x2>pi) x2=x2-2.*pi 
+               if(x2<-pi) x2=x2+2.*pi 
 
                alpha=x1*y2-x2*y1
                s1=x1*x1+y1*y1
@@ -411,7 +424,9 @@ subroutine load_oce_2_reg
   implicit none
   INTEGER                                   :: i
 
+	
   open(1, file=trim(o2r_filename), form='binary', status='old')
+  
   read(1)  oce_2_reg%dim, oce_2_reg%nza
   allocate(oce_2_reg%colind(oce_2_reg%nza), oce_2_reg%values(oce_2_reg%nza))
   allocate(oce_2_reg%rowptr(oce_2_reg%dim+1))
@@ -423,51 +438,10 @@ subroutine load_oce_2_reg
      read(1) oce_2_reg%colind(i), oce_2_reg%values(i)
   end do  
   close(1)	
+write(*,*) 'oce_2_reg statistics:'
+write(*,*) 'oce_2_reg%dim        =', oce_2_reg%dim
+write(*,*) 'max(oce_2_reg%colind)=', maxval(oce_2_reg%colind)
 end subroutine load_oce_2_reg
-! =======================================================================
-subroutine test_mapping_oce_reg
-  use g_oce_2_reg
-  use o_mesh
-  use g_rotate_grid	
-  use o_elements	
-  use o_param
-  use g_config
-  implicit none
-
-  integer                   :: n, i, j, is, ie
-  integer                   :: fileID	
-  real(kind=8)              :: x, y
-  real(kind=8), allocatable :: gcoord(:, :)
-  real(kind=8), dimension(:),   allocatable   :: oce_fld
-  real(kind=8), dimension(:,:), allocatable   :: reg_fld
-
-  allocate(gcoord(2, nod2d))
-  allocate(oce_fld(nod2D))
-  allocate(reg_fld(reg_nx, reg_ny))
-  do n=1, nod2d
-     x=coord_nod2D(1, n)
-     y=coord_nod2D(2, n)
-     if (rotated_grid) then 
-        call r2g(gcoord(1, n), gcoord(2, n), x, y)
-     else
-        gcoord(1, n)=x
-        gcoord(2, n)=y
-     end if
-  end do
- oce_fld=gcoord(1,:)
- call do_oce_2_reg(oce_fld, reg_fld, 1)
- fileID=117
- open(fileID, file='fld.dat')
- do i=1, reg_nx
-    do j=1, reg_ny
-        n=(i-1)*reg_ny+j	      
-        write(fileID, '(x4e15.7)') reg_lon(i), reg_lat(j), reg_fld(i, j)
-    end do
- end do
- close(fileID)
- deallocate(reg_fld, oce_fld)
- deallocate(gcoord) 
-end subroutine test_mapping_oce_reg
 ! =======================================================================
     subroutine do_oce_2_reg(oce, reg, flag)
         use g_oce_2_reg    
@@ -477,7 +451,6 @@ end subroutine test_mapping_oce_reg
         use g_rotate_grid
 
         implicit none
-        save
 	
 	real(kind=8), intent( IN    )         :: oce(nod2D)
 	real(kind=8), intent( INOUT )         :: reg(reg_nx, reg_ny)
@@ -486,6 +459,7 @@ end subroutine test_mapping_oce_reg
 
         ! Apply operator: A*x
 	do i=1, reg_nx
+           !write(*,*) 'i=', i, ' from ', reg_nx
 	   do j=1, reg_ny
       	      n=(i-1)*reg_ny+j
 	      is=oce_2_reg%rowptr(n)

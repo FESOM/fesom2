@@ -44,7 +44,7 @@ subroutine make_diag_uv_curl3
    fileout(2)=trim(outpath)//'uv_ncurl.nc'
 
    do year=year_start, year_end
-   write(filein,   '(a6,I4,a15)') 'fvsom.',year, '.oce.restart.nc'
+   write(filein,   '(a6,I4,a7)') trim(runid)//'.', year, '.oce.nc'
    io=nf_open(trim(datapath)//trim(filein), nf_nowrite, ncid)
    if (io.ne.nf_noerr)then
       write(*,*), 'ERROR: CANNOT READ DATA FILE CORRECTLY !!!!!'

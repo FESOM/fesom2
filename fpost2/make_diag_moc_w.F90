@@ -36,7 +36,7 @@ subroutine make_diag_moc_w
    fileout=trim(outpath)//'diag_moc.nc'
 
    do year=year_start, year_end
-   write(filein,   '(a6,I4,a7)') 'fvsom.',year, '.oce.nc'
+   write(filein,   '(a6,I4,a7)') trim(runid)//'.',year, '.oce.nc'
    io=nf_open(trim(datapath)//trim(filein), nf_nowrite, ncid)
    if (io.ne.nf_noerr)then
       write(*,*), 'ERROR: CANNOT READ DATA FILE CORRECTLY !!!!!'
