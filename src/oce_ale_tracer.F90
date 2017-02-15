@@ -414,11 +414,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		
 		!_______________________________________________________________________
 		! Zero bottom flux
-		tvert(nl1)=0.0_8
+		tvert(nzmax)=0.0_8
 		
 		!_______________________________________________________________________
 		! Other levels
-		do nz=2, nl1-1
+		do nz=2, nl1
 			tvert(nz)= -tv(nz)*Wvel(nz,n)*area(nz,n)
 		end do
 		
