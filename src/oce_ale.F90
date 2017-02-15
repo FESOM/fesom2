@@ -428,16 +428,19 @@ subroutine stiff_mat_update
 		end do
 	end do 
 	deallocate(n_num)
-! DS !this check failed! whiy?
+!DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
+!if (mype==0) then
 !do row=1, myDim_nod2D
 !   nini=SSH_stiff%rowptr(row)
 !   nend=SSH_stiff%rowptr(row+1)-1
 !   factor=sum(SSH_stiff%values(nini:nend))/area(1,row)*dt
-!   if (abs(factor-1._WP)>1.e-10) then
+!   if (abs(factor-1._WP)>1.e-7) then
 !      write(*,*) 'ssh_stiff mype/row/sum(vals)=', mylist_nod2D(row), factor
 !   end if
 !end do
-! DS
+!end if
+!DS
+
 end subroutine stiff_mat_update
 !
 !
@@ -915,8 +918,9 @@ subroutine oce_timestep_ale(n)
 	real(kind=8)      :: global_vol_hflux,local_vol_hflux,global_max_hflux,global_min_hflux,local_max_hflux,local_min_hflux
 !DS 	real(kind=8)      :: global_d_eta, global_wflux, local_d_eta, local_wflux, local_vol, global_vol
 	real(kind=8),allocatable  :: aux1(:),aux2(:)
+
 	t1=MPI_Wtime()
-	
+
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
 	

@@ -108,7 +108,7 @@ integer :: n, nsteps,offset,row,i
 		end if 	
 		
 		!___prepare output______________________________________________________
-! 		call output (0,n)        ! save (NetCDF)
+ 		call output (0,n)        ! save (NetCDF)
 ! 		call restart(0,n)        ! save (NetCDF)
 	end do
 	

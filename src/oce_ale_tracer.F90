@@ -344,7 +344,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		
 		! nzmax ... number of depth levels at node n
 		nzmax=nlevels_nod2D(n)
-		
+		nl1=nzmax-1
 		! tracer at surface layer
 		tv(1)=ttf(1,n)
 		! tracer at surface+1 layer
@@ -424,7 +424,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
-		do nz=1,nlevels_nod2D(n)-1
+		do nz=1, nl1
 			! no division over thickness in ALE !!!
 			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
 		end do         

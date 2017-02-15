@@ -80,7 +80,7 @@ subroutine read_namelist
 
   if(mype==0) write(*,*) 'Namelist files are read in'
 
-  if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
+! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine read_namelist
 ! =================================================================
 subroutine define_prog_tracer

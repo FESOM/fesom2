@@ -628,7 +628,9 @@ ndpyr=365+fleapyear
   else if (output_length_unit.eq.'d') then                                                            
      nsteps=step_per_day                                                                     
   else if (output_length_unit.eq.'h') then                                                            
-     nsteps=int(real(step_per_day)/24.0)                                                                
+     nsteps=int(real(step_per_day)/24.0)
+  else if (output_length_unit.eq.'s') then
+     nsteps=output_length                                                                      
   endif
    UV_mean=UV_mean+UV ; if (do_output) UV_mean=UV_mean/dble(nsteps)                              
    Wvel_mean=Wvel_mean+Wvel; if (do_output) Wvel_mean=Wvel_mean/dble(nsteps)
