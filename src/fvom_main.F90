@@ -114,6 +114,6 @@ integer :: n, nsteps,offset,row,i
 	
 	!___FINISH MODEL RUN________________________________________________________
 	if (mype==0) write(*,*) 'Run is finished, updating clock'
-	!call clock_finish  
+	call clock_finish  
 	call par_ex
 end program main

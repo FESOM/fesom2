@@ -106,6 +106,8 @@ subroutine oce_input
   status=nf_get_vara_double(ncid, ssh_varid, istart, icount, aux2)
   if (status .ne. nf_noerr) call handle_err(status)
   eta_n=aux2(myList_nod2D)
+  hbar=eta_n
+  hbar_old=eta_n
 
   ! 3d fields, velocities
   istart3=(/1,1,nrec/)
