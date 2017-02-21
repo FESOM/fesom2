@@ -49,7 +49,7 @@ subroutine oce_input
   !        u_ice, v_ice nod_size
   
   ! open files
-  filename=trim(ResultPath)//runid//'.'//cyearold//'.oce.restart.nc'
+  filename=trim(ResultPath)//trim(runid)//'.'//cyearold//'.oce.restart.nc'
 
   status = nf_open(filename, nf_nowrite, ncid)
   if (status .ne. nf_noerr) call handle_err(status)
@@ -204,7 +204,7 @@ subroutine ice_input
   allocate(aux2(nod2D))  
 
   ! open files
-  filename=trim(ResultPath)//runid//'.'//cyearold//'.ice.restart.nc'
+  filename=trim(ResultPath)//trim(runid)//'.'//cyearold//'.ice.restart.nc'
   status = nf_open(filename, nf_nowrite, ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 
@@ -282,7 +282,7 @@ subroutine read_prepared_initial_ice
   allocate(aux2(nod2D))  
 
   ! open files
-  filename=trim(ResultPath)//runid//'.'//'initial_ice.nc'
+  filename=trim(ResultPath)//trim(runid)//'.'//'initial_ice.nc'
   status = nf_open(filename, nf_nowrite, ncid)
   if (status .ne. nf_noerr) then
      print*,'ERROR: CANNOT READ initial ice FILE CORRECTLY !'

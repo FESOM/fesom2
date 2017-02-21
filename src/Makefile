@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in_ollie
+include Makefile.in_hlrn
 
 ###### Objects for Mesh Partitioning ################################################
 # modules

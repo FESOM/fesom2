@@ -28,7 +28,7 @@ subroutine init_output_mean(do_init)
 
   ! create an ocean output file
   write(*,*) 'initialize new output files'
-  filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
+  filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.oce.nc'
 
   if (output_offset==32) then
      status = nf_create(filename, nf_clobber, ncid)
@@ -249,7 +249,7 @@ subroutine init_output_mean(do_init)
   ! ice part
   ! create an ice output file
   if (use_ice) then
-     filename=trim(ResultPath)//runid//'.'//cyearnew//'.ice.nc'
+     filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.nc'
      status = nf_create(filename, nf_clobber, ncid)
      if (status.ne.nf_noerr) call handle_err(status)
 
@@ -355,7 +355,7 @@ subroutine write_means(istep)
   ! ocean part
   if (mype==0) then ! Serial output implemented so far
      ! open files
-     filename=trim(ResultPath)//runid//'.'//cyearnew//'.oce.nc'
+     filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.oce.nc'
      status = nf_open(filename, nf_write, ncid)
      if (status .ne. nf_noerr) call handle_err(status)
 
@@ -543,7 +543,7 @@ subroutine write_means(istep)
   if (use_ice) then
      if (mype==0) then ! Serial output implemented so far
         ! open files
-        filename=trim(ResultPath)//runid//'.'//cyearnew//'.ice.nc'
+        filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.nc'
         status = nf_open(filename, nf_write, ncid)
         if (status .ne. nf_noerr) call handle_err(status)
         ! inquire variable id

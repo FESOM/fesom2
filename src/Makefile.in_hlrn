@@ -4,7 +4,7 @@ FC = ftn
 LD = $(FC)
 
 # Optimization specs for compiler
-OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise #-g -debug -traceback -check all
+OPT  = -r8 -i4 -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -fp-model precise -g -debug -traceback #-check all
 # OPT =  -r8 -i4 -xHost -g -debug -traceback -check all -fpe:0
 COPT =  -O3 -DMPI2 -Iinclude -xHost
 ######################################################

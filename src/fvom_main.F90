@@ -108,12 +108,12 @@ integer :: n, nsteps,offset,row,i
 		end if 	
 		
 		!___prepare output______________________________________________________
- 		call output (0,n)        ! save (NetCDF)
-! 		call restart(0,n)        ! save (NetCDF)
+!  		call output (0,n)        ! save (NetCDF)
+!  		call restart(0,n)        ! save (NetCDF)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________
 	if (mype==0) write(*,*) 'Run is finished, updating clock'
-	call clock_finish  
+! 	call clock_finish  
 	call par_ex
 end program main

@@ -24,57 +24,124 @@ use i_arrays
 IMPLICIT NONE
 
 real(kind=WP)         :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s
-integer               :: node, nz, elem, elnodes(3), i
+integer               :: node, nz, nzmax, elem, elnodes(3), i
 real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl)
 real(kind=WP)         :: bulk_up, bulk_dn
 real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=1._WP, av_conv=1._WP
 
+	if(use_ALE) then
+		do node=1, myDim_nod2D+eDim_nod2D
+			!_______________________________________________________________________
+			! implement changing ALE zlevel at every node in PP mxing 
+! 			zbar_n=0.0_WP
+! 			Z_n=0.0_WP
+! 			zbar_n(1)=zbar(1)
+! 			Z_n(1)=zbar_n(1) - hnode_new(1,node)/2.0_WP
+! 			!___________________________________________________________________
+! 			do nz=2,nlevels_nod2d(node)-1
+! 				zbar_n(nz)= zbar_n(nz-1) - hnode_new(nz-1,node)
+! 				Z_n(nz)=zbar_n(nz) - hnode_new(nz,node)/2.0_WP
+! 				dz_inv=1.0_WP/(Z_n(nz-1)-Z_n(nz))
+! 				shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
+! 						(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+! 				shear = shear*dz_inv*dz_inv
+! 				Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_8)+1.0e-14)  ! To avoid NaNs at start
+! 			end do
 
-	DO node=1, myDim_nod2D+eDim_nod2D
-		!_______________________________________________________________________
-		! implement changing ALE zlevel at every node in PP mxing 
-		if(use_ALE) then
+! 			nzmax=nlevels_nod2D(node)
+! 			zbar_n=0.0_WP
+! 			Z_n=0.0_WP
+! 			zbar_n(nzmax)=zbar(nzmax)
+! 			Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,node)/2.0_WP
+! 			!___________________________________________________________________
+! 			do nz=nzmax-1,1,-1
+! 				zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,node)
+! 				if (nz>=2) Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,node)/2.0_WP
+! 				
+! 				dz_inv=1.0_WP/(Z_n(nz)-Z_n(nz+1))
+! 				shear = (Unode(1,nz,node)-Unode(1,nz+1,node))**2 +&
+! 						(Unode(2,nz,node)-Unode(2,nz+1,node))**2 
+! 				shear = shear*dz_inv*dz_inv
+! 				Kv(nz+1,node) = shear/(shear+5.*max(bvfreq(nz+1,node),0.0_WP)+1.0e-14)
+! 			end do
+
+			nzmax=nlevels_nod2D(node)
 			zbar_n=0.0_WP
 			Z_n=0.0_WP
-			zbar_n(1)=zbar(1)
-			Z_n(1)=zbar_n(1) - hnode_new(1,node)/2.0_WP
+			zbar_n(nzmax)=zbar(nzmax)
+			Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,node)/2.0_WP
 			!___________________________________________________________________
-			dO nz=2,nlevels_nod2d(node)-1
-				zbar_n(nz)= zbar_n(nz-1) - hnode_new(nz-1,node)
-				Z_n(nz)=zbar_n(nz) - hnode_new(nz,node)/2.0_WP
-				dz_inv=1.0_WP/(Z_n(nz-1)-Z_n(nz))
-				shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
-						(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+			do nz=nzmax-1,2,-1
+				zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,node)
+				Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,node)/2.0_WP
+				dz_inv=1.0_WP/(Z_n(nz)-Z_n(nz+1))
+				shear = (Unode(1,nz,node)-Unode(1,nz+1,node))**2 +&
+						(Unode(2,nz,node)-Unode(2,nz+1,node))**2 
 				shear = shear*dz_inv*dz_inv
-				Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_8)+1.0e-14)  ! To avoid NaNs at start
+				Kv(nz+1,node) = shear/(shear+5.*max(bvfreq(nz+1,node),0.0_WP)+1.0e-14)
 			end do
+			nz=1
+			dz_inv=1.0_WP/(Z_n(nz)-Z_n(nz+1))
+			shear = (Unode(1,nz,node)-Unode(1,nz+1,node))**2 +&
+					(Unode(2,nz,node)-Unode(2,nz+1,node))**2 
+			shear = shear*dz_inv*dz_inv
+			Kv(nz+1,node) = shear/(shear+5.*max(bvfreq(nz+1,node),0.0_WP)+1.0e-14)
+
+		end do
 		!_______________________________________________________________________
 		! PP mixing withour ALE
-		else	
+	else
+		do node=1, myDim_nod2D+eDim_nod2D
 			!___________________________________________________________________
-			DO nz=2,nlevels_nod2d(node)-1
+			do nz=2,nlevels_nod2d(node)-1
 				dz_inv=1.0_WP/(Z(nz-1)-Z(nz))
 				shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
 						(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
 				shear = shear*dz_inv*dz_inv
 				Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_8)+1.0e-14)  ! To avoid NaNs at start
-			END DO	
-		end if	
-	END DO
+			end do
+		enddo
+	endif
 
 	if (use_ice .and. mo_on) then !stress is only partial!!
-	
-		DO node=1, myDim_nod2D+eDim_nod2D
-			call mo_length(water_flux(node),heat_flux(node), &         
-							stress_atmoce_x(node),stress_atmoce_y(node), &    
-							u_ice(node),v_ice(node),a_ice(node), &                             
-							dt, mixlength(node))
-			
-			DO nz = 2,nlevels_nod2d(node)-1
-				mo(nz,node) = 0._WP
-				if(abs(zbar_n(nz)) <= mixlength(node)) mo(nz,node)=modiff    ! Potentialy bad place 
-			end DO                                                        ! IF inside the internal cycle
-		END DO
+		!_______________________________________________________________________
+		if(use_ALE) then
+			do node=1, myDim_nod2D+eDim_nod2D
+				call mo_length(water_flux(node),heat_flux(node), &         
+								stress_atmoce_x(node),stress_atmoce_y(node), &    
+								u_ice(node),v_ice(node),a_ice(node), &                             
+								dt, mixlength(node))
+				
+				!_______________________________________________________________
+				nzmax=nlevels_nod2D(node)
+				zbar_n=0.0_WP
+				Z_n=0.0_WP
+				zbar_n(nzmax)=zbar(nzmax)
+				Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,node)/2.0_WP
+				do nz=nzmax-1,2,-1
+					zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,node)
+					mo(nz+1,node) = 0._WP
+					if(abs(zbar_n(nz+1)) <= mixlength(node)) mo(nz+1,node)=modiff   ! Potentialy bad place 
+				end do																! IF inside the internal cycle
+				nz = 1
+				zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,node)
+				mo(nz+1,node) = 0._WP
+				if(abs(zbar_n(nz+1)) <= mixlength(node)) mo(nz+1,node)=modiff   ! Potentialy bad place 
+			end do
+		!_______________________________________________________________________
+		else
+			do node=1, myDim_nod2D+eDim_nod2D
+				call mo_length(water_flux(node),heat_flux(node), &         
+								stress_atmoce_x(node),stress_atmoce_y(node), &    
+								u_ice(node),v_ice(node),a_ice(node), &                             
+								dt, mixlength(node))
+				
+				do nz = 2,nlevels_nod2d(node)-1
+					mo(nz,node) = 0._WP
+					if(abs(zbar(nz)) <= mixlength(node)) mo(nz,node)=modiff    ! Potentialy bad place 
+				end do                                                        ! IF inside the internal cycle
+			end do
+		endif
 		
 		DO elem=1, myDim_elem2D
 			elnodes=elem2D_nodes(:,elem)

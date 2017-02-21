@@ -610,7 +610,7 @@ subroutine vert_vel_ale
 	! Contributions from levels in divergence
 	Wvel=0.0_WP
 	if (Fer_GM) then
-         fer_Wvel(nz,n)=0.0_8
+         fer_Wvel(nz,n)=0.0_WP
 	end if
 	
 	do ed=1, myDim_edge2D
@@ -1031,7 +1031,7 @@ subroutine oce_timestep_ale(n)
 ! 		write(*,fmt) '	min(wflux) = ',minval(water_flux)     ,'  max(wflux) = ', maxval(water_flux)
 ! 		write(*,*)
 ! 	end if
-	
+#ifdef FALSE	
 	!___________________________________________________________________________
 	!check for different parameter
 	if (mod(n,logfile_outfreq)==0) then
@@ -1139,14 +1139,16 @@ subroutine oce_timestep_ale(n)
 		call MPI_AllREDUCE(maxval(tr_arr(:,:,1)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(minval(tr_arr(:,:,1)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,"(A, ES10.3, A, ES10.3)") '     temp  : ',global_max_hflux,' | ',global_min_hflux
+! 			write(*,"(A, ES10.3, A, ES10.3)") '     temp  : ',global_max_hflux,' | ',global_min_hflux
+			write(*,*) '     temp  : ',global_max_hflux,' | ',global_min_hflux
 		end if
 		global_max_hflux=0.0_WP
 		global_min_hflux=0.0_WP
 		call MPI_AllREDUCE(maxval(tr_arr(:,:,2)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(minval(tr_arr(:,:,2)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,"(A, ES10.3, A, ES10.3)") '     salt  : ',global_max_hflux,' | ',global_min_hflux
+! 			write(*,"(A, ES10.3, A, ES10.3)") '     salt  : ',global_max_hflux,' | ',global_min_hflux
+			write(*,*) '     salt  : ',global_max_hflux,' | ',global_min_hflux
 		end if
 		
 		!___________________________________________________________________________
@@ -1220,5 +1222,5 @@ subroutine oce_timestep_ale(n)
 			end do
 		end do
 	end if !-->if (mod(n,logfile_outfreq)==0) then
-	
+#endif	
 end subroutine oce_timestep_ale
