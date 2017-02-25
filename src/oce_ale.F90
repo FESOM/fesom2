@@ -590,6 +590,7 @@ subroutine compute_hbar_ale
 		elnodes=elem2D_nodes(:,elem)
 		dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
 	end do
+
 end subroutine compute_hbar_ale
 !
 !
@@ -898,7 +899,7 @@ end subroutine solve_ssh_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n)
-	use g_config, only: logfile_outfreq
+	use g_config, only: logfile_outfreq, dt
 	use o_MESH
 	use o_ARRAYS
 	use o_PARAM
@@ -933,7 +934,7 @@ subroutine oce_timestep_ale(n)
 	!___________________________________________________________________________
 	! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
 	! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
-	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+!DS	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
@@ -986,6 +987,18 @@ subroutine oce_timestep_ale(n)
 	! The main step of ALE procedure
 	call vert_vel_ale 
 	t7=MPI_Wtime() 
+
+
+!if (mstep==3) then
+!if (mype==0) then
+!write(*,*) 'alpha==', alpha
+!do n=1, myDim_nod2D
+!   write(*,*) hbar(n)-hbar_old(n), d_eta(n), wvel(1,n)*dt
+!end do
+!end if
+!call par_ex
+!stop
+!end if
 	
 	! solve tracer equation 
 	call solve_tracers_ale

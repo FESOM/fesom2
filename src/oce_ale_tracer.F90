@@ -70,8 +70,9 @@ subroutine adv_tracers_ale(tr_num)
 	!___________________________________________________________________________
 	! vertical ale tracer advection --> piecewise parabolic method (ppm)
 	! here --> add vertical advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
+!	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
 ! 	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
+ 	call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
 end subroutine adv_tracers_ale
 !
 !
@@ -530,6 +531,49 @@ subroutine adv_tracers_vert_cdiff(ttf)
 		end do         
 	end do ! --> do n=1, myDim_nod2D
 end subroutine adv_tracers_vert_cdiff
+!
+!
+!===============================================================================
+! Vertical ALE advection with upwind reconstruction (1st order)
+subroutine adv_tracers_vert_upw(ttf)
+	use g_config
+	use o_MESH
+	use o_ARRAYS
+	use o_PARAM
+	use g_PARSUP
+	use g_forcing_arrays
+	implicit none
+	integer      :: n, nz, nl1
+	real(kind=8) :: tvert(nl), tv
+	real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=8) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	! --------------------------------------------------------------------------
+	! Vertical advection
+	! --------------------------------------------------------------------------
+	do n=1, myDim_nod2D
+		!_______________________________________________________________________
+		nl1=nlevels_nod2D(n)-1
+		!_______________________________________________________________________
+		! Surface flux
+		tvert(1)= -Wvel(1,n)*ttf(1,n)*area(1,n)		
+		!_______________________________________________________________________
+		! Zero bottom flux
+		tvert(nl1+1)=0.0_8		
+		!_______________________________________________________________________
+		! Other levels
+		do nz=2, nl1
+			tv=ttf(nz-1,n)*min(Wvel(nz,n), 0._WP)+ttf(nz,n)*max(Wvel(nz,n), 0._WP)
+			tvert(nz)= -tv*area(nz,n)
+		end do
+		!_______________________________________________________________________
+		! writing vertical ale advection into rhs
+		do nz=1, nl1
+			! no division over thickness in ALE !!!
+			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
+			
+		end do         
+	end do ! --> do n=1, myDim_nod2D
+end subroutine adv_tracers_vert_upw
 !
 !
 !===============================================================================
