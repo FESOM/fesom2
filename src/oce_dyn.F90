@@ -200,12 +200,6 @@ END DO
 call exchange_nod(Wvel)
 if (Fer_GM) call exchange_nod(fer_Wvel)
 
-if (mype==0) then
-	write(*,*) '--CHECK--> max/min/mean Wvel(1,:):  ' , maxval(Wvel(1,:)),' / ',minval(Wvel(1,:)),' / ',sum(Wvel(1,:))/myDim_nod2D  
-	write(*,*) '--CHECK--> max/min/mean Wvel(2,:):  ' , maxval(Wvel(2,:)),' / ',minval(Wvel(2,:)),' / ',sum(Wvel(2,:))/myDim_nod2D
-	write(*,*) '--CHECK--> max/min/mean Wvel(10,:): ' , maxval(Wvel(10,:)),' / ',minval(Wvel(10,:)),' / ',sum(Wvel(10,:))/myDim_nod2D  
-endif
-
 ! Split implicit vertical velocity onto implicit and explicit components
 if (w_split) then
    Do n=1, myDim_nod2D+eDim_nod2D

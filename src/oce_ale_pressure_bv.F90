@@ -48,16 +48,15 @@ subroutine pressure_bv
 			
 			!___________________________________________________________________
 			! calc node dependent changing ALE zbar_n and Z_n
-			zbar_n= 0.0_WP
 			zbar_n=0.0_WP
 			Z_n=0.0_WP
 			zbar_n(nzmax)=zbar(nzmax)
-			Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,node)/2.0_WP
+			Z_n(nzmax-1)=zbar_n(nzmax) + hnode(nzmax-1,node)/2.0_WP
 			do nz=nzmax-1,2,-1
-				zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,node)
-				Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,node)/2.0_WP
+				zbar_n(nz) = zbar_n(nz+1) + hnode(nz,node)
+				Z_n(nz-1) = zbar_n(nz) + hnode(nz-1,node)/2.0_WP
 			end do
-			zbar_n(1) = zbar_n(2) + hnode_new(1,node)
+			zbar_n(1) = zbar_n(2) + hnode(1,node)
 		
 			!___________________________________________________________________
 			do nz=1, nl1

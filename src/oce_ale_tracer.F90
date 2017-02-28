@@ -28,7 +28,7 @@ subroutine solve_tracers_ale
 		call diff_tracers_ale(tr_num)
 		
 		! relax to salt and temp climatology
-		call relax_to_clim(tr_num)
+! 		call relax_to_clim(tr_num)
 		
 		call exchange_nod(tr_arr(:,:,tr_num))
 		
@@ -70,8 +70,9 @@ subroutine adv_tracers_ale(tr_num)
 	!___________________________________________________________________________
 	! vertical ale tracer advection --> piecewise parabolic method (ppm)
 	! here --> add vertical advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-!	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
-! 	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
+! 	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
+!	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
+	call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
  	call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
 end subroutine adv_tracers_ale
 !
@@ -95,12 +96,12 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 	use g_CONFIG
 	use g_comm_auto
 	implicit none
-	integer      :: el(2), enodes(2), n, nz, ed
-	integer      :: nl1, nl2, n2
-	real(kind=8) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP 
-	real(kind=8) :: Tmean1, Tmean2, a
-	real(kind=8) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=8) :: num_ord
+	integer       :: el(2), enodes(2), n, nz, ed
+	integer       :: nl1, nl2, n2
+	real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP 
+	real(kind=WP) :: Tmean1, Tmean2, a
+	real(kind=WP) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=WP) :: num_ord
 	
 	!___________________________________________________________________________
 	! Horizontal advection
@@ -325,11 +326,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	use g_forcing_arrays
 	implicit none
 	integer      :: n, nz, nzmax
-	real(kind=8) :: tvert(nl), tv(nl)
-	real(kind=8) :: Tmean
-	real(kind=8) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
-	real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=8) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	real(kind=WP) :: tvert(nl), tv(nl)
+	real(kind=WP) :: Tmean
+	real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
+	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+	
 	! --------------------------------------------------------------------------
 	! Vertical advection
 	! --------------------------------------------------------------------------
@@ -364,34 +365,20 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		
 		!_______________________________________________________________________
 		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
-		! depending on layer thinkness over depth at node n
-! 		zbar_n=0.0_WP
-! 		Z_n=0.0_WP
-! 		zbar_n(1)=zbar(1)
-! 		Z_n(1)=zbar_n(1) - hnode_new(1,n)/2.0_WP
-! 		do nz=2,nzmax-1
-! 			zbar_n(nz)= zbar_n(nz-1) - hnode_new(nz-1,n)
-! 			Z_n(nz)=zbar_n(nz) - hnode_new(nz,n)/2.0_WP
-! 		end do
-		
-! 		zbar_n=0.0_WP
-! 		Z_n=0.0_WP
-! 		zbar_n(nzmax)=zbar(nzmax)
-! 		Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-! 		do nz=nzmax-1,1,-1
-! 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-! 			if (nz>=2) Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
-! 		end do
-		
+		! depending on layer thinkness over depth at node n		
+		!
+		! Be carefull have to do vertical tracer advection here on old vertical grid
+		! also horizontal advection is done on old mesh (see helem contains old 
+		! mesh information)
 		zbar_n=0.0_WP
 		Z_n=0.0_WP
 		zbar_n(nzmax)=zbar(nzmax)
-		Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+		Z_n(nzmax-1)=zbar_n(nzmax) + hnode(nzmax-1,n)/2.0_WP
 		do nz=nzmax-1,2,-1
-			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-			Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
+			zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
+			Z_n(nz-1) = zbar_n(nz) + hnode(nz-1,n)/2.0_WP
 		end do
-		zbar_n(1) = zbar_n(2) + hnode_new(1,n)
+		zbar_n(1) = zbar_n(2) + hnode(1,n)
 		
 		!_______________________________________________________________________
 		! calc tracer for surface+2 until depth-2 layer
@@ -491,8 +478,8 @@ end subroutine adv_tracers_vert_ppm_ale
 !
 !
 !===============================================================================
-! Vertical ALE advection with central difference reconstruction (2nd order)
-subroutine adv_tracers_vert_cdiff(ttf)
+! Vertical ALE advection with upwind reconstruction (1st order)
+subroutine adv_tracers_vert_upw(ttf)
 	use g_config
 	use o_MESH
 	use o_ARRAYS
@@ -501,9 +488,9 @@ subroutine adv_tracers_vert_cdiff(ttf)
 	use g_forcing_arrays
 	implicit none
 	integer      :: n, nz, nl1
-	real(kind=8) :: tvert(nl), tv
-	real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=8) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	real(kind=WP) :: tvert(nl), tv
+	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=WP) :: local_max, local_min, local_mean , global_max, global_min, global_mean
 	! --------------------------------------------------------------------------
 	! Vertical advection
 	! --------------------------------------------------------------------------
@@ -515,7 +502,50 @@ subroutine adv_tracers_vert_cdiff(ttf)
 		tvert(1)= -Wvel(1,n)*ttf(1,n)*area(1,n)		
 		!_______________________________________________________________________
 		! Zero bottom flux
-		tvert(nl1+1)=0.0_8		
+		tvert(nl1+1)=0.0_WP
+		!_______________________________________________________________________
+		! Other levels
+		do nz=2, nl1
+			tv=ttf(nz-1,n)*min(Wvel(nz,n), 0._WP)+ttf(nz,n)*max(Wvel(nz,n), 0._WP)
+			tvert(nz)= -tv*area(nz,n)
+		end do
+		!_______________________________________________________________________
+		! writing vertical ale advection into rhs
+		do nz=1, nl1
+			! no division over thickness in ALE !!!
+			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
+			
+		end do         
+	end do ! --> do n=1, myDim_nod2D
+end subroutine adv_tracers_vert_upw
+!
+!
+!===============================================================================
+! Vertical ALE advection with central difference reconstruction (2nd order)
+subroutine adv_tracers_vert_cdiff(ttf)
+	use g_config
+	use o_MESH
+	use o_ARRAYS
+	use o_PARAM
+	use g_PARSUP
+	use g_forcing_arrays
+	implicit none
+	integer      :: n, nz, nl1
+	real(kind=WP) :: tvert(nl), tv
+	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=WP) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	! --------------------------------------------------------------------------
+	! Vertical advection
+	! --------------------------------------------------------------------------
+	do n=1, myDim_nod2D
+		!_______________________________________________________________________
+		nl1=nlevels_nod2D(n)-1
+		!_______________________________________________________________________
+		! Surface flux
+		tvert(1)= -Wvel(1,n)*ttf(1,n)*area(1,n)		
+		!_______________________________________________________________________
+		! Zero bottom flux
+		tvert(nl1+1)=0.0_WP		
 		!_______________________________________________________________________
 		! Other levels
 		do nz=2, nl1
@@ -582,8 +612,8 @@ subroutine diff_tracers_ale(tr_num)
 	use g_PARSUP
 	use o_arrays
 	use o_tracers
-	
 	implicit none
+	
 	integer, intent(in) :: tr_num
 	integer             :: n, nl1, nzmax
 	
@@ -597,8 +627,9 @@ subroutine diff_tracers_ale(tr_num)
 	! do horizontal diffusiion
 	! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
 	! in danilovs srcipt
-	call diff_part_hor
-		
+	! 	call diff_part_hor
+	call diff_part_hor_sergey ! seems to be ~9% faster than diff_part_hor
+	
 	!___________________________________________________________________________
 	! do vertical diffusion: explicite 
 	if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
@@ -616,9 +647,9 @@ subroutine diff_tracers_ale(tr_num)
 		! WHY NOT ??? --> whats advantage of above --> tested it --> the upper 
 		! equation has a 30% smaller nummerical drift
 		!tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
-		!                         del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+ 		!                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+		
 	end do
-	
 	!___________________________________________________________________________
 	if (i_vert_diff) then
 		! do vertical diffusion: implicite 
@@ -709,11 +740,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	
 	implicit none
 	
-	real*8              :: a(nl), b(nl), c(nl), tr(nl)
-	real*8              :: cp(nl), tp(nl)
+	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
+	real(kind=WP)       :: cp(nl), tp(nl)
 	integer             :: nz, n, nzmax,tr_num
-	real*8              :: m, zinv, dt_inv
-	real*8              :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
+	real(kind=WP)       :: m, zinv, dt_inv
+	real(kind=WP)       :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
 
 	dt_inv=1.0_WP/dt
 	Ty=0.0_WP
@@ -726,26 +757,30 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + RHS 
 	! -->   solve for dT_new
 	!	
-	!	----------- Z_1, V_1 (Volume eq. to Area)
-	! zbar_1 o T_1
-	!	----------- Z_2, V_2
-	! zbar_2 o T_2
-	!	----------- Z_3, V_3
-	! zbar_3 o T_3
-	!	----------- Z_4
+	!	----------- zbar_1, V_1 (Volume eq. to Area)
+	! Z_1 o T_1
+	!	----------- zbar_2, V_2
+	! Z_2 o T_2
+	!	----------- zbar_3, V_3
+	! Z_3 o T_3
+	!	----------- zbar_4
 	!        :
 	! --> Difference Quotient at Volume _2:  ddTnew_2/dt + d/dz*K_33 d/dz*dTnew_2 = 0 --> homogene solution 
-	! V1*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_1 - (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_2 ] + RHS
-	!    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_1 - (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_2 ]/V1 + RHS
+	! V2*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_3 ] + RHS
+	!    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_3/V_2 ] + RHS
+	!                                                  |                                 |
+	!                                                  v                                 v
+	!                                         diffusive flux towards             diffusive flux towards
+	!                                         T_2 trough boundary V2             T_2 trough boundary V3 
 	!    
 	! --> solve coefficents for homogene part   
 	!    dTnew_2 *h^(n+0.5) = -dt * [ a*dTnew_1 + b*dTnew_2 + c*dTnew_3 ] 
 	!
 	! --> a = -dt*K_33/(Z_1-Z_2)
 	! 
-	! --> c = -dt*K_33/(Z_2-Z_3)*V_2/V_1
+	! --> c = -dt*K_33/(Z_2-Z_3)*V_3/V_2
 	!
-	! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2) + dt*K_33/(Z_2-Z_3)*V_2/V_1 ] = -(a+c) + h^(n+0.5)
+	! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2) + dt*K_33/(Z_2-Z_3)*V_3/V_2 ] = -(a+c) + h^(n+0.5)
 	
 	!___________________________________________________________________________
 	! loop over local nodes
@@ -764,24 +799,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
 		! depending on layer thinkness over depth at node n
-! 		zbar_n=0.0_WP
-! 		Z_n=0.0_WP
-! 		zbar_n(1)=zbar(1)
-! 		Z_n(1)=zbar_n(1) - hnode_new(1,n)/2.0_WP
-! 		do nz=2,nzmax-1
-! 			zbar_n(nz)= zbar_n(nz-1) - hnode_new(nz-1,n)
-! 			Z_n(nz)=zbar_n(nz) - hnode_new(nz,n)/2.0_WP
-! 		end do
-		
-! 		zbar_n=0.0_WP
-! 		Z_n=0.0_WP
-! 		zbar_n(nzmax)=zbar(nzmax)
-! 		Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-! 		do nz=nzmax-1,1,-1
-! 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-! 			if (nz>=2) Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
-! 		end do
-		
+		! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
 		zbar_n=0.0_WP
 		Z_n=0.0_WP
 		zbar_n(nzmax)=zbar(nzmax)
@@ -805,8 +823,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 ! 			 Kd(4,nz+1,n)*(zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *neutral_slope(3,nz+1,n)**2
 		
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
-		c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
 		a(nz)=0.0_WP
+		c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
 		b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
 		
 		! update from the vertical advection --> comes from splitting of vert 
@@ -861,8 +879,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
-		b(nz)=-a(nz)+hnode_new(nz,n)
 		c(nz)=0.0_WP
+		b(nz)=-a(nz)+hnode_new(nz,n)
 		
 		! update from the vertical advection
 ! 		v_adv=zinv
@@ -872,6 +890,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		!_______________________________________________________________________
 		! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...tr_arr
 		! solve difference quotient for rhs --> tr
+		!  RHS at Volume_2:
+		!  
+		!  RHS*V_2 = K_33*dt*(T_1-T_2)/(Z_1-Z_2)*V_2 - K_33*dt*(T_2-T_3)/(Z_2-Z_3)*V_3
+		!          = -a*T_1 + (a+c)*T_2 - c*T_3
+		!
 		! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 		!  |--> a(1)=0
 		nz=1
@@ -898,8 +921,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		!  freshwaterflux and relaxation terms
 		zinv=1.0_WP*dt    !/(zbar(1)-zbar(2))  ! ale
 		if (tr_num==1) then
-			tr(1)= tr(1)  -  &
-					zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
+			tr(1)= tr(1)  -  zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
+			
 		elseif (tr_num==2) then
 			!___________________________________________________________________
 			! set reference surface salinity if local or global
@@ -917,8 +940,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! 2. In cases where the volume of the upper layer is fixed (i.e. linfs)  the freshwater flux 
 			! 'rsss*water_flux(n)' is applied as a virtual salt boundary condition via the vertical 
 			! diffusion operator.
-			tr(1)= tr(1)  +  &
-					 zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
+			tr(1)= tr(1)  +  zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif
 		
 		!_______________________________________________________________________
@@ -944,6 +966,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! initialize c-prime and s,t-prime
 		cp(1) = c(1)/b(1)
 		tp(1) = tr(1)/b(1)
+		
 		! solve for vectors c-prime and t, s-prime
 		do nz = 2,nzmax-1
 			m = b(nz)-cp(nz-1)*a(nz)
@@ -953,6 +976,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! start with back substitution 
 		tr(nzmax-1) = tp(nzmax-1)
+		
 		! solve for x from the vectors c-prime and d-prime
 		do nz = nzmax-2, 1, -1
 			tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
@@ -964,9 +988,84 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		do nz=1,nzmax-1
 			! tr_arr - before ... T*
 			tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
-			! tr_arr - after ... T^(n+0.5) = dTnew + T* = T^(n+0.5) - T* + T*
+			! tr_arr - after ... T^(n+0.5) = dTnew + T* = T^(n+0.5) - T* + T* 
+			
 		end do
 		
 	end do ! --> do n=1,myDim_nod2D   
 	
 end subroutine diff_ver_part_impl_ale
+!
+!
+!===============================================================================
+subroutine diff_part_hor_sergey
+	use o_ARRAYS
+	use g_PARSUP
+	use o_MESH
+	USE o_param
+	use g_config
+	IMPLICIT NONE
+	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
+	integer         :: edge
+	integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
+	real(kind=WP)   :: c, Tx, Ty, Kh
+	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1)
+	
+	do edge=1, myDim_edge2D
+		rhs1=0.0_WP
+		rhs2=0.0_WP
+		!_______________________________________________________________________
+		deltaX1=edge_cross_dxdy(1,edge)
+		deltaY1=edge_cross_dxdy(2,edge)
+		el=edge_tri(:,edge)
+		enodes=edges(:,edge)
+		nl1=nlevels(el(1))-1
+		elnodes=elem2d_nodes(:,el(1))
+		Kh=elem_area(el(1))
+		
+		!_______________________________________________________________________
+		nl2=0
+		if (el(2)>0) then 
+			Kh=0.5_WP*(Kh+elem_area(el(2)))
+			nl2=nlevels(el(2))-1
+			deltaX2=edge_cross_dxdy(3,edge)
+			deltaY2=edge_cross_dxdy(4,edge)
+		endif
+		Kh=K_hor*Kh/scale_area
+		
+		!_______________________________________________________________________
+		n2=min(nl1,nl2)
+		do nz=1,n2
+			Tx=0.5_WP*Kh*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2)))
+			Ty=0.5_WP*Kh*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
+			c=(deltaX2-deltaX1)*Ty-(deltaY2-deltaY1)*Tx
+			rhs1(nz) = rhs1(nz) + c
+			rhs2(nz) = rhs2(nz) - c
+		enddo
+		
+		!_______________________________________________________________________
+		if(nl1>nl2) then
+			do nz=n2+1,nl1
+				Tx=Kh*tr_xy(1,nz,el(1))
+				Ty=Kh*tr_xy(2,nz,el(1))
+				c=-deltaX1*Ty+deltaY1*Tx
+				rhs1(nz) = rhs1(nz) + c
+				rhs2(nz) = rhs2(nz) - c
+			end do  
+		else
+			do nz=n2+1,nl2
+				Tx=Kh*tr_xy(1,nz,el(2))
+				Ty=Kh*tr_xy(2,nz,el(2))
+				c=deltaX2*Ty-deltaY2*Tx
+				rhs1(nz) = rhs1(nz) + c
+				rhs2(nz) = rhs2(nz) - c
+			end do
+		endif
+		
+		!_______________________________________________________________________
+		n2=max(nl1,nl2)
+		del_ttf(1:n2,enodes(1))=del_ttf(1:n2,enodes(1))+rhs1(1:n2)*dt/area(1:n2,enodes(1))
+		del_ttf(1:n2,enodes(2))=del_ttf(1:n2,enodes(2))+rhs2(1:n2)*dt/area(1:n2,enodes(2))
+		
+	end do
+end subroutine diff_part_hor_sergey

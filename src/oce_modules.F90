@@ -54,6 +54,7 @@ logical                       :: AvKv =.false.   ! write Av, Kv
 logical                       :: hbl_diag =.false.   ! write boundary layer depth
 
 ! Time stepping                               
+! real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence
 real(kind=WP)                 :: epsilon=0.01_WP ! AB2 offset 
@@ -90,6 +91,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
 ! *** others ***
  integer                       :: num_tracer
+ real*8                        :: time_sum=0.0 ! for runtime estimate
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &

@@ -123,9 +123,6 @@ subroutine thermodynamics
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
 
-! 	ehf = 0.0_WP
-! 	fw = 0.0_WP
-          
      m_ice(i)         = h
      m_snow(i)        = hsn
      a_ice(i)         = A

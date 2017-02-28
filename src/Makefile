@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in_hlrn
+include Makefile.in_ollie
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -39,9 +39,9 @@ OBJECTS=  fvom_main.o \
           oce_setup_step.o \
           oce_mesh.o \
           oce_dyn.o \
-          oce_vel_rhs.o \
+          oce_ale_vel_rhs.o \
           oce_vel_rhs_vinv.o \
-	  oce_pressure_bv.o \
+	  oce_ale_pressure_bv.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \

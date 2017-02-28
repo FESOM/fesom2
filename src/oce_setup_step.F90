@@ -471,8 +471,8 @@ USE g_input
   
   call read_init_ts
   
-! 	tr_arr(:,:,1) = 16 
-! 	tr_arr(:,:,2) = 34
+!   tr_arr(:,:,1) = 16;
+!   tr_arr(:,:,2) = 34;
   
      Tclim=tr_arr(:,:,1)
      Sclim=tr_arr(:,:,2)

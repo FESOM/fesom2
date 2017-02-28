@@ -62,6 +62,7 @@ integer :: n, nsteps,offset,row,i
 		call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
 	if (mype==0) write(*,*) 'start interation after the barrier...'
 	
+	
 	!___MODEL TIME STEPPING LOOP________________________________________________
 	do n=1, nsteps
 		
@@ -108,8 +109,8 @@ integer :: n, nsteps,offset,row,i
 		end if 	
 		
 		!___prepare output______________________________________________________
-  		call output (0,n)        ! save (NetCDF)
-  		call restart(0,n)        ! save (NetCDF)
+		call output (0,n)        ! save (NetCDF)
+		call restart(0,n)        ! save (NetCDF)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________

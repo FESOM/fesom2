@@ -3,7 +3,7 @@
 ++ /usr/Modules/3.2.10/bin/modulecmd bash purge
 Module for impi,  version 2017 unloaded.
 Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... version 2017.1.132 unloaded.
-+ eval DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64 ';export' 'DYLD_LIBRARY_PATH;LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;MANPATH=/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;unset' 'CPATH;unset' 'C_INCLUDE_PATH;unset' 'FPATH;unset' 'IDB_HOME;unset' 'INCLUDE;unset' 'INTEL_LICENSE_FILE;unset' 'IPPROOT;unset' 'I_MPI_FABRICS;unset' 'I_MPI_OFI_LIBRARY;unset' 'I_MPI_OFI_PROVIDER;unset' 'I_MPI_ROOT;unset' 'LANGUAGE_TERRITORY;unset' 'LD_RUN_PATH;unset' 'LIBRARY_PATH;unset' 'LOADEDMODULES;unset' 'MKLROOT;unset' 'MPM_LAUNCHER;unset' 'NCARG_ROOT;unset' 'NETCDF;unset' 'NETCDF4_PATH;unset' 'NETCDFCPP_LD;unset' 'NETCDF_DIR;unset' 'NETCDF_INC;unset' 'NETCDF_INC_F90;unset' 'NETCDF_LD;unset' 'NETCDF_LIB;unset' 'NETCDF_VERSION;unset' 'NLSPATH;unset' 'PERL5LIB;unset' 'PE_ENV;unset' 'PKG_CONFIG_PATH;unset' 'PYTHONHOME;unset' 'PYTHONPATH;unset' 'PYTHON_LIBRARY;unset' 'RPATH;unset' 'SLURM_LDFLAGS;unset' 'SLURM_VER;unset' 'TBBROOT;unset' 'UDUNITS2_PATH;unset' 'VT_ROOT;unset' '_LMFILES_;'
++ eval DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64 ';export' 'DYLD_LIBRARY_PATH;LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;MANPATH=/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;unset' 'CDO;unset' 'CDOHOME;unset' 'CDO_VERSION;unset' 'CPATH;unset' 'C_INCLUDE_PATH;unset' 'IDB_HOME;unset' 'INCLUDE;unset' 'INTEL_LICENSE_FILE;unset' 'IPPROOT;unset' 'I_MPI_FABRICS;unset' 'I_MPI_OFI_LIBRARY;unset' 'I_MPI_OFI_PROVIDER;unset' 'I_MPI_ROOT;unset' 'LANGUAGE_TERRITORY;unset' 'LD_RUN_PATH;unset' 'LIBRARY_PATH;unset' 'LOADEDMODULES;unset' 'MKLROOT;unset' 'MPM_LAUNCHER;unset' 'NCARG_ROOT;unset' 'NETCDF;unset' 'NETCDF4_PATH;unset' 'NETCDFCPP_LD;unset' 'NETCDF_DIR;unset' 'NETCDF_INC;unset' 'NETCDF_INC_F90;unset' 'NETCDF_LD;unset' 'NETCDF_LIB;unset' 'NETCDF_VERSION;unset' 'NLSPATH;unset' 'PE_ENV;unset' 'PKG_CONFIG_PATH;unset' 'PYTHONHOME;unset' 'PYTHONPATH;unset' 'PYTHON_LIBRARY;unset' 'RPATH;unset' 'TBBROOT;unset' 'UDUNITS2_PATH;unset' 'VT_ROOT;unset' '_LMFILES_;'
 ++ DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64
 ++ export DYLD_LIBRARY_PATH
 ++ LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64
@@ -12,9 +12,11 @@ Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... ver
 ++ export MANPATH
 ++ PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin
 ++ export PATH
+++ unset CDO
+++ unset CDOHOME
+++ unset CDO_VERSION
 ++ unset CPATH
 ++ unset C_INCLUDE_PATH
-++ unset FPATH
 ++ unset IDB_HOME
 ++ unset INCLUDE
 ++ unset INTEL_LICENSE_FILE
@@ -40,15 +42,12 @@ Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... ver
 ++ unset NETCDF_LIB
 ++ unset NETCDF_VERSION
 ++ unset NLSPATH
-++ unset PERL5LIB
 ++ unset PE_ENV
 ++ unset PKG_CONFIG_PATH
 ++ unset PYTHONHOME
 ++ unset PYTHONPATH
 ++ unset PYTHON_LIBRARY
 ++ unset RPATH
-++ unset SLURM_LDFLAGS
-++ unset SLURM_VER
 ++ unset TBBROOT
 ++ unset UDUNITS2_PATH
 ++ unset VT_ROOT
@@ -95,17 +94,17 @@ Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... ver
 ++ export _LMFILES_
 + module load intel.mpi
 ++ /usr/Modules/3.2.10/bin/modulecmd bash load intel.mpi
-Module for impi,  version 2017 with ofi fabric loaded.
+Module for impi,  version 2017 with ofi fabric compiled for 1.4.0_OPA-10.3 loaded.
 module intel.mpi: This version should NOT be slower than the default, and
 module intel.mpi: provides a bug fix for a seldom hit bug in the default.
-+ eval CPATH=/global/AWIsoft/intel/2017/impi/2017.1.132/include64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/include ';export' 'CPATH;DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64' ';export' 'DYLD_LIBRARY_PATH;I_MPI_FABRICS=shm:ofi' ';export' 'I_MPI_FABRICS;I_MPI_OFI_LIBRARY=/global/AWIsoft/libfabric/1.4.0/lib/libfabric.so' ';export' 'I_MPI_OFI_LIBRARY;I_MPI_OFI_PROVIDER=psm2' ';export' 'I_MPI_OFI_PROVIDER;I_MPI_ROOT=/global/AWIsoft/intel/2017/impi/2017.1.132' ';export' 'I_MPI_ROOT;LD_LIBRARY_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64/gcc4.4:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/../compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mpirt/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/lib/intel64:/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;LD_RUN_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64' ';export' 'LD_RUN_PATH;LOADEDMODULES=intel.compiler/17.0.1:intel.mpi/17.0.1_ofi' ';export' 'LOADEDMODULES;MANPATH=/global/AWIsoft/intel/2017/impi/2017.1.132/man:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/man/common:/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/bin64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/bin/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mpirt/bin/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/debugger/gdb/intel64/py26/bin:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/debugger/gui/intel64:/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;VT_ROOT=/global/AWIsoft/intel/2017/itac_latest' ';export' 'VT_ROOT;_LMFILES_=/global/AWImodules//intel.compiler/17.0.1:/global/AWImodules//intel.mpi/17.0.1_ofi' ';export' '_LMFILES_;'
++ eval CPATH=/global/AWIsoft/intel/2017/impi/2017.1.132/include64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/include ';export' 'CPATH;DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64' ';export' 'DYLD_LIBRARY_PATH;I_MPI_FABRICS=shm:ofi' ';export' 'I_MPI_FABRICS;I_MPI_OFI_LIBRARY=/global/AWIsoft/libfabric/1.4.0_OPA-10.3/lib/libfabric.so' ';export' 'I_MPI_OFI_LIBRARY;I_MPI_OFI_PROVIDER=psm2' ';export' 'I_MPI_OFI_PROVIDER;I_MPI_ROOT=/global/AWIsoft/intel/2017/impi/2017.1.132' ';export' 'I_MPI_ROOT;LD_LIBRARY_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64/gcc4.4:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/../compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mpirt/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/lib/intel64:/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;LD_RUN_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64' ';export' 'LD_RUN_PATH;LOADEDMODULES=intel.compiler/17.0.1:intel.mpi/17.0.1_ofi' ';export' 'LOADEDMODULES;MANPATH=/global/AWIsoft/intel/2017/impi/2017.1.132/man:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/man/common:/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/bin64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/bin/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mpirt/bin/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/debugger/gdb/intel64/py26/bin:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/debugger/gui/intel64:/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;VT_ROOT=/global/AWIsoft/intel/2017/itac_latest' ';export' 'VT_ROOT;_LMFILES_=/global/AWImodules//intel.compiler/17.0.1:/global/AWImodules//intel.mpi/17.0.1_ofi' ';export' '_LMFILES_;'
 ++ CPATH=/global/AWIsoft/intel/2017/impi/2017.1.132/include64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/ipp/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/include:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/include
 ++ export CPATH
 ++ DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/impi/2017.1.132/lib64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/compiler/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/mkl/lib/intel64:/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64
 ++ export DYLD_LIBRARY_PATH
 ++ I_MPI_FABRICS=shm:ofi
 ++ export I_MPI_FABRICS
-++ I_MPI_OFI_LIBRARY=/global/AWIsoft/libfabric/1.4.0/lib/libfabric.so
+++ I_MPI_OFI_LIBRARY=/global/AWIsoft/libfabric/1.4.0_OPA-10.3/lib/libfabric.so
 ++ export I_MPI_OFI_LIBRARY
 ++ I_MPI_OFI_PROVIDER=psm2
 ++ export I_MPI_OFI_PROVIDER
@@ -159,15 +158,10 @@ Module for netcdf version 4.4.0_intel loaded
 ++ export PATH
 ++ _LMFILES_=/global/AWImodules//intel.compiler/17.0.1:/global/AWImodules//intel.mpi/17.0.1_ofi:/global/AWImodules//netcdf/4.4.0_intel
 ++ export _LMFILES_
-++ echo 280248
+++ echo 353686
 ++ cut -d. -f1
-+ JOBID=280248
++ JOBID=353686
 + cd /home/ollie/pscholz/fvom_ALE/bin
 + date
 + srun --mpi=pmi2 --ntasks=72 ./fvom.x
-application called MPI_Abort(MPI_COMM_WORLD, 1) - process 24
-slurmstepd: *** STEP 280248.0 ON prod-0126 CANCELLED AT 2017-02-02T13:36:25 ***
-srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
-srun: error: prod-0126: tasks 0-35: Killed
-srun: error: prod-0127: tasks 36-71: Killed
 + date
