@@ -20,6 +20,7 @@ IMPLICIT NONE
 END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
+! The mesh will be read only by 0 proc and broadcasted to the others.
 SUBROUTINE read_mesh
 USE o_PARAM
 USE g_CONFIG
@@ -29,250 +30,379 @@ USE g_PARSUP
 USE g_rotate_grid 
 IMPLICIT NONE
 
- Integer        :: n, m, fileID, ind, nini, nend, n1, n2, n3, n4
- integer        :: vert_nodes(100)
- real(kind=WP)  :: x, y
+ integer        :: n, nn, k, m, fileID
+ integer        :: error_status !0/1=no error/error
+ integer        :: vert_nodes(1000)
+ integer        :: nchunk, chunk_size, ipos, iofs, mesh_check
+ real(kind=WP)  :: x, y, rx, ry
+ real(kind=WP)  :: t0, t1
  character*10   :: mype_string,npes_string
- character*200   :: file_name
- character*200   :: dist_mesh_dir
- integer, allocatable :: mapping(:)
+ character*500  :: file_name
+ character*500  :: dist_mesh_dir
+ integer       :: ierror              ! return error code
+ integer, allocatable, dimension(:)        :: mapping
+ integer, allocatable, dimension(:,:)      :: ibuff
+ real(kind=8), allocatable, dimension(:,:) :: rbuff
+ integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
+
+
+  !mesh related files will be read in chunks of chunk_size
+  chunk_size=100000
+  !==============================
+  ! Allocate mapping array (chunk_size)
+  ! It will be used for several purposes 
+  !==============================
+  allocate(mapping(chunk_size))
+  allocate(ibuff(chunk_size,4), rbuff(chunk_size,3))
+
+  mapping=0 
+  !==============================
+  t0=MPI_Wtime()
+  write(mype_string,'(i5.5)') mype  
+  write(npes_string,"(I10)") npes
+  dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
  
- write(mype_string,'(i5.5)') mype  
- write(npes_string,"(I10)") npes
- dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
+  !=======================
+  ! rank partitioning vector
+  ! will be read by 0 proc
+  !=======================
+  if (mype==0) then
+     file_name=trim(dist_mesh_dir)//'rpart.out'
+     fileID=10
+     open(fileID, file=trim(file_name)) 
+     allocate(part(npes+1))
+     read(fileID,*) n
+     error_status=0
+     if (n/=npes) error_status=1 !set the error status for consistency in rpart
+     part(1)=1
+     read(fileID,*) part(2:npes+1)
+     DO n=2, npes+1
+        part(n)=part(n-1)+part(n)
+     END DO
+     close(fileID)
+  end if
+  ! check the error status
+  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  if (error_status/=0) then
+     write(*,*) n
+     write(*,*) 'error: NPES does not coincide with that of the mesh'
+     call par_ex(1)
+     STOP
+  end if
+  ! broadcasting partitioning vector to the other procs
+  if (mype/=0) then
+     allocate(part(npes+1))
+  end if
+  call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  if (mype==0) write(*,*) mype,'rpart is read'
+
+  !===========================
+  ! Lists of nodes and elements in global indexing. 
+  ! every proc reads its file
+  !===========================
  
- 
-         !=======================
-	 ! rank partitioning vectors
-	 !=======================
-         file_name=trim(dist_mesh_dir)//'rpart.out' 
-	 fileID=10+mype
-	 open(fileID, file=trim(file_name)) 
-         allocate(part(npes+1))
-	 
-	 read(fileID,*) n
-	 if (n.ne.npes) then
-	  write(*,*) 'NPES does not coincide with that of the mesh'
-	  call par_ex(1)
-	  STOP
-	 end if
-	 part(1)=1
-	 read(fileID,*) part(2:npes+1)
-	 DO n=2, npes+1
-	 part(n)=part(n-1)+part(n)
-         END DO
-	 close(fileID)
-	 if (mype==0) write(*,*) mype,'rpart is read'
-	 !===========================
-	 ! Lists of nodes and elements 
-	 ! in global indexing. Not everything
-	 ! is needed
-	 !===========================
- 
-         file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
-         fileID=10+mype  
+  file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
+  fileID=10+mype  
     
-         open(fileID, file=trim(file_name))
-         read(fileID,*) n
-	 
-	 read(fileID,*) myDim_nod2D
-	 read(fileID,*) eDim_nod2D
-	 allocate(myList_nod2D(myDim_nod2D+eDim_nod2D)) 	 
-	 read(fileID,*) myList_nod2D
-	 
-	 read(fileID,*) myDim_elem2D
-	 read(fileID,*) eDim_elem2D
-	 read(fileID,*) eXDim_elem2D
-	 allocate(myList_elem2D(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-	 read(fileID,*) myList_elem2D
-	
-	 read(fileID,*) myDim_edge2D
-	 read(fileID,*) eDim_edge2D
-         allocate(myList_edge2D(myDim_edge2D+eDim_edge2D))
-	 read(fileID,*) myList_edge2D ! m
-
-	 close(fileID)
-	 if (mype==0) write(*,*) 'myLists are read'
-         !==============================
-         ! Allocate mapping array
-         !==============================
-	 nod2D=part(npes+1)-1
-	 file_name=trim(meshpath)//'elem2d.out'
-	 open(fileID, file=file_name)
-	 read(fileID,*) elem2D
-	 close(fileID)
-	 Allocate(mapping(elem2D))  
-         mapping=0 
-	                       
-	 DO n=1, myDim_nod2D+eDim_nod2D
-	 mapping(myList_nod2D(n))=n
-	 END DO
-	 
-	 !==============================
-         ! read 2d node data
-	 !==============================
-	 
-	 ALLOCATE(coord_nod2D(2,myDim_nod2D+eDim_nod2D))
-	 
-	 file_name=trim(meshpath)//'nod2d.out' 
-	 open(fileID, file=file_name)
-	 read(fileID,*) n      ! nod2D, we know it already
-	                      
-         DO n=1,nod2D
-            read(fileID,*) m, x, y
-            if (mapping(n)>0) then
-               if (force_rotation) then
-                  call g2r(x*rad, y*rad, x, y)
-                  x=x/rad
-                  y=y/rad
-               end if
-               coord_nod2D(1,mapping(n))=x*rad
-               coord_nod2D(2,mapping(n))=y*rad
-	 end if
-	 END DO
-         close(fileID)
-	
-	 !==============================
-         ! read depth data
-	 !==============================
-	 
-	 ALLOCATE(depth(myDim_nod2D+eDim_nod2D))
-	 
-	 file_name=trim(meshpath)//'aux3d.out' 
-	 open(fileID, file=file_name)
-	 read(fileID,*) nl          ! the number of levels 
-         allocate(zbar(nl))         ! their standard depths
-         read(fileID,*) zbar
-         if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
-         allocate(Z(nl-1))
-         Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
-         Z=0.5_WP*Z 
-	 DO n=1,nod2D
-	 read(fileID,*) x
-	 if (x>0) x=-x
-         if (x>zbar(5)) x=zbar(5) !TODO KK threshholding for depth
-	 if (mapping(n)>0) then
-	  depth(mapping(n))=x
-	 end if
-	 END DO
-	 mapping(1:nod2D)=0
-	 close(fileID)
-	 
-         if(depth(2)>0) depth=-depth  ! depth is negative
-	 
-	 !==============================
-         ! read 2d elem data
-	 !==============================
-	 file_name=trim(meshpath)//'elem2d.out' 
-	 open(fileID, file=file_name)
-	 
-	 ALLOCATE(elem2D_nodes(3, myDim_elem2D))
-         DO n=1, myDim_elem2D
-	 mapping(myList_elem2D(n))=n
-	 END DO
-	 read(fileID,*) elem2d    
-	 DO n=1,elem2D
-	 read(fileID,*) n1, n2, n3
-	 if (mapping(n)>0) then
-	 elem2D_nodes(1,mapping(n))=n1
-	 elem2D_nodes(2,mapping(n))=n2
-	 elem2D_nodes(3,mapping(n))=n3
-	 end if
-	 END DO
-	 close(fileID)
-	 ! nodes in elem2d are in global numbering. convert to local:
+  open(fileID, file=trim(file_name))
+  read(fileID,*) n
  
-	 mapping(1:elem2D)=0
-	 DO n=1, myDim_nod2D+eDim_nod2D
-	 mapping(myList_nod2D(n))=n
-	 END DO
-	 DO n=1, myDim_elem2D
-	    DO m=1,3
-               n1=elem2D_nodes(m,n)	 
-	       elem2D_nodes(m,n)=mapping(n1)	 
-	    END DO
-	 END DO   
-	 mapping(1:nod2D)=0
+  read(fileID,*) myDim_nod2D
+  read(fileID,*) eDim_nod2D
+  allocate(myList_nod2D(myDim_nod2D+eDim_nod2D)) 	 
+  read(fileID,*) myList_nod2D
 	 
-	 if (mype==0) write(*,*) 'elements are read' 
-	 
-	 ! ==============================
-         ! Communication information
-         ! ==============================
-         file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
-         fileID=10+mype  
-         open(fileID, file=file_name)
-	 read(fileID,*)  n
-	 read(fileID,*) com_nod2D%rPEnum
-	 ALLOCATE(com_nod2D%rPE(com_nod2D%rPEnum))
-	 read(fileID,*) com_nod2D%rPE
-	 ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
-	 read(fileID,*) com_nod2D%rptr
-	 ALLOCATE(com_nod2D%rlist(eDim_nod2D))
-	 read(fileID,*) com_nod2D%rlist
-	 
-	 read(fileID,*) com_nod2D%sPEnum
-	 ALLOCATE(com_nod2D%sPE(com_nod2D%sPEnum))
-	 read(fileID,*) com_nod2D%sPE
-	 ALLOCATE(com_nod2D%sptr(com_nod2D%sPEnum+1))
-	 read(fileID,*) com_nod2D%sptr
-	 n=com_nod2D%sptr(com_nod2D%sPEnum+1)-1
-	 ALLOCATE(com_nod2D%slist(n))
-	 read(fileID,*) com_nod2D%slist
-	 
-	 read(fileID,*) com_elem2D%rPEnum
-	 ALLOCATE(com_elem2D%rPE(com_elem2D%rPEnum))
-	 read(fileID,*) com_elem2D%rPE
-	 ALLOCATE(com_elem2D%rptr(com_elem2D%rPEnum+1))
-	 read(fileID,*) com_elem2D%rptr
-	 ALLOCATE(com_elem2D%rlist(eDim_elem2D))
-	 read(fileID,*) com_elem2D%rlist
-	 
-	 read(fileID,*) com_elem2D%sPEnum
-	 ALLOCATE(com_elem2D%sPE(com_elem2D%sPEnum))
-	 read(fileID,*) com_elem2D%sPE
-	 ALLOCATE(com_elem2D%sptr(com_elem2D%sPEnum+1))
-	 read(fileID,*) com_elem2D%sptr
-	 n=com_elem2D%sptr(com_elem2D%sPEnum+1)-1
-	 ALLOCATE(com_elem2D%slist(n))
-	 read(fileID,*) com_elem2D%slist
-	 
-	 read(fileID,*) com_elem2D_full%rPEnum
-	 ALLOCATE(com_elem2D_full%rPE(com_elem2D_full%rPEnum))
-	 read(fileID,*) com_elem2D_full%rPE
-	 ALLOCATE(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1))
-	 read(fileID,*) com_elem2D_full%rptr
-	 ALLOCATE(com_elem2D_full%rlist(eDim_elem2D+eXDim_elem2D))
-	 read(fileID,*) com_elem2D_full%rlist
-	 
-	 read(fileID,*) com_elem2D_full%sPEnum
-	 ALLOCATE(com_elem2D_full%sPE(com_elem2D_full%sPEnum))
-	 read(fileID,*) com_elem2D_full%sPE
-	 ALLOCATE(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1))
-	 read(fileID,*) com_elem2D_full%sptr
-	 n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
-	 ALLOCATE(com_elem2D_full%slist(n))
-	 read(fileID,*) com_elem2D_full%slist
+  read(fileID,*) myDim_elem2D
+  read(fileID,*) eDim_elem2D
+  read(fileID,*) eXDim_elem2D
+  allocate(myList_elem2D(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+  read(fileID,*) myList_elem2D
+	
+  read(fileID,*) myDim_edge2D
+  read(fileID,*) eDim_edge2D
+  allocate(myList_edge2D(myDim_edge2D+eDim_edge2D))
+  read(fileID,*) myList_edge2D ! m
 
-	 read(fileID,*) com_edge2D%rPEnum
-	 ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
-	 read(fileID,*) com_edge2D%rPE
-	 ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
-	 read(fileID,*) com_edge2D%rptr
-	 ALLOCATE(com_edge2D%rlist(eDim_edge2D))
-	 read(fileID,*) com_edge2D%rlist
+  close(fileID)
+  if (mype==0) write(*,*) 'myLists are read'
+
+  !==============================
+  ! read 2d node data
+  !==============================
+  ! read the nod2D from nod2d.out and check whether it is equal to part(npes+1)-1
+  nod2D=part(npes+1)-1
+  allocate(coord_nod2D(2,myDim_nod2D+eDim_nod2D))
+  if (mype==0) then
+    file_name=trim(meshpath)//'nod2d.out'
+    open(fileID, file=file_name)
+    read(fileID,*) n      ! nod2D, we know it already
+     error_status=0
+     if (n/=nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
+    write(*,*) 'reading '// trim(file_name)   
+  end if
+  ! check the error status
+  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  if (error_status/=0) then
+     write(*,*) n
+     write(*,*) 'error: nod2D/=part(npes+1)-1'
+     call par_ex(1)
+     STOP
+  end if
+
+  ! 0 proc reads the data in chunks and distributes it between other procs
+  mesh_check=0
+  do nchunk=0, (nod2D-1)/chunk_size
+     !create the mapping for the current chunk
+     mapping(1:chunk_size)=0
+     do n=1, myDim_nod2D+eDim_nod2D
+        ipos=(myList_nod2D(n)-1)/chunk_size
+        if (ipos==nchunk) then
+           iofs=myList_nod2D(n)-nchunk*chunk_size
+           mapping(iofs)=n
+        end if
+     end do
+     !read the chunk into the buffers
+     k=min(chunk_size, nod2D-nchunk*chunk_size)
+     if (mype==0) then
+        do n=1, k
+           read(fileID,*) ibuff(n,1), rbuff(n,1:2), ibuff(n,2)
+        end do
+     end if
+     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(rbuff(1:k,2), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+     ! fill the local arrays
+     do n=1, k
+        x=rbuff(n,1)*rad
+        y=rbuff(n,2)*rad
+        if (force_rotation) then
+           rx=x
+           ry=y
+           call g2r(rx, ry, x, y)
+        end if        
+        if (mapping(n)>0) then
+           mesh_check=mesh_check+1
+           coord_nod2D(1,mapping(n))=x
+           coord_nod2D(2,mapping(n))=y
+        end if
+     end do
+  end do
+  if (mype==0) close(fileID)
+
+  if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+     write(*,*) 'ERROR while reading nod2d.out on mype=', mype
+     write(*,*) mesh_check, ' values have been read in according to partitioning'
+     write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+  end if
+
+  !==============================
+  ! read 2d elem data
+  !==============================
+  ! read the elem2D from elem2d.out
+  if (mype==0)  then 
+     file_name=trim(meshpath)//'elem2d.out'
+     open(fileID, file=file_name)
+     read(fileID,*) elem2d
+     write(*,*) 'reading '// trim(file_name)   
+  end if
+  call MPI_BCast(elem2d, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  allocate(elem2D_nodes(3, myDim_elem2D))
+
+  ! 0 proc reads the data in chunks and distributes it between other procs
+  do nchunk=0, (elem2D-1)/chunk_size
+     mapping(1:chunk_size)=0
+     do n=1, myDim_elem2D
+        ipos=(myList_elem2D(n)-1)/chunk_size
+        if (ipos==nchunk) then
+           iofs=myList_elem2D(n)-nchunk*chunk_size
+           mapping(iofs)=n
+        end if
+     end do
+
+     k=min(chunk_size, elem2D-nchunk*chunk_size)
+     if (mype==0) then
+        do n=1, k
+           read(fileID,*) ibuff(n, 1:3)
+        end do
+     end if
+
+     call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+
+     do n=1, k
+        if (mapping(n)>0) then
+           elem2D_nodes(1,mapping(n))=ibuff(n,1)
+           elem2D_nodes(2,mapping(n))=ibuff(n,2)
+           elem2D_nodes(3,mapping(n))=ibuff(n,3)
+        end if
+     end do
+  end do
+  if (mype==0) close(fileID)
+  ! nodes in elem2d are in global numbering. convert to local:
+  do nchunk=0, (nod2D-1)/chunk_size
+     mapping(1:chunk_size)=0
+     do n=1, myDim_nod2D+eDim_nod2D
+        ipos=(myList_nod2D(n)-1)/chunk_size
+        if (ipos==nchunk) then
+           iofs=myList_nod2D(n)-nchunk*chunk_size
+           mapping(iofs)=n
+        end if
+     end do
+     do n=1, myDim_elem2D
+        do m=1,3
+           nn=elem2D_nodes(m, n)
+           ipos=(nn-1)/chunk_size
+           if (ipos==nchunk) then
+              iofs=nn-nchunk*chunk_size
+              ! minus sign is required to avoid modified entry being modified in another chunk
+              ! will be changed to plus at the end
+              elem2D_nodes(m,n)=-mapping(iofs) 
+           end if
+        end do
+     end do
+  end do
+  elem2D_nodes=-elem2D_nodes
+ if (mype==0) write(*,*) 'elements are read' 
+ !==============================
+ ! read depth data
+ !==============================
+ ! 0 proc reads header of aux3d.out and broadcasts it between procs
+ allocate(depth(myDim_nod2D+eDim_nod2D))
+ if (mype==0) then !open the file for reading on 0 proc
+    file_name=trim(meshpath)//'aux3d.out' 
+    open(fileID, file=file_name)
+    read(fileID,*) nl  ! the number of levels 
+ end if
+ call MPI_BCast(nl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+ allocate(zbar(nl))              ! allocate the array for storing the standard depths
+ if (mype==0) read(fileID,*) zbar
+ call MPI_BCast(zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+ if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+ allocate(Z(nl-1))
+ Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
+ Z=0.5_WP*Z 
+
+ ! 0 proc reads the data in chunks and distributes it between other procs
+ mesh_check=0
+ do nchunk=0, (nod2D-1)/chunk_size
+    mapping(1:chunk_size)=0
+    do n=1, myDim_nod2D+eDim_nod2D
+       ipos=(myList_nod2D(n)-1)/chunk_size
+       if (ipos==nchunk) then
+          iofs=myList_nod2D(n)-nchunk*chunk_size
+          mapping(iofs)=n
+       end if
+    end do
+
+    k=min(chunk_size, nod2D-nchunk*chunk_size)
+    if (mype==0) then
+       do n=1, k
+          read(fileID,*) rbuff(n,1)
+       end do
+    end if
+    call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+
+    do n=1, k
+       x=rbuff(n,1)
+       if (x>0) x=-x !deps must be negative!
+       if (x>zbar(5)) x=zbar(5) !threshold for depth
+       if (mapping(n)>0) then
+          mesh_check=mesh_check+1
+          depth(mapping(n))=x
+        end if
+     end do
+ end do
+
+ if (mype==0) close(fileID)
+ if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+    write(*,*) 'ERROR while reading aux3d.out on mype=', mype
+    write(*,*) mesh_check, ' values have been read in according to partitioning'
+    write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+ end if
+
+ ! ==============================
+ ! Communication information
+ ! every proc reads its file
+ ! ==============================
+ file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
+ fileID=10+mype  
+ open(fileID, file=file_name)
+ read(fileID,*)  n
+ read(fileID,*) com_nod2D%rPEnum
+ ALLOCATE(com_nod2D%rPE(com_nod2D%rPEnum))
+ read(fileID,*) com_nod2D%rPE
+ ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
+ read(fileID,*) com_nod2D%rptr
+ ALLOCATE(com_nod2D%rlist(eDim_nod2D))
+ read(fileID,*) com_nod2D%rlist
 	 
-	 read(fileID,*) com_edge2D%sPEnum
-	 ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
-	 read(fileID,*) com_edge2D%sPE
-	 ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
-	 read(fileID,*) com_edge2D%sptr
-	 n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
-	 ALLOCATE(com_edge2D%slist(n))
-	 read(fileID,*) com_edge2D%slist
-	 close(fileID)
-	 if (mype==0) write(*,*) 'communication arrays are read'
-	 deallocate(mapping)
+ read(fileID,*) com_nod2D%sPEnum
+ ALLOCATE(com_nod2D%sPE(com_nod2D%sPEnum))
+ read(fileID,*) com_nod2D%sPE
+ ALLOCATE(com_nod2D%sptr(com_nod2D%sPEnum+1))
+ read(fileID,*) com_nod2D%sptr
+ n=com_nod2D%sptr(com_nod2D%sPEnum+1)-1
+ ALLOCATE(com_nod2D%slist(n))
+ read(fileID,*) com_nod2D%slist
+	 
+ read(fileID,*) com_elem2D%rPEnum
+ ALLOCATE(com_elem2D%rPE(com_elem2D%rPEnum))
+ read(fileID,*) com_elem2D%rPE
+ ALLOCATE(com_elem2D%rptr(com_elem2D%rPEnum+1))
+ read(fileID,*) com_elem2D%rptr
+ ALLOCATE(com_elem2D%rlist(eDim_elem2D))
+ read(fileID,*) com_elem2D%rlist
+	 
+ read(fileID,*) com_elem2D%sPEnum
+ ALLOCATE(com_elem2D%sPE(com_elem2D%sPEnum))
+ read(fileID,*) com_elem2D%sPE
+ ALLOCATE(com_elem2D%sptr(com_elem2D%sPEnum+1))
+ read(fileID,*) com_elem2D%sptr
+ n=com_elem2D%sptr(com_elem2D%sPEnum+1)-1
+ ALLOCATE(com_elem2D%slist(n))
+ read(fileID,*) com_elem2D%slist
+	 
+ read(fileID,*) com_elem2D_full%rPEnum
+ ALLOCATE(com_elem2D_full%rPE(com_elem2D_full%rPEnum))
+ read(fileID,*) com_elem2D_full%rPE
+ ALLOCATE(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1))
+ read(fileID,*) com_elem2D_full%rptr
+ ALLOCATE(com_elem2D_full%rlist(eDim_elem2D+eXDim_elem2D))
+ read(fileID,*) com_elem2D_full%rlist
+	 
+ read(fileID,*) com_elem2D_full%sPEnum
+ ALLOCATE(com_elem2D_full%sPE(com_elem2D_full%sPEnum))
+ read(fileID,*) com_elem2D_full%sPE
+ ALLOCATE(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1))
+ read(fileID,*) com_elem2D_full%sptr
+ n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
+ ALLOCATE(com_elem2D_full%slist(n))
+ read(fileID,*) com_elem2D_full%slist
+
+ read(fileID,*) com_edge2D%rPEnum
+ ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
+ read(fileID,*) com_edge2D%rPE
+ ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
+ read(fileID,*) com_edge2D%rptr
+ ALLOCATE(com_edge2D%rlist(eDim_edge2D))
+ read(fileID,*) com_edge2D%rlist
+	 
+ read(fileID,*) com_edge2D%sPEnum
+ ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
+ read(fileID,*) com_edge2D%sPE
+ ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
+ read(fileID,*) com_edge2D%sptr
+ n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
+ ALLOCATE(com_edge2D%slist(n))
+ read(fileID,*) com_edge2D%slist
+ close(fileID)
+ if (mype==0) write(*,*) 'communication arrays are read'
+ deallocate(rbuff, ibuff)
+ deallocate(mapping)
+
+ t1=MPI_Wtime()
+ if(mype==0) write(*,*) 'mesh was read in ', t1-t0, ' seconds'
  END subroutine  read_mesh
 !============================================================ 
 subroutine find_levels
