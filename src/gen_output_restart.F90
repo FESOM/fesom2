@@ -16,6 +16,7 @@ subroutine init_output_restart(do_init)
   integer                   :: u_varid, v_varid, wpot_varid
   integer                   :: urhs_varid_AB, vrhs_varid_AB
   integer                   :: w_varid, we_varid, wi_varid
+  integer          			:: hbar_varid, hbar_old_varid, ssh_rhs_varid, ssh_rhs_old_varid, hnode_varid, hnode_old_varid
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid
   character(100)            :: longname
@@ -136,12 +137,47 @@ subroutine init_output_restart(do_init)
      END SELECT
      status = nf_def_var(ncid, trim(trname), NF_DOUBLE, 3, dimid3, tra_varid(j))
      if (status .ne. nf_noerr) call handle_err(status)
-     ! Adams–Bashforth part
+     ! Adams–Bashforth part!PS 
      trname=trim(trname)//'_AB'
      status = nf_def_var(ncid, trim(trname), NF_DOUBLE, 3, dimid3, tra_varid_ab(j))
      if (status .ne. nf_noerr) call handle_err(status)
   end do
-
+  
+	!___________________________________________________________________________
+	! write ale variables in restart file
+	if (use_ALE) then
+		!_______________________________________________________________________
+		! save ALE surface elevation 
+		dimids(1) = dimid_2d
+		dimids(2) = dimid_rec
+		status = nf_def_var(ncid, 'hbar', NF_DOUBLE, 2, dimids, hbar_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		status = nf_def_var(ncid, 'hbar_old', NF_DOUBLE, 2, dimids, hbar_old_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+		! save ALE ssh_rhs
+		status = nf_def_var(ncid, 'ssh_rhs', NF_DOUBLE, 2, dimids, ssh_rhs_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		status = nf_def_var(ncid, 'ssh_rhs_old', NF_DOUBLE, 2, dimids, ssh_rhs_old_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+		! save ALE layer thickness
+		dimid3(1) = dimid_nl1
+		dimid3(2) = dimid_2d
+		dimid3(3) = dimid_rec
+		status = nf_def_var(ncid, 'hnode', NF_DOUBLE, 3, dimid3, hnode_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		status = nf_def_var(ncid, 'hnode_old', NF_DOUBLE, 3, dimid3, hnode_old_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+	end if
+	
   ! Assign long_name and units attributes to variables.
 
   longname='model time'
@@ -250,6 +286,54 @@ subroutine init_output_restart(do_init)
      if (status .ne. nf_noerr) call handle_err(status)
   end do
 
+	!___________________________________________________________________________
+	! write ale variables in restart file
+	if (use_ALE) then
+		!_______________________________________________________________________
+		! save ALE surface elevation 
+		longname='ALE surface elevation hbar_n+0.5'
+		status = nf_put_att_text(ncid, hbar_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, hbar_varid, 'units', 3, 'm')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		longname='ALE surface elevation hbar_n-0.5'
+		status = nf_put_att_text(ncid, hbar_old_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, hbar_old_varid, 'units', 3, 'm')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+		! save ALE ssh_rhs_old
+		longname='ALE sea surface height RHS ssh_rhs_n+1'
+		status = nf_put_att_text(ncid, ssh_rhs_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, ssh_rhs_varid, 'units', 3, '???')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		longname='ALE sea surface height RHS ssh_rhs_n'
+		status = nf_put_att_text(ncid, ssh_rhs_old_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, ssh_rhs_old_varid, 'units', 3, '???')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+		! save ALE layer thickness
+		longname='ALE layer thickness hnode_n+0.5'
+		status = nf_put_att_text(ncid, hnode_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, hnode_varid, 'units', 3, 'm')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		longname='ALE layer thickness hnode_n-0.5'
+		status = nf_put_att_text(ncid, hnode_old_varid, 'description', len_trim(longname), trim(longname)) 
+		if (status .ne. nf_noerr) call handle_err(status)
+		status = nf_put_att_text(ncid, hnode_old_varid, 'units', 3, 'm')
+		if (status .ne. nf_noerr) call handle_err(status)
+		
+		!_______________________________________________________________________
+	end if
+  
   status = nf_enddef(ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 
@@ -355,6 +439,7 @@ subroutine write_restarts(istep)
   integer                   :: u_varid, v_varid, wpot_varid
   integer                   :: w_varid, we_varid, wi_varid
   integer                   :: urhs_varid_AB, vrhs_varid_AB
+  integer          			:: hbar_varid, hbar_old_varid, ssh_rhs_varid, ssh_rhs_old_varid, hnode_varid, hnode_old_varid
   integer                   :: area_varid, hice_varid, hsnow_varid
   integer                   :: uice_varid, vice_varid, count_id
   integer                   :: start(2), count(2),start3(3), count3(3) 
@@ -393,7 +478,21 @@ subroutine write_restarts(istep)
      if (status .ne. nf_noerr) call handle_err(status)
      status=nf_inq_varid(ncid, 'w_impl', wi_varid)
      if (status .ne. nf_noerr) call handle_err(status)
-
+     
+	!___________________________________________________________________________
+	if (use_ALE) then
+		status=nf_inq_varid(ncid, 'hbar', hbar_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		status=nf_inq_varid(ncid, 'hbar_old', hbar_old_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		status=nf_inq_varid(ncid, 'ssh_rhs', ssh_rhs_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		status=nf_inq_varid(ncid, 'ssh_rhs_old', ssh_rhs_old_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		status=nf_inq_varid(ncid, 'hnode', hnode_varid)
+		if (status .ne. nf_noerr) call handle_err(status)
+		status=nf_inq_varid(ncid, 'hnode_old', hnode_old_varid)
+	endif
 !     if (hbl_diag) then
 !        status=nf_inq_varid(ncid, 'hbl', hbl_varid)
 !        if (status .ne. nf_noerr) call handle_err(status)
@@ -560,11 +659,60 @@ subroutine write_restarts(istep)
      end if
   end do
 
+	!___________________________________________________________________________
+	! write ale variables in restart file
+	if (use_ALE) then
+		!_______________________________________________________________________
+		start=(/1,save_count_restart/)
+		count=(/nod2d, 1/)
+			
+		!_______________________________________________________________________
+		! save ALE surface elevation 
+		call gather_nod(hbar, aux2)
+		if(mype==0) then            
+			status=nf_put_vara_double(ncid, hbar_varid, start, count, aux2, 4)
+			if (status .ne. nf_noerr) call handle_err(status)
+		end if
+		
+		call gather_nod(hbar_old, aux2)
+		if(mype==0) then            
+			status=nf_put_vara_double(ncid, hbar_old_varid, start, count, aux2, 4)
+			if (status .ne. nf_noerr) call handle_err(status)
+		end if
+		
+		!_______________________________________________________________________
+		! save ALE ssh_rhs
+		call gather_nod(ssh_rhs, aux2)
+		if(mype==0) then            
+			status=nf_put_vara_double(ncid, ssh_rhs_varid, start, count, aux2, 4)
+			if (status .ne. nf_noerr) call handle_err(status)
+		end if
+		
+		call gather_nod(ssh_rhs_old, aux2)
+		if(mype==0) then            
+			status=nf_put_vara_double(ncid, ssh_rhs_old_varid, start, count, aux2, 4)
+			if (status .ne. nf_noerr) call handle_err(status)
+		end if
+		
+		!_______________________________________________________________________
+		! save ALE layer thickness
+		start3=(/1, 1, save_count_restart/)
+		count3=(/nl-1, nod2D, 1/)
+		call gather_nod(hnode_new,aux3)
+		if(mype==0) then                        
+			status=nf_put_vara_double(ncid, hnode_varid, start3, count3, aux3)
+			if (status .ne. nf_noerr) call handle_err(status)
+		end if
+	end if
+	
+
   if(mype==0) then
      status=nf_close(ncid)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
   deallocate(aux3)
+  
+  
   ! ice part
   if (use_ice) then
      if (mype==0) then ! Serial output implemented so far

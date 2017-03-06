@@ -16,9 +16,12 @@ IMPLICIT NONE
 				write(*,*)
 		end if	
 		call ale_init
+		call stiff_mat_ale
+	else
+		call stiff_mat
 	end if    
         
-	call stiff_mat
+	
 	if(mype==0) write(*,*) 'Arrays are set'
         
 	!if(open_boundary) call set_open_boundary   !TODO

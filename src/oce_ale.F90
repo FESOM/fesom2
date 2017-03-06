@@ -31,6 +31,7 @@ subroutine ale_init
 	
 	! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
 	allocate(ssh_rhs_old(myDim_nod2D+eDim_nod2D))
+	allocate(ssh_rhs_old2(myDim_nod2D+eDim_nod2D)) !PS
 	
 	! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
 	allocate(hbar(myDim_nod2D+eDim_nod2D))
@@ -59,6 +60,8 @@ subroutine ale_init
 	
 	! calculate thinkness of partial bottom layer cells
 	call init_bottom_elem_thickness
+	
+	!___setup virt_salt_flux____________________________________________________
 	! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual salinity flux need to be used
 	! otherwise we set the reference salinity to zero
 	if ( .not. trim(which_ALE)=='linfs') then
@@ -69,6 +72,7 @@ subroutine ale_init
 	else
 		use_virt_salt=.true.
 	end if
+	
 end subroutine ale_init
 !
 !
@@ -352,9 +356,262 @@ subroutine update_thickness_ale
 end subroutine update_thickness_ale
 !
 !
+!
+!===============================================================================
+! Stiffness matrix for the elevation
+! 
+! We first use local numbering and assemble the matrix
+! Having completed this step we substitute global contiguous numbers.
+!
+! Our colind cannot be used to access local node neighbors
+! This is a reminder from FESOM
+!        do q=1, nghbr_nod2D(row)%nmb
+!           col_pos(nghbr_nod2D(row)%addresses(q)) = q
+!        enddo
+!       ipos=sshstiff%rowptr(row)+col_pos(col)-sshstiff%rowptr(1)
+! 
+! To achive it we should use global arrays n_num and n_pos.
+! Reserved for future. 
+subroutine stiff_mat_ale
+	use o_PARAM
+	use o_MESH
+	use g_PARSUP
+	use o_ARRAYS, only:bottom_elem_thickness 
+	use g_CONFIG
+	implicit none
+	
+	integer                             :: n, n1, n2, i, j,  row, ed
+	integer                             :: elnodes(3), el(2)
+	integer                             :: npos(3), offset, nini, nend
+	real(kind=WP)                       :: dmean, ff, factor, a 
+	real(kind=WP)                       :: fx(3), fy(3), ax, ay
+	integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
+	integer, allocatable                :: mapping(:)
+	logical                             :: flag
+	character*10                        :: mype_string,npes_string
+	character*200                       :: dist_mesh_dir,file_name
+	
+	!___________________________________________________________________________
+	! a)
+	ssh_stiff%dim=nod2D
+	allocate(ssh_stiff%rowptr(myDim_nod2D+1))
+	ssh_stiff%rowptr(1)=1               ! This has to be updated as
+										! contiguous numbering is required
+	
+	allocate(n_num(myDim_nod2D+eDim_nod2D),n_pos(12,myDim_nod2D))
+	n_pos=0
+	
+	!___________________________________________________________________________
+	! b) Neighbourhood information
+	dO n=1,myDim_nod2d
+		! number of neigbouring nodes to node n
+		n_num(n)=1
+		! position indices of neigbouring nodes
+		n_pos(1,n)=n
+	end do   
+	do n=1, myDim_edge2D
+		n1=edges(1,n)
+		n2=edges(2,n)
+		! ... if(n1<=myDim_nod2D) --> because dont use extended nodes
+		if (n1<=myDim_nod2D) then
+			n_pos(n_num(n1)+1,n1)=n2
+			n_num(n1)=n_num(n1)+1
+		end if
+		! ... if(n2<=myDim_nod2D) --> because dont use extended nodes
+		if (n2<=myDim_nod2D) then
+			n_pos(n_num(n2)+1,n2)=n1
+			n_num(n2)=n_num(n2)+1
+		end if
+	end do
+	
+	!___________________________________________________________________________
+	! fill up reduced row vector: indice entry where sparse entrys switch to next 
+	! row
+	! n_num contains the number of neighbors
+	! n_pos -- their indices 
+	do n=1,myDim_nod2D
+		ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+n_num(n)
+	end do
+	
+	!___________________________________________________________________________
+	! c)
+	! how many nonzero entries sparse matrix has
+	ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1								 
+	! allocate column and value array of sparse matrix, have length of nonzero 
+	! entrie of sparse matrix 
+	allocate(ssh_stiff%colind(ssh_stiff%nza))
+	allocate(ssh_stiff%values(ssh_stiff%nza))
+	ssh_stiff%values=0.0_WP  
+	
+	!___________________________________________________________________________
+	! d) 
+	! fill up sparse matrix column index 
+	do n=1,myDim_nod2D
+		! for every node points n, estimate start (nini) and end (nend) indices of neighbouring nodes
+		! in sparse matrix
+		nini = ssh_stiff%rowptr(n) 
+		nend = ssh_stiff%rowptr(n+1)- 1
+		! fill colind with local indices location from n_pos
+		ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
+	end do
+	
+	!!! Thus far everything is in local numbering.	!!!
+	!!! We will update it later when the values are !!!
+	!!! filled in 									!!!
+	
+	!___________________________________________________________________________
+	! e) fill in 
+	!M/dt-alpha*theta*g*dt*\nabla(H\nabla\eta))
+	n_num=0 ! is here reinitialised to become auxilary array to switch from local to global node indices
+	
+	! 1st do secod term of lhs od equation (12) of "FESOM2 from finite element to finite volumes"
+	! stiffness part
+	factor = g*dt*alpha*theta
+	
+	! loop over edges
+	do ed=1,myDim_edge2D   !! Attention
+		
+		! el ... which two elements contribute to edge 
+		el=edge_tri(:,ed)
+		! loop over two triangle elements
+		do i=1,2  ! Two elements related to the edge
+				! It should be just grad on elements 
+			
+			if (el(i)<1) cycle ! if el(i)<1, it means its an outer boundary edge this
+							! has only one triangle element to which it contribute
+			
+			! which three nodes span up triangle el(i)
+			! elnodes ... node indices 
+			elnodes=elem2D_nodes(:,el(i))
+			
+			! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
+			! at element el(i)
+			fy(1:3) = ( zbar(nlevels(el(i))-1)-bottom_elem_thickness(el(i)) ) * &
+					  (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)  &
+					 - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
+			
+			if(i==2) fy=-fy
+			
+			! who is node point 1 of edge ed --> connected with row index of sparse matrix
+			row=edges(1,ed)
+			if (row <= myDim_nod2D) then
+				!n... loop over neighbouring nodes to 1st node point of edge ed 
+				DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
+					! SSH_stiff%colind(n) contains still local indices location
+					! n is in global indexing
+					! n_num(SSH_stiff%colind(n)) = n --> with n_num connect local index location 
+					! SSH_stiff%colind(n) with global index n
+					n_num(SSH_stiff%colind(n)) = n
+				END DO
+				!npos contains global index location of local nodes that spanup elemental
+				! el(i) which contributes to edge ed
+				! npos = [1 x 3]
+				npos = n_num(elnodes)
+				! fill sparse martix value array with stiffness info
+				SSH_stiff%values(npos) = SSH_stiff%values(npos) + fy*factor
+			endif
+			
+			! who is node point 2 of edge ed
+			row=edges(2,ed)
+			if (row <= myDim_nod2D) then
+				! same like for row=edges(1,ed)
+				DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
+					n_num(SSH_stiff%colind(n)) = n
+				END DO
+				npos = n_num(elnodes)
+				SSH_stiff%values(npos) = SSH_stiff%values(npos) - fy*factor
+			endif
+		end do
+	end do
+	
+	! 2nd do first term of lhs od equation (12) of "FESOM2 from finite element to finite volumes"
+	! Mass matrix part
+	do row=1, myDim_nod2D
+		offset = ssh_stiff%rowptr(row)
+		SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
+	end do
+	deallocate(n_pos,n_num)
+	
+	!___________________________________________________________________________
+	! f)
+	! =================================
+	! Global contiguous numbers:
+	! =================================
+	! Now we need to exchange between PE to know their 
+	! numbers of non-zero entries (nza):
+	! ================================= 
+	allocate(pnza(npes), rpnza(npes))    
+	pnza(1:npes)=0
+	rpnza=0
+	
+	! number of nonzero entries at every CPU
+	pnza(mype+1)=ssh_stiff%nza
+	call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
+	!collect this number from all CPUs into rpnza
+	call MPI_AllREDUCE( pnza, rpnza, &
+		npes, MPI_INTEGER,MPI_SUM, &
+		MPI_COMM_WORLD, MPIerr)
+		
+	if (mype==0) then
+		offset=0
+	else
+		! calculate offset for all cpus mype~=0
+		offset=sum(rpnza(1:mype))  ! This is offset for mype 
+	end if
+	
+	!--> make sparse matrix row pointers from local to global by nonzero entrie 
+	!    offset
+	ssh_stiff%rowptr=ssh_stiff%rowptr+offset   ! pointers are global
+	
+	! =================================
+	! replace local nza with a global one
+	! =================================
+	ssh_stiff%nza=sum(rpnza(1:npes))
+	deallocate(rpnza, pnza)
+	
+	! ==================================
+	! colindices are now local to PE. We need to make them local
+	! contiguous
+	! ==================================
+	allocate(mapping(nod2d))
+	write(npes_string,"(I10)") npes
+	dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
+	file_name=trim(dist_mesh_dir)//'rpart.out'
+	open(10,file=trim(dist_mesh_dir)//'rpart.out')
+	! n ... how many cpus
+	read(10,*) n
+	! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
+	read(10,*) mapping(1:npes)
+	! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
+	! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
+	! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
+	read(10,*) mapping
+	close(10) 
+	
+	! (i) global natural: 
+	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
+		! myList_nod2D ... contains global node index of every meshpoit that belongs 
+		! to a CPU
+		! ssh_stiff%colind(n) ... contains local node index (1:myDim_nod2d)
+		! myList_nod2D(ssh_stiff%colind(n))  ... converts local index to global index
+		ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
+	end do
+	
+	! (ii) global PE contiguous: 
+	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
+		! convert global mesh node point numbering to global numbering of how the single 
+		! node points are contigous located on the CPUs
+		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
+	end do
+	
+	!___________________________________________________________________________
+	deallocate(mapping)
+end subroutine stiff_mat_ale
+!
+!
 !_______________________________________________________________________________
 ! Update ssh stiffness matrix for a new elevation
-subroutine stiff_mat_update
+subroutine stiff_mat_ale_update
 	use g_config,only: dt
 	use o_PARAM
 	use o_MESH
@@ -441,7 +698,7 @@ subroutine stiff_mat_update
 !end if
 !DS
 
-end subroutine stiff_mat_update
+end subroutine stiff_mat_ale_update
 !
 !
 !===============================================================================
@@ -507,10 +764,9 @@ subroutine compute_ssh_rhs_ale
 	! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	if ( .not. trim(which_ALE)=='linfs') then
 		do n=1,myDim_nod2D
-			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+!PS 	ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+		ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n) !!PS
 			
-! 			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n) !!PS
-
 		end do
 	else
 		do n=1,myDim_nod2D
@@ -583,7 +839,7 @@ subroutine compute_hbar_ale
 	!___________________________________________________________________________
 	! update the thickness
 	hbar_old=hbar
-	hbar(1:myDim_nod2D)=hbar(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
+	hbar(1:myDim_nod2D)=hbar_old(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
 	call exchange_nod(hbar)
 		
 	!___________________________________________________________________________
@@ -592,7 +848,7 @@ subroutine compute_hbar_ale
 		elnodes=elem2D_nodes(:,elem)
 		dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
 	end do
-
+	
 end subroutine compute_hbar_ale
 !
 !
@@ -705,7 +961,6 @@ subroutine vert_vel_ale
 	!                                                    |
 	!                                                    |--> (dh/dt)_k = 1/H*dh/dt
 	
-	
 	!___________________________________________________________________________
 	! Correct for free surface (zlevel and zstar)
 	if(trim(which_ALE)=='zlevel') then
@@ -714,6 +969,7 @@ subroutine vert_vel_ale
 		! Wvel(1,n) should be 0 up to machine precision,
 		! this place should be checked.
 		do n=1, myDim_nod2D
+		
 			Wvel(1,n)=Wvel(1,n)-(hbar(n)-hbar_old(n))/dt-water_flux(n)
 			hnode_new(1,n)=hnode(1,n)+hbar(n)-hbar_old(n)
 		end do
@@ -854,19 +1110,19 @@ interface
 end interface
 
 ident=1
-maxiter=2000
-restart=15
-fillin=3
-lutype=2
-droptol=1.e-8
+maxiter=2000  
+restart=15 
+fillin=3  
+lutype=2   
+droptol=1.e-8 
 soltol=1.e-10
 
 if  (trim(which_ale)=='linfs') then
     reuse=0
     new_values=0
 else
-    reuse=1      ! For varying coefficients, set reuse=1
-    new_values=1 ! and new_values=1, as soon as the coefficients have changed
+    reuse=1     ! For varying coefficients, set reuse=1
+    new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
 end if
 
 ! reuse=0: matrix remains static
@@ -1067,7 +1323,8 @@ subroutine oce_timestep_ale(n)
 	!___________________________________________________________________________
 	! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
 	! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
-!DS	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+	! --> eta_(n)
 	
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
@@ -1087,7 +1344,7 @@ subroutine oce_timestep_ale(n)
 	! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
 	!___________________________________________________________________________
 	! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements
-	call stiff_mat_update 
+	call stiff_mat_ale_update 
 	
 	! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 	! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (12) rhs
@@ -1100,6 +1357,7 @@ subroutine oce_timestep_ale(n)
 	! estimate new horizontal velocity u^(n+1)
 	! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
 	call update_vel
+	! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
 	t4=MPI_Wtime() 
 	
 	! Update to hbar(n+3/2) and compute dhe to be used on the next step
@@ -1121,29 +1379,17 @@ subroutine oce_timestep_ale(n)
 	! is decided how change in hbar is distributed over the vertical layers
 	call vert_vel_ale 
 	t7=MPI_Wtime() 
-
-
-!if (mstep==3) then
-!if (mype==0) then
-!write(*,*) 'alpha==', alpha
-!do n=1, myDim_nod2D
-!   write(*,*) hbar(n)-hbar_old(n), d_eta(n), wvel(1,n)*dt
-!end do
-!end if
-!call par_ex
-!stop
-!end if
 	
-	if (mstep==3) then
-		if (mype==0) then
-			write(*,*) 'alpha==', alpha
-			do n=1, myDim_nod2D
-				write(*,*) hbar(n)-hbar_old(n), d_eta(n), Wvel(1,n)*dt
-			end do
-		end if
-		call par_ex
-		stop
-	end if 
+! 	if (mstep==3) then
+! 		if (mype==0) then
+! 			write(*,*) 'alpha==', alpha
+! 			do n=1, myDim_nod2D
+! 				write(*,*) hbar(n)-hbar_old(n), d_eta(n), Wvel(1,n)*dt
+! 			end do
+! 		end if
+! 		call par_ex
+! 		stop
+! 	end if 
 	
 	! solve tracer equation 
 	call solve_tracers_ale
@@ -1171,6 +1417,8 @@ subroutine oce_timestep_ale(n)
 		write(*,*)
 ! 		write(*,*) 'average_time (horizontal diffusion) = ', time_sum/n
 	end if
+	
+	call write_step_info(n)
 	
 	!___________________________________________________________________________
 	! write out field estimates
@@ -1292,7 +1540,20 @@ subroutine oce_timestep_ale(n)
 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux : ',global_max_hflux,' | ',global_min_hflux,' | ',global_vol_hflux
 		endif
 		
-		
+		global_max_hflux=0.0_WP
+		global_min_hflux=0.0_WP
+		call MPI_AllREDUCE(maxval(hbar-eta_n), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+		call MPI_AllREDUCE(minval(hbar-eta_n), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
+		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
+			write(*,*) '  hbar-eta: ',global_max_hflux,' | ',global_min_hflux
+		end if
+		global_max_hflux=0.0_WP
+		global_min_hflux=0.0_WP
+		call MPI_AllREDUCE(maxval(hbar-hbar_old-d_eta), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+		call MPI_AllREDUCE(minval(hbar-hbar_old-d_eta), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
+		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
+			write(*,*) '  dhbar-deta: ',global_max_hflux,' | ',global_min_hflux
+		end if
 		global_max_hflux=0.0_WP
 		global_min_hflux=0.0_WP
 		call MPI_AllREDUCE(maxval(tr_arr(:,:,1)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
@@ -1312,7 +1573,7 @@ subroutine oce_timestep_ale(n)
 		call MPI_AllREDUCE(maxval(Wvel(1,:)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(minval(Wvel(1,:)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '    Wvel(:,1): ',global_max_hflux,' | ',global_min_hflux
+			write(*,*) ' Wvel(:,1): ',global_max_hflux,' | ',global_min_hflux
 		end if
 ! 		global_max_hflux=0.0_WP
 ! 		global_min_hflux=0.0_WP
@@ -1328,8 +1589,8 @@ subroutine oce_timestep_ale(n)
 		
 			! check SSH
 			if ( (ieee_is_nan(eta_n(el)) .or. &
-				eta_n(el)<-10.0 .or. eta_n(el)>10.0)) then
-				write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
+				eta_n(el)<-20.0 .or. eta_n(el)>20.0)) then
+				write(*,*) ' --STOP--> found eta_n become NaN or <-20.0, >20.0'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',n
 				write(*,*) 'node        = ',el
@@ -1339,16 +1600,16 @@ subroutine oce_timestep_ale(n)
 			endif
 			
 			! check HBAR
-			if ( (ieee_is_nan(hbar(el)) .or. &
-				hbar(el)<-10.0 .or. hbar(el)>10.0)) then
-				write(*,*) ' --STOP--> found hbar become NaN or <-10.0, >10.0'
-				write(*,*) 'mype        = ',mype
-				write(*,*) 'mstep       = ',n
-				write(*,*) 'node        = ',el
-				write(*,*) 'hbar(el)    = ',hbar(el)
-				write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
-				call par_ex(1)
-			endif
+! 			if ( (ieee_is_nan(hbar(el)) .or. &
+! 				hbar(el)<-10.0 .or. hbar(el)>10.0)) then
+! 				write(*,*) ' --STOP--> found hbar become NaN or <-10.0, >10.0'
+! 				write(*,*) 'mype        = ',mype
+! 				write(*,*) 'mstep       = ',n
+! 				write(*,*) 'node        = ',el
+! 				write(*,*) 'hbar(el)    = ',hbar(el)
+! 				write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
+! 				call par_ex(1)
+! 			endif
 			
 			
 			
@@ -1362,18 +1623,25 @@ subroutine oce_timestep_ale(n)
 					write(*,*) 'node        = ',el
 					write(*,*) 'nz          = ',nz
 					write(*,*)
-					write(*,*) 'temp(nz, el)= ',tr_arr(nz, el,1)
-					write(*,*) 'temp(: , el)= ',tr_arr(:, el,1)
+					write(*,*) 'temp(nz, el)    = ',tr_arr(nz, el,1)
+					write(*,*) 'temp_old(nz, el)= ',tr_arr_old(nz, el,1)
+					write(*,*) 'temp(: , el)    = ',tr_arr(:, el,1)
+					write(*,*) 'temp_old(: , el)= ',tr_arr_old(:, el,1)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(el)
+					write(*,*) 'wflux       = ',water_flux(el)
 					write(*,*)
 					write(*,*) 'eta_n       = ',eta_n(el)
+					write(*,*) 'hbar        = ',hbar(el)
+					write(*,*) 'hbar_old    = ',hbar_old(el)
+					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
+					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
 					write(*,*)
 					write(*,*) 'hnode_new   = ',hnode_new(:,el)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,el)
 					write(*,*)
-					write(*,*) 'Wvel        = ',Wvel(:,el)
+					write(*,*) 'W           = ',Wvel(:,el)
 					write(*,*)
 					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
 					call output (1,n)        ! save (NetCDF)
@@ -1397,25 +1665,62 @@ subroutine oce_timestep_ale(n)
 					write(*,*) 'temp(nz, el)= ',tr_arr(nz, el,1)
 					write(*,*) 'temp(: , el)= ',tr_arr(:, el,1)
 					write(*,*)
+					write(*,*) 'hflux       = ',heat_flux(el)
 					write(*,*) 'wflux       = ',water_flux(el)
 					write(*,*)
 					write(*,*) 'eta_n       = ',eta_n(el)
+					write(*,*) 'hbar        = ',hbar(el)
+					write(*,*) 'hbar_old    = ',hbar_old(el)
+					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
+					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
 					write(*,*)
 					write(*,*) 'hnode_new   = ',hnode_new(:,el)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,el)
 					write(*,*)
-					write(*,*) 'Wvel        = ',Wvel(:,el)
+					write(*,*) 'W           = ',Wvel(:,el)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
 					write(*,*)
-! 					call output (0,n)        ! save (NetCDF)
-! 					call restart(1,n)        ! save (NetCDF)
-! 					pause(30)
+					call output (1,n)        ! save (NetCDF)
+					call restart(1,n)        ! save (NetCDF)
+					call par_ex(1)
+				endif 
+				
+				! check vertical velocity
+				if ( ieee_is_nan(Wvel(1, el))) then
+					
+					write(*,*) ' --STOP--> found surface layer vertical velocity become NaN'
+					write(*,*) 'mype        = ',mype
+					write(*,*) 'mstep       = ',n
+					write(*,*) 'node        = ',el
+					write(*,*) 'nz          = ',nz
+					write(*,*)
+					write(*,*) 'Wvel(1, el) = ',Wvel(1,el)
+					write(*,*) 'Wvel(:, el) = ',Wvel(:,el)
+					write(*,*)
+					write(*,*) 'wflux       = ',water_flux(el)
+					write(*,*) 'hflux       = ',heat_flux(el)
+					write(*,*)
+					write(*,*) 'eta_n       = ',eta_n(el)
+					write(*,*) 'hbar        = ',hbar(el)
+					write(*,*) 'hbar_old    = ',hbar_old(el)
+					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
+					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
+					write(*,*)
+					write(*,*) 'hnode_new   = ',hnode_new(:,el)
+					write(*,*)
+					write(*,*) 'Kv          = ',Kv(:,el)
+					write(*,*)
+					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
+					write(*,*)
+					call output (1,n)        ! save (NetCDF)
+					call restart(1,n)        ! save (NetCDF)
 					call par_ex(1)
 				endif 
 			end do
 		end do
 	end if !-->if (mod(n,logfile_outfreq)==0) then
+	
 ! #endif	
 end subroutine oce_timestep_ale

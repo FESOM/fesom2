@@ -80,6 +80,8 @@ integer :: n, nsteps,offset,row,i
 		call forcing_index
 		call compute_vel_nodes 
 		
+! 		eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old !PS
+		
 		!___model sea-ice step__________________________________________________
 		if(use_ice) then
 			call ocean2ice
@@ -115,6 +117,6 @@ integer :: n, nsteps,offset,row,i
 	
 	!___FINISH MODEL RUN________________________________________________________
 	if (mype==0) write(*,*) 'Run is finished, updating clock'
- 	call clock_finish  
+!  	call clock_finish  
 	call par_ex
 end program main

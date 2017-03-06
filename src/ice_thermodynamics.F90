@@ -122,7 +122,30 @@ subroutine thermodynamics
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
-
+	
+! 	if (mype==65 .and. i==1753) then
+! 		write(*,*)
+! 		write(*,*) ' === mstep=',mstep,'======================'
+! 		write(*,*) '  ehf_old     = ',net_heat_flux(i) , ' ehf       = ',ehf
+! 		write(*,*) '  fw_old      = ',fresh_wa_flux(i) , '  fw       = ',fw
+! 		write(*,*) '     T_oc     = ',T_oc
+! 		write(*,*) '     S_oc     = ',S_oc
+! 		write(*,*) '       ug     = ',ug
+! 		write(*,*) '     ustar    = ',ustar
+! 		write(*,*) '    t_skin    = ',t
+! 		write(*,*) 'a_ice_old     = ',a_ice(i)         , ' a_ice     = ', A
+! 		write(*,*) 'h_ice_old     = ',m_ice(i)         , ' h_ice     = ', h
+! 		write(*,*) 'h_snow_old    = ',m_snow(i)        , ' h_snow    = ', hsn
+! 		write(*,*)
+! 		write(*,*) 'hfsenow_old   = ',osen_heat(i)     , ' hfsenow   = ', hfsenow
+! 		write(*,*) 'hflatow_old   = ',olat_heat(i)     , ' hflatow   = ', hflatow
+! 		write(*,*) 'hflwrdout_old = ',olwout(i)        , ' hflwrdout = ', hflwrdout
+! 		write(*,*)
+! 		write(*,*) 'ithdgr_old    = ', thdgr(i)        , ' ithdgr    = ',ithdgr
+! 		write(*,*) 'ithdgrsn_old  = ', thdgrsn(i)      , ' ithdgrsn  = ',ithdgrsn
+! 		write(*,*)
+! 	end if
+	
      m_ice(i)         = h
      m_snow(i)        = hsn
      a_ice(i)         = A

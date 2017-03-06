@@ -833,7 +833,7 @@ real(kind=WP), allocatable,dimension(:)     :: dhe
 real(kind=WP), allocatable,dimension(:)     :: hbar, hbar_old
 
 ! --> auxiliary array to store an intermediate part of the rhs computations.
-real(kind=WP), allocatable,dimension(:)     :: ssh_rhs_old
+real(kind=WP), allocatable,dimension(:)     :: ssh_rhs_old, ssh_rhs_old2 !PS
 
 ! --> auxiliary array to store depth of layers and depth of mid level due to changing 
 !     layer thinkness at every node

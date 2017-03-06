@@ -60,7 +60,8 @@ OBJECTS=  fvom_main.o \
           gen_forcing_ocean.o \
           gen_interpolation.o \
           gen_output_mean.o \
-          gen_output_restart.o
+          gen_output_restart.o \
+          write_step_info.o
 
 
 

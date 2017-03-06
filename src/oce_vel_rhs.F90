@@ -28,8 +28,8 @@ end do
 ! ====================
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
-   !eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
-   eta=g*eta_n(elnodes)
+   eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
+!    eta=g*eta_n(elnodes)
    gg=elem_area(elem)
    ff=coriolis(elem)*gg
    !mm=metric_factor(elem)*gg

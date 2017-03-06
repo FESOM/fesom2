@@ -110,15 +110,17 @@ t0=MPI_Wtime()
  ! ===== Advection part
  call ice_fct_solve
  call cut_off
+ t2=MPI_Wtime()
  ! ===== Thermodynamic part
  call thermodynamics
- t2=MPI_Wtime()
+ t3=MPI_Wtime()
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
-		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t1-t0
-		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t2-t1
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
+		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
+		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
 		write(*,*) '   _______________________________'
-		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t2-t0
+		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
 		write(*,*)
 endif
 

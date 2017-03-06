@@ -3,7 +3,7 @@
 ++ /usr/Modules/3.2.10/bin/modulecmd bash purge
 Module for impi,  version 2017 unloaded.
 Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... version 2017.1.132 unloaded.
-+ eval DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64 ';export' 'DYLD_LIBRARY_PATH;LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;MANPATH=/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;unset' 'CDO;unset' 'CDOHOME;unset' 'CDO_VERSION;unset' 'CPATH;unset' 'C_INCLUDE_PATH;unset' 'IDB_HOME;unset' 'INCLUDE;unset' 'INTEL_LICENSE_FILE;unset' 'IPPROOT;unset' 'I_MPI_FABRICS;unset' 'I_MPI_OFI_LIBRARY;unset' 'I_MPI_OFI_PROVIDER;unset' 'I_MPI_ROOT;unset' 'LANGUAGE_TERRITORY;unset' 'LD_RUN_PATH;unset' 'LIBRARY_PATH;unset' 'LOADEDMODULES;unset' 'MKLROOT;unset' 'MPM_LAUNCHER;unset' 'NCARG_ROOT;unset' 'NETCDF;unset' 'NETCDF4_PATH;unset' 'NETCDFCPP_LD;unset' 'NETCDF_DIR;unset' 'NETCDF_INC;unset' 'NETCDF_INC_F90;unset' 'NETCDF_LD;unset' 'NETCDF_LIB;unset' 'NETCDF_VERSION;unset' 'NLSPATH;unset' 'PE_ENV;unset' 'PKG_CONFIG_PATH;unset' 'PYTHONHOME;unset' 'PYTHONPATH;unset' 'PYTHON_LIBRARY;unset' 'RPATH;unset' 'TBBROOT;unset' 'UDUNITS2_PATH;unset' 'VT_ROOT;unset' '_LMFILES_;'
++ eval DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64 ';export' 'DYLD_LIBRARY_PATH;LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64' ';export' 'LD_LIBRARY_PATH;MANPATH=/opt/munge/default/share/man::/global/opt/slurm/default/share/man:' ';export' 'MANPATH;PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin' ';export' 'PATH;unset' 'CPATH;unset' 'C_INCLUDE_PATH;unset' 'IDB_HOME;unset' 'INCLUDE;unset' 'INTEL_LICENSE_FILE;unset' 'IPPROOT;unset' 'I_MPI_FABRICS;unset' 'I_MPI_OFI_LIBRARY;unset' 'I_MPI_OFI_PROVIDER;unset' 'I_MPI_ROOT;unset' 'LANGUAGE_TERRITORY;unset' 'LD_RUN_PATH;unset' 'LIBRARY_PATH;unset' 'LOADEDMODULES;unset' 'MKLROOT;unset' 'MPM_LAUNCHER;unset' 'NCARG_ROOT;unset' 'NETCDF;unset' 'NETCDF4_PATH;unset' 'NETCDFCPP_LD;unset' 'NETCDF_DIR;unset' 'NETCDF_INC;unset' 'NETCDF_INC_F90;unset' 'NETCDF_LD;unset' 'NETCDF_LIB;unset' 'NETCDF_VERSION;unset' 'NLSPATH;unset' 'PE_ENV;unset' 'PKG_CONFIG_PATH;unset' 'PYTHONHOME;unset' 'PYTHONPATH;unset' 'PYTHON_LIBRARY;unset' 'RPATH;unset' 'TBBROOT;unset' 'UDUNITS2_PATH;unset' 'VT_ROOT;unset' '_LMFILES_;'
 ++ DYLD_LIBRARY_PATH=/global/AWIsoft/intel/2017/compilers_and_libraries_2017.1.132/linux/tbb/lib/intel64
 ++ export DYLD_LIBRARY_PATH
 ++ LD_LIBRARY_PATH=/opt/cray/lib64:/usr/lib64
@@ -12,9 +12,6 @@ Module for Intel Compiler and Libraries, ifort, icc, icpc; mkl, ipp, tbb,... ver
 ++ export MANPATH
 ++ PATH=/usr/lib64/qt-3.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/opt/munge/default/bin:/global/opt/slurm/default/bin:/global/AWIsoft/bin:/home/ollie/pscholz/bin
 ++ export PATH
-++ unset CDO
-++ unset CDOHOME
-++ unset CDO_VERSION
 ++ unset CPATH
 ++ unset C_INCLUDE_PATH
 ++ unset IDB_HOME
@@ -158,10 +155,9 @@ Module for netcdf version 4.4.0_intel loaded
 ++ export PATH
 ++ _LMFILES_=/global/AWImodules//intel.compiler/17.0.1:/global/AWImodules//intel.mpi/17.0.1_ofi:/global/AWImodules//netcdf/4.4.0_intel
 ++ export _LMFILES_
-++ echo 353686
+++ echo 376293
 ++ cut -d. -f1
-+ JOBID=353686
++ JOBID=376293
 + cd /home/ollie/pscholz/fvom_ALE/bin
 + date
 + srun --mpi=pmi2 --ntasks=72 ./fvom.x
-+ date
