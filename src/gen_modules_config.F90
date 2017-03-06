@@ -52,7 +52,7 @@ module g_config
   integer                :: grid_type=1 	! z-level, 2 sigma, 3 sigma + z-level
   logical                :: use_ALE=.false.     ! switch on/off ALE
   character(20)          :: which_ALE='zlevel' ! 'zlevel', 'zstar', 'zstar-weighted', 'ztilde'
-  logical                :: use_partial_cell=.true.  ! use partial bottom cell configuration  
+  logical                :: use_partial_cell=.false.  ! use partial bottom cell configuration  
 
   namelist /mesh_def/ grid_type, use_ALE, which_ALE, use_partial_cell
 
