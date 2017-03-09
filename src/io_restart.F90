@@ -87,10 +87,10 @@ subroutine create_restart_file(l_create)
   call def_variable(oid, 'ssh_rhs_old', (/nod2D/), 'RHS for the elevation', '?', ssh_rhs_old);
   !___Define the netCDF variables for 3D fields_______________________________
   call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'ALE stuff', '?', hnode);
-!  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity', 'm/s', UV(1,:,:));
-!  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity', 'm/s', UV(2,:,:));
-!  call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
-!  call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity', 'm/s', UV(1,:,:));
+  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity', 'm/s', UV(2,:,:));
+  call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
+  call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
 
   do j=1,num_tracers
      SELECT CASE (j) 
@@ -107,13 +107,13 @@ subroutine create_restart_file(l_create)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-!     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
+     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
      longname=trim(longname)//', Adams–Bashforth'
-!     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
   end do
-!  call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
-!  call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
-!  call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
+  call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
+  call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
+  call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
 
 
   call open_new_file(oid); call was_error
@@ -178,26 +178,6 @@ end subroutine open_new_file
 !
 !--------------------------------------------------------------------------------------------
 !
-
-subroutine def_variable2(ncid, vname, ndim, dimids, varid, longname, unit)
-  implicit none
-
-  integer, intent(in)                    :: ncid
-  character(len=*), intent(in)           :: vname
-  integer, intent(in)                    :: ndim
-  integer, intent(in)                    :: dimids(ndim)
-  integer, intent(out)                   :: varid
-  character(len=*), intent(in), optional :: unit, longname
-  integer                                :: c
-  ! Serial output implemented so far
-  if (mype/=0) return
-  c=1
-  error_status(c) = nf_def_var(ncid, trim(vname), NF_DOUBLE, ndim, dimids, varid); c=c+1
-  error_count=c-1
-end subroutine def_variable2
-!
-!--------------------------------------------------------------------------------------------
-!
 subroutine was_error
   implicit none
 
@@ -215,19 +195,6 @@ call MPI_BCast(error_status(1), error_count, MPI_INTEGER, 0, MPI_COMM_WORLD, ier
      end if
   end do
 end subroutine was_error
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine was_error0
-  implicit none
-
-  integer                   :: k, status, ierror
-
-  do k=1, error_count
-     status=error_status(k)
-     if (status .ne. nf_noerr) call handle_err(status)
-  end do
-end subroutine was_error0
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -404,8 +371,6 @@ subroutine write_restart(id, istep)
         if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id.var(i).pt2, aux2)
         if (size1==elem2D .or. size2==elem2D) call gather_elem(id.var(i).pt2, aux2)
         if (mype==0) then
-write(*,*) id.rec_count, size1, size2
-
            error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 3); c=c+1
         end if
         deallocate(aux2)
@@ -425,38 +390,3 @@ end subroutine write_restart
 
 
 END MODULE io_RESTART
-
-
-!subroutine def_variable(id, name, ndim, dims, longname, units, data)
-!  implicit none
-!  type(nc_file),    intent(inout)        :: id
-!  character(len=*), intent(in)           :: name
-!  integer, intent(in)                    :: ndim
-!  integer, intent(in)                    :: dims(ndim)
-!  character(len=*), intent(in), optional :: units, longname
-!  real(kind=8)                           :: data(:)
-!  integer                                :: c
-!  type(nc_file_vars), allocatable, dimension(:) :: temp
-!
-!  if (id.nvar > 0) then
-!     ! create temporal dimension
-!     allocate(temp(id.nvar)); temp=id.var
-!     ! deallocate the input data array
-!     deallocate(id.var)
-!     ! then reallocate
-!     id.nvar=id.nvar+1
-!     allocate(id.var(id.nvar))
-!     ! restore the original data
-!     id.var(1:id.nvar-1)=temp  
-!     deallocate(temp)
-!   else
-!     ! first dimension in a file
-!     id.nvar=1
-!     allocate(id.var(id.nvar))
-!   end if
-!   id.var(id.nvar).name=trim(name)
-!   id.var(id.nvar).longname=trim(longname)
-!   id.var(id.nvar).units=trim(units)
-!   id.var(id.nvar).ndim=ndim
-!   id.var(id.nvar).dims(1:ndim)=dims
-!end subroutine def_variable
