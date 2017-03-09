@@ -4,7 +4,7 @@ FC = mpiifort
 LD = $(FC)
 
 # Optimization specs for compiler
-OPT  = -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -implicitnone -traceback #-g -debug -check all
+OPT  = -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -implicitnone -traceback -g -debug #-check all -check noarg_temp_created
 COPT = -O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude -xHost -traceback -g
 ######################################################
 # Include path for MPI header file

@@ -1318,13 +1318,7 @@ subroutine oce_timestep_ale(n)
 	call status_check
 	
 	!___________________________________________________________________________
-	call oce_mixing_PP
-	
-	!___________________________________________________________________________
-	! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
-	! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
-	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
-	! --> eta_(n)
+	call oce_mixing_PP	
 	
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
@@ -1363,6 +1357,12 @@ subroutine oce_timestep_ale(n)
 	! Update to hbar(n+3/2) and compute dhe to be used on the next step
 	call compute_hbar_ale
 	t5=MPI_Wtime() 
+	!___________________________________________________________________________
+	! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
+	! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
+        ! ...if we do it here we don't need to write hbar_old into a restart file...
+	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+	! --> eta_(n)
 	
 	!---------------------------------------------------------------------------
 	! Does not belong directly to ALE formalism: Ferrari, Gent, McWiliams parameterisation
@@ -1644,9 +1644,9 @@ subroutine oce_timestep_ale(n)
 					write(*,*) 'W           = ',Wvel(:,el)
 					write(*,*)
 					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
-					call output (1,n)        ! save (NetCDF)
-					call restart(1,n)        ! save (NetCDF)
-					call par_ex(1)
+!					call output (1,n)        ! save (NetCDF)
+!					call restart(1,n)        ! save (NetCDF)
+!					call par_ex(1)
 				endif
 				
 				! check SALT
@@ -1682,9 +1682,9 @@ subroutine oce_timestep_ale(n)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
 					write(*,*)
-					call output (1,n)        ! save (NetCDF)
-					call restart(1,n)        ! save (NetCDF)
-					call par_ex(1)
+!					call output (1,n)        ! save (NetCDF)
+!					call restart(1,n)        ! save (NetCDF)
+!					call par_ex(1)
 				endif 
 				
 				! check vertical velocity
@@ -1714,9 +1714,9 @@ subroutine oce_timestep_ale(n)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
 					write(*,*)
-					call output (1,n)        ! save (NetCDF)
-					call restart(1,n)        ! save (NetCDF)
-					call par_ex(1)
+!					call output (1,n)        ! save (NetCDF)
+!					call restart(1,n)        ! save (NetCDF)
+!					call par_ex(1)
 				endif 
 			end do
 		end do

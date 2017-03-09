@@ -18,6 +18,7 @@ use g_config
 use g_forcing_index
 use g_comm_auto
 use g_forcing_arrays
+use io_RESTART
 IMPLICIT NONE
 
 integer :: n, nsteps,offset,row,i
@@ -39,9 +40,11 @@ integer :: n, nsteps,offset,row,i
 	! fancy advection etc.  
 	!=====================
 	call check_mesh_consistency
+call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
 	if (mype==0) write(*,*) 'check_mesh_consistency... complete'
 	call ocean_setup
-	
+call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
+if (mype==0) write(*,*) 'ocean_setup made'	
 	if (mype==0) write(*,*) 'ocean_setup... complete'
 	call forcing_setup
 	
@@ -53,7 +56,15 @@ integer :: n, nsteps,offset,row,i
 	
 	call clock_newyear                    	! check if it is a new year
 	call init_output_mean(.not. r_restart)  ! create new output files
-	call init_output_restart(.not. r_restart)
+
+	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
+        ! The interface to the restart module is made via check_restart !
+        ! The inputs are: istep, l_write, l_create
+        ! if istep is not zero it will be decided whether restart shall be written
+        ! if l_write  is TRUE the restart will be forced
+        ! if l_create is TRUE the new restart file will be created
+	call check_restart(0, .false., .not. r_restart) ! istep, l_write, l_create
+	!=====================
 	
 	!=====================
 	! Time stepping
@@ -75,7 +86,6 @@ integer :: n, nsteps,offset,row,i
 		end if
 		
 		call init_output_mean(yearnew/=yearold)
-		call init_output_restart(yearnew/=yearold)
 		call clock
 		call forcing_index
 		call compute_vel_nodes 
@@ -112,7 +122,7 @@ integer :: n, nsteps,offset,row,i
 		
 		!___prepare output______________________________________________________
 		call output (0,n)        ! save (NetCDF)
-		call restart(0,n)        ! save (NetCDF)
+ 	        call check_restart(n, .false., yearnew/=yearold) 
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________
