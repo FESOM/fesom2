@@ -51,9 +51,10 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
   type(nc_file), save       :: oid
+  integer,       save       :: globalstep=0
 
   PRIVATE
-  PUBLIC :: check_restart
+  PUBLIC :: restart
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -129,21 +130,29 @@ end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine check_restart(istep, l_write, l_create)
+subroutine restart(istep, l_write, l_create, l_read)
   implicit none
   ! this is the main restart subroutine
-  ! if l_write  is TRUE the restart will be forced
+  ! if l_write  is TRUE writing restart file will be forced
+  ! if l_read   is TRUE the the restart file will be read
   ! if l_create is TRUE the new restart file will be created
 
   integer :: istep
-  logical :: l_create, l_write
+  logical :: l_create, l_write, l_read
   logical :: is_restart
   logical, save :: lfirst=.true.
   integer :: mpierr
 
-  if (lfirst)   call ini_ocean_io
+  if (lfirst .or. l_create) call ini_ocean_io
   lfirst=.false.
+
+  if (l_read) then
+   call assoc_ids(oid);    call was_error(oid)
+   call read_restart(oid); call was_error(oid)
+  end if
+
   if (l_create) call create_new_file(oid); call was_error(oid)
+
   if (istep==0) return
 
   !check whether restart will be written
@@ -174,7 +183,7 @@ subroutine check_restart(istep, l_write, l_create)
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
   call assoc_ids(oid);            call was_error(oid)  
   call write_restart(oid, istep); call was_error(oid)
-end subroutine check_restart
+end subroutine restart
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -227,6 +236,8 @@ end do
      end do
      id.error_status(c) = nf_def_var(id.ncid, trim(id.var(j).name), NF_DOUBLE, id.var(j).ndim+1, &
                        (/dimid(1:n), id.rec/), id.var(j).code); c=c+1
+     id.error_status(c)=nf_put_att_text(id.ncid, id.var(j).code, 'description', len_trim(id.var(j).longname), id.var(j).longname); c=c+1
+     id.error_status(c)=nf_put_att_text(id.ncid, id.var(j).code, 'units',       len_trim(id.var(j).units),    id.var(j).units);    c=c+1
   end do
   id.error_status(c)=nf_close(id.ncid); c=c+1
   id.error_count=c-1
@@ -343,36 +354,38 @@ subroutine write_restart(id, istep)
   integer                       :: i, size1, size2, shape
   integer                       :: c
   ! Serial output implemented so far
-  c=1
-  id.error_status(c)=nf_open(id.filename, nf_write, id.ncid); c=c+1
-  id.rec_count=id.rec_count+1
-
-  id.error_status(c)=nf_put_vara_double(id.ncid, id.Tid, id.rec_count, 1, real(id.rec_count), 1); c=c+1
-  id.error_status(c)=nf_put_vara_int(id.ncid,    id.Iid, id.rec_count, 1, id.rec_count, 1);       c=c+1
+  if (mype==0) then
+     c=1
+     id.rec_count=id.rec_count+1
+     write(*,*) 'writing restart record ', id.rec_count
+     id.error_status(c)=nf_open(id.filename, nf_write, id.ncid); c=c+1
+     id.error_status(c)=nf_put_vara_double(id.ncid, id.Tid, id.rec_count, 1, real(id.rec_count), 1); c=c+1
+     id.error_status(c)=nf_put_vara_int(id.ncid,    id.Iid, id.rec_count, 1, globalstep+istep, 1);   c=c+1
+  end if
 
   do i=1, id.nvar
      shape=id.var(i).ndim
 !_______writing 2D fields________________________________________________
      if (shape==1) then
         size1=id.var(i).dims(1)
-        allocate(aux1(size1))
+        if (mype==0) allocate(aux1(size1))
         if (size1==nod2D)  call gather_nod (id.var(i).pt1, aux1)
         if (size1==elem2D) call gather_elem(id.var(i).pt1, aux1)
         if (mype==0) then
-           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, id.rec_count/), (/size1, 1/), aux1, 2); c=c+1
+           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, id.rec_count/), (/size1, 1/), aux1, 1); c=c+1
         end if
-        deallocate(aux1)
+        if (mype==0) deallocate(aux1)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id.var(i).dims(1)
         size2=id.var(i).dims(2)
-        allocate(aux2(size1, size2))
+        if (mype==0) allocate(aux2(size1, size2))
         if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id.var(i).pt2, aux2)
         if (size1==elem2D .or. size2==elem2D) call gather_elem(id.var(i).pt2, aux2)
         if (mype==0) then
-           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 3); c=c+1
+           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
         end if
-        deallocate(aux2)
+        if (mype==0) deallocate(aux2)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file'
            call par_ex
@@ -386,6 +399,66 @@ subroutine write_restart(id, istep)
   id.error_count=1
   call was_error(id)
 end subroutine write_restart
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine read_restart(id, arg)
+  implicit none
+  type(nc_file),     intent(inout) :: id
+  integer, optional, intent(in)    :: arg
+  real(kind=8), allocatable        :: aux1(:), aux2(:,:) 
+  integer                          :: i, size1, size2, shape
+  integer                          :: rec2read, c
+  ! Serial output implemented so far
+  c=1
+  if (mype==0) then
+     write(*,*) 'reading restart file ', trim(id.filename)
+     id.error_status(c)=nf_open(id.filename, nf_nowrite, id.ncid);                           c=c+1
+     id.error_status(c)=nf_get_vara_int(id.ncid,    id.Iid, id.rec_count, 1, globalstep, 1); c=c+1
+     if (.not. present(arg)) then
+        rec2read=id.rec_count
+     else
+        rec2read=arg
+     end if
+     write(*,*) 'restart from record ', rec2read, ' of ', id.rec_count
+  end if
+
+  do i=1, id.nvar
+     shape=id.var(i).ndim
+!_______writing 2D fields________________________________________________
+     if (shape==1) then
+        size1=id.var(i).dims(1)
+        allocate(aux1(size1))
+        if (mype==0) then
+           id.error_status(c)=nf_get_vara_double(id.ncid, id.var(i).code, (/1, id.rec_count/), (/size1, 1/), aux1, 1); c=c+1
+        end if
+        if (size1==nod2D)  call broadcast_nod (id.var(i).pt1, aux1)
+        if (size1==elem2D) call broadcast_elem(id.var(i).pt1, aux1)
+        deallocate(aux1)
+!_______writing 3D fields________________________________________________
+     elseif (shape==2) then
+        size1=id.var(i).dims(1)
+        size2=id.var(i).dims(2)
+        allocate(aux2(size1, size2))
+        if (mype==0) then        
+           id.error_status(c)=nf_get_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+        end if
+        if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id.var(i).pt2, aux2)
+        if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id.var(i).pt2, aux2)
+        deallocate(aux2)
+     else
+        if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
+           call par_ex
+           stop
+     end if
+  end do
+
+  id.error_count=c-1
+  call was_error(id)
+  if (mype==0) id.error_status(1)=nf_close(id.ncid);
+  id.error_count=1
+  call was_error(id)
+end subroutine read_restart
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -420,6 +493,7 @@ subroutine assoc_ids(id)
   end do
   id.error_status(c)=nf_close(id.ncid); c=c+1
   id.error_count=c-1
+  write(*,*) 'current restart counter = ', id.rec_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------

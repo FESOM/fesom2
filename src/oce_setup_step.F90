@@ -487,7 +487,7 @@ USE g_input
   !=====================    
   if (r_restart) then
      if(mype==0) write(*,*) 'read ocean restart file'
-     call oce_input
+!    call oce_input
   end if
 
   relax2clim=0.0 

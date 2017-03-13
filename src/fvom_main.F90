@@ -40,30 +40,25 @@ integer :: n, nsteps,offset,row,i
 	! fancy advection etc.  
 	!=====================
 	call check_mesh_consistency
-call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
-	if (mype==0) write(*,*) 'check_mesh_consistency... complete'
 	call ocean_setup
-call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
-if (mype==0) write(*,*) 'ocean_setup made'	
 	if (mype==0) write(*,*) 'ocean_setup... complete'
 	call forcing_setup
-	
 	if (use_ice) then 
 		call ice_setup
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
 	endif
-	
 	call clock_newyear                    	! check if it is a new year
 	call init_output_mean(.not. r_restart)  ! create new output files
-
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        ! The interface to the restart module is made via check_restart !
+        ! The interface to the restart module is made via call restart !
         ! The inputs are: istep, l_write, l_create
         ! if istep is not zero it will be decided whether restart shall be written
         ! if l_write  is TRUE the restart will be forced
         ! if l_create is TRUE the new restart file will be created
-	call check_restart(0, .false., .not. r_restart) ! istep, l_write, l_create
+        ! if l_read the restart will be read
+        ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
+	call restart(0, .false., .not. r_restart, r_restart) ! istep, l_write, l_create, l_read
 	!=====================
 	
 	!=====================
@@ -122,11 +117,11 @@ if (mype==0) write(*,*) 'ocean_setup made'
 		
 		!___prepare output______________________________________________________
 		call output (0,n)        ! save (NetCDF)
- 	        call check_restart(n, .false., yearnew/=yearold) 
+ 	        call restart(n, .false., yearnew/=yearold, .false.)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________
 	if (mype==0) write(*,*) 'Run is finished, updating clock'
-!  	call clock_finish  
+  	call clock_finish  
 	call par_ex
 end program main

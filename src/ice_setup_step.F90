@@ -160,6 +160,6 @@ subroutine ice_initial_state
      enddo
   else
      if(mype==0) write(*,*) 'read ice restart file'
-     call ice_input     
+!    call ice_input     
   endif
 end subroutine ice_initial_state
