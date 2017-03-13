@@ -50,7 +50,7 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
-  type(nc_file), save       :: oid
+  type(nc_file), save       :: oid, iid
   integer,       save       :: globalstep=0
 
   PRIVATE
@@ -69,7 +69,7 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
-! the restart file. This is the only place need to be modified if a new variable is added!
+! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io
   implicit none
 
@@ -129,6 +129,34 @@ subroutine ini_ocean_io
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
+! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
+! the ice restart file. This is the only place need to be modified if a new variable is added!
+subroutine ini_ice_io
+  implicit none
+
+  integer                   :: ncid, j
+  integer                   :: varid
+  character(500)            :: longname
+  character(500)            :: filename
+  character(500)            :: trname, units
+
+  ! create an ocean restart file; serial output implemented so far
+  iid.filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.restart.nc'
+  call def_dim(iid, 'node', nod2d)
+
+  !===========================================================================
+  !===================== Definition part =====================================
+  !===========================================================================
+  !___Define the netCDF variables for 2D fields_______________________________
+  !___SSH_____________________________________________________________________
+  call def_variable(iid, 'area',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice);
+  call def_variable(iid, 'hice',         (/nod2D/),  'effective ice thickness',    'm', m_ice);
+  call def_variable(iid, 'hsnow',        (/nod2D/),  'effective snow thickness',   'm', m_snow);
+  call def_variable(iid, 'uice',         (/nod2D/),  'zonal velocity',    'm/s', u_ice);
+  call def_variable(iid, 'vice',         (/nod2D/),  'meridional velocity', 'm', v_ice);
+end subroutine ini_ice_io
+!
+!--------------------------------------------------------------------------------------------
 !
 subroutine restart(istep, l_write, l_create, l_read)
   implicit none
@@ -143,15 +171,25 @@ subroutine restart(istep, l_write, l_create, l_read)
   logical, save :: lfirst=.true.
   integer :: mpierr
 
-  if (lfirst .or. l_create) call ini_ocean_io
+  if (lfirst .or. l_create) then
+                  call ini_ocean_io
+     if (use_ice) call ini_ice_io
+  end if
   lfirst=.false.
 
   if (l_read) then
    call assoc_ids(oid);    call was_error(oid)
    call read_restart(oid); call was_error(oid)
+   if (use_ice) then
+      call assoc_ids(iid);    call was_error(iid)
+      call read_restart(iid); call was_error(iid)
+   end if
   end if
 
-  if (l_create) call create_new_file(oid); call was_error(oid)
+  if (l_create) then
+                  call create_new_file(oid); call was_error(oid)
+     if (use_ice) call create_new_file(iid); call was_error(iid)
+  end if
 
   if (istep==0) return
 
@@ -183,6 +221,10 @@ subroutine restart(istep, l_write, l_create, l_read)
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
   call assoc_ids(oid);            call was_error(oid)  
   call write_restart(oid, istep); call was_error(oid)
+  if (use_ice) then
+     call assoc_ids(iid);            call was_error(iid)  
+     call write_restart(iid, istep); call was_error(iid)
+  end if
 end subroutine restart
 !
 !--------------------------------------------------------------------------------------------
