@@ -54,7 +54,7 @@ MODULE io_RESTART
   integer,       save       :: globalstep=0
 
   PRIVATE
-  PUBLIC :: restart
+  PUBLIC :: restart, oid, iid 
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -80,7 +80,7 @@ subroutine ini_ocean_io
   character(500)            :: trname, units
 
   ! create an ocean restart file; serial output implemented so far
-  oid.filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.oce.restart.nc'
+  oid%filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.oce.restart.nc'
   call def_dim(oid, 'node', nod2d)
   call def_dim(oid, 'elem', elem2d)
   call def_dim(oid, 'nz_1', nl-1)
@@ -141,7 +141,7 @@ subroutine ini_ice_io
   character(500)            :: trname, units
 
   ! create an ocean restart file; serial output implemented so far
-  iid.filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.restart.nc'
+  iid%filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.restart.nc'
   call def_dim(iid, 'node', nod2d)
 
   !===========================================================================
@@ -239,50 +239,50 @@ subroutine create_new_file(id)
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
-  id.error_status=0
+  id%error_status=0
   ! create an ocean output file
-  write(*,*) 'initializing restart file ', trim(id.filename)
+  write(*,*) 'initializing restart file ', trim(id%filename)
 
   if (restart_offset==32) then
-     id.error_status(c) = nf_create(id.filename, nf_clobber, id.ncid);                      c=c+1
+     id%error_status(c) = nf_create(id%filename, nf_clobber, id%ncid);                      c=c+1
   else
-     id.error_status(c) = nf_create(id.filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), id.ncid); c=c+1
+     id%error_status(c) = nf_create(id%filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), id%ncid); c=c+1
   end if
 
-do j=1, id.ndim
+do j=1, id%ndim
 !___Create mesh related dimentions__________________________________________
-  id.error_status(c) = nf_def_dim(id.ncid, id.dim(j).name, id.dim(j).size, id.dim(j).code ); c=c+1
+  id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
 end do
 !___Create time related dimentions__________________________________________
-  id.error_status(c) = nf_def_dim(id.ncid, 'time', NF_UNLIMITED, id.rec);         c=c+1
+  id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
 !___Define the time and iteration variables_________________________________
-  id.error_status(c) = nf_def_var(id.ncid, 'time', NF_DOUBLE, 1, id.rec, id.Tid); c=c+1
-  id.error_status(c) = nf_def_var(id.ncid, 'iter', NF_INT,    1, id.rec, id.Iid); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%Tid); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%Iid); c=c+1
 
   longname='model time'
-  id.error_status(c) = nf_put_att_text(id.ncid, id%Tid, 'long_name', len_trim(longname), trim(longname)); c=c+1
-  id.error_status(c) = nf_put_att_text(id.ncid, id%Tid, 'units', 1, 's');                                 c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%Tid, 'long_name', len_trim(longname), trim(longname)); c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%Tid, 'units', 1, 's');                                 c=c+1
   longname='iteration_count'
-  id.error_status(c) = nf_put_att_text(id.ncid, id%Iid, 'long_name', len_trim(longname), trim(longname)); c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%Iid, 'long_name', len_trim(longname), trim(longname)); c=c+1
 
-  do j=1, id.nvar
+  do j=1, id%nvar
 !___associate physical dimension with the netcdf IDs________________________
-     n=id.var(j).ndim ! shape size of the variable (exluding time)
+     n=id%var(j)%ndim ! shape size of the variable (exluding time)
      do k=1, n
         !k_th dimension of the variable
-        kdim=id.var(j).dims(k)
-        do l=1, id.ndim ! list all defined dimensions 
-           if (kdim==id.dim(l).size) dimid(k)=id.dim(l).code
+        kdim=id%var(j)%dims(k)
+        do l=1, id%ndim ! list all defined dimensions 
+           if (kdim==id%dim(l)%size) dimid(k)=id%dim(l)%code
         end do
 !________write(*,*) kdim, ' -> ', dimid(k)__________________________________
      end do
-     id.error_status(c) = nf_def_var(id.ncid, trim(id.var(j).name), NF_DOUBLE, id.var(j).ndim+1, &
-                       (/dimid(1:n), id.rec/), id.var(j).code); c=c+1
-     id.error_status(c)=nf_put_att_text(id.ncid, id.var(j).code, 'description', len_trim(id.var(j).longname), id.var(j).longname); c=c+1
-     id.error_status(c)=nf_put_att_text(id.ncid, id.var(j).code, 'units',       len_trim(id.var(j).units),    id.var(j).units);    c=c+1
+     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, &
+                       (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
+     id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
   end do
-  id.error_status(c)=nf_close(id.ncid); c=c+1
-  id.error_count=c-1
+  id%error_status(c)=nf_close(id%ncid); c=c+1
+  id%error_count=c-1
 end subroutine create_new_file
 !
 !--------------------------------------------------------------------------------------------
@@ -294,24 +294,24 @@ subroutine def_dim(id, name, ndim)
   integer,          intent(in)    :: ndim
   type(nc_file_dims), allocatable, dimension(:) :: temp
 
-  if (id.ndim > 0) then
+  if (id%ndim > 0) then
      ! create temporal dimension
-     allocate(temp(id.ndim)); temp=id.dim
+     allocate(temp(id%ndim)); temp=id%dim
      ! deallocate the input data array
-     deallocate(id.dim)
+     deallocate(id%dim)
      ! then reallocate
-     id.ndim=id.ndim+1
-     allocate(id.dim(id.ndim))
+     id%ndim=id%ndim+1
+     allocate(id%dim(id%ndim))
      ! restore the original data
-     id.dim(1:id.ndim-1)=temp  
+     id%dim(1:id%ndim-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id.ndim=1
-     allocate(id.dim(id.ndim))
+     id%ndim=1
+     allocate(id%dim(id%ndim))
    end if
-   id.dim(id.ndim).name=trim(name)
-   id.dim(id.ndim).size=ndim
+   id%dim(id%ndim)%name=trim(name)
+   id%dim(id%ndim)%size=ndim
 end subroutine def_dim
 !
 !--------------------------------------------------------------------------------------------
@@ -326,28 +326,28 @@ subroutine def_variable_1d(id, name, dims, longname, units, data)
   integer                                :: c
   type(nc_file_vars), allocatable, dimension(:) :: temp
 
-  if (id.nvar > 0) then
+  if (id%nvar > 0) then
      ! create temporal dimension
-     allocate(temp(id.nvar)); temp=id.var
+     allocate(temp(id%nvar)); temp=id%var
      ! deallocate the input data array
-     deallocate(id.var)
+     deallocate(id%var)
      ! then reallocate
-     id.nvar=id.nvar+1
-     allocate(id.var(id.nvar))
+     id%nvar=id%nvar+1
+     allocate(id%var(id%nvar))
      ! restore the original data
-     id.var(1:id.nvar-1)=temp  
+     id%var(1:id%nvar-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id.nvar=1
-     allocate(id.var(id.nvar))
+     id%nvar=1
+     allocate(id%var(id%nvar))
    end if
-   id.var(id.nvar).name=trim(name)
-   id.var(id.nvar).longname=trim(longname)
-   id.var(id.nvar).units=trim(units)
-   id.var(id.nvar).ndim=1
-   id.var(id.nvar).dims(1)=dims(1)
-   id.var(id.nvar).pt1=>data
+   id%var(id%nvar)%name=trim(name)
+   id%var(id%nvar)%longname=trim(longname)
+   id%var(id%nvar)%units=trim(units)
+   id%var(id%nvar)%ndim=1
+   id%var(id%nvar)%dims(1)=dims(1)
+   id%var(id%nvar)%pt1=>data
 end subroutine def_variable_1d
 !
 !--------------------------------------------------------------------------------------------
@@ -362,28 +362,28 @@ subroutine def_variable_2d(id, name, dims, longname, units, data)
   integer                                :: c
   type(nc_file_vars), allocatable, dimension(:) :: temp
 
-  if (id.nvar > 0) then
+  if (id%nvar > 0) then
      ! create temporal dimension
-     allocate(temp(id.nvar)); temp=id.var
+     allocate(temp(id%nvar)); temp=id%var
      ! deallocate the input data array
-     deallocate(id.var)
+     deallocate(id%var)
      ! then reallocate
-     id.nvar=id.nvar+1
-     allocate(id.var(id.nvar))
+     id%nvar=id%nvar+1
+     allocate(id%var(id%nvar))
      ! restore the original data
-     id.var(1:id.nvar-1)=temp  
+     id%var(1:id%nvar-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id.nvar=1
-     allocate(id.var(id.nvar))
+     id%nvar=1
+     allocate(id%var(id%nvar))
    end if
-   id.var(id.nvar).name=trim(name)
-   id.var(id.nvar).longname=trim(longname)
-   id.var(id.nvar).units=trim(units)
-   id.var(id.nvar).ndim=2
-   id.var(id.nvar).dims(1:2)=dims
-   id.var(id.nvar).pt2=>data
+   id%var(id%nvar)%name=trim(name)
+   id%var(id%nvar)%longname=trim(longname)
+   id%var(id%nvar)%units=trim(units)
+   id%var(id%nvar)%ndim=2
+   id%var(id%nvar)%dims(1:2)=dims
+   id%var(id%nvar)%pt2=>data
 end subroutine def_variable_2d
 !
 !--------------------------------------------------------------------------------------------
@@ -398,34 +398,34 @@ subroutine write_restart(id, istep)
   ! Serial output implemented so far
   if (mype==0) then
      c=1
-     id.rec_count=id.rec_count+1
-     write(*,*) 'writing restart record ', id.rec_count
-     id.error_status(c)=nf_open(id.filename, nf_write, id.ncid); c=c+1
-     id.error_status(c)=nf_put_vara_double(id.ncid, id.Tid, id.rec_count, 1, real(id.rec_count), 1); c=c+1
-     id.error_status(c)=nf_put_vara_int(id.ncid,    id.Iid, id.rec_count, 1, globalstep+istep, 1);   c=c+1
+     id%rec_count=id%rec_count+1
+     write(*,*) 'writing restart record ', id%rec_count
+     id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
+     id%error_status(c)=nf_put_vara_double(id%ncid, id%Tid, id%rec_count, 1, real(id%rec_count), 1); c=c+1
+     id%error_status(c)=nf_put_vara_int(id%ncid,    id%Iid, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
-  do i=1, id.nvar
-     shape=id.var(i).ndim
+  do i=1, id%nvar
+     shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
      if (shape==1) then
-        size1=id.var(i).dims(1)
+        size1=id%var(i)%dims(1)
         if (mype==0) allocate(aux1(size1))
-        if (size1==nod2D)  call gather_nod (id.var(i).pt1, aux1)
-        if (size1==elem2D) call gather_elem(id.var(i).pt1, aux1)
+        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1)
+        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1)
         if (mype==0) then
-           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, id.rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
         end if
         if (mype==0) deallocate(aux1)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
-        size1=id.var(i).dims(1)
-        size2=id.var(i).dims(2)
+        size1=id%var(i)%dims(1)
+        size2=id%var(i)%dims(2)
         if (mype==0) allocate(aux2(size1, size2))
-        if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id.var(i).pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call gather_elem(id.var(i).pt2, aux2)
+        if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2)
+        if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2)
         if (mype==0) then
-           id.error_status(c)=nf_put_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
         end if
         if (mype==0) deallocate(aux2)
      else
@@ -435,10 +435,10 @@ subroutine write_restart(id, istep)
      end if
   end do
 
-  id.error_count=c-1
+  id%error_count=c-1
   call was_error(id)
-  if (mype==0) id.error_status(1)=nf_close(id.ncid);
-  id.error_count=1
+  if (mype==0) id%error_status(1)=nf_close(id%ncid);
+  id%error_count=1
   call was_error(id)
 end subroutine write_restart
 !
@@ -454,39 +454,39 @@ subroutine read_restart(id, arg)
   ! Serial output implemented so far
   c=1
   if (mype==0) then
-     write(*,*) 'reading restart file ', trim(id.filename)
-     id.error_status(c)=nf_open(id.filename, nf_nowrite, id.ncid);                           c=c+1
-     id.error_status(c)=nf_get_vara_int(id.ncid,    id.Iid, id.rec_count, 1, globalstep, 1); c=c+1
+     write(*,*) 'reading restart file ', trim(id%filename)
+     id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
+     id%error_status(c)=nf_get_vara_int(id%ncid,    id%Iid, id%rec_count, 1, globalstep, 1); c=c+1
      if (.not. present(arg)) then
-        rec2read=id.rec_count
+        rec2read=id%rec_count
      else
         rec2read=arg
      end if
-     write(*,*) 'restart from record ', rec2read, ' of ', id.rec_count
+     write(*,*) 'restart from record ', rec2read, ' of ', id%rec_count
   end if
 
-  do i=1, id.nvar
-     shape=id.var(i).ndim
+  do i=1, id%nvar
+     shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
      if (shape==1) then
-        size1=id.var(i).dims(1)
+        size1=id%var(i)%dims(1)
         allocate(aux1(size1))
         if (mype==0) then
-           id.error_status(c)=nf_get_vara_double(id.ncid, id.var(i).code, (/1, id.rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
         end if
-        if (size1==nod2D)  call broadcast_nod (id.var(i).pt1, aux1)
-        if (size1==elem2D) call broadcast_elem(id.var(i).pt1, aux1)
+        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux1)
+        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux1)
         deallocate(aux1)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
-        size1=id.var(i).dims(1)
-        size2=id.var(i).dims(2)
+        size1=id%var(i)%dims(1)
+        size2=id%var(i)%dims(2)
         allocate(aux2(size1, size2))
         if (mype==0) then        
-           id.error_status(c)=nf_get_vara_double(id.ncid, id.var(i).code, (/1, 1, id.rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
         end if
-        if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id.var(i).pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id.var(i).pt2, aux2)
+        if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2, aux2)
+        if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2, aux2)
         deallocate(aux2)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
@@ -495,10 +495,10 @@ subroutine read_restart(id, arg)
      end if
   end do
 
-  id.error_count=c-1
+  id%error_count=c-1
   call was_error(id)
-  if (mype==0) id.error_status(1)=nf_close(id.ncid);
-  id.error_count=1
+  if (mype==0) id%error_status(1)=nf_close(id%ncid);
+  id%error_count=1
   call was_error(id)
 end subroutine read_restart
 !
@@ -513,29 +513,29 @@ subroutine assoc_ids(id)
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
-  id.error_status=0
+  id%error_status=0
   ! open existing netcdf file
-  write(*,*) 'associating restart file ', trim(id.filename)
+  write(*,*) 'associating restart file ', trim(id%filename)
 
-  id.error_status(c) = nf_open(id.filename, nf_nowrite, id.ncid); c=c+1
+  id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
 
-  do j=1, id.ndim
+  do j=1, id%ndim
 !___Associate mesh related dimentions_______________________________________
-    id.error_status(c) = nf_inq_dimid(id.ncid, id.dim(j).name, id.dim(j).code); c=c+1
+    id%error_status(c) = nf_inq_dimid(id%ncid, id%dim(j)%name, id%dim(j)%code); c=c+1
   end do
 !___Associate time related dimentions_______________________________________
-  id.error_status(c) = nf_inq_dimid (id.ncid, 'time', id.rec);       c=c+1
-  id.error_status(c) = nf_inq_dimlen(id.ncid, id.rec, id.rec_count); c=c+1
+  id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec);       c=c+1
+  id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec, id%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
-  id.error_status(c) = nf_inq_varid(id.ncid, 'time', id.Tid); c=c+1
-  id.error_status(c) = nf_inq_varid(id.ncid, 'iter', id.Iid); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%Tid); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%Iid); c=c+1
 !___Associate physical variables____________________________________________
-  do j=1, id.nvar
-     id.error_status(c) = nf_inq_varid(id.ncid, id.var(j).name, id.var(j).code); c=c+1
+  do j=1, id%nvar
+     id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
   end do
-  id.error_status(c)=nf_close(id.ncid); c=c+1
-  id.error_count=c-1
-  write(*,*) 'current restart counter = ', id.rec_count
+  id%error_status(c)=nf_close(id%ncid); c=c+1
+  id%error_count=c-1
+  write(*,*) 'current restart counter = ', id%rec_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------
@@ -545,11 +545,11 @@ subroutine was_error(id)
   type(nc_file),  intent(inout) :: id
   integer                       :: k, status, ierror
 
-  call MPI_BCast(id.error_count, 1,  MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(id.error_status(1), id.error_count, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
 
-  do k=1, id.error_count
-     status=id.error_status(k)
+  do k=1, id%error_count
+     status=id%error_status(k)
      if (status .ne. nf_noerr) then
         if (mype==0) call handle_err(status)
         call par_ex
