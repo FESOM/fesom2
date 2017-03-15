@@ -40,6 +40,7 @@ MODULE io_RESTART
     integer :: ncid
     integer :: rec_count=0
     integer :: error_status(100), error_count
+    logical :: is_in_use=.false.
   end type nc_file
 !
 !--------------------------------------------------------------------------------------------
@@ -70,17 +71,22 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io
+subroutine ini_ocean_io(year)
   implicit none
 
+  integer, intent(in)       :: year
   integer                   :: ncid, j
   integer                   :: varid
   character(500)            :: longname
   character(500)            :: filename
   character(500)            :: trname, units
+  character(4)              :: cyear
 
+  write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
-  oid%filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.oce.restart.nc'
+  oid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  if (oid%is_in_use) return
+  oid%is_in_use=.true.
   call def_dim(oid, 'node', nod2d)
   call def_dim(oid, 'elem', elem2d)
   call def_dim(oid, 'nz_1', nl-1)
@@ -131,17 +137,22 @@ end subroutine ini_ocean_io
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io
+subroutine ini_ice_io(year)
   implicit none
 
+  integer, intent(in)       :: year
   integer                   :: ncid, j
   integer                   :: varid
   character(500)            :: longname
   character(500)            :: filename
   character(500)            :: trname, units
+  character(4)              :: cyear
 
+  write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
-  iid%filename=trim(ResultPath)//trim(runid)//'.'//cyearnew//'.ice.restart.nc'
+  iid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+  if (iid%is_in_use) return
+  iid%is_in_use=.true.
   call def_dim(iid, 'node', nod2d)
 
   !===========================================================================
@@ -162,7 +173,7 @@ subroutine restart(istep, l_write, l_create, l_read)
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
-  ! if l_read   is TRUE the the restart file will be read
+  ! if l_read   is TRUE the restart file will be read
   ! if l_create is TRUE the new restart file will be created
 
   integer :: istep
@@ -172,8 +183,13 @@ subroutine restart(istep, l_write, l_create, l_read)
   integer :: mpierr
 
   if (lfirst .or. l_create) then
-                  call ini_ocean_io
-     if (use_ice) call ini_ice_io
+     if (.not. l_read) then
+                  call ini_ocean_io(yearnew)
+     if (use_ice) call ini_ice_io(yearnew)
+     else
+                  call ini_ocean_io(yearold)
+     if (use_ice) call ini_ice_io(yearold)
+     end if
   end if
   lfirst=.false.
 
@@ -188,6 +204,7 @@ subroutine restart(istep, l_write, l_create, l_read)
 
   if (l_create) then
                   call create_new_file(oid); call was_error(oid)
+  if(mype==0) write(*,*) 'initialization compele'
      if (use_ice) call create_new_file(iid); call was_error(iid)
   end if
 
@@ -242,7 +259,6 @@ subroutine create_new_file(id)
   id%error_status=0
   ! create an ocean output file
   write(*,*) 'initializing restart file ', trim(id%filename)
-
   if (restart_offset==32) then
      id%error_status(c) = nf_create(id%filename, nf_clobber, id%ncid);                      c=c+1
   else
@@ -253,6 +269,7 @@ do j=1, id%ndim
 !___Create mesh related dimentions__________________________________________
   id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
 end do
+
 !___Create time related dimentions__________________________________________
   id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
 !___Define the time and iteration variables_________________________________
@@ -281,6 +298,7 @@ end do
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
   end do
+
   id%error_status(c)=nf_close(id%ncid); c=c+1
   id%error_count=c-1
 end subroutine create_new_file
@@ -552,6 +570,7 @@ subroutine was_error(id)
      status=id%error_status(k)
      if (status .ne. nf_noerr) then
         if (mype==0) call handle_err(status)
+        if (mype==0) write(*,*) 'error counter=', k
         call par_ex
         stop
      end if
