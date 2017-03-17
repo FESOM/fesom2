@@ -11,15 +11,15 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! 
-  type nc_file_dims
+  type nc_dims
     integer        :: size
     character(100) :: name
     integer        :: code
-  end type nc_file_dims
+  end type nc_dims
 !
 !--------------------------------------------------------------------------------------------
 !
-  type nc_file_vars
+  type nc_vars
     character(100) :: name
     integer        :: code
     character(500) :: longname
@@ -27,19 +27,19 @@ MODULE io_RESTART
     integer        :: ndim
     integer        :: dims(2) !<=2; assume there are no variables with dimension more than 2xNLxT
     real(kind=WP), pointer :: pt1(:), pt2(:,:)
-  end type nc_file_vars
+  end type nc_vars
 !
 !--------------------------------------------------------------------------------------------
 !
   type nc_file
     character(500)                                :: filename
-    type(nc_file_dims), allocatable, dimension(:) :: dim
-    type(nc_file_vars), allocatable, dimension(:) :: var
+    type(nc_dims), allocatable, dimension(:) :: dim
+    type(nc_vars), allocatable, dimension(:) :: var
     integer :: ndim=0, nvar=0
     integer :: rec, Tid, Iid
     integer :: ncid
     integer :: rec_count=0
-    integer :: error_status(100), error_count
+    integer :: error_status(200), error_count
     logical :: is_in_use=.false.
   end type nc_file
 !
@@ -169,29 +169,24 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_create, l_read)
+subroutine restart(istep, l_write, l_read)
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
   ! if l_read   is TRUE the restart file will be read
-  ! if l_create is TRUE the new restart file will be created
 
   integer :: istep
-  logical :: l_create, l_write, l_read
+  logical :: l_write, l_read
   logical :: is_restart
-  logical, save :: lfirst=.true.
   integer :: mpierr
 
-  if (lfirst .or. l_create) then
-     if (.not. l_read) then
-                  call ini_ocean_io(yearnew)
-     if (use_ice) call ini_ice_io(yearnew)
-     else
-                  call ini_ocean_io(yearold)
-     if (use_ice) call ini_ice_io(yearold)
-     end if
+  if (.not. l_read) then
+               call ini_ocean_io(yearnew)
+  if (use_ice) call ini_ice_io(yearnew)
+  else
+               call ini_ocean_io(yearold)
+  if (use_ice) call ini_ice_io(yearold)
   end if
-  lfirst=.false.
 
   if (l_read) then
    call assoc_ids(oid);    call was_error(oid)
@@ -200,12 +195,6 @@ subroutine restart(istep, l_write, l_create, l_read)
       call assoc_ids(iid);    call was_error(iid)
       call read_restart(iid); call was_error(iid)
    end if
-  end if
-
-  if (l_create) then
-                  call create_new_file(oid); call was_error(oid)
-  if(mype==0) write(*,*) 'initialization compele'
-     if (use_ice) call create_new_file(iid); call was_error(iid)
   end if
 
   if (istep==0) return
@@ -250,37 +239,36 @@ subroutine create_new_file(id)
   implicit none
 
   type(nc_file),  intent(inout) :: id
-  character(500)                :: longname
   integer                       :: c, j
   integer                       :: n, k, l, kdim, dimid(4)
+  character(2000)               :: att_text
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
   id%error_status=0
   ! create an ocean output file
   write(*,*) 'initializing restart file ', trim(id%filename)
-  if (restart_offset==32) then
-     id%error_status(c) = nf_create(id%filename, nf_clobber, id%ncid);                      c=c+1
-  else
-     id%error_status(c) = nf_create(id%filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), id%ncid); c=c+1
-  end if
+  id%error_status(c) = nf_create(id%filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), id%ncid); c=c+1
 
-do j=1, id%ndim
+  do j=1, id%ndim
 !___Create mesh related dimentions__________________________________________
-  id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
-end do
+     id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
+  end do
 
 !___Create time related dimentions__________________________________________
   id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
 !___Define the time and iteration variables_________________________________
-  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%Tid); c=c+1
-  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%Iid); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%tID); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%iID); c=c+1
 
-  longname='model time'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%Tid, 'long_name', len_trim(longname), trim(longname)); c=c+1
-  id%error_status(c) = nf_put_att_text(id%ncid, id%Tid, 'units', 1, 's');                                 c=c+1
-  longname='iteration_count'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%Iid, 'long_name', len_trim(longname), trim(longname)); c=c+1
+
+  att_text='time'
+  id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearnew, '-', month, '-', day_in_month, ' 0:0:0'
+  id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
+
+  att_text='iteration_count'
+  id%error_status(c) = nf_put_att_text(id%ncid, id%iID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
 
   do j=1, id%nvar
 !___associate physical dimension with the netcdf IDs________________________
@@ -310,7 +298,7 @@ subroutine def_dim(id, name, ndim)
   type(nc_file),    intent(inout) :: id
   character(len=*), intent(in)    :: name
   integer,          intent(in)    :: ndim
-  type(nc_file_dims), allocatable, dimension(:) :: temp
+  type(nc_dims), allocatable, dimension(:) :: temp
 
   if (id%ndim > 0) then
      ! create temporal dimension
@@ -342,7 +330,7 @@ subroutine def_variable_1d(id, name, dims, longname, units, data)
   character(len=*), intent(in), optional :: units, longname
   real(kind=8),target,     intent(inout)        :: data(:)
   integer                                :: c
-  type(nc_file_vars), allocatable, dimension(:) :: temp
+  type(nc_vars), allocatable, dimension(:) :: temp
 
   if (id%nvar > 0) then
      ! create temporal dimension
@@ -378,7 +366,7 @@ subroutine def_variable_2d(id, name, dims, longname, units, data)
   character(len=*), intent(in), optional :: units, longname
   real(kind=8),target,     intent(inout) :: data(:,:)
   integer                                :: c
-  type(nc_file_vars), allocatable, dimension(:) :: temp
+  type(nc_vars), allocatable, dimension(:) :: temp
 
   if (id%nvar > 0) then
      ! create temporal dimension
@@ -419,8 +407,8 @@ subroutine write_restart(id, istep)
      id%rec_count=id%rec_count+1
      write(*,*) 'writing restart record ', id%rec_count
      id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
-     id%error_status(c)=nf_put_vara_double(id%ncid, id%Tid, id%rec_count, 1, real(id%rec_count), 1); c=c+1
-     id%error_status(c)=nf_put_vara_int(id%ncid,    id%Iid, id%rec_count, 1, globalstep+istep, 1);   c=c+1
+     id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, timeold+(dayold-1)*86400, 1); c=c+1
+     id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
   do i=1, id%nvar
@@ -453,7 +441,7 @@ subroutine write_restart(id, istep)
      end if
   end do
 
-  id%error_count=c-1
+  if (mype==0) id%error_count=c-1
   call was_error(id)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
@@ -474,7 +462,7 @@ subroutine read_restart(id, arg)
   if (mype==0) then
      write(*,*) 'reading restart file ', trim(id%filename)
      id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
-     id%error_status(c)=nf_get_vara_int(id%ncid,    id%Iid, id%rec_count, 1, globalstep, 1); c=c+1
+     id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
      if (.not. present(arg)) then
         rec2read=id%rec_count
      else
@@ -535,7 +523,13 @@ subroutine assoc_ids(id)
   ! open existing netcdf file
   write(*,*) 'associating restart file ', trim(id%filename)
 
-  id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
+  id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid)
+  !if the file does not exist it will be created!
+  if (id%error_status(c) .ne. nf_noerr) then
+     call create_new_file(id) ! error status counter will be reset
+     c=id%error_count+1
+     id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
+  end if
 
   do j=1, id%ndim
 !___Associate mesh related dimentions_______________________________________
@@ -545,8 +539,8 @@ subroutine assoc_ids(id)
   id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec);       c=c+1
   id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec, id%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
-  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%Tid); c=c+1
-  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%Iid); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%tID); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iID); c=c+1
 !___Associate physical variables____________________________________________
   do j=1, id%nvar
      id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
@@ -554,6 +548,7 @@ subroutine assoc_ids(id)
   id%error_status(c)=nf_close(id%ncid); c=c+1
   id%error_count=c-1
   write(*,*) 'current restart counter = ', id%rec_count
+  write(*,*) 'final current  id%error_count = ', id%error_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------
@@ -569,8 +564,8 @@ subroutine was_error(id)
   do k=1, id%error_count
      status=id%error_status(k)
      if (status .ne. nf_noerr) then
-        if (mype==0) call handle_err(status)
         if (mype==0) write(*,*) 'error counter=', k
+        if (mype==0) call handle_err(status)
         call par_ex
         stop
      end if

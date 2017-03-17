@@ -19,6 +19,7 @@ use g_forcing_index
 use g_comm_auto
 use g_forcing_arrays
 use io_RESTART
+use io_MEANDATA
 IMPLICIT NONE
 
 integer :: n, nsteps,offset,row,i
@@ -49,16 +50,14 @@ integer :: n, nsteps,offset,row,i
 		ice_update=.true.
 	endif
 	call clock_newyear                    	! check if it is a new year
-	call init_output_mean(.not. r_restart)  ! create new output files
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
         ! The interface to the restart module is made via call restart !
         ! The inputs are: istep, l_write, l_create
         ! if istep is not zero it will be decided whether restart shall be written
         ! if l_write  is TRUE the restart will be forced
-        ! if l_create is TRUE the new restart file will be created
         ! if l_read the restart will be read
         ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
-	call restart(0, .false., .not. r_restart, r_restart) ! istep, l_write, l_create, l_read
+	call restart(0, .false., r_restart) ! istep, l_write, l_read
 
 	!=====================
 	
@@ -81,7 +80,6 @@ integer :: n, nsteps,offset,row,i
 			write(*,*)
 		end if
 		
-		call init_output_mean(yearnew/=yearold)
 		call clock
 		call forcing_index
 		call compute_vel_nodes 
@@ -117,8 +115,8 @@ integer :: n, nsteps,offset,row,i
 		end if 	
 		
 		!___prepare output______________________________________________________
-		call output (0,n)        ! save (NetCDF)
- 	        call restart(n, .false., yearnew/=yearold, .false.)
+                call output (n)
+ 	        call restart(n, .false., .false.)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________

@@ -31,7 +31,8 @@ MODULES = oce_modules.o \
           gen_str2unstr.o \
 	  fort_part.o \
           gen_input.o \
-          io_restart.o
+          io_restart.o \
+          io_meandata.o
 
 OBJECTS=  fvom_main.o \
           oce_ale.o \
@@ -60,7 +61,7 @@ OBJECTS=  fvom_main.o \
           gen_forcing_couple.o \
           gen_forcing_ocean.o \
           gen_interpolation.o \
-          gen_output_mean.o \
+          gen_events.o \
           write_step_info.o
 
 
