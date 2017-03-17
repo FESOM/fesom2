@@ -264,7 +264,7 @@ subroutine create_new_file(id)
 
   att_text='time'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearnew, '-', month, '-', daynew, ' 0:0:0'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   att_text='iteration_count'
