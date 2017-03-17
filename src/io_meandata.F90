@@ -150,9 +150,9 @@ subroutine assoc_ids(entry)
 
   if (entry%error_status(c) .ne. nf_noerr) then
      call create_new_file(entry) ! error status counter will be reset
-     c=entry%error_count
+     c=entry%error_count+1
+     entry%error_status(c) = nf_open(entry%filename, nf_nowrite, entry%ncid); c=c+1
   end if
-  c=c+1
 
   do j=1, entry%ndim
 !___Create mesh related dimentions__________________________________________
