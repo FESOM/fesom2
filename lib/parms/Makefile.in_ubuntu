@@ -13,7 +13,7 @@ CPP = /usr/bin/cpp -P -C
 
 # Compiler and Linker
 CC = mpicc
-FC = mpif90
+FC = mpif90 -fdefault-real-8
 LD = $FC
 
 # Optimization specs for compiler

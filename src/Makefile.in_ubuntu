@@ -1,3 +1,5 @@
+# To install fesom2 on ubuntu 16.04 the following packages have to be installed:
+# sudo apt-get install subversion build-essential gfortran mpi-default-dev libnetcdf-dev ibnetcdff-dev libhdf5-dev libopenblas-dev
 # Compiler and Linker
 CC = mpicc 
 FC = mpif90 
@@ -15,14 +17,14 @@ MPI_INCLUDE        =
 # NetCDF library and include definitions
 #    (use 'module load netcdf')
 NCDIR   = # /opt/cray/netcdf/4.3.0/INTEL/130
-NCLIB   = -L/scratch/users/nkolduno/miniconda2/lib -lnetcdff -lnetcdf -lhdf5 -lhdf5_fortran -lhdf5_hl
-NCINC   = -I/scratch/users/nkolduno/miniconda2/include
+NCLIB   = -L/usr/lib/x86_64-linux-gnu/ -lnetcdff -lnetcdf -lhdf5 -lhdf5_fortran -lhdf5_hl
+NCINC   = -I/usr/include/
 
 #NCLIB   = -/usr/lib/x86_64-linux-gnu/ -lnetcdff -lnetcdf -lhdf5 -lhdf5_fortran -lhdf5_hl
 #NCINC   = -I/usr/include/
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
-LIB_LAP = -L/scratch/users/nkolduno/miniconda2/lib -lopenblas
+LIB_LAP = -L/usr/lib/ -lopenblas
 
 # Further libraries
 LIBS =
