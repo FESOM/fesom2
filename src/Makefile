@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in
+include Makefile.in_hlrn
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -31,24 +31,24 @@ MODULES = oce_modules.o \
           gen_str2unstr.o \
 	  fort_part.o \
           gen_input.o \
-          io_restart.o \
-          io_meandata.o
+          io_meandata.o \
+          io_restart.o
 
 OBJECTS=  fvom_main.o \
-          oce_ale.o \
-          oce_ale_tracer.o \
-          oce_ale_mixing_pp.o \
           oce_setup_step.o \
           oce_mesh.o \
           oce_dyn.o \
-          oce_ale_vel_rhs.o \
+          oce_vel_rhs.o \
           oce_vel_rhs_vinv.o \
-	  oce_ale_pressure_bv.o \
+	  oce_pressure_bv.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
           oce_fct_muscl_adv.o \
+          oce_mixing.o \
           oce_ice_init_state.o \
           oce_shortwave_pene.o \
+          oce_ale.o \
+          oce_ale_tracer.o \
           ice_setup_step.o \
           ice_evp.o \
           ice_fct.o \
@@ -62,8 +62,7 @@ OBJECTS=  fvom_main.o \
           gen_forcing_ocean.o \
           gen_interpolation.o \
           gen_events.o \
-          write_step_info.o
-
+          write_step_info.o  
 
 
 # oce_pressure_bv.o \
@@ -80,14 +79,14 @@ default: run
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) 
+	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB) 
 	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
-	$(MPI_LIB) $(LIB_METIS) $(NCLIB)
+	$(MPI_LIB) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 
@@ -97,8 +96,9 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 
 .F90.o :
 	@echo $@
-	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) \
-	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
+	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
+	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
+	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 
 clean :
 	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x
