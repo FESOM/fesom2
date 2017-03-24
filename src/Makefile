@@ -35,6 +35,7 @@ MODULES = oce_modules.o \
           io_restart.o
 
 OBJECTS=  fvom_main.o \
+          gen_comm.o \
           oce_setup_step.o \
           oce_mesh.o \
           oce_dyn.o \
@@ -54,7 +55,6 @@ OBJECTS=  fvom_main.o \
           ice_fct.o \
           ice_oce_coupling.o \
           ice_thermodynamics.o \
-          gen_comm.o \
           gen_model_setup.o \
           gen_forcing_init.o \
           gen_bulk_formulae.o \
@@ -94,11 +94,15 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 .c.o :
 	$(CC) $(COPT) $(METIS_DEFS) $(CPP_DEFS) $(PARMS_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INCLUDE) -c $*.c	
 
+#.F90.o :
+#	@echo $@
+#	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
+#	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
+#	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 .F90.o :
 	@echo $@
-	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
-	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
-	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
+	$(FC) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
+	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
 
 clean :
 	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x
