@@ -22,7 +22,6 @@ module io_MEANDATA
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:)
 
-
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -34,7 +33,7 @@ module io_MEANDATA
     integer                                            :: dimID(2), varID
     integer                                            :: freq=1
     character					       :: freq_unit='m'
-    integer                                            :: error_status(100), error_count
+    integer                                            :: error_status(1000), error_count
     logical                                            :: is_in_use=.false.
   end type
 !
@@ -42,6 +41,7 @@ module io_MEANDATA
 !
   type(Meandata), save, allocatable, target :: io_stream(:)
   integer, save                             :: io_NSTREAMS=0
+  real(kind=WP)                             :: ctime !current time in seconds from the beginning of the year
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -138,7 +138,8 @@ subroutine assoc_ids(entry)
   implicit none
 
   type(Meandata), intent(inout) :: entry
-  integer                       :: c, j
+  integer                       :: c, j, k
+  real(kind=8)                  :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
@@ -163,11 +164,29 @@ subroutine assoc_ids(entry)
   entry%error_status(c) = nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
   entry%error_status(c) = nf_inq_varid(entry%ncid, 'time', entry%tID); c=c+1
+!___if the time rtime at the rec_count is larger than ctime we look for the closest record with the 
+! timestamp less than ctime
+  do k=entry%rec_count, 1, -1
+     entry%error_status(c)=nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1);
+     if (ctime > rtime) then
+        entry%rec_count=k+1
+!       write(*,*) 'I/O '//trim(entry%name)//' : current record = ', entry%rec_count, '; ', entry%rec_count, ' records in the file;'
+        exit ! a proper rec_count detected, exit the loop
+     end if
+     if (k==1) then
+        write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
+        entry%rec_count=1
+        exit ! no appropriate rec_count detected
+     end if
+  end do
+  c=c+1 ! check will be made only for the last nf_get_vara_double
+
+  entry%rec_count=max(entry%rec_count, 1)
 !___Associate physical variables____________________________________________
   entry%error_status(c) = nf_inq_varid(entry%ncid, entry%name, entry%varID); c=c+1
   entry%error_status(c)=nf_close(entry%ncid); c=c+1
   entry%error_count=c-1
-  write(*,*) 'current mean I/O counter = ', entry%rec_count
+  write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------
@@ -181,13 +200,12 @@ subroutine write_mean(entry)
   ! Serial output implemented so far
   if (mype==0) then
      c=1
-     entry%rec_count=entry%rec_count+1
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      entry%error_status(c)=nf_open(entry%filename, nf_write, entry%ncid); c=c+1
-     entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, timeold+(dayold-1.)*86400, 1); c=c+1
+     entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1); c=c+1
   end if
 !_______writing 2D fields________________________________________________
-     if (entry.ndim==1) then
+     if (entry%ndim==1) then
         size1=entry%glsize(1)
         if (mype==0) allocate(aux1(size1))
         if (size1==nod2D)  call gather_nod (entry%local_values(1:entry%lcsize(1),1), aux1)
@@ -197,7 +215,7 @@ subroutine write_mean(entry)
         end if
         if (mype==0) deallocate(aux1)
 !_______writing 3D fields________________________________________________
-     elseif (entry.ndim==2) then
+     elseif (entry%ndim==2) then
         size1=entry%glsize(1)
         size2=entry%glsize(2)
         if (mype==0) allocate(aux2(size1, size2))
@@ -254,9 +272,9 @@ subroutine output(istep)
   logical       :: do_output
   type(Meandata), pointer :: entry
 
+  ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io
-  lfirst=.false.
- 
+
   call update_means
 
   do n=1, io_NSTREAMS
@@ -294,6 +312,7 @@ subroutine output(istep)
      entry%local_values = 0. ! clean_meanarrays
      entry%addcounter   = 0  ! clean_meanarrays
   end do
+  lfirst=.false.
 end subroutine output
 !
 !--------------------------------------------------------------------------------------------

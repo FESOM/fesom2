@@ -53,6 +53,7 @@ MODULE io_RESTART
 ! id will keep the IDs of all required dimentions and variables
   type(nc_file), save       :: oid, iid
   integer,       save       :: globalstep=0
+  real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
   PUBLIC :: restart, oid, iid 
@@ -180,6 +181,7 @@ subroutine restart(istep, l_write, l_read)
   logical :: is_restart
   integer :: mpierr
 
+  ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                call ini_ocean_io(yearnew)
   if (use_ice) call ini_ice_io(yearnew)
@@ -404,10 +406,10 @@ subroutine write_restart(id, istep)
   ! Serial output implemented so far
   if (mype==0) then
      c=1
-     id%rec_count=id%rec_count+1
+     !id%rec_count=id%rec_count+1
      write(*,*) 'writing restart record ', id%rec_count
      id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
-     id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, timeold+(dayold-1)*86400, 1); c=c+1
+     id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, ctime, 1); c=c+1
      id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
@@ -457,20 +459,32 @@ subroutine read_restart(id, arg)
   real(kind=8), allocatable        :: aux1(:), aux2(:,:) 
   integer                          :: i, size1, size2, shape
   integer                          :: rec2read, c
+  real(kind=8)                     :: rtime !timestamp of the record
   ! Serial output implemented so far
   c=1
   if (mype==0) then
      write(*,*) 'reading restart file ', trim(id%filename)
      id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
      id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
+     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
+
      if (.not. present(arg)) then
         rec2read=id%rec_count
      else
         rec2read=arg
      end if
      write(*,*) 'restart from record ', rec2read, ' of ', id%rec_count
+
+     if (int(ctime)/=int(rtime)) then
+        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
+        write(*,*) 'restart/ times are:', ctime, rtime
+        write(*,*) 'the model will stop!'
+        id%error_status(c)=-310; c=c+1
+     end if
   end if
 
+  call was_error(id); c=1
+ 
   do i=1, id%nvar
      shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
@@ -515,7 +529,8 @@ subroutine assoc_ids(id)
 
   type(nc_file),  intent(inout) :: id
   character(500)                :: longname
-  integer                       :: c, j
+  integer                       :: c, j, k
+  real(kind=8)                  :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
@@ -541,14 +556,33 @@ subroutine assoc_ids(id)
 !___Associate the time and iteration variables______________________________
   id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%tID); c=c+1
   id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iID); c=c+1
+!___if the time rtime at the rec_count does not equal ctime we look for the closest record with the 
+! timestamp less than ctime
+  do k=id%rec_count, 1, -1
+     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, k, 1, rtime, 1);
+     if (ctime > rtime) then
+        id%rec_count=k+1
+        exit ! a proper rec_count detected, ready for writing restart, exit the loop
+     elseif (ctime == rtime) then
+        id%rec_count=k
+        exit ! a proper rec_count detected, ready for reading restart, exit the loop
+     end if
+     if (k==1) then
+        if (mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
+        if (mype==0) write(*,*) 'reading restart will not be possible !'
+        if (mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
+        id%error_status(c)=-310;
+     end if
+  end do
+  c=c+1 ! check will be made only for the last nf_get_vara_double
+  id%rec_count=max(id%rec_count, 1)
 !___Associate physical variables____________________________________________
   do j=1, id%nvar
      id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
   end do
   id%error_status(c)=nf_close(id%ncid); c=c+1
   id%error_count=c-1
-  write(*,*) 'current restart counter = ', id%rec_count
-  write(*,*) 'final current  id%error_count = ', id%error_count
+  write(*,*) 'current restart counter = ',       id%rec_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------

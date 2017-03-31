@@ -104,8 +104,8 @@ contains
 
     ! set timeold to be timenew, ready for initializing forcing fields,
     ! yearold should not be updated here, which is requird to open input files.
-    timeold=timenew 
-    dayold=daynew
+    ! timeold=timenew 
+    ! dayold=daynew
     
     ! check fleap year
     call check_fleapyr(yearnew, fleapyear)
