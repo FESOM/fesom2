@@ -71,8 +71,8 @@ subroutine adv_tracers_ale(tr_num)
 			call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
 			
 		case(2) !MUSCL+FCT(3D)
-! 			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr_old(:,:,tr_num), 0.85)
-			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr_old(:,:,tr_num), 0.0)
+			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 0.85)
+! 			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 0.0)
 		case default !unknown
 			if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
 			call par_ex(1)

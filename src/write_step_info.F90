@@ -1,6 +1,6 @@
 !==========================================================================
 SUBROUTINE write_step_info(istep)
-use g_config, only: logfile_outfreq
+use g_config, only: logfile_outfreq, dt
 USE o_MESH
 USE o_PARAM
 USE g_PARSUP
@@ -9,20 +9,20 @@ USE g_comm_auto
 IMPLICIT NONE
 
 integer                                   :: n, elnodes(3), istep
-real(kind=8)                              :: int_eta, int_hbar
-real(kind=8)                              :: min_eta, min_hbar
-real(kind=8)                              :: max_eta, max_hbar
-real(kind=8)                              :: loc_eta, loc_hbar
+real(kind=8)                              :: int_eta, int_hbar, int_deta, int_dhbar, int_wflux
+real(kind=8)                              :: min_eta, min_hbar, min_wflux
+real(kind=8)                              :: max_eta, max_hbar, max_wflux
+real(kind=8)                              :: loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux
 
 	if (mod(istep,logfile_outfreq)==0) then
 		!_______________________________________________________________________
-		int_eta=0.
-		int_hbar=0.
-		int_deta=0.
-		int_dhbar=0.
-		int_wflux=0.
-		loc_eta=0.
-		loc_hbar=0.
+		int_eta   =0.
+		int_hbar  =0.
+		int_deta  =0.
+		int_dhbar =0.
+		int_wflux =0.
+		loc_eta   =0.
+		loc_hbar  =0.
 		
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D

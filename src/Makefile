@@ -27,6 +27,7 @@ MODULES = oce_modules.o \
           gen_halo_exchange.o \
           psolve.o \
           oce_mixing_kpp.o \
+          oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
 	  fort_part.o \
@@ -34,32 +35,34 @@ MODULES = oce_modules.o \
           io_meandata.o \
           io_restart.o
 
-OBJECTS=  fvom_main.o \
-          gen_comm.o \
-          oce_setup_step.o \
-          oce_mesh.o \
-          oce_dyn.o \
-          oce_ale_vel_rhs.o \
-          oce_vel_rhs_vinv.o \
+OBJECTS=  fvom_main.o 		\
+          gen_comm.o 		\
+          oce_setup_step.o 	\
+          oce_mesh.o 		\
+          oce_dyn.o 		\
+          oce_ale_vel_rhs.o 	\
+          oce_vel_rhs_vinv.o 	\
 	  oce_ale_pressure_bv.o \
-	  oce_fer_gm.o \
-          oce_muscl_adv.o \
-          oce_ale_fct_3d_adv.o \
-	  oce_fct_muscl_adv.o \
-          oce_ice_init_state.o \
-          oce_shortwave_pene.o \
-          ice_setup_step.o \
-          ice_evp.o \
-          ice_fct.o \
-          ice_oce_coupling.o \
-          ice_thermodynamics.o \
-          gen_model_setup.o \
-          gen_forcing_init.o \
-          gen_bulk_formulae.o \
-          gen_forcing_couple.o \
-          gen_forcing_ocean.o \
-          gen_interpolation.o \
-          gen_events.o \
+	  oce_fer_gm.o 		\
+          oce_muscl_adv.o 	\
+          oce_ale_fct_3d_adv.o 	\
+	  oce_fct_muscl_adv.o 	\
+          oce_ice_init_state.o 	\
+          oce_shortwave_pene.o 	\
+          oce_ale.o 		\
+          oce_ale_tracer.o 	\
+          ice_setup_step.o 	\
+          ice_evp.o 		\
+          ice_fct.o 		\
+          ice_oce_coupling.o 	\
+          ice_thermodynamics.o 	\
+          gen_model_setup.o 	\
+          gen_forcing_init.o 	\
+          gen_bulk_formulae.o 	\
+          gen_forcing_couple.o 	\
+          gen_forcing_ocean.o 	\
+          gen_interpolation.o 	\
+          gen_events.o 		\
           write_step_info.o
 
 
