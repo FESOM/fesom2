@@ -174,13 +174,11 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			!___________________________________________________________________
 			! 1st. Low order upwind solution
 			cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
-			!PS ATTENTION: ttfAB(n+1/2) or ttf(n) which one is better
-			!PS Tupw1=0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
-			fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO      ! Low-order upwind 
+			fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO     
 			fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO  
 			
 			!___________________________________________________________________
-			! 2nd. High order solution --> c1
+			! 2nd. High order solution
 			! num_ord is the fraction of fourth-order contribution in the HO solution
 			! (1-num_ord) is done with 3rd order upwind
 			cHO=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
@@ -355,6 +353,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			
 			! antidiffusive flux: (HO-LO)
 			fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
+			
 		end do ! --> do nz=3,nl1-1
 		
 		!_______________________________________________________________________
@@ -395,13 +394,12 @@ subroutine fct_ale(ttf)
 	integer       :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
 	real(kind=WP) :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=WP) :: dttf(nl-1, myDim_nod2D+eDim_nod2D)
 	real*8        :: flux_eps=1e-16
 	real*8        :: bignumber=1e3
 	integer       :: vlimit=1
 	! --------------------------------------------------------------------------
 	! ttf is the tracer field on step n
-	! dttf is the increment 
+	! del_ttf is the increment 
 	! vlimit sets the version of limiting, see below
 	! --------------------------------------------------------------------------
 	
@@ -434,9 +432,9 @@ subroutine fct_ale(ttf)
 	
 	!___________________________________________________________________________
 	! a3. Bounds on clusters and admissible increments
-	!Vertical1: In this version we look at the bounds on the clusters
-	!           above and below, which leaves wide bounds because typically 
-	!           vertical gradients are larger.  
+	! Vertical1: In this version we look at the bounds on the clusters
+	!            above and below, which leaves wide bounds because typically 
+	!            vertical gradients are larger.  
 	if(vlimit==1) then
 		!Horizontal
 		do n=1, myDim_nod2D
@@ -491,8 +489,8 @@ subroutine fct_ale(ttf)
 	end if
 	
 	!___________________________________________________________________________
-	!Vertical3: Vertical bounds are taken into account only if they are narrower than the
-	!           horizontal ones  
+	! Vertical3: Vertical bounds are taken into account only if they are narrower than the
+	!            horizontal ones  
 	if(vlimit==3) then
 		do n=1, myDim_nod2D
 			do nz=1,nlevels_nod2D(n)-1
@@ -625,7 +623,7 @@ subroutine fct_ale(ttf)
 	! Vertical
 	do n=1, myDim_nod2d
 		do nz=1,nlevels_nod2D(n)-1  
-			dttf(nz,n)=dttf(nz,n)-ttf(nz,n)+fct_LO(nz,n) + &
+			del_ttf(nz,n)=del_ttf(nz,n)-ttf(nz,n)+fct_LO(nz,n) + &
 					(fct_aec_ver(nz,n)-fct_aec_ver(nz+1,n))*dt/area(nz,n)    
 		end do
 	end do
@@ -638,8 +636,8 @@ subroutine fct_ale(ttf)
 		nl2=0
 		if(el(2)>0) nl2=nlevels(el(2))-1
 		do nz=1, max(nl1,nl2)
-			dttf(nz,enodes(1))=dttf(nz,enodes(1))+fct_aec(nz,edge)*dt/area(nz,enodes(1))
-			dttf(nz,enodes(2))=dttf(nz,enodes(2))-fct_aec(nz,edge)*dt/area(nz,enodes(2))
+			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+fct_aec(nz,edge)*dt/area(nz,enodes(1))
+			del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-fct_aec(nz,edge)*dt/area(nz,enodes(2))
 		end do
 	end do
 	
