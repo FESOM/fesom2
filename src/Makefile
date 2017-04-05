@@ -5,7 +5,7 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in_hlrn
+include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -39,17 +39,15 @@ OBJECTS=  fvom_main.o \
           oce_setup_step.o \
           oce_mesh.o \
           oce_dyn.o \
-          oce_vel_rhs.o \
+          oce_ale_vel_rhs.o \
           oce_vel_rhs_vinv.o \
-	  oce_pressure_bv.o \
+	  oce_ale_pressure_bv.o \
 	  oce_fer_gm.o \
           oce_muscl_adv.o \
-          oce_fct_muscl_adv.o \
-          oce_mixing.o \
+          oce_ale_fct_3d_adv.o \
+	  oce_fct_muscl_adv.o \
           oce_ice_init_state.o \
           oce_shortwave_pene.o \
-          oce_ale.o \
-          oce_ale_tracer.o \
           ice_setup_step.o \
           ice_evp.o \
           ice_fct.o \
@@ -62,7 +60,8 @@ OBJECTS=  fvom_main.o \
           gen_forcing_ocean.o \
           gen_interpolation.o \
           gen_events.o \
-          write_step_info.o  
+          write_step_info.o
+
 
 
 # oce_pressure_bv.o \
@@ -79,14 +78,14 @@ default: run
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB) 
+	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) 
 	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
-	$(MPI_LIB) $(LIB_METIS) $(OASIS3_LIB) $(NCLIB)
+	$(MPI_LIB) $(LIB_METIS) $(NCLIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 

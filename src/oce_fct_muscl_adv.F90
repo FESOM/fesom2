@@ -4,7 +4,10 @@
 !	fct_hor
 !	fct_ver
 !	fct_muscl_solve_LH
-! ==========================================================================
+!
+!
+!===============================================================================
+! Caller routine for FCT tracer advection 
 SUBROUTINE adv_tracer_fct(ttf,dttf,ttfold,num_ord)
 USE o_ARRAYS
 USE o_MESH

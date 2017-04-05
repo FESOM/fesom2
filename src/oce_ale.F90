@@ -31,7 +31,6 @@ subroutine ale_init
 	
 	! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
 	allocate(ssh_rhs_old(myDim_nod2D+eDim_nod2D))
-	allocate(ssh_rhs_old2(myDim_nod2D+eDim_nod2D)) !PS
 	
 	! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
 	allocate(hbar(myDim_nod2D+eDim_nod2D))
@@ -62,7 +61,8 @@ subroutine ale_init
 	call init_bottom_elem_thickness
 	
 	!___setup virt_salt_flux____________________________________________________
-	! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual salinity flux need to be used
+	! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
+	! salinity flux need to be used
 	! otherwise we set the reference salinity to zero
 	if ( .not. trim(which_ALE)=='linfs') then
 		use_virt_salt=.false.
@@ -486,8 +486,9 @@ subroutine stiff_mat_ale
 			
 			! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
 			! at element el(i)
-			fy(1:3) = ( zbar(nlevels(el(i))-1)-bottom_elem_thickness(el(i)) ) * &
-					  (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)  &
+			! Attention: here corrected with bottom depth of partial cells !!!
+			fy(1:3) = (zbar(nlevels(el(i))-1)-bottom_elem_thickness(el(i)))* &
+					  (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
 					 - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
 			
 			if(i==2) fy=-fy
@@ -760,13 +761,16 @@ subroutine compute_ssh_rhs_ale
 		
 	!___________________________________________________________________________
 	! take into account water flux
-	! at this point ssh_rhs_old= -alpha* nabla* int(u^n + deltau dz) 
+	! at this point: ssh_rhs     = -alpha * nabla*int(u^n + deltau dz)
+	!                ssh_rhs_old = - nabla*int(u^n dz) - water_flux*area
+	!                
+	! (eta_(n+1)-eta_n)/dt = ssh_rhs - alpha*water_flux*area + (1-alpha)*ssh_rhs_old
+	!                      = ssh_rhs
+	!                      
 	! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	if ( .not. trim(which_ALE)=='linfs') then
 		do n=1,myDim_nod2D
-!PS 	ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
-		ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n) !!PS
-			
+			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n) !!PS
 		end do
 	else
 		do n=1,myDim_nod2D
@@ -1380,17 +1384,6 @@ subroutine oce_timestep_ale(n)
 	call vert_vel_ale 
 	t7=MPI_Wtime() 
 	
-! 	if (mstep==3) then
-! 		if (mype==0) then
-! 			write(*,*) 'alpha==', alpha
-! 			do n=1, myDim_nod2D
-! 				write(*,*) hbar(n)-hbar_old(n), d_eta(n), Wvel(1,n)*dt
-! 			end do
-! 		end if
-! 		call par_ex
-! 		stop
-! 	end if 
-	
 	! solve tracer equation 
 	call solve_tracers_ale
 	t8=MPI_Wtime() 
@@ -1398,6 +1391,8 @@ subroutine oce_timestep_ale(n)
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
 	t9=MPI_Wtime() 
+	
+!PS 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	
 	!___________________________________________________________________________
 	! write out execution times for ocean step parts
@@ -1420,30 +1415,12 @@ subroutine oce_timestep_ale(n)
 	
 	call write_step_info(n)
 	
-	!___________________________________________________________________________
-	! write out field estimates
-! 	if(mod(n,logfile_outfreq)==0 .and. mype==0) then
-! 		fmt="(A, ES10.3, A, ES10.3)"
-! 		write(*,*) '	___ALE OCEAN STEP: FIELDS______________________________'
-! 		write(*,fmt) '	min(hnode) = ',minval(hnode,MASK=(hnode/=0.0)),', max(hnode) = ', maxval(hnode,MASK=(hnode/=0.0))
-! 		write(*,fmt) '	min(helem) = ',minval(helem,MASK=(helem/=0.0))          ,', max(helem) = ', maxval(helem,MASK=(helem/=0.0))
-! 		write(*,fmt) '	min(hbar)  = ',minval(hbar)           ,', max(hbar)  = ', maxval(hbar)
-! 		write(*,fmt) '	min(eta_n) = ',minval(eta_n)          ,', max(eta_n) = ', maxval(eta_n)
-! 		write(*,fmt) '	min(U)     = ',minval(UV(1,:,:))      ,', max(U)     = ', maxval(UV(1,:,:))
-! 		write(*,fmt) '	min(V)     = ',minval(UV(2,:,:))      ,', max(V)     = ', maxval(UV(2,:,:))
-! 		write(*,fmt) '	min(Wvel)  = ',minval(Wvel(:,:))      ,', max(Wvel)  = ', maxval(Wvel(:,:))
-! 		write(*,fmt) '	min(temp)  = ',minval(tr_arr(:,:,1))  ,', max(temp)  = ', maxval(tr_arr(:,:,1))
-! 		write(*,fmt) '	min(salt)  = ',minval(tr_arr(:,:,2))  ,', max(salt)  = ', maxval(tr_arr(:,:,2))
-! 		write(*,fmt) '	min(hflux) = ',minval(heat_flux)      ,'  max(hflux) = ', maxval(heat_flux)
-! 		write(*,fmt) '	min(wflux) = ',minval(water_flux)     ,'  max(wflux) = ', maxval(water_flux)
-! 		write(*,*)
-! 	end if
 ! #ifdef FALSE	
 	!___________________________________________________________________________
 	!check for different parameter
 	if (mod(n,logfile_outfreq)==0) then
-		local_vol_eta=0.0_WP
-		local_vol_hbar=0.0_WP
+! 		local_vol_eta=0.0_WP
+! 		local_vol_hbar=0.0_WP
 		local_vol_wflux=0.0_WP
 		local_vol_hflux=0.0_WP
 !DS		local_vol=0.0_WP
@@ -1451,8 +1428,8 @@ subroutine oce_timestep_ale(n)
 !DS		local_wflux=0.0_WP
 		do el=1, myDim_elem2D
 			elnodes=elem2D_nodes(:, el)
-			local_vol_eta=local_vol_eta+sum(eta_n(elnodes))/3.0_WP !*elem_area(el)
-			local_vol_hbar=local_vol_hbar+sum(hbar(elnodes))/3.0_WP !*elem_area(el)
+! 			local_vol_eta=local_vol_eta+sum(eta_n(elnodes))/3.0_WP !*elem_area(el)
+! 			local_vol_hbar=local_vol_hbar+sum(hbar(elnodes))/3.0_WP !*elem_area(el)
 			local_vol_wflux=local_vol_wflux+sum(water_flux(elnodes))/3.0_WP !*elem_area(el)
 			local_vol_hflux=local_vol_hflux+sum(heat_flux(elnodes))/3.0_WP !*elem_area(el)
 !DS 			local_vol=local_vol+elem_area(el)
@@ -1460,33 +1437,33 @@ subroutine oce_timestep_ale(n)
 !DS 			local_wflux=local_wflux+sum(water_flux(elnodes))/3.0_WP*elem_area(el)
 		end do
 		
-		local_vol_eta  = local_vol_eta/myDim_elem2D
-		local_max_eta  = maxval(eta_n)
-		local_min_eta  = minval(eta_n)
-		global_vol_eta=0.0_WP
-		global_max_eta=0.0_WP
-		global_min_eta=0.0_WP
-		call MPI_AllREDUCE(local_vol_eta, global_vol_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-							MPI_COMM_WORLD, MPIerr)
-		global_vol_eta = global_vol_eta/npes
-		call MPI_AllREDUCE(local_max_eta, global_max_eta, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-							MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(local_min_eta, global_min_eta, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-							MPI_COMM_WORLD, MPIerr)
+! 		local_vol_eta  = local_vol_eta/myDim_elem2D
+! 		local_max_eta  = maxval(eta_n)
+! 		local_min_eta  = minval(eta_n)
+! 		global_vol_eta=0.0_WP
+! 		global_max_eta=0.0_WP
+! 		global_min_eta=0.0_WP
+! 		call MPI_AllREDUCE(local_vol_eta, global_vol_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+! 							MPI_COMM_WORLD, MPIerr)
+! 		global_vol_eta = global_vol_eta/npes
+! 		call MPI_AllREDUCE(local_max_eta, global_max_eta, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+! 							MPI_COMM_WORLD, MPIerr)
+! 		call MPI_AllREDUCE(local_min_eta, global_min_eta, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
+! 							MPI_COMM_WORLD, MPIerr)
 							
-		local_vol_hbar = local_vol_hbar/myDim_elem2D
-		local_max_hbar = maxval(hbar)
-		local_min_hbar = minval(hbar)
-		global_vol_hbar=0.0_WP
-		global_max_hbar=0.0_WP
-		global_min_hbar=0.0_WP
-		call MPI_AllREDUCE(local_vol_hbar, global_vol_hbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-							MPI_COMM_WORLD, MPIerr)
-		global_vol_hbar=global_vol_hbar/npes
-		call MPI_AllREDUCE(local_max_hbar, global_max_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-							MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(local_min_hbar, global_min_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-							MPI_COMM_WORLD, MPIerr)
+! 		local_vol_hbar = local_vol_hbar/myDim_elem2D
+! 		local_max_hbar = maxval(hbar)
+! 		local_min_hbar = minval(hbar)
+! 		global_vol_hbar=0.0_WP
+! 		global_max_hbar=0.0_WP
+! 		global_min_hbar=0.0_WP
+! 		call MPI_AllREDUCE(local_vol_hbar, global_vol_hbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+! 							MPI_COMM_WORLD, MPIerr)
+! 		global_vol_hbar=global_vol_hbar/npes
+! 		call MPI_AllREDUCE(local_max_hbar, global_max_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+! 							MPI_COMM_WORLD, MPIerr)
+! 		call MPI_AllREDUCE(local_min_hbar, global_min_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
+! 							MPI_COMM_WORLD, MPIerr)
 							
 		local_vol_wflux = local_vol_wflux/myDim_elem2D
 		local_max_wflux = maxval(water_flux)
@@ -1534,26 +1511,12 @@ subroutine oce_timestep_ale(n)
 							
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*) '	___global max/min/mean --> mstep=',mstep,'_________'
-			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     eta_n : ',global_max_eta,' | ',global_min_eta,' | ',global_vol_eta
-			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hbar  : ',global_max_hbar,' | ',global_min_hbar,' | ',global_vol_hbar
+! 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     eta_n : ',global_max_eta,' | ',global_min_eta,' | ',global_vol_eta
+! 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hbar  : ',global_max_hbar,' | ',global_min_hbar,' | ',global_vol_hbar
 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     wflux : ',global_max_wflux,' | ',global_min_wflux,' | ',global_vol_wflux
 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux : ',global_max_hflux,' | ',global_min_hflux,' | ',global_vol_hflux
 		endif
 		
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(maxval(hbar-eta_n), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(hbar-eta_n), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '  hbar-eta: ',global_max_hflux,' | ',global_min_hflux
-		end if
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(maxval(hbar-hbar_old-d_eta), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(hbar-hbar_old-d_eta), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '  dhbar-deta: ',global_max_hflux,' | ',global_min_hflux
-		end if
 		global_max_hflux=0.0_WP
 		global_min_hflux=0.0_WP
 		call MPI_AllREDUCE(maxval(tr_arr(:,:,1)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
@@ -1575,13 +1538,7 @@ subroutine oce_timestep_ale(n)
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*) ' Wvel(:,1): ',global_max_hflux,' | ',global_min_hflux
 		end if
-! 		global_max_hflux=0.0_WP
-! 		global_min_hflux=0.0_WP
-! 		call MPI_AllREDUCE(maxval(hnode,MASK=(hnode/=0.0)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-! 		call MPI_AllREDUCE(minval(hnode,MASK=(hnode/=0.0)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-! 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-! 			write(*,"(A, ES10.3, A, ES10.3)") '     hnode : ',global_max_hflux,' | ',global_min_hflux
-! 		end if
+
 		
 		!___________________________________________________________________________
 		! check variables for strange values

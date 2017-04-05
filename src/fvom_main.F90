@@ -115,8 +115,8 @@ integer :: n, nsteps,offset,row,i
 		end if 	
 		
 		!___prepare output______________________________________________________
-                call output (n)
- 	        call restart(n, .false., .false.)
+		call output (n)
+		call restart(n, .false., .false.)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________

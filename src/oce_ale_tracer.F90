@@ -11,8 +11,8 @@ subroutine solve_tracers_ale
 	use o_tracers
 	
 	implicit none
-	integer :: tr_num, nz, el
-	
+	integer :: tr_num
+	real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
 	!___________________________________________________________________________
 	! loop over all tracers 
 	do tr_num=1,num_tracers
@@ -28,7 +28,13 @@ subroutine solve_tracers_ale
 		call diff_tracers_ale(tr_num)
 		
 		! relax to salt and temp climatology
-! 		call relax_to_clim(tr_num)
+		call relax_to_clim(tr_num)
+		
+		! BRECHSTANGE: prevent temperature from running away to negative values
+		! --> should violate tracer conservation
+! 		if (tr_num==1) then
+! 			where(tr_arr(:,:,1)<-2.1_WP)  tr_arr(:,:,1)=-2.1_WP
+! 		end	if
 		
 		call exchange_nod(tr_arr(:,:,tr_num))
 		
@@ -58,10 +64,15 @@ subroutine adv_tracers_ale(tr_num)
 	select case (tracer_adv)
 		case(1) !MUSCL
 			! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-! 			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.85)
-			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0) ! use only third order
-			! case(2) !MUSCL+FCT(3D)
-			!	call adv_tracer_fct(tr_arr(:,:,tr_num),del_ttf,tr_arr_old(:,:,tr_num), 0.75_WP)
+			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.85)
+			!	call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0) ! use only third order
+			!	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
+			!	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
+			call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
+			
+		case(2) !MUSCL+FCT(3D)
+! 			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr_old(:,:,tr_num), 0.85)
+			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr_old(:,:,tr_num), 0.0)
 		case default !unknown
 			if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
 			call par_ex(1)
@@ -70,9 +81,6 @@ subroutine adv_tracers_ale(tr_num)
 	!___________________________________________________________________________
 	! vertical ale tracer advection --> piecewise parabolic method (ppm)
 	! here --> add vertical advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-! 	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
-!	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
-	call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
 end subroutine adv_tracers_ale
 !
 !
@@ -324,9 +332,8 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	use g_PARSUP
 	use g_forcing_arrays
 	implicit none
-	integer      :: n, nz, nzmax
+	integer       :: n, nz, nzmax
 	real(kind=WP) :: tvert(nl), tv(nl)
-	real(kind=WP) :: Tmean
 	real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
 	
@@ -486,10 +493,10 @@ subroutine adv_tracers_vert_upw(ttf)
 	use g_PARSUP
 	use g_forcing_arrays
 	implicit none
-	integer      :: n, nz, nl1
+	integer       :: n, nz, nl1
 	real(kind=WP) :: tvert(nl), tv
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=WP) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	
 	! --------------------------------------------------------------------------
 	! Vertical advection
 	! --------------------------------------------------------------------------
@@ -529,10 +536,10 @@ subroutine adv_tracers_vert_cdiff(ttf)
 	use g_PARSUP
 	use g_forcing_arrays
 	implicit none
-	integer      :: n, nz, nl1
+	integer       :: n, nz, nl1
 	real(kind=WP) :: tvert(nl), tv
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real(kind=WP) :: local_max, local_min, local_mean , global_max, global_min, global_mean
+	
 	! --------------------------------------------------------------------------
 	! Vertical advection
 	! --------------------------------------------------------------------------
@@ -571,7 +578,7 @@ subroutine diff_tracers_ale(tr_num)
 	implicit none
 	
 	integer, intent(in) :: tr_num
-	integer             :: n, nl1, nzmax
+	integer             :: n, nzmax
 	
 	!___________________________________________________________________________
 	! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
@@ -583,7 +590,7 @@ subroutine diff_tracers_ale(tr_num)
 	! do horizontal diffusiion
 	! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
 	! in danilovs srcipt
-	! 	call diff_part_hor
+! 		call diff_part_hor
 	call diff_part_hor_sergey ! seems to be ~9% faster than diff_part_hor
 	
 	!___________________________________________________________________________

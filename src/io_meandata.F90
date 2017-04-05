@@ -32,7 +32,7 @@ module io_MEANDATA
     integer                                            :: recID, tID
     integer                                            :: dimID(2), varID
     integer                                            :: freq=1
-    character					       :: freq_unit='m'
+    character                                          :: freq_unit='m'
     integer                                            :: error_status(1000), error_count
     logical                                            :: is_in_use=.false.
   end type

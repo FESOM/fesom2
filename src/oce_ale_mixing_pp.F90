@@ -50,6 +50,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=1._WP, av_conv=1._WP
 				Kv(nz+1,node) = shear/(shear+5.*max(bvfreq(nz+1,node),0.0_WP)+1.0e-14)
 			end do
 			nz=1
+			zbar_n(nz) = zbar_n(nz+1) + hnode(nz,node)
 			dz_inv=1.0_WP/(Z_n(nz)-Z_n(nz+1))
 			shear = (Unode(1,nz,node)-Unode(1,nz+1,node))**2 +&
 					(Unode(2,nz,node)-Unode(2,nz+1,node))**2 
