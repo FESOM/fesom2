@@ -20,9 +20,10 @@ subroutine ale_init
 	USE g_PARSUP
 	USE o_ARRAYS
 	USE g_config, only: which_ale
-        USE g_forcing_param, only: use_virt_salt
+	USE g_forcing_param, only: use_virt_salt
 	Implicit NONE
 	
+	integer             :: n, nzmax
 	
 	!___allocate________________________________________________________________
 	! hnode and hnode_new: layer thicknesses at nodes. 
@@ -45,9 +46,11 @@ subroutine ale_init
 	
 	! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
 	allocate(zbar_n(nl))
+	allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D)) 
 	
 	! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
 	allocate(Z_n(nl-1))
+	allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
 	
 	! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
 	allocate(bottom_elem_thickness(myDim_elem2D))
@@ -57,8 +60,18 @@ subroutine ale_init
 	hbar_old=hbar
 	dhe=0.0_WP
 	
-	! calculate thinkness of partial bottom layer cells
+	! calculate thickness of partial bottom layer cells
 	call init_bottom_elem_thickness
+	
+	! initialise 3d field of depth levels and mid-depth levels
+	zbar_3d_n=0.0_WP
+	Z_3d_n   =0.0_WP
+	do n=1,myDim_nod2D+eDim_nod2D 
+		! max. number of levels at node n
+		nzmax=nlevels_nod2D(n)
+		zbar_3d_n(1:nzmax,n)=zbar(1:nzmax);
+		Z_3d_n(1:nzmax-1,n) =Z(1:nzmax-1);
+	end do
 	
 	!___setup virt_salt_flux____________________________________________________
 	! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -318,7 +331,7 @@ subroutine update_thickness_ale
 	use o_ARRAYS
 	use g_config,only: which_ale
 	implicit none
-	integer :: n, nz, elem, elnodes(3)
+	integer :: n, nz, elem, elnodes(3),nzmax
 	
 	if     (trim(which_ale)=='zlevel') then
 		!_______________________________________________________________________
@@ -326,7 +339,9 @@ subroutine update_thickness_ale
 		!_______________________________________________________________________
 		! only actualize layer thinkness in first layer 
 		do n=1,myDim_nod2D+eDim_nod2D
-			hnode(1,n)=hnode_new(1,n)
+			hnode(1,n)    = hnode_new(1,n)
+			zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
+			Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
 		end do
 		
 		do elem=1,myDim_elem2D
@@ -342,6 +357,19 @@ subroutine update_thickness_ale
 			do nz=1,nlevels_nod2D_min(n)-2
 				hnode(nz,n) = hnode_new(nz,n)
 			end do
+			
+			! actualize 3d depth levels and mid-depth levels from bottom to top
+			nzmax=nlevels_nod2D(n)
+			zbar_3d_n=0.0_WP
+			Z_3d_n   =0.0_WP
+			zbar_3d_n(nzmax,n)=zbar(nzmax)
+			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
+			do nz=nzmax-1,2,-1
+				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
+				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+			end do
+			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
+			
 		end do
 		
 		!_______________________________________________________________________
@@ -981,10 +1009,10 @@ subroutine vert_vel_ale
 	elseif (trim(which_ALE)=='zstar') then
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
 		dO n=1, myDim_nod2D
-			dd1=zbar(nlevels_nod2D_min(n)-1)
+			dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
 			
 			! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-			dd=zbar(1)-dd1                      
+			dd=zbar_3d_n(1,n)-dd1                      
 			
 			! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
 			! 1/H*dhbar
@@ -1001,8 +1029,8 @@ subroutine vert_vel_ale
 				!
 				!     Wvel_k = SUM_i=k:kmax(div(h_i*v_i)) + 1/H*dhbar/dt*SUM_i=k:kmax(h⁰_k)
 				! SUM_i=k:kmax(h⁰_k) == (zbar(nz)-dd1)
-				Wvel(nz,n)=Wvel(nz,n)-dddt*(zbar(nz)-dd1) 
-				hnode_new(nz,n)=(zbar(nz)-zbar(nz+1))*dd
+				Wvel(nz,n)=Wvel(nz,n)-dddt*(zbar_3d_n(nz,n)-dd1) 
+				hnode_new(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
 ! 				hnode_new(nz,n)=hnode(nz,n) + (zbar(nz)-zbar(nz+1))*dd ! ????
 			end do
 			Wvel(1,n)=Wvel(1,n)-water_flux(n) 
@@ -1177,6 +1205,8 @@ DO elem=1,myDim_elem2D
 	nzmax=nlevels(elem)
 	
 	!___________________________________________________________________________
+	! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
+	! they run over elements here 
 	zbar_n=0.0_WP
 	Z_n=0.0_WP
 	zbar_n(nzmax)=zbar(nzmax)

@@ -315,21 +315,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		fct_aec_ver(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
-		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
-		! depending on layer thinkness over depth at node n		
-		!
 		! Be carefull have to do vertical tracer advection here on old vertical grid
 		! also horizontal advection is done on old mesh (see helem contains old 
 		! mesh information)
-		zbar_n=0.0_WP
-		Z_n=0.0_WP
-		zbar_n(nl1)=zbar(nl1)
-		Z_n(nl1-1)=zbar_n(nl1) + hnode(nl1-1,n)/2.0_WP
-		do nz=nl1-1,2,-1
-			zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
-			Z_n(nz-1) = zbar_n(nz) + hnode(nz-1,n)/2.0_WP
-		end do
-		zbar_n(1) = zbar_n(2) + hnode(1,n)
 		
 		!_______________________________________________________________________
 		! vert. flux at remaining levels    
@@ -341,12 +329,12 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			tvert(nz)=cLO*area(nz,n)
 			
 			! high order --> centered (4th order)
-			qc=(ttfAB(nz-1,n)-ttfAB(nz  ,n))/(Z_n(nz-1)-Z_n(nz  ))
-			qu=(ttfAB(nz  ,n)-ttfAB(nz+1,n))/(Z_n(nz  )-Z_n(nz+1))    
-			qd=(ttfAB(nz-2,n)-ttfAB(nz-1,n))/(Z_n(nz-2)-Z_n(nz-1))
+			qc=(ttfAB(nz-1,n)-ttfAB(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
+			qu=(ttfAB(nz  ,n)-ttfAB(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
+			qd=(ttfAB(nz-2,n)-ttfAB(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
 			
-			Tmean1=ttfAB(nz  ,n)+(2*qc+qu)*(zbar_n(nz)-Z_n(nz  ))/3.0_WP
-			Tmean2=ttfAB(nz-1,n)+(2*qc+qd)*(zbar_n(nz)-Z_n(nz-1))/3.0_WP
+			Tmean1=ttfAB(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
+			Tmean2=ttfAB(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
 			Tmean =(Wvel(nz,n)+abs(Wvel(nz,n)))*Tmean1+ &
 				   (Wvel(nz,n)-abs(Wvel(nz,n)))*Tmean2
 			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel(nz,n)+(1.0_WP-num_ord)*Tmean)

@@ -818,7 +818,7 @@ real(kind=WP), allocatable    :: hbl_mean(:)
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
 ! --> layer thinkness at node and depthlayer for t=n and t=n+1
-real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new
+real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
 
 ! --> layer thinkness at elements, interpolated from hnode
 real(kind=WP), allocatable,dimension(:,:)   :: helem

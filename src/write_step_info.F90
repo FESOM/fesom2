@@ -52,25 +52,27 @@ real(kind=8)                              :: loc_eta, loc_hbar, loc_deta, loc_dh
 		loc_eta= maxval(eta_n(1:myDim_nod2D))
 		loc_hbar=maxval(hbar(1:myDim_nod2D))
 		loc_wflux=maxval(water_flux(1:myDim_nod2D))
-		call MPI_AllREDUCE(loc_eta  ,  max_eta , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+		call MPI_AllREDUCE(loc_eta  , max_eta  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(loc_hbar , max_hbar , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		call MPI_AllREDUCE(loc_wflux, max_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		
 		!_______________________________________________________________________
 		if (mype==0) then
 			write(*,*) '	___global estimat of eta & hbar --> mstep=',mstep,'____'
-			write(*,*) '	 int(eta), int(hbar)    =', int_eta, int_hbar
-			write(*,*) '	  --> error(eta-hbar)   =', int_eta-int_hbar
-			write(*,*) '	 min(eta) , max(eta)    =', min_eta, max_eta
-			write(*,*) '	 max(hbar), max(hbar)   =', min_hbar, max_hbar
+			write(*,*) '	 int(eta), int(hbar)      =', int_eta, int_hbar
+			write(*,*) '	  --> error(eta-hbar)     =', int_eta-int_hbar
+			write(*,*) '	 min(eta) , max(eta)      =', min_eta, max_eta
+			write(*,*) '	 max(hbar), max(hbar)     =', min_hbar, max_hbar
 			write(*,*)
-			write(*,*) '	 int(deta), int(dhbar)  =', int_deta, int_dhbar
-			write(*,*) '	  --> error(deta-dhbar) =', int_deta-int_dhbar
-			write(*,*) '	  --> error(deta-wflux) =', int_deta-int_wflux
-			write(*,*) '	  --> error(dhbar-wflux)=', int_dhbar-int_wflux
+			write(*,*) '	 int(deta), int(dhbar)    =', int_deta, int_dhbar
+			write(*,*) '	  --> error(deta-dhbar)   =', int_deta-int_dhbar
+			write(*,*) '	  --> error(deta-wflux)   =', int_deta-int_wflux
+			write(*,*) '	  --> error(dhbar-wflux)  =', int_dhbar-int_wflux
 			write(*,*)
-			write(*,*) '	 -int(wflux)*dt         =', int_wflux
-			write(*,*) '	 min(wflux), max(wflux) =', min_wflux, max_wflux
+			write(*,*) '	 -int(wflux)*dt           =', int_wflux
+			write(*,*) '	 int(deta )-int(wflux)*dt =', int_deta-int_wflux
+			write(*,*) '	 int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux
+			write(*,*) '	 min(wflux), max(wflux)   =', min_wflux, max_wflux
 			write(*,*)
 		endif
 	endif

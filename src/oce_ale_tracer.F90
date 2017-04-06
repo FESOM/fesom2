@@ -370,23 +370,6 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		tv(nzmax)=ttf(nzmax-1,n) 
 		
 		!_______________________________________________________________________
-		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
-		! depending on layer thinkness over depth at node n		
-		!
-		! Be carefull have to do vertical tracer advection here on old vertical grid
-		! also horizontal advection is done on old mesh (see helem contains old 
-		! mesh information)
-		zbar_n=0.0_WP
-		Z_n=0.0_WP
-		zbar_n(nzmax)=zbar(nzmax)
-		Z_n(nzmax-1)=zbar_n(nzmax) + hnode(nzmax-1,n)/2.0_WP
-		do nz=nzmax-1,2,-1
-			zbar_n(nz) = zbar_n(nz+1) + hnode(nz,n)
-			Z_n(nz-1) = zbar_n(nz) + hnode(nz-1,n)/2.0_WP
-		end do
-		zbar_n(1) = zbar_n(2) + hnode(1,n)
-		
-		!_______________________________________________________________________
 		! calc tracer for surface+2 until depth-2 layer
 		! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
 ! 		do nz=2,nzmax-3
@@ -400,10 +383,10 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
 			! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
 			! --> full equation (1.6), (1.7) and (1.8)
-			dzjm1    = Z_n(nz-1)
-			dzj      = Z_n(nz)
-			dzjp1    = Z_n(nz+1)
-			dzjp2    = Z_n(nz+2)
+			dzjm1    = Z_3d_n(nz-1,n)
+			dzj      = Z_3d_n(nz,n)
+			dzjp1    = Z_3d_n(nz+1,n)
+			dzjp2    = Z_3d_n(nz+2,n)
 			
 			!___________________________________________________________________
 			! equation (1.7)
@@ -663,19 +646,13 @@ subroutine diff_ver_part_expl_ale(tr_num)
 		vd_flux(1)= flux + rlx*(rdata-tr_arr(1,n,tr_num))
 		
 		!_______________________________________________________________________
-		zbar_n=0.0_WP
-		Z_n=0.0_WP
-		zbar_n(1)=zbar(1)
-		Z_n(1)=zbar_n(1) - hnode_new(1,n)/2.0_WP
 		do nz=2,nl1
 			!___________________________________________________________________
-			zbar_n(nz)=zbar_n(nz-1) - hnode_new(nz-1,n)
-			Z_n(nz)=zbar_n(nz) - hnode_new(nz,n)/2.0_WP
-			zinv1=1.0_WP/(Z_n(nz-1)-Z_n(nz))
+			zinv1=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
 			
 			!___________________________________________________________________
-			Ty= Kd(4,nz-1,n)*(Z_n(nz-1)-zbar_n(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-				Kd(4,nz,n)*(zbar_n(nz)-Z_n(nz))*zinv1 *neutral_slope(3,nz,n)**2
+			Ty= Kd(4,nz-1,n)*(Z_3d_n(nz-1,n)-zbar_3d_n(nz,n))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
+				Kd(4,nz,n)*(zbar_3d_n(nz,n)-Z_3d_n(nz,n))*zinv1 *neutral_slope(3,nz,n)**2
 			
 			vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
 			
@@ -683,9 +660,9 @@ subroutine diff_ver_part_expl_ale(tr_num)
 		
 		!_______________________________________________________________________
 		do nz=1,nl1-1
-			del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_n(nz)-zbar_n(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dt/area(nz,n)
 		end do
-		del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_n(nl1)-zbar_n(nl1+1)))*dt/area(nl1,n)
+		del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
 		
 	end do ! --> do n=1, myDim_nod2D
 	
@@ -760,6 +737,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! max. number of levels at node n
 		nzmax=nlevels_nod2D(n)
 		
+		!___________________________________________________________________________
+		! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because  
+		! they be calculate from the actualized mesh with hnode_new
 		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
 		! depending on layer thinkness over depth at node n
 		! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
