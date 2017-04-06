@@ -12,16 +12,33 @@ USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
 real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: tr_z(nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: deltaX1,deltaY1
 integer           :: elem,  elnodes(3)
 integer           :: n, nz
 
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
-   DO nz=1, nlevels(elem)-1   
+   deltaX1=edge_cross_dxdy(1,elem)
+   deltaY1=edge_cross_dxdy(2,elem)
+   DO nz=1, nlevels(elem)-2   
       tr_xy(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
       tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
+      tr_z(nz, elem)=(ttf(nz+1,elnodes)-ttf(nz,elnodes))/hnode_new(nz,elem)     !calculate derivative by z
    END DO
- END DO     
+   !tr_z(1, elem)=tr_z(2, elem)
+   tr_xy(1,nz+1, elem)=sum(gradient_sca(1:3,elem)*ttf(nz+1,nlevels(elem)-1))
+   tr_xy(2,nz+1, elem)=sum(gradient_sca(4:6,elem)*ttf(nz+1,nlevels(elem)-1))
+END DO 
+!approximation of z derivatives
+DO elem=1, myDim_elem2D
+   DO nz=2, nlevels(elem)-2
+      tr_z_av(nz, elem)=(tr_z(nz+1)*hnode_new(nz+1,elem)+tr_z(nz)*hnode_new(nz,elem)) &
+          /(hnode_new(nz+1,elem)+hnode_new(nz,elem))
+   END DO
+   tr_z_av(1, elem)=tr_z_av(2, elem)
+   tr_z_av(nz+1, elem)=tr_z_av(nz, elem)
+END DO    
 END SUBROUTINE tracer_gradient_elements
 !========================================================================================
 SUBROUTINE init_tracers_AB(tr_num)
@@ -70,7 +87,8 @@ integer, intent(in) :: tr_num
 integer             :: n, nl1
 
 tr_arr_old(:,:,tr_num)=tr_arr(:,:,tr_num) !DS: check that this is the right place!
-call diff_part_hor
+!call diff_part_hor 
+call diff_part_hor_upd
 if (.not. i_vert_diff) call diff_ver_part_expl(tr_num)
 !Update tracer berofe implicit operator is applied
 DO n=1, myDim_nod2D
@@ -379,3 +397,103 @@ DO tr_num=1,num_tracers
    call exchange_nod(tr_arr(:,:,tr_num))
 END DO
 END SUBROUTINE solve_tracers
+
+
+
+!========================================================================================
+SUBROUTINE calc_neutral_slope
+  USE o_mesh
+  USE o_param
+  USE o_arrays, ONLY: sigma_xy, bvfreq, tr_arr
+  USE g_parsup
+  USE g_comm_auto
+  IMPLICIT NONE
+  
+  real(kind=WP) eps, norm, coeff,S_cr,S_d
+
+  S_cr=4.0e-3
+  S_d=1.0e-3
+  eps=1.0e-8
+  if (.NOT.Fer_GM) then
+    CALL compute_sigma_xy !will it be computed?
+  endif
+  DO n=1, myDim_nod2D
+    DO nz=1, nlevels_nod2D(n)-1
+      neutral_slope(:,nz,n)=sigma_xy(:,nz,n)/(-bvfreq(nz,n)*density_0*density_0/g)
+      !if upper layer or not
+      norm = sqrt(neutral_slope(1,nz,n)*neutral_slope(1,nz,n)+neutral_slope(2,nz,n)*neutral_slope(2,nz,n))
+      IF (norm.LT.eps) THEN
+        !coeff = 1-TANH((norm-0.075)/0.025)/2
+        coeff = 0.5_WP*(1.0_WP + tanh((S_cr - norm)/S_d))
+        neutral_slope(:,nz,n)=neutral_slope(:,nz,n)*coeff
+      ENDIF
+    ENDDO
+  ENDDO
+END SUBROUTINE calc_neutral_slope
+!========================================================================================
+SUBROUTINE diff_part_hor_upd
+  use o_ARRAYS
+  use g_PARSUP
+  use o_MESH
+  USE o_param
+  use g_config
+  IMPLICIT NONE
+  real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
+  integer         :: edge
+  integer         :: nl1,nz,el(2),elnodes(3),n,nl2,enodes(2)
+  real(kind=WP)   :: temp(3),d,c1,Tx,Ty,Kh
+  !real(kind=WP)    :: neutral_slope(nl-1, myDim_nod2D+eDim_nod2D)
+
+  CALL calc_neutral_slope
+  ttrhs=0d0
+  DO edge=1, myDim_edge2D
+     deltaX1=edge_cross_dxdy(1,edge)
+     deltaY1=edge_cross_dxdy(2,edge)
+     el=edge_tri(:,edge)
+     enodes=edges(:,edge)
+     nl1=nlevels(el(1))-1
+     nl2=0
+     elnodes=elem2d_nodes(:,el(1))
+     Kh=elem_area(el(1))
+     IF (el(2)>0) then 
+        deltaX2=edge_cross_dxdy(3,edge)
+        deltaY2=edge_cross_dxdy(4,edge)
+        Kh=0.5*(Kh+elem_area(el(2)))
+        nl2=nlevels(el(2))-1
+     ENDIF
+     Kh=K_hor*sqrt(Kh/scale_area) !added sqrt
+
+     DO nz=1,min(nl1,nl2)
+        Tx=0d0
+        Ty=0d0
+        Tx=Tx+0.5*Kh*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2))+tr_z_av(nz,el(1))*neutral_slope(1,nz,el(1)) &
+           +tr_z_av(nz,el(2))*neutral_slope(1,nz,el(2)))
+        Ty=Ty+0.5*Kh*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2))+tr_z_av(nz,el(1))*neutral_slope(2,nz,el(1)) &
+           +tr_z_av(nz,el(2))*neutral_slope(2,nz,el(2)))
+        ttrhs(nz,enodes(1)) = ttrhs(nz,enodes(1)) - Ty*deltaX1 + Tx*deltaY1
+        ttrhs(nz,enodes(2)) = ttrhs(nz,enodes(2)) + Ty*deltaX1 - Tx*deltaY1
+     ENDDO
+     DO nz=min(nl1,nl2),nl1
+        Tx=0d0
+        Ty=0d0
+        Tx=Tx+Kh*(tr_xy(1,nz,el(1))+tr_z_av(nz,el(1))*neutral_slope(1,nz,el(1)))
+        Ty=Ty+Kh*(tr_xy(2,nz,el(1))+tr_z_av(nz,el(1))*neutral_slope(2,nz,el(1)))
+        ttrhs(nz,enodes(1)) = ttrhs(nz,enodes(1)) - Ty*deltaX1 + Tx*deltaY1
+        ttrhs(nz,enodes(2)) = ttrhs(nz,enodes(2)) + Ty*deltaX1 - Tx*deltaY1
+     ENDDO
+     DO nz=min(nl1,nl2),nl2
+        Tx=0d0
+        Ty=0d0
+        Tx=Tx+Kh*(tr_xy(1,nz,el(2))+tr_z_av(nz,el(2))*neutral_slope(1,nz,el(2)))
+        Ty=Ty+Kh*(tr_xy(2,nz,el(2))+tr_z_av(nz,el(2))*neutral_slope(2,nz,el(2)))
+        ttrhs(nz,enodes(1)) = ttrhs(nz,enodes(1)) - Ty*deltaX1 + Tx*deltaY1
+        ttrhs(nz,enodes(2)) = ttrhs(nz,enodes(2)) + Ty*deltaX1 - Tx*deltaY1
+     ENDDO
+ENDDO
+
+DO n=1, myDim_nod2D
+   DO nz=1,nlevels_nod2D(n)-1
+      del_ttf(nz,n)=del_ttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
+   END DO
+END DO
+END SUBROUTINE diff_part_hor_upd
