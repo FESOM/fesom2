@@ -43,46 +43,33 @@ subroutine pressure_bv
 	if(use_ALE) then
 		!_______________________________________________________________________
 		do node=1, myDim_nod2D+eDim_nod2D
-			nzmax = nlevels_nod2d(node)
-			nl1=nzmax-1
+			nl1= nlevels_nod2d(node)-1
 			
-			!___________________________________________________________________
-			! calc node dependent changing ALE zbar_n and Z_n
-			zbar_n=0.0_WP
-			Z_n=0.0_WP
-			zbar_n(nzmax)=zbar(nzmax)
-			Z_n(nzmax-1)=zbar_n(nzmax) + hnode(nzmax-1,node)/2.0_WP
-			do nz=nzmax-1,2,-1
-				zbar_n(nz) = zbar_n(nz+1) + hnode(nz,node)
-				Z_n(nz-1) = zbar_n(nz) + hnode(nz-1,node)/2.0_WP
-			end do
-			zbar_n(1) = zbar_n(2) + hnode(1,node)
-		
 			!___________________________________________________________________
 			do nz=1, nl1
 				t=tr_arr(nz, node,1)
 				s=tr_arr(nz, node,2)
 				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-				rho(nz)= bulk_0(nz)   + Z_n(nz)*(bulk_pz(nz)   + Z_n(nz)*bulk_pz2(nz))
-				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_n(nz))-density_0
+				rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
 			end do
 			
 			!___________________________________________________________________
 			! Pressure
-			hpressure(1, node)=-Z_n(1)*rho(1)*g
+			hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
 			DO nz=2, nl1
-				a=0.5_WP*g*(rho(nz-1)*(zbar_n(nz-1)-zbar_n(nz))+rho(nz)*(zbar_n(nz)-zbar_n(nz+1)))
+				a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
 				hpressure(nz, node)=hpressure(nz-1, node)+a
 			END DO
 			
 			!___________________________________________________________________
 			! BV frequency:  bvfreq(nl,:), squared value is stored   
 			DO nz=2,nl1
-				bulk_up = bulk_0(nz-1) + zbar_n(nz)*(bulk_pz(nz-1) + zbar_n(nz)*bulk_pz2(nz-1)) 
-				bulk_dn = bulk_0(nz)   + zbar_n(nz)*(bulk_pz(nz)   + zbar_n(nz)*bulk_pz2(nz))
-				rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_n(nz))  
-				rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_n(nz))  
-				dz_inv=1.0_WP/(Z_n(nz-1)-Z_n(nz))  
+				bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
+				bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
+				rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_3d_n(nz,node))  
+				rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
+				dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
 				bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
 			END DO
 			bvfreq(1,node)=bvfreq(2,node)
