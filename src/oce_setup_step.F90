@@ -134,6 +134,10 @@ allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!!
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
+
+allocate(heat_flux_old(node_size), Tsurf_old(node_size)) !PS
+allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
+allocate(real_salt_flux(node_size)) !PS
 ! =================
 ! Arrays used to organize surface forcing
 ! =================
@@ -187,7 +191,6 @@ allocate(Unode(2,nl-1,node_size))
 !Tracer gradients&RHS  
 allocate(ttrhs(nl-1,node_size))
 allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-allocate(tr_z_av(nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 allocate(neutral_slope(3, nl-1, node_size))
 allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
 neutral_slope=0.0_WP
@@ -234,11 +237,17 @@ end if
     T_rhs=0.0_WP
     heat_flux=0.0_WP
     Tsurf=0.0_WP
+    heat_flux_old=0.0_WP !PS
+    Tsurf_old=0.0_WP !PS
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
     Ssurf=0.0_WP
-
+	water_flux_old=0.0_WP !PS
+    Ssurf_old=0.0_WP !PS
+    
+    real_salt_flux=0.0_WP
+    
     tr_arr=0d0
     tr_arr_old=0d0    
 
@@ -483,14 +492,6 @@ USE g_input
      Tsurf=tr_arr(1,:,1)
      Ssurf=tr_arr(1,:,2)
   if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
-  !=====================
-  ! Restart from NetCDF output (not fully rigorous because of AB)
-  !=====================    
-  if (r_restart) then
-     if(mype==0) write(*,*) 'read ocean restart file'
-!    call oce_input
-  end if
-
   relax2clim=0.0 
 end subroutine oce_initial_state
 !==========================================================================

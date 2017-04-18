@@ -18,7 +18,9 @@ subroutine ice2ocean
   ! ==================
   ! heat and freshwater
   ! ==================
-    
+     heat_flux_old = heat_flux !PS
+     water_flux_old = water_flux !PS
+     
      heat_flux   = -net_heat_flux 
      water_flux  = -fresh_wa_flux
   ! ==================
@@ -67,11 +69,13 @@ subroutine ocean2ice
 if (ice_update) then
      T_oc_array(n)=tr_arr(1,n,1)
      S_oc_array(n)=tr_arr(1,n,2)  
-     elevation(n)= eta_n(n)
+!PS      elevation(n)= eta_n(n)
+     elevation(n)= hbar(n) !PS
 else
      T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1)
      S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1)
-     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1)
+!PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1)
+     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1) !PS
 endif
   end do
      do n=1, myDim_nod2d  

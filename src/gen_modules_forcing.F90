@@ -79,6 +79,7 @@ use o_param
 
   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn, flice
   real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout
+  real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 
   ! drag coefficient Cd_atm_oce and transfer coefficients for evaporation
   ! Ce_atm_oce and sensible heat Ch_atm_oce between atmosphere and ocean

@@ -763,7 +763,7 @@ subroutine compute_ssh_rhs_ale
 		deltaY1=edge_cross_dxdy(2,ed)
 		do nz=1, nlevels(el(1))-1
 			c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
-				(UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
+						 (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
 		end do
 		
 		!_______________________________________________________________________
@@ -777,7 +777,7 @@ subroutine compute_ssh_rhs_ale
 			deltaY2=edge_cross_dxdy(4,ed)
 			do nz=1, nlevels(el(2))-1
 				c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
-					(UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+							 (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
 			end do
 		end if
 		
@@ -798,7 +798,7 @@ subroutine compute_ssh_rhs_ale
 	! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	if ( .not. trim(which_ALE)=='linfs') then
 		do n=1,myDim_nod2D
-			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n) !!PS
+			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
 		end do
 	else
 		do n=1,myDim_nod2D
@@ -859,6 +859,7 @@ subroutine compute_hbar_ale
 		!_______________________________________________________________________
 		ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
 		ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
+
 		
 	end do
 	
@@ -872,6 +873,7 @@ subroutine compute_hbar_ale
 	! update the thickness
 	hbar_old=hbar
 	hbar(1:myDim_nod2D)=hbar_old(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
+	
 	call exchange_nod(hbar)
 		
 	!___________________________________________________________________________
@@ -1001,7 +1003,6 @@ subroutine vert_vel_ale
 		! Wvel(1,n) should be 0 up to machine precision,
 		! this place should be checked.
 		do n=1, myDim_nod2D
-		
 			Wvel(1,n)=Wvel(1,n)-(hbar(n)-hbar_old(n))/dt-water_flux(n)
 			hnode_new(1,n)=hnode(1,n)+hbar(n)-hbar_old(n)
 		end do
@@ -1325,6 +1326,8 @@ subroutine oce_timestep_ale(n)
 	use o_PARAM
 	use g_PARSUP
 	use g_comm_auto
+	use io_RESTART !PS
+	use i_ARRAYS !PS
 	
 	use ieee_arithmetic        !??????????????????????????????
 	
@@ -1391,10 +1394,11 @@ subroutine oce_timestep_ale(n)
 	! Update to hbar(n+3/2) and compute dhe to be used on the next step
 	call compute_hbar_ale
 	t5=MPI_Wtime() 
+	
 	!___________________________________________________________________________
 	! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
 	! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
-        ! ...if we do it here we don't need to write hbar_old into a restart file...
+	! ...if we do it here we don't need to write hbar_old into a restart file...
 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	! --> eta_(n)
 	
@@ -1421,8 +1425,6 @@ subroutine oce_timestep_ale(n)
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
 	t9=MPI_Wtime() 
-	
-!PS 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	
 	!___________________________________________________________________________
 	! write out execution times for ocean step parts
@@ -1616,7 +1618,14 @@ subroutine oce_timestep_ale(n)
 					write(*,*) 'temp_old(: , el)= ',tr_arr_old(:, el,1)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(el)
+					write(*,*) 'hflux_old   = ',heat_flux_old(el)
 					write(*,*) 'wflux       = ',water_flux(el)
+					write(*,*) 'wflux_old   = ',water_flux_old(el)
+					write(*,*)
+					write(*,*) 'aice        = ',a_ice(el)
+					write(*,*) 'aice_old    = ',a_ice_old(el)
+					write(*,*) 'hice        = ',m_ice(el)
+					write(*,*) 'hice_old    = ',m_ice_old(el)
 					write(*,*)
 					write(*,*) 'eta_n       = ',eta_n(el)
 					write(*,*) 'hbar        = ',hbar(el)
@@ -1633,7 +1642,8 @@ subroutine oce_timestep_ale(n)
 					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
 !					call output (1,n)        ! save (NetCDF)
 !					call restart(1,n)        ! save (NetCDF)
-!					call par_ex(1)
+					call restart(n, .true., .false.)
+					call par_ex(1)
 				endif
 				
 				! check SALT

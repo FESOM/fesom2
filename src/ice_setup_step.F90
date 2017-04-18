@@ -58,6 +58,14 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
 
+ allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
+ allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+ m_ice_old=0.0_WP !PS
+ a_ice_old=0.0_WP !PS
+ m_snow_old=0.0_WP !PS
+ thdgr_old=0.0_WP !PS
+ U_ice_old=0.0_WP !PS
+ V_ice_old=0.0_WP !PS
  
  rhs_m=0.0_WP
  rhs_ms=0.0_WP
@@ -135,31 +143,25 @@ subroutine ice_initial_state
   use o_arrays        
   use g_parsup 
   USE g_CONFIG
-  use g_input
   implicit none
   !
   integer        :: i
   character*100  :: filename
   real*8, external  :: TFrez  ! Sea water freeze temperature.
-  if (.not.r_restart) then
-     m_ice =0.
-     a_ice =0.
-     u_ice =0.
-     v_ice =0.
-     m_snow=0.
-     if(mype==0) write(*,*) 'initialize the sea ice'
+  m_ice =0.
+  a_ice =0.
+  u_ice =0.
+  v_ice =0.
+  m_snow=0.
+  if(mype==0) write(*,*) 'initialize the sea ice'
 
-     do i=1,myDim_nod2D+eDim_nod2D                           
-        if (tr_arr(1,i,1)< 0.0_WP) then
-           m_ice(i) = 1.0_WP
-           a_ice(i) = 0.9_WP
-           u_ice(i) = 0.0_WP
-           v_ice(i) = 0.0_WP
-           m_snow(i)= 0.1_WP 
-        endif
-     enddo
-  else
-     if(mype==0) write(*,*) 'read ice restart file'
-!    call ice_input     
-  endif
+  do i=1,myDim_nod2D+eDim_nod2D                           
+     if (tr_arr(1,i,1)< 0.0_WP) then
+        m_ice(i) = 1.0_WP
+        a_ice(i) = 0.9_WP
+        u_ice(i) = 0.0_WP
+        v_ice(i) = 0.0_WP
+        m_snow(i)= 0.1_WP 
+     endif
+  enddo
 end subroutine ice_initial_state

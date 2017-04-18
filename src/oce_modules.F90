@@ -769,11 +769,13 @@ real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable    :: stress_surf(:,:)
 real(kind=WP), allocatable    :: T_rhs(:,:) 
 real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable    :: S_rhs(:,:)
 real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable    :: del_ttf(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+real(kind=WP), allocatable    :: water_flux_old(:), Ssurf_old(:) !PS
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)

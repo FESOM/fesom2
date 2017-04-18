@@ -9,7 +9,6 @@ subroutine initial_state_test
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
-  use g_input
   !
   implicit none
   integer                            :: elem, n, nz, elnodes(3)

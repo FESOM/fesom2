@@ -235,14 +235,14 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			do nz=n2+1, nl2
 				!_______________________________________________________________
 				Tmean2=ttfAB(nz, enodes(2))- &
-				(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
-				edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-				edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
+						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
+						edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+						edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP
 				
 				Tmean1=ttfAB(nz, enodes(1))+ &
-				(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
-				edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-				edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP   
+						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
+						edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+						edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP   
 						
 				!_______________________________________________________________
 				! volume flux across the segments

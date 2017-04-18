@@ -266,6 +266,10 @@ do shortstep=1, evp_rheol_steps
  
  call stress_tensor
  call stress2rhs 
+ 
+ U_ice_old = U_ice !PS
+ V_ice_old = V_ice !PS
+ 
  do n=1,myDim_nod2D 
     am=a_ice(n)
     mm=m_ice(n)

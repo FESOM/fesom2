@@ -128,12 +128,12 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 		deltaX1=edge_cross_dxdy(1,ed)
 		deltaY1=edge_cross_dxdy(2,ed)
 		
+		
 		! same parameter but for other element el(2) that contributes to edge ed
 		! if el(2)==0 than edge is boundary edge
 		nl2=0
 		deltaX2=0.0_WP
 		deltaY2=0.0_WP
-		a=r_earth*elem_cos(el(1))
 		if(el(2)>0) then
 			deltaX2=edge_cross_dxdy(3,ed)
 			deltaY2=edge_cross_dxdy(4,ed)
@@ -677,7 +677,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
-	
+		
 	implicit none
 	
 	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
@@ -862,9 +862,16 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		!_______________________________________________________________________
 		!  The first row contains also the boundary condition from heatflux, 
 		!  freshwaterflux and relaxation terms
+		!  --> tr_arr(1,n,1)*water_flux(n) : latent heatflux contribution due to 
+		!      cell volume. If Volume compressed --> temp has tto raise, if volume 
+		!      expended --> temp has to decrease
 		zinv=1.0_WP*dt    !/(zbar(1)-zbar(2))  ! ale
 		if (tr_num==1) then
-			tr(1)= tr(1)  -  zinv*(heat_flux(n)/vcpw - surf_relax_T*(Tsurf(n)-tr_arr(1,n,1)))
+			tr(1)= tr(1) - zinv*(&
+								heat_flux(n)/vcpw & 
+								- tr_arr(1,n,1)*water_flux(n) & !
+								- surf_relax_T*(Tsurf(n)-tr_arr(1,n,1))&
+								)
 			
 		elseif (tr_num==2) then
 			!___________________________________________________________________
@@ -883,7 +890,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! 2. In cases where the volume of the upper layer is fixed (i.e. linfs)  the freshwater flux 
 			! 'rsss*water_flux(n)' is applied as a virtual salt boundary condition via the vertical 
 			! diffusion operator.
-			tr(1)= tr(1)  +  zinv*(rsss*water_flux(n) + surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
+			! --> real_salt_flux(:): salt flux due to containment/releasing of salt
+			!     by forming/melting of sea ice
+			! --> rsss*water_flux(n) : virtual salt flux 
+			tr(1)= tr(1)  +  zinv*( &
+									rsss*water_flux(n) &
+									+ real_salt_flux(n) &
+									+ surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif
 		
 		!_______________________________________________________________________

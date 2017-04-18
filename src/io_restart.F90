@@ -166,6 +166,15 @@ subroutine ini_ice_io(year)
   call def_variable(iid, 'hsnow',        (/nod2D/),  'effective snow thickness',   'm', m_snow);
   call def_variable(iid, 'uice',         (/nod2D/),  'zonal velocity',    'm/s', u_ice);
   call def_variable(iid, 'vice',         (/nod2D/),  'meridional velocity', 'm', v_ice);
+  call def_variable(iid, 'area_old',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice_old); !PS
+  call def_variable(iid, 'hice_old',         (/nod2D/),  'effective ice thickness',    'm', m_ice_old); !PS
+  call def_variable(iid, 'hsnow_old',        (/nod2D/),  'effective snow thickness',   'm', m_snow_old); !PS
+  call def_variable(iid, 'uice_old',         (/nod2D/),  'zonal velocity',    'm/s', u_ice_old);
+  call def_variable(iid, 'vice_old',         (/nod2D/),  'meridional velocity', 'm', v_ice_old);
+  call def_variable(iid, 'heat_flux',         (/nod2D/),  'heat flux ',    '?', heat_flux); !PS
+  call def_variable(iid, 'heat_flux_old',         (/nod2D/),  'heat flux old',    '?', heat_flux_old); !PS
+  call def_variable(iid, 'water_flux',         (/nod2D/),  'water flux ',    '?', water_flux); !PS
+  call def_variable(iid, 'water_flux_old',         (/nod2D/),  'water flux old',    '?', water_flux_old); !PS
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
