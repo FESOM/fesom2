@@ -351,6 +351,7 @@ subroutine set_par_support_ini
   call communication_edgen
   call communication_nodn
   call communication_elemn
+  deallocate(elem_neighbors,elem_edges)
   call communication_elem_fulln
   call mymesh
   if(mype==0) write(*,*) 'Communication arrays have been set up'   

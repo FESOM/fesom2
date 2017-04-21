@@ -428,6 +428,7 @@ subroutine communication_elem_fulln
   use o_MESH
   use g_PARSUP 
   implicit none
+  integer, parameter :: MAX_PATCHSIZE=24
   integer n, k, ep, np1, np2, np3, prank, elem, elemn(30), counter, enodes(3),q
   integer, allocatable, dimension(:,:) :: aux, pnum, aux_e_list
   integer, allocatable, dimension(:) :: aux_e, aux_e_num, pmap 
@@ -447,30 +448,31 @@ subroutine communication_elem_fulln
   ! Find elements that have common nodes with a given element
   ! =========
   
-  allocate(aux_e(elem2D), aux_e_num(elem2D), aux_e_list(30,elem2D))
+  allocate(aux_e(elem2D), aux_e_num(elem2D), aux_e_list(MAX_PATCHSIZE,elem2D))
   aux_e=0
   DO n=1, elem2D
      enodes=elem2D_nodes(:,n)
      ep=1
      aux_e_list(ep,n)=n
      DO q=1,3
-       DO k=1, nod_in_elem2D_num(enodes(q))
-        elem=nod_in_elem2D(k,enodes(q))
-        if(aux_e(elem)==0) then
-	   aux_e(elem)=1 
-	   if(ep>30) then
-	   write(*,*) 'ERROR in communication_elem_fulln'
-	   call par_ex(1)
-	   STOP
-	   end if
-           ep=ep+1
-	   aux_e_list(ep,n)=elem   
-        end if
-       END DO
+        DO k=1, nod_in_elem2D_num(enodes(q))
+           elem=nod_in_elem2D(k,enodes(q))
+           if(aux_e(elem)==0) then
+              aux_e(elem)=1 
+              if(ep>MAX_PATCHSIZE) then
+                 write(*,*) 'ERROR in communication_elem_fulln:'
+                 write(*,*) '--- increase MAX_PATCHSIZE and recompile'
+                 call par_ex(1)
+                 STOP
+              end if
+              ep=ep+1
+              aux_e_list(ep,n)=elem   
+           end if
+        END DO
      END DO
      aux_e_num(n)=ep
      aux_e(aux_e_list(1:ep,n))=0
-  END DO   
+  END DO
   
   
   ! ========
@@ -478,22 +480,22 @@ subroutine communication_elem_fulln
   ! ========     	 
   do elem=1,elem2D
      elemn= aux_e_list(:,elem) !elem_neighbors(:,elem)
-    do k=1,3 
-     ep=part(elem2D_nodes(k,elem))
-     do n=1, aux_e_num(elem) !3
-        if(elemn(n)<1) cycle
-	np1=part(elem2D_nodes(1,elemn(n)))
-	np2=part(elem2D_nodes(2,elemn(n)))
-	np3=part(elem2D_nodes(3,elemn(n)))
-	if((np1.ne.ep).and.(np2.ne.ep).and.(np3.ne.ep)) then
-	   pnum(ep+1,np1+1)=1
-	   pnum(ep+1,np2+1)=1
-	   pnum(ep+1,np3+1)=1
-        end if
+     do k=1,3 
+        ep=part(elem2D_nodes(k,elem))
+        do n=1, aux_e_num(elem) !3
+           if(elemn(n)<1) cycle
+           np1=part(elem2D_nodes(1,elemn(n)))
+           np2=part(elem2D_nodes(2,elemn(n)))
+           np3=part(elem2D_nodes(3,elemn(n)))
+           if((np1.ne.ep).and.(np2.ne.ep).and.(np3.ne.ep)) then
+              pnum(ep+1,np1+1)=1
+              pnum(ep+1,np2+1)=1
+              pnum(ep+1,np3+1)=1
+           end if
+        end do
      end do
-    end do 
   end do
-   ! pnum =1 for all PEs that can in principle communicate with each other 
+  ! pnum =1 for all PEs that can in principle communicate with each other 
   ! but: mype communicates with a subset of npes
   allocate(pmap(npes))
   pmap=0
