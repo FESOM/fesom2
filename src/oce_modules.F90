@@ -332,12 +332,22 @@ subroutine set_par_support_ini
         write(*,*) 'Calling partit'
         call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
              nlevels_nod2D, npes, part)
-        
+  	
+        call check_partitioning
+
         write(*,*) 'partitioning is done.'
+
+! The stiffness matrix is no longer needed. 
+        deallocate(ssh_stiff%rowptr)
+        deallocate(ssh_stiff%colind)
+        
      end if
+     !NR No longer needed - last use was as weight for partitioning
+     deallocate(nlevels_nod2D)
+
      call MPI_BCAST(part,nod2D,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
   endif
-
+  
   call communication_edgen
   call communication_nodn
   call communication_elemn
@@ -346,6 +356,187 @@ subroutine set_par_support_ini
   if(mype==0) write(*,*) 'Communication arrays have been set up'   
 end subroutine set_par_support_ini
 
+!=======================================================================
+
+subroutine check_partitioning
+
+! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
+!   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
+!   * lower maximum of weights per partition (better load balancing)
+!   * lower memory demand
+!
+! BUT: there might be outliers, single nodes connected to their partition by
+!      only one edge or even completely isolated. This spoils everything :-(
+!
+! This routine checks for isolated nodes and moves them to an adjacent partition,
+! trying not to spoil the load balance.
+
+  use o_MESH
+  integer :: i, j, k, n, node, n_iso, n_iter, is, ie, kmax, np
+  integer :: nod_per_partition(2,0:npes-1)
+  integer :: max_nod_per_part(2), min_nod_per_part(2)
+  integer :: average_nod_per_part(2)
+  logical :: already_counted, found_part
+  
+  integer :: max_adjacent
+  integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
+
+! call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
+!             nlevels_nod2D, npes, part)
+
+! Check load balancing
+  nod_per_partition(:,:)=0
+  do n=1,nod2D
+     nod_per_partition(1,part(n)) = nod_per_partition(1,part(n)) +1
+     nod_per_partition(2,part(n)) = nod_per_partition(2,part(n)) +nlevels_nod2D(n)
+  enddo
+
+  min_nod_per_part(1) = minval( nod_per_partition(1,:))
+  min_nod_per_part(2) = minval( nod_per_partition(2,:))
+
+  max_nod_per_part(1) = maxval( nod_per_partition(1,:))
+  max_nod_per_part(2) = maxval( nod_per_partition(2,:))
+
+  average_nod_per_part(1) = nod2D / npes
+  average_nod_per_part(2) = sum(nlevels_nod2D(:)) / npes
+  
+! Now check for isolated nodes (connect by one or even no edge to other
+! nodes of its partition) and repair, if possible
+
+  max_adjacent = maxval(ssh_stiff%rowptr(2:nod2D+1) - ssh_stiff%rowptr(1:nod2D))
+  allocate(ne_part(max_adjacent), ne_part_num(max_adjacent), ne_part_load(2,max_adjacent))
+
+  isolated_nodes_check: do n_iter = 1, 10
+     print *,' '
+     print *,'Check for isolated nodes, new iteration ========'
+     n_iso = 0
+     do n=1,nod2D
+        is = ssh_stiff%rowptr(n)
+        ie = ssh_stiff%rowptr(n+1) -1
+
+        if (count(part(ssh_stiff%colind(is:ie)) == part(n)) <= 1) then
+
+           n_iso = n_iso+1
+           print *,'Isolated node',n, 'in partition', part(n)
+           print *,'Neighbouring nodes are in partitions', part(ssh_stiff%colind(is:ie))
+
+        ! count the adjacent nodes of the other PEs
+        
+           np=1
+           ne_part(1) = part(ssh_stiff%colind(is))
+           ne_part_num(1) = 1
+           ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
+           ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
+           
+           do i=is+1,ie
+              node = ssh_stiff%colind(i)
+              if (part(node)==part(n)) cycle
+              already_counted = .false.
+              do k=1,np
+                 if (part(node) == ne_part(k)) then
+                    ne_part_num(k) = ne_part_num(k) + 1
+                    already_counted = .true.
+                    exit
+                 endif
+              enddo
+              if (.not. already_counted) then
+                 np = np+1
+                 ne_part(np) = part(node)
+                 ne_part_num(np) = 1
+                 ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
+                 ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+              endif
+           enddo
+        
+        ! Now, check for two things: The load balance, and if 
+        ! there is more than one node of that partition.
+        ! Otherwise, it would become isolated again.
+
+        ! Best choice would be the partition with most adjacent nodes (edgecut!)
+        ! Choose, if it does not decrease the load balance. 
+        !        (There might be two partitions with the same number of adjacent
+        !         nodes. Don't care about this here)
+
+           kmax = maxloc(ne_part_num(1:np),1)
+
+           if (ne_part_num(kmax) <= 1) then
+              print *,'Sorry, no chance to solve an isolated node problem'
+              exit isolated_nodes_check
+           endif
+
+           if  (ne_part_load(1,kmax) <= max_nod_per_part(1) .and. &
+                ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
+              k = kmax
+           else
+           ! Don't make it too compicated. Reject partitions that have only one
+           ! adjacent node. Take the next not violating the load balance.
+              found_part = .false.
+              do k=1,np
+                 if (ne_part_num(k)==1 .or. k==kmax) cycle
+                 
+                 if  (ne_part_load(1,k) <= max_nod_per_part(1) .and. &
+                      ne_part_load(2,k) <= max_nod_per_part(2) ) then
+                    
+                    found_part = .true.
+                    exit
+                 endif
+              enddo
+
+              if (.not. found_part) then
+              ! Ok, don't think to much. Simply go for minimized edge cut.
+                 k = kmax
+              endif
+           endif
+        
+! Adjust the load balancing
+        
+           nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
+           nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
+           nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
+           nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
+
+! And, finally, move nod n to other partition        
+           part(n) = ne_part(k)
+           print *,'Node',n,'is moved to part',part(n)
+        endif
+  enddo  
+  
+  if (n_iso==0) then
+     print *,'No isolated nodes found'
+     exit isolated_nodes_check 
+  endif
+  ! Check for isolated nodes again
+end do isolated_nodes_check
+
+  deallocate(ne_part, ne_part_num, ne_part_load)
+
+  if (n_iso > 0) then
+     print *,'++++++++++++++++++++++++++++++++++++++++++++'
+     print *,'+  WARNING: PARTITIONING LOOKS REALLY BAD  +'
+     print *,'+  It was not possible to remove all       +'
+     print *,'+  isolated nodes. Consider to rerun with  +'
+     print *,'+  new metis random seed (see Makefile.in) +'
+     print *,'++++++++++++++++++++++++++++++++++++++++++++'
+  endif
+
+  print *,'=== LOAD BALANCING ==='
+  print *,'2D nodes: min, aver, max per part',min_nod_per_part(1), &
+          average_nod_per_part(1),max_nod_per_part(1)
+
+  write(*,"('2D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
+          100.*real(min_nod_per_part(1)) / real(average_nod_per_part(1)), &
+          100.*real(max_nod_per_part(1)) / real(average_nod_per_part(1))
+
+  print *,'3D nodes: Min, aver, max per part',min_nod_per_part(2), &
+          average_nod_per_part(2),max_nod_per_part(2)
+  write(*,"('3D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
+          100.*real(min_nod_per_part(2)) / real(average_nod_per_part(2)), &
+          100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
+
+
+
+
+end subroutine check_partitioning
 !=======================================================================
 
 subroutine set_par_support

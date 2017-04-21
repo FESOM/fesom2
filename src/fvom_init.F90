@@ -33,6 +33,11 @@ program MAIN
   call find_elem_neighbors_ini
   call find_levels
 
+! NR Some arrays are not needed for partitioning, after setting up the grid
+  deallocate(coord_nod2D)
+  deallocate(edge_tri)
+  deallocate(zbar,Z,nlevels)
+
   if (mype==0) call stiff_mat_ini  ! Only the master will call Metis and needs the matrix
   call set_par_support_ini
   call save_dist_mesh
@@ -357,7 +362,7 @@ END DO
  close(12)
  end if
 END SUBROUTINE find_edges_ini
-!===================================================================
+!=========================================================================
 !> @brief
 !> Finds elemental and nodal levels.
 !> Does some thresholding: if (depth>zbar(4)) x=zbar(4)
