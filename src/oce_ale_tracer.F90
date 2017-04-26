@@ -871,11 +871,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		if (tr_num==1) then
 			tr(1)= tr(1) - zinv*(&
 								heat_flux(n)/vcpw & 
-  	 						        - tr_arr_old(1,n,1)*water_flux(n) & !
+  	 						        - tr_arr_old(1,n,1)*water_flux(n) &
                                                                 ! the proper way would be the following (not tested yet)
-								- ((1.-a_ice(n))*tr_arr_old(1,n,1)+a_ice(n)*TFrez(tr_arr_old(1,n,2)))*water_flux(n) & !
-								- tr_arr(1,n,1)*water_flux(n) & !
-								- surf_relax_T*(Tsurf(n)-tr_arr(1,n,1))&
+								!- ((1.-a_ice(n))*tr_arr_old(1,n,1)+a_ice(n)*TFrez(tr_arr_old(1,n,2)))*water_flux(n) &
+								!- tr_arr(1,n,1)*water_flux(n) & !
+								!- surf_relax_T*(Tsurf(n)-tr_arr(1,n,1))&
 								)
 			
 		elseif (tr_num==2) then
