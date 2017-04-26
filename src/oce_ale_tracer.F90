@@ -674,6 +674,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	use o_MESH
 	use o_PARAM
 	use o_ARRAYS
+        use i_ARRAYS
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
@@ -685,6 +686,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	integer             :: nz, n, nzmax,tr_num
 	real(kind=WP)       :: m, zinv, dt_inv
 	real(kind=WP)       :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
+        real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
 
 	dt_inv=1.0_WP/dt
 	Ty=0.0_WP
@@ -869,6 +871,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		if (tr_num==1) then
 			tr(1)= tr(1) - zinv*(&
 								heat_flux(n)/vcpw & 
+  	 						        - tr_arr_old(1,n,1)*water_flux(n) & !
+                                                                ! the proper way would be the following (not tested yet)
+								- ((1.-a_ice(n))*tr_arr_old(1,n,1)+a_ice(n)*TFrez(tr_arr_old(1,n,2)))*water_flux(n) & !
 								- tr_arr(1,n,1)*water_flux(n) & !
 								- surf_relax_T*(Tsurf(n)-tr_arr(1,n,1))&
 								)
