@@ -1,9 +1,12 @@
 SUBROUTINE compute_vel_rhs
 USE o_MESH
 USE o_ARRAYS
+USE i_ARRAYS
+USE i_therm_param
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+USE g_forcing_param, only: use_virt_salt
 use g_comm_auto
 IMPLICIT NONE
 integer          :: elem, elnodes(3), nz 
@@ -11,6 +14,7 @@ real(kind=WP)    :: eta(3), ff, gg, mm
 real(kind=WP)    :: Fx, Fy, pre(3)
 logical, save    :: lfirst=.true.
 real(kind=8)     :: t1, t2, t3, t4
+real(kind=8)     :: p_ice(3), use_pice
 
 t1=MPI_Wtime()
 ! =================
@@ -26,6 +30,9 @@ end do
 ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
 ! and the Coriolis force + metric terms
 ! ====================
+!to avoid if condition inside the loop
+use_pice=0._WP
+if (.not. use_virt_salt) use_pice=1._WP
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
    
@@ -35,8 +42,9 @@ DO elem=1, myDim_elem2D
    gg=elem_area(elem)
    ff=coriolis(elem)*gg
    !mm=metric_factor(elem)*gg
+   p_ice=(m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
    DO nz=1,nlevels(elem)-1
-      pre=-(eta+hpressure(nz,elnodes)/density_0)
+      pre=-(eta+hpressure(nz,elnodes)/density_0+p_ice*use_pice)!+atmospheric pressure etc.
       Fx=sum(gradient_sca(1:3,elem)*pre)
       Fy=sum(gradient_sca(4:6,elem)*pre)
       UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+Fx*gg 

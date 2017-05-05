@@ -1,6 +1,7 @@
 SUBROUTINE compute_vel_rhs
 USE o_MESH
 USE o_ARRAYS
+USE i_therm_param
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG

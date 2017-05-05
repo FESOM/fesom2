@@ -6,6 +6,8 @@ module io_MEANDATA
   use g_clock
   use g_comm_auto
   use o_ARRAYS
+  use g_forcing_arrays
+  use i_ARRAYS
   implicit none
 #include "netcdf.inc"
   private
@@ -66,12 +68,15 @@ subroutine ini_mean_io
   call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D+eDim_nod2D/), 'temp', 'temperature', 'C',   tr_arr(:,:,1), 1, 'm')
   call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D+eDim_nod2D/), 'salt', 'salinity',    'psu', tr_arr(:,:,2), 1, 'm')
 !2D
-!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'ssh', 'sea surface elevation',   'm', eta_n,                                1, 'd')
-!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sst', 'sea surface temperature', 'C', tr_arr(1,1:myDim_nod2D+eDim_nod2D,1), 1, 'd')
-!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sss', 'sea surface salinity',  'psu', tr_arr(1,1:myDim_nod2D+eDim_nod2D,2), 1, 'd')
-  call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'ssh', 'sea surface elevation',   'm', eta_n,                                1, 'm')
-  call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sst', 'sea surface temperature', 'C', tr_arr(1,1:myDim_nod2D+eDim_nod2D,1), 1, 'm')
-  call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sss', 'sea surface salinity',  'psu', tr_arr(1,1:myDim_nod2D+eDim_nod2D,2), 1, 'm')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'ssh',   'sea surface elevation',   'm',   eta_n,                                    1, 'd')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sst',   'sea surface temperature', 'C',   tr_arr(1,1:myDim_nod2D+eDim_nod2D,1),     1, 'd')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sss',   'sea surface salinity',    'psu', tr_arr(1,1:myDim_nod2D+eDim_nod2D,2),     1, 'd')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'a_ice', 'ice concentration',       '%',   a_ice(1:myDim_nod2D+eDim_nod2D),          1, 'd')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'm_ice', 'ice height',              'm',   m_ice(1:myDim_nod2D+eDim_nod2D),          1, 'd')
+   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'm_snow','snow height',             'm',   m_snow(1:myDim_nod2D+eDim_nod2D),         1, 'd')
+!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'w_flux','water flux',              'm/s', water_flux(1:myDim_nod2D+eDim_nod2D),     1, 'd')
+!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'h_flux','heat flux',               'm/s', heat_flux(1:myDim_nod2D+eDim_nod2D),      1, 'd')
+
 end subroutine ini_mean_io
 !
 !--------------------------------------------------------------------------------------------
@@ -297,10 +302,10 @@ subroutine output(istep)
         call daily_event(do_output, entry%freq)
 
      else if (entry%freq_unit == 'h') then
-        call daily_event(do_output, entry%freq)
+        call hourly_event(do_output, entry%freq)
 
      else if (entry%freq_unit == 's') then
-        call daily_event(do_output, istep, entry%freq)
+        call step_event(do_output, istep, entry%freq)
 
      else
         write(*,*) 'You did not specify a supported outputflag.'

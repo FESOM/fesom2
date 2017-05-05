@@ -58,7 +58,7 @@ subroutine thermodynamics
   rsss=ref_sss
 
   ! u_ice and v_ice are at nodes
-  ! u_w, v_w is always on elements
+  ! u_w, v_w are at nodes (interpolated from elements)
   ! u_wind and v_wind are always at nodes
   ! ================
   ! Friction velocity 
@@ -66,9 +66,9 @@ subroutine thermodynamics
   allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
     DO i=1, myDim_nod2D
        ustar=0.0_WP
-           ustar=((u_ice(i)-u_w(i))**2+ &
-	                     (v_ice(i)-v_w(i))**2)
-           ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
+       ustar=((u_ice(i)-u_w(i))**2+ &
+	               (v_ice(i)-v_w(i))**2)
+       ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
     END DO	
   call exchange_nod(ustar_aux) !TODO Why do we need it?
   
@@ -109,7 +109,7 @@ subroutine thermodynamics
      ce	     = Ce_atm_oce_arr(i)
      ch_i    = Ch_atm_ice
      ce_i    = Ce_atm_ice
-     h_ml    = 10.0_WP       	         ! 10.0 or 30. used previously
+     h_ml    = 1.0_WP       	         ! 10.0 or 30. used previously
      fw      = 0.0_WP
      ehf     = 0.0_WP
      lid_Clo=h0
@@ -334,7 +334,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
 
   ! Update snow and ice depth
   hsn=sn
-  h=max(qhst,0.0_WP)   
+  h=max(qhst,0.0_WP)
   if (h.lt.1E-6) h=0.        ! Avoid very small ice thicknesses
 
   ! heat and fresh water fluxes
@@ -351,7 +351,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
     
   ! (prec+runoff)+evap - freezing(+melting) ice&snow
   if (.not. use_virt_salt) then
-     fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat 
+     fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat
      rsf= -dhgrowth*rhoice*inv_rhowat*Sice
   else
      fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
@@ -379,7 +379,6 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   else
      fw=fw+iflice*rhoice*inv_rhowat*Sice/rsss
   end if
-
 evap=evap+subli
 end subroutine therm_ice
 !

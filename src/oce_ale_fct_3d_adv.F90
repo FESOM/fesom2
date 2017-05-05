@@ -15,6 +15,10 @@ subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
 	
 	! 1st. first calculate Low and High order solution
 	call fct_ale_muscl_LH(ttfAB,ttf,num_ord)
+
+!just for using the low order:
+!	fct_aec    =0.
+!	fct_aec_ver=0.
 	
 	! 2nd. apply constrained bounds
 	call fct_ale(ttf)

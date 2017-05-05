@@ -23,6 +23,9 @@ real(kind=8)                              :: loc_eta, loc_hbar, loc_deta, loc_dh
 		int_wflux =0.
 		loc_eta   =0.
 		loc_hbar  =0.
+                loc_deta  =0.
+                loc_dhbar =0.
+                loc_wflux =0.
 		
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D

@@ -48,7 +48,6 @@ subroutine pressure_bv
 			
 			!___________________________________________________________________
 			! calc node dependent changing ALE zbar_n and Z_n
-			zbar_n= 0.0_WP
 			zbar_n=0.0_WP
 			Z_n=0.0_WP
 			zbar_n(nzmax)=zbar(nzmax)
