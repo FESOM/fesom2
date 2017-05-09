@@ -1033,6 +1033,11 @@ real(kind=WP), allocatable,dimension(:)     :: ssh_rhs_old !, ssh_rhs_old2 !PS
 !     layer thinkness at every node
 real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 
+! --> multiplication factor for surface boundary condition in 
+!     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
+!     (zlevel,zstar...) --> = 1.0
+real(kind=WP)                               :: is_nonlinfs
+
 !_______________________________________________________________________________
 !Monin-Obukhov correction
 real*8,allocatable :: mo(:,:),mixlength(:)
