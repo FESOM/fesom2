@@ -674,7 +674,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	use o_MESH
 	use o_PARAM
 	use o_ARRAYS
-        use i_ARRAYS
+	use i_ARRAYS
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
@@ -865,13 +865,22 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		!  The first row contains also the boundary condition from heatflux, 
 		!  freshwaterflux and relaxation terms
 		!  --> tr_arr(1,n,1)*water_flux(n) : latent heatflux contribution due to 
-		!      cell volume. If Volume compressed --> temp has tto raise, if volume 
+		!      cell volume. If Volume decreases --> temp has to raise, if volume 
 		!      expended --> temp has to decrease
+		!                           (-)   ^                        (-)   ^ 
+		!                            |    |                         |    | 
+		!   IN MOMENT: heat_flux ~~~~|~~~~|~~~~   ,  water_flux ~~~~|~~~~|~~~~
+		!  (BUT CHECK!)              |    |                         |    |
+		!                            v   (+)                        v   (+) 
+		!                            
+		!  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
+		!  --> is_nonlinfs=0.0 for linfs
+		!                            
 		zinv=1.0_WP*dt    !/(zbar(1)-zbar(2))  ! ale
 		if (tr_num==1) then
 			tr(1)= tr(1) - zinv*(&
 								heat_flux(n)/vcpw & 
-  	 						        + tr_arr(1,n,1)*water_flux(n) &
+								+ tr_arr(1,n,1)*water_flux(n)*is_nonlinfs &
 								)
 			
 		elseif (tr_num==2) then
@@ -896,7 +905,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! --> rsss*water_flux(n) : virtual salt flux 
 			tr(1)= tr(1)  +  zinv*( &
 									rsss*water_flux(n) &
-									- real_salt_flux(n) &
+									- real_salt_flux(n)*is_nonlinfs &
 									+ surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif
 		

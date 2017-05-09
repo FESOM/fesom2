@@ -82,8 +82,10 @@ subroutine ale_init
 		! this will force the virtual saltinity flux to be zero
 		ref_sss_local=.false.
 		ref_sss=0._WP
+		is_nonlinfs = 1.0_WP
 	else
 		use_virt_salt=.true.
+		is_nonlinfs = 0.0_WP
 	end if
 	
 end subroutine ale_init
