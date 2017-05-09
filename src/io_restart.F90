@@ -259,7 +259,7 @@ subroutine create_new_file(id)
   id%error_status=0
   ! create an ocean output file
   write(*,*) 'initializing restart file ', trim(id%filename)
-  id%error_status(c) = nf_create(id%filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), id%ncid); c=c+1
+  id%error_status(c) = nf_create(id%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), id%ncid); c=c+1
 
   do j=1, id%ndim
 !___Create mesh related dimentions__________________________________________

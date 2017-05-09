@@ -114,11 +114,7 @@ subroutine create_new_file(entry)
   ! create an ocean output file
   write(*,*) 'initializing I/O file for ', trim(entry%name)
 
-  if (restart_offset==32) then
-     entry%error_status(c) = nf_create(entry%filename, nf_clobber, entry%ncid);                      c=c+1
-  else
-     entry%error_status(c) = nf_create(entry%filename, IOR(NF_CLOBBER,NF_64BIT_OFFSET), entry%ncid); c=c+1
-  end if
+  entry%error_status(c) = nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid); c=c+1
 
   do j=1, entry%ndim
 !___Create mesh related dimentions__________________________________________
