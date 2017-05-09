@@ -22,7 +22,7 @@ def ftriplot(mesh, data2, contours, cmap=[], oce='global', do_cbar=True, mlabels
 		if data_on_elem==1:
 			data2=data2[k]
 
-		print 'ftriplot, number of dummy points:', len(d)-len(k)	
+		print('ftriplot, number of dummy points:', len(d)-len(k))
 		map = Basemap(projection='robin',lon_0=0)
 		x, y = map(mesh.x2, mesh.y2)
 		map.drawmapboundary(fill_color='0.9')
@@ -49,8 +49,8 @@ def ftriplot(mesh, data2, contours, cmap=[], oce='global', do_cbar=True, mlabels
 		d=data2[elem2].mean(axis=1)
 		k = [i for (i, val) in enumerate(d) if not np.isnan(val)]
 		elem2=elem2[k,:]
-		print 'ftriplot, number of dummy points:', len(d)-len(k)		
-	        map = Basemap(projection='nplaea',boundinglat=45,lon_0=0,resolution='l')
+		print('ftriplot, number of dummy points:', len(d)-len(k))
+		map = Basemap(projection='nplaea',boundinglat=45,lon_0=0,resolution='l')
 		x, y = map(mesh.x2, mesh.y2)
 		map.drawcoastlines()
 		map.drawparallels(np.arange(-80.,81.,20.), labels=plabels)
@@ -70,7 +70,7 @@ def ftriplot(mesh, data2, contours, cmap=[], oce='global', do_cbar=True, mlabels
 		d=data2[elem2].mean(axis=1)
 		k = [i for (i, val) in enumerate(d) if not np.isnan(val)]
 		elem2=elem2[k,:]
-		print 'ftriplot, number of dummy points:', len(d)-len(k)		
+		print('ftriplot, number of dummy points:', len(d)-len(k))
 		map = Basemap(projection='splaea',boundinglat=-20,lon_0=180,resolution='l')
 		x, y = map(mesh.x2, mesh.y2)
 		map.drawcoastlines()
@@ -85,8 +85,7 @@ def ftriplot(mesh, data2, contours, cmap=[], oce='global', do_cbar=True, mlabels
 		im=plt.tricontourf(x, y, elem2, data2, levels=contours, cmap=cmap, extend=extend)
 		if do_cbar:
 			cbar=map.colorbar(im,"bottom", size="5%", pad="2%")
-			cbar.set_ticks([round(i,1) for i in np.linspace(cont[0], cont[1], 5)])
-	return(im, cbar if (do_cbar) else False)
+	return(im, map, cbar if (do_cbar) else False)
 
 def wplot_xy(xx,yy,zz,contours, cmap=[], do_cbar=True):
 	import numpy as np
@@ -106,17 +105,14 @@ def wplot_xy(xx,yy,zz,contours, cmap=[], do_cbar=True):
 	map.drawmapboundary(fill_color='0.9')
 	map.drawcoastlines()
 	map.fillcontinents(color='.7',lake_color='.7')
-#	map.drawparallels(np.arange(-90, 90, 30),labels=[1,0,0,0])
-#	map.drawmeridians(np.arange(map.lonmin,map.lonmax+30,60),labels=[0,0,0,1])
-        map.drawparallels(np.arange(-90,90,45),labels=[1,0,0,0])
-        map.drawmeridians([-120.0, 0., 120.0], labels=[0,0,0,1])
-
+	map.drawparallels(np.arange(-90,90,45),labels=[1,0,0,0])
+	map.drawmeridians([-120.0, 0., 120.0], labels=[0,0,0,1])
 	im=plt.contourf(xxx, yyy, zz, levels=contours, cmap=cmap, extend='both')
-        if do_cbar:
-        	cbar=map.colorbar(im,"bottom", size="5%", pad="2%")
-        	return(im, map, cbar)
-        else:
-                return(im, map)
+	if do_cbar:
+		cbar=map.colorbar(im,"bottom", size="5%", pad="2%")
+		return(im, map, cbar)
+	else:
+		return(im, map)
 
 def wplot_yz(y,z,v,contours, cmap=[]):
 	import numpy as np

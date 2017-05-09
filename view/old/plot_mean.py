@@ -1,8 +1,8 @@
 #	modify include.py and init.py before running this script
 # 	include required system & FESOM modules
-execfile("include.py")
+exec(open("include.py").read())
 # 	define the paths where the mesh & data are stored
-execfile("init.py")
+exec(open("init.py").read())
 
 ######################################
 str_id, depth	='hice', 100

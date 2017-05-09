@@ -9,5 +9,3 @@ from load_mesh_data import *
 sys.path.append("/home/h/hbkdsido/utils/seawater-1.1/")
 import seawater as sw
 from fesom_plot_tools import *
-from woa2005 import *
-from mpl_toolkits.axes_grid1 import AxesGrid

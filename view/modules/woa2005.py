@@ -28,13 +28,13 @@ class woa2005:
 		self.Tyz=nanmean(self.T, 2)
 		self.Syz=nanmean(self.S, 2)
 
-def fesom_2_woa2005(str_id, months, years, mesh, result_path, runid, ext, woa05):
+def fesom_2_woa2005(str_id, months, years, mesh, result_path, runid, woa05):
 	xx,yy = np.meshgrid(woa05.x, woa05.y)
 	zz=np.copy(woa05.T)
 # Preload the 3D whole field if fits into the memory
-	data = read_fesom_3d_full(str_id, months, years, mesh, result_path, runid, ext)
+	data = read_fesom_3d_full(str_id, months, years, mesh, result_path, runid)
 	for dep_ind in range(len(woa05.z)):
-		print 'interpolating level: ', dep_ind
+		print('interpolating level: ', dep_ind)
 		wdep=woa05.z[dep_ind]
 # find indicies and depth of the nodes below and above the target			
 		iz_up=[(i,z) for (i,z) in enumerate(abs(mesh.zbars)) if z <= wdep]
