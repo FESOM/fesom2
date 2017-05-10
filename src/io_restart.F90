@@ -496,27 +496,28 @@ subroutine read_restart(id, arg)
  
   do i=1, id%nvar
      shape=id%var(i)%ndim
+     if (mype==0) write(*,*) 'reading restart for ', trim(id%var(i)%name)
 !_______writing 2D fields________________________________________________
      if (shape==1) then
         size1=id%var(i)%dims(1)
-        allocate(aux1(size1))
         if (mype==0) then
+           allocate(aux1(size1))
            id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
         end if
         if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux1)
         if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux1)
-        deallocate(aux1)
+        if (mype==0) deallocate(aux1)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        allocate(aux2(size1, size2))
-        if (mype==0) then        
+        if (mype==0) then
+           allocate(aux2(size1, size2))
            id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
         end if
         if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2, aux2)
         if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2, aux2)
-        deallocate(aux2)
+        if (mype==0) deallocate(aux2)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
            call par_ex

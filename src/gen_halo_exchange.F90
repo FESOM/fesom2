@@ -683,23 +683,15 @@ END SUBROUTINE exchange_elem2D_i_begin
 ! Many because of different sizes.
 ! ========================================================================
 subroutine broadcast_nod3D(arr3D, arr3Dglobal)
-
-! Make nodal information available to all PE 
-!
-! Use only with 3D arrays stored in (vertical, horizontal) way
-
+! Distribute the nodal information available on 0 PE to other PEs
 use g_PARSUP
 USE o_MESH
 
-
 IMPLICIT NONE
 
-INTEGER :: ireals, nz, counter,nl1
+INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  isendbuf, irecvbuf
-
-!real(kind=WP) ::  arr3D(nl-1,myDim_nod2D+eDim_nod2D)
-!real(kind=WP) ::  arr3Dglobal(nl-1,nod2D)
+INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
 real(kind=WP) ::  arr3D(:,:)
 real(kind=WP) ::  arr3Dglobal(:,:)
 real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
@@ -707,302 +699,207 @@ real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
     if (npes>1) then
-    arr3Dglobal(:,myList_nod2D(1:myDim_nod2D))=arr3D(:,1:myDim_nod2D)
+    arr3D(:,1:myDim_nod2D)=arr3Dglobal(:,myList_nod2D(1:myDim_nod2D))
     end if
     DO  n = 1, npes-1
-
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
                      0, MPI_COMM_WORLD, status, MPIerr )
        sender = status(MPI_SOURCE)
-       ALLOCATE(recvbuf(1:nTS*nl1), irecvbuf(1:nTS) )
-       CALL MPI_RECV( irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
-       CALL MPI_RECV( recvbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+       ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
 
+       CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
+                      1, MPI_COMM_WORLD, status, MPIerr )
        counter=0
        DO i = 1, nTS
           DO nz=1, nl1
-	  counter=counter+1
-          arr3Dglobal(nz,irecvbuf(i)) = recvbuf(counter)
-	  ENDDO
+             counter=counter+1
+             sendbuf(counter) = arr3Dglobal(nz,irecvbuf(i))
+          ENDDO
        ENDDO
-       DEALLOCATE( recvbuf, irecvbuf )
 
+       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
+                   sender, 2, MPI_COMM_WORLD, MPIerr )
+
+       DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
-
 ELSE
+    CALL MPI_SEND( myDim_nod2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myList_nod2D(1), myDim_nod2D, MPI_INTEGER, 0, 1, &
+                   MPI_COMM_WORLD, MPIerr )
 
-    ALLOCATE( sendbuf(1:myDim_nod2D*nl1), isendbuf(1:myDim_nod2D) )
+    ALLOCATE(recvbuf(myDim_nod2D*nl1))
+    CALL MPI_RECV( recvbuf(1), myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, 0, &
+                      2, MPI_COMM_WORLD, status, MPIerr )
     counter=0
     DO n = 1, myDim_nod2D
-       isendbuf(n) = myList_nod2D(n)
        DO nz=1, nl1
-       counter=counter+1
-       sendbuf(counter)  = arr3D(nz,n)
+         counter=counter+1
+         arr3D(nz,n)=recvbuf(counter)
        ENDDO
     ENDDO
-    CALL MPI_SEND( myDim_nod2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( isendbuf(1), myDim_nod2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( sendbuf(1), myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, &
-                   0, 2, MPI_COMM_WORLD, MPIerr )
-    DEALLOCATE( sendbuf, isendbuf )
 
+    DEALLOCATE(recvbuf)
 ENDIF
- DO n=1,nl1
- CALL MPI_BCAST( arr3Dglobal(n,:), nod2d, MPI_DOUBLE_PRECISION, 0, &
-                 MPI_COMM_WORLD, MPIerr)
- END DO
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 end subroutine broadcast_nod3D
 !
 !============================================================================
+!
 subroutine broadcast_nod2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
 USE o_MESH
-
-
 IMPLICIT NONE
 
-INTEGER :: ireals
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  isendbuf, irecvbuf
+real(kind=WP) ::  arr2D(:)
+real(kind=WP) ::  arr2Dglobal(:)
 
-real(kind=WP) ::  arr2D(myDim_nod2D+eDim_nod2D)
-real(kind=WP) ::  arr2Dglobal(nod2D)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+integer                                  ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
 
 IF ( mype == 0 ) THEN
     if (npes>1) then
-    arr2Dglobal(myList_nod2D(1:myDim_nod2D))=arr2D(1:myDim_nod2D)
+    arr2D(1:myDim_nod2D)=arr2Dglobal(myList_nod2D(1:myDim_nod2D))
     end if
     DO  n = 1, npes-1
-
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
                      0, MPI_COMM_WORLD, status, MPIerr )
        sender = status(MPI_SOURCE)
-       ALLOCATE( recvbuf(1:nTS), irecvbuf(1:nTS) )
-       CALL MPI_RECV( irecvbuf(1), nTS, MPI_INTEGER, sender, &
+       ALLOCATE(sendbuf(nTS), irecvbuf(nTS))
+
+       CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
                       1, MPI_COMM_WORLD, status, MPIerr )
-       CALL MPI_RECV( recvbuf(1), nTS, MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
-
        DO i = 1, nTS
-          arr2Dglobal(irecvbuf(i)) = recvbuf(i)
+             sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
-       DEALLOCATE( recvbuf, irecvbuf )
 
+       CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
+                   sender, 2, MPI_COMM_WORLD, MPIerr )
+
+       DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
-
 ELSE
-
-    ALLOCATE( sendbuf(1:myDim_nod2d), isendbuf(1:myDim_nod2D) )
-    DO n = 1, myDim_nod2D
-       isendbuf(n) = myList_nod2D(n)
-       sendbuf(n)  = arr2D(n)
-    ENDDO
     CALL MPI_SEND( myDim_nod2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( isendbuf(1), myDim_nod2D, MPI_INTEGER, 0, 1, &
+    CALL MPI_SEND( myList_nod2D(1), myDim_nod2D, MPI_INTEGER, 0, 1, &
                    MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( sendbuf(1), myDim_nod2D, MPI_DOUBLE_PRECISION, &
-                   0, 2, MPI_COMM_WORLD, MPIerr )
-    DEALLOCATE( sendbuf, isendbuf )
-
+    CALL MPI_RECV( arr2D(1), myDim_nod2D, MPI_DOUBLE_PRECISION, 0, &
+                      2, MPI_COMM_WORLD, status, MPIerr )
 ENDIF
-
- CALL MPI_BCAST(arr2Dglobal, nod2d, MPI_DOUBLE_PRECISION, 0, &
-                 MPI_COMM_WORLD, MPIerr)
-
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 end subroutine broadcast_nod2D
-!===================================================================
-subroutine broadcast_edge2D(arr2D, arr2Dglobal)
+!
+!============================================================================
+!
+subroutine broadcast_elem3D(arr3D, arr3Dglobal)
+! Distribute the elemental information available on 0 PE to other PEs
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+INTEGER      :: nz, counter,nl1
+integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
+real(kind=WP) ::  arr3D(:,:)
+real(kind=WP) ::  arr3Dglobal(:,:)
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+
+nl1=ubound(arr3D,1)
+IF ( mype == 0 ) THEN
+    if (npes>1) then
+    arr3D(:,1:myDim_elem2D)=arr3Dglobal(:,myList_elem2D(1:myDim_elem2D))
+    end if
+    DO  n = 1, npes-1
+       CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                     0, MPI_COMM_WORLD, status, MPIerr )
+       sender = status(MPI_SOURCE)
+       ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
+
+       CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
+                      1, MPI_COMM_WORLD, status, MPIerr )
+       counter=0
+       DO i = 1, nTS
+          DO nz=1, nl1
+             counter=counter+1
+             sendbuf(counter) = arr3Dglobal(nz,irecvbuf(i))
+          ENDDO
+       ENDDO
+
+       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
+                   sender, 2, MPI_COMM_WORLD, MPIerr )
+
+       DEALLOCATE(irecvbuf, sendbuf)
+    ENDDO
+ELSE
+    CALL MPI_SEND( myDim_elem2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myList_elem2D(1), myDim_elem2D, MPI_INTEGER, 0, 1, &
+                   MPI_COMM_WORLD, MPIerr )
+
+    ALLOCATE(recvbuf(myDim_elem2D*nl1))
+    CALL MPI_RECV( recvbuf(1), myDim_elem2D*nl1, MPI_DOUBLE_PRECISION, 0, &
+                      2, MPI_COMM_WORLD, status, MPIerr )
+    counter=0
+    DO n = 1, myDim_elem2D
+       DO nz=1, nl1
+       counter=counter+1
+       arr3D(nz,n)=recvbuf(counter)
+       ENDDO
+    ENDDO
+
+    DEALLOCATE(recvbuf)
+ENDIF
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+end subroutine broadcast_elem3D
+!
+!============================================================================
+!
+subroutine broadcast_elem2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
 USE o_MESH
-
-
 IMPLICIT NONE
 
-INTEGER :: ireals
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  isendbuf, irecvbuf
+INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
 
-real(kind=WP) ::  arr2D(myDim_edge2D+eDim_edge2D)
-real(kind=WP) ::  arr2Dglobal(nod2D)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(kind=WP) ::  arr2D(:)
+real(kind=WP) ::  arr2Dglobal(:)
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
 
 IF ( mype == 0 ) THEN
     if (npes>1) then
-    arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
-    end if
-    DO  n = 1, npes-1
-    
-       CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
-       sender = status(MPI_SOURCE)
-       ALLOCATE( recvbuf(1:nTS), irecvbuf(1:nTS) )
-       CALL MPI_RECV( irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
-       CALL MPI_RECV( recvbuf(1), nTS, MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
-
-       DO i = 1, nTS
-          arr2Dglobal(irecvbuf(i)) = recvbuf(i)
-       ENDDO
-       DEALLOCATE( recvbuf, irecvbuf )
-
-    ENDDO
-
-ELSE
-
-    ALLOCATE( sendbuf(1:myDim_edge2d), isendbuf(1:myDim_edge2D) )
-    DO n = 1, myDim_edge2D
-       isendbuf(n) = myList_edge2D(n)
-       sendbuf(n)  = arr2D(n)
-    ENDDO
-    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( isendbuf(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( sendbuf(1), myDim_edge2D, MPI_DOUBLE_PRECISION, &
-                   0, 2, MPI_COMM_WORLD, MPIerr )
-    DEALLOCATE( sendbuf, isendbuf )
-
-ENDIF
-    
- CALL MPI_BCAST(arr2Dglobal, edge2d, MPI_DOUBLE_PRECISION, 0, &
-                 MPI_COMM_WORLD, MPIerr)
-
-end subroutine broadcast_edge2D 
-!===================================================================
-subroutine broadcast_elem3D(arr3D, arr3Dglobal)
-!Makes elemental information available to all PE 
-!
-! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-USE o_MESH
-
-
-IMPLICIT NONE
-
-INTEGER :: ireals, nz, counter
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  isendbuf, irecvbuf
-
-real(kind=8) ::  arr3D(nl-1,myDim_elem2D+eDim_elem2D)
-real(kind=8) ::  arr3Dglobal(nl-1,elem2D)
-real(kind=8), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-
-IF ( mype == 0 ) THEN
-    if (npes>1) then
-    arr3Dglobal(:,myList_elem2D(1:myDim_elem2D))=arr3D(:,1:myDim_elem2D)
+    arr2D(1:myDim_elem2D)=arr2Dglobal(myList_elem2D(1:myDim_elem2D))
     end if
     DO  n = 1, npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
                      0, MPI_COMM_WORLD, status, MPIerr )
        sender = status(MPI_SOURCE)
-       ALLOCATE(recvbuf(1:nTS*(nl-1)), irecvbuf(1:nTS) )
-       CALL MPI_RECV( irecvbuf(1), nTS, MPI_INTEGER, sender, &
+       ALLOCATE(sendbuf(1:nTS), irecvbuf(nTS))
+
+       CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
                       1, MPI_COMM_WORLD, status, MPIerr )
-       CALL MPI_RECV( recvbuf(1), nTS*(nl-1), MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
-
-       counter=0
        DO i = 1, nTS
-          DO nz=1, nl-1
-	  counter=counter+1
-          arr3Dglobal(nz,irecvbuf(i)) = recvbuf(counter)
-	  ENDDO
+             sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
-       DEALLOCATE( recvbuf, irecvbuf )
 
+       CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
+                   sender, 2, MPI_COMM_WORLD, MPIerr )
+
+       DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
-
 ELSE
-
-    ALLOCATE( sendbuf(1:myDim_elem2D*(nl-1)), isendbuf(1:myDim_elem2D) )
-    counter=0
-    DO n = 1, myDim_elem2D
-       isendbuf(n) = myList_elem2D(n)
-       DO nz=1, nl-1
-       counter=counter+1
-       sendbuf(counter)  = arr3D(nz,n)
-       ENDDO
-    ENDDO
     CALL MPI_SEND( myDim_elem2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( isendbuf(1), myDim_elem2D, MPI_INTEGER, 0, 1, &
+    CALL MPI_SEND( myList_elem2D(1), myDim_elem2D, MPI_INTEGER, 0, 1, &
                    MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( sendbuf(1), myDim_elem2D*(nl-1), MPI_DOUBLE_PRECISION, &
-                   0, 2, MPI_COMM_WORLD, MPIerr )
-    DEALLOCATE( sendbuf, isendbuf )
-
-ENDIF
- DO n=1,nl-1 
- CALL MPI_BCAST( arr3Dglobal(n,:), elem2d, MPI_DOUBLE_PRECISION, 0, &
-                 MPI_COMM_WORLD, MPIerr)
- END DO 
-end subroutine broadcast_elem3D
-!
-!===================================================================
-subroutine broadcast_elem2D(arr2D, arr2D_global)
-! PE0 collects all information. Only its copy of arrays will be
-! correct
-use g_PARSUP
-USE o_MESH
-
-
-IMPLICIT NONE
-
-INTEGER :: ireals
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  isendbuf, irecvbuf
-
-real(kind=8) ::  arr2D(myDim_elem2D+eDim_elem2D)
-real(kind=8) ::  arr2D_global(elem2D)
-real(kind=8), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-
-IF ( mype == 0 ) THEN
-    arr2D_global(myList_elem2D(1:myDim_elem2D))=arr2D(1:myDim_elem2D)
-    DO  n = 1, npes-1
-
-       CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
-       sender = status(MPI_SOURCE)
-       ALLOCATE( recvbuf(1:nTS), irecvbuf(1:nTS) )
-       CALL MPI_RECV( irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
-       CALL MPI_RECV( recvbuf(1), nTS, MPI_DOUBLE_PRECISION, sender, &
+    CALL MPI_RECV( arr2D(1), myDim_elem2D, MPI_DOUBLE_PRECISION, 0, &
                       2, MPI_COMM_WORLD, status, MPIerr )
-
-       DO i = 1, nTS
-          arr2D_global(irecvbuf(i)) = recvbuf(i)
-       ENDDO
-       DEALLOCATE( recvbuf, irecvbuf )
-
-    ENDDO
-
-ELSE
-
-    ALLOCATE( sendbuf(1:myDim_elem2d), isendbuf(1:myDim_elem2D) )
-    DO n = 1, myDim_elem2D
-       isendbuf(n) = myList_elem2D(n)
-       sendbuf(n)  = arr2D(n)
-    ENDDO
-    CALL MPI_SEND( myDim_elem2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( isendbuf(1), myDim_elem2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
-    CALL MPI_SEND( sendbuf(1), myDim_elem2D, MPI_DOUBLE_PRECISION, &
-                   0, 2, MPI_COMM_WORLD, MPIerr )
-    DEALLOCATE( sendbuf, isendbuf )
-
 ENDIF
-
- CALL MPI_BCAST( arr2D_global, elem2d, MPI_DOUBLE_PRECISION, 0, &
-                 MPI_COMM_WORLD, MPIerr)
-
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 end subroutine broadcast_elem2D
+!
 !============================================================================
+!
 subroutine gather_nod3D(arr3D, arr3D_global)
 
 ! Make nodal information available to master PE 
