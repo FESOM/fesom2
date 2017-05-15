@@ -1,5 +1,7 @@
 # This file is part of pyfesom
-#
+#use following for debugging wherever required:
+#import pdb
+#pdb.set_trace()
 ################################################################################
 #
 # Original code by Dmitry Sidorenko, 2013
@@ -202,157 +204,38 @@ number of 3d nodes    = {}
         return meshinfo 
     def __str__(self):
         return __repr__(self)
-        
-def read_fesom_3d(str_id, records, years, mesh, result_path, runid, ext, how='mean'): 
-
-    str_id      =str_id
-    ext         =ext
-    runid       =runid
-    years       =years
-    records      =records
-    result_path =result_path
-
-    y           =years[0]
-    data3       =np.zeros(shape=(mesh.n3d))
-    while y<=years[1]:
-        print(['reading year '+str(y)+':'])
-        ncfile =result_path+runid+'.'+str(y)+ext
-        f = Dataset(ncfile, 'r')
-        if how=='mean':
-            data3 = data3+f.variables[str_id][records,:].mean(axis=0)
-        elif how=='max':
-            data3 = data3+f.variables[str_id][records,:].max(axis=0)
-        f.close()
-        y=y+1
-    data3=data3/(years[1]-years[0]+1)
-    return data3
-
-def read_fesom_2d(str_id, records, year, mesh, result_path, runid,how='mean'): 
-
-    data2=np.zeros(shape=(mesh.n2d))
-    print(['reading year '+str(year)+':'])
-    ncfile =result_path+'/'+str_id+'.'+runid+'.'+str(year)+'.nc'
-    f = Dataset(ncfile, 'r')
-    if how=='mean':
-       data2 = data2+f.variables[str_id][records,0:mesh.n2d].mean(axis=0)
-    elif how=='max':
-        data2 = data2+f.variables[str_id][records,0:mesh.n2d].max(axis=0)
-    f.close()
-    return data2
-
-def fesom2depth(depth, data3, mesh, verbose=True):
-    '''
-    Return 2d array of the 2d mesh shape with data
-    from the model level closest to the desired depth. 
-    There is no interpolation to the depth.
-
-    Parameters
-    ----------
-    depth : int
-        desired depth
-    data3 : array
-        complete 3d data (vector) for one timestep
-    mesh  : fesom_mesh object
-        mesh representation
-    verbose : bool
-        flag to turn off information about which level will be used.
-
-    Returns
-    -------
-    data2 : array
-        2d array (actually vector) with data from the desired level.
-
-
-    ''' 
-
-    # create 2d field with the 2d mesh size
-    data2=np.zeros(shape=(mesh.n2d))
-    # find the model depth that is closest to the required depth 
-    dind=(abs(mesh.zlevs-depth)).argmin()
-    # select data from the level and find indexes with values and with nans
-    ind_depth=mesh.n32[:,dind]-1
-    ind_noempty=np.where(ind_depth>=0)[0]
-    ind_empty=np.where(ind_depth<0)[0]
-    # fill in the output array 
-    data2[ind_noempty]=data3[ind_depth[ind_noempty]]
-    data2[ind_empty]=np.nan
-    if verbose:
-        print("For depth {} model level {} will be used".format(str(depth),str(mesh.zlevs[dind])))
-    return data2
-
-def ind_for_depth(depth, mesh):
-    # find the model depth that is closest to the required depth 
-    dind=(abs(mesh.zlevs-depth)).argmin()
-    # select data from the level and find indexes with values and with nans
-    ind_depth=mesh.n32[:,dind]-1
-    ind_noempty=np.where(ind_depth>=0)[0]
-    ind_empty=np.where(ind_depth<0)[0]
-    return ind_depth, ind_noempty, ind_empty
-
-def get_data(data, mesh, depth = 0):
-    '''
-    Show data from the model level that is closest to the
-    desired depth. 
-
-    Parameters
-    ----------
-    data : array
-        complete 3d data for one timestep
-    mesh : fesom_mesh object
-        mesh representation
-    depth : int
-        desired depth
-
-    Returns
-    -------
-    level_data : array
-        2d array (actually vector) with data from the desired level.
-    elem_no_nan : array
-        array with triangles (defined as triplets of node indexes) with
-        not NaN elements. 
-
-    '''
-    elem2=mesh.elem[mesh.no_cyclic_elem,:]
-    level_data = fesom2depth(depth, data ,mesh)
-    #The data2[elem2] creates 3d array where every raw is three
-    #values of the parameter on the verticies of the triangle.
-    d=level_data[elem2].mean(axis=1)
-    #k = [i for (i, val) in enumerate(d) if not np.isnan(val)]
-    #elem2=elem2[k,:]
-    no_nan_triangles = np.invert(np.isnan(d))
-    elem_no_nan = elem2[no_nan_triangles,:]
-
-    return level_data, elem_no_nan
-
-def get_layer_mean(data, depth, mesh, timeslice=None):
-    '''
-    Return mean over the model depth that is closest to specified depth.
-    '''
-
-    ind_depth, ind_noempty, ind_empty = ind_for_depth(depth, mesh)
-    data_mean=np.zeros(shape=(mesh.n2d))
-    if timeslice is None:
-        data_mean[ind_noempty]=data[:,ind_depth[ind_noempty]].mean(axis=0)
-    else:
-        data_mean[ind_noempty]=data[timeslice,ind_depth[ind_noempty]].mean(axis=0)
-
-    data_mean[ind_empty] = np.nan
-    #np.ma.masked_equal(data_mean,-9999)
-
-    elem2=mesh.elem[mesh.no_cyclic_elem,:]
-    #The data2[elem2] creates 3d array where every raw is three
-    #values of the parameter on the verticies of the triangle.
-    d=data_mean[elem2].mean(axis=1)
-    #k = [i for (i, val) in enumerate(d) if not np.isnan(val)]
-    #elem2=elem2[k,:]
-    no_nan_triangles = np.invert(np.isnan(d))
-    elem_no_nan = elem2[no_nan_triangles,:]
     
-
-
-    return data_mean, elem_no_nan
-
-
-
-
-
+def ind_for_depth(depth, mesh):
+    # find the model depth index that is closest to the required depth
+    arr=([abs(abs(z)-abs(depth)) for z in mesh.zlev])
+    v, i= min((v, i) for (i, v) in enumerate(arr))    
+    dind=i
+    return dind
+        
+def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, how='mean'): 
+        #print(['reading year '+str(year)+':'])
+    ncfile =result_path+'/'+str_id+'.'+runid+'.'+str(year)+'.nc'
+    print(['reading ', ncfile])
+    f = Dataset(ncfile, 'r')
+    # dimensions of the netcdf variable
+    ncdims=f.variables[str_id].shape
+    # indexies for reading 2D part
+    if (ncdims[1]==mesh.n2d):
+        print('data at nodes')
+    elif (ncdims[1]==mesh.e2d):
+        print('data on elements')
+    else:
+        raise IOError('not existing dimension '+str(ncdims[1]))    
+    
+    dim=[records, np.arange(ncdims[1])]
+    data=np.zeros(shape=(ncdims[1]))    
+    # add 3rd index if reading a slice from 3D data
+    if (len(ncdims)==3):
+       dim.append(ilev)
+        
+    if how=='mean':
+       data = data+f.variables[str_id][dim].mean(axis=0)
+    elif how=='max':
+        data = data+f.variables[str_id][dim].max(axis=0)
+    f.close()
+    return data
