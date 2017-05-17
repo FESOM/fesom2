@@ -204,6 +204,7 @@ int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x)
     free(st);
     free(t);
     free(v);
+    free(pt);
     
 
     self->its = its;
