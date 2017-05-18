@@ -13,6 +13,13 @@ subroutine solve_tracers_ale
 	implicit none
 	integer :: tr_num
 	real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
+        ! update 3D velocities with the bolus velocities:
+        ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
+        ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
+        if (Fer_GM) then
+           UV  =UV  +fer_UV
+           Wvel=Wvel+fer_Wvel
+        end if
 	!___________________________________________________________________________
 	! loop over all tracers 
 	do tr_num=1,num_tracers
@@ -36,10 +43,13 @@ subroutine solve_tracers_ale
 ! 			where(tr_arr(:,:,1)<-2.1_WP)  tr_arr(:,:,1)=-2.1_WP
 ! 		end	if
 		
-		call exchange_nod(tr_arr(:,:,tr_num))
-		
+		call exchange_nod(tr_arr(:,:,tr_num))		
 	end do
-	
+        ! subtract the the bolus velocities back from 3D velocities:
+        if (Fer_GM) then
+           UV  =UV  -fer_UV
+           Wvel=Wvel-fer_Wvel
+        end if
 end subroutine solve_tracers_ale
 !
 !

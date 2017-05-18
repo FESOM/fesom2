@@ -60,23 +60,28 @@ module io_MEANDATA
 !
 subroutine ini_mean_io
   implicit none
-!					global size           local size      varname     varname long      unit        array           writeout unit (day,mon,year...) 
-! call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u', 'horizontal velocity', 'm/s',     uv(1,:,:),     1, 'm')  
 !3D
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u', 'horizontal velocity', 'm/s',     uv(1,:,:),     1, 'm')
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v', 'meridional velocity', 'm/s',     uv(2,:,:),     1, 'm')
-  call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D+eDim_nod2D/), 'temp', 'temperature', 'C',   tr_arr(:,:,1), 1, 'm')
-  call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D+eDim_nod2D/), 'salt', 'salinity',    'psu', tr_arr(:,:,2), 1, 'm')
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm')
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'm')
 !2D
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'ssh',   'sea surface elevation',   'm',   eta_n,                                    1, 'd')
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sst',   'sea surface temperature', 'C',   tr_arr(1,1:myDim_nod2D+eDim_nod2D,1),     1, 'd')
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'sss',   'sea surface salinity',    'psu', tr_arr(1,1:myDim_nod2D+eDim_nod2D,2),     1, 'd')
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'a_ice', 'ice concentration',       '%',   a_ice(1:myDim_nod2D+eDim_nod2D),          1, 'd')
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'm_ice', 'ice height',              'm',   m_ice(1:myDim_nod2D+eDim_nod2D),          1, 'd')
-   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'm_snow','snow height',             'm',   m_snow(1:myDim_nod2D+eDim_nod2D),         1, 'd')
-!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'w_flux','water flux',              'm/s', water_flux(1:myDim_nod2D+eDim_nod2D),     1, 'd')
-!   call def_stream(nod2D, myDim_nod2D+eDim_nod2D, 'h_flux','heat flux',               'm/s', heat_flux(1:myDim_nod2D+eDim_nod2D),      1, 'd')
+  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm')
 
+  if (Fer_GM) then
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U', 'm/s',     fer_uv(1,:,:),  1, 'm')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V', 'm/s',     fer_uv(2,:,:),  1, 'm')
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W', 'm/s',     fer_Wvel(:,:),  1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'fer_K', 'GM, stirring diffusivity',     'm2/s',        fer_k(1:myDim_nod2D),           1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'y')
+  end if
 end subroutine ini_mean_io
 !
 !--------------------------------------------------------------------------------------------

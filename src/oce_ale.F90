@@ -905,7 +905,7 @@ subroutine vert_vel_ale
 	! Contributions from levels in divergence
 	Wvel=0.0_WP
 	if (Fer_GM) then
-         fer_Wvel(nz,n)=0.0_WP
+         fer_Wvel=0.0_WP
 	end if
 	
 	do ed=1, myDim_edge2D
@@ -1352,7 +1352,12 @@ subroutine oce_timestep_ale(n)
 
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
-	
+	!___________________________________________________________________________
+        ! calculate alpha and beta
+        ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
+        call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
+        ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
+        call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
 	!___________________________________________________________________________
 	call status_check
 	
@@ -1403,12 +1408,12 @@ subroutine oce_timestep_ale(n)
 	! ...if we do it here we don't need to write hbar_old into a restart file...
 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	! --> eta_(n)
-	
+        ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
 	!---------------------------------------------------------------------------
-	! Does not belong directly to ALE formalism: Ferrari, Gent, McWiliams parameterisation
+	! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
+        ! does not belong directly to ALE formalism
 	if (Fer_GM) then
 		call fer_compute_C_K
-		call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
 		call fer_solve_Gamma
 		call fer_gamma2vel
 	end if
@@ -1423,7 +1428,7 @@ subroutine oce_timestep_ale(n)
 	! solve tracer equation 
 	call solve_tracers_ale
 	t8=MPI_Wtime() 
-	
+
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
 	t9=MPI_Wtime() 

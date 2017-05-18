@@ -712,5 +712,67 @@ integer       :: step, n, elnodes(3)
    stress_atmice_y = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*v_wind
    
 end subroutine ice_update_forcing_test
-!===================================================================
 !
+!==============================================================================
+! Simple initialization for tests for GM with the real geometry
+! ============================================================================ 
+subroutine ini_global_ocean
+  use o_MESH
+  use o_ARRAYS
+  use o_PARAM
+  use g_PARSUP
+  USE g_ROTATE_grid
+  !
+  implicit none
+  integer                            :: n, nz
+  real(kind=WP)                      :: minlat,maxlat, lon, lat, val
+
+ tr_arr(:,:,1)=20.0_WP
+ tr_arr(:,:,2)=34.0_WP
+
+
+ call r2g(lon, maxlat, coord_nod2D(1,1), coord_nod2D(2,1))
+ call r2g(lon, minlat, coord_nod2D(1,1), coord_nod2D(2,1))
+ DO n=2,myDim_nod2D+eDim_nod2D 
+    call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
+    maxlat=max(maxlat, lat)
+    minlat=min(minlat, lat)
+ END DO
+
+ call MPI_AllREDUCE(minlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
+ minlat=val
+ call MPI_AllREDUCE(maxlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+ maxlat=val
+
+ ! Stratification
+  DO n=1, myDim_nod2D+eDim_nod2D
+     call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
+     DO nz=1, nlevels_nod2D(n)-1 
+        tr_arr(nz,n,1)=tr_arr(nz,n,1)-(lat-minlat)/(maxlat-minlat)*2.0_WP
+     END DO
+  END DO   
+end subroutine ini_global_ocean
+! ====================================================================
+!
+!==============================================================================
+! Zero the dynamicsl variables and forcing to allow for debugging of new implementations
+! ============================================================================ 
+subroutine zero_dynamics
+   use g_parsup
+   use o_PARAM, only: tracer_adv,num_tracers
+   use o_arrays
+   use o_mesh
+   use g_comm_auto
+   use o_tracers
+   use g_forcing_arrays
+   implicit none
+
+  water_flux    =0._WP
+  real_salt_flux=0._WP
+  surf_relax_S  =0._WP
+  heat_flux     =0._WP
+  UV            =0._WP
+  Wvel          =0._WP
+end subroutine zero_dynamics
+! ====================================================================
+
