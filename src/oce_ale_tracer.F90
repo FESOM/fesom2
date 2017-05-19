@@ -20,6 +20,8 @@ subroutine solve_tracers_ale
            UV  =UV  +fer_UV
            Wvel=Wvel+fer_Wvel
         end if
+        ! this shall not be called inside the loop?
+        call fill_up_dn_grad
 	!___________________________________________________________________________
 	! loop over all tracers 
 	do tr_num=1,num_tracers
@@ -583,13 +585,15 @@ subroutine diff_tracers_ale(tr_num)
 	! do horizontal diffusiion
 	! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
 	! in danilovs srcipt
-! 		call diff_part_hor
-	call diff_part_hor_sergey ! seems to be ~9% faster than diff_part_hor
+        ! includes Redi diffusivity if Redi=.true.
+	call diff_part_hor_redi ! seems to be ~9% faster than diff_part_hor
 	
 	!___________________________________________________________________________
 	! do vertical diffusion: explicite 
 	if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
-		
+        ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
+        ! derivatives and has to be computed explicitly!
+        if (Redi) call diff_ver_part_redi_expl
 	!___________________________________________________________________________
 	! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
 	! to finite volume" 
@@ -661,8 +665,8 @@ subroutine diff_ver_part_expl_ale(tr_num)
 			zinv1=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
 			
 			!___________________________________________________________________
-			Ty= Kd(4,nz-1,n)*(Z_3d_n(nz-1,n)-zbar_3d_n(nz,n))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-				Kd(4,nz,n)*(zbar_3d_n(nz,n)-Z_3d_n(nz,n))*zinv1 *neutral_slope(3,nz,n)**2
+!			Ty= Kd(4,nz-1,n)*(Z_3d_n(nz-1,n)-zbar_3d_n(nz,n))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
+!				Kd(4,nz,n)*(zbar_3d_n(nz,n)-Z_3d_n(nz,n))*zinv1 *neutral_slope(3,nz,n)**2
 			
 			vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
 			
@@ -678,8 +682,8 @@ subroutine diff_ver_part_expl_ale(tr_num)
 	
 end subroutine diff_ver_part_expl_ale
 !
-!
 !===============================================================================
+! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
 subroutine diff_ver_part_impl_ale(tr_num)
 	use o_MESH
 	use o_PARAM
@@ -697,10 +701,12 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	real(kind=WP)       :: m, zinv, dt_inv
 	real(kind=WP)       :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
         real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
+	real(kind=WP)   :: isredi=0._WP
 
+        if (Redi) isredi=1._WP
 	dt_inv=1.0_WP/dt
-	Ty=0.0_WP
-	Ty1=0.0_WP
+	Ty    =0.0_WP
+	Ty1   =0.0_WP
 	
 	! solve equation diffusion equation implicite part: 
 	! --> h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
@@ -774,9 +780,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-! 		Ty1= Kd(4,nz,n)  *(Z_n(nz)     -zbar_n(nz+1))*zinv2 *neutral_slope(3,nz,n  )**2 + &
-! 			 Kd(4,nz+1,n)*(zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *neutral_slope(3,nz+1,n)**2
-		
+ 	        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n  )**2 + &
+ 		     (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
+		Ty1=Ki(n)*Ty1*isredi
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
 		a(nz)=0.0_WP
 		c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -797,13 +803,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 			! 1/dz(nz)
 			zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
-			
-			! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-! 			Ty = Kd(4,nz-1,n)*(Z_n(nz-1)-zbar_n(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-! 				 Kd(4,nz,n)*(zbar_n(nz)-Z_n(nz))*zinv1 *neutral_slope(3,nz,n)**2
-! 			Ty1= Kd(4,nz,n)*(Z_n(nz)-zbar_n(nz+1))*zinv2 *neutral_slope(3,nz,n)**2 + &
-! 				 Kd(4,nz+1,n)*(zbar_n(nz+1)-Z_n(nz+1))*zinv2 *neutral_slope(3,nz+1,n)**2
-			
+ 		        ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
+			Ty = (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
+			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
+ 			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
+ 			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
+		        Ty =Ki(n)*Ty *isredi
+		        Ty1=Ki(n)*Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 			a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -829,9 +835,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-! 		Ty= Kd(4,nz-1,n)*(Z_n(nz-1)-zbar_n(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-! 			Kd(4,nz,n)*(zbar_n(nz)-Z_n(nz))*zinv1 *neutral_slope(3,nz,n)**2
-		
+	        Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
+ 		    (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
+	        Ty =Ki(n)*Ty *isredi
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
 		c(nz)=0.0_WP
@@ -972,9 +978,54 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	
 end subroutine diff_ver_part_impl_ale
 !
-!
 !===============================================================================
-subroutine diff_part_hor_sergey
+subroutine diff_ver_part_redi_expl
+	use o_ARRAYS
+	use g_PARSUP
+	use o_MESH
+	USE o_param
+	use g_config
+	use g_comm_auto
+	IMPLICIT NONE
+	integer         :: elem,k
+	integer         :: n2,nl1,nl2,nz,n
+	real(kind=WP)   :: Tx, Ty
+	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D),vd_flux(nl-1)
+
+	do n=1, myDim_nod2D
+		DO nz=1, nlevels_nod2D(n)-1
+           		Tx=0.0_WP
+			Ty=0.0_WP
+			DO k=1, nod_in_elem2D_num(n)
+           			elem=nod_in_elem2D(k,n)
+				if(nz.LE.(nlevels(elem)-1)) then
+           				Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
+	   				Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
+				endif
+        		END DO
+			tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
+			tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
+        	END DO
+	end do
+	call exchange_nod(tr_xynodes)
+	DO n=1, myDim_nod2D
+		nl1=nlevels_nod2D(n)-1
+		vd_flux=0d0
+
+		do nz=2,nl1
+  			vd_flux(nz)=  ((Z(nz-1)-zbar(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
+				*tr_xynodes(2,nz-1,n) ) &
+     		 		+ (zbar(nz)-Z(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
+				*tr_xynodes(2,nz,n) ))/(Z(nz-1)-Z(nz))*area(nz,n)
+		enddo
+		do nz=1,nl1-1
+ 			del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
+		enddo
+		del_ttf(nl1,n) = del_ttf(nl1,n)+Ki(n)*vd_flux(nl1)/(zbar(nl1)-zbar(nl1+1))*dt/area(nl1,n)
+	ENDDO
+end subroutine diff_ver_part_redi_expl
+!===============================================================================
+subroutine diff_part_hor_redi
 	use o_ARRAYS
 	use g_PARSUP
 	use o_MESH
@@ -984,9 +1035,12 @@ subroutine diff_part_hor_sergey
 	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
 	integer         :: edge
 	integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
-	real(kind=WP)   :: c, Tx, Ty, Kh
-	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1)
-	
+	real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz
+	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh
+	real(kind=WP)   :: isredi=0._WP
+
+        if (Redi) isredi=1._WP
+        
 	do edge=1, myDim_edge2D
 		rhs1=0.0_WP
 		rhs2=0.0_WP
@@ -997,46 +1051,54 @@ subroutine diff_part_hor_sergey
 		enodes=edges(:,edge)
 		nl1=nlevels(el(1))-1
 		elnodes=elem2d_nodes(:,el(1))
-		Kh=elem_area(el(1))
-		
+		Kh=sum(Ki(enodes))/2.0_WP
+		!Kh=elem_area(el(1))
 		!_______________________________________________________________________
 		nl2=0
 		if (el(2)>0) then 
-			Kh=0.5_WP*(Kh+elem_area(el(2)))
+			!Kh=0.5_WP*(Kh+elem_area(el(2)))
 			nl2=nlevels(el(2))-1
 			deltaX2=edge_cross_dxdy(3,edge)
 			deltaY2=edge_cross_dxdy(4,edge)
 		endif
-		Kh=K_hor*Kh/scale_area
-		
+                !Kh=K_hor*Kh/scale_area
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
-			Tx=0.5_WP*Kh*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2)))
-			Ty=0.5_WP*Kh*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
+			SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
+			SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+			Tx=0.5_WP*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2)))
+			Ty=0.5_WP*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
+			Fx=Kh*(Tx+SxTz*isredi)
+			Fy=Kh*(Ty+SyTz*isredi)
 			c=(deltaX2-deltaX1)*Ty-(deltaY2-deltaY1)*Tx
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		enddo
 		
 		!_______________________________________________________________________
-		if(nl1>nl2) then
-			do nz=n2+1,nl1
-				Tx=Kh*tr_xy(1,nz,el(1))
-				Ty=Kh*tr_xy(2,nz,el(1))
-				c=-deltaX1*Ty+deltaY1*Tx
-				rhs1(nz) = rhs1(nz) + c
-				rhs2(nz) = rhs2(nz) - c
-			end do  
-		else
-			do nz=n2+1,nl2
-				Tx=Kh*tr_xy(1,nz,el(2))
-				Ty=Kh*tr_xy(2,nz,el(2))
-				c=deltaX2*Ty-deltaY2*Tx
-				rhs1(nz) = rhs1(nz) + c
-				rhs2(nz) = rhs2(nz) - c
-			end do
-		endif
+		do nz=n2+1,nl1
+                        SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
+                        SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+			Tx=tr_xy(1,nz,el(1))
+			Ty=tr_xy(2,nz,el(1))
+			Fx=Kh*(Tx+SxTz*isredi)
+			Fy=Kh*(Ty+SyTz*isredi)
+			c=-deltaX1*Ty+deltaY1*Tx
+			rhs1(nz) = rhs1(nz) + c
+			rhs2(nz) = rhs2(nz) - c
+		end do
+		do nz=n2+1,nl2
+                        SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
+                        SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+			Tx=tr_xy(1,nz,el(2))
+			Ty=tr_xy(2,nz,el(2))
+			Fx=Kh*(Tx+SxTz*isredi)
+			Fy=Kh*(Ty+SyTz*isredi)
+			c=deltaX2*Ty-deltaY2*Tx
+			rhs1(nz) = rhs1(nz) + c
+			rhs2(nz) = rhs2(nz) - c
+		end do
 		
 		!_______________________________________________________________________
 		n2=max(nl1,nl2)
@@ -1044,4 +1106,4 @@ subroutine diff_part_hor_sergey
 		del_ttf(1:n2,enodes(2))=del_ttf(1:n2,enodes(2))+rhs2(1:n2)*dt/area(1:n2,enodes(2))
 		
 	end do
-end subroutine diff_part_hor_sergey
+end subroutine diff_part_hor_redi

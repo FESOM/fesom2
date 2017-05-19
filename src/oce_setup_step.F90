@@ -79,12 +79,13 @@ USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
+use g_comm_auto
 use g_config
 use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 IMPLICIT NONE
 integer     :: elem_size, node_size
-
+integer     :: n
 elem_size=myDim_elem2D+eDim_elem2D
 node_size=myDim_nod2D+eDim_nod2D
 
@@ -164,12 +165,19 @@ allocate(Unode(2,nl-1,node_size))
 ! tracer gradients & RHS  
 allocate(ttrhs(nl-1,node_size))
 allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+allocate(tr_z(nl-1,myDim_nod2D+eDim_nod2D))
 
 ! neutral slope etc. to be used in Redi formulation
 allocate(neutral_slope(3, nl-1, node_size))
-allocate(Kd(4, nl-1, myDim_nod2D+eDim_nod2D))
+allocate(slope_tapered(3, nl-1, node_size))
+allocate(Ki(node_size))
 neutral_slope=0.0_WP
-Kd=0.0_WP
+slope_tapered=0.0_WP
+
+do n=1, node_size
+   Ki(n)=K_hor*area(1,n)/scale_area
+end do
+call exchange_nod(Ki)
 
 ! xy gradient of a neutral surface
 allocate(sigma_xy(2, nl-1, node_size))

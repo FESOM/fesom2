@@ -38,7 +38,9 @@ del_ttf=0d0
 !AB interpolation
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
 call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
+call tracer_gradient_z(tr_arr_old(:,:,tr_num))
 call exchange_elem(tr_xy)
+call exchange_nod(tr_z)
 call fill_up_dn_grad
 END SUBROUTINE init_tracers_AB
 !========================================================================================
@@ -187,10 +189,7 @@ DO n=1, myDim_nod2D
 
    DO nz=2,nl1
       zinv1=1.0_WP/(Z(nz-1)-Z(nz))
-      Ty= Kd(4,nz-1,n)*(Z(nz-1)-zbar(nz))*zinv1 *neutral_slope(3,nz-1,n)**2 + &
-              Kd(4,nz,n)*(zbar(nz)-Z(nz))*zinv1 *neutral_slope(3,nz,n)**2
-
-      vd_flux(nz) = (Kv(nz,n)+Ty)*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
+      vd_flux(nz) = (Kv(nz,n))*(tr_arr(nz-1,n,tr_num)-tr_arr(nz,n,tr_num))*zinv1*area(nz,n)
 ENDDO
 DO nz=1,nl1-1
  del_ttf(nz,n) =del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
@@ -379,3 +378,29 @@ DO tr_num=1,num_tracers
    call exchange_nod(tr_arr(:,:,tr_num))
 END DO
 END SUBROUTINE solve_tracers
+!=======================================================================
+SUBROUTINE tracer_gradient_z(ttf)
+!computes elemental gradient of tracer 
+USE o_PARAM
+USE o_MESH
+USE o_ARRAYS
+USE g_PARSUP
+IMPLICIT NONE
+real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: vd_flux(nl)
+real(kind=WP)     :: tvol
+integer           :: elem,  elnodes(3)
+integer           :: n, nz, tr_num,nl1
+DO n=1,myDim_nod2D+eDim_nod2D
+     nl1 = nlevels_nod2D(n)
+     DO nz=2,nl1-1
+        tvol=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n)) !Z(nz-1)-Z(nz)
+        vd_flux(nz)=(ttf(nz-1,n)-ttf(nz,n))/tvol
+     END DO
+        vd_flux(1)=0.0_WP
+	vd_flux(nl1)=0.0_WP
+     do nz=1,nl1-1
+        tr_z(nz,n) = 0.5_WP*(vd_flux(nz) + vd_flux(nz+1))
+     end do
+END DO
+END SUBROUTINE tracer_gradient_z

@@ -1358,6 +1358,9 @@ subroutine oce_timestep_ale(n)
         call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
         ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
         call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
+        ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
+        ! will be primarily used for computing Redi diffusivities. etc?
+        call compute_neutral_slope
 	!___________________________________________________________________________
 	call status_check
 	

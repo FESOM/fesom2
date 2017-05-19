@@ -40,7 +40,8 @@ real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
-logical                       :: Fer_GM =.false.   !flag for Ferrari et al. (2010) GM scheme
+logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
+logical			      :: Redi   =.false.  !flag for Redi scheme
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
@@ -95,7 +96,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
-                    Fer_GM, visc_sh_limit, mix_scheme, Ricr, concv
+                    Fer_GM, Redi, visc_sh_limit, mix_scheme, Ricr, concv
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
@@ -981,6 +982,7 @@ real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)
 !Tracer gradients&RHS      
 real(kind=8), allocatable :: ttrhs(:,:)
 real(kind=8), allocatable :: tr_xy(:,:,:)
+real(kind=8), allocatable :: tr_z(:,:)
 
 ! Auxiliary arrays for vector-invariant form of momentum advection
 real(kind=WP), allocatable,dimension(:,:)   :: vorticity
@@ -992,12 +994,13 @@ real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 
 ! Auxiliary arrays to store Redi-GM fields
 real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
+real(kind=WP), allocatable,dimension(:,:,:) :: slope_tapered
 real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
-!Array for Redi-GM coefs
-real(kind=WP), allocatable :: Kd(:,:,:)
+!Isoneutral diffusivities (or xy diffusivities if Redi=.false)
+real(kind=WP), allocatable :: Ki(:)
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
