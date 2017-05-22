@@ -223,6 +223,7 @@ save
      integer, dimension(:), allocatable :: sptr
      integer, dimension(:), allocatable :: slist
      integer, dimension(:), allocatable :: req  ! request for MPI_Wait
+     integer    :: nreq  ! number of requests for MPI_Wait (to combine halo exchange of several fields)
   end type com_struct
 
   type(com_struct)   :: com_nod2D

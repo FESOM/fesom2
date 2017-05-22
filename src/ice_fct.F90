@@ -149,9 +149,8 @@ subroutine ice_solve_low_order
 	          m_snow(location(1:cn))))/area(1,row) + &
 		  (1.0_WP-gamma)*m_snow(row)
  end do
-     call exchange_nod(m_icel)
-     call exchange_nod(a_icel)
-     call exchange_nod(m_snowl)
+     call exchange_nod(m_icel,a_icel,m_snowl)
+
         ! Low-order solution must be known to neighbours
 end subroutine ice_solve_low_order     
 !
@@ -178,9 +177,8 @@ subroutine ice_solve_high_order
      da_ice(row)=rhs_a(row)/area(1,row)
      dm_snow(row)=rhs_ms(row)/area(1,row)
   end do
-     call exchange_nod(dm_ice)
-     call exchange_nod(da_ice)
-     call exchange_nod(dm_snow)
+     call exchange_nod(dm_ice, da_ice, dm_snow)
+
   !iterate 
   do n=1,num_iter_solve-1
      do row=1,myDim_nod2D
@@ -200,9 +198,8 @@ subroutine ice_solve_high_order
         da_ice(row)=a_icel(row)
 	dm_snow(row)=m_snowl(row)
      end do
-     call exchange_nod(dm_ice)
-     call exchange_nod(da_ice)
-     call exchange_nod(dm_snow)
+     call exchange_nod(dm_ice, da_ice, dm_snow)
+
   end do
  
 end subroutine ice_solve_high_order
@@ -360,8 +357,8 @@ subroutine ice_fem_fct(tr_array_id)
 	 end if
 	 end do
   ! pminus and pplus are to be known to neighbouting PE
-        call exchange_nod(icepminus)
-	call exchange_nod(icepplus) 
+        call exchange_nod(icepminus, icepplus)
+
   !========================	 
   ! Limiting
   !========================	 
@@ -419,9 +416,8 @@ subroutine ice_fem_fct(tr_array_id)
 	 end do   
          end if
 	 
-        call exchange_nod(m_ice)
-   	call exchange_nod(a_ice) 
-   	call exchange_nod(m_snow)  
+        call exchange_nod(m_ice, a_ice, m_snow)
+
 	deallocate(tmin, tmax)
 end subroutine ice_fem_fct
 !

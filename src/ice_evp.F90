@@ -2,7 +2,7 @@
 ! Contains routines of EVP dynamics
 !
 !===================================================================
-subroutine stress_tensor
+subroutine stress_tensor(ice_strength)
 ! EVP rheology. The routine computes stress tensor components based on ice 
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
@@ -14,51 +14,47 @@ use g_parsup
 USE g_CONFIG
 implicit none
 
-real(kind=WP)   :: eps11, eps12, eps22, eta, xi, ice_strength, delta, aa
-integer         :: elem, elnodes(3)
+real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
+real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta, aa
+integer         :: el, elnodes(3)
 real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
 real(kind=WP)   :: zeta, delta_inv, d1, d2
 
-  vale=1.0_WP/(ellipse**2)
+  vale = 1.0_WP/(ellipse**2)
    
-  dte=ice_dt/(1.0_WP*evp_rheol_steps)
-  det1=1.0_WP+0.5_WP*Tevp_inv*dte
-  det2=1.0_WP+0.5_WP*Tevp_inv*dte!*ellipse**2 
+  dte  = ice_dt/(1.0_WP*evp_rheol_steps)
+  det1 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte)
+  det2 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte) !*ellipse**2 
      
-  det1=1.0_WP/det1
-  det2=1.0_WP/det2
 
-  do elem=1,myDim_elem2D
+  do el=1,myDim_elem2D
      
-     elnodes=elem2D_nodes(:,elem)
       ! ===== Check if there is ice on elem
-        aa=product(m_ice(elnodes))*product(a_ice(elnodes))
-        if (aa==0) CYCLE     ! There is no ice in elem
+
+     ! There is no ice in elem 
+     ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE     
+     if (ice_strength(el) > 0.) then
       ! =====	
       ! ===== Deformation rate tensor on element elem:
            !du/dx
-       d1=sum(gradient_sca(1:3, elem)*U_ice(elnodes))
-       d2=sum(V_ice(elnodes))/3.0_WP
-     eps11=d1-d2*metric_factor(elem)   
-     eps22=sum(gradient_sca(4:6, elem)*V_ice(elnodes))
-       d1=sum(gradient_sca(4:6, elem)*U_ice(elnodes)) + &
-          sum(gradient_sca(1:3, elem)*V_ice(elnodes))
-       d2=sum(U_ice(elnodes))/3.0_WP	   
-     eps12=0.5_WP*(d1+ d2*metric_factor(elem))      
-      ! ===== moduli:
-     delta=(eps11**2+eps22**2)*(1.0_WP+vale)+4.0_WP*vale*eps12**2 + &
-            2.0_WP*eps11*eps22*(1.0_WP-vale)
-     delta=sqrt(delta)
-     msum=sum(m_ice(elnodes))/3.0_WP
-     asum=sum(a_ice(elnodes))/3.0_WP
-     
-      ! ===== Hunke and Dukowicz c*h*p*
-     ice_strength=pstar*(msum)*exp(-c_pressure*(1.0_WP-asum))
-      ! =======================================
-      ! ===== Here the EVP rheology piece starts
-      ! =======================================
-     ice_strength=0.5_WP*ice_strength
+
+        eps11 = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
+               - metric_factor(el) * sum(V_ice(elem2D_nodes(1:3,el)))/3.0_WP
+
+        eps22 = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
+
+        eps12 = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
+                      + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
+                       + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
+        ! ===== moduli:
+        delta = sqrt((eps11*eps11 + eps22*eps22)*(1.0_WP+vale) + 4.0_WP*vale*eps12*eps12 + &
+                              2.0_WP*eps11*eps22*(1.0_WP-vale))
+
+       ! =======================================
+       ! ===== Here the EVP rheology piece starts
+       ! =======================================
+
       ! ===== viscosity zeta should exceed zeta_min
       ! (done via limiting delta from above)
       
@@ -69,8 +65,8 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
       
       ! ===== if delta is too small or zero, viscosity will too large (unlimited)
       ! (limit delta_inv)
-     delta_inv=1.0_WP/max(delta,delta_min) 
-     zeta=ice_strength*delta_inv			     
+        delta_inv = 1.0_WP/max(delta,delta_min) 
+        zeta = ice_strength(el)*delta_inv			     
       ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
       ! is too large in some regions and CFL criterion is violated.
       ! The regularization below was introduced by Hunke, 
@@ -79,25 +75,24 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
       ! remains stable), using it reduces viscosities too strongly.
       ! It is therefore commented
       
-      !if (zeta>Clim_evp*voltriangle(elem)) then
-      !zeta=Clim_evp*voltriangle(elem)
+      !if (zeta>Clim_evp*voltriangle(el)) then
+      !zeta=Clim_evp*voltriangle(el)
       !end if 
       
-      ice_strength=ice_strength*Tevp_inv
-      zeta=zeta*Tevp_inv
+        zeta = zeta*Tevp_inv
       				     
-     r1=zeta*(eps11+eps22) - ice_strength
-     r2=zeta*(eps11-eps22)*vale
-     r3=zeta*eps12*vale
-     si1=sigma11(elem)+sigma22(elem)
-     si2=sigma11(elem)-sigma22(elem)
-     
-     si1=det1*(si1+dte*r1)
-     si2=det2*(si2+dte*r2)
-     sigma12(elem)=det2*(sigma12(elem)+dte*r3)
-     sigma11(elem)=0.5_WP*(si1+si2)
-     sigma22(elem)=0.5_WP*(si1-si2)
-    end do
+        r1  = zeta*(eps11+eps22) - ice_strength(el)*Tevp_inv
+        r2  = zeta*(eps11-eps22)*vale
+        r3  = zeta*eps12*vale
+        
+        si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
+        si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
+        
+        sigma12(el) = det2*(sigma12(el)+dte*r3)
+        sigma11(el) = 0.5_WP*(si1+si2)
+        sigma22(el) = 0.5_WP*(si1-si2)
+     endif
+  end do
     
 end subroutine stress_tensor
 !===================================================================
@@ -128,30 +123,27 @@ REAL(kind=8) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
  
  ! Stress divergence
  DO  ed=1,myDim_edge2D
-   ednodes=edges(:,ed) 
-   el=edge_tri(:,ed)
-   deltaX1=edge_cross_dxdy(1,ed)
-   deltaY1=edge_cross_dxdy(2,ed)
-   deltaX2=edge_cross_dxdy(3,ed)
-   deltaY2=edge_cross_dxdy(4,ed)
-   
-   if(myList_edge2D(ed)>edge2D_in) cycle     
-   ! elements on both sides
-   uc=-sigma12(el(1))*deltaX1+sigma11(el(1))*deltaY1
-   vc=-sigma22(el(1))*deltaX1+sigma12(el(1))*deltaY1
-   uc=uc+sigma12(el(2))*deltaX2-sigma11(el(2))*deltaY2
-   vc=vc+sigma22(el(2))*deltaX2-sigma12(el(2))*deltaY2
-   U_rhs_ice(ednodes(1))=U_rhs_ice(ednodes(1))+uc
-   U_rhs_ice(ednodes(2))=U_rhs_ice(ednodes(2))-uc
-   V_rhs_ice(ednodes(1))=V_rhs_ice(ednodes(1))+vc
-   V_rhs_ice(ednodes(2))=V_rhs_ice(ednodes(2))-vc
-   END DO
+    ednodes=edges(:,ed) 
+    el=edge_tri(:,ed)
+    if(myList_edge2D(ed)>edge2D_in) cycle     
+    ! elements on both sides
+    uc = - sigma12(el(1))*edge_cross_dxdy(1,ed) + sigma11(el(1))*edge_cross_dxdy(2,ed) &
+         + sigma12(el(2))*edge_cross_dxdy(3,ed) - sigma11(el(2))*edge_cross_dxdy(4,ed)
+    
+    vc = - sigma22(el(1))*edge_cross_dxdy(1,ed) + sigma12(el(1))*edge_cross_dxdy(2,ed) &
+         + sigma22(el(2))*edge_cross_dxdy(3,ed) - sigma12(el(2))*edge_cross_dxdy(4,ed)
+
+    U_rhs_ice(ednodes(1)) = U_rhs_ice(ednodes(1)) + uc
+    U_rhs_ice(ednodes(2)) = U_rhs_ice(ednodes(2)) - uc
+    V_rhs_ice(ednodes(1)) = V_rhs_ice(ednodes(1)) + vc
+    V_rhs_ice(ednodes(2)) = V_rhs_ice(ednodes(2)) - vc
+ END DO
  
  DO n=1, myDim_nod2D
-      mass=area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)) 
-      if(mass>0.) then 
-         U_rhs_ice(n)=U_rhs_ice(n)/mass
-         V_rhs_ice(n)=V_rhs_ice(n)/mass
+    mass = area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)) 
+    if(mass>0.) then 
+         U_rhs_ice(n) = U_rhs_ice(n) / mass
+         V_rhs_ice(n) = V_rhs_ice(n) / mass
       else
          U_rhs_ice(n)=0.0_WP
          V_rhs_ice(n)=0.0_WP
@@ -169,7 +161,7 @@ REAL(kind=8) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
  END DO
 end subroutine stress2rhs_e
 !===================================================================
-subroutine stress2rhs
+subroutine stress2rhs(inv_areamass,ice_strength)
 ! EVP implementation:
 ! Computes the divergence of stress tensor and puts the result into the
 ! rhs vectors 
@@ -182,58 +174,49 @@ USE g_PARSUP
 USE i_arrays
 
 IMPLICIT NONE
-INTEGER      :: n, elem, elnodes(3), k, ed, ednodes(2) 
-REAL(kind=8) :: mass, aa
-REAL(kind=8) :: elevation_elem(3)
-REAL(kind=8) :: dx(3), dy(3), val3
+REAL(kind=WP), intent(in) :: inv_areamass(myDim_nod2D), ice_strength(mydim_elem2D)
+INTEGER      :: n, el,  k
+REAL(kind=8) :: val3
 
 val3=1/3.0_WP
- DO  n=1, myDim_nod2D
-     U_rhs_ice(n)=0.0
-     V_rhs_ice(n)=0.0
-     rhs_a(n)=0.0       ! these are used as temporal storage here
-     rhs_m(n)=0.0       ! for the contribution due to ssh
- END DO
- 
- do elem=1,myDim_elem2D
-     elnodes=elem2D_nodes(:,elem)
-      ! ===== Skip if ice is absent
-     aa=product(m_ice(elnodes))*product(a_ice(elnodes))
-     if (aa==0) CYCLE
-      ! =====
 
-     dx=gradient_sca(1:3,elem)
-     dy=gradient_sca(4:6,elem)
-     elevation_elem=elevation(elnodes)
-     
-     DO k=1,3
-        n=elnodes(k)
-        U_rhs_ice(n)=U_rhs_ice(n) - elem_area(elem) * &
-             (sigma11(elem)*dx(k)+sigma12(elem)*(dy(k)) &
-             +sigma12(elem)*val3*metric_factor(elem))            !metrics
-        V_rhs_ice(n)=V_rhs_ice(n) - elem_area(elem) * &
-             (sigma12(elem)*dx(k)+sigma22(elem)*dy(k) &   
-             -sigma11(elem)*val3*metric_factor(elem))
-     END DO
-      ! use rhs_m and rhs_a for storing the contribution from elevation:
-     aa=9.81*elem_area(elem)/3.0_WP
-     DO k=1,3
-        n=elnodes(k)
-        rhs_a(n)=rhs_a(n)-aa*sum(dx*elevation_elem)	    
-        rhs_m(n)=rhs_m(n)-aa*sum(dy*elevation_elem)
-     END DO     
- end do 
+DO  n=1, myDim_nod2D
+   U_rhs_ice(n)=0.0
+   V_rhs_ice(n)=0.0
+END DO
  
+do el=1,myDim_elem2D
+      ! ===== Skip if ice is absent
+
+!   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
+   if (ice_strength(el) > 0.) then
+
+!$IVDEP       
+      DO k=1,3
+
+         U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
+           - elem_area(el) * &
+              (sigma11(el)*gradient_sca(k,el) + sigma12(el)*gradient_sca(k+3,el) &
+              +sigma12(el)*val3*metric_factor(el))            !metrics
+
+         V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) & 
+             - elem_area(el) * &
+              (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &   
+              -sigma11(el)*val3*metric_factor(el))
+      END DO
+
+
+   endif
+ end do 
+
   DO n=1, myDim_nod2D
-     mass=area(1,n)*(m_ice(n)*rhoice+m_snow(n)*rhosno)
-     
-     if (mass.ne.0) then
-     U_rhs_ice(n)=U_rhs_ice(n)/mass + rhs_a(n)/area(1,n) 
-     V_rhs_ice(n)=V_rhs_ice(n)/mass + rhs_m(n)/area(1,n)
+     if (inv_areamass(n) > 0._WP) then
+        U_rhs_ice(n) = U_rhs_ice(n)*inv_areamass(n) + rhs_a(n)
+        V_rhs_ice(n) = V_rhs_ice(n)*inv_areamass(n) + rhs_m(n)
      else
-     U_rhs_ice(n)=0.  
-     V_rhs_ice(n)=0.
-     end if
+        U_rhs_ice(n) = 0._WP
+        V_rhs_ice(n) = 0._WP
+     endif
   END DO 
   
 end subroutine stress2rhs
@@ -253,58 +236,117 @@ USE g_comm_auto
 
 IMPLICIT NONE
 integer          :: steps, shortstep
-real(kind=WP)    :: rdt, am, sm, mm
-real(kind=WP)    :: drag, inv_mass, det, umod, rhsu, rhsv
-integer          :: n, ed, ednodes(2)
-real(kind=WP)    :: ax, ay, yx, tx, ty
-    rdt=ice_dt/(1.0*evp_rheol_steps)
-    ax=cos(theta_io)
-    ay=sin(theta_io)
+real(kind=WP)    :: rdt, asum, msum, r_a, r_b
+real(kind=WP)    :: drag, det, umod, rhsu, rhsv
+integer          :: n, ed, ednodes(2), el
+real(kind=WP)    :: ax, ay, aa, elevation_dx, elevation_dy
+
+real(kind=WP)    :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
+real(kind=WP)    :: ice_strength(myDim_elem2D)
     
+rdt=ice_dt/(1.0*evp_rheol_steps)
+ax=cos(theta_io)
+ay=sin(theta_io)
     
+! Precompute values that are never changed during the iteration
+ do n=1,myDim_nod2D 
+
+    if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 0._WP) then
+       inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n))) 
+    else
+       inv_areamass(n) = 0._WP
+    endif
+
+    if (a_ice(n) < 0.01) then
+       ! Skip if ice is absent
+       inv_mass(n) = 0.
+    else
+       inv_mass(n) = (rhoice*m_ice(n)+rhosno*m_snow(n))/a_ice(n)
+       inv_mass(n) = 1.0/max(inv_mass(n), 9.0)        ! Limit the mass 
+                                       ! if it is too small
+    endif
+
+    rhs_a(n)=0.0       ! these are used as temporal storage here
+    rhs_m(n)=0.0       ! for the contribution due to ssh
+ enddo
+    
+ do el = 1,myDim_elem2D
+
+    if (any(m_ice(elem2D_nodes(:,el)) <= 0.) .or. &
+        any(a_ice(elem2D_nodes(:,el)) <=0.)) then
+       
+       ! There is no ice in elem
+       ice_strength(el) = 0.
+    else
+       msum = sum(m_ice(elem2D_nodes(:,el)))/3.0_WP
+       asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
+     
+       ! ===== Hunke and Dukowicz c*h*p*
+       ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+       ice_strength(el) = 0.5_WP*ice_strength(el)
+
+      ! use rhs_m and rhs_a for storing the contribution from elevation:
+       aa = 9.81*elem_area(el)/3.0_WP
+
+       elevation_dx = sum(gradient_sca(1:3,el)*elevation(elem2D_nodes(:,el)))	    
+       elevation_dy = sum(gradient_sca(4:6,el)*elevation(elem2D_nodes(:,el)))
+
+       rhs_a(elem2D_nodes(:,el)) = rhs_a(elem2D_nodes(:,el))-aa*elevation_dx
+       rhs_m(elem2D_nodes(:,el)) = rhs_m(elem2D_nodes(:,el))-aa*elevation_dy
+   
+    end if
+
+ enddo
+do n=1,myDim_nod2D 
+    rhs_a(n) = rhs_a(n)/area(1,n)
+    rhs_m(n) = rhs_m(n)/area(1,n)
+ enddo
+! End of Precomputing
+
+!==============================================================
+! And the ice stepping starts
+
 do shortstep=1, evp_rheol_steps 
  
- call stress_tensor
- call stress2rhs 
+   call stress_tensor(ice_strength)
+   call stress2rhs(inv_areamass,ice_strength) 
  
- U_ice_old = U_ice !PS
- V_ice_old = V_ice !PS
+   U_ice_old = U_ice !PS
+   V_ice_old = V_ice !PS
  
- do n=1,myDim_nod2D 
-    am=a_ice(n)
-    mm=m_ice(n)
-    sm=m_snow(n)
-    if (am < 0.01) cycle               ! Skip if ice is absent
-    inv_mass=(rhoice*mm+rhosno*sm)/am
-    inv_mass=max(inv_mass, 9.0)        ! Limit the mass 
-                                       ! if it is too small
-    inv_mass=1.0/inv_mass
-    umod=sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
-    drag=Cd_oce_ice*umod*density_0*inv_mass
-    tx=stress_atmice_x(n)
-    ty=stress_atmice_y(n)
-    rhsu=U_ice(n)+rdt*(drag*(ax*U_w(n)-ay*V_w(n))+ &
-                    inv_mass*tx+U_rhs_ice(n))
-    rhsv=V_ice(n)+rdt*(drag*(ax*V_w(n)+ay*U_w(n))+ &
-                    inv_mass*ty+V_rhs_ice(n))
+   do n=1,myDim_nod2D 
+    
+      if (a_ice(n) >= 0.01) then               ! Skip if ice is absent
 
-    det=(1.+ax*drag*rdt)**2+(rdt*coriolis_node(n)+rdt*ay*drag)**2
-    det=1.0_WP/det
-    U_ice(n)=det*((1.0+ax*drag*rdt)*rhsu+rdt*(coriolis_node(n)+ay*drag)*rhsv)
-    V_ice(n)=det*((1.0+ax*drag*rdt)*rhsv-rdt*(coriolis_node(n)+ay*drag)*rhsu)
- end do
- DO  ed=1,myDim_edge2D
+
+         umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
+
+         drag = Cd_oce_ice*umod*density_0*inv_mass(n)
+
+         rhsu = U_ice(n) +rdt*(drag*(ax*U_w(n) - ay*V_w(n))+ &
+              inv_mass(n)*stress_atmice_x(n) + U_rhs_ice(n))
+
+         rhsv = V_ice(n) +rdt*(drag*(ax*V_w(n) + ay*U_w(n))+ &
+              inv_mass(n)*stress_atmice_y(n) + V_rhs_ice(n))
+
+         r_a = 1. + ax*drag*rdt
+         r_b = rdt*(coriolis_node(n) + ay*drag)
+
+         det = 1.0_WP/(r_a*r_a + r_b*r_b)
+      
+         U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
+         V_ice(n) = det*(r_a*rhsv -r_b*rhsu)
+      endif
+   end do
+   DO  ed=1,myDim_edge2D
    ! boundary conditions
-   ednodes=edges(:,ed) 
-   if(myList_edge2D(ed)<=edge2D_in) cycle 
-   U_ice(ednodes(1))=0.0_WP
-   U_ice(ednodes(2))=0.0_WP
-   V_ice(ednodes(1))=0.0_WP
-   V_ice(ednodes(2))=0.0_WP
- end do  
+      if(myList_edge2D(ed) > edge2D_in) then
+         U_ice(edges(1:2,ed))=0.0_WP
+         V_ice(edges(1:2,ed))=0.0_WP
+      endif
+   end do
  
- call exchange_nod(U_ice)
- call exchange_nod(V_ice)    
- END DO
+   call exchange_nod(U_ice,V_ice)
+END DO
  
 end subroutine EVPdynamics
