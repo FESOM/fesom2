@@ -295,6 +295,81 @@ endif
 END SUBROUTINE exchange_nod3D_begin
 
 ! ========================================================================
+subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D)
+
+USE g_PARSUP
+IMPLICIT NONE
+
+real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
+real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+! General version of the communication routine for 3D nodal fields
+! stored in (vertical, horizontal) format
+ 
+if (npes > 1) then
+   call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D)
+   call exchange_nod_end
+endif
+END SUBROUTINE exchange_nod3D_2fields
+
+! ========================================================================
+subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D)
+USE o_MESH
+USE g_PARSUP
+IMPLICIT NONE
+
+
+real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
+real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+! General version of the communication routine for 3D nodal fields
+! stored in (vertical, horizontal) format
+ 
+ integer  :: n, sn, rn
+ integer  :: nz, nl1, nl2
+
+if (npes > 1) then
+  sn=com_nod2D%sPEnum
+  rn=com_nod2D%rPEnum
+
+  nl1 = ubound(nod1_array3D,1)
+  
+  if ((nl1<nl-1) .or. (nl1>nl)) then
+     if (mype==0) then
+        print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
+        print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
+     endif
+     call par_ex(1)
+  endif
+
+  nl2 = ubound(nod2_array3D,1)
+  if ((nl2<nl-1) .or. (nl2>nl)) then
+     if (mype==0) then
+        print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
+        print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
+     endif
+     call par_ex(1)
+  endif
+  
+  DO n=1,rn    
+     call MPI_IRECV(nod1_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
+          com_nod2D%rPE(n),      MPI_COMM_WORLD, com_nod2D%req(2*n-1), MPIerr)  
+
+     call MPI_IRECV(nod2_array3D, 1, r_mpitype_nod3D(n,nl2,1), com_nod2D%rPE(n), &
+          com_nod2D%rPE(n)+npes, MPI_COMM_WORLD, com_nod2D%req(2*n  ), MPIerr) 
+  END DO
+ 
+  DO n=1, sn
+     call MPI_ISEND(nod1_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
+          mype,      MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n-1), MPIerr)
+
+     call MPI_ISEND(nod2_array3D, 1, s_mpitype_nod3D(n,nl2,1), com_nod2D%sPE(n), &
+          mype+npes, MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n), MPIerr)
+  END DO
+
+  com_nod2D%nreq = 2*(rn+sn)
+
+endif
+END SUBROUTINE exchange_nod3D_2fields_begin
+! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D)
 USE o_MESH
 USE g_PARSUP
@@ -1554,6 +1629,7 @@ interface exchange_nod
       module procedure exchange_nod2D_2fields
       module procedure exchange_nod2D_3fields
       module procedure exchange_nod3D
+      module procedure exchange_nod3D_2fields
       module procedure exchange_nod3D_n
 end interface exchange_nod
 
@@ -1563,6 +1639,7 @@ interface exchange_nod_begin
       module procedure exchange_nod2D_2fields_begin
       module procedure exchange_nod2D_3fields_begin
       module procedure exchange_nod3D_begin
+      module procedure exchange_nod3D_2fields_begin
       module procedure exchange_nod3D_n_begin
 end interface exchange_nod_begin
 
