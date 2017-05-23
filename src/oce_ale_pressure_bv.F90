@@ -430,6 +430,7 @@ subroutine compute_neutral_slope
 	use o_MESH
 	USE o_param
 	use g_config
+        use g_comm_auto
 	IMPLICIT NONE
 	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
 	integer         :: edge
@@ -437,25 +438,24 @@ subroutine compute_neutral_slope
 	real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
 
 	!if sigma_xy is not computed
-	if (.NOT.Fer_GM) then
-		call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
-	endif
 	eps=5.0e-6
-	S_cr=4.0e-3 
+	S_cr=4.0e-3
 	S_d=1.0e-3
 	do n=1, myDim_nod2D
 		do nz = 1,nl-1
-			ro_z_inv=2*g*density_0_r/(bvfreq(nz,n)+bvfreq(nz+1,n))
+			ro_z_inv=-2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
 			neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
 			neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
 			neutral_slope(3,nz,n)=sqrt(sigma_xy(1,nz,n)**2+sigma_xy(2,nz,n)**2)
 			slope_tapered(:,nz,n)=neutral_slope(:,nz,n)
 			!tapering
-			if (slope_tapered(3,nz,n) < eps) then
+			if (slope_tapered(3,nz,n) > S_cr) then
 				c=0.5_WP*(1.0_WP + tanh((S_cr - slope_tapered(3,nz,n))/S_d))
 				slope_tapered(1:2,nz,n)=slope_tapered(1:2,nz,n)*c
-				slope_tapered(3,nz,n)=slope_tapered(3,nz,n)*c*K_ver
+				slope_tapered(3,  nz,n)=slope_tapered(3,  nz,n)*c!*K_ver
 			endif
 		enddo
 	enddo
+        call exchange_nod(neutral_slope)
+        call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope
