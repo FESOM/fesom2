@@ -165,7 +165,7 @@ IMPLICIT NONE
      k=min(chunk_size, nod2D-nchunk*chunk_size)
      if (mype==0) then
         do n=1, k
-           read(fileID,*) ibuff(n,1), rbuff(n,1:2), ibuff(n,2)
+           read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
         end do
      end if
      call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
@@ -222,7 +222,7 @@ IMPLICIT NONE
      k=min(chunk_size, elem2D-nchunk*chunk_size)
      if (mype==0) then
         do n=1, k
-           read(fileID,*) ibuff(n, 1:3)
+           read(fileID,*) ibuff(n,1), ibuff(n,2), ibuff(n,3)
         end do
      end if
 
