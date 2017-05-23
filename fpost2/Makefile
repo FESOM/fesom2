@@ -27,7 +27,7 @@ EXE = do_work.x
 CC = cc
 CCFLAGS = -g
 FC = ifort #/opt/intel/fc/9.1.033/bin/ifort
-FC_OPT = -r8 -i4 -g -fpp -bc -traceback
+FC_OPT = -r8 -i4 -g -fpp -O3 -traceback #-bc
 LD = $(FC)
 
 CPP = cpp

@@ -29,6 +29,7 @@ close (20)
 
 call ocean_mesh_setup
 call def_exchange_mesh
+call def_mask
 write(*,*) 'elem2D=', elem2D
 write(*,*) 'Total ocean area is: ', sum(voltriangle), ' m^2'
 !run it only once

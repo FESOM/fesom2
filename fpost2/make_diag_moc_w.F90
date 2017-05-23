@@ -16,6 +16,7 @@ module diag_moc_w
    real(kind=8)            		      	:: x, y, vol
    real(kind=8), dimension(:,:),   allocatable	:: w, arr
    real(kind=8), dimension(:,:),   allocatable	:: moc
+   logical,      dimension(:,:),   allocatable  :: moc_topo
    character(15)                              	:: varid2
    character(100)				:: svarid_in(1), svarid_out(1)
    integer					:: NFIELDS_IN, NFIELDS_OUT
@@ -31,7 +32,8 @@ subroutine make_diag_moc_w
    svarid_out(1)='MOC'
 
    allocate(w(max_num_layers, nod2D), arr(max_num_layers, nod2D))
-   allocate(moc(reg_ny, max_num_layers))
+   allocate(moc     (reg_ny, max_num_layers))
+   allocate(moc_topo(reg_ny, max_num_layers))
 
    fileout=trim(outpath)//'diag_moc.nc'
 
@@ -48,6 +50,7 @@ subroutine make_diag_moc_w
    write(*,*) trim(datapath)//trim(filein)
    w=0.
    moc=0.
+   moc_topo=.false.
    do month=1, snap_per_year
 	varid2='w'
 	call read_fesom(ncid, month, varid2, nod2D, max_num_layers, arr)
@@ -74,17 +77,30 @@ subroutine make_diag_moc_w
          end if
       end do
       do lev=1, elvls(el)-1
-         moc(pos, lev)=moc(pos, lev)+vol*sum(w(lev, elnodes))/3.*1.e-6
+         moc     (pos, lev)=moc(pos, lev)+vol*sum(w(lev, elnodes)*real(mask_n2(elnodes)))/3.*1.e-6
+         moc_topo(pos, lev)=.true.
       end do
    end do
 
-   do i=2, reg_ny
-      moc(i, :)=moc(i, :)+moc(i-1, :)
-   end do
+!full MOC
+   if (use_mask) then
+      do i=reg_ny-1, 1, -1
+         moc(i, :)=-moc(i, :)+moc(i+1, :)
+      end do
+   else
+      do i=2, reg_ny
+         moc(i, :)=moc(i, :)+moc(i-1, :)
+      end do
+   end if
+
+   where (.not. moc_topo)
+         moc=0.
+   end where
+
    call netcdf_write(fileout, year==year_start)      
    end do
    io=nf_close(ncid)   
-   deallocate(w, arr, moc)
+   deallocate(w, arr, moc, moc_topo)
 end subroutine make_diag_moc_w
 ! ============================================================
 SUBROUTINE netcdf_write(filename, newold)
