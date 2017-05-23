@@ -561,7 +561,7 @@ subroutine set_par_support
 ! MPI REQUEST BUFFERS
 !================================================
       allocate(com_edge2D%req(          3*com_edge2D%rPEnum +      3*com_edge2D%sPEnum))
-      allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum)))
+      allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum))
       allocate(com_elem2D%req(          3*com_elem2D%rPEnum +      3*com_elem2D%sPEnum))
       allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum + 3*com_elem2D_full%sPEnum))
 
