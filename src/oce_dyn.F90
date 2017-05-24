@@ -49,7 +49,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
 #include "fparms.h"
 logical, save        :: lfirst=.true.
 integer(kind=C_INT)  :: ident
-integer(kind=C_INT)  :: n3, reuse, new_values
+integer(kind=C_INT)  :: n3, reuse, new_values, temp
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
 integer :: n
@@ -98,11 +98,24 @@ if (lfirst) then
    ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
    ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
+! C-numbering (avoid temporary array in function call)
+   temp = ssh_stiff%rowptr(1)
+   ssh_stiff%rowptr(:) = ssh_stiff%rowptr(:) - temp
+   ssh_stiff%colind(:) = ssh_stiff%colind(:) - 1
+   part(:)             = part(:) - 1
+
    call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
-        part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-        ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
+        part, ssh_stiff%rowptr, &
+        ssh_stiff%colind, ssh_stiff%values, reuse, MPI_COMM_WORLD)
    lfirst=.false.
+
+! Back to Fortran numbering
+   
+   ssh_stiff%rowptr(:) = ssh_stiff%rowptr(:) + temp
+   ssh_stiff%colind(:) = ssh_stiff%colind(:) + 1
+   part(:)             = part(:) + 1
+
 end if
 
    call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)

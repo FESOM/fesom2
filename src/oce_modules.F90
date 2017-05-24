@@ -548,6 +548,7 @@ subroutine set_par_support
   integer   n, offset
   integer :: i, max_nb, nb, nini, nend, nl1, n_val
   integer, allocatable :: blocklen(:),     displace(:)
+  integer, allocatable :: blocklen_tmp(:), displace_tmp(:)
 
   !
   ! In the distributed memory version, most of the job is already done 
@@ -576,7 +577,7 @@ subroutine set_par_support
       max_nb = max(maxval(com_edge2D%rptr(2:com_edge2D%rPEnum+1) - com_edge2D%rptr(1:com_edge2D%rPEnum)), &
                    maxval(com_edge2D%sptr(2:com_edge2D%sPEnum+1) - com_edge2D%sptr(1:com_edge2D%sPEnum)))
 
-      allocate(displace(max_nb), blocklen(max_nb))
+      allocate(displace(max_nb),     blocklen(max_nb))
 
       do n=1,com_edge2D%rPEnum
          nb = 1
@@ -649,7 +650,8 @@ subroutine set_par_support
            maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
            maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
       
-      allocate(displace(max_nb), blocklen(max_nb))
+      allocate(displace(max_nb),     blocklen(max_nb))
+      allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
       
       do n=1,com_elem2D%rPEnum
@@ -670,13 +672,21 @@ subroutine set_par_support
          enddo
          
          DO n_val=1,4
-            call MPI_TYPE_INDEXED(nb, blocklen*n_val, displace*n_val, MPI_DOUBLE_PRECISION, &
+
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
+            displace_tmp(1:nb) = displace(1:nb)*n_val 
+
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
                  r_mpitype_elem2D(n,n_val), MPIerr)
 
             call MPI_TYPE_COMMIT(r_mpitype_elem2D(n,n_val), MPIerr) 
 
             DO nl1=nl-1, nl
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(r_mpitype_elem3D(n,nl1,n_val),  MPIerr)  
@@ -702,13 +712,21 @@ subroutine set_par_support
          enddo
                   
          DO n_val=1,4
-            call MPI_TYPE_INDEXED(nb, blocklen*n_val, displace*n_val, MPI_DOUBLE_PRECISION, &
+
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
+            displace_tmp(1:nb) = displace(1:nb)*n_val 
+
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
                  s_mpitype_elem2D(n, n_val), MPIerr)
 
             call MPI_TYPE_COMMIT(s_mpitype_elem2D(n, n_val),   MPIerr) 
  
             DO nl1=nl-1, nl
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     s_mpitype_elem3D(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(s_mpitype_elem3D(n,nl1,n_val),  MPIerr)  
@@ -744,7 +762,11 @@ subroutine set_par_support
             call MPI_TYPE_COMMIT(r_mpitype_elem2D_full(n, n_val),   MPIerr)
 
             DO nl1=nl-1, nl
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(r_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)  
@@ -779,7 +801,11 @@ subroutine set_par_support
             call MPI_TYPE_COMMIT(s_mpitype_elem2D_full(n,n_val),   MPIerr)
   
             DO nl1=nl-1, nl
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     s_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(s_mpitype_elem3D_full(n,nl1,n_val),  MPIerr)  
@@ -787,7 +813,8 @@ subroutine set_par_support
          ENDDO
       enddo
 
-      deallocate(displace,blocklen)
+      deallocate(displace,     blocklen)
+      deallocate(displace_tmp, blocklen_tmp)
 
 
    ! Build MPI Data types for halo exchange: Nodes
@@ -804,7 +831,8 @@ subroutine set_par_support
       max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
                    maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
 
-      allocate(displace(max_nb), blocklen(max_nb))
+      allocate(displace(max_nb),     blocklen(max_nb))
+      allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
       do n=1,com_nod2D%rPEnum
          nb = 1
@@ -834,7 +862,11 @@ subroutine set_par_support
 
          DO nl1=nl-1, nl
             DO n_val=1,3
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     r_mpitype_nod3D(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(r_mpitype_nod3D(n,nl1,n_val),  MPIerr)  
@@ -870,7 +902,11 @@ subroutine set_par_support
 
          DO nl1=nl-1, nl
             DO n_val=1,3
-               call MPI_TYPE_INDEXED(nb, blocklen*nl1*n_val, displace*nl1*n_val, MPI_DOUBLE_PRECISION, & 
+
+               blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
+               displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
+
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
                     s_mpitype_nod3D(n,nl1,n_val),  MPIerr)
 
                call MPI_TYPE_COMMIT(s_mpitype_nod3D(n,nl1,n_val),  MPIerr)  
@@ -879,6 +915,7 @@ subroutine set_par_support
       enddo
 
       deallocate(blocklen,     displace)
+      deallocate(blocklen_tmp, displace_tmp)
 
    endif
 
