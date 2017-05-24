@@ -23,6 +23,8 @@ subroutine ice2ocean
      
      heat_flux   = -net_heat_flux 
      water_flux  = -fresh_wa_flux
+
+     call exchange_nod_begin(heat_flux, water_flux)
   ! ==================
   ! momentum flux:
   ! ==================
@@ -43,8 +45,7 @@ subroutine ice2ocean
      stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                              stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
   END DO
-  call exchange_nod(heat_flux)
-  call exchange_nod(water_flux)
+  call exchange_nod_end()
   if (use_sw_pene) call cal_shortwave_rad
 end subroutine ice2ocean
 !=======================================================================================
@@ -64,20 +65,30 @@ subroutine ocean2ice
   integer :: n, elem, k
   real*8 :: uw,vw
   ! the arrays in the ice model are renamed
-
-  do n=1, myDim_nod2d+eDim_nod2d         
+     
 if (ice_update) then
+  do n=1, myDim_nod2d+eDim_nod2d    
      T_oc_array(n)=tr_arr(1,n,1)
      S_oc_array(n)=tr_arr(1,n,2)  
-!PS      elevation(n)= eta_n(n)
-     elevation(n)= hbar(n) !PS
+  end do
+  if ( .not. use_ALE ) then
+     elevation(:)= eta_n(:)
+  else
+     elevation(:)= hbar(:)
+  endif
 else
+  do n=1, myDim_nod2d+eDim_nod2d    
      T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1)
      S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1)
-!PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1)
-     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1) !PS
-endif
+!NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1)
+!NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1) !PS
   end do
+  if ( .not. use_ALE ) then
+     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+eta_n(:))/real(ice_steps_since_upd+1)
+  else
+     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1)
+  endif
+endif
      do n=1, myDim_nod2d  
        uw=0.0_WP
        vw=0.0_WP
@@ -97,7 +108,6 @@ else
      v_w(n)=(v_w(n)*real(ice_steps_since_upd)+vw)/real(ice_steps_since_upd+1)
 endif
      enddo
-     call exchange_nod(u_w)
-     call exchange_nod(v_w)
+     call exchange_nod(u_w, v_w)
 end subroutine ocean2ice
 !=========================================================================================================
