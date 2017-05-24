@@ -82,6 +82,7 @@ subroutine pressure_bv
 		!_______________________________________________________________________
 	else
 		do node=1, myDim_nod2D+eDim_nod2D
+			nl1= nlevels_nod2d(node)-1
 			!___________________________________________________________________
 			do nz=1, nl1
 				t=tr_arr(nz, node,1)
