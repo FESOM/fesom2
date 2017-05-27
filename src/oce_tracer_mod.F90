@@ -385,12 +385,15 @@ USE o_PARAM
 USE o_MESH
 USE o_ARRAYS
 USE g_PARSUP
+USE g_CONFIG
 IMPLICIT NONE
 real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
 real(kind=WP)     :: vd_flux(nl)
 real(kind=WP)     :: tvol
 integer           :: elem,  elnodes(3)
 integer           :: n, nz, tr_num,nl1
+
+if (use_ALE) then
 DO n=1,myDim_nod2D+eDim_nod2D
      nl1 = nlevels_nod2D(n)
      DO nz=2,nl1-1
@@ -403,4 +406,19 @@ DO n=1,myDim_nod2D+eDim_nod2D
         tr_z(nz,n) = 0.5_WP*(vd_flux(nz) + vd_flux(nz+1))
      end do
 END DO
+else
+DO n=1,myDim_nod2D+eDim_nod2D
+     nl1 = nlevels_nod2D(n)
+     DO nz=2,nl1-1
+        tvol=0.5_WP*(Z(nz-1)-Z(nz))
+        vd_flux(nz)=(ttf(nz-1,n)-ttf(nz,n))/tvol
+     END DO
+        vd_flux(1)=0.0_WP
+	vd_flux(nl1)=0.0_WP
+     do nz=1,nl1-1
+        tr_z(nz,n) = 0.5_WP*(vd_flux(nz) + vd_flux(nz+1))
+     end do
+END DO
+end if
+
 END SUBROUTINE tracer_gradient_z
