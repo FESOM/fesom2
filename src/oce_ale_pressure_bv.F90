@@ -440,7 +440,7 @@ subroutine compute_neutral_slope
 
 	!if sigma_xy is not computed
 	eps=5.0e-6
-	S_cr=4.0e-3
+	S_cr=5.0e-2
 	S_d=1.0e-3
 	do n=1, myDim_nod2D
 		do nz = 1,nl-1
@@ -448,15 +448,14 @@ subroutine compute_neutral_slope
 			neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
 			neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
 			neutral_slope(3,nz,n)=sqrt(sigma_xy(1,nz,n)**2+sigma_xy(2,nz,n)**2)
-			slope_tapered(:,nz,n)=neutral_slope(:,nz,n)
 			!tapering
-			if (slope_tapered(3,nz,n) > S_cr) then
-				c=0.5_WP*(1.0_WP + tanh((S_cr - slope_tapered(3,nz,n))/S_d))
-				slope_tapered(1:2,nz,n)=slope_tapered(1:2,nz,n)*c
-				slope_tapered(3,  nz,n)=slope_tapered(3,  nz,n)*c!*K_ver
-			endif
+                        c=1.0_WP
+			c=0.5*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
+                        if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
+			slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
 		enddo
 	enddo
+!       slope_tapered(1,:,:)=0.0_WP
         call exchange_nod(neutral_slope)
         call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope

@@ -66,6 +66,9 @@ subroutine ini_mean_io
   call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'm')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'm')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'm')
+! call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope','neutral slope',       'none',neutral_slope(3,:,:), 1, 'd')
+! call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'd')
+
 !2D
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm')

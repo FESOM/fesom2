@@ -780,7 +780,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
- 	        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n  )**2 + &
+ 	        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,  n)**2 + &
  		     (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
 		Ty1=Ki(n)*Ty1*isredi
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
@@ -811,7 +811,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		        Ty =Ki(n)*Ty *isredi
 		        Ty1=Ki(n)*Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
-			a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
+			a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
 			b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
 			
@@ -836,7 +836,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 	        Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
- 		    (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
+ 		    (zbar_n(nz)-Z_n(nz))  *zinv1 *slope_tapered(3,nz,n)**2
 	        Ty =Ki(n)*Ty *isredi
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
@@ -990,10 +990,11 @@ subroutine diff_ver_part_redi_expl
 	integer         :: elem,k
 	integer         :: n2,nl1,nl2,nz,n
 	real(kind=WP)   :: Tx, Ty
-	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D),vd_flux(nl-1)
+	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D),vd_flux(nl)
 
 	do n=1, myDim_nod2D
-		DO nz=1, nlevels_nod2D(n)-1
+                nl1=nlevels_nod2D(n)-1
+		DO nz=1, nl1
            		Tx=0.0_WP
 			Ty=0.0_WP
 			DO k=1, nod_in_elem2D_num(n)
@@ -1013,15 +1014,15 @@ subroutine diff_ver_part_redi_expl
 		vd_flux=0d0
 
 		do nz=2,nl1
-  			vd_flux(nz)=  ((Z(nz-1)-zbar(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
+  			vd_flux(nz)=((Z(nz-1)-zbar(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
 				*tr_xynodes(2,nz-1,n) ) &
      		 		+ (zbar(nz)-Z(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
 				*tr_xynodes(2,nz,n) ))/(Z(nz-1)-Z(nz))*area(nz,n)
+                        vd_flux(nz)=vd_flux(nz)*tr_z(nz,n)
 		enddo
-		do nz=1,nl1-1
- 			del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
+		do nz=1,nl1
+ 		   del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
 		enddo
-		del_ttf(nl1,n) = del_ttf(nl1,n)+Ki(n)*vd_flux(nl1)/(zbar(nl1)-zbar(nl1+1))*dt/area(nl1,n)
 	ENDDO
 end subroutine diff_ver_part_redi_expl
 !===============================================================================
@@ -1035,7 +1036,7 @@ subroutine diff_part_hor_redi
 	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
 	integer         :: edge
 	integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
-	real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz
+	real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
 	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh
 	real(kind=WP)   :: isredi=0._WP
 
@@ -1065,8 +1066,9 @@ subroutine diff_part_hor_redi
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
-			SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
-			SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
+			SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=0.5_WP*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2)))
 			Ty=0.5_WP*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
 			Fx=Kh*(Tx+SxTz*isredi)
@@ -1078,8 +1080,9 @@ subroutine diff_part_hor_redi
 		
 		!_______________________________________________________________________
 		do nz=n2+1,nl1
-                        SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
-                        SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+                        SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
+                        SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=tr_xy(1,nz,el(1))
 			Ty=tr_xy(2,nz,el(1))
 			Fx=Kh*(Tx+SxTz*isredi)
@@ -1089,8 +1092,9 @@ subroutine diff_part_hor_redi
 			rhs2(nz) = rhs2(nz) - c
 		end do
 		do nz=n2+1,nl2
-                        SxTz=sum(tr_z(nz,enodes)*slope_tapered(1,nz,enodes))/2.0_WP
-                        SyTz=sum(tr_z(nz,enodes)*slope_tapered(2,nz,enodes))/2.0_WP
+                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+                        SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
+                        SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=tr_xy(1,nz,el(2))
 			Ty=tr_xy(2,nz,el(2))
 			Fx=Kh*(Tx+SxTz*isredi)

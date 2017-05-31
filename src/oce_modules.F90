@@ -1027,6 +1027,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: vorticity
 
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
+real(kind=WP), allocatable,dimension(:)     :: Kv0
 !Velocities interpolated to nodes
 real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
 

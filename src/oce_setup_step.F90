@@ -165,7 +165,7 @@ allocate(Unode(2,nl-1,node_size))
 ! tracer gradients & RHS  
 allocate(ttrhs(nl-1,node_size))
 allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-allocate(tr_z(nl-1,myDim_nod2D+eDim_nod2D))
+allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 
 ! neutral slope etc. to be used in Redi formulation
 allocate(neutral_slope(3, nl-1, node_size))
