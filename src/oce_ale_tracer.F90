@@ -45,13 +45,15 @@ subroutine solve_tracers_ale
 ! 			where(tr_arr(:,:,1)<-2.1_WP)  tr_arr(:,:,1)=-2.1_WP
 ! 		end	if
 		
-		call exchange_nod(tr_arr(:,:,tr_num))		
+                call exchange_nod(tr_arr(:,:,tr_num))		
 	end do
+        
         ! subtract the the bolus velocities back from 3D velocities:
         if (Fer_GM) then
            UV  =UV  -fer_UV
            Wvel=Wvel-fer_Wvel
         end if
+
 end subroutine solve_tracers_ale
 !
 !
@@ -1008,7 +1010,9 @@ subroutine diff_ver_part_redi_expl
 			tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
         	END DO
 	end do
-	call exchange_nod(tr_xynodes)
+      
+	! call exchange_nod_begin(tr_xynodes)  !NR the halo is not needed
+
 	DO n=1, myDim_nod2D
 		nl1=nlevels_nod2D(n)-1
 		vd_flux=0d0
