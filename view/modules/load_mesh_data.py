@@ -22,6 +22,7 @@ import os
 import logging
 import time
 import pickle
+import pyresample
 
 def load_mesh(path, abg = [50, 15, -90], usepickle = True):
     path=os.path.abspath(path)
@@ -130,8 +131,9 @@ class fesom_mesh(object):
     def read2d(self):
         file_content = pd.read_csv(self.nod2dfile, delim_whitespace=True, skiprows=1, \
                                       names=['node_number','x','y','flag'] )
-        self.x2=file_content.x.values
-        self.y2=file_content.y.values
+        self.x2     =file_content.x.values
+        self.y2     =file_content.y.values
+        self.ind2d  =file_content.flag.values        
         self.n2d=len(self.x2)
 
         file_content = pd.read_csv(self.elm2dfile, delim_whitespace=True, skiprows=1, \
@@ -192,15 +194,13 @@ path                  = {}
 alpha, beta, gamma    = {}, {}, {}
 number of 2d nodes    = {}
 number of 2d elements = {}
-number of 3d nodes    = {}
 
         '''.format(self.path,
                    str(self.alpha),
                    str(self.beta),
                    str(self.gamma),
                    str(self.n2d),
-                   str(self.e2d),
-                   str(self.n3d))
+                   str(self.e2d))
         return meshinfo 
     def __str__(self):
         return __repr__(self)
@@ -212,20 +212,22 @@ def ind_for_depth(depth, mesh):
     dind=i
     return dind
         
-def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, how='mean'): 
+def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, how='mean', verbose=False): 
         #print(['reading year '+str(year)+':'])
     ncfile =result_path+'/'+str_id+'.'+runid+'.'+str(year)+'.nc'
-    print(['reading ', ncfile])
+    if (verbose):
+        print(['reading ', ncfile])
     f = Dataset(ncfile, 'r')
     # dimensions of the netcdf variable
     ncdims=f.variables[str_id].shape
     # indexies for reading 2D part
-    if (ncdims[1]==mesh.n2d):
-        print('data at nodes')
-    elif (ncdims[1]==mesh.e2d):
-        print('data on elements')
-    else:
-        raise IOError('not existing dimension '+str(ncdims[1]))    
+    if (verbose):
+        if (ncdims[1]==mesh.n2d):
+            print('data at nodes')
+        elif (ncdims[1]==mesh.e2d):
+            print('data on elements')
+        else:
+            raise IOError('not existing dimension '+str(ncdims[1]))    
     
     dim=[records, np.arange(ncdims[1])]
     data=np.zeros(shape=(ncdims[1]))    
@@ -239,3 +241,41 @@ def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, ho
         data = data+f.variables[str_id][dim].max(axis=0)
     f.close()
     return data
+
+def read_fesom_sect(str_id, records, year, mesh, result_path, runid, p1, p2, N, nlev=0, \
+    how='mean', line_distance=3., radius_of_influence=2000000, do_land=False, verbose=False): 
+    # define section: sx, sy, sz
+    sx=np.linspace(p1[0], p2[0], N)
+    sy=np.linspace(p1[1], p2[1], N)
+    if (nlev==0):
+        nlev=mesh.nlev
+    sz=np.zeros([nlev, N])
+    sz[:,:]=np.nan
+    # find 2D points which are within the line_distance to the section
+    # to make it cheaper, only these points will be used for interpolation
+    lnorm=np.sqrt(sum((p2-p1)**2))
+    d = np.cross( np.array([mesh.x2,mesh.y2]).T-p1, p2-p1)/lnorm
+    ind=(d<line_distance)
+    x=mesh.x2[ind]
+    y=mesh.y2[ind]
+    oce_ind2d=np.ones(x.shape)
+    oce_ind2d[mesh.ind2d[ind]!=0]=np.nan
+    # prepare the interpolation weights
+    orig_def = pyresample.geometry.SwathDefinition(lons=x,  lats=y)
+    targ_def = pyresample.geometry.SwathDefinition(lons=sx, lats=sy)
+    
+    oce_mask=pyresample.kd_tree.resample_nearest(orig_def, oce_ind2d, \
+    targ_def, radius_of_influence=radius_of_influence, fill_value=0.)
+    # do the interpolation layerwise
+    for ilev in range(nlev):
+        # read the model result from fesom.XXXX.oce.nc
+        if (verbose):
+            print("interpolating level ", ilev)
+        
+        data=read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=ilev)
+        data[data==0.]=np.nan
+        sz[ilev,:] = pyresample.kd_tree.resample_gauss(orig_def, data[ind], \
+                           targ_def, radius_of_influence=radius_of_influence, neighbours=10,\
+                           sigmas=250000, fill_value=None)*oce_mask
+    
+    return(sx, sy, sz)

@@ -74,7 +74,7 @@ class climatology(object):
             self.Syz=nanmean(self.S, 2)
 
 
-def fesom_2_clim(data, depth, mesh, climatology, verbose=True):
+def fesom_2_clim(data, depth, mesh, climatology, verbose=True, radius_of_influence=100000):
     '''
     Interpolation of fesom data to grid of the climatology.
 
@@ -106,6 +106,6 @@ def fesom_2_clim(data, depth, mesh, climatology, verbose=True):
     #pdb.set_trace()
     iz=abs(abs(climatology.z)-abs(depth)).argmin()
     print('the model depth is: ', depth, '; the closest depth in climatology is: ', climatology.z[iz])
-    out_data=fesom2regular(data, mesh, xx, yy, distances=distances, inds=inds)
+    out_data=fesom2regular(data, mesh, xx, yy, distances=distances, inds=inds, radius_of_influence=radius_of_influence)
     out_data[np.isnan(climatology.T[iz,:,:])]=np.nan
     return iz, xx, yy, out_data
