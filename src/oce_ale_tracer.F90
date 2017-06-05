@@ -861,18 +861,18 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 		!  |--> a(1)=0
 		nz=1
-                dz=(zbar(nz)-zbar(nz+1))
+                dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
                 tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 		!tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
 		do nz=2,nzmax-2
-                   dz=(zbar(nz)-zbar(nz+1))
+                   dz=hnode_new(nz,n)
                    tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 		   !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
 		   !       -c(nz)*tr_arr(nz+1,n,tr_num) &
 		   !       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
 		end do
 		nz=nzmax-1
-                dz=(zbar(nz)-zbar(nz+1))
+                dz=hnode_new(nz,n)
                 tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
 	        !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
 		
