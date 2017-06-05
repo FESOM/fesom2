@@ -1061,7 +1061,6 @@ subroutine vert_vel_ale
 		Wvel_e=Wvel
 	end if
 	Wvel_i=Wvel-Wvel_e
-
 end subroutine vert_vel_ale
 !
 !

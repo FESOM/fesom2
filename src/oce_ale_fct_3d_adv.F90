@@ -281,19 +281,19 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! vert. flux at surface layer
 		nz=1
-		tvert(nz)=-Wvel(nz,n)*ttf(nz,n)*area(nz,n)
+		tvert(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
 		fct_aec_ver(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
 		! vert. flux at surface + 1 layer --> centered differences
 		nz=2
 		! low order
-		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-					 ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+					 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
 		tvert(nz)=cLO*area(nz,n)
 		
 		! high order
-		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
+		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
 		fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
@@ -302,12 +302,12 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		! vert. flux at bottom - 1 layer --> centered differences
 		nz=nl1-1
 		! low order
-		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-					 ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+					 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
 		tvert(nz)=cLO*area(nz,n)
 		
 		! high order
-		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
+		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
 		fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
@@ -328,8 +328,8 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		do nz=3,nl1-2
 			
 			! low order --> First-order upwind estimate
-			cLO=-0.5*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-					  ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+			cLO=-0.5*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+					  ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
 			tvert(nz)=cLO*area(nz,n)
 			
 			! high order --> centered (4th order)
@@ -339,9 +339,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			
 			Tmean1=ttfAB(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
 			Tmean2=ttfAB(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-			Tmean =(Wvel(nz,n)+abs(Wvel(nz,n)))*Tmean1+ &
-				   (Wvel(nz,n)-abs(Wvel(nz,n)))*Tmean2
-			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel(nz,n)+(1.0_WP-num_ord)*Tmean)
+			Tmean =(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))*Tmean1+ &
+				   (Wvel_e(nz,n)-abs(Wvel_e(nz,n)))*Tmean2
+			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel_e(nz,n)+(1.0_WP-num_ord)*Tmean)
 			
 			! antidiffusive flux: (HO-LO)
 			fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)

@@ -18,7 +18,7 @@ subroutine solve_tracers_ale
         ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
         if (Fer_GM) then
            UV  =UV  +fer_UV
-           Wvel=Wvel+fer_Wvel
+           Wvel_e=Wvel_e+fer_Wvel
         end if
         ! this shall not be called inside the loop?
         call fill_up_dn_grad
@@ -51,7 +51,7 @@ subroutine solve_tracers_ale
         ! subtract the the bolus velocities back from 3D velocities:
         if (Fer_GM) then
            UV  =UV  -fer_UV
-           Wvel=Wvel-fer_Wvel
+           Wvel_e=Wvel_e-fer_Wvel
         end if
 
 end subroutine solve_tracers_ale
@@ -456,12 +456,12 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		
 		!_______________________________________________________________________
 		! Surface flux
-		tvert(1)= -tv(1)*Wvel(1,n)*area(1,n)
+		tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
 		
 		!_______________________________________________________________________
 		! Other levels
 		do nz=2, nzmax-1
-			tvert(nz)= -tv(nz)*Wvel(nz,n)*area(nz,n)
+			tvert(nz)= -tv(nz)*Wvel_e(nz,n)*area(nz,n)
 		end do
 		
 		!_______________________________________________________________________
@@ -502,14 +502,14 @@ subroutine adv_tracers_vert_upw(ttf)
 		nl1=nlevels_nod2D(n)-1
 		!_______________________________________________________________________
 		! Surface flux
-		tvert(1)= -Wvel(1,n)*ttf(1,n)*area(1,n)		
+		tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)		
 		!_______________________________________________________________________
 		! Zero bottom flux
 		tvert(nl1+1)=0.0_WP
 		!_______________________________________________________________________
 		! Other levels
 		do nz=2, nl1
-			tv=ttf(nz-1,n)*min(Wvel(nz,n), 0._WP)+ttf(nz,n)*max(Wvel(nz,n), 0._WP)
+			tv=ttf(nz-1,n)*min(Wvel_e(nz,n), 0._WP)+ttf(nz,n)*max(Wvel_e(nz,n), 0._WP)
 			tvert(nz)= -tv*area(nz,n)
 		end do
 		!_______________________________________________________________________
@@ -545,7 +545,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
 		nl1=nlevels_nod2D(n)-1
 		!_______________________________________________________________________
 		! Surface flux
-		tvert(1)= -Wvel(1,n)*ttf(1,n)*area(1,n)		
+		tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)		
 		!_______________________________________________________________________
 		! Zero bottom flux
 		tvert(nl1+1)=0.0_WP		
@@ -553,7 +553,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
 		! Other levels
 		do nz=2, nl1
 			tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
-			tvert(nz)= -tv*Wvel(nz,n)*area(nz,n)
+			tvert(nz)= -tv*Wvel_e(nz,n)*area(nz,n)
 		end do
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
@@ -700,10 +700,10 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
 	real(kind=WP)       :: cp(nl), tp(nl)
 	integer             :: nz, n, nzmax,tr_num
-	real(kind=WP)       :: m, zinv, dt_inv
-	real(kind=WP)       :: rsss, Ty,Ty1,c1,zinv1,zinv2,v_adv
+	real(kind=WP)       :: m, zinv, dt_inv, dz
+	real(kind=WP)       :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
         real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
-	real(kind=WP)   :: isredi=0._WP
+	real(kind=WP)       :: isredi=0._WP
 
         if (Redi) isredi=1._WP
 	dt_inv=1.0_WP/dt
@@ -792,10 +792,10 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! update from the vertical advection --> comes from splitting of vert 
 		! velocity into explicite and implicite contribution
-! 		v_adv=zinv*area(2,n)/area(1,n)
-! 		b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
-! 		c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
-		
+		v_adv=zinv*area(2,n)/area(1,n)
+		b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
+		c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
+	
 		! backup zinv2 for next depth level
 		zinv1=zinv2
 		
@@ -821,13 +821,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			zinv1=zinv2
 			
 			! update from the vertical advection
-! 			v_adv=zinv
-! 			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
-! 			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-! 			
-! 			v_adv=v_adv*area(nz+1,n)/area(nz,n)
-! 			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
-! 			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+ 			v_adv=zinv
+ 			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
+ 			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+ 			
+ 			v_adv=v_adv*area(nz+1,n)/area(nz,n)
+ 			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+ 			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
 		end do ! --> do nz=2, nzmax-2
 		
 		!_______________________________________________________________________
@@ -846,9 +846,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		b(nz)=-a(nz)+hnode_new(nz,n)
 		
 		! update from the vertical advection
-! 		v_adv=zinv
-! 		a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
-! 		b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+ 		v_adv=zinv
+ 		a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
+ 		b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
 		
 		!_______________________________________________________________________
 		! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...tr_arr
@@ -861,14 +861,20 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 		!  |--> a(1)=0
 		nz=1
-		tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
+                dz=(zbar(nz)-zbar(nz+1))
+                tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+		!tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
 		do nz=2,nzmax-2
-			tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
-			       -c(nz)*tr_arr(nz+1,n,tr_num) &
-			       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
+                   dz=(zbar(nz)-zbar(nz+1))
+                   tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+		   !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
+		   !       -c(nz)*tr_arr(nz+1,n,tr_num) &
+		   !       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
 		end do
 		nz=nzmax-1
-		tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
+                dz=(zbar(nz)-zbar(nz+1))
+                tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
+	        !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
 		
 		!_______________________________________________________________________
 		! case of activated shortwave penetration into the ocean, ad 3d contribution

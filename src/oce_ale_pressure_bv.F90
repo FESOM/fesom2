@@ -440,7 +440,7 @@ subroutine compute_neutral_slope
 
 	!if sigma_xy is not computed
 	eps=5.0e-6
-	S_cr=5.0e-2
+	S_cr=1.0e-2
 	S_d=1.0e-3
 	do n=1, myDim_nod2D
 		do nz = 1,nl-1
