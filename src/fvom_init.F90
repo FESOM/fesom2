@@ -23,6 +23,7 @@ program MAIN
   open (20,file=nmlfile)
   read (20,NML=paths)         ! We need MeshPath
   read (20,NML=geometry)      ! We need cyclic_length and cartesian
+  read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
   call set_mesh_transform_matrix  !(rotated grid) 

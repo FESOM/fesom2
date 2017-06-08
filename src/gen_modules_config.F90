@@ -82,13 +82,15 @@ module g_config
   namelist /calendar/ include_fleapyear
   
    ! *** machine ***
-  integer                       :: system_arch=1    ! XD1 2(byte), HLRN 1(word)
-  namelist /machine/ system_arch
+  integer                :: system_arch = 1    ! XD1 2(byte), HLRN 1(word)
+  integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
+  integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
+  namelist /machine/ system_arch, n_levels, n_part
   
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
-  logical                       :: toy_ocean=.false. ! Erzatz forcing has
+  logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
   namelist /run_config/ use_ice, use_sw_pene, toy_ocean
   

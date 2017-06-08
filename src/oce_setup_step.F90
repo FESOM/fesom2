@@ -252,7 +252,7 @@ use o_mixing_kpp_mod ! _OG_
 
 
 use g_comm_auto !??????????????????????????????
-use ieee_arithmetic        !??????????????????????????????
+!use ieee_arithmetic        !??????????????????????????????
 
 
 IMPLICIT NONE
@@ -281,7 +281,7 @@ if (trim(mix_scheme)=='KPP') then
 else if(trim(mix_scheme)=='PP') then
   call oce_mixing_PP
 else
-   stop("!not existing mixing scheme!")
+   stop "!not existing mixing scheme!"
    call par_ex
 end if  
 
@@ -354,7 +354,7 @@ end if
 							MPI_COMM_WORLD, MPIerr)
 							
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,"(A, I, A, ES10.3, A, ES10.3)") ' --mstep=',mstep,'--> global min/max hflux      : ',global_min_eta,' / ',global_max_eta		
+			write(*,"(A, I0, A, ES10.3, A, ES10.3)") ' --mstep=',mstep,'--> global min/max hflux      : ',global_min_eta,' / ',global_max_eta		
 			write(*,*)
 		endif
 	
@@ -374,7 +374,7 @@ end if
 		
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*)
-			write(*,"(A, I, A, ES10.3, A, ES10.3, A, ES10.3)") ' --mstep=',n,'--> global max/min/int eta_n : ',global_max_eta,' / ',global_min_eta,' / ',global_vol_eta
+			write(*,"(A, I0, A, ES10.3, A, ES10.3, A, ES10.3)") ' --mstep=',n,'--> global max/min/int eta_n : ',global_max_eta,' / ',global_min_eta,' / ',global_vol_eta
 		endif
 	endif 
 		
@@ -390,7 +390,7 @@ end if
 	! check tracerfor nan
 	do el=1,myDim_nod2d
 		do nz=1,nl
-			if ( ieee_is_nan(tr_arr(nz, el,1)) .or. &
+			if ( (tr_arr(nz, el,1) /= tr_arr(nz, el,1)) .or. &
 			     tr_arr(nz, el,1) < -5.0 .or. tr_arr(nz, el,1)>100) then
 				write(*,*) ' --STOP--> found temperture become NaN or <-5.0, >100'
 				write(*,*) 'mype        = ',mype
@@ -402,7 +402,7 @@ end if
 		
 				call par_ex(1)
 			endif
-			if ( ieee_is_nan(tr_arr(nz, el,2)) .or.  &
+			if ( (tr_arr(nz, el,2) /= tr_arr(nz, el,2)) .or.  &
 			     tr_arr(nz, el,2) < 0 .or. tr_arr(nz, el,2)>100 ) then
 				write(*,*) ' --STOP--> found salinity become NaN or <0, >100'
 				write(*,*) 'mype        = ',mype

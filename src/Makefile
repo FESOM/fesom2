@@ -9,7 +9,7 @@ include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
-MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_rotate_grid.o  
+MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
 
 OBJ_INI =  fvom_init.o \
            oce_local.o \
@@ -20,6 +20,7 @@ OBJ_INI =  fvom_init.o \
 MODULES = oce_modules.o \
           ice_modules.o \
           gen_modules_config.o \
+          gen_modules_partitioning.o \
           gen_modules_clock.o \
           gen_modules_rotate_grid.o \
           gen_modules_read_NetCDF.o \

@@ -998,7 +998,7 @@ subroutine diff_ver_part_redi_expl
 	integer         :: elem,k
 	integer         :: n2,nl1,nl2,nz,n
 	real(kind=WP)   :: Tx, Ty
-	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D),vd_flux(nl)
+	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D), vd_flux(nl)
 
 	do n=1, myDim_nod2D
                 nl1=nlevels_nod2D(n)-1
@@ -1023,15 +1023,24 @@ subroutine diff_ver_part_redi_expl
 		nl1=nlevels_nod2D(n)-1
 		vd_flux=0d0
 
+		zbar_n=0.0_WP
+		Z_n   =0.0_WP
+		zbar_n(nl1+1)=zbar(nl1+1)
+		Z_n(nl1-1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+		do nz=nl1, 2, -1
+			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
+			Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
+		end do
+		zbar_n(1) = zbar_n(2) + hnode_new(1,n)
+
 		do nz=2,nl1
-  			vd_flux(nz)=((Z(nz-1)-zbar(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
+  			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
 				*tr_xynodes(2,nz-1,n) ) &
-     		 		+ (zbar(nz)-Z(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
-				*tr_xynodes(2,nz,n) ))/(Z(nz-1)-Z(nz))*area(nz,n)
-                        vd_flux(nz)=vd_flux(nz)*tr_z(nz,n)
+     		 		+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
+				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
- 		   del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))/(zbar(nz)-zbar(nz+1))*dt/area(nz,n)
+ 		   del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
 	ENDDO
 end subroutine diff_ver_part_redi_expl
@@ -1047,7 +1056,7 @@ subroutine diff_part_hor_redi
 	integer         :: edge
 	integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
 	real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
-	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh
+	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh, dz
 	real(kind=WP)   :: isredi=0._WP
 
         if (Redi) isredi=1._WP
@@ -1076,6 +1085,7 @@ subroutine diff_part_hor_redi
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
+			dz=sum(helem(nz, el))/2.0_WP
                         Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
 			SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
@@ -1083,13 +1093,14 @@ subroutine diff_part_hor_redi
 			Ty=0.5_WP*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=(deltaX2-deltaX1)*Ty-(deltaY2-deltaY1)*Tx
+			c=((deltaX2-deltaX1)*Ty-(deltaY2-deltaY1)*Tx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		enddo
 		
 		!_______________________________________________________________________
 		do nz=n2+1,nl1
+			dz=helem(nz, el(1))
                         Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
                         SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
                         SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
@@ -1097,11 +1108,12 @@ subroutine diff_part_hor_redi
 			Ty=tr_xy(2,nz,el(1))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=-deltaX1*Ty+deltaY1*Tx
+			c=(-deltaX1*Ty+deltaY1*Tx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		end do
 		do nz=n2+1,nl2
+			dz=helem(nz, el(2))
                         Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
                         SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
                         SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
@@ -1109,7 +1121,7 @@ subroutine diff_part_hor_redi
 			Ty=tr_xy(2,nz,el(2))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=deltaX2*Ty-deltaY2*Tx
+			c=(deltaX2*Ty-deltaY2*Tx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		end do

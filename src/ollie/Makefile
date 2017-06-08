@@ -9,7 +9,7 @@ include Makefile.in
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
-MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_rotate_grid.o  
+MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
 
 OBJ_INI =  fvom_init.o \
            oce_local.o \
@@ -20,6 +20,7 @@ OBJ_INI =  fvom_init.o \
 MODULES = oce_modules.o \
           ice_modules.o \
           gen_modules_config.o \
+          gen_modules_partitioning.o \
           gen_modules_clock.o \
           gen_modules_rotate_grid.o \
           gen_modules_read_NetCDF.o \
@@ -27,40 +28,42 @@ MODULES = oce_modules.o \
           gen_halo_exchange.o \
           psolve.o \
           oce_mixing_kpp.o \
+          oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
 	  fort_part.o \
-          gen_input.o
+          gen_input.o \
+          io_meandata.o \
+          io_restart.o
 
-OBJECTS=  fvom_main.o \
-          oce_ale.o \
-          oce_ale_tracer.o \
-          oce_ale_mixing_pp.o \
-          oce_setup_step.o \
-          oce_mesh.o \
-          oce_dyn.o \
-          oce_ale_vel_rhs.o \
-          oce_vel_rhs_vinv.o \
+OBJECTS=  fvom_main.o 		\
+          gen_comm.o 		\
+          oce_setup_step.o 	\
+          oce_mesh.o 		\
+          oce_dyn.o 		\
+          oce_ale_vel_rhs.o 	\
+          oce_vel_rhs_vinv.o 	\
 	  oce_ale_pressure_bv.o \
-	  oce_fer_gm.o \
-          oce_muscl_adv.o \
-          oce_fct_muscl_adv.o \
-          oce_ice_init_state.o \
-          oce_shortwave_pene.o \
-          ice_setup_step.o \
-          ice_evp.o \
-          ice_fct.o \
-          ice_oce_coupling.o \
-          ice_thermodynamics.o \
-          gen_comm.o \
-          gen_model_setup.o \
-          gen_forcing_init.o \
-          gen_bulk_formulae.o \
-          gen_forcing_couple.o \
-          gen_forcing_ocean.o \
-          gen_interpolation.o \
-          gen_output_mean.o \
-          gen_output_restart.o \
+	  oce_fer_gm.o 		\
+          oce_muscl_adv.o 	\
+          oce_ale_fct_3d_adv.o 	\
+	  oce_fct_muscl_adv.o 	\
+          oce_ice_init_state.o 	\
+          oce_shortwave_pene.o 	\
+          oce_ale.o 		\
+          oce_ale_tracer.o 	\
+          ice_setup_step.o 	\
+          ice_evp.o 		\
+          ice_fct.o 		\
+          ice_oce_coupling.o 	\
+          ice_thermodynamics.o 	\
+          gen_model_setup.o 	\
+          gen_forcing_init.o 	\
+          gen_bulk_formulae.o 	\
+          gen_forcing_couple.o 	\
+          gen_forcing_ocean.o 	\
+          gen_interpolation.o 	\
+          gen_events.o 		\
           write_step_info.o
 
 
@@ -94,9 +97,14 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 .c.o :
 	$(CC) $(COPT) $(METIS_DEFS) $(CPP_DEFS) $(PARMS_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INCLUDE) -c $*.c	
 
+#.F90.o :
+#	@echo $@
+#	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
+#	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
+#	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 .F90.o :
 	@echo $@
-	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) \
+	$(FC) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
 	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
 
 clean :

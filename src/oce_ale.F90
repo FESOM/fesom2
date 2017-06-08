@@ -1330,7 +1330,7 @@ subroutine oce_timestep_ale(n)
 	use io_RESTART !PS
 	use i_ARRAYS !PS
 	
-	use ieee_arithmetic        !??????????????????????????????
+!	use ieee_arithmetic        !??????????????????????????????
 	
 	IMPLICIT NONE
 	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9
@@ -1586,7 +1586,7 @@ subroutine oce_timestep_ale(n)
 		do el=1,myDim_nod2d
 		
 			! check SSH
-			if ( (ieee_is_nan(eta_n(el)) .or. &
+			if ( ((eta_n(el) /= eta_n(el)) .or. &
 				eta_n(el)<-20.0 .or. eta_n(el)>20.0)) then
 				write(*,*) ' --STOP--> found eta_n become NaN or <-20.0, >20.0'
 				write(*,*) 'mype        = ',mype
@@ -1613,7 +1613,7 @@ subroutine oce_timestep_ale(n)
 			
 			do nz=1,nlevels_nod2D(el)-1
 				! check TEMP
-				if ( ieee_is_nan(tr_arr(nz, el,1)) .or. &
+				if ( (tr_arr(nz, el,1) /= tr_arr(nz, el,1)) .or. &
 					tr_arr(nz, el,1) < -5.0 .or. tr_arr(nz, el,1)>100) then
 					write(*,*) ' --STOP--> found temperture become NaN or <-3.0, >100'
 					write(*,*) 'mype        = ',mype
@@ -1656,7 +1656,7 @@ subroutine oce_timestep_ale(n)
 				endif
 				
 				! check SALT
-				if ( ieee_is_nan(tr_arr(nz, el,2)) .or.  &
+				if ( (tr_arr(nz, el,2) /= tr_arr(nz, el,2)) .or.  &
 					tr_arr(nz, el,2) < 0 .or. tr_arr(nz, el,2)>50 ) then
 					
 					write(*,*) ' --STOP--> found salinity become NaN or <0, >50'
@@ -1694,7 +1694,7 @@ subroutine oce_timestep_ale(n)
 				endif 
 				
 				! check vertical velocity
-				if ( ieee_is_nan(Wvel(1, el))) then
+				if ( Wvel(1, el) /= Wvel(1, el)) then
 					
 					write(*,*) ' --STOP--> found surface layer vertical velocity become NaN'
 					write(*,*) 'mype        = ',mype
