@@ -447,7 +447,8 @@ subroutine compute_neutral_slope
 			ro_z_inv=-2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
 			neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
 			neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
-			neutral_slope(3,nz,n)=sqrt(sigma_xy(1,nz,n)**2+sigma_xy(2,nz,n)**2)
+!                       neutral_slope(3,nz,n)=sqrt(sigma_xy(1,nz,n)**2+sigma_xy(2,nz,n)**2) !!!there was a bug here!!!
+			neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
 			!tapering
                         c=1.0_WP
 			c=0.5*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
@@ -455,7 +456,6 @@ subroutine compute_neutral_slope
 			slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
 		enddo
 	enddo
-!       slope_tapered(1,:,:)=0.0_WP
         call exchange_nod(neutral_slope)
         call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope
