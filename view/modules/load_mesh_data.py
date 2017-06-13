@@ -31,7 +31,7 @@ def load_mesh(path, abg = [50, 15, -90], usepickle = True):
     if usepickle and (os.path.isfile(pickle_file)):
         print("The *usepickle = True* and the pickle file (*pickle_mesh*) exists.\n We load the mesh from it.")
 
-        ifile = open(pickle_file, 'r')
+        ifile = open(pickle_file, 'rb')
         mesh = pickle.load(ifile)
         ifile.close()
         return mesh
