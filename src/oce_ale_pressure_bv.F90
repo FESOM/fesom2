@@ -375,16 +375,15 @@ end subroutine sw_alpha_beta
 subroutine compute_sigma_xy(TF1,SF1)
   !--------------------------------------------------------------------
   ! DESCRIPTION:
-  !   A function to calculate GM_rhs on nodes
+  !   computes density gradient
   !
   ! INPUT:
   !   SF          = salinity              [psu      (PSS-78)]
   !   TF          = potential temperature [degree C (ITS-90)]
   !
   ! OUTPUT:
-  ! based on thermal expansion and saline contraction coefficients computes:
-  !   density horizontal gradient on nodes scaled with g/rho_0 (GM_rhs)
-  !   squared boyancy (GM_N2)
+  ! based on thermal expansion and saline contraction coefficients
+  ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
   use o_mesh
   use o_param
@@ -444,10 +443,9 @@ subroutine compute_neutral_slope
 	S_d=1.0e-3
 	do n=1, myDim_nod2D
 		do nz = 1,nl-1
-			ro_z_inv=-2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2)
+			ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
 			neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
 			neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
-!                       neutral_slope(3,nz,n)=sqrt(sigma_xy(1,nz,n)**2+sigma_xy(2,nz,n)**2) !!!there was a bug here!!!
 			neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
 			!tapering
                         c=1.0_WP
