@@ -174,6 +174,8 @@ allocate(Ki(node_size))
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
+allocate(MLD1(node_size), MLD2(node_size), MLD_ind(node_size))
+
 do n=1, node_size
    Ki(n)=K_hor*area(1,n)/scale_area
 end do
@@ -233,6 +235,10 @@ end if
     bvfreq=0d0
     mixlay_dep=0d0
     bv_ref=0d0
+
+    MLD1   =0.0_WP
+    MLD2   =0.0_WP
+    MLD_ind=0
 
     relax2clim=0.0_WP
 

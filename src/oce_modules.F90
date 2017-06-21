@@ -42,7 +42,12 @@ real(kind=WP)                 :: clim_decay, clim_growth
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
+real(kind=WP)                 :: K_GM=1000.
+logical			      :: scaling_Ferreira   =.true.
+logical			      :: scaling_Rossby     =.false.
+logical			      :: scaling_resolution =.true.
 logical			      :: Redi   =.false.  !flag for Redi scheme
+
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
@@ -80,7 +85,7 @@ integer                       :: mom_adv=2
 
 logical                       :: open_b=.false.   ! Reserved    
 
-logical                       :: mo_on=.false. !Monin-Obukhov
+logical                       :: mo_on=.true. !Monin-Obukhov
 real*8 :: modiff=0.01                   !for PP, mixing coefficient within MO length
 
   ! *** active tracer cutoff
@@ -97,7 +102,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
-                    Fer_GM, Redi, visc_sh_limit, mix_scheme, Ricr, concv
+                    Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, Redi, visc_sh_limit, mix_scheme, Ricr, concv
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, &
 		    tracer_adv
@@ -230,6 +235,8 @@ real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:)
 real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:) 
 real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
+real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
+integer,       allocatable    :: MLD_ind(:)
 
 ! Passive and age tracers
  character(4), allocatable    :: prog_tracer_name(:)

@@ -12,10 +12,11 @@ subroutine pressure_bv
 	
 	real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
 	integer               :: node, nz, nl1, nzmax
-	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl)
-	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit
-	
-	
+	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), db_max
+	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
+	real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
+	logical               :: flag1, flag2
+
 	smallvalue=1.0e-20
 	buoyancy_crit=0.0003
 	
@@ -44,7 +45,9 @@ subroutine pressure_bv
 		!_______________________________________________________________________
 		do node=1, myDim_nod2D+eDim_nod2D
 			nl1= nlevels_nod2d(node)-1
-			
+                        ! also compute the maximum buoyancy gradient between the surface and any depth
+                        ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+			db_max=0.0
 			!___________________________________________________________________
 			do nz=1, nl1
 				t=tr_arr(nz, node,1)
@@ -52,8 +55,12 @@ subroutine pressure_bv
 				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
 				rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
 				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
+                                ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+                                rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
+				rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+                                db_max=max(-g * (rho_surf-rho(nz))/(rho(nz)+density_0)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
 			end do
-			
+
 			!___________________________________________________________________
 			! Pressure
 			hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
@@ -64,6 +71,11 @@ subroutine pressure_bv
 			
 			!___________________________________________________________________
 			! BV frequency:  bvfreq(nl,:), squared value is stored   
+                        MLD1(node)=Z_3d_n(2,node)
+                        MLD2(node)=Z_3d_n(2,node)
+                        MLD_ind=2
+                        flag1=.true.
+                        flag2=.true.
 			DO nz=2,nl1
 				bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
 				bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
@@ -71,7 +83,22 @@ subroutine pressure_bv
 				rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
 				dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
 				bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+                                ! Define MLD following FESOM 1.4 implementation (after Large et al. 1997) 
+                                ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
+                                ! between the surface and any discrete depth within the water column.
+                                if (bvfreq(nz, node) > db_max .and. flag1) then
+                                   MLD1(node)    =Z_3d_n(min(nz, nl1), node)
+                                   MLD_ind(node)=min(nz, nl1)
+                                   flag1=.false.
+                                end if
+                                if ((rhopot(nz)-rhopot(1) > sigma_theta_crit) .and. flag2) then
+                                   MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                                   flag2=.false.
+                                elseif (flag2) then
+                                   MLD2(node)=Z_3d_n(nz,node)
+                                end if
 			END DO
+                        
 			bvfreq(1,node)=bvfreq(2,node)
 			bvfreq(nl1+1,node)=bvfreq(nl1,node) 
 			!___________________________________________________________________

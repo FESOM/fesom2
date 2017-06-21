@@ -8,7 +8,7 @@
 subroutine fer_solve_Gamma
    USE o_MESH
    USE o_PARAM
-   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new
+   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new, MLD_ind
    USE g_PARSUP
    USE g_CONFIG
    use g_comm_auto
@@ -18,7 +18,9 @@ subroutine fer_solve_Gamma
    real*8                          :: zinv1,zinv2, zinv, m, r
    real*8                          :: a(nl), b(nl), c(nl)
    real*8                          :: cp(nl), tp(2,nl)
+   real*8                          :: scaling(nl), bvref
    real*8, dimension(:,:), pointer :: tr
+
    DO n=1,myDim_nod2D
           tr=>fer_gamma(:,:,n)
           ! minimum number of levels below elements containing node n
@@ -57,11 +59,22 @@ subroutine fer_solve_Gamma
           ! The rhs:
           tr(:, 1)=0.
           tr(:, nzmax)=0.
+          ! Allpy vertical scaling after Ferreira et al.(2005)
+          if (scaling_Ferreira) then
+             bvref=max(bvfreq(MLD_ind(n)+1, n), 1.e-12_WP)
+             DO nz=1, nzmax
+                scaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
+                scaling(nz)=min(scaling(nz), 1.0_WP)
+             END DO
+          else
+             scaling=1.0_WP
+          end if
+
           DO nz=2, nzmax-1
              r=g/density_0
-             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n))*fer_K(n)
-             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n))*fer_K(n)
-          END DO 
+             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n))*fer_K(n)*scaling(nz)
+             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n))*fer_K(n)*scaling(nz)
+          END DO
          ! =============================================
           ! The sweep algorithm
           ! initialize c-prime and s,t-prime
@@ -131,11 +144,19 @@ subroutine fer_compute_C_K
          c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
       END DO
       c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
-      rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
-      rr_ratio=min(reso/rosb, 5._WP)
-      scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
+      scaling=1._WP
+      !Cutoff K_GM depending on (Resolution/Rossby radius) ratio
+      if (scaling_Rossby) then
+         rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+         rr_ratio=min(reso/rosb, 5._WP)
+         scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
+      end if
+      !Scale K_GM with resolution (referenced to 100,000m)
+      if (scaling_resolution) then
+         scaling=scaling*mesh_resolution(n)/100000._WP
+      end if
+      fer_k(n)=K_GM*scaling
       fer_c(n)=c1
-      fer_k(n)=1000._WP*scaling
    END DO
    call exchange_nod(fer_c)
    call exchange_nod(fer_k)
