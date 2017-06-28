@@ -27,7 +27,7 @@ real(kind=WP)         :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s
 integer               :: node, nz, nzmax, elem, elnodes(3), i
 real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl)
 real(kind=WP)         :: bulk_up, bulk_dn
-real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=1._WP, av_conv=1._WP
+real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 
 !_______________________________________________________________________________
 	if(use_ALE) then

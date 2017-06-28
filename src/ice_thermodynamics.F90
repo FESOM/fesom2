@@ -109,21 +109,21 @@ subroutine thermodynamics
      ce	     = Ce_atm_oce_arr(i)
      ch_i    = Ch_atm_ice
      ce_i    = Ce_atm_ice
-     h_ml    = 1.0_WP       	         ! 10.0 or 30. used previously
+     h_ml    = 2.5_WP       	         ! 10.0 or 30. used previously
      fw      = 0.0_WP
      ehf     = 0.0_WP
      lid_Clo=h0
      if (coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
        lid_clo=0.5
      else
-       lid_clo=1.
+       lid_clo=0.1
      endif
 
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
           rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
 
-	 m_ice_old(i)         = m_ice(i) !PS
+     m_ice_old(i)         = m_ice(i) !PS
      m_snow_old(i)        = m_snow(i) !PS
      a_ice_old(i)         = a_ice(i) !PS
      thdgr_old(i)         = thdgr(i) !PS

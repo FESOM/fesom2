@@ -928,7 +928,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			!     by forming/melting of sea ice
 			! --> rsss*water_flux(n) : virtual salt flux 
 			tr(1)= tr(1)  +  zinv*( &
-									rsss*water_flux(n) &
+									rsss*water_flux(n)*(1.0_WP-is_nonlinfs) & !*... to make it secure
 									- real_salt_flux(n)*is_nonlinfs &
 									+ surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
 		endif

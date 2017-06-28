@@ -69,6 +69,10 @@ subroutine fer_solve_Gamma
           else
              scaling=1.0_WP
           end if
+          ! Switch off GM within a BL in NH (a strategy following FESOM 1.4)
+          if (scaling_FESOM14) then
+             scaling(1:MLD_ind(n))=0.0_WP
+          end if
 
           DO nz=2, nzmax-1
              r=g/density_0
