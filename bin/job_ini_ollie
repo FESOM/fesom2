@@ -1,17 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=fesom2.0_ini
+#SBATCH --job-name=fesom2.0_INI
 #SBATCH -p mpp
-#SBATCH --ntasks=72
-#SBATCH --time=1:00:00
+#SBATCH --ntasks=1440
+#SBATCH --time=12:00:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
 
 set -x
 
-ulimit -s 1000000
-
-ulimit -n 6000
-ulimit -a
-
-
+ulimit -s unlimited
 
 module purge
 module load intel.compiler
@@ -19,12 +16,9 @@ module load intel.mpi
 module load netcdf/4.4.0_intel
 
 # determine JOBID
-JOBID=`echo $PBS_JOBID |cut -d"." -f1`
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
-#export I_MPI_FABRICS=shm:tmi
+date
+srun --mpi=pmi2 --ntasks=1440 ./fvom_ini.x > "fvom_ini.out"
+date
 
-cd /home/ollie/dsidoren/fesom2.0/bin
-date
-srun --mpi=pmi2 --ntasks=72 ./fvom_ini.x > fvom_ini.out
-date
-qstat -f $PBS_JOBID

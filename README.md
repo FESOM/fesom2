@@ -3,6 +3,10 @@ The Finite Element Sea Ice-Ocean Model (FESOM2)
 
 Multi-resolution ocean general circulation model that solves the equations of motion describing the ocean and sea ice using finite-element and finite-volume methods on unstructured computational grids. The model is developed and supported by researchers at the Alfred Wegener Institute, Helmholtz Centre for Polar and Marine Research (AWI), in Bremerhaven, Germany.
 
+Documentation
+=============
+[Basic tutorial](https://gitlab.dkrz.de/FESOM/fesom2/blob/master/docs/README.md)
+
 References
 ==========
 * Danilov, S., Q. Wang, R. Timmermann, N. Iakovlev, D. Sidorenko, M. Kimmritz, T. Jung, and Schröter, J. (2015), Finite-Element Sea Ice Model (FESIM), version 2, Geosci. Model Dev., 8, 1747–1761, http://www.geosci-model-dev.net/8/1747/2015/
