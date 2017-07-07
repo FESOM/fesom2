@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=fesom2.0_ALE
+#SBATCH --job-name=fesom2.0
 #SBATCH -p mpp
-#SBATCH --ntasks=72
-#SBATCH --time=0:30:00
+##SBATCH --ntasks=8
+#SBATCH --ntasks=288
+#SBATCH --time=12:00:00
+##SBATCH --qos=short
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
-
 set -x
-
 ulimit -s unlimited
 
 module purge
@@ -19,12 +19,12 @@ module load netcdf/4.4.0_intel
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun --mpi=pmi2 --ntasks=72 ./fvom.x > "fvom.out"
+srun --mpi=pmi2 --ntasks=288 ./fvom.x > "fesom.out"
 date
 # qstat -f $PBS_JOBID
 
 #export EXITSTATUS=$?
 #if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
-#sbatch job.ll_ollie
+#sbatch job_ollie
 #fi
 
