@@ -8,7 +8,7 @@
 subroutine fer_solve_Gamma
    USE o_MESH
    USE o_PARAM
-   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new, MLD_ind
+   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new, MLD1_ind
    USE g_PARSUP
    USE g_CONFIG
    use g_comm_auto
@@ -61,7 +61,7 @@ subroutine fer_solve_Gamma
           tr(:, nzmax)=0.
           ! Allpy vertical scaling after Ferreira et al.(2005)
           if (scaling_Ferreira) then
-             bvref=max(bvfreq(MLD_ind(n)+1, n), 1.e-12_WP)
+             bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-12_WP)
              DO nz=1, nzmax
                 scaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
                 scaling(nz)=min(scaling(nz), 1.0_WP)
@@ -71,7 +71,7 @@ subroutine fer_solve_Gamma
           end if
           ! Switch off GM within a BL in NH (a strategy following FESOM 1.4)
           if (scaling_FESOM14) then
-             scaling(1:MLD_ind(n))=0.0_WP
+             scaling(1:MLD1_ind(n)+1)=0.0_WP
           end if
 
           DO nz=2, nzmax-1

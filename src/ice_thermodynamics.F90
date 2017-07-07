@@ -71,7 +71,6 @@ subroutine thermodynamics
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
     END DO	
   call exchange_nod(ustar_aux) !TODO Why do we need it?
-  
   ! ================
   ! end: friction velocity 
   ! ================
@@ -116,7 +115,7 @@ subroutine thermodynamics
      if (coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
        lid_clo=0.5
      else
-       lid_clo=0.1
+       lid_clo=0.5
      endif
 
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &

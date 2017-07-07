@@ -153,11 +153,14 @@ end if
 ! =================
 
 allocate(Av(nl,elem_size), Kv(nl,node_size))
- 
+
 Av=0.0_WP
 Kv=0.0_WP
-
-if (trim(mix_scheme)=='KPP') call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+if (trim(mix_scheme)=='KPP') then
+   allocate(Kv_double(nl,node_size,num_tracers))
+   Kv_double=0.0_WP
+   call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+end if
 
 !Velocities at nodes
 allocate(Unode(2,nl-1,node_size))
@@ -174,7 +177,7 @@ allocate(Ki(node_size))
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
-allocate(MLD1(node_size), MLD2(node_size), MLD_ind(node_size))
+allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
 
 do n=1, node_size
    Ki(n)=K_hor*area(1,n)/scale_area
@@ -238,7 +241,8 @@ end if
 
     MLD1   =0.0_WP
     MLD2   =0.0_WP
-    MLD_ind=0
+    MLD1_ind=0
+    MLD2_ind=0
 
     relax2clim=0.0_WP
 

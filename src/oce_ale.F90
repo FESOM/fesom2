@@ -1329,7 +1329,7 @@ subroutine oce_timestep_ale(n)
 	use g_comm_auto
 	use io_RESTART !PS
 	use i_ARRAYS !PS
-	
+	use o_mixing_KPP_mod
 !	use ieee_arithmetic        !??????????????????????????????
 	
 	IMPLICIT NONE
@@ -1364,8 +1364,15 @@ subroutine oce_timestep_ale(n)
 	call status_check
 	
 	!___________________________________________________________________________
-	call oce_mixing_PP	
-	
+        if (trim(mix_scheme)=='KPP') then
+           call oce_mixing_KPP(Av, Kv_double)
+           Kv=Kv_double(:,:,1)
+        else if(trim(mix_scheme)=='PP') then
+           call oce_mixing_PP
+        else
+           stop "!not existing mixing scheme!"
+           call par_ex
+        end if  
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
 		call compute_vel_rhs

@@ -13,6 +13,8 @@ MODULE o_mixing_KPP_mod
   USE g_config
   USE i_arrays
   USE g_forcing_arrays
+  USE g_comm_auto
+  USE g_smooth
   IMPLICIT NONE
   
   private 
@@ -20,7 +22,7 @@ MODULE o_mixing_KPP_mod
   public oce_mixing_kpp_init
   public oce_mixing_kpp
 
-  public hbl, ghats, blmc !!!!! ghats is nonzero only for scalars in unstable forcing conditions
+  public hbl, ghats, blmc, Bo,dbsfc !!!!! ghats is nonzero only for scalars in unstable forcing conditions
 
   private bldepth    ! only within o_mixing_kpp_mod
   private wscale
@@ -29,15 +31,15 @@ MODULE o_mixing_KPP_mod
   private blmix_kpp
   private enhance
 
-  real(KIND=WP), dimension(:), allocatable      :: bfsfc    ! surface buoyancy forcing    (m^2/s^3)
-  real(KIND=WP), dimension(:), allocatable      :: caseA    ! = 1 in case A; =0 in case B
-  real(KIND=WP), dimension(:), allocatable      :: stable   ! = 1 in stable forcing; =0 in unstable
-  real(KIND=WP), dimension(:,:), allocatable    :: dkm1     ! boundary layer diff_cbt at kbl-1 level
+  real(KIND=WP), dimension(:),     allocatable  :: bfsfc    ! surface buoyancy forcing    (m^2/s^3)
+  real(KIND=WP), dimension(:),     allocatable  :: caseA    ! = 1 in case A; =0 in case B
+  real(KIND=WP), dimension(:),     allocatable  :: stable   ! = 1 in stable forcing; =0 in unstable
+  real(KIND=WP), dimension(:,:),   allocatable  :: dkm1     ! boundary layer diff_cbt at kbl-1 level
   real(KIND=WP), dimension(:,:,:), allocatable  :: blmc     ! boundary layer mixing coefficients
-  real(KIND=WP), dimension(:), allocatable      :: ustar    ! surface friction velocity       (m/s)
-  real(KIND=WP), dimension(:), allocatable      :: Bo       ! surface turb buoy. forcing  (m^2/s^3)
-  real(KIND=WP), dimension(:,:), allocatable    :: dVsq     ! (velocity shear re sfc)^2   (m/s)^2
-  real(KIND=WP), dimension(:,:), allocatable    :: dbsfc 
+  real(KIND=WP), dimension(:),     allocatable  :: ustar    ! surface friction velocity       (m/s)
+  real(KIND=WP), dimension(:),     allocatable  :: Bo       ! surface turb buoy. forcing  (m^2/s^3)
+  real(KIND=WP), dimension(:,:),   allocatable  :: dVsq     ! (velocity shear re sfc)^2   (m/s)^2
+  real(KIND=WP), dimension(:,:),   allocatable  :: dbsfc 
 
   integer, dimension(:), allocatable            :: kbl      ! index of first grid level below hbl
   real(KIND=WP), dimension(:,:), allocatable    :: ghats    ! nonlocal transport (s/m^2)
@@ -66,6 +68,9 @@ MODULE o_mixing_KPP_mod
   integer, parameter                        :: nnj = 480         ! number of values for ustar in the look up table
   real(KIND=WP), dimension(0:nni+1,0:nnj+1) :: wmt ! lookup table for wm, the turbulent velocity scale for momentum
   real(KIND=WP), dimension(0:nni+1,0:nnj+1) :: wst ! lookup table for ws, the turbulent velocity scale scalars
+  logical                    :: smooth_blmc=.false.
+  logical                    :: smooth_hbl =.false.
+  logical                    :: smooth_Ri  =.true.
 
 contains
 
@@ -110,17 +115,16 @@ contains
      allocate ( ghats 	( nl-1,	myDim_nod2D+eDim_nod2D 		))   ! nonlocal transport (s/m^2)
      allocate ( hbl   	(	myDim_nod2D+eDim_nod2D 		))   ! boundary layer depth
 
-     allocate (	bfsfc  	(	myDim_nod2D+eDim_nod2D		))   ! surface buoyancy forcing    (m^2/s^3)
-     allocate (	caseA	(	myDim_nod2D+eDim_nod2D		))   ! = 1 in case A; =0 in case B
-     allocate (	stable	(	myDim_nod2D+eDim_nod2D		))   ! = 1 in stable forcing; =0 in unstable
-     allocate (	dkm1	(	myDim_nod2D+eDim_nod2D,	      3	))   ! boundary layer diff at kbl-1 level
-     allocate (	blmc	( nl  ,	myDim_nod2D+eDim_nod2D,	      3	))   ! boundary layer mixing coefficients
-     allocate (	ustar	(	myDim_nod2D+eDim_nod2D		))   ! surface friction velocity       (m/s)
-     allocate (	Bo	(	myDim_nod2D+eDim_nod2D		))   ! surface turb buoy. forcing  (m^2/s^3)
-     allocate (	dVsq	( nl  ,	myDim_nod2D+eDim_nod2D		))   ! (velocity shear re sfc)^2   (m/s)^2
-     allocate (	dbsfc   ( nl  ,	myDim_nod2D+eDim_nod2D		))   ! buoyancy re sfc
-     allocate (	kbl	(	myDim_nod2D+eDim_nod2D		))   ! index of first grid level below hbl
-
+     allocate (	bfsfc  	 (       myDim_nod2D+eDim_nod2D		))   ! surface buoyancy forcing    (m^2/s^3)
+     allocate (	caseA    (       myDim_nod2D+eDim_nod2D		))   ! = 1 in case A; =0 in case B
+     allocate (	stable   (       myDim_nod2D+eDim_nod2D		))   ! = 1 in stable forcing; =0 in unstable
+     allocate (	dkm1     (       myDim_nod2D+eDim_nod2D,      3	))   ! boundary layer diff at kbl-1 level
+     allocate (	blmc     ( nl,   myDim_nod2D+eDim_nod2D,      3	))   ! boundary layer mixing coefficients
+     allocate (	ustar    (       myDim_nod2D+eDim_nod2D		))   ! surface friction velocity       (m/s)
+     allocate (	Bo       (       myDim_nod2D+eDim_nod2D		))   ! surface turb buoy. forcing  (m^2/s^3)
+     allocate (	dVsq     ( nl,   myDim_nod2D+eDim_nod2D		))   ! (velocity shear re sfc)^2   (m/s)^2
+     allocate (	dbsfc    ( nl,   myDim_nod2D+eDim_nod2D		))   ! buoyancy re sfc
+     allocate (	kbl      (	 myDim_nod2D+eDim_nod2D		))   ! index of first grid level below hbl
      ghats       = 0.0
      hbl         = 0.0
 
@@ -228,8 +232,8 @@ contains
 !      *******************************************************************
 
      integer                    :: node, kn, elem, elnodes(3)
-     integer                    :: nz, num, ns, lay, lay_mi
-     real(KIND=WP)              :: smftu, smftv, aux
+     integer                    :: nz, ns, j, q, lay, lay_mi
+     real(KIND=WP)              :: smftu, smftv, aux, vol
      real(KIND=WP)              :: dens_up, minmix
      real(KIND=WP)              :: u_loc, v_loc
      real(kind=WP)              :: tsurf, ssurf, t, s
@@ -240,7 +244,6 @@ contains
      real(KIND=WP), dimension(nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
-
   ViscA=0.0_WP
   DO node=1, myDim_nod2D+eDim_nod2D
 
@@ -279,29 +282,9 @@ contains
            
         dVsq(nz,node) = ( usurf - u_loc )**2 + ( vsurf - v_loc )**2
 
-!    Local temperature and salinity
-        t = tr_arr(nz,node,1)
-        s = tr_arr(nz,node,2)
-!        pz = zbar(nz) ! needed if densityJM_local is called
- 
-!    Send surface temperature and salinity to depth zbar(nz) and calculate density
-        CALL densityJM_components(tsurf, ssurf, bulk_0, bulk_pz, bulk_pz2, rhopot)
-        bulk     = bulk_0 + zbar(nz) * ( bulk_pz + zbar(nz) * bulk_pz2 )
-        rho_surf = bulk * rhopot / ( bulk + 0.1_WP * zbar(nz) )
-        ! call densityJM_local(tsurf, ssurf, pz, rho_surf)   
-
-!    Find insitu density with local temperature and salinity
-        CALL densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-        bulk       = bulk_0 + zbar(nz) * ( bulk_pz + zbar(nz) * bulk_pz2 )
-        rho_insitu = bulk * rhopot / ( bulk + 0.1_WP * zbar(nz) )
-       ! call densityJM_local(t, s, pz, rho_insitu)
-
-!    Buoyancy difference with respect to the surface(m/s2)
-!        dbsfc(nz,node) = -g * ( rho_surf - rho_insitu ) * density_0_r
-        dbsfc(nz,node) = -g * ( rho_surf - rho_insitu ) / rho_insitu
+!    dbsfc (buoyancy difference with respect to the surface (m/s2)) is now computed in oce_ale_pressure_bv.F90
      END DO
-     dVsq ( nlevels_nod2d(node), node ) = dVsq  ( nlevels_nod2d(node)-1, node )  
-     dbsfc( nlevels_nod2d(node), node ) = dbsfc ( nlevels_nod2d(node)-1, node ) 
+     dVsq ( nlevels_nod2d(node), node ) = dVsq  ( nlevels_nod2d(node)-1, node )
   END DO
 
 !      *******************************************************************
@@ -317,7 +300,7 @@ contains
 !       where compute_sigma_xy -> sw_alpha_beta is called (Fer_GM should be set to true)
 !      *******************************************************************
 !  IF ( .not. Fer_GM ) THEN
-     CALL sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2)) 
+!     CALL sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
 !  ENDIF
 !      *******************************************************************
 !       friction velocity, turbulent sfc buoyancy forcing
@@ -351,6 +334,12 @@ contains
 
 ! enhance diffusivity at interface kbl - 1
     CALL enhance(viscA, diffK) 
+
+    if (smooth_blmc) then
+       do j=1, 3
+          call smooth_nod(blmc(:,:,j), 3)
+       end do
+    end if
 
 ! then combine blmc and viscA/diffK
 
@@ -541,7 +530,13 @@ contains
            hlimit = stable(node) * AMIN1( hekman, hmonob )  
            hbl(node) = AMIN1( hbl(node), hlimit )
            hbl(node) = MAX( hbl(node), ABS(zbar(2)) ) 
-        END IF 
+        END IF
+  END DO
+
+  if (smooth_hbl) call smooth_nod(hbl, 3)
+
+  DO node=1, myDim_nod2D+eDim_nod2D
+       nk = nlevels_nod2D(node)
        !-----------------------------------------------------------------------
        !     find new kbl 
        !-----------------------------------------------------------------------
@@ -680,7 +675,7 @@ contains
 ! Compute Richardson number and store it as diffK to save memory
      DO node=1, myDim_nod2D+eDim_nod2D
         DO nz=2,nlevels_nod2d(node)-1
-           dz_inv = 1.0_WP / (Z(nz-1) - Z(nz))  ! > 0
+           dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
            shear  = ( Unode(1, nz-1, node) - Unode(1, nz, node) )**2 + &
 	            ( Unode(2, nz-1, node) - Unode(2, nz, node) )**2 
            shear  = shear * dz_inv * dz_inv
@@ -708,8 +703,11 @@ contains
         END IF
      END DO
 
-! compute viscA and diffK
+    if (smooth_Ri) then
+       call smooth_nod(diffK(:,:,1), 3)
+    end if
 
+! compute viscA and diffK
      DO node=1, myDim_nod2D+eDim_nod2D
         DO nz=2,nlevels_nod2d(node)-1
 

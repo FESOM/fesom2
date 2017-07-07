@@ -8,6 +8,7 @@ module io_MEANDATA
   use o_ARRAYS
   use g_forcing_arrays
   use i_ARRAYS
+  use o_mixing_KPP_mod
   implicit none
 #include "netcdf.inc"
   private
@@ -69,7 +70,8 @@ subroutine ini_mean_io
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'y')
+  call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing k',   'm2/s',Kv(:,:),       1, 'm')
 
 !2D
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
@@ -80,6 +82,13 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'MLD1',   'Mixed Layer Depth',      'm',      MLD1(1:myDim_nod2D),           1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm')
+
 
   if (Fer_GM) then
      call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U', 'm/s',     fer_uv(1,:,:),  1, 'm')

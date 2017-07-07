@@ -8,11 +8,12 @@ subroutine pressure_bv
 	USE g_PARSUP
 	USE g_config
 	use i_arrays
+        USE o_mixing_KPP_mod, only: dbsfc
 	IMPLICIT NONE
 	
 	real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
 	integer               :: node, nz, nl1, nzmax
-	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), db_max
+	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
 	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
 	real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
 	logical               :: flag1, flag2
@@ -58,9 +59,13 @@ subroutine pressure_bv
                                 ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
                                 rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
 				rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-                                db_max=max(-g * (rho_surf-rho(nz))/(rho(nz)+density_0)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
+                                dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
+                                db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
 			end do
-
+                        dbsfc1(nl)=dbsfc1(nl1)
+                        if (trim(mix_scheme)=='KPP') then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
+                           dbsfc(1:nl, node )=dbsfc1(1:nl)
+                        end if
 			!___________________________________________________________________
 			! Pressure
 			hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
@@ -73,7 +78,8 @@ subroutine pressure_bv
 			! BV frequency:  bvfreq(nl,:), squared value is stored   
                         MLD1(node)=Z_3d_n(2,node)
                         MLD2(node)=Z_3d_n(2,node)
-                        MLD_ind=2
+                        MLD1_ind(node)=2
+                        MLD2_ind(node)=2
                         flag1=.true.
                         flag2=.true.
 			DO nz=2,nl1
@@ -87,18 +93,20 @@ subroutine pressure_bv
                                 ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
                                 ! between the surface and any discrete depth within the water column.
                                 if (bvfreq(nz, node) > db_max .and. flag1) then
-                                   MLD1(node)    =Z_3d_n(min(nz, nl1), node)
-                                   MLD_ind(node)=min(nz, nl1)
+                                   MLD1(node)    =Z_3d_n(nz, node)
+                                   MLD1_ind(node)=nz
                                    flag1=.false.
                                 end if
+                                ! another definition of MLD after Levitus
                                 if ((rhopot(nz)-rhopot(1) > sigma_theta_crit) .and. flag2) then
                                    MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                                   MLD2_ind(node)=nz
                                    flag2=.false.
                                 elseif (flag2) then
                                    MLD2(node)=Z_3d_n(nz,node)
                                 end if
 			END DO
-                        
+                        if (flag2) MLD2_ind(node)=nl1
 			bvfreq(1,node)=bvfreq(2,node)
 			bvfreq(nl1+1,node)=bvfreq(nl1,node) 
 			!___________________________________________________________________

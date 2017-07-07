@@ -237,7 +237,7 @@ real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
 real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
-integer,       allocatable    :: MLD_ind(:)
+integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
 
 ! Passive and age tracers
  character(4), allocatable    :: prog_tracer_name(:)
@@ -252,6 +252,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: vorticity
 
 !Viscosity and diff coefs
 real(kind=WP), allocatable,dimension(:,:)   :: Av,Kv
+real(kind=WP), allocatable,dimension(:,:,:) :: Kv_double
 real(kind=WP), allocatable,dimension(:)     :: Kv0
 !Velocities interpolated to nodes
 real(kind=WP), allocatable,dimension(:,:,:)   :: Unode
