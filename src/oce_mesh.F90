@@ -400,66 +400,139 @@ IMPLICIT NONE
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
-
+CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
  t1=MPI_Wtime()
- if(mype==0) write(*,*) 'mesh was read in ', t1-t0, ' seconds'
+ if (mype==0) then
+    write(*,*) '========================='
+    write(*,*) '2D mesh was read in ', t1-t0, ' seconds'
+    write(*,*) '2D mesh info : ', 'nod2D=', nod2D,' elem2D=', elem2D
+    write(*,*) '========================='
+ endif
+
  END subroutine  read_mesh
 !============================================================ 
 subroutine find_levels
 USE o_MESH
 USE o_PARAM
 USE g_PARSUP
-  use g_config
+USE g_config
 !
 IMPLICIT NONE
 !
-character*200 :: file_name
-integer :: n,fileID=111,x
-integer, allocatable                  :: mapping(:)
-allocate(nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+ character*1000                         :: file_name
+ integer                                :: ierror   ! MPI return error code
+ integer                                :: k, n, fileID
+ integer                                :: nchunk, chunk_size, ipos, iofs, mesh_check
+ integer, allocatable, dimension(:)     :: mapping
+ integer, allocatable, dimension(:)     :: ibuff
+ real(kind=WP)                          :: t0, t1
 
-file_name=trim(meshpath)//'elvls.out'
-open(fileID, file=file_name)
-allocate(mapping(elem2D))
-mapping=0 
-DO n=1,myDim_elem2D+eDim_elem2D+eXDim_elem2D
-      mapping(myList_elem2D(n))=n 
-END DO
-DO n=1,elem2D
-read(fileID,*) x
-if (mapping(n)>0) then
-      nlevels(mapping(n)) = x
-endif
-ENDDO
-deallocate(mapping)
-close(fileID)
+ t0=MPI_Wtime()
+ allocate(nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+ allocate(nlevels_nod2D(myDim_nod2D+eDim_nod2D))
+ !mesh related files will be read in chunks of chunk_size
+ chunk_size=100000
+ !==============================
+ ! Allocate mapping array (chunk_size)
+ ! It will be used for several purposes 
+ !==============================
+ allocate(mapping(chunk_size))
+ allocate(ibuff(chunk_size))
+ !==============================
+ !Part I: reading levels at elements...
+ if (mype==0)  then 
+    fileID=10
+    file_name=trim(meshpath)//'elvls.out'
+    open(fileID, file=file_name)
+    write(*,*) 'reading '// trim(file_name)   
+ end if
+ ! 0 proc reads the data in chunks and distributes it between other procs
+ mesh_check=0
+ do nchunk=0, (elem2D-1)/chunk_size
+    !create the mapping for the current chunk
+    mapping(1:chunk_size)=0
+    do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+       ipos=(myList_elem2D(n)-1)/chunk_size
+       if (ipos==nchunk) then
+          iofs=myList_elem2D(n)-nchunk*chunk_size
+          mapping(iofs)=n
+       end if
+    end do
+    !read the chunk into the buffers
+    k=min(chunk_size, elem2D-nchunk*chunk_size)
+    if (mype==0) then
+       do n=1, k
+          read(fileID,*) ibuff(n)
+       end do
+    end if
+    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    ! fill the local arrays
+    do n=1, k      
+       if (mapping(n)>0) then
+          mesh_check=mesh_check+1
+          nlevels(mapping(n))=ibuff(n)
+       end if
+    end do
+ end do
+ if (mype==0) close(fileID)
+ if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+    write(*,*) 'ERROR while reading elvls.out on mype=', mype
+    write(*,*) mesh_check, ' values have been read in according to partitioning'
+    write(*,*) 'it does not equal to myDim_elem2D+eDim_elem2D = ', myDim_elem2D+eDim_elem2D
+ end if
 
-allocate(nlevels_nod2D(myDim_nod2D+eDim_nod2D))
-file_name=trim(meshpath)//'nlvls.out'
-open(fileID, file=file_name)
-allocate(mapping(nod2D))
-mapping=0 
-DO n=1,myDim_nod2D+eDim_nod2D
-      mapping(myList_nod2D(n))=n
-END DO
-DO n=1,nod2D
-read(fileID,*) x
-if (mapping(n)>0) then
-      nlevels_nod2D(mapping(n)) = x
-endif
-ENDDO
-deallocate(mapping)
-close(fileID)
+ !==============================
+ !Part II: reading levels at nodes...
+ if (mype==0)  then 
+    file_name=trim(meshpath)//'nlvls.out'
+    open(fileID, file=file_name)
+    write(*,*) 'reading '// trim(file_name)   
+ end if
+ ! 0 proc reads the data in chunks and distributes it between other procs
+ mesh_check=0
+ do nchunk=0, (nod2D-1)/chunk_size
+    !create the mapping for the current chunk
+    mapping(1:chunk_size)=0
+    do n=1, myDim_nod2D+eDim_nod2D
+       ipos=(myList_nod2D(n)-1)/chunk_size
+       if (ipos==nchunk) then
+          iofs=myList_nod2D(n)-nchunk*chunk_size
+          mapping(iofs)=n
+       end if
+    end do
+    !read the chunk into the buffers
+    k=min(chunk_size, nod2D-nchunk*chunk_size)
+    if (mype==0) then
+       do n=1, k
+          read(fileID,*) ibuff(n)
+       end do
+    end if
+    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    ! fill the local arrays
+    do n=1, k      
+       if (mapping(n)>0) then
+          mesh_check=mesh_check+1
+          nlevels_nod2D(mapping(n))=ibuff(n)
+       end if
+    end do
+ end do
+ if (mype==0) close(fileID)
+ if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+    write(*,*) 'ERROR while reading nelvls.out on mype=', mype
+    write(*,*) mesh_check, ' values have been read in according to partitioning'
+    write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+ end if
+ deallocate(ibuff)
+ deallocate(mapping)
+ !============================== 
+CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+ t1=MPI_Wtime()
 
-if (mype==0) then
-write(*,*) '========================='
-write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-write(*,*) 'Min/max depth on mype: ', mype, -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-write(*,*) '3D tracer nodes on mype ', mype, sum(nlevels_nod2d)-(myDim_elem2D+eDim_elem2D)
-write(*,*) 'Further info on mype (1)', mype, minval(nlevels),maxval(nlevels)
-write(*,*) 'Further info on mype (2)', mype, minval(nlevels_nod2d),maxval(nlevels_nod2d)
-write(*,*) '========================='
-endif
+ if (mype==0) then
+    write(*,*) '3D mesh was read in ', t1-t0, ' seconds'
+    write(*,*) 'Min/max depth on mype : ', mype, -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+    write(*,*) '========================='
+ endif
 END SUBROUTINE find_levels
 !===========================================================================
 SUBROUTINE test_tri
@@ -472,7 +545,9 @@ IMPLICIT NONE
 ! it same sense (clockwise) 
 real(kind=WP)   ::  a(2), b(2), c(2),  r
 integer         ::  n, nx, elnodes(3)
+real(kind=WP)   :: t0, t1
 
+   t0=MPI_Wtime()
    
    DO n=1, myDim_elem2D
       elnodes=elem2D_nodes(:,n)
@@ -498,7 +573,11 @@ integer         ::  n, nx, elnodes(3)
 	  elem2D_nodes(:,n)=elnodes
       end if
    END DO
-
+   t1=MPI_Wtime()
+   if (mype==0) then
+      write(*,*) 'test_tri finished in ', t1-t0, ' seconds'
+      write(*,*) '========================='
+   endif
 END SUBROUTINE  test_tri
 !=========================================================================
 SUBROUTINE load_edges
@@ -507,70 +586,173 @@ USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-integer                               :: counter, n, k,q
+character*1000                        :: file_name
+integer                               :: counter, n, m, nn, k, q, fileID
 integer                               :: elems(2), elem
 integer                               :: elnodes(3), ed(2), eledges(3)
-integer, allocatable                  :: mapping(:), aux(:)         
-integer              :: n1, n2, m
+integer, allocatable                  :: aux(:)         
+real(kind=WP)                         :: t0, t1
+integer                               :: nchunk, chunk_size, ipos, iofs, mesh_check
+integer, allocatable, dimension(:)    :: mapping
+integer, allocatable, dimension(:,:)  :: ibuff
+integer                               :: ierror              ! return error code
+
+t0=MPI_Wtime()
+
+!==============================
 ! Edge array is already available (we computed it in the init phase)
-! 
 ! (a) Read list of edges and tri containing them from file 
-!
-open(11, file=trim(meshpath)//'edgenum.out')
- read(11,*) edge2D
- read(11,*) edge2D_in
- close(11) 
-open(10, file=trim(meshpath)//'edges.out')
-open(12, file=trim(meshpath)//'edge_tri.out')
-allocate(edges(2,myDim_edge2D+eDim_edge2D))
-allocate(edge_tri(2,myDim_edge2D+eDim_edge2D))
-allocate(mapping(edge2D))
- mapping=0
-   DO n=1,myDim_edge2D+eDim_edge2D 
-      mapping(myList_edge2D(n))=n 
-   END DO
-   
- DO n=1,edge2D
-   read(10,*) ed
-   read(12,*) elems
-   if(mapping(n)>0) then
-   edges(:,mapping(n))=ed
-   edge_tri(:,mapping(n))=elems
-   end if
- END DO
-   close(10)
-   close(12) 
+!==============================
+!mesh related files will be read in chunks of chunk_size
+chunk_size=100000
+!==============================
+! Allocate mapping array (chunk_size)
+! It will be used for several purposes 
+!==============================
+ allocate(mapping(chunk_size))
+ allocate(ibuff(chunk_size, 4))
+! 0 proc reads the data and sends it to other procs
+ fileID=10
+ if (mype==0) then
+    file_name=trim(meshpath)//'edgenum.out'
+    write(*,*) 'reading '// trim(file_name)
+    open(fileID, file=trim(file_name))
+    read(fileID,*) edge2D
+    read(fileID,*) edge2D_in
+    write(*,*) '2D mesh info : edge2D=', edge2D
+    close(fileID)
+  end if
+  call MPI_BCast(edge2D,    1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(edge2D_in, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+
+  allocate(edges(2,myDim_edge2D+eDim_edge2D))
+  allocate(edge_tri(2,myDim_edge2D+eDim_edge2D))
+
+  ! 0 proc reads the data in chunks and distributes it between other procs
+  if (mype==0) then
+     file_name=trim(meshpath)//'edges.out'
+     open(fileID,   file=trim(file_name))
+     write(*,*) 'reading '// trim(file_name)
+
+     file_name=trim(meshpath)//'edge_tri.out'
+     open(fileID+1, file=trim(file_name))
+     write(*,*) 'reading '// trim(file_name)
+  end if
+
+ mesh_check=0
+ do nchunk=0, (edge2D-1)/chunk_size
+    !create the mapping for the current chunk
+    mapping(1:chunk_size)=0
+    do n=1, myDim_edge2D+eDim_edge2D
+       ipos=(myList_edge2D(n)-1)/chunk_size
+       if (ipos==nchunk) then
+          iofs=myList_edge2D(n)-nchunk*chunk_size
+          mapping(iofs)=n
+       end if
+    end do
+    !read the chunk into the buffers
+    k=min(chunk_size, edge2D-nchunk*chunk_size)
+    if (mype==0) then
+       do n=1, k
+          read(fileID  ,*) ibuff(n, 1:2) !edge nodes
+          read(fileID+1,*) ibuff(n, 3:4) !edge elements
+       end do
+    end if
+    call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:k,4), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    ! fill the local arrays
+    do n=1, k      
+       if (mapping(n)>0) then
+          mesh_check=mesh_check+1
+          edges   (:, mapping(n))=ibuff(n,1:2)
+          edge_tri(:, mapping(n))=ibuff(n,3:4)
+       end if
+    end do
+ end do
+
+ if (mesh_check/=myDim_edge2D+eDim_edge2D) then
+    write(*,*) 'ERROR while reading edges.out/edge_tri.out on mype=', mype
+    write(*,*) mesh_check, ' values have been read in according to partitioning'
+    write(*,*) 'it does not equal to myDim_edge2D+eDim_edge2D = ', myDim_edge2D+eDim_edge2D
+ end if
+
+ if (mype==0) then 
+    close(fileID)
+    close(fileID+1)
+ end if 
  
-   ! =========
-   ! Local numbers for nodes
-   ! =========
-   mapping=0 
-   DO n=1,myDim_nod2D+eDim_nod2D 
-     mapping(myList_nod2D(n))=n 
-   END DO
-   DO n=1,myDim_edge2D+eDim_edge2D
-      ed=edges(:,n)
-      edges(1,n)=mapping(ed(1))
-      edges(2,n)=mapping(ed(2))
-   END DO
-   ! =========
-   ! Local numbers for elements
-   ! =========
-   mapping(1:nod2D)=0 
-   DO n=1,myDim_elem2D+eDim_elem2D
-     mapping(myList_elem2D(n))=n 
-   END DO
-   DO n=1,myDim_edge2D+eDim_edge2D
-      ed=edge_tri(:,n)
-      edge_tri(1,n)=mapping(ed(1))   ! Neighbor elements may appear
-      if(ed(2)>0) then               ! with eDim edges
-      edge_tri(2,n)=mapping(ed(2))   
-      else
-      edge_tri(2,n)=(ed(2))
-      end if
-   END DO
- 
- deallocate(mapping)   
+! =========
+! edges are in global numbering, transform it to local indexing
+! =========
+  mesh_check=0
+  do nchunk=0, (nod2D-1)/chunk_size
+     mapping(1:chunk_size)=0
+     do n=1, myDim_nod2D+eDim_nod2D
+        ipos=(myList_nod2D(n)-1)/chunk_size
+        if (ipos==nchunk) then
+           iofs=myList_nod2D(n)-nchunk*chunk_size
+           mapping(iofs)=n
+        end if
+     end do
+     do n=1, myDim_edge2D+eDim_edge2D
+        do m=1, 2
+           nn=edges(m, n)
+           ipos=(nn-1)/chunk_size
+           if (ipos==nchunk) then
+              mesh_check=mesh_check+1
+              iofs=nn-nchunk*chunk_size
+              ! minus sign is required to avoid modified entry being modified in another chunk
+              ! will be changed to plus at the end
+              edges(m,n)=-mapping(iofs) 
+           end if
+        end do
+     end do
+  end do
+  edges=-edges
+  mesh_check=mesh_check/2
+  if (mesh_check/=myDim_edge2D+eDim_edge2D) then
+     write(*,*) 'ERROR while transforming edge nodes to local indexing on mype=', mype
+     write(*,*) mesh_check, ' edges have been transformed!'
+     write(*,*) 'It does not equal to myDim_edge2D+eDim_edge2D = ', myDim_edge2D+eDim_edge2D
+  end if  
+! =========
+! edge_tri are in global numbering, transform it to local indexing
+! =========
+  mesh_check=0
+  do nchunk=0, (elem2D-1)/chunk_size
+     mapping(1:chunk_size)=0
+     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+        ipos=(myList_elem2D(n)-1)/chunk_size
+        if (ipos==nchunk) then
+           iofs=myList_elem2D(n)-nchunk*chunk_size
+           mapping(iofs)=n
+        end if
+     end do
+     do n=1, myDim_edge2D+eDim_edge2D
+        do m=1, 2
+           nn=edge_tri(m, n)
+           ipos=(nn-1)/chunk_size
+           if (ipos==nchunk) then
+              mesh_check=mesh_check+abs(m-2) !only first triangle will contribute to statistic
+              iofs=nn-nchunk*chunk_size
+              ! minus sign is required to avoid modified entry being modified in another chunk
+              ! will be changed to plus at the end
+              edge_tri(m,n)=-mapping(iofs) 
+           end if
+        end do
+     end do
+  end do
+  edge_tri=-edge_tri
+  if (mesh_check/=myDim_edge2D+eDim_edge2D) then
+     write(*,*) 'ERROR while transforming edge elements to local indexing on mype=', mype
+     write(*,*) mesh_check, ' edges have been transformed!'
+     write(*,*) 'It does not equal to myDim_edge2D+eDim_edge2D = ', myDim_edge2D+eDim_edge2D
+  end if  
+! =========
+
+
 ! Now the only way to check whether an edge is on boundary is 
 ! through myList_edge2D(n):  myList_edge2D(n)>edge2D_in == boundary edge
 
@@ -606,6 +788,15 @@ DO elem=1,myDim_elem2D
 END DO
 ! The edge and elem lists agree in the sense that edge1 does not
 ! contain node 1 and so on
+
+deallocate(ibuff)
+deallocate(mapping)
+
+t1=MPI_Wtime()
+if (mype==0) then
+   write(*,*) 'load_edges finished in ', t1-t0, ' seconds'
+   write(*,*) '========================='
+endif
 END SUBROUTINE load_edges
 !===========================================================================
 SUBROUTINE find_neighbors
@@ -624,7 +815,11 @@ USE g_PARSUP
 implicit none
 integer               :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz
 integer, allocatable  :: temp_i(:)
-integer               :: mymax(npes), rmax(npes)    
+integer               :: mymax(npes), rmax(npes)
+real(kind=WP)         :: t0, t1
+CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+t0=MPI_Wtime()
+
  ! =============
  ! elem neighbors == those that share edges
  ! =============
@@ -655,6 +850,8 @@ END DO
     nod_in_elem2D_num(node)=nod_in_elem2D_num(node)+1
     end do
  end do
+CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+
  mymax=0
  rmax=0
  mymax(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
@@ -664,7 +861,6 @@ END DO
  
  allocate(nod_in_elem2D(maxval(rmax),myDim_nod2D+eDim_nod2D))
  nod_in_elem2D=0
- 
  nod_in_elem2D_num=0
  do n=1,myDim_elem2D   
     do j=1,3
@@ -674,7 +870,6 @@ END DO
     nod_in_elem2D(nod_in_elem2D_num(node),node)=n
     end do
  end do
-
 
  call exchange_nod(nod_in_elem2D_num)
  allocate (temp_i(myDim_nod2D+eDim_nod2D))
@@ -699,7 +894,8 @@ END DO
        nod_in_elem2D(j,n)=temp_i(nod_in_elem2D(j,n))
     END DO
  END DO
- deallocate(temp_i)       
+ deallocate(temp_i)
+
  ! Among elem_neighbors there can be negative numbers. These correspond to 
  ! boundary elements for which neighbours are absent. However, an element 
  ! should have at least two valid neighbors
@@ -716,8 +912,12 @@ DO elem=1,myDim_elem2D
     call par_ex(1)
     STOP
    end if
-END DO    
-
+END DO
+t1=MPI_Wtime()
+if (mype==0) then
+   write(*,*) 'find_neighbors finished in ', t1-t0, ' seconds'
+   write(*,*) '========================='
+endif
 END SUBROUTINE find_neighbors
 !==========================================================================
 subroutine edge_center(n1, n2, x, y)
@@ -772,7 +972,10 @@ IMPLICIT NONE
 integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
 real(kind=8)	                          :: a(2), b(2), ax, ay, lon, lat, vol
 real(kind=WP), allocatable,dimension(:)   :: work_array
-	 
+real(kind=WP)                             :: t0, t1
+
+t0=MPI_Wtime()
+
  allocate(elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  !allocate(elem_area(myDim_elem2D))
  allocate(area(nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
@@ -875,6 +1078,12 @@ if (mype==0) then
     write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
  end if
 endif
+
+t1=MPI_Wtime()
+if (mype==0) then
+   write(*,*) 'mesh_areas finished in ', t1-t0, ' seconds'
+   write(*,*) '========================='
+endif
 END SUBROUTINE mesh_areas
 
 !===================================================================
@@ -905,7 +1114,9 @@ real(kind=WP)	     :: a(2), b(2), ax, ay, dfactor, lon, lat
 real(kind=WP)	     :: deltaX31, deltaX21, deltaY31, deltaY21
 real(kind=WP)         :: x(3), y(3), cxx, cxy, cyy, d
 real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:) 
+real(kind=WP)                             :: t0, t1
 
+t0=MPI_Wtime()
 
 !real*8,allocatable :: arr2Dglobal(:,:) 
  
@@ -985,40 +1196,33 @@ real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:)
  ! Cross-distances for the edge
  ! They are in physical measure!
  ! ===========
- DO n=1, myDim_edge2D
- ed=edges(:,n)
- el=edge_tri(:,n)
+ DO n=1, myDim_edge2D+eDim_edge2D    !!! Difference to FESOM2:
+    ! Since we know elem centers on the extended halo of elements
+    ! the computations can be carried out for all edges (owned and
+    ! the halo ones). 
+    ed=edges(:,n)
+    el=edge_tri(:,n)
+    call edge_center(ed(1), ed(2), a(1), a(2))
+    b(1)=center_x(el(1))
+    b(2)=center_y(el(1))
+    b=b-a
+    call trim_cyclic(b(1))
+    b(1)=b(1)*elem_cos(el(1))
+    b=b*r_earth
+    edge_cross_dxdy(1:2,n)=b(1:2)
  
- call elem_center(el(1), b(1), b(2))
- call edge_center(ed(1), ed(2), a(1), a(2))
- b=b-a
- 
- if(b(1)>cyclic_length/2)  b(1)=b(1)-cyclic_length
- if(b(1)<-cyclic_length/2) b(1)=b(1)+cyclic_length
- 
- b(1)=b(1)*elem_cos(el(1))
- b=b*r_earth
- edge_cross_dxdy(1:2,n)=b(1:2)
- 
- if(el(2)>0) then
- call elem_center(el(2), b(1), b(2))
- b=b-a
- if(b(1)>cyclic_length/2) b(1)=b(1)-cyclic_length
- if(b(1)<-cyclic_length/2) b(1)=b(1)+cyclic_length
- 
- b(1)=b(1)*elem_cos(el(2))
- b=b*r_earth
- edge_cross_dxdy(3:4,n)=b(1:2)
- else
- edge_cross_dxdy(3:4,n)=0.0
- end if
+   if(el(2)>0) then
+    b(1)=center_x(el(2)) 
+    b(2)=center_y(el(2))
+    b=b-a
+    call trim_cyclic(b(1))
+    b(1)=b(1)*elem_cos(el(2))
+    b=b*r_earth
+    edge_cross_dxdy(3:4,n)=b(1:2)
+   else
+    edge_cross_dxdy(3:4,n)=0.0_WP
+   end if
  END DO
-    allocate(temp(myDim_edge2D+eDim_edge2D))
-    do n=1,4  
-       temp(1:myDim_edge2D)=edge_cross_dxdy(n,1:myDim_edge2D)
-       call exchange_edge(temp)
-       edge_cross_dxdy(n,:)=temp
-    end do       
 
  ! ==========================
  ! Derivatives of scalar quantities
@@ -1091,7 +1295,11 @@ END DO
       gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
     END DO
     deallocate(center_y, center_x)
-
+    t1=MPI_Wtime()
+    if (mype==0) then
+       write(*,*) 'mesh_auxiliary_arrays finished in ', t1-t0, ' seconds'
+       write(*,*) '========================='
+    endif
 END SUBROUTINE mesh_auxiliary_arrays
 
 !===================================================================
@@ -1146,3 +1354,14 @@ end if
 !call par_ex
 !stop
 END SUBROUTINE check_mesh_consistency
+!==================================================================
+subroutine trim_cyclic(b)
+use o_PARAM
+use g_config
+implicit none
+real(kind=8) :: b
+ if(b> cyclic_length/2.0_WP) b=b-cyclic_length
+ if(b<-cyclic_length/2.0_WP) b=b+cyclic_length
+end subroutine trim_cyclic
+!===================================================================
+

@@ -26,7 +26,7 @@ IMPLICIT NONE
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	if (tracer_adv==2) call fct_init
+	call fct_init
         call muscl_adv_init
 	!=====================
 	! Initialize fields
@@ -442,7 +442,7 @@ USE g_input
   ! ===============
   ! read ocean state
   ! ===============
-  
+   if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
    call read_init_ts
 !  call ini_global_ocean ! initialize T&S somehow differently for a particular test case !
   
@@ -450,7 +450,6 @@ USE g_input
      Sclim=tr_arr(:,:,2)
      Tsurf=tr_arr(1,:,1)
      Ssurf=tr_arr(1,:,2)
-  if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
   relax2clim=0.0 
 end subroutine oce_initial_state
 !==========================================================================

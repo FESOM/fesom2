@@ -410,7 +410,7 @@ subroutine stiff_mat_ale
 	use g_CONFIG
 	implicit none
 	
-	integer                             :: n, n1, n2, i, j,  row, ed
+	integer                             :: n, n1, n2, i, j, row, ed, fileID
 	integer                             :: elnodes(3), el(2)
 	integer                             :: npos(3), offset, nini, nend
 	real(kind=WP)                       :: dmean, ff, factor, a 
@@ -419,8 +419,11 @@ subroutine stiff_mat_ale
 	integer, allocatable                :: mapping(:)
 	logical                             :: flag
 	character*10                        :: mype_string,npes_string
-	character*200                       :: dist_mesh_dir,file_name
-	
+	character*1000                      :: dist_mesh_dir, file_name
+        real(kind=WP)                       :: t0, t1
+        integer                             :: ierror              ! MPI, return error code
+
+        t0=MPI_Wtime()
 	!___________________________________________________________________________
 	! a)
 	ssh_stiff%dim=nod2D
@@ -599,26 +602,10 @@ subroutine stiff_mat_ale
 	! =================================
 	ssh_stiff%nza=sum(rpnza(1:npes))
 	deallocate(rpnza, pnza)
-	
 	! ==================================
 	! colindices are now local to PE. We need to make them local
 	! contiguous
 	! ==================================
-	allocate(mapping(nod2d))
-	write(npes_string,"(I10)") npes
-	dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
-	file_name=trim(dist_mesh_dir)//'rpart.out'
-	open(10,file=trim(dist_mesh_dir)//'rpart.out')
-	! n ... how many cpus
-	read(10,*) n
-	! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
-	read(10,*) mapping(1:npes)
-	! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
-	! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
-	! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
-	read(10,*) mapping
-	close(10) 
-	
 	! (i) global natural: 
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
 		! myList_nod2D ... contains global node index of every meshpoit that belongs 
@@ -627,16 +614,41 @@ subroutine stiff_mat_ale
 		! myList_nod2D(ssh_stiff%colind(n))  ... converts local index to global index
 		ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
 	end do
+
+	allocate(mapping(nod2d))
+        ! 0 proc reads the data in chunks and distributes it between other procs
+	write(npes_string,"(I10)") npes
+	dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
+	file_name=trim(dist_mesh_dir)//'rpart.out'
+        fileID=10
+        if (mype==0) then
+           write(*,*) 'in stiff_mat_ale, reading ', trim(file_name)
+ 	   open(fileID, file=trim(file_name))
+           ! n ... how many cpus
+           read(fileID, *) n      
+           ! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
+           read(fileID, *) mapping(1:npes)
+           ! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
+           ! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
+           ! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
+           read(fileID, *) mapping
+           close(fileID) 
+        end if
+        call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
 	
 	! (ii) global PE contiguous: 
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
 		! convert global mesh node point numbering to global numbering of how the single 
 		! node points are contigous located on the CPUs
 		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
-	end do
-	
+	end do	
 	!___________________________________________________________________________
 	deallocate(mapping)
+        t1=MPI_Wtime()
+        if (mype==0) then
+           write(*,*) 'Building SSH operator took ', t1-t0, ' seconds'
+           write(*,*) '========================='
+        endif
 end subroutine stiff_mat_ale
 !
 !
@@ -1144,11 +1156,11 @@ interface
 end interface
 
 ident=1
-maxiter=2000  
-restart=15 
-fillin=3  
-lutype=2   
-droptol=1.e-8 
+maxiter=2000
+restart=15
+fillin=3
+lutype=2
+droptol=1.e-8
 soltol=1.e-10
 
 if  (trim(which_ale)=='linfs') then
