@@ -68,9 +68,9 @@ MODULE o_mixing_KPP_mod
   integer, parameter                        :: nnj = 480         ! number of values for ustar in the look up table
   real(KIND=WP), dimension(0:nni+1,0:nnj+1) :: wmt ! lookup table for wm, the turbulent velocity scale for momentum
   real(KIND=WP), dimension(0:nni+1,0:nnj+1) :: wst ! lookup table for ws, the turbulent velocity scale scalars
-  logical                    :: smooth_blmc=.false.
+  logical                    :: smooth_blmc=.true.
   logical                    :: smooth_hbl =.false.
-  logical                    :: smooth_Ri  =.true.
+  logical                    :: smooth_Ri  =.false.
 
 contains
 
@@ -277,7 +277,7 @@ contains
      DO nz=2, nlevels_nod2d(node)-1
 
 !    Squared velocity shear referenced to surface (@ Z)
-        u_loc = 0.5_WP * ( Unode(1,nz-1,node) + Unode(1,nz,node) )           
+        u_loc = 0.5_WP * ( Unode(1,nz-1,node) + Unode(1,nz,node) )
         v_loc = 0.5_WP * ( Unode(2,nz-1,node) + Unode(2,nz,node) )
            
         dVsq(nz,node) = ( usurf - u_loc )**2 + ( vsurf - v_loc )**2
@@ -291,7 +291,7 @@ contains
 !       compute thermal and haline expansion coefficients (without factor of rho).
 !       thermal expansion coefficient without 1/rho factor       (kg/m3/C)
 !             talpha= -d(rho{k,k})/d(T(k))
-!       salt expansion coefficient without 1/rho factor        (kg/m3/PSU)
+!       salt expansion coefficient without 1/rho factor          (kg/m3/PSU)
 !             sbeta = d(rho{k,k})/d(S(k))
 
 !       sw_alpha(nz,n) and sw_beta(nz,n) are computed @ Z where T and S are defined
@@ -320,7 +320,6 @@ contains
 ! internal wave activity, static instability, and local shear 
 ! instability.
     CALL ri_iwmix(viscA, diffK)
-
 ! add double diffusion
     IF (double_diffusion) then
        CALL ddmix(diffK)
@@ -687,8 +686,8 @@ contains
 !       diffK @ zbar. Model do not use these levels !!!!!!!       
 !      *******************************************************************
  
-!        diffK(1,node,1)=diffK(2,node,1)
-!        diffK(nlevels_nod2d(node),node,1)=diffK(nlevels_nod2d(node)-1,node,1)
+        diffK(1,node,1)=diffK(2,node,1)
+        diffK(nlevels_nod2d(node),node,1)=diffK(nlevels_nod2d(node)-1,node,1)
 
 ! smooth Richardson number in the vertical using a 1-2-1 filter
         IF(smooth_richardson_number .and. nlevels_nod2d(node)>2) then

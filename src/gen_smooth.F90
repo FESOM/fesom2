@@ -72,9 +72,9 @@ subroutine smooth_nod3D(arr, N)
   DO q=1, N !apply mass matrix N times to smooth the field
      DO nz=1, nl
         DO node=1, myDim_nod2D
-           if (nlevels_nod2d(node) < nz) CYCLE
            vol=0._WP
            work_array(node)=0._WP
+           if (nlevels_nod2d(node) < nz) CYCLE
            DO j=1, nod_in_elem2D_num(node)
               elem=nod_in_elem2D(j, node)
               if (elem<=0) CYCLE
@@ -139,9 +139,9 @@ subroutine smooth_elem3D(arr, N)
   DO q=1, N !apply mass matrix N times to smooth the field
      DO nz=1, nl
         DO node=1, myDim_nod2D+eDim_nod2D
-           if (nlevels_nod2d(node) < nz) CYCLE
            vol=0._WP
            work_array(node)=0._WP
+           if (nlevels_nod2d(node) < nz) CYCLE
            DO j=1, nod_in_elem2D_num(node)
               elem=nod_in_elem2D(j, node)
               if (elem<=0) CYCLE
