@@ -20,12 +20,9 @@ subroutine solve_tracers_ale
            UV  =UV  +fer_UV
            Wvel_e=Wvel_e+fer_Wvel
         end if
-        ! this shall not be called inside the loop?
-        call fill_up_dn_grad
 	!___________________________________________________________________________
 	! loop over all tracers 
 	do tr_num=1,num_tracers
-	
 		! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
 		! needed
 		call init_tracers_AB(tr_num)
