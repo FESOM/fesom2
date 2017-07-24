@@ -52,8 +52,9 @@ n_num=0
      nn_num(n2)=nn_num(n2)+1
      end if
   END DO  
-  DO n=1,myDim_nod2D
-    nlevels_nod2D_min(n)=minval(nlevels_nod2D(nn_pos(1:nn_num(n),n))) 
+  DO n=1, myDim_nod2d
+     k=nod_in_elem2D_num(n)
+     nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
   END DO
   call exchange_nod(nlevels_nod2D_min)
 end SUBROUTINE muscl_adv_init
