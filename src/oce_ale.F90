@@ -386,6 +386,71 @@ subroutine update_thickness_ale
 end subroutine update_thickness_ale
 !
 !
+!===============================================================================
+! update thickness arrays based on the current hbar 
+subroutine restart_thickness_ale
+	use o_PARAM
+	use o_MESH
+	use g_PARSUP
+	use o_ARRAYS
+	use g_config,only: which_ale
+	implicit none
+	integer :: n, nz, elem, elnodes(3),nzmax
+	
+	if(mype==0) then
+		write(*,*) '____________________________________________________________'
+		write(*,*) ' --> restart ALE layerthicknesses, depth levels and middepth levels'
+		write(*,*)
+	end if
+	if     (trim(which_ale)=='zlevel') then
+		!_______________________________________________________________________
+		! >->->->->->->->->->->->->->->     z-level    <-<-<-<-<-<-<-<-<-<-<-<-<
+		!_______________________________________________________________________
+		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
+		do n=1,myDim_nod2D+eDim_nod2D
+			zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
+			Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
+		end do
+		
+		! restart element layer thinkness (helem) and The increment of total 
+		! fluid depth on elements (dhe)
+		do elem=1,myDim_elem2D
+			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
+			
+			elnodes=elem2D_nodes(:,elem)
+			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+		end do
+		
+	elseif (trim(which_ale)=='zstar' ) then
+		!_______________________________________________________________________
+		! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
+		!_______________________________________________________________________
+		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
+		nzmax=nlevels_nod2D(n)
+		zbar_3d_n=0.0_WP
+		Z_3d_n   =0.0_WP
+		zbar_3d_n(nzmax,n)=zbar(nzmax)
+		Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
+		do nz=nzmax-1,2,-1
+			zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
+			Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+		end do
+		zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
+		
+		! restart element layer thinkness (helem) and the increment of total 
+		! fluid depth on elements (dhe)
+		do elem=1, myDim_elem2D
+			elnodes=elem2D_nodes(:, elem)
+			do nz=1,nlevels(elem)-2
+				helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+			end do
+			
+			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+		end do
+	endif
+end subroutine restart_thickness_ale
+!
+!
 !
 !===============================================================================
 ! Stiffness matrix for the elevation
@@ -420,10 +485,10 @@ subroutine stiff_mat_ale
 	logical                             :: flag
 	character*10                        :: mype_string,npes_string
 	character*1000                      :: dist_mesh_dir, file_name
-        real(kind=WP)                       :: t0, t1
-        integer                             :: ierror              ! MPI, return error code
-
-        t0=MPI_Wtime()
+	real(kind=WP)                       :: t0, t1
+	integer                             :: ierror              ! MPI, return error code
+	
+	t0=MPI_Wtime()
 	!___________________________________________________________________________
 	! a)
 	ssh_stiff%dim=nod2D
@@ -616,25 +681,25 @@ subroutine stiff_mat_ale
 	end do
 
 	allocate(mapping(nod2d))
-        ! 0 proc reads the data in chunks and distributes it between other procs
+	! 0 proc reads the data in chunks and distributes it between other procs
 	write(npes_string,"(I10)") npes
 	dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
 	file_name=trim(dist_mesh_dir)//'rpart.out'
-        fileID=10
-        if (mype==0) then
-           write(*,*) 'in stiff_mat_ale, reading ', trim(file_name)
- 	   open(fileID, file=trim(file_name))
-           ! n ... how many cpus
-           read(fileID, *) n      
-           ! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
-           read(fileID, *) mapping(1:npes)
-           ! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
-           ! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
-           ! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
-           read(fileID, *) mapping
-           close(fileID) 
-        end if
-        call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+	fileID=10
+	if (mype==0) then
+		write(*,*) 'in stiff_mat_ale, reading ', trim(file_name)
+		open(fileID, file=trim(file_name))
+		! n ... how many cpus
+		read(fileID, *) n      
+		! 1st part of rpart.out: mapping(1:npes) = how many 2d node points owns every CPU
+		read(fileID, *) mapping(1:npes)
+		! 2nd part of rpart.out: mapping for contigous numbering of how the 2d mesh points are
+		! locate on the CPUs: e.g node point 1, lies on CPU 2 and is there the 5th node point. 
+		! If CPU1 owns in total 5000 node points that is the mapping for the node point 1 =5005
+		read(fileID, *) mapping
+		close(fileID) 
+	end if
+	call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
 	
 	! (ii) global PE contiguous: 
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
@@ -642,13 +707,14 @@ subroutine stiff_mat_ale
 		! node points are contigous located on the CPUs
 		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
 	end do	
+	
 	!___________________________________________________________________________
 	deallocate(mapping)
-        t1=MPI_Wtime()
-        if (mype==0) then
-           write(*,*) 'Building SSH operator took ', t1-t0, ' seconds'
-           write(*,*) '========================='
-        endif
+	t1=MPI_Wtime()
+	if (mype==0) then
+		write(*,*) 'Building SSH operator took ', t1-t0, ' seconds'
+		write(*,*) '========================='
+	endif
 end subroutine stiff_mat_ale
 !
 !
@@ -832,7 +898,7 @@ subroutine compute_hbar_ale
 	use g_comm_auto
 	
 	implicit none
-
+	
 	! see "FESOM2: from finite elements to finte volumes, S. Danilov..." 
 	! hbar(n+1)-hbar(n)=tau*ssh_rhs_old 
 	! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
@@ -873,7 +939,6 @@ subroutine compute_hbar_ale
 		!_______________________________________________________________________
 		ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
 		ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
-
 		
 	end do
 	
@@ -917,7 +982,7 @@ subroutine vert_vel_ale
 	! Contributions from levels in divergence
 	Wvel=0.0_WP
 	if (Fer_GM) then
-         fer_Wvel=0.0_WP
+		fer_Wvel=0.0_WP
 	end if
 	
 	do ed=1, myDim_edge2D
@@ -1342,7 +1407,6 @@ subroutine oce_timestep_ale(n)
 	use io_RESTART !PS
 	use i_ARRAYS !PS
 	use o_mixing_KPP_mod
-!	use ieee_arithmetic        !??????????????????????????????
 	
 	IMPLICIT NONE
 	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9
@@ -1355,36 +1419,38 @@ subroutine oce_timestep_ale(n)
 	real(kind=8)      :: global_vol_hflux,local_vol_hflux,global_max_hflux,global_min_hflux,local_max_hflux,local_min_hflux
 !DS 	real(kind=8)      :: global_d_eta, global_wflux, local_d_eta, local_wflux, local_vol, global_vol
 	real(kind=8),allocatable  :: aux1(:),aux2(:)
-
+	
 	t1=MPI_Wtime()
 	
 ! 	heat_flux=0.0_WP
 ! 	water_flux=0.0_WP
-
+	
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
 	!___________________________________________________________________________
-        ! calculate alpha and beta
-        ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
-        call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
-        ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
-        call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
-        ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
-        ! will be primarily used for computing Redi diffusivities. etc?
-        call compute_neutral_slope
+	! calculate alpha and beta
+	! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
+	call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
+	
+	! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
+	call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
+	
+	! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
+	! will be primarily used for computing Redi diffusivities. etc?
+	call compute_neutral_slope
 	!___________________________________________________________________________
 	call status_check
 	
 	!___________________________________________________________________________
-        if (trim(mix_scheme)=='KPP') then
-           call oce_mixing_KPP(Av, Kv_double)
-           Kv=Kv_double(:,:,1)
-        else if(trim(mix_scheme)=='PP') then
-           call oce_mixing_PP
-        else
-           stop "!not existing mixing scheme!"
-           call par_ex
-        end if  
+	if (trim(mix_scheme)=='KPP') then
+		call oce_mixing_KPP(Av, Kv_double)
+		Kv=Kv_double(:,:,1)
+	else if(trim(mix_scheme)=='PP') then
+		call oce_mixing_PP
+	else
+		stop "!not existing mixing scheme!"
+		call par_ex
+	end if  
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
 		call compute_vel_rhs
@@ -1429,10 +1495,10 @@ subroutine oce_timestep_ale(n)
 	! ...if we do it here we don't need to write hbar_old into a restart file...
 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	! --> eta_(n)
-        ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
+	! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
 	!---------------------------------------------------------------------------
 	! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
-        ! does not belong directly to ALE formalism
+	! does not belong directly to ALE formalism
 	if (Fer_GM) then
 		call fer_compute_C_K
 		call fer_solve_Gamma
@@ -1449,7 +1515,7 @@ subroutine oce_timestep_ale(n)
 	! solve tracer equation 
 	call solve_tracers_ale
 	t8=MPI_Wtime() 
-
+	
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
 	t9=MPI_Wtime() 

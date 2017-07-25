@@ -51,15 +51,20 @@ integer :: n, nsteps,offset,row,i
 	endif
 	call clock_newyear                    	! check if it is a new year
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        ! The interface to the restart module is made via call restart !
-        ! The inputs are: istep, l_write, l_create
-        ! if istep is not zero it will be decided whether restart shall be written
-        ! if l_write  is TRUE the restart will be forced
-        ! if l_read the restart will be read
-        ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
+	! The interface to the restart module is made via call restart !
+	! The inputs are: istep, l_write, l_create
+	! if istep is not zero it will be decided whether restart shall be written
+	! if l_write  is TRUE the restart will be forced
+	! if l_read the restart will be read
+	! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
 	call restart(0, .false., r_restart) ! istep, l_write, l_read
-
-	!=====================
+	
+	!___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
+	!___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
+	if (r_restart==.true. .and. use_ALE==.true.) then
+		call restart_thickness_ale
+	end if
+	
 	
 	!=====================
 	! Time stepping
