@@ -1,8 +1,9 @@
-!========================================================================================
+!
+!======================================================================================
+!
 subroutine ice2ocean
   ! transmits the relevant fields from the ice to the ocean model
   !
-
   use o_PARAM
   use o_ARRAYS
   use o_MESH
@@ -48,7 +49,9 @@ subroutine ice2ocean
   call exchange_nod_end()
   if (use_sw_pene) call cal_shortwave_rad
 end subroutine ice2ocean
-!=======================================================================================
+!
+!======================================================================================
+!
 subroutine ocean2ice
   
   ! transmits the relevant fields from the ocean to the ice model
@@ -110,4 +113,93 @@ endif
      enddo
      call exchange_nod(u_w, v_w)
 end subroutine ocean2ice
-!=========================================================================================================
+!
+!======================================================================================
+!
+subroutine oce_fluxes
+  use o_ARRAYS
+  use i_ARRAYS
+  use g_comm_auto
+  use g_forcing_param, only: use_virt_salt
+  use g_forcing_arrays
+  use g_PARSUP,        only: myDim_nod2D, eDim_nod2D
+  implicit none
+  integer                   :: n, elem, elnodes(3),n1
+  real(kind=WP)             :: rsss, net
+  real(kind=8), allocatable :: flux(:)
+
+  allocate(flux(myDim_nod2D+eDim_nod2D))
+  ! ==================
+  ! heat and freshwater
+  ! ==================
+  heat_flux_old  = heat_flux !PS
+  water_flux_old = water_flux !PS
+     
+  heat_flux   = -net_heat_flux 
+  water_flux  = -fresh_wa_flux
+
+  call exchange_nod(heat_flux, water_flux) ! do we really need it?
+
+  ! virtual salt flux
+  if (use_virt_salt) then
+     rsss=ref_sss
+     do n=1, myDim_nod2D+eDim_nod2D
+        if (ref_sss_local) rsss = tr_arr(1,n,2)
+        virtual_salt(n)=rsss*water_flux(n) 
+     end do
+  end if
+
+  ! SSS restoring to climatology
+  do n=1, myDim_nod2D+eDim_nod2D
+     relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(1,n,2))
+  end do
+
+  ! enforce the total freshwater/salt flux be zero
+
+  ! 1. water flux ! if (.not. use_virt_salt) can be used!
+  ! we conserve only the fluxes from the database plus evaporation.
+  ! the rest (ocean/ice transformation etc. will follow from the conservation of volume)
+  flux=evaporation+prec_rain+ prec_snow+runoff  
+  call comp_net_imbalance(flux, net)
+  water_flux=water_flux+net ! the + sign should be used here
+    
+  ! 2. virtual salt flux
+  if (use_virt_salt) then ! virtual_salt array is not allocated otherwise !
+     call comp_net_imbalance(virtual_salt, net)
+     virtual_salt=virtual_salt-net
+  end if
+
+  ! 3. restoring to SSS climatology
+  call comp_net_imbalance(relax_salt, net)
+  relax_salt=relax_salt-net
+
+  deallocate(flux)
+end subroutine oce_fluxes
+!
+!======================================================================================
+!
+subroutine comp_net_imbalance(data, net)
+  use o_MESH
+  use g_PARSUP
+  use g_comm_auto
+
+  IMPLICIT NONE
+  real(KIND=WP), dimension(:), intent(in) :: data
+  real(kind=WP), intent(out)              :: net
+
+  integer      :: row
+  real(kind=8) :: flux, corr
+
+  flux=0.0
+  do row=1,myDim_nod2D
+     flux=flux+data(row)
+  end do
+
+  corr=0.0
+  call MPI_AllREDUCE(flux, corr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_WORLD, MPIerr)
+  net=corr/ocean_area
+end subroutine comp_net_imbalance
+!
+!======================================================================================
+!
