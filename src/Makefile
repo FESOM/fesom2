@@ -62,7 +62,6 @@ OBJECTS=  fvom_main.o 		\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\
           gen_forcing_couple.o 	\
-          gen_forcing_ocean.o 	\
           gen_interpolation.o 	\
           gen_events.o 		\
           write_step_info.o
