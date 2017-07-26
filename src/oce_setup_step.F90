@@ -4,8 +4,25 @@ USE o_PARAM
 USE g_PARSUP
 USE o_ARRAYS
 USE g_config
+USE g_forcing_param, only: use_virt_salt
 IMPLICIT NONE
-         
+
+       if (use_ALE) then
+	  !___setup virt_salt_flux____________________________________________________
+          ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
+          ! salinity flux need to be used
+          ! otherwise we set the reference salinity to zero
+          if ( .not. trim(which_ALE)=='linfs') then
+ 	     use_virt_salt=.false.
+             ! this will force the virtual saltinity flux to be zero
+             ref_sss_local=.false.
+             ref_sss=0._WP
+             is_nonlinfs = 1.0_WP
+          else
+             use_virt_salt=.true.
+             is_nonlinfs = 0.0_WP
+          end if
+        end if
         call array_setup
     !___________________________________________________________________________
 	! initialize arrays for ALE
@@ -83,6 +100,7 @@ use g_comm_auto
 use g_config
 use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
+USE g_forcing_param, only: use_virt_salt
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -129,6 +147,8 @@ allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!!
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
+allocate(relax_salt(node_size))
+allocate(virtual_salt(node_size))
 
 allocate(heat_flux_old(node_size), Tsurf_old(node_size)) !PS
 allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
@@ -226,8 +246,11 @@ end if
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
+    relax_salt=0.
+    virtual_salt=0.
+
     Ssurf=0.0_WP
-	water_flux_old=0.0_WP !PS
+    water_flux_old=0.0_WP !PS
     Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP

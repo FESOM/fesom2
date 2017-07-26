@@ -961,7 +961,7 @@ USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_ROTATE_GRID
-  use g_comm_auto
+use g_comm_auto
 IMPLICIT NONE
 ! Collects auxilliary information on the mesh
 ! Allocated and filled in are:
@@ -1068,6 +1068,7 @@ end do
  ocean_area=0.0
  call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_WORLD, MPIerr)
+
 if (mype==0) then
  write(*,*)  mype, 'Mesh statistics:'
  write(*,*)  mype, 'maxArea ',maxval(elem_area), '   MinArea ', minval(elem_area)

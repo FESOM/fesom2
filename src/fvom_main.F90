@@ -107,11 +107,12 @@ integer :: n, nsteps,offset,row,i
 			
 			if (ice_update) call ice_timestep(n)
 			
-			call ice2ocean
-		else
-			if(.not.toy_ocean) call update_atm_forcing_OnlyOcean(n)  
+			call oce_fluxes_mom ! momentum only
+                        call oce_fluxes
 		end if  
 		
+		
+
 		!___model ocean step____________________________________________________
 		if(.not.use_ALE) then
 			call oce_timestep(n)
