@@ -10,22 +10,13 @@ use g_CONFIG
 use g_forcing_interp
 implicit none
 
-  if(mype==0) write(*,*) '****************************************************'
+  if (mype==0) write(*,*) '****************************************************'
   call forcing_index
-  if(use_ice) then
-    call forcing_array_setup
-    call init_forcing_interp      ! calculates the forcing interpolation weights
-    call init_atm_forcing         ! initialize forcing fields
-  else
-    if(.not.toy_ocean) then
-    call forcing_array_setup_OnlyOcean ! forced only by wind 
-    call init_forcing_interp 
-    call init_atm_forcing_OnlyOcean 
-    endif 
-  endif
-
-  !if(use_landice_water) call landice_water_init
- 
+  if (use_ice) then
+     call forcing_array_setup
+     call init_forcing_interp      ! calculates the forcing interpolation weights
+     call init_atm_forcing         ! initialize forcing fields
+  endif 
 end subroutine forcing_setup
 ! ==========================================================
 subroutine forcing_array_setup
@@ -115,43 +106,3 @@ end subroutine forcing_array_setup
 !
 !----------------------------------------------------------------------
 !
-subroutine forcing_array_setup_OnlyOcean
-  !inializing forcing fields for an ocean-alone case
-  !currently only wind is applied.
-  
-  use o_param
-  use o_mesh
-  use i_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_parsup
-  implicit none
-
-  integer    :: n2
-
-  n2=myDim_nod2D+eDim_nod2D  
-
-  ! Allocate memory for atmospheric forcing 
-  allocate(u_wind(n2), v_wind(n2))
-  allocate(Tair(n2), shum(n2))
-allocate(S_oc_array(n2), T_oc_array(n2))
-allocate(U_w(n2), V_w(n2))
-  u_wind=0.
-  v_wind=0.
-  Tair=0.
-  shum=0.
-  S_oc_array=0.
-  T_oc_array=0.
-  U_w=0.
-  V_w=0.
-  ! drag coefficient and transfer coefficients for latent and sensible heat
-  allocate(Cd_atm_oce_arr(n2))
-  allocate(Ce_atm_oce_arr(n2))
-  allocate(Ch_atm_oce_arr(n2))
-  Cd_atm_oce_arr=Cd_atm_oce
-  Ce_atm_oce_arr=Ce_atm_oce
-  Ch_atm_oce_arr=Ch_atm_oce
-
-  if(mype==0) write(*,*) 'forcing arrays for a no-ice case have been set up'   
-
-end subroutine forcing_array_setup_OnlyOcean

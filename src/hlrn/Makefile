@@ -26,8 +26,9 @@ MODULES = oce_modules.o \
           gen_modules_read_NetCDF.o \
           gen_modules_forcing.o \
           gen_halo_exchange.o \
+          gen_support.o \
           psolve.o \
-          oce_mixing_kpp.o \
+          oce_ale_mixing_kpp.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
           gen_str2unstr.o \
@@ -61,7 +62,6 @@ OBJECTS=  fvom_main.o 		\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\
           gen_forcing_couple.o 	\
-          gen_forcing_ocean.o 	\
           gen_interpolation.o 	\
           gen_events.o 		\
           write_step_info.o

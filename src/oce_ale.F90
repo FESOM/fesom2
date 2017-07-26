@@ -72,22 +72,6 @@ subroutine ale_init
 		zbar_3d_n(1:nzmax,n)=zbar(1:nzmax);
 		Z_3d_n(1:nzmax-1,n) =Z(1:nzmax-1);
 	end do
-	
-	!___setup virt_salt_flux____________________________________________________
-	! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
-	! salinity flux need to be used
-	! otherwise we set the reference salinity to zero
-	if ( .not. trim(which_ALE)=='linfs') then
-		use_virt_salt=.false.
-		! this will force the virtual saltinity flux to be zero
-		ref_sss_local=.false.
-		ref_sss=0._WP
-		is_nonlinfs = 1.0_WP
-	else
-		use_virt_salt=.true.
-		is_nonlinfs = 0.0_WP
-	end if
-	
 end subroutine ale_init
 !
 !

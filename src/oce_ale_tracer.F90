@@ -626,6 +626,7 @@ end subroutine diff_tracers_ale
 !Vertical diffusive flux(explicit scheme):                                                                            
 subroutine diff_ver_part_expl_ale(tr_num)
 	use o_ARRAYS
+	use g_forcing_arrays
 	use o_MESH
 	use g_PARSUP
 	use g_config,only: dt
@@ -645,9 +646,7 @@ subroutine diff_ver_part_expl_ale(tr_num)
 			rdata =  Tsurf(n)
 			rlx   =  surf_relax_T
 		elseif (tr_num==2) then
-			flux  =  water_flux(n)*tr_arr(1,n,2)
-			rdata =  Ssurf(n)
-			rlx   =  surf_relax_S
+			flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
 		else
 			flux  = 0d0
 			rdata = 0d0
@@ -656,7 +655,7 @@ subroutine diff_ver_part_expl_ale(tr_num)
 		
 		!_______________________________________________________________________
 		!Surface forcing
-		vd_flux(1)= flux + rlx*(rdata-tr_arr(1,n,tr_num))
+		vd_flux(1)= flux
 		
 		!_______________________________________________________________________
 		do nz=2,nl1
@@ -925,9 +924,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			!     by forming/melting of sea ice
 			! --> rsss*water_flux(n) : virtual salt flux 
 			tr(1)= tr(1)  +  zinv*( &
-									rsss*water_flux(n)*(1.0_WP-is_nonlinfs) & !*... to make it secure
-									- real_salt_flux(n)*is_nonlinfs &
-									+ surf_relax_S*(Ssurf(n)-tr_arr(1,n,2)))
+									virtual_salt(n) &
+									+ relax_salt(n) &
+									- real_salt_flux(n)*is_nonlinfs)
 		endif
 		
 		!_______________________________________________________________________
