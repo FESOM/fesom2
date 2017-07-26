@@ -1,5 +1,7 @@
-!a set of routines for smoothing FESOM fields using mass matrix
-module g_smooth
+!a set of auxuary routines for: 
+!1. smoothing FESOM fields using mass matrix
+!2. computing surface integrals of the FESOM fields
+module g_support
   use o_mesh
   use g_parsup
   use g_comm_auto
@@ -7,8 +9,7 @@ module g_smooth
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem
-
+  public :: smooth_nod, smooth_elem, integrate_nod
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -21,6 +22,12 @@ module g_smooth
 ! generic interface for smoothing fields on elements
   INTERFACE smooth_elem
             MODULE PROCEDURE smooth_elem2D, smooth_elem3D
+  END INTERFACE
+!
+!--------------------------------------------------------------------------------------------
+! computes 2D integral of a nodal field
+  INTERFACE integrate_nod
+            MODULE PROCEDURE integrate_nod_2D
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
@@ -161,5 +168,29 @@ subroutine smooth_elem3D(arr, N)
   END DO
   deallocate(work_array)
 end subroutine smooth_elem3D
-end module g_smooth
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine integrate_nod_2D(data, int2D)
+  use o_MESH
+  use g_PARSUP
+  use g_comm_auto
+
+  IMPLICIT NONE
+  real(kind=WP), intent(in)       :: data(:)
+  real(kind=WP), intent(inout)    :: int2D
+
+  integer       :: row
+  real(kind=WP) :: lval, gval
+
+  lval=0.0
+  do row=1, myDim_nod2D
+     lval=lval+data(row)*area(1,row)
+  end do
+
+  gval=0.0
+  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_WORLD, MPIerr)
+end subroutine integrate_nod_2D
+end module g_support
 

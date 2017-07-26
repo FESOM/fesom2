@@ -107,16 +107,19 @@ end subroutine ocean2ice
 !======================================================================================
 !
 subroutine oce_fluxes
+  use o_MESH,          only: ocean_area
   use o_ARRAYS
   use i_ARRAYS
   use g_comm_auto
   use g_forcing_param, only: use_virt_salt
   use g_forcing_arrays
-  use g_PARSUP,        only: myDim_nod2D, eDim_nod2D
+  use g_PARSUP
+  use g_support
+
   implicit none
-  integer                   :: n, elem, elnodes(3),n1
-  real(kind=WP)             :: rsss, net
-  real(kind=8), allocatable :: flux(:)
+  integer                    :: n, elem, elnodes(3),n1
+  real(kind=WP)              :: rsss, net
+  real(kind=WP), allocatable :: flux(:)
 
   allocate(flux(myDim_nod2D+eDim_nod2D))
   ! ==================
@@ -145,51 +148,25 @@ subroutine oce_fluxes
   end do
 
   ! enforce the total freshwater/salt flux be zero
-
   ! 1. water flux ! if (.not. use_virt_salt) can be used!
   ! we conserve only the fluxes from the database plus evaporation.
   ! the rest (ocean/ice transformation etc. will follow from the conservation of volume)
-  flux=evaporation+prec_rain+ prec_snow+runoff  
-  call comp_net_imbalance(flux, net)
-  water_flux=water_flux+net ! the + sign should be used here
-    
+  flux=evaporation+prec_rain+ prec_snow+runoff
+  call integrate_nod(flux, net)
+  water_flux=water_flux+net/ocean_area ! the + sign should be used here
+
   ! 2. virtual salt flux
   if (use_virt_salt) then ! is already zero otherwise
-     call comp_net_imbalance(virtual_salt, net)
-     virtual_salt=virtual_salt-net
+     call integrate_nod(virtual_salt, net)
+     virtual_salt=virtual_salt-net/ocean_area
   end if
 
   ! 3. restoring to SSS climatology
-  call comp_net_imbalance(relax_salt, net)
-  relax_salt=relax_salt-net
+  call integrate_nod(relax_salt, net)
+  relax_salt=relax_salt-net/ocean_area
 
   deallocate(flux)
 end subroutine oce_fluxes
-!
-!======================================================================================
-!
-subroutine comp_net_imbalance(data, net)
-  use o_MESH
-  use g_PARSUP
-  use g_comm_auto
-
-  IMPLICIT NONE
-  real(KIND=WP), dimension(:), intent(in) :: data
-  real(kind=WP), intent(out)              :: net
-
-  integer      :: row
-  real(kind=8) :: flux, corr
-
-  flux=0.0
-  do row=1,myDim_nod2D
-     flux=flux+data(row)
-  end do
-
-  corr=0.0
-  call MPI_AllREDUCE(flux, corr, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
-  net=corr/ocean_area
-end subroutine comp_net_imbalance
 !
 !======================================================================================
 !
