@@ -107,7 +107,7 @@ integer :: n, nsteps,offset,row,i
 			
 			if (ice_update) call ice_timestep(n)
 			
-			call ice2ocean ! momentum only
+			call oce_fluxes_mom ! momentum only
                         call oce_fluxes
 		end if  
 		

@@ -1,7 +1,7 @@
 !
 !======================================================================================
 !
-subroutine ice2ocean
+subroutine oce_fluxes_mom
   ! transmits the relevant fields from the ice to the ocean model
   !
   use o_PARAM
@@ -16,17 +16,8 @@ subroutine ice2ocean
   
   integer                 :: n, elem, elnodes(3),n1
   real(kind=WP)           :: aux, aux1
-  ! ==================
-  ! heat and freshwater
-  ! ==================
-     heat_flux_old = heat_flux !PS
-     water_flux_old = water_flux !PS
-     
-     heat_flux   = -net_heat_flux 
-     water_flux  = -fresh_wa_flux
-
-     call exchange_nod_begin(heat_flux, water_flux)
-  ! ==================
+ 
+ ! ==================
   ! momentum flux:
   ! ==================
   do n=1,myDim_nod2D+eDim_nod2D   
@@ -46,9 +37,8 @@ subroutine ice2ocean
      stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                              stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
   END DO
-  call exchange_nod_end()
   if (use_sw_pene) call cal_shortwave_rad
-end subroutine ice2ocean
+end subroutine oce_fluxes_mom
 !
 !======================================================================================
 !
@@ -141,7 +131,7 @@ subroutine oce_fluxes
   call exchange_nod(heat_flux, water_flux) ! do we really need it?
 
   ! virtual salt flux
-  if (use_virt_salt) then
+  if (use_virt_salt) then ! will remain zero otherwise
      rsss=ref_sss
      do n=1, myDim_nod2D+eDim_nod2D
         if (ref_sss_local) rsss = tr_arr(1,n,2)
@@ -164,7 +154,7 @@ subroutine oce_fluxes
   water_flux=water_flux+net ! the + sign should be used here
     
   ! 2. virtual salt flux
-  if (use_virt_salt) then ! virtual_salt array is not allocated otherwise !
+  if (use_virt_salt) then ! is already zero otherwise
      call comp_net_imbalance(virtual_salt, net)
      virtual_salt=virtual_salt-net
   end if

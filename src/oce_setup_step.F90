@@ -148,7 +148,7 @@ allocate(relax2clim(node_size))
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
-if (use_virt_salt) allocate(virtual_salt(node_size))
+allocate(virtual_salt(node_size))
 
 allocate(heat_flux_old(node_size), Tsurf_old(node_size)) !PS
 allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
@@ -247,7 +247,7 @@ end if
     S_rhs=0.0_WP
     water_flux=0.0_WP
     relax_salt=0.
-    if (use_virt_salt) virtual_salt=0.
+    virtual_salt=0.
 
     Ssurf=0.0_WP
     water_flux_old=0.0_WP !PS
