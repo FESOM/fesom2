@@ -1247,7 +1247,7 @@ ENDIF
 
 endif
 end subroutine gather_nod2D
-!==============================================
+
 !============================================================================
 subroutine gather_elem3D(arr3D, arr3D_global)
 
@@ -1269,7 +1269,6 @@ real(kind=WP)  ::  arr3D_global(:,:)
 real(kind=WP), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
-integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
@@ -1292,7 +1291,7 @@ IF ( mype == 0 ) THEN
          call MPI_IRECV(recvbuf(1,start), e3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
       enddo
       
-      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1, 1:myDim_elem2D)
    
 
       call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
@@ -1324,13 +1323,12 @@ USE o_MESH
 
 IMPLICIT NONE
 
-integer      :: n
-
-real(kind=WP)  ::  arr2D(:)
-real(kind=WP)  ::  arr2D_global(:)
-real(kind=WP)  :: recvbuf(elem2D)
-integer        :: req(npes-1)
-integer        :: start, e2D
+integer                    :: n
+real(kind=WP)              :: arr2D(:)
+real(kind=WP)              :: arr2D_global(:)
+real(kind=WP), allocatable :: recvbuf(:)
+integer                    :: req(npes-1)
+integer                    :: start, e2D
 
 
  if (npes> 1) then
@@ -1341,6 +1339,8 @@ CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
+
+      allocate(recvbuf(remPtr_elem2D(npes)))
 
       do  n = 1, npes-1
          e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
@@ -1353,8 +1353,9 @@ IF ( mype == 0 ) THEN
       call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
    
       arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
-
+                         = recvbuf(1 : remPtr_elem2D(npes)-1)
+      
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1492,7 +1493,6 @@ ENDIF
 
 end if
 end subroutine gather_real4_nod2D
-!==============================================
 !============================================================================
 subroutine gather_real4_elem3D(arr3D, arr3D_global)
 
@@ -1567,14 +1567,13 @@ USE o_MESH
 
 IMPLICIT NONE
 
-integer      :: n
-
-real(kind=WP)  ::  arr2D(:)
-real(kind=4)  ::  arr2D_global(:)
-real(kind=4)  :: recvbuf(elem2D)
-real(kind=4)  :: sendbuf(myDim_elem2D)
-integer        :: req(npes-1)
-integer        :: start, e2D
+integer                   :: n
+real(kind=WP)             :: arr2D(:)
+real(kind=4)              :: arr2D_global(:)
+real(kind=4), allocatable :: recvbuf(:)
+real(kind=4)              :: sendbuf(myDim_elem2D)
+integer                   :: req(npes-1)
+integer                   :: start, e2D
 
 
  if (npes> 1) then
@@ -1586,6 +1585,7 @@ IF ( mype == 0 ) THEN
    
    if (npes>1) then
 
+      allocate(recvbuf(remPtr_elem2D(npes)))
       do  n = 1, npes-1
          e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
          start = remPtr_elem2D(n)
@@ -1598,7 +1598,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
                        = recvbuf(1 : remPtr_elem2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1615,6 +1615,41 @@ ENDIF
 end if
 end subroutine gather_real4_elem2D
 !==============================================
+subroutine gather_elem2D_i(arr2D, arr2D_global)
+! Make element information available to master PE 
+  use g_PARSUP
+  use o_MESH
+  IMPLICIT NONE
+
+  integer                       :: n
+  integer                       :: arr2D(:)
+  integer                       :: arr2D_global(:)
+  integer, allocatable          :: recvbuf(:)
+  integer                       :: req(npes-1)
+  integer                       :: start, e2D
+  CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+  ! Consider MPI-datatypes to recv directly into arr2D_global!
+  IF ( mype == 0 ) THEN
+     if (npes > 1) then
+        allocate(recvbuf(remPtr_elem2D(npes)))
+        do  n = 1, npes-1
+            e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
+            start = remPtr_elem2D(n)
+            call MPI_IRECV(recvbuf(start), e2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+        enddo      
+        arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+        call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+        arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                          = recvbuf(1 : remPtr_elem2D(npes)-1)
+        deallocate(recvbuf)
+     else
+        arr2D_global(:) = arr2D(:)
+     endif
+  ELSE
+     call MPI_SEND(arr2D, myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
+  ENDIF
+end subroutine gather_elem2D_i
+!============================================================================
 
 end module g_comm
 
@@ -1685,6 +1720,7 @@ interface gather_elem
       module procedure gather_elem2D
       module procedure gather_real4_elem3D
       module procedure gather_real4_elem2D
+      module procedure gather_elem2D_i
 end interface gather_elem
 
 
