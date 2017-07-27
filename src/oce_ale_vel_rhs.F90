@@ -42,7 +42,10 @@ DO elem=1, myDim_elem2D
    gg=elem_area(elem)
    ff=coriolis(elem)*gg
    !mm=metric_factor(elem)*gg
-   if (use_ice) p_ice=(m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
+   ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
+   ! to account for floating ice
+   if (use_ice) p_ice=(m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*g*inv_rhowat
+   
    DO nz=1,nlevels(elem)-1
       pre=-(eta+hpressure(nz,elnodes)/density_0+p_ice*use_pice)!+atmospheric pressure etc.
       Fx=sum(gradient_sca(1:3,elem)*pre)
