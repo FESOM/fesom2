@@ -16,11 +16,11 @@ subroutine pressure_bv
 	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
 	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
 	real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
-	logical               :: flag1, flag2
+	logical               :: flag1, flag2, mixing_kpp
 
 	smallvalue=1.0e-20
 	buoyancy_crit=0.0003
-	
+	mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
 	!___________________________________________________________________________
 	! Screen salinity
 	a=0.0_8
@@ -54,6 +54,10 @@ subroutine pressure_bv
 				t=tr_arr(nz, node,1)
 				s=tr_arr(nz, node,2)
 				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                        enddo
+                        !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
+                        !NR and did not vectorize the full loop. 
+                        do nz=1, nl1
 				rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
 				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
                                 ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
@@ -63,7 +67,7 @@ subroutine pressure_bv
                                 db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
 			end do
                         dbsfc1(nl)=dbsfc1(nl1)
-                        if (trim(mix_scheme)=='KPP') then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
+                        if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
                            dbsfc(1:nl, node )=dbsfc1(1:nl)
                         end if
 			!___________________________________________________________________
