@@ -151,7 +151,7 @@ subroutine oce_fluxes
   ! 1. water flux ! if (.not. use_virt_salt) can be used!
   ! we conserve only the fluxes from the database plus evaporation.
   ! the rest (ocean/ice transformation etc. will follow from the conservation of volume)
-  flux=evaporation+prec_rain+ prec_snow+runoff
+  flux=-evaporation+prec_rain+prec_snow+runoff
   call integrate_nod(flux, net)
   water_flux=water_flux+net/ocean_area ! the + sign should be used here
 
