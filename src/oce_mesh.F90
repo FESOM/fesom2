@@ -720,6 +720,13 @@ chunk_size=100000
 ! =========
 ! edge_tri are in global numbering, transform it to local indexing
 ! =========
+
+!*** Vadym pointed to the bug with bilding edge_tri
+! if not doing so the land boundary elements will be set to 999 instead of being zeros or negative!
+  where (edge_tri<0)
+         edge_tri=0
+  end where
+!***
   mesh_check=0
   do nchunk=0, (elem2D-1)/chunk_size
      mapping(1:chunk_size)=0
@@ -734,7 +741,7 @@ chunk_size=100000
         do m=1, 2
            nn=edge_tri(m, n)
            ipos=(nn-1)/chunk_size
-           if (ipos==nchunk) then
+           if (ipos==nchunk .and. nn > 0) then
               mesh_check=mesh_check+abs(m-2) !only first triangle will contribute to statistic
               iofs=nn-nchunk*chunk_size
               ! minus sign is required to avoid modified entry being modified in another chunk
