@@ -1247,7 +1247,6 @@ ENDIF
 
 endif
 end subroutine gather_nod2D
-
 !============================================================================
 subroutine gather_elem3D(arr3D, arr3D_global)
 
@@ -1650,7 +1649,141 @@ subroutine gather_elem2D_i(arr2D, arr2D_global)
   ENDIF
 end subroutine gather_elem2D_i
 !============================================================================
+subroutine gather_nod2D_i(arr2D, arr2D_global)
 
+! Make nodal information available to master PE 
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+integer  :: n
+integer  :: arr2D(:)
+integer  :: arr2D_global(:)
+integer  :: recvbuf(nod2D)
+integer  :: req(npes-1)
+integer  :: start, n2D
+
+if (npes> 1) then
+
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+
+! Consider MPI-datatypes to recv directly into arr2D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+
+      do  n = 1, npes-1
+         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+      enddo
+      
+      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+
+   else
+
+      arr2D_global(:) = arr2D(:)
+     
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr2D, myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
+   
+ENDIF
+
+endif
+end subroutine gather_nod2D_i
+!
+!============================================================================
+!
+subroutine gather_edg2D(arr2D, arr2Dglobal)
+! A 2D version of the previous routine
+use g_PARSUP
+USE o_MESH
+IMPLICIT NONE
+
+real(kind=WP) ::  arr2D(:)
+real(kind=WP) ::  arr2Dglobal(:)
+
+integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf
+REAL(kind=WP), ALLOCATABLE, DIMENSION(:) ::  rbuf
+
+IF ( mype == 0 ) THEN
+    arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
+    DO  n = 1, npes-1
+       CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                      0, MPI_COMM_WORLD, status, MPIerr )
+       sender = status(MPI_SOURCE)
+       ALLOCATE(rbuf(buf_size), ibuf(buf_size))
+
+       CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
+                      1, MPI_COMM_WORLD, status, MPIerr )
+
+       CALL MPI_RECV(rbuf(1), buf_size, MPI_DOUBLE_PRECISION, sender, &
+                      2, MPI_COMM_WORLD, status, MPIerr )
+       arr2Dglobal(ibuf)=rbuf
+       DEALLOCATE(ibuf, rbuf)
+    ENDDO
+ELSE
+    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+                   MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
+                   MPI_COMM_WORLD, MPIerr )
+ENDIF
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+end subroutine gather_edg2D
+!
+!============================================================================
+!
+subroutine gather_edg2D_i(arr2D, arr2Dglobal)
+! A 2D version of the previous routine
+use g_PARSUP
+USE o_MESH
+IMPLICIT NONE
+
+integer  ::  arr2D(:)
+integer  ::  arr2Dglobal(:)
+
+integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf, vbuf
+
+IF ( mype == 0 ) THEN
+    arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
+    DO  n = 1, npes-1
+       CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
+                      0, MPI_COMM_WORLD, status, MPIerr )
+       sender = status(MPI_SOURCE)
+       ALLOCATE(ibuf(buf_size), vbuf(buf_size))
+
+       CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
+                      1, MPI_COMM_WORLD, status, MPIerr )
+
+       CALL MPI_RECV(vbuf(1), buf_size, MPI_INTEGER, sender, &
+                      2, MPI_COMM_WORLD, status, MPIerr )
+       arr2Dglobal(ibuf)=vbuf
+       DEALLOCATE(ibuf, vbuf)
+    ENDDO
+ELSE
+    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
+                   MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_INTEGER, 0, 2,&
+                   MPI_COMM_WORLD, MPIerr )
+ENDIF
+CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+end subroutine gather_edg2D_i
+!============================================================================
 end module g_comm
 
 
@@ -1713,6 +1846,7 @@ interface gather_nod
       module procedure gather_nod2D
       module procedure gather_real4_nod3D
       module procedure gather_real4_nod2D
+      module procedure gather_nod2D_i
 end interface gather_nod
 
 interface gather_elem
@@ -1723,9 +1857,14 @@ interface gather_elem
       module procedure gather_elem2D_i
 end interface gather_elem
 
+interface gather_edge
+      module procedure gather_edg2D
+      module procedure gather_edg2D_i
+end interface gather_edge
+
 
 private  ! hides items not listed on public statement 
 public :: exchange_nod,exchange_edge,exchange_elem,broadcast_nod,broadcast_elem, &
           gather_nod, gather_elem, exchange_nod_begin, exchange_nod_end, exchange_elem_begin, &
-          exchange_elem_end
+          exchange_elem_end, gather_edge
 end module g_comm_auto
