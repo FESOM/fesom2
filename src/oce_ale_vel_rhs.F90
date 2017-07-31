@@ -10,50 +10,48 @@ USE g_forcing_param, only: use_virt_salt
 use g_comm_auto
 IMPLICIT NONE
 integer          :: elem, elnodes(3), nz 
-real(kind=WP)    :: eta(3), ff, gg, mm 
+real(kind=WP)    :: eta(3), ff, mm 
 real(kind=WP)    :: Fx, Fy, pre(3)
 logical, save    :: lfirst=.true.
 real(kind=8)     :: t1, t2, t3, t4
-real(kind=8)     :: p_ice(3), use_pice
+real(kind=8)     :: p_ice_eta(3)
 
 t1=MPI_Wtime()
+do elem=1, myDim_elem2D
 ! =================
 ! Take care of the AB part
 ! =================
-do elem=1, myDim_elem2D
    do nz=1,nl-1 
       UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
       UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
     end do
-end do
+
 ! ====================
 ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
 ! and the Coriolis force + metric terms
 ! ====================
-!to avoid if condition inside the loop
-use_pice=0._WP
-if (.not. use_virt_salt) use_pice=1._WP
-DO elem=1, myDim_elem2D
+
    elnodes=elem2D_nodes(:,elem)
    
-!    eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
-   eta=g*eta_n(elnodes)
-   
-   gg=elem_area(elem)
-   ff=coriolis(elem)*gg
-   !mm=metric_factor(elem)*gg
+   ff=coriolis(elem)*elem_area(elem)
+   !mm=metric_factor(elem)*elem_area(elem)
    ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
    ! to account for floating ice
-   if (use_ice) p_ice=(m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*g*inv_rhowat
-   
+   if (use_ice .and. .not. use_virt_salt) then
+      p_ice_eta = g*eta_n(elnodes) + (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*g*inv_rhowat
+   else   
+!NR Here comes an old comment. If relevant, do not forget to modify the if-branch above, too.
+!    eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
+      p_ice_eta = g*eta_n(elnodes)
+   endif
    DO nz=1,nlevels(elem)-1
-      pre=-(eta+hpressure(nz,elnodes)/density_0+p_ice*use_pice)!+atmospheric pressure etc.
-      Fx=sum(gradient_sca(1:3,elem)*pre)
-      Fy=sum(gradient_sca(4:6,elem)*pre)
-      UV_rhs(1,nz,elem)=UV_rhs(1,nz,elem)+Fx*gg 
-      UV_rhs(2,nz,elem)=UV_rhs(2,nz,elem)+Fy*gg 
-      UV_rhsAB(1,nz,elem)= UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-      UV_rhsAB(2,nz,elem)=-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
+      pre = -(hpressure(nz,elnodes)/density_0+p_ice_eta)!+atmospheric pressure etc.
+      Fx  = sum(gradient_sca(1:3,elem)*pre)
+      Fy  = sum(gradient_sca(4:6,elem)*pre)
+      UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + Fx*elem_area(elem) 
+      UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + Fy*elem_area(elem)
+      UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
+      UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
    END DO
 END DO
 t2=MPI_Wtime() 
