@@ -91,7 +91,7 @@ subroutine thermodynamics
            rain=0.0_WP
            snow=prec_rain(i)
         endif
-        evap_in=-evaporation(i) !evap_in: positive down
+        evap_in=evaporation(i) !evap_in: positive up
      else
         rain = prec_rain(i)
         snow = prec_snow(i)
