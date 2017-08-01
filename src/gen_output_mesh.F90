@@ -1,17 +1,34 @@
-!
-!-------------------------------------------------------------------------
-! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation. 
-! info: fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
-subroutine write_mesh_diag
-
+module io_mesh_info
 use g_PARSUP
 use o_MESH
 use g_config
 use g_comm_auto
 use o_ARRAYS
-implicit none
 
-#include "netcdf.inc" 
+implicit none
+#include "netcdf.inc"
+private
+public :: write_mesh_info
+!INTERFACE
+!subroutine my_def_var(ncid, short_name, vtype, dsize, dids, id, att_text)
+!           integer, intent(in)        :: ncid, dsize, dids(dsize), vtype
+!           character(*), intent(in)   :: short_name, att_text
+!           integer,      intent(inout):: id
+!end subroutine my_def_var
+!
+!subroutine my_def_dim(ncid, short_name, value, id)
+!           integer,      intent(in)   :: ncid, value
+!           character(*), intent(in)   :: short_name
+!           integer,      intent(inout):: id
+!end subroutine my_def_dim
+!END INTERFACE
+contains
+!
+!-------------------------------------------------------------------------
+! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation. 
+! info: fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
+subroutine write_mesh_info
+implicit none
 
   integer                    :: status, ncid, j
   integer                    :: nod_n_id, elem_n_id, edge_n_id
@@ -45,11 +62,15 @@ implicit none
      ! create a file
      status = nf_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid)
      if (status.ne.nf_noerr) call handle_err(status)
+  end if
+
+  call my_def_dim(ncid, 'nod_n', nod2D, nod_n_id)
+
+
+  if (mype==0) then  ! create a file
 
      ! Define the dimensions
-     status = nf_def_dim(ncid, 'nod_n', nod2d, nod_n_id)
-     if (status .ne. nf_noerr) call handle_err(status)
- 
+
      status = nf_def_dim(ncid, 'edg_n', edge2d, edge_n_id)
      if (status .ne. nf_noerr) call handle_err(status)
 
@@ -74,82 +95,26 @@ implicit none
      status = nf_def_dim(ncid, 'N',   N_max, id_N)
      if (status .ne. nf_noerr) call handle_err(status)
 
-     pid=>zbar_id; short_name='zbar'; att_text='depth of levels'; vtype=NF_DOUBLE
+     end if
 
-     status = nf_def_var(ncid, 'Z', NF_DOUBLE, 1, nl1_id, z_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='depth of layers'
-     status = nf_put_att_text(ncid, z_id, 'long_name', len_trim(att_text), trim(att_text));
-    
-     status = nf_def_var(ncid, 'nod_area', NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='nodal areas'
-     status = nf_put_att_text(ncid, nod_area_id, 'long_name', len_trim(att_text), trim(att_text));
-     
-     status = nf_def_var(ncid, 'elem_area', NF_DOUBLE, 1, elem_n_id, elem_area_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='element areas'
-     status = nf_put_att_text(ncid, elem_area_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'elem', NF_INT, 2, (/elem_n_id, id_3/), elem_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='elements'
-     status = nf_put_att_text(ncid, elem_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'nodes', NF_DOUBLE, 2, (/nod_n_id, id_2/), nod_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='nodal geo. coordinates'
-     status = nf_put_att_text(ncid, nod_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'nlevels_nod2D', NF_INT, 1, nod_n_id, nlevels_nod2D_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='number of levels below nodes'
-     status = nf_put_att_text(ncid, nlevels_nod2D_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'nlevels', NF_INT, 1, elem_n_id, nlevels_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='number of levels below elements'
-     status = nf_put_att_text(ncid, nlevels_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'nod_in_elem2D_num', NF_INT, 1, nod_n_id, nod_in_elem2D_num_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='number of elements containing the node'
-     status = nf_put_att_text(ncid, nod_in_elem2D_num_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'nod_in_elem2D', NF_INT, 2, (/nod_n_id, id_N/), nod_in_elem2D_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='elements containing the node'
-     status = nf_put_att_text(ncid, nod_in_elem2D_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'edges', NF_INT, 2, (/edge_n_id, id_2/), edges_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='edges'
-     status = nf_put_att_text(ncid, edges_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'edge_tri', NF_INT, 2, (/edge_n_id, id_2/), edge_tri_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='edge triangles'
-     status = nf_put_att_text(ncid, edge_tri_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'edge_cross_dxdy', NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='edge triangles'
-     status = nf_put_att_text(ncid, edge_cross_dxdy_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'gradient_sca_x', NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='x component of a gradient at nodes of an element'
-     status = nf_put_att_text(ncid, gradient_sca_x_id, 'long_name', len_trim(att_text), trim(att_text));
-
-     status = nf_def_var(ncid, 'gradient_sca_y', NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id)
-     if (status .ne. nf_noerr) call handle_err(status)
-     att_text='y component of a gradient at nodes of an element'
-     status = nf_put_att_text(ncid, gradient_sca_y_id, 'long_name', len_trim(att_text), trim(att_text));
+     call my_def_var(ncid, 'zbar',              NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels'                       )
+     call my_def_var(ncid, 'Z',                 NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers'                       )
+     call my_def_var(ncid, 'elem_area',         NF_DOUBLE, 1, (/elem_n_id/), elem_area_id,         'element areas'                         )
+     call my_def_var(ncid, 'nlevels_nod2D',     NF_INT,    1, (/nod_n_id/),  nlevels_nod2D_id,     'number of levels below nodes'          )
+     call my_def_var(ncid, 'nlevels',           NF_INT,    1, (/elem_n_id/), nlevels_id,           'number of levels below elements'       )
+     call my_def_var(ncid, 'nod_in_elem2D_num', NF_INT,    1, (/nod_n_id/),  nod_in_elem2D_num_id, 'number of elements containing the node')
 
 
-     status = nf_enddef(ncid)
-     if (status .ne. nf_noerr) call handle_err(status)
-  end if
+     call my_def_var(ncid, 'nod_area',        NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
+     call my_def_var(ncid, 'elem',            NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
+     call my_def_var(ncid, 'nodes',           NF_DOUBLE, 2, (/nod_n_id,  id_2/), nod_id,             'nodal geo. coordinates'      )
+     call my_def_var(ncid, 'nod_in_elem2D',   NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node')
+     call my_def_var(ncid, 'edges',           NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges'                       )
+     call my_def_var(ncid, 'edge_tri',        NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles'              )
+     call my_def_var(ncid, 'edge_cross_dxdy', NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess'       )
+     call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id, 'x component of a gradient at nodes of an element')
+     call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id, 'y component of a gradient at nodes of an element')
+     call my_nf_enddef(ncid)
 
   ! vercical levels/layers
   if (mype==0) then
@@ -319,25 +284,66 @@ implicit none
      status = nf_close(ncid)
      if (status .ne. nf_noerr) call handle_err(status)
   end if
-end subroutine write_mesh_diag
+end subroutine write_mesh_info
 !
 !============================================================================
 !
-subroutine my_def_var(ncid, pid, short_name, att_text, vtype)
-use g_PARSUP
-USE o_MESH
+subroutine my_def_dim(ncid, short_name, value, id)
 IMPLICIT NONE
 
-integer, intent(in)        :: ncid, pid
-character(:), intent(in)   :: short_name, att_text
-integer                    :: status, lstatus
+integer,      intent(in)   :: ncid, value
+character(*), intent(in)   :: short_name
+integer,      intent(inout):: id
+integer                    :: ierror, status
 
 if (mype==0) then
-   status = nf_def_var(ncid, trim(short_name), vtype, 1, nl_id, pid)
-   if (status .ne. nf_noerr) call handle_err(status)
-   lstatus = nf_put_att_text(ncid, pid, 'long_name', len_trim(att_text), trim(att_text));
+   status =  nf_def_dim(ncid, trim(short_name), value, id)
 end if
 
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+if (status .ne. nf_noerr) call handle_err(status)
 
+end subroutine my_def_dim
+!
+!============================================================================
+!
+subroutine my_def_var(ncid, short_name, vtype, dsize, dids, id, att_text)
+IMPLICIT NONE
+
+integer, intent(in)        :: ncid, dsize, dids(dsize), vtype
+character(*), intent(in)   :: short_name, att_text
+integer,      intent(inout):: id
+integer                    :: ierror, status
+
+if (mype==0) then
+   status = nf_def_var(ncid, trim(short_name), vtype, dsize, dids, id)
+end if
+
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+if (status .ne. nf_noerr) call handle_err(status)
+
+if (mype==0) then
+   status = nf_put_att_text(ncid, id, 'long_name', len_trim(att_text), trim(att_text));
+end if
+
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_def_var
+!
+!============================================================================
+!
+subroutine my_nf_enddef(ncid)
+IMPLICIT NONE
+integer, intent(in)        :: ncid
+integer                    :: ierror, status
+
+if (mype==0) then
+   status = nf_enddef(ncid)
+end if
+
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+if (status .ne. nf_noerr) call handle_err(status)
+end subroutine my_nf_enddef
+
+end module io_mesh_info
