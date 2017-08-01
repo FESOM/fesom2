@@ -26,7 +26,6 @@ MODULES = oce_modules.o \
           gen_modules_read_NetCDF.o \
           gen_modules_forcing.o \
           gen_halo_exchange.o \
-          gen_output_mesh.o \
           gen_support.o \
           psolve.o \
           oce_ale_mixing_kpp.o \
@@ -36,7 +35,8 @@ MODULES = oce_modules.o \
 	  fort_part.o \
           gen_input.o \
           io_meandata.o \
-          io_restart.o
+          io_restart.o \
+          io_mesh_info.o
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\
