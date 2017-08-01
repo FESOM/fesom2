@@ -95,12 +95,12 @@ END DO
 ! U_rhs contains all contributions to velocity from old time steps   
 ! =======================
 t4=MPI_Wtime() 
-! if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
-!    write(*,*) 'Momentum:   ', t4-t1
-!    write(*,*) 'pres., Cor: ', t2-t1
-!    write(*,*) 'h adv       ', t3-t2
-!    write(*,*) 'vert. part  ', t4-t3
-! end if     
+ if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
+    write(*,*) 'Momentum:   ', t4-t1
+    write(*,*) 'pres., Cor: ', t2-t1
+    write(*,*) 'h adv       ', t3-t2
+    write(*,*) 'vert. part  ', t4-t3
+ end if     
 END SUBROUTINE compute_vel_rhs
 ! ===========================================================================
 SUBROUTINE momentum_adv_p1
@@ -386,7 +386,8 @@ IMPLICIT NONE
 
 integer        :: n, nz, el1, el2
 integer        :: nl1, nl2, nod(2), el, ed
-real(kind=WP)  :: un(1:nl-1), wu(1:nl),wv(1:nl), wu1, wu2, wv1, wv2
+real(kind=WP)  :: un1(1:nl-1), wu1(1:nl),wv1(1:nl), wu11, wu12, wv11, wv12
+real(kind=WP)  :: un2(1:nl-1), wu2(1:nl),wv2(1:nl), wu21, wu22, wv21, wv22
 real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
 
 Unode_rhs=0.0_WP
@@ -401,39 +402,39 @@ DO ed=1, myDim_edge2D
 	!___________________________________________________________________________
 	! The vertical part
 	! Here 1/6 because the 1/6 of area is related to the edge
-	wu(1)     = UV(1,1,el1)*elem_area(el1)/6.0_WP
-	wu(2:nl1) = (UV(1,2:nl1,el1)+UV(1,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
-	wu(nl1+1) = 0.0_WP
+	wu1(1)     = UV(1,1,el1)*elem_area(el1)/6.0_WP
+	wu1(2:nl1) = (UV(1,2:nl1,el1)+UV(1,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
+	wu1(nl1+1) = 0.0_WP
 	
-	wv(1)     = UV(2,1,el1)*elem_area(el1)/6.0_WP
-	wv(2:nl1) = (UV(2,2:nl1,el1)+UV(2,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
-	wv(nl1+1) = 0.0_WP
+	wv1(1)     = UV(2,1,el1)*elem_area(el1)/6.0_WP
+	wv1(2:nl1) = (UV(2,2:nl1,el1)+UV(2,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
+	wv1(nl1+1) = 0.0_WP
 
 	!___________________________________________________________________________
 	! The horizontal part
-	un(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-				- UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
+	un1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+                   - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
 	
 	! first edge node
 	! Do not calculate on Halo nodes, as the result will not be used. 
 	! The "if" is cheaper than the avoided computiations.
 	if (nod(1) <= myDim_nod2d) then
 		do nz=1, nl1
-			wu1 = wu(nz)*Wvel_e(nz,nod(1)) - wu(nz+1)*Wvel_e(nz+1,nod(1)) 
-			wv1 = wv(nz)*Wvel_e(nz,nod(1)) - wv(nz+1)*Wvel_e(nz+1,nod(1)) 
+			wu11 = wu1(nz)*Wvel_e(nz,nod(1)) - wu1(nz+1)*Wvel_e(nz+1,nod(1)) 
+			wv11 = wv1(nz)*Wvel_e(nz,nod(1)) - wv1(nz+1)*Wvel_e(nz+1,nod(1)) 
 			! Add horizontal and vertical part in one go         
-			Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un(nz)*UV(1,nz,el1) - wu1/hnode(nz,nod(1))
-			Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un(nz)*UV(2,nz,el1) - wv1/hnode(nz,nod(1))
+			Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) - wu11/hnode(nz,nod(1))
+			Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) - wv11/hnode(nz,nod(1))
 		end do
 	endif
 	! second edge node
 	if  (nod(2) <= myDim_nod2d) then
 		do nz=1, nl1
-			wu2 = wu(nz)*Wvel_e(nz,nod(2)) - wu(nz+1)*Wvel_e(nz+1,nod(2)) 
-			wv2 = wv(nz)*Wvel_e(nz,nod(2)) - wv(nz+1)*Wvel_e(nz+1,nod(2)) 
+			wu12 = wu1(nz)*Wvel_e(nz,nod(2)) - wu1(nz+1)*Wvel_e(nz+1,nod(2)) 
+			wv12 = wv1(nz)*Wvel_e(nz,nod(2)) - wv1(nz+1)*Wvel_e(nz+1,nod(2)) 
 			
-			Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un(nz)*UV(1,nz,el1)-wu2/hnode(nz,nod(2))
-			Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un(nz)*UV(2,nz,el1)-wv2/hnode(nz,nod(2))
+			Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)-wu12/hnode(nz,nod(2))
+			Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)-wv12/hnode(nz,nod(2))
 		end do
 	endif
 	
@@ -442,27 +443,27 @@ DO ed=1, myDim_edge2D
 		nl2 = nlevels(el2)-1
 		!_______________________________________________________________________
 		! vertical
-		wu(1)=UV(1,1,el2)*elem_area(el2)/6.0_WP
-		wu(2:nl2)=(UV(1,2:nl2,el2)+UV(1,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
-		wu(nl2+1)=0.0_WP
+		wu2(1)     = UV(1,1,el2)*elem_area(el2)/6.0_WP
+		wu2(2:nl2) = (UV(1,2:nl2,el2)+UV(1,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
+		wu2(nl2+1) = 0.0_WP
 		
-		wv(1)=UV(2,1,el2)*elem_area(el2)/6.0_WP
-		wv(2:nl2)=(UV(2,2:nl2,el2)+UV(2,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
-		wv(nl2+1)=0.0_WP
+		wv2(1)     = UV(2,1,el2)*elem_area(el2)/6.0_WP
+		wv2(2:nl2) = (UV(2,2:nl2,el2)+UV(2,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
+		wv2(nl2+1) = 0.0_WP
 		
 		!_______________________________________________________________________
 		! horizontal   
-		un(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
-					+ UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
+		un2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
+                             + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
 		
 		!_______________________________________________________________________
 		if (nod(1) <= myDim_nod2d) then
 			do nz=1, nl2
-				wu1 = wu(nz)*Wvel_e(nz,nod(1)) - wu(nz+1)*Wvel_e(nz+1,nod(1)) 
-				wv1 = wv(nz)*Wvel_e(nz,nod(1)) - wv(nz+1)*Wvel_e(nz+1,nod(1))  
+				wu21 = wu2(nz)*Wvel_e(nz,nod(1)) - wu2(nz+1)*Wvel_e(nz+1,nod(1)) 
+				wv21 = wv2(nz)*Wvel_e(nz,nod(1)) - wv2(nz+1)*Wvel_e(nz+1,nod(1))  
 				
-				Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) +un(nz)*UV(1,nz,el2) -wu1/hnode(nz,nod(1))
-				Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) +un(nz)*UV(2,nz,el2) -wv1/hnode(nz,nod(1))
+				Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) +un2(nz)*UV(1,nz,el2) -wu21/hnode(nz,nod(1))
+				Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) +un2(nz)*UV(2,nz,el2) -wv21/hnode(nz,nod(1))
 				
 			end do
 		endif
@@ -470,11 +471,11 @@ DO ed=1, myDim_edge2D
 		!_______________________________________________________________________
 		if (nod(2) <= myDim_nod2d) then
 			do nz=1, nl2
-				wu2 = wu(nz)*Wvel_e(nz,nod(2)) - wu(nz+1)*Wvel_e(nz+1,nod(2)) 
-				wv2 = wv(nz)*Wvel_e(nz,nod(2)) - wv(nz+1)*Wvel_e(nz+1,nod(2))  
+				wu22 = wu2(nz)*Wvel_e(nz,nod(2)) - wu2(nz+1)*Wvel_e(nz+1,nod(2)) 
+				wv22 = wv2(nz)*Wvel_e(nz,nod(2)) - wv2(nz+1)*Wvel_e(nz+1,nod(2))  
 				
-				Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) -un(nz)*UV(1,nz,el2) -wu2/hnode(nz,nod(2))
-				Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) -un(nz)*UV(2,nz,el2) -wv2/hnode(nz,nod(2))
+				Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) -un2(nz)*UV(1,nz,el2) -wu22/hnode(nz,nod(2))
+				Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) -un2(nz)*UV(2,nz,el2) -wv22/hnode(nz,nod(2))
 				
 			end do
 		endif
