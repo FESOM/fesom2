@@ -32,7 +32,7 @@ end do
 ! ====================
 !to avoid if condition inside the loop
 use_pice=0._WP
-if (.not. use_virt_salt) use_pice=1._WP
+if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1._WP
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
    
