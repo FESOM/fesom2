@@ -13,13 +13,13 @@ subroutine solve_tracers_ale
 	implicit none
 	integer :: tr_num
 	real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
-        ! update 3D velocities with the bolus velocities:
-        ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
-        ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
-        if (Fer_GM) then
-           UV  =UV  +fer_UV
-           Wvel_e=Wvel_e+fer_Wvel
-        end if
+	! update 3D velocities with the bolus velocities:
+	! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
+	! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
+	if (Fer_GM) then
+		UV    =UV    +fer_UV
+		Wvel_e=Wvel_e+fer_Wvel
+	end if
 	!___________________________________________________________________________
 	! loop over all tracers 
 	do tr_num=1,num_tracers
@@ -36,21 +36,15 @@ subroutine solve_tracers_ale
 		! relax to salt and temp climatology
 		call relax_to_clim(tr_num)
 		
-		! BRECHSTANGE: prevent temperature from running away to negative values
-		! --> should violate tracer conservation
-! 		if (tr_num==1) then
-! 			where(tr_arr(:,:,1)<-2.1_WP)  tr_arr(:,:,1)=-2.1_WP
-! 		end	if
-		
-                call exchange_nod(tr_arr(:,:,tr_num))		
+		call exchange_nod(tr_arr(:,:,tr_num))		
 	end do
-        
-        ! subtract the the bolus velocities back from 3D velocities:
-        if (Fer_GM) then
-           UV  =UV  -fer_UV
-           Wvel_e=Wvel_e-fer_Wvel
-        end if
-
+	
+	! subtract the the bolus velocities back from 3D velocities:
+	if (Fer_GM) then
+		UV    =UV    -fer_UV
+		Wvel_e=Wvel_e-fer_Wvel
+	end if
+	
 end subroutine solve_tracers_ale
 !
 !
@@ -138,7 +132,6 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 		! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
 		deltaX1=edge_cross_dxdy(1,ed)
 		deltaY1=edge_cross_dxdy(2,ed)
-		
 		
 		! same parameter but for other element el(2) that contributes to edge ed
 		! if el(2)==0 than edge is boundary edge
@@ -584,15 +577,16 @@ subroutine diff_tracers_ale(tr_num)
 	! do horizontal diffusiion
 	! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
 	! in danilovs srcipt
-        ! includes Redi diffusivity if Redi=.true.
+	! includes Redi diffusivity if Redi=.true.
 	call diff_part_hor_redi ! seems to be ~9% faster than diff_part_hor
 	
 	!___________________________________________________________________________
 	! do vertical diffusion: explicite 
 	if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
-        ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
-        ! derivatives and has to be computed explicitly!
-        if (Redi) call diff_ver_part_redi_expl
+	! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
+	! derivatives and has to be computed explicitly!
+	if (Redi) call diff_ver_part_redi_expl
+	
 	!___________________________________________________________________________
 	! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
 	! to finite volume" 
@@ -606,9 +600,10 @@ subroutine diff_tracers_ale(tr_num)
 		! WHY NOT ??? --> whats advantage of above --> tested it --> the upper 
 		! equation has a 30% smaller nummerical drift
 		!tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
- 		!                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+		!                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
 		
 	end do
+	
 	!___________________________________________________________________________
 	if (i_vert_diff) then
 		! do vertical diffusion: implicite 
@@ -698,10 +693,10 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	integer             :: nz, n, nzmax,tr_num
 	real(kind=WP)       :: m, zinv, dt_inv, dz
 	real(kind=WP)       :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
-        real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
+	real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
 	real(kind=WP)       :: isredi=0._WP
-
-        if (Redi) isredi=1._WP
+	
+	if (Redi) isredi=1._WP
 	dt_inv=1.0_WP/dt
 	Ty    =0.0_WP
 	Ty1   =0.0_WP
@@ -778,8 +773,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
- 	        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,  n)**2 + &
- 		     (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
+		Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,  n)**2 + &
+			 (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
 		Ty1=Ki(n)*Ty1*isredi
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
 		a(nz)=0.0_WP
@@ -791,7 +786,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		v_adv=zinv*area(2,n)/area(1,n)
 		b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
 		c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
-	
+		
 		! backup zinv2 for next depth level
 		zinv1=zinv2
 		
@@ -801,13 +796,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 			! 1/dz(nz)
 			zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
- 		        ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
+			! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 			Ty = (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
 			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
- 			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
- 			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
-		        Ty =Ki(n)*Ty *isredi
-		        Ty1=Ki(n)*Ty1*isredi
+			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
+			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
+			Ty =Ki(n)*Ty *isredi
+			Ty1=Ki(n)*Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 			a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -817,13 +812,13 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			zinv1=zinv2
 			
 			! update from the vertical advection
- 			v_adv=zinv
- 			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
- 			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
- 			
- 			v_adv=v_adv*area(nz+1,n)/area(nz,n)
- 			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
- 			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+			v_adv=zinv
+			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
+			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+			
+			v_adv=v_adv*area(nz+1,n)/area(nz,n)
+			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
 		end do ! --> do nz=2, nzmax-2
 		
 		!_______________________________________________________________________
@@ -833,18 +828,18 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-	        Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
- 		    (zbar_n(nz)-Z_n(nz))  *zinv1 *slope_tapered(3,nz,n)**2
-	        Ty =Ki(n)*Ty *isredi
+		Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
+			(zbar_n(nz)-Z_n(nz))  *zinv1 *slope_tapered(3,nz,n)**2
+		Ty =Ki(n)*Ty *isredi
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
 		c(nz)=0.0_WP
 		b(nz)=-a(nz)+hnode_new(nz,n)
 		
 		! update from the vertical advection
- 		v_adv=zinv
- 		a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
- 		b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+		v_adv=zinv
+		a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
+		b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
 		
 		!_______________________________________________________________________
 		! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...tr_arr
@@ -857,20 +852,20 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
 		!  |--> a(1)=0
 		nz=1
-                dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
-                tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+		dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
+		tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 		!tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
 		do nz=2,nzmax-2
-                   dz=hnode_new(nz,n)
-                   tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
-		   !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
-		   !       -c(nz)*tr_arr(nz+1,n,tr_num) &
-		   !       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
+			dz=hnode_new(nz,n)
+			tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
+			!tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
+			!       -c(nz)*tr_arr(nz+1,n,tr_num) &
+			!       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
 		end do
 		nz=nzmax-1
-                dz=hnode_new(nz,n)
-                tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
-	        !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
+		dz=hnode_new(nz,n)
+		tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
+		!tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
 		
 		!_______________________________________________________________________
 		! case of activated shortwave penetration into the ocean, ad 3d contribution
@@ -924,7 +919,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			!     by forming/melting of sea ice
 			! --> rsss*water_flux(n) : virtual salt flux 
 			tr(1)= tr(1)  +  zinv*( &
-									virtual_salt(n) &
+									virtual_salt(n) & !--> is zeros for zlevel/zstar
 									+ relax_salt(n) &
 									- real_salt_flux(n)*is_nonlinfs)
 		endif
@@ -982,6 +977,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	
 end subroutine diff_ver_part_impl_ale
 !
+!
 !===============================================================================
 subroutine diff_ver_part_redi_expl
 	use o_ARRAYS
@@ -995,30 +991,30 @@ subroutine diff_ver_part_redi_expl
 	integer         :: n2,nl1,nl2,nz,n
 	real(kind=WP)   :: Tx, Ty
 	real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D), vd_flux(nl)
-
+	
 	do n=1, myDim_nod2D
-                nl1=nlevels_nod2D(n)-1
-		DO nz=1, nl1
-           		Tx=0.0_WP
+		nl1=nlevels_nod2D(n)-1
+		do nz=1, nl1
+			Tx=0.0_WP
 			Ty=0.0_WP
-			DO k=1, nod_in_elem2D_num(n)
-           			elem=nod_in_elem2D(k,n)
-				if(nz.LE.(nlevels(elem)-1)) then
-           				Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
-	   				Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
-				endif
-        		END DO
-			tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
-			tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
-        	END DO
+			do k=1, nod_in_elem2D_num(n)
+			elem=nod_in_elem2D(k,n)
+			if(nz.LE.(nlevels(elem)-1)) then
+				Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
+				Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
+			endif
+		end do
+		tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
+		tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
+		end do
 	end do
-      
+	
 	! call exchange_nod_begin(tr_xynodes)  !NR the halo is not needed
-
-	DO n=1, myDim_nod2D
+	
+	do n=1, myDim_nod2D
 		nl1=nlevels_nod2D(n)-1
 		vd_flux=0d0
-
+		
 		zbar_n=0.0_WP
 		Z_n   =0.0_WP
 		zbar_n(nl1+1)=zbar(nl1+1)
@@ -1028,24 +1024,26 @@ subroutine diff_ver_part_redi_expl
 			Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
 		end do
 		zbar_n(1) = zbar_n(2) + hnode_new(1,n)
-
+		
 		do nz=2,nl1
-  			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
+			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
 				*tr_xynodes(2,nz-1,n) ) &
-     		 		+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
+					+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
 				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
- 		   del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
-	ENDDO
-end subroutine diff_ver_part_redi_expl
+	end do
+end subroutine diff_ver_part_redi_expl!
+!
+!
 !===============================================================================
 subroutine diff_part_hor_redi
 	use o_ARRAYS
 	use g_PARSUP
 	use o_MESH
-	USE o_param
+	use o_param
 	use g_config
 	IMPLICIT NONE
 	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
@@ -1054,9 +1052,9 @@ subroutine diff_part_hor_redi
 	real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
 	real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh, dz
 	real(kind=WP)   :: isredi=0._WP
-
-        if (Redi) isredi=1._WP
-        
+	
+	if (Redi) isredi=1._WP
+	
 	do edge=1, myDim_edge2D
 		rhs1=0.0_WP
 		rhs2=0.0_WP
@@ -1077,12 +1075,12 @@ subroutine diff_part_hor_redi
 			deltaX2=edge_cross_dxdy(3,edge)
 			deltaY2=edge_cross_dxdy(4,edge)
 		endif
-                !Kh=K_hor*Kh/scale_area
+		!Kh=K_hor*Kh/scale_area
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
 			dz=sum(helem(nz, el))/2.0_WP
-                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
 			SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=0.5_WP*(tr_xy(1,nz,el(1))+tr_xy(1,nz,el(2)))
@@ -1097,9 +1095,9 @@ subroutine diff_part_hor_redi
 		!_______________________________________________________________________
 		do nz=n2+1,nl1
 			dz=helem(nz, el(1))
-                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
-                        SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
-                        SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
+			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
+			SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=tr_xy(1,nz,el(1))
 			Ty=tr_xy(2,nz,el(1))
 			Fx=Kh*(Tx+SxTz*isredi)
@@ -1110,9 +1108,9 @@ subroutine diff_part_hor_redi
 		end do
 		do nz=n2+1,nl2
 			dz=helem(nz, el(2))
-                        Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
-                        SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
-                        SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
+			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
+			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
+			SyTz=sum(Tz*slope_tapered(2,nz,enodes))/2.0_WP
 			Tx=tr_xy(1,nz,el(2))
 			Ty=tr_xy(2,nz,el(2))
 			Fx=Kh*(Tx+SxTz*isredi)
