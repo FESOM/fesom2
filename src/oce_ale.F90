@@ -1082,13 +1082,14 @@ subroutine vert_vel_ale
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
 		do n=1, myDim_nod2D
 			! --> be careful Sergey suggest in his paper to use the unperturbed
-			!     ocean levels NOT the actual one !!!
-			dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
-! 			dd1=zbar(nlevels_nod2D_min(n)-1)
+			!     ocean levels NOT the actual one !!! but spoke with Sergey its not 
+			!     so important which to use as long as volume is conserved
+			! dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
+			dd1=zbar(nlevels_nod2D_min(n)-1)
 			
 			! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-			dd=zbar_3d_n(1,n)-dd1    
-! 			dd=zbar(1)-dd1    
+			! dd=zbar_3d_n(1,n)-dd1    
+			dd=zbar(1)-dd1    
 			
 			! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
 			! 1/H*dhbar
@@ -1109,10 +1110,11 @@ subroutine vert_vel_ale
 				!     the vertical integration bottom to top of Wvel
 				! --> be careful Sergey suggest in his paper to use the unperturbed
 				!     layerthicknesses NOT the actual layerthicknesses !!!
-				Wvel(nz,n)     =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
-! 				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
-				hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
-! 				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
+				
+				! Wvel(nz,n)     =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
+				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
+				! hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
+				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
 			end do
 			
 			! Add surface fresh water flux as upper boundary condition for 
