@@ -385,12 +385,39 @@ use g_comm_auto
 IMPLICIT NONE
 
 integer        :: n, nz, el1, el2
-integer        :: nl1, nl2, nod(2), el, ed
-real(kind=WP)  :: un1(1:nl-1), wu1(1:nl),wv1(1:nl), wu11, wu12, wv11, wv12
-real(kind=WP)  :: un2(1:nl-1), wu2(1:nl),wv2(1:nl), wu21, wu22, wv21, wv22
+integer        :: nl1, nl2, nod(2), el, ed, k, nle
+real(kind=WP)  :: un1(1:nl-1),  wu11, wu12, wv11, wv12
+real(kind=WP)  :: un2(1:nl-1), wu_sum(1:nl),wv_sum(1:nl), wu_diff, wv_diff
+real(kind=WP)  :: wu(1:nl),wv(1:nl)
 real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
 
-Unode_rhs=0.0_WP
+
+
+!_______________________________________________________________________________
+do n=1,myDim_nod2d
+   nl1 = nlevels_nod2D(n)-1
+   wu_sum(1:nl1+1) = 0._WP
+   wv_sum(1:nl1+1) = 0._WP
+
+   do k=1,nod_in_elem2D_num(n)
+      el = nod_in_elem2D(k,n)
+      nle = nlevels(el)-1	
+   !___________________________________________________________________________
+   ! The vertical part
+      wu_sum(1) = wu_sum(1) + UV(1,1,el)*elem_area(el)
+      wv_sum(1) = wv_sum(1) + UV(2,1,el)*elem_area(el)
+       
+      wu_sum(2:nle) = wu_sum(2:nle) + 0.5_WP*(UV(1,2:nle,el)+UV(1,1:nle-1,el))*elem_area(el)
+      wv_sum(2:nle) = wv_sum(2:nle) + 0.5_WP*(UV(2,2:nle,el)+UV(2,1:nle-1,el))*elem_area(el)
+   enddo
+
+   do nz=1,nl1
+      ! Here 1/3 because the 1/3 of area is related to the node
+      Unode_rhs(1,nz,n) = - (wu_sum(nz)*Wvel_e(nz,n) - wu_sum(nz+1)*Wvel_e(nz+1,n) ) / (3._WP*hnode(nz,n)) 
+      Unode_rhs(2,nz,n) = - (wv_sum(nz)*Wvel_e(nz,n) - wv_sum(nz+1)*Wvel_e(nz+1,n) ) / (3._WP*hnode(nz,n)) 
+   enddo
+end do
+
 
 !_______________________________________________________________________________
 DO ed=1, myDim_edge2D
@@ -398,17 +425,6 @@ DO ed=1, myDim_edge2D
 	el1  = edge_tri(1,ed)   
 	el2  = edge_tri(2,ed)
 	nl1 = nlevels(el1)-1
-	
-	!___________________________________________________________________________
-	! The vertical part
-	! Here 1/6 because the 1/6 of area is related to the edge
-	wu1(1)     = UV(1,1,el1)*elem_area(el1)/6.0_WP
-	wu1(2:nl1) = (UV(1,2:nl1,el1)+UV(1,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
-	wu1(nl1+1) = 0.0_WP
-	
-	wv1(1)     = UV(2,1,el1)*elem_area(el1)/6.0_WP
-	wv1(2:nl1) = (UV(2,2:nl1,el1)+UV(2,1:nl1-1,el1))*0.5_WP*elem_area(el1)/6.0_WP
-	wv1(nl1+1) = 0.0_WP
 
 	!___________________________________________________________________________
 	! The horizontal part
@@ -420,36 +436,22 @@ DO ed=1, myDim_edge2D
 	! The "if" is cheaper than the avoided computiations.
 	if (nod(1) <= myDim_nod2d) then
 		do nz=1, nl1
-			wu11 = wu1(nz)*Wvel_e(nz,nod(1)) - wu1(nz+1)*Wvel_e(nz+1,nod(1)) 
-			wv11 = wv1(nz)*Wvel_e(nz,nod(1)) - wv1(nz+1)*Wvel_e(nz+1,nod(1)) 
-			! Add horizontal and vertical part in one go         
-			Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) - wu11/hnode(nz,nod(1))
-			Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) - wv11/hnode(nz,nod(1))
+
+			Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
+			Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
 		end do
 	endif
 	! second edge node
 	if  (nod(2) <= myDim_nod2d) then
 		do nz=1, nl1
-			wu12 = wu1(nz)*Wvel_e(nz,nod(2)) - wu1(nz+1)*Wvel_e(nz+1,nod(2)) 
-			wv12 = wv1(nz)*Wvel_e(nz,nod(2)) - wv1(nz+1)*Wvel_e(nz+1,nod(2)) 
-			
-			Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)-wu12/hnode(nz,nod(2))
-			Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)-wv12/hnode(nz,nod(2))
+			Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
+			Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
 		end do
 	endif
 	
 	!___________________________________________________________________________
 	if (el2>0) then
 		nl2 = nlevels(el2)-1
-		!_______________________________________________________________________
-		! vertical
-		wu2(1)     = UV(1,1,el2)*elem_area(el2)/6.0_WP
-		wu2(2:nl2) = (UV(1,2:nl2,el2)+UV(1,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
-		wu2(nl2+1) = 0.0_WP
-		
-		wv2(1)     = UV(2,1,el2)*elem_area(el2)/6.0_WP
-		wv2(2:nl2) = (UV(2,2:nl2,el2)+UV(2,1:nl2-1,el2))*0.5_WP*elem_area(el2)/6.0_WP
-		wv2(nl2+1) = 0.0_WP
 		
 		!_______________________________________________________________________
 		! horizontal   
@@ -459,11 +461,8 @@ DO ed=1, myDim_edge2D
 		!_______________________________________________________________________
 		if (nod(1) <= myDim_nod2d) then
 			do nz=1, nl2
-				wu21 = wu2(nz)*Wvel_e(nz,nod(1)) - wu2(nz+1)*Wvel_e(nz+1,nod(1)) 
-				wv21 = wv2(nz)*Wvel_e(nz,nod(1)) - wv2(nz+1)*Wvel_e(nz+1,nod(1))  
-				
-				Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) +un2(nz)*UV(1,nz,el2) -wu21/hnode(nz,nod(1))
-				Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) +un2(nz)*UV(2,nz,el2) -wv21/hnode(nz,nod(1))
+				Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) +un2(nz)*UV(1,nz,el2) 
+				Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) +un2(nz)*UV(2,nz,el2) 
 				
 			end do
 		endif
@@ -471,11 +470,8 @@ DO ed=1, myDim_edge2D
 		!_______________________________________________________________________
 		if (nod(2) <= myDim_nod2d) then
 			do nz=1, nl2
-				wu22 = wu2(nz)*Wvel_e(nz,nod(2)) - wu2(nz+1)*Wvel_e(nz+1,nod(2)) 
-				wv22 = wv2(nz)*Wvel_e(nz,nod(2)) - wv2(nz+1)*Wvel_e(nz+1,nod(2))  
-				
-				Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) -un2(nz)*UV(1,nz,el2) -wu22/hnode(nz,nod(2))
-				Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) -un2(nz)*UV(2,nz,el2) -wv22/hnode(nz,nod(2))
+				Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) -un2(nz)*UV(1,nz,el2)
+				Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) -un2(nz)*UV(2,nz,el2)
 				
 			end do
 		endif
@@ -484,9 +480,11 @@ end do
 
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
-	nl1 = nlevels_nod2D(n)-1
-	Unode_rhs(1,1:nl1,n) = Unode_rhs(1,1:nl1,n) *area_inv(1:nl1,n)
-	Unode_rhs(2,1:nl1,n) = Unode_rhs(2,1:nl1,n) *area_inv(1:nl1,n)
+   nl1 = nlevels_nod2D(n)-1
+   
+   Unode_rhs(1,1:nl1,n) = Unode_rhs(1,1:nl1,n) *area_inv(1:nl1,n)
+   Unode_rhs(2,1:nl1,n) = Unode_rhs(2,1:nl1,n) *area_inv(1:nl1,n)
+   
 end do
 
 !_______________________________________________________________________________
