@@ -90,9 +90,10 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+  logical 						:: use_floatice = .false.
   logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
-  namelist /run_config/ use_ice, use_sw_pene, toy_ocean
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean
   
   ! *** others ***
   real(kind=8)             	:: dt

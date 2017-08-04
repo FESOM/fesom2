@@ -172,6 +172,12 @@ subroutine init_thickness_ale
 	implicit none
 	integer :: n, nz, elem, elnodes(3)
 	real(kind=WP) :: dd 
+	
+	if(mype==0) then
+		write(*,*) '____________________________________________________________'
+		write(*,*) ' --> initialise ALE layerthicknesses, depth levels and middepth levels'
+		write(*,*)
+	end if
 	!___________________________________________________________________________
 	! Fill in ssh_rhs_old
 	ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
@@ -333,12 +339,13 @@ subroutine update_thickness_ale
 		do elem=1,myDim_elem2D
 			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
 		end do
-		
 	elseif (trim(which_ale)=='zstar' ) then
 		!_______________________________________________________________________
 		! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
 		!_______________________________________________________________________
 		! --> update layer thinkness at depth layer and node
+		zbar_3d_n=0.0_WP
+		Z_3d_n   =0.0_WP
 		do n=1, myDim_nod2D+eDim_nod2D
 			do nz=1,nlevels_nod2D_min(n)-2
 				hnode(nz,n) = hnode_new(nz,n)
@@ -346,8 +353,6 @@ subroutine update_thickness_ale
 			
 			! actualize 3d depth levels and mid-depth levels from bottom to top
 			nzmax=nlevels_nod2D(n)
-			zbar_3d_n=0.0_WP
-			Z_3d_n   =0.0_WP
 			zbar_3d_n(nzmax,n)=zbar(nzmax)
 			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
 			do nz=nzmax-1,2,-1
@@ -400,7 +405,6 @@ subroutine restart_thickness_ale
 		! fluid depth on elements (dhe)
 		do elem=1,myDim_elem2D
 			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
-			
 			elnodes=elem2D_nodes(:,elem)
 			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
 		end do
@@ -410,16 +414,18 @@ subroutine restart_thickness_ale
 		! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
 		!_______________________________________________________________________
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
-		nzmax=nlevels_nod2D(n)
 		zbar_3d_n=0.0_WP
 		Z_3d_n   =0.0_WP
-		zbar_3d_n(nzmax,n)=zbar(nzmax)
-		Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
-		do nz=nzmax-1,2,-1
-			zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
-			Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+		do n=1, myDim_nod2D+eDim_nod2D
+			nzmax=nlevels_nod2D(n)
+			zbar_3d_n(nzmax,n)=zbar(nzmax)
+			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
+			do nz=nzmax-1,2,-1
+				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
+				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+			end do
+			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 		end do
-		zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 		
 		! restart element layer thinkness (helem) and the increment of total 
 		! fluid depth on elements (dhe)
@@ -961,6 +967,8 @@ subroutine vert_vel_ale
 	
 	integer       :: el(2), enodes(2), n, nz, ed
 	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt 
+	real(kind=WP) :: dhbar, dhbar_rest,dhbar_aux , limit_hnode=2.0_WP !PS
+	integer 	  :: nzmin 
 	
 	!___________________________________________________________________________
 	! Contributions from levels in divergence
@@ -1072,11 +1080,15 @@ subroutine vert_vel_ale
 		
 	elseif (trim(which_ALE)=='zstar') then
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
-		dO n=1, myDim_nod2D
+		do n=1, myDim_nod2D
+			! --> be careful Sergey suggest in his paper to use the unperturbed
+			!     ocean levels NOT the actual one !!!
 			dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
+! 			dd1=zbar(nlevels_nod2D_min(n)-1)
 			
 			! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-			dd=zbar_3d_n(1,n)-dd1                      
+			dd=zbar_3d_n(1,n)-dd1    
+! 			dd=zbar(1)-dd1    
 			
 			! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
 			! 1/H*dhbar
@@ -1084,7 +1096,7 @@ subroutine vert_vel_ale
 			
 			! 1/H*dhbar/dt
 			dddt=dd/dt
-			dO nz=1,nlevels_nod2D_min(n)-2
+			do nz=1,nlevels_nod2D_min(n)-2
 				! why  *(zbar(nz)-dd1) ??? 
 				! because here Wvel_k = SUM_k:kmax(div(h_k*v_k))/V_k
 				! but Wvel_k = Wvel_k+1 - div(h_k*v_k) - h⁰_k/H*dhbar/dt
@@ -1093,16 +1105,29 @@ subroutine vert_vel_ale
 				!
 				!     Wvel_k = SUM_i=k:kmax(div(h_i*v_i)) + 1/H*dhbar/dt*SUM_i=k:kmax(h⁰_k)
 				! SUM_i=k:kmax(h⁰_k) == (zbar(nz)-dd1)
-				Wvel(nz,n)=Wvel(nz,n)-dddt*(zbar_3d_n(nz,n)-dd1) 
-				hnode_new(nz,n)=(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
-! 				hnode_new(nz,n)=hnode(nz,n) + (zbar(nz)-zbar(nz+1))*dd ! ????
+				! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from 
+				!     the vertical integration bottom to top of Wvel
+				! --> be careful Sergey suggest in his paper to use the unperturbed
+				!     layerthicknesses NOT the actual layerthicknesses !!!
+				Wvel(nz,n)     =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
+! 				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
+				hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
+! 				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
 			end do
+			
+			! Add surface fresh water flux as upper boundary condition for 
+			! continutity
 			Wvel(1,n)=Wvel(1,n)-water_flux(n) 
+			
 		end do
 		! The implementation here is a bit strange, but this is to avoid 
 		! unnecessary multiplications and divisions by area. We use the fact 
 		! that we apply stretching only over the part of the column
 		! where area(nz,n)=area(1,n)
+	endif
+	
+	if (any(hnode_new<0.0)) then
+		write(*,*) ' --> fatal problem <--: layerthickness of a layer became smaller zero'
 	endif
 	
 	!___________________________________________________________________________
@@ -1406,9 +1431,6 @@ subroutine oce_timestep_ale(n)
 	
 	t1=MPI_Wtime()
 	
-! 	heat_flux=0.0_WP
-! 	water_flux=0.0_WP
-	
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
 	!___________________________________________________________________________
@@ -1489,9 +1511,9 @@ subroutine oce_timestep_ale(n)
 		call fer_gamma2vel
 	end if
 	t6=MPI_Wtime() 
-	!---------------------------------------------------------------------------
 	
-	! The main step of ALE procedure --> this is were the magic happens --> here 
+	!---------------------------------------------------------------------------
+	!The main step of ALE procedure --> this is were the magic happens --> here 
 	! is decided how change in hbar is distributed over the vertical layers
 	call vert_vel_ale 
 	t7=MPI_Wtime() 
@@ -1502,6 +1524,7 @@ subroutine oce_timestep_ale(n)
 	
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
+	
 	t9=MPI_Wtime() 
 	
 	!___________________________________________________________________________
@@ -1711,6 +1734,7 @@ subroutine oce_timestep_ale(n)
 					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
 					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
 					write(*,*)
+					write(*,*) 'hnode       = ',hnode(:,el)
 					write(*,*) 'hnode_new   = ',hnode_new(:,el)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,el)
@@ -1797,5 +1821,4 @@ subroutine oce_timestep_ale(n)
 		end do
 	end if !-->if (mod(n,logfile_outfreq)==0) then
 	
-! #endif	
 end subroutine oce_timestep_ale

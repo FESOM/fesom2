@@ -181,15 +181,15 @@ subroutine integrate_nod_2D(data, int2D)
   real(kind=WP), intent(inout)    :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval, gval
+  real(kind=WP) :: lval
 
   lval=0.0
   do row=1, myDim_nod2D
      lval=lval+data(row)*area(1,row)
   end do
 
-  gval=0.0
-  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  int2D=0.0
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_WORLD, MPIerr)
 end subroutine integrate_nod_2D
 end module g_support

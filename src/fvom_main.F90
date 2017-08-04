@@ -20,6 +20,7 @@ use g_comm_auto
 use g_forcing_arrays
 use io_RESTART
 use io_MEANDATA
+use io_mesh_info
 IMPLICIT NONE
 
 integer :: n, nsteps,offset,row,i
@@ -58,7 +59,9 @@ integer :: n, nsteps,offset,row,i
 	! if l_read the restart will be read
 	! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
 	call restart(0, .false., r_restart) ! istep, l_write, l_read
-	
+        ! store grid information into netcdf file
+	if (.not. r_restart) call write_mesh_info
+
 	!___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
 	!___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
 	if (r_restart==.true. .and. use_ALE==.true.) then
