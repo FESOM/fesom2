@@ -746,6 +746,5 @@ END DO
 !NR    END DO 
 !NR END DO
 
-if (mype==20) print *,'check',sum(UV_rhs(1,:,1:myDim_elem2D)),sum(UV_rhs(2,:,1:myDim_elem2D))
 
 end subroutine viscosity_filt2x
