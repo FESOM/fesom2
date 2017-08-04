@@ -95,12 +95,12 @@ END DO
 ! U_rhs contains all contributions to velocity from old time steps   
 ! =======================
 t4=MPI_Wtime() 
- if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
-    write(*,*) 'Momentum:   ', t4-t1
-    write(*,*) 'pres., Cor: ', t2-t1
-    write(*,*) 'h adv       ', t3-t2
-    write(*,*) 'vert. part  ', t4-t3
- end if     
+! if (mod(mstep,logfile_outfreq)==0 .and. mype==0) then
+!    write(*,*) 'Momentum:   ', t4-t1
+!    write(*,*) 'pres., Cor: ', t2-t1
+!    write(*,*) 'h adv       ', t3-t2
+!    write(*,*) 'vert. part  ', t4-t3
+! end if     
 END SUBROUTINE compute_vel_rhs
 ! ===========================================================================
 SUBROUTINE momentum_adv_p1
@@ -386,9 +386,8 @@ IMPLICIT NONE
 
 integer        :: n, nz, el1, el2
 integer        :: nl1, nl2, nod(2), el, ed, k, nle
-real(kind=WP)  :: un1(1:nl-1),  wu11, wu12, wv11, wv12
-real(kind=WP)  :: un2(1:nl-1), wu_sum(1:nl),wv_sum(1:nl), wu_diff, wv_diff
-real(kind=WP)  :: wu(1:nl),wv(1:nl)
+real(kind=WP)  :: un1(1:nl-1), un2(1:nl-1)
+real(kind=WP)  :: wu(1:nl), wv(1:nl)
 real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
 
 
@@ -396,86 +395,99 @@ real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
    nl1 = nlevels_nod2D(n)-1
-   wu_sum(1:nl1+1) = 0._WP
-   wv_sum(1:nl1+1) = 0._WP
+   wu(1:nl1+1) = 0._WP
+   wv(1:nl1+1) = 0._WP
 
    do k=1,nod_in_elem2D_num(n)
       el = nod_in_elem2D(k,n)
       nle = nlevels(el)-1	
    !___________________________________________________________________________
-   ! The vertical part
-      wu_sum(1) = wu_sum(1) + UV(1,1,el)*elem_area(el)
-      wv_sum(1) = wv_sum(1) + UV(2,1,el)*elem_area(el)
-       
-      wu_sum(2:nle) = wu_sum(2:nle) + 0.5_WP*(UV(1,2:nle,el)+UV(1,1:nle-1,el))*elem_area(el)
-      wv_sum(2:nle) = wv_sum(2:nle) + 0.5_WP*(UV(2,2:nle,el)+UV(2,1:nle-1,el))*elem_area(el)
+   ! The vertical part for each element is collected
+      wu(1) = wu(1) + UV(1,1,el)*elem_area(el)
+      wv(1) = wv(1) + UV(2,1,el)*elem_area(el)
+             
+      wu(2:nle) = wu(2:nle) + 0.5_WP*(UV(1,2:nle,el)+UV(1,1:nle-1,el))*elem_area(el)
+      wv(2:nle) = wv(2:nle) + 0.5_WP*(UV(2,2:nle,el)+UV(2,1:nle-1,el))*elem_area(el)
    enddo
 
+   wu(1:nl1) = wu(1:nl1)*Wvel_e(1:nl1,n)
+   wv(1:nl1) = wv(1:nl1)*Wvel_e(1:nl1,n)
+
    do nz=1,nl1
-      ! Here 1/3 because the 1/3 of area is related to the node
-      Unode_rhs(1,nz,n) = - (wu_sum(nz)*Wvel_e(nz,n) - wu_sum(nz+1)*Wvel_e(nz+1,n) ) / (3._WP*hnode(nz,n)) 
-      Unode_rhs(2,nz,n) = - (wv_sum(nz)*Wvel_e(nz,n) - wv_sum(nz+1)*Wvel_e(nz+1,n) ) / (3._WP*hnode(nz,n)) 
+      ! Here 1/3 because 1/3 of the area is related to the node
+      Unode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
+      Unode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
+      
    enddo
+
+   ! To get a clean checksum, set the remaining values to zero
+   Unode_rhs(1:2,nl1+1:nl-1,n) = 0.
+
 end do
 
 
 !_______________________________________________________________________________
 DO ed=1, myDim_edge2D
-	nod = edges(:,ed)   
-	el1  = edge_tri(1,ed)   
-	el2  = edge_tri(2,ed)
-	nl1 = nlevels(el1)-1
+   nod = edges(:,ed)   
+   el1  = edge_tri(1,ed)   
+   el2  = edge_tri(2,ed)
+   nl1 = nlevels(el1)-1
 
-	!___________________________________________________________________________
-	! The horizontal part
-	un1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-                   - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
-	
-	! first edge node
-	! Do not calculate on Halo nodes, as the result will not be used. 
-	! The "if" is cheaper than the avoided computiations.
-	if (nod(1) <= myDim_nod2d) then
-		do nz=1, nl1
+   !___________________________________________________________________________
+   ! The horizontal part
+   un1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+              - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
+   
+   !___________________________________________________________________________
+   if (el2>0) then
+      nl2 = nlevels(el2)-1
+      
+      un2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
+                   + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
 
-			Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-			Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
-		end do
-	endif
-	! second edge node
-	if  (nod(2) <= myDim_nod2d) then
-		do nz=1, nl1
-			Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-			Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
-		end do
-	endif
-	
-	!___________________________________________________________________________
-	if (el2>0) then
-		nl2 = nlevels(el2)-1
-		
-		!_______________________________________________________________________
-		! horizontal   
-		un2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
-                             + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
-		
-		!_______________________________________________________________________
-		if (nod(1) <= myDim_nod2d) then
-			do nz=1, nl2
-				Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) +un2(nz)*UV(1,nz,el2) 
-				Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) +un2(nz)*UV(2,nz,el2) 
-				
-			end do
-		endif
-		
-		!_______________________________________________________________________
-		if (nod(2) <= myDim_nod2d) then
-			do nz=1, nl2
-				Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) -un2(nz)*UV(1,nz,el2)
-				Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) -un2(nz)*UV(2,nz,el2)
-				
-			end do
-		endif
-	end if
+      ! fill with zeros to combine the loops
+      ! Usually, no or only a very few levels have to be filled. In this case, 
+      ! computing "zeros" is cheaper than the loop overhead.
+      
+      un1(nl1+1:max(nl1,nl2)) = 0.
+      un2(nl2+1:max(nl1,nl2)) = 0.
+
+      ! first edge node
+      ! Do not calculate on Halo nodes, as the result will not be used. 
+      ! The "if" is cheaper than the avoided computiations.
+      if (nod(1) <= myDim_nod2d) then
+         do nz=1, max(nl1,nl2)
+            
+            Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
+            Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+         end do
+      endif
+      
+      if (nod(2) <= myDim_nod2d) then
+         do nz=1, max(nl1,nl2)
+            Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+            Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+         end do
+      endif
+
+
+   else  ! ed is a boundary edge, there is only the contribution from el1
+      if (nod(1) <= myDim_nod2d) then
+         do nz=1, nl1
+            
+            Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
+            Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
+         end do
+      endif
+      ! second edge node
+      if  (nod(2) <= myDim_nod2d) then
+         do nz=1, nl1
+            Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
+            Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
+         end do
+      endif
+   endif
+
 end do
 
 !_______________________________________________________________________________
