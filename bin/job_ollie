@@ -13,13 +13,13 @@ ulimit -s unlimited
 module purge
 module load intel.compiler
 module load intel.mpi
-module load netcdf/4.4.0_intel
+module load netcdf
 
 # determine JOBID
-JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+JOBID=$SLURM_JOB_ID 
 
 date
-srun --mpi=pmi2 --ntasks=72 ./fvom.x > "fesom.out"
+srun ./fvom.x > "fesom.out"
 date
 # qstat -f $PBS_JOBID
 

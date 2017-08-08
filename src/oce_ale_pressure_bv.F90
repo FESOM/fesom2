@@ -16,11 +16,11 @@ subroutine pressure_bv
 	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
 	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
 	real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
-	logical               :: flag1, flag2
+	logical               :: flag1, flag2, mixing_kpp
 
 	smallvalue=1.0e-20
 	buoyancy_crit=0.0003
-	
+	mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
 	!___________________________________________________________________________
 	! Screen salinity
 	a=0.0_8
@@ -54,6 +54,10 @@ subroutine pressure_bv
 				t=tr_arr(nz, node,1)
 				s=tr_arr(nz, node,2)
 				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                        enddo
+                        !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
+                        !NR and did not vectorize the full loop. 
+                        do nz=1, nl1
 				rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
 				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
                                 ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
@@ -63,7 +67,7 @@ subroutine pressure_bv
                                 db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
 			end do
                         dbsfc1(nl)=dbsfc1(nl1)
-                        if (trim(mix_scheme)=='KPP') then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
+                        if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
                            dbsfc(1:nl, node )=dbsfc1(1:nl)
                         end if
 			!___________________________________________________________________
@@ -428,32 +432,45 @@ subroutine compute_sigma_xy(TF1,SF1)
   implicit none
   !
   real(kind=WP), intent(IN)   :: TF1(nl-1, myDim_nod2D+eDim_nod2D), SF1(nl-1, myDim_nod2D+eDim_nod2D)
-  real(kind=WP)               :: tx, ty, sx, sy, dz, vol
-  integer                     :: n, nz, elnodes(3),elem, k
+  real(kind=WP)               :: tx(nl-1), ty(nl-1), sx(nl-1), sy(nl-1), vol(nl-1), testino(2)
+  integer                     :: n, nz, elnodes(3),el, k, nl1
+  
   !
   DO n=1, myDim_nod2D
-     DO nz=1, nlevels_nod2D(n)-1
-        vol=0.0_WP
-	tx=0.0_WP
-	ty=0.0_WP
-	sx=0.0_WP
-	sy=0.0_WP
-	DO k=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(k, n)
-           if(nlevels(elem)-1 < nz) cycle
-           vol=vol+elem_area(elem)
-	   elnodes=elem2D_nodes(:,elem)
+        nl1 = nlevels_nod2D(n)-1
+        vol(1:nl1) = 0.0_WP
+	tx(1:nl1)  = 0.0_WP
+	ty(1:nl1)  = 0.0_WP
+	sx(1:nl1)  = 0.0_WP
+	sy(1:nl1)  = 0.0_WP
+        DO k=1, nod_in_elem2D_num(n)
+           el=nod_in_elem2D(k, n)
+           
+           DO nz=1, nlevels(el)-1 
 
-           tx=tx+sum(gradient_sca(1:3,elem)*TF1(nz,elnodes))*elem_area(elem)
-	   ty=ty+sum(gradient_sca(4:6,elem)*TF1(nz,elnodes))*elem_area(elem)
-           sx=sx+sum(gradient_sca(1:3,elem)*SF1(nz,elnodes))*elem_area(elem)
-	   sy=sy+sum(gradient_sca(4:6,elem)*SF1(nz,elnodes))*elem_area(elem)
+              vol(nz) = vol(nz)+elem_area(el)
 
-        END DO 
-        
-	  sigma_xy(1,nz,n)=(-sw_alpha(nz,n)*tx+sw_beta(nz,n)*sx)/vol*density_0
-	  sigma_xy(2,nz,n)=(-sw_alpha(nz,n)*ty+sw_beta(nz,n)*sy)/vol*density_0
-     END DO
+              !NR  writing the sum over elem2D_nodes explicitly helps the compiler to vectorize the nz-loop
+
+              tx(nz) = tx(nz)+(gradient_sca(1,el)*TF1(nz,elem2D_nodes(1,el)) &
+                             + gradient_sca(2,el)*TF1(nz,elem2D_nodes(2,el)) &
+                             + gradient_sca(3,el)*TF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+
+              ty(nz) = ty(nz)+(gradient_sca(4,el)*TF1(nz,elem2D_nodes(1,el)) &
+                             + gradient_sca(5,el)*TF1(nz,elem2D_nodes(2,el)) &
+                             + gradient_sca(6,el)*TF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+
+              sx(nz) = sx(nz)+(gradient_sca(1,el)*SF1(nz,elem2D_nodes(1,el)) &
+                             + gradient_sca(2,el)*SF1(nz,elem2D_nodes(2,el)) &
+                             + gradient_sca(3,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+
+              sy(nz) = sy(nz)+(gradient_sca(4,el)*SF1(nz,elem2D_nodes(1,el)) &
+                             + gradient_sca(5,el)*SF1(nz,elem2D_nodes(2,el)) &
+                             + gradient_sca(6,el)*SF1(nz,elem2D_nodes(3,el)))*elem_area(el)
+           END DO
+        enddo
+	  sigma_xy(1,1:nl1,n) = (-sw_alpha(1:nl1,n)*tx(1:nl1)+sw_beta(1:nl1,n)*sx(1:nl1))/vol(1:nl1)*density_0
+	  sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
   END DO 
 
   call exchange_nod(sigma_xy)

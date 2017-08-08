@@ -650,40 +650,43 @@ USE g_config
 USE g_comm_auto
 IMPLICIT NONE
 
-real(kind=8)               :: u1, v1, tau_inv, s
-integer                    :: ed, el(2), nz
-real(kind=8), allocatable  :: UV_c(:,:,:), UV_f(:,:,:)
+real(kind=8)  :: u1, v1, tau_inv, s, factor, factor1, factor2
+integer       :: ed, el(2), nz, elem
+real(kind=8)  :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D+eDim_elem2D)
  
 ! Filter is applied twice. It should be approximately 
 ! equivalent to biharmonic operator with the coefficient
 ! (tau_c/day)a^3/9. Scaling inside is found to help 
 ! with smoothness in places of mesh transition. *(it makes a^3 from a^4) 
-ed=myDim_elem2D+eDim_elem2D
-allocate(UV_c(2,nl-1,ed)) ! to store the filtered velocity
-allocate(UV_f(2,nl-1,ed)) ! to store the contributions into the RHS
 
 
 UV_c=0.0_8
-UV_f=0.0_8
+!NR UV_f=0.0_8
 tau_inv=dt*tau_c/3600.0/24.0     ! SET IT experimentally 
   
 DO ed=1, myDim_edge2D+eDim_edge2D
    if(myList_edge2D(ed)>edge2D_in) cycle
    el=edge_tri(:,ed)
-   DO nz=1,minval(nlevels(el))-1
-      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
 
-      UV_c(1,nz,el(1))=UV_c(1,nz,el(1))-u1
-      UV_c(1,nz,el(2))=UV_c(1,nz,el(2))+u1
-      UV_c(2,nz,el(1))=UV_c(2,nz,el(1))-v1
-      UV_c(2,nz,el(2))=UV_c(2,nz,el(2))+v1
+   factor1 = -tau_inv*sqrt(scale_area/elem_area(el(1)))
+   factor2 = -tau_inv*sqrt(scale_area/elem_area(el(2)))
+
+   DO nz=1,min(nlevels(el(1)),nlevels(el(2)))-1
+      u1 = UV(1,nz,el(1)) - UV(1,nz,el(2))
+      v1 = UV(2,nz,el(1)) - UV(2,nz,el(2))
+
+      UV_c(1,nz,el(1)) = UV_c(1,nz,el(1)) - u1*factor1
+      UV_c(2,nz,el(1)) = UV_c(2,nz,el(1)) - v1*factor1
+      UV_c(1,nz,el(2)) = UV_c(1,nz,el(2)) + u1*factor2
+      UV_c(2,nz,el(2)) = UV_c(2,nz,el(2)) + v1*factor2
    END DO 
 END DO
  
 ! ============ 
 ! Contribution from boundary edges (Dirichlet boundary conditions)
 ! ============
+!NR If it should be used again, please integrate into the loop above.
+!NR if (inner edge) then [...] else [Dirichlet] endif
 ! DO ed=1, myDim_edge2D+eDim_edge2D
 !    if(myList_edge2D(ed)<=edge2D_in) cycle
 !    el=edge_tri(:, ed)
@@ -693,42 +696,55 @@ END DO
 !    END DO
 ! END DO
 
-Do ed=1,myDim_elem2D
-   Do nz=1,nlevels(ed)-1
-       UV_c(1,nz,ed)=-UV_c(1,nz,ed)*tau_inv*sqrt(scale_area/elem_area(ed))
-       UV_c(2,nz,ed)=-UV_c(2,nz,ed)*tau_inv*sqrt(scale_area/elem_area(ed))
-   END DO
-end do
+!NR  moved this factor to the edge loop. If the commented Dirichlet
+!NR boundary condition shall be reactivated, do not forget the factor.
+!NR do elem=1,myDim_elem2D
+!NR   factor = tau_inv*sqrt(scale_area/elem_area(elem))
+!NR   Do nz=1,nlevels(elem)-1
+!NR       UV_c(1,nz,elem) = -UV_c(1,nz,elem)*factor
+!NR       UV_c(2,nz,elem) = -UV_c(2,nz,elem)*factor
+!NR   END DO
+!NR end do
 
 call exchange_elem(UV_c)
-! call exchange_elem(UV_c(1,:,:))
-! call exchange_elem(UV_c(2,:,:))
+
 
 DO ed=1, myDim_edge2D+eDim_edge2D
    if(myList_edge2D(ed)>edge2D_in) cycle
    el=edge_tri(:,ed)
-   DO nz=1,minval(nlevels(el))-1 
-      u1=(UV_c(1,nz,el(1))-UV_c(1,nz,el(2)))
-      v1=(UV_c(2,nz,el(1))-UV_c(2,nz,el(2)))
+   DO nz=1,min(nlevels(el(1)),nlevels(el(2)))-1 
+      u1 = UV_c(1,nz,el(1)) - UV_c(1,nz,el(2))
+      v1 = UV_c(2,nz,el(1)) - UV_c(2,nz,el(2))
 
-      UV_f(1,nz,el(1))=UV_f(1,nz,el(1))-u1
-      UV_f(1,nz,el(2))=UV_f(1,nz,el(2))+u1
-      UV_f(2,nz,el(1))=UV_f(2,nz,el(1))-v1
-      UV_f(2,nz,el(2))=UV_f(2,nz,el(2))+v1
+     !NR UV_f(1,nz,el(1)) = UV_f(1,nz,el(1)) - u1
+     !NR UV_f(2,nz,el(1)) = UV_f(2,nz,el(1)) - v1
+     !NR UV_f(1,nz,el(2)) = UV_f(1,nz,el(2)) + u1
+     !NR UV_f(2,nz,el(2)) = UV_f(2,nz,el(2)) + v1
+     !NR As UV_f is simply added to UV_rhs, we can skip this intermediate field
+     !NR and add to UV_rhs directly.
+     !NR However, if the limit to the contribution of the filter is to be applied,
+     !NR this does not work any more. At the time of my optimizations, the limit
+     !NR was commented.
+     !NR If UV_f is to be used again, please remember to initialize it with UV_f=0. 
+     UV_rhs(1,nz,el(1)) = UV_rhs(1,nz,el(1)) - u1
+     UV_rhs(2,nz,el(1)) = UV_rhs(2,nz,el(1)) - v1
+     UV_rhs(1,nz,el(2)) = UV_rhs(1,nz,el(2)) + u1
+     UV_rhs(2,nz,el(2)) = UV_rhs(2,nz,el(2)) + v1
+
    END DO 
 END DO
  
-DO ed=1, myDim_elem2D
-   DO nz=1, nlevels(ed)-1 
-      u1=sqrt(UV_f(1,nz,ed)**2+UV_f(2,nz,ed)**2)
-      u1=u1+tiny(u1)
-      v1=sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2)
-   ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
-   ! this is done to force the CFL, which is otherwise exceeded in some points
-   ! some other criteria is welcome (i.e. like computing the eigenvalues from filtering)
-      UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_f(1,nz,ed)!*min(1.0_WP, 2.0_WP*v1/u1)
-      UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_f(2,nz,ed)!*min(1.0_WP, 2.0_WP*v1/u1)
-   END DO 
-END DO
-deallocate(UV_f, UV_c)
+!NR DO elem=1, myDim_elem2D
+!NR   DO nz=1, nlevels(elem)-1 
+!NR !      u1 = sqrt(UV_f(1,nz,elem)**2+UV_f(2,nz,elem)**2)+tiny(u1)
+!NR !      v1 = sqrt(UV(1,nz,elem)**2+UV(2,nz,elem)**2)
+!NR    ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
+!NR    ! this is done to force the CFL, which is otherwise exceeded in some points
+!NR    ! some other criteria is welcome (i.e. like computing the eigenvalues from filtering)
+!NR       UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+UV_f(1,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
+!NR       UV_rhs(2,nz,elem) = UV_rhs(2,nz,elem)+UV_f(2,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
+!NR    END DO 
+!NR END DO
+
+
 end subroutine viscosity_filt2x
