@@ -18,19 +18,18 @@ real(kind=8)     :: p_ice(3)
 integer          :: use_pice
 
 t1=MPI_Wtime()
+
+use_pice=0
+if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
+
+do elem=1, myDim_elem2D
 ! =================
 ! Take care of the AB part
 ! =================
-do elem=1, myDim_elem2D
    do nz=1,nl-1 
       UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
       UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
     end do
-
-!to avoid if condition with string comparison inside the loop
-use_pice=0
-if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
-
 
 ! ====================
 ! Sea level and pressure contribution   -\nabla(\eta +hpressure/rho_0)
@@ -39,7 +38,7 @@ if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
 
    elnodes=elem2D_nodes(:,elem)
    
-!    eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
+!  eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
    eta=g*eta_n(elnodes)
    
    ff=coriolis(elem)*elem_area(elem)
