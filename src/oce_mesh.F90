@@ -654,8 +654,8 @@ chunk_size=100000
     k=min(chunk_size, edge2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
-          read(fileID  ,*) ibuff(n, 1:2) !edge nodes
-          read(fileID+1,*) ibuff(n, 3:4) !edge elements
+          read(fileID  ,*) ibuff(n,1), ibuff(n,2) !edge nodes
+          read(fileID+1,*) ibuff(n,3), ibuff(n,4) !edge elements
        end do
     end if
     call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
