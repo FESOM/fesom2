@@ -184,7 +184,11 @@ implicit none
   allocate(lbuffer(myDim_edge2D))
   do i=1, 2
      do k=1, myDim_edge2D
-        lbuffer(k)=myList_elem2D(edge_tri(i, k))
+        if (edge_tri(i,k) > 0) then
+           lbuffer(k) = myList_elem2D(edge_tri(i,k))
+        else
+           lbuffer(k) = 0
+        endif
      end do
      call gather_edge(lbuffer, ibuffer)
      call my_put_vara(ncid, edge_tri_id, (/1, i/), (/edge2D, 1/), ibuffer)
