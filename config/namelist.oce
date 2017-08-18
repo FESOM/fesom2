@@ -17,7 +17,7 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.false.
-w_exp_max=1.e-3
+w_exp_max=5.e-3
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM=1500.                  ! GM thickness diffusivity (m2/s)
 scaling_Ferreira   =.true.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
