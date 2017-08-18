@@ -163,10 +163,10 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
 ! All auxiliary arrays
 ! =================
  
-if(mom_adv==3) then
+!if(mom_adv==3) then
 allocate(vorticity(nl-1,node_size))
 vorticity=0.0_8
-end if
+!end if
 
 ! =================
 ! Visc and Diff coefs
@@ -200,7 +200,8 @@ slope_tapered=0.0_WP
 allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
 
 do n=1, node_size
-   Ki(n)=K_hor*area(1,n)/scale_area
+!  Ki(n)=K_hor*area(1,n)/scale_area
+   Ki(n)=K_hor*mesh_resolution(n)/100000.0_WP
 end do
 call exchange_nod(Ki)
 
@@ -323,7 +324,8 @@ end if
   else
     call compute_vel_rhs_vinv
   end if
-  if (tau_c > 1.e-12) call viscosity_filt2x
+  
+  call viscosity_filter(2)
 
   if (i_vert_visc)    call impl_vert_visc ! Probably should be moved for Btr-bcl splitting case
 

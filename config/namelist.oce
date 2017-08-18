@@ -6,9 +6,9 @@ A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 laplacian=.false.      ! Use Laplacian viscosity 
 A_hor=0.               ! 500.      ! Background horizontal viscosity
 A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
-Div_c=0.  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
-Leith_c=0.	       ! The strength of the Leith viscosity
-tau_c= 0.3             ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
+Div_c=1.  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
+Leith_c=1.	       ! The strength of the Leith viscosity
+tau_c= 0.              ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
 Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
 biharmonic=.false.     ! Use biharmonic viscosity
 Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s
@@ -17,7 +17,7 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.false.
-w_exp_max=1.e-3
+w_exp_max=5.e-3
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM=1500.                  ! GM thickness diffusivity (m2/s)
 scaling_Ferreira   =.true.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
@@ -38,7 +38,7 @@ Kv0_const=.false.
 double_diffusion=.false.	! for KPP,dd switch
 K_ver=1.0e-5
 K_hor=10.
-surf_relax_T=0.0    ! 
+surf_relax_T=0.0
 surf_relax_S=1.929e-06       ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
 balance_salt_water =.true.   ! balance virtual-salt or freshwater flux or not
 clim_relax=0.0	    ! 1/s, geometrical information has to be supplied

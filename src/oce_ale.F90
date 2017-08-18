@@ -1429,6 +1429,7 @@ subroutine oce_timestep_ale(n)
 !DS 	real(kind=8)      :: global_d_eta, global_wflux, local_d_eta, local_wflux, local_vol, global_vol
 	real(kind=8),allocatable  :: aux1(:),aux2(:)
 	
+
 	t1=MPI_Wtime()
 	
 	!___________________________________________________________________________
@@ -1465,7 +1466,7 @@ subroutine oce_timestep_ale(n)
 	end if
 	
 	!___________________________________________________________________________
-	if (tau_c > 1.e-12) call viscosity_filt2x
+        call viscosity_filter(2)
 	
 	!___________________________________________________________________________
 	if(i_vert_visc) call impl_vert_visc_ale
