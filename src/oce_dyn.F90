@@ -973,7 +973,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
  
  Do ed=1,myDim_elem2D
-    len=0.04*sqrt(elem_area(ed))                     
+    len=0.02*sqrt(elem_area(ed))                     
     Do nz=1,nlevels(ed)-1
      vi=dt*abs(min(Visc(nz,ed)-len,0.0))    
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
@@ -1024,7 +1024,6 @@ real(kind=WP)  :: leithx, leithy
 real, allocatable :: aux(:,:) 
   !  
   if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
-  vorticity=vorticity*0.01
   ! Fill in viscosity:
   DO  elem=1, myDim_elem2D          !! m=1, myDim_elem2D
                                     !! elem=myList_elem2D(m)
@@ -1078,4 +1077,3 @@ real, allocatable :: aux(:,:)
 deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
-
