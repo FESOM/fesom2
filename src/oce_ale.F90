@@ -1421,6 +1421,7 @@ subroutine oce_timestep_ale(n)
 	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
 	integer           :: n
 	
+
 	t1=MPI_Wtime()
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
@@ -1458,7 +1459,7 @@ subroutine oce_timestep_ale(n)
 	end if
 	
 	!___________________________________________________________________________
-	if (tau_c > 1.e-12) call viscosity_filt2x
+        call viscosity_filter(2)
 	
 	!___________________________________________________________________________
 	if(i_vert_visc) call impl_vert_visc_ale

@@ -354,7 +354,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! writing horizontal and vertical low order fct advection into rhs
 		do  nz=1,nlevels_nod2D(n)-1
-			fct_LO(nz,n)=ttf(nz,n)+( fct_LO(nz,n)+(tvert(nz)-tvert(nz+1)) )*dt/area(nz,n)
+			fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(tvert(nz)-tvert(nz+1)))*dt/area(nz,n))/hnode_new(nz,n)
 		end do
 		
 	end do ! --> do n=1, myDim_nod2D
@@ -615,8 +615,8 @@ subroutine fct_ale(ttf)
 	! Vertical
 	do n=1, myDim_nod2d
 		do nz=1,nlevels_nod2D(n)-1  
-			del_ttf(nz,n)=del_ttf(nz,n)-ttf(nz,n)+fct_LO(nz,n) + &
-					(fct_aec_ver(nz,n)-fct_aec_ver(nz+1,n))*dt/area(nz,n)    
+			del_ttf(nz,n)=del_ttf(nz,n)-ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
+					(fct_aec_ver(nz,n)-fct_aec_ver(nz+1,n))*dt/area(nz,n)
 		end do
 	end do
 	

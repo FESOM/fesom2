@@ -610,7 +610,7 @@ chunk_size=100000
 ! It will be used for several purposes 
 !==============================
  allocate(mapping(chunk_size))
- allocate(ibuff(chunk_size, 4))
+ allocate(ibuff(4,chunk_size))
 ! 0 proc reads the data and sends it to other procs
  fileID=10
  if (mype==0) then
@@ -654,20 +654,20 @@ chunk_size=100000
     k=min(chunk_size, edge2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
-          read(fileID  ,*) ibuff(n, 1:2) !edge nodes
-          read(fileID+1,*) ibuff(n, 3:4) !edge elements
+          read(fileID  ,*) ibuff(1:2,n) !edge nodes
+          read(fileID+1,*) ibuff(3:4,n) !edge elements
        end do
     end if
-    call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-    call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-    call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-    call MPI_BCast(ibuff(1:k,4), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:4,1:k), 4*k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+!    call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+!    call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+!    call MPI_BCast(ibuff(1:k,4), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
     ! fill the local arrays
     do n=1, k      
        if (mapping(n)>0) then
           mesh_check=mesh_check+1
-          edges   (:, mapping(n))=ibuff(n,1:2)
-          edge_tri(:, mapping(n))=ibuff(n,3:4)
+          edges   (:, mapping(n))=ibuff(1:2,n)
+          edge_tri(:, mapping(n))=ibuff(3:4,n)
        end if
     end do
  end do
