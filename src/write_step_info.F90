@@ -165,7 +165,13 @@ subroutine check_blowup(istep)
 				write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
 				write(*,*) 'wflux       = ',water_flux(n)
 				write(*,*) 'wflux_old   = ',water_flux_old(n)
-				write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,n)/rad
+				write(*,*)
+				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
+				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
+				write(*,*)
+				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
+				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
+				write(*,*) ' glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				call par_ex(1)
 			endif
