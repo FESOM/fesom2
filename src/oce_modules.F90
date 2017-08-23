@@ -194,9 +194,11 @@ type(ob_type), allocatable                    ::  ob_info(:)
 type(ob_rhs_type), allocatable                ::  ob_2rhs(:)
 !
 ! The fct part
-real(kind=WP),allocatable,dimension(:,:)      :: fct_aec  ! Antidif. elem. contrib.
-real(kind=WP),allocatable,dimension(:,:)      :: fct_LO, fct_HO  ! Low-order solution
-real(kind=WP),allocatable,dimension(:,:)      :: fct_aec_ver  ! Antidif. vert. fluxes
+integer                                       :: fct_iter=1
+real(kind=WP),allocatable,dimension(:,:)      :: fct_LO, fct_HO           ! Low-order solution
+real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_h, fct_adf_h2    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
+real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_v, fct_adf_v2    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
+
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
