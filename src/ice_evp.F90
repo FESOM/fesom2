@@ -238,11 +238,12 @@ IMPLICIT NONE
 integer          :: steps, shortstep
 real(kind=WP)    :: rdt, asum, msum, r_a, r_b
 real(kind=WP)    :: drag, det, umod, rhsu, rhsv
-integer          :: n, ed, ednodes(2), el
+integer          :: n, ed, ednodes(2), el,  elnodes(3)
 real(kind=WP)    :: ax, ay, aa, elevation_dx, elevation_dy
 
 real(kind=WP)    :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
-real(kind=WP)    :: ice_strength(myDim_elem2D)
+real(kind=WP)    :: ice_strength(myDim_elem2D), elevation_elem(3), p_ice(3)
+integer          :: use_pice
     
 rdt=ice_dt/(1.0*evp_rheol_steps)
 ax=cos(theta_io)
@@ -270,33 +271,82 @@ ay=sin(theta_io)
     rhs_m(n)=0.0       ! for the contribution due to ssh
  enddo
     
- do el = 1,myDim_elem2D
-
-    if (any(m_ice(elem2D_nodes(:,el)) <= 0.) .or. &
-        any(a_ice(elem2D_nodes(:,el)) <=0.)) then
-       
-       ! There is no ice in elem
-       ice_strength(el) = 0.
-    else
-       msum = sum(m_ice(elem2D_nodes(:,el)))/3.0_WP
-       asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
-     
-       ! ===== Hunke and Dukowicz c*h*p*
-       ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
-       ice_strength(el) = 0.5_WP*ice_strength(el)
-
-      ! use rhs_m and rhs_a for storing the contribution from elevation:
-       aa = 9.81*elem_area(el)/3.0_WP
-
-       elevation_dx = sum(gradient_sca(1:3,el)*elevation(elem2D_nodes(:,el)))	    
-       elevation_dy = sum(gradient_sca(4:6,el)*elevation(elem2D_nodes(:,el)))
-
-       rhs_a(elem2D_nodes(:,el)) = rhs_a(elem2D_nodes(:,el))-aa*elevation_dx
-       rhs_m(elem2D_nodes(:,el)) = rhs_m(elem2D_nodes(:,el))-aa*elevation_dy
-   
-    end if
-
- enddo
+!_______________________________________________________________________________ !!PS
+use_pice=0
+if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
+if ( .not. trim(which_ALE)=='linfs') then
+	! for full free surface include pressure from ice mass
+	do el = 1,myDim_elem2D
+		
+		elnodes = elem2D_nodes(:,el)
+		
+		!_______________________________________________________________________ !!PS
+		if (any(m_ice(elnodes) <= 0.) .or. &
+			any(a_ice(elnodes) <=0.)) then
+			
+			! There is no ice in elem
+			ice_strength(el) = 0.
+			
+		!_______________________________________________________________________ !!PS
+		else
+			msum = sum(m_ice(elnodes))/3.0_WP
+			asum = sum(a_ice(elnodes))/3.0_WP
+			
+			!___________________________________________________________________ !!PS
+			! Hunke and Dukowicz c*h*p*
+			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+			ice_strength(el) = 0.5_WP*ice_strength(el)
+			
+			!___________________________________________________________________ !!PS
+			! use rhs_m and rhs_a for storing the contribution from elevation:
+			aa = 9.81*elem_area(el)/3.0_WP
+			
+			!___________________________________________________________________ !!PS
+			! add and limit pressure from ice weight in case of floating ice
+			! like in FESOM 1.4
+			p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+			do n=1,3
+				p_ice(n)=min(p_ice(n),max_ice_loading)
+			end do
+			
+			!___________________________________________________________________ !!PS
+			elevation_elem = elevation(elnodes)
+			elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))   
+			elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
+			
+			!___________________________________________________________________ !!PS
+			rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
+			rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
+		end if
+	enddo
+else
+	! for linear free surface
+	do el = 1,myDim_elem2D
+		if (any(m_ice(elem2D_nodes(:,el)) <= 0.) .or. &
+			any(a_ice(elem2D_nodes(:,el)) <=0.)) then
+		
+			! There is no ice in elem
+			ice_strength(el) = 0.
+		else
+			msum = sum(m_ice(elem2D_nodes(:,el)))/3.0_WP
+			asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
+			
+			! ===== Hunke and Dukowicz c*h*p*
+			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+			ice_strength(el) = 0.5_WP*ice_strength(el)
+			
+			! use rhs_m and rhs_a for storing the contribution from elevation:
+			aa = 9.81*elem_area(el)/3.0_WP
+			
+			elevation_dx = sum(gradient_sca(1:3,el)*elevation(elem2D_nodes(:,el)))	    
+			elevation_dy = sum(gradient_sca(4:6,el)*elevation(elem2D_nodes(:,el)))
+			
+			rhs_a(elem2D_nodes(:,el)) = rhs_a(elem2D_nodes(:,el))-aa*elevation_dx
+			rhs_m(elem2D_nodes(:,el)) = rhs_m(elem2D_nodes(:,el))-aa*elevation_dy
+		end if
+	enddo
+ endif
+ 
 do n=1,myDim_nod2D 
     rhs_a(n) = rhs_a(n)/area(1,n)
     rhs_m(n) = rhs_m(n)/area(1,n)
