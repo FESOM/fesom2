@@ -208,8 +208,8 @@ subroutine init_thickness_ale
 			Do nz=nlevels(elem),nl-1
 				helem(nz,elem)=0.0_WP
 			end do
-		END DO
-	
+		end do
+		
 	elseif (trim(which_ale)=='zlevel') then
 		!_______________________________________________________________________
 		! >->->->->->->->->->->->->->->     z-level    <-<-<-<-<-<-<-<-<-<-<-<-<
@@ -254,7 +254,7 @@ subroutine init_thickness_ale
 			end do
 			
 		end do
-	
+		
 	elseif (trim(which_ale)=='zstar' ) then
 		!_______________________________________________________________________
 		! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
@@ -321,45 +321,79 @@ subroutine update_thickness_ale
 	use o_MESH
 	use g_PARSUP
 	use o_ARRAYS
-	use g_config,only: which_ale
+	use g_config,only: which_ale,lzstar_lev,min_hnode
 	implicit none
 	integer :: n, nz, elem, elnodes(3),nzmax
 	
+	!___________________________________________________________________________
+	! >->->->->->->->->->->->->->->       z-level      <-<-<-<-<-<-<-<-<-<-<-<-<
+	!___________________________________________________________________________
 	if     (trim(which_ale)=='zlevel') then
-		!_______________________________________________________________________
-		! >->->->->->->->->->->->->->->     z-level    <-<-<-<-<-<-<-<-<-<-<-<-<
-		!_______________________________________________________________________
 		! only actualize layer thinkness in first layer 
 		do n=1,myDim_nod2D+eDim_nod2D
-			hnode(1,n)    = hnode_new(1,n)
-			zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
-			Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
+			if (hnode_new(1,n) == (zbar(1)-zbar(2))*min_hnode ) then 
+				! --> case local zstar 
+				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
+				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
+				nzmax = min(lzstar_lev,nlevels_nod2D_min(n)-2) 
+				do nz=nzmax,1,-1
+					hnode(nz,n)     = hnode_new(nz,n)
+					zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode(nz,n)
+					Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode(nz,n)/2.0_WP
+				end do
+			else
+				! --> case normal zlevel
+				hnode(1,n)    = hnode_new(1,n)
+				zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
+				Z_3d_n(1,n)   = zbar_3d_n(2,n)-hnode(1,n)/2.0_WP
+			end if
 		end do
 		
+		!_______________________________________________________________________
 		do elem=1,myDim_elem2D
-			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
+			elnodes=elem2D_nodes(:, elem)
+			if (any(hnode(1,elnodes)==(zbar(1)-zbar(2))*min_hnode)) then
+				! --> case local zstar 
+				nzmax = min(lzstar_lev,nlevels(elem)-2)
+				do nz=1,nzmax
+					helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+				end do
+			else
+				! --> case normal zlevel
+				helem(1,elem)=sum(hnode(1,elnodes))/3.0_WP
+			end if
 		end do
+		
+	!___________________________________________________________________________
+	! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
+	!___________________________________________________________________________
 	elseif (trim(which_ale)=='zstar' ) then
-		!_______________________________________________________________________
-		! >->->->->->->->->->->->->->->     z-star     <-<-<-<-<-<-<-<-<-<-<-<-<
-		!_______________________________________________________________________
 		! --> update layer thinkness at depth layer and node
 		zbar_3d_n=0.0_WP
 		Z_3d_n   =0.0_WP
 		do n=1, myDim_nod2D+eDim_nod2D
-			do nz=1,nlevels_nod2D_min(n)-2
-				hnode(nz,n) = hnode_new(nz,n)
-			end do
+! ! 			do nz=1,nlevels_nod2D_min(n)-2
+! ! 				hnode(nz,n) = hnode_new(nz,n)
+! ! 			end do
+! ! 			
+! ! 			! actualize 3d depth levels and mid-depth levels from bottom to top
+! ! 			nzmax=nlevels_nod2D(n)
+! ! 			zbar_3d_n(nzmax,n)=zbar(nzmax)
+! ! 			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
+! ! 			do nz=nzmax-1,2,-1
+! ! 				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
+! ! 				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+! ! 			end do
+! ! 			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 			
 			! actualize 3d depth levels and mid-depth levels from bottom to top
-			nzmax=nlevels_nod2D(n)
-			zbar_3d_n(nzmax,n)=zbar(nzmax)
-			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
-			do nz=nzmax-1,2,-1
+			nzmax               =nlevels_nod2D(n)-1
+			zbar_3d_n(nzmax+1,n)=zbar(nzmax+1)
+			do nz=nzmax,1,-1
+				hnode(nz,n)     =hnode_new(nz,n)
 				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
-				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+				Z_3d_n(nz-1,n)  =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
 			end do
-			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 			
 		end do
 		
@@ -382,7 +416,7 @@ subroutine restart_thickness_ale
 	use o_MESH
 	use g_PARSUP
 	use o_ARRAYS
-	use g_config,only: which_ale
+	use g_config,only: which_ale,lzstar_lev,min_hnode
 	implicit none
 	integer :: n, nz, elem, elnodes(3),nzmax
 	
@@ -397,16 +431,43 @@ subroutine restart_thickness_ale
 		!_______________________________________________________________________
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
 		do n=1,myDim_nod2D+eDim_nod2D
-			zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
-			Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
+			if (hnode(1,n) == (zbar(1)-zbar(2))*min_hnode ) then 
+				! --> case local zstar 
+				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
+				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
+				nzmax = min(lzstar_lev,nlevels_nod2D_min(n)-2) 
+				do nz=nzmax,1,-1
+					zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode(nz,n)
+					Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode(nz,n)/2.0_WP
+				end do
+			else
+				! --> case normal zlevel
+				zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
+				Z_3d_n(1,n)   = zbar_3d_n(2,n)-hnode(1,n)/2.0_WP
+				! Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
+			end if
 		end do
 		
+		!_______________________________________________________________________
 		! restart element layer thinkness (helem) and The increment of total 
 		! fluid depth on elements (dhe)
 		do elem=1,myDim_elem2D
-			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
 			elnodes=elem2D_nodes(:,elem)
+			!___________________________________________________________________
+			if (any(hnode(1,elnodes)==(zbar(1)-zbar(2))*min_hnode)) then
+				! --> case local zstar 
+				nzmax = min(lzstar_lev,nlevels(elem)-2)
+				do nz=1,nzmax
+					helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
+				end do
+			else
+				! --> case normal zlevel
+				helem(1,elem)=sum(hnode(1,elnodes))/3.0_WP
+			end if
+			
+			!___________________________________________________________________
 			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+			
 		end do
 		
 	elseif (trim(which_ale)=='zstar' ) then
@@ -427,15 +488,19 @@ subroutine restart_thickness_ale
 			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 		end do
 		
+		!_______________________________________________________________________
 		! restart element layer thinkness (helem) and the increment of total 
 		! fluid depth on elements (dhe)
 		do elem=1, myDim_elem2D
 			elnodes=elem2D_nodes(:, elem)
+			!___________________________________________________________________
 			do nz=1,nlevels(elem)-2
 				helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
 			end do
 			
+			!___________________________________________________________________
 			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+			
 		end do
 	endif
 end subroutine restart_thickness_ale
@@ -669,7 +734,7 @@ subroutine stiff_mat_ale
 		! myList_nod2D(ssh_stiff%colind(n))  ... converts local index to global index
 		ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
 	end do
-
+	
 	allocate(mapping(nod2d))
 	! 0 proc reads the data in chunks and distributes it between other procs
 	write(npes_string,"(I10)") npes
@@ -957,7 +1022,7 @@ end subroutine compute_hbar_ale
 !
 !===============================================================================
 subroutine vert_vel_ale
-	use g_config,only: dt, which_ALE
+	use g_config,only: dt, which_ALE,min_hnode,lzstar_lev
 	use o_MESH
 	use o_ARRAYS
 	use o_PARAM
@@ -967,8 +1032,14 @@ subroutine vert_vel_ale
 	
 	integer       :: el(2), enodes(2), n, nz, ed
 	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt 
-	real(kind=WP) :: dhbar, dhbar_rest,dhbar_aux , limit_hnode=2.0_WP !PS
-	integer 	  :: nzmin 
+	integer 	  :: nzmax 
+	
+	!_______________________________
+	! --> zlevel with local zstar
+	real(kind=WP) :: dhbar_total, dhbar_rest, weight_hbar_int  !PS
+	real(kind=WP), dimension(:), allocatable :: maxhbar2distr,weight_hbar
+	allocate(maxhbar2distr(lzstar_lev),weight_hbar(lzstar_lev))
+	
 	
 	!___________________________________________________________________________
 	! Contributions from levels in divergence
@@ -1074,21 +1145,90 @@ subroutine vert_vel_ale
 		! Wvel(1,n) should be 0 up to machine precision,
 		! this place should be checked.
 		do n=1, myDim_nod2D
-			Wvel(1,n)=Wvel(1,n)-(hbar(n)-hbar_old(n))/dt-water_flux(n)
-			hnode_new(1,n)=hnode(1,n)+hbar(n)-hbar_old(n)
+			!___________________________________________________________________
+			! ssh change to distribute
+			dhbar_total = hbar(n)-hbar_old(n)
+			
+			!___________________________________________________________________
+			! if new surface layerthickness at node n is smaller than the initial 
+			! layerthickness*min_hnode than go from zlevel to local zstar approach
+			! over the first lzstar_lev layers
+			if (hnode(1,n)+dhbar_total <= (zbar(1)-zbar(2))*min_hnode ) then 
+				! --> local zstar
+! 				write(*,*)
+! 				write(*,*) " --> do local zstar"
+! 				write(*,*)
+				
+				!_______________________________________________________________
+				! maxhbar2distr ... how much ssh change can be maximal distributed 
+				! per layer (must be negativ, if positive or ==0 layer reached already 
+				! minimum layerthickness)
+				maxhbar2distr = 0.0_WP
+				maxhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
+				maxhbar2distr(maxhbar2distr>=0.0_WP)=0.0_WP
+				
+				!_______________________________________________________________
+				! calc weighting array for distribution of ssh change over layers
+				weight_hbar = 0.0_WP
+				dhbar_rest  = dhbar_total
+				
+				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
+				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
+				nzmax = min(lzstar_lev,nlevels_nod2D_min(n)-2) 
+				do nz=1,nzmax
+					weight_hbar(nz) = max(dhbar_rest,maxhbar2distr(nz))    
+					dhbar_rest = dhbar_rest - weight_hbar(nz)
+					dhbar_rest = min(0.0_WP,dhbar_rest)
+				end do
+				weight_hbar = abs(weight_hbar/dhbar_total)
+				
+				if ( abs(sum(weight_hbar)-1.0_WP) >= 1e-15) then
+					write(*,*) " --> problems with conservation of weighting over depth"
+					write(*,*) "     weight_hbar     =",weight_hbar
+					write(*,*) "     sum(weight_hbar)=",sum(weight_hbar)
+					write(*,"(A, ES10.3)") "     abs(sum(weight_hbar)-1.0_WP) =",abs(sum(weight_hbar)-1.0_WP)
+					write(*,*) "     maxhbar2distr   =",maxhbar2distr
+					write(*,*) "     dhbar_total     =",dhbar_total
+					call par_ex(1)
+				end if 
+				
+				! be sure that weight_hbar is normed to 1.0
+				weight_hbar = weight_hbar/sum(weight_hbar)
+				
+				!_______________________________________________________________
+				! distribute change in ssh over layers in hnode and Wvel
+				weight_hbar_int = 0.0_WP
+				do nz=nzmax,1,-1
+					! --> integrate weighting from down to up
+					weight_hbar_int= weight_hbar_int + weight_hbar(nz)
+					Wvel(nz,n)     = Wvel(nz,n) - dhbar_total*weight_hbar_int/dt
+					hnode_new(nz,n)= hnode(nz,n)+ dhbar_total*weight_hbar(nz)
+				end do
+				
+				! Add surface fresh water flux as upper boundary condition for continutity
+				Wvel(1,n)=Wvel(1,n)-water_flux(n)
+				
+			else
+				! --> normal zlevel case
+				Wvel(1,n)=Wvel(1,n)-dhbar_total/dt
+				hnode_new(1,n)=hnode(1,n)+dhbar_total
+				! Add surface fresh water flux as upper boundary condition for continutity
+				Wvel(1,n)=Wvel(1,n)-water_flux(n)
+			end if 
 		end do
 		
 	elseif (trim(which_ALE)=='zstar') then
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
 		do n=1, myDim_nod2D
 			! --> be careful Sergey suggest in his paper to use the unperturbed
-			!     ocean levels NOT the actual one !!!
-			dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
-! 			dd1=zbar(nlevels_nod2D_min(n)-1)
+			!     ocean levels NOT the actual one !!! but spoke with Sergey its not 
+			!     so important which to use as long as volume is conserved
+			! dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
+			dd1=zbar(nlevels_nod2D_min(n)-1)
 			
 			! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-			dd=zbar_3d_n(1,n)-dd1    
-! 			dd=zbar(1)-dd1    
+			! dd=zbar_3d_n(1,n)-dd1    
+			dd=zbar(1)-dd1    
 			
 			! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
 			! 1/H*dhbar
@@ -1107,12 +1247,11 @@ subroutine vert_vel_ale
 				! SUM_i=k:kmax(h⁰_k) == (zbar(nz)-dd1)
 				! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from 
 				!     the vertical integration bottom to top of Wvel
-				! --> be careful Sergey suggest in his paper to use the unperturbed
-				!     layerthicknesses NOT the actual layerthicknesses !!!
-				Wvel(nz,n)     =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
-! 				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
-				hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
-! 				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
+				
+				! Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
+				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
+				! hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
+				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
 			end do
 			
 			! Add surface fresh water flux as upper boundary condition for 
@@ -1161,7 +1300,7 @@ use g_config, only: which_ale
 	!
 	!
 	!___USE PETSC SOLVER________________________________________________________
-        ! this is not longer used but is still kept in the code
+	! this is not longer used but is still kept in the code
 #ifdef PETSC
 implicit none
 #include "petscf.h"
@@ -1238,11 +1377,11 @@ droptol=1.e-8
 soltol=1.e-10
 
 if  (trim(which_ale)=='linfs') then
-    reuse=0
-    new_values=0
+	reuse=0
+	new_values=0
 else
-    reuse=1     ! For varying coefficients, set reuse=1
-    new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
+	reuse=1     ! For varying coefficients, set reuse=1
+	new_values=1 !PS 1 ! and new_values=1, as soon as the coefficients have changed
 end if
 
 ! reuse=0: matrix remains static
@@ -1402,12 +1541,11 @@ DO elem=1,myDim_elem2D
 	
 end do   !!! cycle over elements
 end subroutine impl_vert_visc_ale
-
 !
 !
 !===============================================================================
 subroutine oce_timestep_ale(n)
-	use g_config, only: logfile_outfreq,dt
+	use g_config, only: logfile_outfreq
 	use o_MESH
 	use o_ARRAYS
 	use o_PARAM
@@ -1418,22 +1556,13 @@ subroutine oce_timestep_ale(n)
 	use o_mixing_KPP_mod
 	
 	IMPLICIT NONE
-	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9
+	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
 	integer           :: n
-	integer           :: el,nz,elnodes(3) !??????????????????????????????
-	CHARACTER(LEN=80) :: fmt   !??????????????????????????????
-	real(kind=8)      :: global_vol_eta ,local_vol_eta ,global_max_eta ,global_min_eta ,local_max_eta ,local_min_eta
-	real(kind=8)      :: global_vol_hbar,local_vol_hbar,global_max_hbar,global_min_hbar,local_max_hbar,local_min_hbar
-	real(kind=8)      :: global_vol_wflux,local_vol_wflux,global_max_wflux,global_min_wflux,local_max_wflux,local_min_wflux
-	real(kind=8)      :: global_vol_hflux,local_vol_hflux,global_max_hflux,global_min_hflux,local_max_hflux,local_min_hflux
-!DS 	real(kind=8)      :: global_d_eta, global_wflux, local_d_eta, local_wflux, local_vol, global_vol
-	real(kind=8),allocatable  :: aux1(:),aux2(:)
 	
-
 	t1=MPI_Wtime()
-	
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
+	
 	!___________________________________________________________________________
 	! calculate alpha and beta
 	! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
@@ -1458,6 +1587,7 @@ subroutine oce_timestep_ale(n)
 		stop "!not existing mixing scheme!"
 		call par_ex
 	end if  
+	
 	!___________________________________________________________________________
 	if(mom_adv/=3) then
 		call compute_vel_rhs
@@ -1466,7 +1596,7 @@ subroutine oce_timestep_ale(n)
 	end if
 	
 	!___________________________________________________________________________
-        call viscosity_filter(2)
+	call viscosity_filter(2)
 	
 	!___________________________________________________________________________
 	if(i_vert_visc) call impl_vert_visc_ale
@@ -1503,7 +1633,8 @@ subroutine oce_timestep_ale(n)
 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	! --> eta_(n)
 	! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
-	!---------------------------------------------------------------------------
+	
+	!___________________________________________________________________________
 	! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
 	! does not belong directly to ALE formalism
 	if (Fer_GM) then
@@ -1513,313 +1644,51 @@ subroutine oce_timestep_ale(n)
 	end if
 	t6=MPI_Wtime() 
 	
-	!---------------------------------------------------------------------------
+	!___________________________________________________________________________
 	!The main step of ALE procedure --> this is were the magic happens --> here 
 	! is decided how change in hbar is distributed over the vertical layers
 	call vert_vel_ale 
 	t7=MPI_Wtime() 
 	
+	!___________________________________________________________________________
 	! solve tracer equation 
 	call solve_tracers_ale
 	t8=MPI_Wtime() 
 	
+	!___________________________________________________________________________
 	! Update hnode=hnode_new, helem
 	call update_thickness_ale  
-	
 	t9=MPI_Wtime() 
 	
 	!___________________________________________________________________________
-	! write out execution times for ocean step parts
-	if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
-		write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-		write(*,"(A, ES10.3)") '	Oce. Dynamics    :', t2-t1
-		write(*,"(A, ES10.3)") '	Oce. Update Vel. :', t4-t3
-		write(*,"(A, ES10.3)") '	Oce. Fer-GM.     :', t6-t5
-		write(*,*) '   _______________________________'
-		write(*,"(A, ES10.3)") '	ALE-Solve SSH    :', t3-t2
-		write(*,"(A, ES10.3)") '	ALE-Calc. hbar   :', t5-t4
-		write(*,"(A, ES10.3)") '	ALE-Update+W     :', t7-t6
-		write(*,"(A, ES10.3)") '	ALE-Solve Tracer :', t8-t7
-		write(*,"(A, ES10.3)") '	ALE-Update hnode :', t9-t8
-		write(*,*) '   _______________________________'
-		write(*,"(A, ES10.3)") '	Oce. TOTAL       :', t9-t1
-		write(*,*)
-! 		write(*,*) 'average_time (horizontal diffusion) = ', time_sum/n
-	end if
-	
+	! write out global fields for debugging
 	call write_step_info(n)
 	
-! #ifdef FALSE	
+	! check model for blowup --> ! write_step_info and check_blowup require 
+	! togeather around 2.5% of model runtime
+	call check_blowup(n)
+	
+	
 	!___________________________________________________________________________
-	!check for different parameter
-	if (mod(n,logfile_outfreq)==0) then
-! 		local_vol_eta=0.0_WP
-! 		local_vol_hbar=0.0_WP
-		local_vol_wflux=0.0_WP
-		local_vol_hflux=0.0_WP
-!DS		local_vol=0.0_WP
-!DS		local_d_eta=0.0_WP
-!DS		local_wflux=0.0_WP
-		do el=1, myDim_elem2D
-			elnodes=elem2D_nodes(:, el)
-! 			local_vol_eta=local_vol_eta+sum(eta_n(elnodes))/3.0_WP !*elem_area(el)
-! 			local_vol_hbar=local_vol_hbar+sum(hbar(elnodes))/3.0_WP !*elem_area(el)
-			local_vol_wflux=local_vol_wflux+sum(water_flux(elnodes))/3.0_WP !*elem_area(el)
-			local_vol_hflux=local_vol_hflux+sum(heat_flux(elnodes))/3.0_WP !*elem_area(el)
-!DS 			local_vol=local_vol+elem_area(el)
-!DS 			local_d_eta=local_d_eta+sum(d_eta(elnodes))/3.0_WP*elem_area(el)
-!DS 			local_wflux=local_wflux+sum(water_flux(elnodes))/3.0_WP*elem_area(el)
-		end do
-		
-! 		local_vol_eta  = local_vol_eta/myDim_elem2D
-! 		local_max_eta  = maxval(eta_n)
-! 		local_min_eta  = minval(eta_n)
-! 		global_vol_eta=0.0_WP
-! 		global_max_eta=0.0_WP
-! 		global_min_eta=0.0_WP
-! 		call MPI_AllREDUCE(local_vol_eta, global_vol_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-! 							MPI_COMM_WORLD, MPIerr)
-! 		global_vol_eta = global_vol_eta/npes
-! 		call MPI_AllREDUCE(local_max_eta, global_max_eta, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-! 							MPI_COMM_WORLD, MPIerr)
-! 		call MPI_AllREDUCE(local_min_eta, global_min_eta, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-! 							MPI_COMM_WORLD, MPIerr)
-							
-! 		local_vol_hbar = local_vol_hbar/myDim_elem2D
-! 		local_max_hbar = maxval(hbar)
-! 		local_min_hbar = minval(hbar)
-! 		global_vol_hbar=0.0_WP
-! 		global_max_hbar=0.0_WP
-! 		global_min_hbar=0.0_WP
-! 		call MPI_AllREDUCE(local_vol_hbar, global_vol_hbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-! 							MPI_COMM_WORLD, MPIerr)
-! 		global_vol_hbar=global_vol_hbar/npes
-! 		call MPI_AllREDUCE(local_max_hbar, global_max_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-! 							MPI_COMM_WORLD, MPIerr)
-! 		call MPI_AllREDUCE(local_min_hbar, global_min_hbar, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-! 							MPI_COMM_WORLD, MPIerr)
-							
-		local_vol_wflux = local_vol_wflux/myDim_elem2D
-		local_max_wflux = maxval(water_flux)
-		local_min_wflux = minval(water_flux)
-		global_vol_wflux=0.0_WP
-		global_max_wflux=0.0_WP
-		global_min_wflux=0.0_WP
-		call MPI_AllREDUCE(local_vol_wflux, global_vol_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-							MPI_COMM_WORLD, MPIerr)
-		global_vol_wflux=global_vol_wflux/npes
-		call MPI_AllREDUCE(local_max_wflux, global_max_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-							MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(local_min_wflux, global_min_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-							MPI_COMM_WORLD, MPIerr)
-							
-		local_vol_hflux = local_vol_hflux/myDim_elem2D
-		local_max_hflux = maxval(heat_flux)
-		local_min_hflux = minval(heat_flux)
-		global_vol_hflux=0.0_WP
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(local_vol_hflux, global_vol_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-							MPI_COMM_WORLD, MPIerr)
-		global_vol_hflux=global_vol_hflux/npes
-		call MPI_AllREDUCE(local_max_hflux, global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-							MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(local_min_hflux, global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, &
-							MPI_COMM_WORLD, MPIerr)
-
-!DS             ! integrate d_eta and ssh_rhs over the ocean surface and compute their means
-!DS 		global_vol   = 0.0_WP
-!DS 		global_d_eta = 0.0_WP
-!DS 		global_wflux = 0.0_WP
-!DS 		call MPI_AllREDUCE(local_vol, global_vol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!DS 							MPI_COMM_WORLD, MPIerr)
-!DS 		call MPI_AllREDUCE(local_d_eta, global_d_eta, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!DS 							MPI_COMM_WORLD, MPIerr)
-!DS 		call MPI_AllREDUCE(local_wflux, global_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-!DS 							MPI_COMM_WORLD, MPIerr)
-!DS 		global_wflux=global_wflux/global_vol
-!DS 		global_d_eta=global_d_eta/global_vol
-!DS             if (mype==0) then
-!DS                write(*,*) 'int. d_eta and water_flux =', global_d_eta, global_wflux
-!DS             end if
-							
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '	___global max/min/mean --> mstep=',mstep,'_________'
-! 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     eta_n : ',global_max_eta,' | ',global_min_eta,' | ',global_vol_eta
-! 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hbar  : ',global_max_hbar,' | ',global_min_hbar,' | ',global_vol_hbar
-			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     wflux : ',global_max_wflux,' | ',global_min_wflux,' | ',global_vol_wflux
-			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux : ',global_max_hflux,' | ',global_min_hflux,' | ',global_vol_hflux
-		endif
-		
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(maxval(tr_arr(:,:,1)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(tr_arr(:,:,1)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '    temp  : ',global_max_hflux,' | ',global_min_hflux
-		end if
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(maxval(tr_arr(:,:,2),MASK=(tr_arr(:,:,2)/=0.0)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(tr_arr(:,:,2),MASK=(tr_arr(:,:,2)/=0.0)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '    salt  : ',global_max_hflux,' | ',global_min_hflux
-		end if
-		global_max_hflux=0.0_WP
-		global_min_hflux=0.0_WP
-		call MPI_AllREDUCE(maxval(Wvel(1,:)), global_max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
-		call MPI_AllREDUCE(minval(Wvel(1,:)), global_min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
-		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) ' Wvel(:,1): ',global_max_hflux,' | ',global_min_hflux
-		end if
-
-		
-		!___________________________________________________________________________
-		! check variables for strange values
-		do el=1,myDim_nod2d
-		
-			! check SSH
-			if ( ((eta_n(el) /= eta_n(el)) .or. &
-				eta_n(el)<-20.0 .or. eta_n(el)>20.0)) then
-				write(*,*) ' --STOP--> found eta_n become NaN or <-20.0, >20.0'
-				write(*,*) 'mype        = ',mype
-				write(*,*) 'mstep       = ',n
-				write(*,*) 'node        = ',el
-				write(*,*) 'eta_n(el)   = ',eta_n(el)
-				write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
-				call par_ex(1)
-			endif
-			
-			! check HBAR
-! 			if ( (ieee_is_nan(hbar(el)) .or. &
-! 				hbar(el)<-10.0 .or. hbar(el)>10.0)) then
-! 				write(*,*) ' --STOP--> found hbar become NaN or <-10.0, >10.0'
-! 				write(*,*) 'mype        = ',mype
-! 				write(*,*) 'mstep       = ',n
-! 				write(*,*) 'node        = ',el
-! 				write(*,*) 'hbar(el)    = ',hbar(el)
-! 				write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
-! 				call par_ex(1)
-! 			endif
-			
-			
-			
-			do nz=1,nlevels_nod2D(el)-1
-				! check TEMP
-				if ( (tr_arr(nz, el,1) /= tr_arr(nz, el,1)) .or. &
-					tr_arr(nz, el,1) < -5.0 .or. tr_arr(nz, el,1)>100) then
-					write(*,*) ' --STOP--> found temperture become NaN or <-3.0, >100'
-					write(*,*) 'mype        = ',mype
-					write(*,*) 'mstep       = ',n
-					write(*,*) 'node        = ',el
-					write(*,*) 'nz          = ',nz
-					write(*,*)
-					write(*,*) 'temp(nz, el)    = ',tr_arr(nz, el,1)
-					write(*,*) 'temp_old(nz, el)= ',tr_arr_old(nz, el,1)
-					write(*,*) 'temp(: , el)    = ',tr_arr(:, el,1)
-					write(*,*) 'temp_old(: , el)= ',tr_arr_old(:, el,1)
-					write(*,*)
-					write(*,*) 'hflux       = ',heat_flux(el)
-					write(*,*) 'hflux_old   = ',heat_flux_old(el)
-					write(*,*) 'wflux       = ',water_flux(el)
-					write(*,*) 'wflux_old   = ',water_flux_old(el)
-					write(*,*)
-					write(*,*) 'aice        = ',a_ice(el)
-					write(*,*) 'aice_old    = ',a_ice_old(el)
-					write(*,*) 'hice        = ',m_ice(el)
-					write(*,*) 'hice_old    = ',m_ice_old(el)
-					write(*,*)
-					write(*,*) 'eta_n       = ',eta_n(el)
-					write(*,*) 'hbar        = ',hbar(el)
-					write(*,*) 'hbar_old    = ',hbar_old(el)
-					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
-					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
-					write(*,*)
-					write(*,*) 'hnode       = ',hnode(:,el)
-					write(*,*) 'hnode_new   = ',hnode_new(:,el)
-					write(*,*)
-					write(*,*) 'Kv          = ',Kv(:,el)
-					write(*,*)
-					write(*,*) 'W           = ',Wvel(:,el)
-					write(*,*)
-					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,el)/rad
-!					call output (1,n)        ! save (NetCDF)
-!					call restart(1,n)        ! save (NetCDF)
-					call restart(n, .true., .false.)
-					call par_ex(1)
-				endif
-				
-				! check SALT
-				if ( (tr_arr(nz, el,2) /= tr_arr(nz, el,2)) .or.  &
-					tr_arr(nz, el,2) < 0 .or. tr_arr(nz, el,2)>50 ) then
-					
-					write(*,*) ' --STOP--> found salinity become NaN or <0, >50'
-					write(*,*) 'mype        = ',mype
-					write(*,*) 'mstep       = ',n
-					write(*,*) 'node        = ',el
-					write(*,*) 'nz          = ',nz
-					write(*,*)
-					write(*,*) 'salt(nz, el)= ',tr_arr(nz, el,2)
-					write(*,*) 'salt(: , el)= ',tr_arr(:, el,2)
-					write(*,*)
-					write(*,*) 'temp(nz, el)= ',tr_arr(nz, el,1)
-					write(*,*) 'temp(: , el)= ',tr_arr(:, el,1)
-					write(*,*)
-					write(*,*) 'hflux       = ',heat_flux(el)
-					write(*,*) 'wflux       = ',water_flux(el)
-					write(*,*)
-					write(*,*) 'eta_n       = ',eta_n(el)
-					write(*,*) 'hbar        = ',hbar(el)
-					write(*,*) 'hbar_old    = ',hbar_old(el)
-					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
-					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
-					write(*,*)
-					write(*,*) 'hnode_new   = ',hnode_new(:,el)
-					write(*,*)
-					write(*,*) 'Kv          = ',Kv(:,el)
-					write(*,*)
-					write(*,*) 'W           = ',Wvel(:,el)
-					write(*,*)
-					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
-					write(*,*)
-!					call output (1,n)        ! save (NetCDF)
-!					call restart(1,n)        ! save (NetCDF)
-!					call par_ex(1)
-				endif 
-				
-				! check vertical velocity
-				if ( Wvel(1, el) /= Wvel(1, el)) then
-					
-					write(*,*) ' --STOP--> found surface layer vertical velocity become NaN'
-					write(*,*) 'mype        = ',mype
-					write(*,*) 'mstep       = ',n
-					write(*,*) 'node        = ',el
-					write(*,*) 'nz          = ',nz
-					write(*,*)
-					write(*,*) 'Wvel(1, el) = ',Wvel(1,el)
-					write(*,*) 'Wvel(:, el) = ',Wvel(:,el)
-					write(*,*)
-					write(*,*) 'wflux       = ',water_flux(el)
-					write(*,*) 'hflux       = ',heat_flux(el)
-					write(*,*)
-					write(*,*) 'eta_n       = ',eta_n(el)
-					write(*,*) 'hbar        = ',hbar(el)
-					write(*,*) 'hbar_old    = ',hbar_old(el)
-					write(*,*) 'ssh_rhs     = ',ssh_rhs(el)
-					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(el)
-					write(*,*)
-					write(*,*) 'hnode_new   = ',hnode_new(:,el)
-					write(*,*)
-					write(*,*) 'Kv          = ',Kv(:,el)
-					write(*,*)
-					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,el)/rad
-					write(*,*)
-!					call output (1,n)        ! save (NetCDF)
-!					call restart(1,n)        ! save (NetCDF)
-!					call par_ex(1)
-				endif 
-			end do
-		end do
-	end if !-->if (mod(n,logfile_outfreq)==0) then
+	! write out execution times for ocean step parts
+	t10=MPI_Wtime() 
+	if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+		write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
+		write(*,"(A, ES10.3)") ' 	Oce. Dynamics    :', t2-t1
+		write(*,"(A, ES10.3)") ' 	Oce. Update Vel. :', t4-t3
+		write(*,"(A, ES10.3)") ' 	Oce. Fer-GM.     :', t6-t5
+		write(*,*) '	_______________________________'
+		write(*,"(A, ES10.3)") ' 	ALE-Solve SSH    :', t3-t2
+		write(*,"(A, ES10.3)") ' 	ALE-Calc. hbar   :', t5-t4
+		write(*,"(A, ES10.3)") ' 	ALE-Update+W     :', t7-t6
+		write(*,"(A, ES10.3)") ' 	ALE-Solve Tracer :', t8-t7
+		write(*,"(A, ES10.3)") ' 	ALE-Update hnode :', t9-t8
+		write(*,*) '	_______________________________'
+		write(*,"(A, ES10.3)") ' 	check for blowup :', t10-t9
+		write(*,*) '	_______________________________'
+		write(*,"(A, ES10.3)") ' 	Oce. TOTAL       :', t10-t1
+		write(*,*)
+		write(*,*)
+	end if
 	
 end subroutine oce_timestep_ale

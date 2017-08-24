@@ -53,9 +53,16 @@ module g_config
   logical                :: use_ALE=.false.     ! switch on/off ALE
   character(20)          :: which_ALE='zlevel' ! 'zlevel', 'zstar', 'zstar-weighted', 'ztilde'
   logical                :: use_partial_cell=.false.  ! use partial bottom cell configuration  
+! for zlevel: layer thickness should not become smaller than min_hnode of 
+  ! original layer thickness. If it happens switch from zelvel to local zstar
+  real(kind=WP)          :: min_hnode=0.25 
+  ! for zlevel: in case min_hnode criteria is reached over how many level should 
+  ! ssh change be distributed
+  integer                :: lzstar_lev=3
+  ! maximal pressure from ice felt by the ocean
+  real(kind=8)           :: max_ice_loading=5.0
 
-  namelist /mesh_def/ grid_type, use_ALE, which_ALE, use_partial_cell
-
+  namelist /mesh_def/ grid_type, use_ALE, which_ALE, use_partial_cell, min_hnode, lzstar_lev, max_ice_loading
 
   ! *** model geometry
   logical                :: cartesian=.false.
