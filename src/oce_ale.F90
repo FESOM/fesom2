@@ -1155,24 +1155,22 @@ subroutine vert_vel_ale
 			! over the first lzstar_lev layers
 			if (hnode(1,n)+dhbar_total <= (zbar(1)-zbar(2))*min_hnode ) then 
 				! --> local zstar
-				write(*,*)
-				write(*,*) " --> do local zstar"
-				write(*,*)
-				maxhbar2distr  = 0.0_WP
-				weight_hbar    = 0.0_WP
-				weight_hbar_int= 0.0_WP
+! 				write(*,*)
+! 				write(*,*) " --> do local zstar"
+! 				write(*,*)
 				
 				!_______________________________________________________________
 				! maxhbar2distr ... how much ssh change can be maximal distributed 
 				! per layer (must be negativ, if positive or ==0 layer reached already 
 				! minimum layerthickness)
+				maxhbar2distr = 0.0_WP
 				maxhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
 				maxhbar2distr(maxhbar2distr>=0.0_WP)=0.0_WP
 				
 				!_______________________________________________________________
 				! calc weighting array for distribution of ssh change over layers
-				weight_hbar=0.0_WP
-				dhbar_rest=dhbar_total
+				weight_hbar = 0.0_WP
+				dhbar_rest  = dhbar_total
 				
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
 				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
@@ -1184,17 +1182,18 @@ subroutine vert_vel_ale
 				end do
 				weight_hbar = abs(weight_hbar/dhbar_total)
 				
-				! be sure that weight_hbar is normed to 1.0
-				weight_hbar = weight_hbar/sum(weight_hbar)
-				
 				if ( abs(sum(weight_hbar)-1.0_WP) >= 1e-15) then
 					write(*,*) " --> problems with conservation of weighting over depth"
 					write(*,*) "     weight_hbar     =",weight_hbar
 					write(*,*) "     sum(weight_hbar)=",sum(weight_hbar)
 					write(*,"(A, ES10.3)") "     abs(sum(weight_hbar)-1.0_WP) =",abs(sum(weight_hbar)-1.0_WP)
 					write(*,*) "     maxhbar2distr   =",maxhbar2distr
+					write(*,*) "     dhbar_total     =",dhbar_total
 					call par_ex(1)
 				end if 
+				
+				! be sure that weight_hbar is normed to 1.0
+				weight_hbar = weight_hbar/sum(weight_hbar)
 				
 				!_______________________________________________________________
 				! distribute change in ssh over layers in hnode and Wvel
