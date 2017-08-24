@@ -49,7 +49,6 @@ OBJECTS=  fvom_main.o 		\
 	  oce_fer_gm.o 		\
           oce_muscl_adv.o 	\
           oce_ale_fct_3d_adv.o 	\
-	  oce_fct_muscl_adv.o 	\
           oce_ice_init_state.o 	\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\

@@ -9,23 +9,57 @@ subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
 	use g_PARSUP
 	implicit none
 	
-	real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D),ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	! real(kind=WP)  :: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
+	real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), ttf(nl-1, myDim_nod2D+eDim_nod2D)
 	real(kind=WP)  :: num_ord
-	
+	integer        :: i
 	! 1st. first calculate Low and High order solution
 	call fct_ale_muscl_LH(ttfAB,ttf,num_ord)
 
 !just for using the low order:
-!	fct_aec    =0.
-!	fct_aec_ver=0.
+!	fct_adf_h = 0.
+!	fct_adf_v = 0.
 	
 	! 2nd. apply constrained bounds
-	call fct_ale(ttf)
-	
+        do i=1, fct_iter
+	   call fct_ale(ttf, (fct_iter-i > 0))
+        end do
 end subroutine adv_tracer_fct_ale
 !
 !
+SUBROUTINE fct_init
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+IMPLICIT NONE
+integer      :: my_size
+
+my_size=myDim_nod2D+eDim_nod2D
+allocate(fct_LO(nl-1, my_size))        ! Low-order solution 
+allocate(fct_adf_h(nl-1,myDim_edge2D)) ! antidiffusive hor. contributions / from edges
+allocate(fct_adf_v(nl, myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
+
+if (fct_iter > 1) then
+   allocate(fct_adf_h2(nl-1,myDim_edge2D))
+   allocate(fct_adf_v2(nl, myDim_nod2D))
+   fct_adf_h2=0.
+   fct_adf_v2=0.
+end if
+
+allocate(fct_ttf_max(nl-1, my_size),fct_ttf_min(nl-1, my_size))
+allocate(fct_plus(nl-1, my_size),fct_minus(nl-1, my_size))
+! Initialize with zeros: 
+ fct_LO=0.0
+ fct_adf_h=0.0
+ fct_adf_v=0.0
+ fct_ttf_max=0.0
+ fct_ttf_min=0.0
+ fct_plus=0.0
+ fct_minus=0.0
+ 
+ if (mype==0) write(*,*) 'FCT is initialized'
+ 
+END SUBROUTINE fct_init
 !===============================================================================
 subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 	use o_MESH
@@ -53,8 +87,8 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 	! The result is the low-order solution
 	! and vertical and horizontal antidiffusive fluxes
 	! They are put into fct_LO
-	!                   fct_aec
-	!                   fct_aec_ver
+	!                   fct_adf_h
+	!                   fct_adf_v
 	! --------------------------------------------------------------------------
 	
 	!___________________________________________________________________________
@@ -190,7 +224,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			
 			!___________________________________________________________________
 			! 3nd. calculate Antidiffusive edge flux: AEF=[HO - LO]
-			fct_aec(nz,edge)=cHO-cLO
+			fct_adf_h(nz,edge)=cHO-cLO
 			
 		end do  ! --> do nz=1, n2
 		
@@ -232,7 +266,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 				
 				!_______________________________________________________________
 				! 3nd. calculate Antidiffusive edge flux: AEF=-[HO - LO]
-				fct_aec(nz,edge)=cHO-cLO
+				fct_adf_h(nz,edge)=cHO-cLO
 				
 			end do ! --> do nz=n2+1, nl1
 		else
@@ -267,7 +301,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 				
 				!_______________________________________________________________
 				! 3nd. calculate Antidiffusive edge flux: AEF=-[HO - LO]
-				fct_aec(nz,edge)=cHO-cLO
+				fct_adf_h(nz,edge)=cHO-cLO
 			end do ! --> do nz=n2+1, nl2
 		end if
 	end do
@@ -282,7 +316,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		! vert. flux at surface layer
 		nz=1
 		tvert(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
-		fct_aec_ver(nz,n)=0.0_WP
+		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
 		! vert. flux at surface + 1 layer --> centered differences
@@ -296,7 +330,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
-		fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
+		fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
 		
 		!_______________________________________________________________________
 		! vert. flux at bottom - 1 layer --> centered differences
@@ -310,13 +344,13 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
-		fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
+		fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
 		
 		!_______________________________________________________________________
 		! vert. flux at bottom layer --> zero bottom flux
 		nz=nl1
 		tvert(nz)=0.0_WP	
-		fct_aec_ver(nz,n)=0.0_WP
+		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
 		! Be carefull have to do vertical tracer advection here on old vertical grid
@@ -344,7 +378,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel_e(nz,n)+(1.0_WP-num_ord)*Tmean)
 			
 			! antidiffusive flux: (HO-LO)
-			fct_aec_ver(nz,n)=(cHO-cLO)*area(nz,n)
+			fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
 			
 		end do ! --> do nz=3,nl1-1
 		
@@ -363,13 +397,13 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 	call exchange_nod(fct_LO) 
 	! Summary:   
 	! fct_LO contains full low-order solution
-	! fct_aec contains antidiffusive component of horizontal flux 
-	! fct_aec_ver contains antidiffusive component of vertical fluxes
+	! fct_adf_h contains antidiffusive component of horizontal flux 
+	! fct_adf_v contains antidiffusive component of vertical fluxes
 end subroutine fct_ale_muscl_LH
 !
 !
 !===============================================================================
-subroutine fct_ale(ttf)
+subroutine fct_ale(ttf, iter_yn)
 	!
 	! 3D Flux Corrected Transport scheme
 	! Limits antidiffusive fluxes==the difference in flux HO-LO
@@ -383,12 +417,13 @@ subroutine fct_ale(ttf)
 	use g_CONFIG
 	use g_comm_auto
 	implicit none
-	integer       :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
-	real(kind=WP) :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
-	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real*8        :: flux_eps=1e-16
-	real*8        :: bignumber=1e3
-	integer       :: vlimit=1
+	integer                   :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
+	real(kind=WP)             :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
+	real(kind=WP), intent(in) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+	real*8                    :: flux_eps=1e-16
+	real*8                    :: bignumber=1e3
+	integer                   :: vlimit=1
+        logical, intent(in)       :: iter_yn !more iterations to be made with fct_ale?
 	! --------------------------------------------------------------------------
 	! ttf is the tracer field on step n
 	! del_ttf is the increment 
@@ -517,13 +552,13 @@ subroutine fct_ale(ttf)
 	do n=1, myDim_nod2D
 		do nz=1,nlevels_nod2D(n)-1
 ! 			fct_plus(nz,n)=fct_plus(nz,n)+ &
-! 							(max(0.0_WP,fct_aec_ver(nz,n))+max(0.0_WP,-fct_aec_ver(nz+1,n))) &
+! 							(max(0.0_WP,fct_adf_v(nz,n))+max(0.0_WP,-fct_adf_v(nz+1,n))) &
 ! 							/hnode(nz,n)
 ! 			fct_minus(nz,n)=fct_minus(nz,n)+ &
-! 							(min(0.0_WP,fct_aec_ver(nz,n))+min(0.0_WP,-fct_aec_ver(nz+1,n))) &
+! 							(min(0.0_WP,fct_adf_v(nz,n))+min(0.0_WP,-fct_adf_v(nz+1,n))) &
 ! 							/hnode(nz,n)
-			fct_plus(nz,n) =fct_plus(nz,n) +(max(0.0_WP,fct_aec_ver(nz,n))+max(0.0_WP,-fct_aec_ver(nz+1,n)))
-			fct_minus(nz,n)=fct_minus(nz,n)+(min(0.0_WP,fct_aec_ver(nz,n))+min(0.0_WP,-fct_aec_ver(nz+1,n)))
+			fct_plus(nz,n) =fct_plus(nz,n) +(max(0.0_WP,fct_adf_v(nz,n))+max(0.0_WP,-fct_adf_v(nz+1,n)))
+			fct_minus(nz,n)=fct_minus(nz,n)+(min(0.0_WP,fct_adf_v(nz,n))+min(0.0_WP,-fct_adf_v(nz+1,n)))
 		end do
 	end do
 	
@@ -537,10 +572,10 @@ subroutine fct_ale(ttf)
 			nl2=nlevels(el(2))-1
 		end if   
 		do nz=1, max(nl1,nl2)
-			fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0, fct_aec(nz,edge))
-			fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0, fct_aec(nz,edge))  
-			fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0,-fct_aec(nz,edge))
-			fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0,-fct_aec(nz,edge)) 
+			fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0, fct_adf_h(nz,edge))
+			fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0, fct_adf_h(nz,edge))  
+			fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0,-fct_adf_h(nz,edge))
+			fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0,-fct_adf_h(nz,edge)) 
 		end do
 	end do 
 	
@@ -565,24 +600,27 @@ subroutine fct_ale(ttf)
 	do n=1, myDim_nod2D
 		nz=1
 		ae=1.0_8
-		flux=fct_aec_ver(nz,n)
+		flux=fct_adf_v(nz,n)
 		if(flux>=0.0) then 
 			ae=min(ae,fct_plus(nz,n))
 		else
 			ae=min(ae,fct_minus(nz,n))
 		end if
-		fct_aec_ver(nz,n)=ae*fct_aec_ver(nz,n)    
+		fct_adf_v(nz,n)=ae*fct_adf_v(nz,n)    
 		do nz=2,nlevels_nod2D(n)-1
 			ae=1.0
-			flux=fct_aec_ver(nz,n)
+			flux=fct_adf_v(nz,n)
 			if(flux>=0.) then 
 				ae=min(ae,fct_minus(nz-1,n))
 				ae=min(ae,fct_plus(nz,n))
 			else
 				ae=min(ae,fct_plus(nz-1,n))
 				ae=min(ae,fct_minus(nz,n))
-			end if   
-			fct_aec_ver(nz,n)=ae*fct_aec_ver(nz,n)
+			end if
+                        if (iter_yn) then
+                           fct_adf_v2(nz,n)=(1.0_WP-ae)*fct_adf_v(nz,n)
+                        end if
+			fct_adf_v(nz,n)=ae*fct_adf_v(nz,n)
 		end do
 	! the bottom flux is always zero 
 	end do
@@ -598,7 +636,7 @@ subroutine fct_ale(ttf)
 		end if  
 		do nz=1, max(nl1,nl2)
 			ae=1.0
-			flux=fct_aec(nz,edge)
+			flux=fct_adf_h(nz,edge)
 			if(flux>=0.) then
 				ae=min(ae,fct_plus(nz,enodes(1)))
 				ae=min(ae,fct_minus(nz,enodes(2)))
@@ -606,17 +644,47 @@ subroutine fct_ale(ttf)
 				ae=min(ae,fct_minus(nz,enodes(1)))
 				ae=min(ae,fct_plus(nz,enodes(2)))
 			endif
-			fct_aec(nz,edge)=ae*fct_aec(nz,edge)
+                        if (iter_yn) then
+                           fct_adf_h2(nz,edge)=(1.0_WP-ae)*fct_adf_h(nz,edge)
+                        end if
+			fct_adf_h(nz,edge)=ae*fct_adf_h(nz,edge)
 		end do
 	end do
 	
+        if (iter_yn) then
+           !___________________________________________________________________________
+           ! c. Update the LO
+           ! Vertical
+           do n=1, myDim_nod2d
+              do nz=1,nlevels_nod2D(n)-1  
+                 fct_LO(nz,n)=fct_LO(nz,n)+(fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)/hnode_new(nz,n)
+              end do
+           end do
+	
+           ! Horizontal
+           do edge=1, myDim_edge2D
+              enodes(1:2)=edges(:,edge)
+              el=edge_tri(:,edge)
+              nl1=nlevels(el(1))-1
+              nl2=0
+              if (el(2)>0) nl2=nlevels(el(2))-1
+              do nz=1, max(nl1,nl2)
+                 fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+fct_adf_h(nz,edge)*dt/area(nz,enodes(1))/hnode_new(nz,enodes(1))
+                 fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-fct_adf_h(nz,edge)*dt/area(nz,enodes(2))/hnode_new(nz,enodes(2))
+              end do
+           end do
+           fct_adf_h=fct_adf_h2
+           fct_adf_v=fct_adf_v2
+           return !do the next iteration with fct_ale
+        end if
+
 	!___________________________________________________________________________
 	! c. Update the solution
 	! Vertical
 	do n=1, myDim_nod2d
 		do nz=1,nlevels_nod2D(n)-1  
 			del_ttf(nz,n)=del_ttf(nz,n)-ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
-					(fct_aec_ver(nz,n)-fct_aec_ver(nz+1,n))*dt/area(nz,n)
+					(fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)
 		end do
 	end do
 	
@@ -628,9 +696,8 @@ subroutine fct_ale(ttf)
 		nl2=0
 		if(el(2)>0) nl2=nlevels(el(2))-1
 		do nz=1, max(nl1,nl2)
-			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+fct_aec(nz,edge)*dt/area(nz,enodes(1))
-			del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-fct_aec(nz,edge)*dt/area(nz,enodes(2))
+			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+fct_adf_h(nz,edge)*dt/area(nz,enodes(1))
+			del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
 		end do
 	end do
-	
 end subroutine fct_ale

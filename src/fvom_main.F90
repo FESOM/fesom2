@@ -117,12 +117,7 @@ integer :: n, nsteps,offset,row,i
 		
 
 		!___model ocean step____________________________________________________
-		if(.not.use_ALE) then
-			call oce_timestep(n)
-		else
-			call oce_timestep_ale(n)
-		end if 	
-		
+		call oce_timestep_ale(n)		
 		!___prepare output______________________________________________________
 		call output (n)
 		call restart(n, .false., .false.)

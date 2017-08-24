@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=fesom2.0_ALE
+#SBATCH --job-name=fesom2.0
 #SBATCH -p mpp
-#SBATCH --ntasks=72
-#SBATCH --time=0:30:00
+#SBATCH --ntasks=1728
+#SBATCH --time=12:00:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 
@@ -10,16 +10,11 @@ set -x
 
 ulimit -s unlimited
 
-module purge
-module load intel.compiler
-module load intel.mpi
-module load netcdf
-
 # determine JOBID
-JOBID=$SLURM_JOB_ID 
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun ./fvom.x > "fesom.out"
+srun --mpi=pmi2 --ntasks=1728 ./fvom.x > "fesom.out"
 date
 # qstat -f $PBS_JOBID
 
