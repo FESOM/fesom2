@@ -55,7 +55,7 @@ module g_config
   logical                :: use_partial_cell=.false.  ! use partial bottom cell configuration  
 ! for zlevel: layer thickness should not become smaller than min_hnode of 
   ! original layer thickness. If it happens switch from zelvel to local zstar
-  real(kind=WP)          :: min_hnode=0.5 
+  real(kind=WP)          :: min_hnode=0.25 
   ! for zlevel: in case min_hnode criteria is reached over how many level should 
   ! ssh change be distributed
   integer                :: lzstar_lev=3
