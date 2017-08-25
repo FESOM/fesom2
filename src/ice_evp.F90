@@ -281,8 +281,8 @@ if ( .not. trim(which_ALE)=='linfs') then
 		elnodes = elem2D_nodes(:,el)
 		
 		!_______________________________________________________________________ !!PS
-		if (any(m_ice(elnodes) <= 0.) .or. &
-			any(a_ice(elnodes) <=0.)) then
+		if (any(m_ice(elnodes)<=0.) .or. &
+			any(a_ice(elnodes)<=0.)) then
 			
 			! There is no ice in elem
 			ice_strength(el) = 0.
