@@ -133,7 +133,7 @@ subroutine thermodynamics
      t_skin(i)        = t
      fresh_wa_flux(i) = fw      !positive down
      net_heat_flux(i) = ehf     !positive down
-     evaporation(i)   = -evap   !positive up
+     evaporation(i)   = evap    !negative up
 
      thdgr(i)         = ithdgr
      thdgrsn(i)       = ithdgrsn

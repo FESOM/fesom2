@@ -132,7 +132,18 @@ subroutine oce_fluxes
   water_flux  = -fresh_wa_flux
 
   call exchange_nod(heat_flux, water_flux) ! do we really need it?
-
+!___________________________________________________________________
+! on freshwater inflow/outflow or virtual salinity:
+  ! 1. In zlevel & zstar the freshwater flux is applied in the update of the 
+  ! ssh matrix when solving the continuity equation of vertically 
+  ! integrated flow. The salt concentration in the first layer will 
+  ! be then adjusted according to the change in volume.
+  ! In this case rsss is forced to be zero by setting ref_sss=0. and ref_sss_local=.false.
+  ! in routines above.
+  ! 2. In cases where the volume of the upper layer is fixed (i.e. linfs)  the freshwater flux 
+  ! 'rsss*water_flux(n)' is applied as a virtual salt boundary condition via the vertical 
+  ! diffusion operator.
+  ! --> rsss*water_flux(n) : virtual salt flux 
   ! virtual salt flux
   if (use_virt_salt) then ! will remain zero otherwise
      rsss=ref_sss
