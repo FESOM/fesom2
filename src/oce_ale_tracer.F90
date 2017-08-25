@@ -898,25 +898,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 								)
 			
 		elseif (tr_num==2) then
-			!___________________________________________________________________
-			! set reference surface salinity if local or global
-			rsss=ref_sss
-			if(ref_sss_local) rsss = tr_arr(1,n,2)
-			
-			!___________________________________________________________________
-			! on freshwater inflow/outflow or virtual salinity:
-			! 1. In zlevel & zstar the freshwater flux is applied in the update of the 
-			! ssh matrix when solving the continuity equation of vertically 
-			! integrated flow. The salt concentration in the first layer will 
-			! be then adjusted according to the change in volume.
-			! In this case rsss is forced to be zero by setting ref_sss=0. and ref_sss_local=.false.
-			! in routines above.
-			! 2. In cases where the volume of the upper layer is fixed (i.e. linfs)  the freshwater flux 
-			! 'rsss*water_flux(n)' is applied as a virtual salt boundary condition via the vertical 
-			! diffusion operator.
-			! --> real_salt_flux(:): salt flux due to containment/releasing of salt
-			!     by forming/melting of sea ice
-			! --> rsss*water_flux(n) : virtual salt flux 
+                ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
+                !     by forming/melting of sea ice
+
 			tr(1)= tr(1)  +  zinv*( &
 									virtual_salt(n) & !--> is zeros for zlevel/zstar
 									+ relax_salt(n) &

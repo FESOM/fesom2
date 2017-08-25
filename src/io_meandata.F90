@@ -65,14 +65,14 @@ subroutine ini_mean_io
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
   call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'm')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'm')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'm')
-  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'm')
+  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'y')
+  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'y')
+  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y')
 
 !2D
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
@@ -87,6 +87,10 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y')
+  call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm')
+
   if (trim(mix_scheme)=='KPP') then
      call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm')
