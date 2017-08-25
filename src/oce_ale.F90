@@ -331,6 +331,11 @@ subroutine update_thickness_ale
 	if     (trim(which_ale)=='zlevel') then
 		! only actualize layer thinkness in first layer 
 		do n=1,myDim_nod2D+eDim_nod2D
+		
+! ! 			hnode(1,n)    = hnode_new(1,n)
+! ! 			zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
+! ! 			Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
+
 			if (hnode_new(1,n) == (zbar(1)-zbar(2))*min_hnode ) then 
 				! --> case local zstar 
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
@@ -344,13 +349,14 @@ subroutine update_thickness_ale
 			else
 				! --> case normal zlevel
 				hnode(1,n)    = hnode_new(1,n)
-				zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
-				Z_3d_n(1,n)   = zbar_3d_n(2,n)-hnode(1,n)/2.0_WP
+				zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
+				Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
 			end if
 		end do
 		
 		!_______________________________________________________________________
 		do elem=1,myDim_elem2D
+! ! 			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
 			elnodes=elem2D_nodes(:, elem)
 			if (any(hnode(1,elnodes)==(zbar(1)-zbar(2))*min_hnode)) then
 				! --> case local zstar 
@@ -431,6 +437,10 @@ subroutine restart_thickness_ale
 		!_______________________________________________________________________
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
 		do n=1,myDim_nod2D+eDim_nod2D
+			
+! ! 			zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
+! ! 			Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
+			
 			if (hnode(1,n) == (zbar(1)-zbar(2))*min_hnode ) then 
 				! --> case local zstar 
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
@@ -442,9 +452,8 @@ subroutine restart_thickness_ale
 				end do
 			else
 				! --> case normal zlevel
-				zbar_3d_n(1,n)= zbar_3d_n(2,n)-hnode(1,n)
-				Z_3d_n(1,n)   = zbar_3d_n(2,n)-hnode(1,n)/2.0_WP
-				! Z_3d_n(1,n)   = Z_3d_n(2,n)-hnode(1,n)/2.0_WP
+				zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
+				Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
 			end if
 		end do
 		
@@ -452,6 +461,11 @@ subroutine restart_thickness_ale
 		! restart element layer thinkness (helem) and The increment of total 
 		! fluid depth on elements (dhe)
 		do elem=1,myDim_elem2D
+			
+! ! 			helem(1,elem)=sum(hnode(1,elem2d_nodes(:,elem)))/3.0_WP
+! ! 			elnodes=elem2D_nodes(:,elem)
+! ! 			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+			
 			elnodes=elem2D_nodes(:,elem)
 			!___________________________________________________________________
 			if (any(hnode(1,elnodes)==(zbar(1)-zbar(2))*min_hnode)) then
@@ -1146,7 +1160,7 @@ subroutine vert_vel_ale
 		! this place should be checked.
 		do n=1, myDim_nod2D
 			!___________________________________________________________________
-			! ssh change to distribute
+			! total ssh change to distribute
 			dhbar_total = hbar(n)-hbar_old(n)
 			
 			!___________________________________________________________________
@@ -1155,10 +1169,6 @@ subroutine vert_vel_ale
 			! over the first lzstar_lev layers
 			if (hnode(1,n)+dhbar_total <= (zbar(1)-zbar(2))*min_hnode ) then 
 				! --> local zstar
-! 				write(*,*)
-! 				write(*,*) " --> do local zstar"
-! 				write(*,*)
-				
 				!_______________________________________________________________
 				! maxhbar2distr ... how much ssh change can be maximal distributed 
 				! per layer (must be negativ, if positive or ==0 layer reached already 
@@ -1177,8 +1187,8 @@ subroutine vert_vel_ale
 				nzmax = min(lzstar_lev,nlevels_nod2D_min(n)-2) 
 				do nz=1,nzmax
 					weight_hbar(nz) = max(dhbar_rest,maxhbar2distr(nz))    
-					dhbar_rest = dhbar_rest - weight_hbar(nz)
-					dhbar_rest = min(0.0_WP,dhbar_rest)
+					dhbar_rest      = dhbar_rest - weight_hbar(nz)
+					dhbar_rest      = min(0.0_WP,dhbar_rest)
 				end do
 				weight_hbar = abs(weight_hbar/dhbar_total)
 				
@@ -1200,21 +1210,21 @@ subroutine vert_vel_ale
 				weight_hbar_int = 0.0_WP
 				do nz=nzmax,1,-1
 					! --> integrate weighting from down to up
-					weight_hbar_int= weight_hbar_int + weight_hbar(nz)
-					Wvel(nz,n)     = Wvel(nz,n) - dhbar_total*weight_hbar_int/dt
-					hnode_new(nz,n)= hnode(nz,n)+ dhbar_total*weight_hbar(nz)
+					weight_hbar_int = weight_hbar_int + weight_hbar(nz)
+					Wvel(nz,n)      = Wvel(nz,n) - dhbar_total*weight_hbar_int/dt
+					hnode_new(nz,n) = hnode(nz,n)+ dhbar_total*weight_hbar(nz)
 				end do
-				
-				! Add surface fresh water flux as upper boundary condition for continutity
-				Wvel(1,n)=Wvel(1,n)-water_flux(n)
 				
 			else
 				! --> normal zlevel case
-				Wvel(1,n)=Wvel(1,n)-dhbar_total/dt
-				hnode_new(1,n)=hnode(1,n)+dhbar_total
-				! Add surface fresh water flux as upper boundary condition for continutity
-				Wvel(1,n)=Wvel(1,n)-water_flux(n)
+				Wvel(1,n)      = Wvel(1,n)-dhbar_total/dt
+				hnode_new(1,n) = hnode(1,n)+dhbar_total
+				
 			end if 
+			
+			! Add surface fresh water flux as upper boundary condition for continutity
+			Wvel(1,n) = Wvel(1,n)-water_flux(n)
+				
 		end do
 		
 	elseif (trim(which_ALE)=='zstar') then
@@ -1667,7 +1677,6 @@ subroutine oce_timestep_ale(n)
 	! check model for blowup --> ! write_step_info and check_blowup require 
 	! togeather around 2.5% of model runtime
 	call check_blowup(n)
-	
 	
 	!___________________________________________________________________________
 	! write out execution times for ocean step parts

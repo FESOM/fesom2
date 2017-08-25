@@ -47,10 +47,10 @@ do elem=1, myDim_elem2D
    ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
    ! to account for floating ice
    if (use_pice > 0) then
+! 		p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*g*inv_rhowat
       p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
       ! limit maximum ice loading like in FESOM1.4
       p_ice = g*min(p_ice,max_ice_loading)
-      
    else
       p_ice = 0._WP
    endif
