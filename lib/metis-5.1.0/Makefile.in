@@ -4,7 +4,7 @@ CC = icc
 LD = $(CC)
 
 # Optimization specs for compiler
-OPT = -O2 -xHost
+OPT = -O2 -xHost -DLINUX -DNDEBUG -DNDEBUG2 -DHAVE_EXECINFO_H -DHAVE_GETLINE 
 
 # What archiving to use
 # Do not use option "r" - util.o comes twice from GKlib and libmetis!

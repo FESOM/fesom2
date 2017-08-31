@@ -119,6 +119,7 @@ USE o_PARAM
 ! of open boundaries and advection schemes
 ! 
 
+integer, parameter                         :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
 integer                                    ::   nod2D      ! the number of 2D nodes
 real(kind=WP)                              ::   ocean_area
 real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
