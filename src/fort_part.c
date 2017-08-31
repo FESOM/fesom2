@@ -7,6 +7,7 @@
 #define METIS_VERSION 5
 #endif
 
+/* #define GRAPH_OUTPUT          /\* Output graph into a file in addition to partitioning *\/ */
 #define USE_EDGE_WEIGHTS      /* Adds edge weights to METIS partitioning */
 #define MAX_HIER_LEVELS 10    /* Maximum number of hierarchical partitioning levels 
                                  (should be set equal to one for compatibility with old versions) */
@@ -174,7 +175,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
     }
     for (i=0; i<*n; i++){
       wgt_2d3d[2*i]   = 1;
-      wgt_2d3d[2*i+1] = wgt[i]+100; /* soften the 3D-criteria to allow for better general quality */
+      wgt_2d3d[2*i+1] = wgt!=NULL ? wgt[i]+100 : 100; /* soften the 3D-criteria to allow for better general quality */
     }
     
     printf("Distribution weight: 2D and 3D nodes\n");
@@ -199,8 +200,34 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 
     for (i=0; i<*n; i++)
       for (j=ptr[i]-1; j<ptr[i+1]-1; j++)
-        wgt_edge[j] = wgt[i]+wgt[adj[j]-1];
+        wgt_edge[j] = wgt!=NULL ? wgt[i]+wgt[adj[j]-1] : 1;
   }
+#endif
+
+#ifdef GRAPH_OUTPUT /* Output the graph to file and exit */
+  FILE *coord_file=fopen("fesom.graph", "w");
+  if (!coord_file)
+  {
+    printf("Cannot open graph file!\n");
+    exit(1);
+  }
+
+  /* Output header */
+  fprintf(coord_file, "%d %d %s %d\n", *n, (ptr[*n])/2, "11", ncon);
+
+  /* Output the data for each vertex of the graph */
+  for (i=0; i<*n; i++)
+  {
+    for (j=0; j<ncon; j++)
+      fprintf(coord_file, " %d", wgt_2d3d!=NULL? wgt_2d3d[i*ncon+j] : 0);
+    for (j=ptr[i]-1; j<ptr[i+1]-1; j++)
+    {
+      fprintf(coord_file, " %d %d", adj[j], wgt_edge!=NULL ? wgt_edge[j] : 1);
+    }
+    fprintf(coord_file, "\n");
+  }
+    
+  fclose(coord_file);
 #endif
 
   ierr = METIS_PartGraphRecursive(n,&ncon,ptr,adj,wgt_2d3d,NULL,wgt_edge,np+current_level,NULL,NULL,opt,&ec,part);

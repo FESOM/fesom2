@@ -1175,7 +1175,7 @@ subroutine vert_vel_ale
 				! minimum layerthickness)
 				maxhbar2distr = 0.0_WP
 				maxhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
-				maxhbar2distr(maxhbar2distr>=0.0_WP)=0.0_WP
+				where(maxhbar2distr>=0.0_WP) maxhbar2distr=0.0_WP
 				
 				!_______________________________________________________________
 				! calc weighting array for distribution of ssh change over layers
