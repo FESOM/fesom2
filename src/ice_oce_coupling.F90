@@ -37,7 +37,6 @@ subroutine oce_fluxes_mom
      stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                              stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
   END DO
-  if (use_sw_pene) call cal_shortwave_rad
 end subroutine oce_fluxes_mom
 !
 !======================================================================================
@@ -108,6 +107,7 @@ end subroutine ocean2ice
 !
 subroutine oce_fluxes
   use o_MESH,          only: ocean_area
+  USE g_CONFIG
   use o_ARRAYS
   use i_ARRAYS
   use g_comm_auto
@@ -177,6 +177,7 @@ subroutine oce_fluxes
   relax_salt=relax_salt-net/ocean_area
 
   deallocate(flux)
+  if (use_sw_pene) call cal_shortwave_rad
 end subroutine oce_fluxes
 !
 !======================================================================================

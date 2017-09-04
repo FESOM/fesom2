@@ -380,22 +380,22 @@ IMPLICIT NONE
  ALLOCATE(com_elem2D_full%slist(n))
  read(fileID,*) com_elem2D_full%slist
 
- read(fileID,*) com_edge2D%rPEnum
- ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
- read(fileID,*) com_edge2D%rPE
- ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
- read(fileID,*) com_edge2D%rptr
- ALLOCATE(com_edge2D%rlist(eDim_edge2D))
- read(fileID,*) com_edge2D%rlist
-	 
- read(fileID,*) com_edge2D%sPEnum
- ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
- read(fileID,*) com_edge2D%sPE
- ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
- read(fileID,*) com_edge2D%sptr
- n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
- ALLOCATE(com_edge2D%slist(n))
- read(fileID,*) com_edge2D%slist
+!!$ read(fileID,*) com_edge2D%rPEnum
+!!$ ALLOCATE(com_edge2D%rPE(com_edge2D%rPEnum))
+!!$ read(fileID,*) com_edge2D%rPE
+!!$ ALLOCATE(com_edge2D%rptr(com_edge2D%rPEnum+1))
+!!$ read(fileID,*) com_edge2D%rptr
+!!$ ALLOCATE(com_edge2D%rlist(eDim_edge2D))
+!!$ read(fileID,*) com_edge2D%rlist
+!!$	 
+!!$ read(fileID,*) com_edge2D%sPEnum
+!!$ ALLOCATE(com_edge2D%sPE(com_edge2D%sPEnum))
+!!$ read(fileID,*) com_edge2D%sPE
+!!$ ALLOCATE(com_edge2D%sptr(com_edge2D%sPEnum+1))
+!!$ read(fileID,*) com_edge2D%sptr
+!!$ n=com_edge2D%sptr(com_edge2D%sPEnum+1)-1
+!!$ ALLOCATE(com_edge2D%slist(n))
+!!$ read(fileID,*) com_edge2D%slist
  close(fileID)
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
