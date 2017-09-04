@@ -308,6 +308,7 @@ if ( .not. trim(which_ALE)=='linfs') then
 			do n=1,3
 				p_ice(n)=min(p_ice(n),max_ice_loading)
 			end do
+! 			p_ice= 0.0_WP
 			
 			!___________________________________________________________________ !!PS
 			elevation_elem = elevation(elnodes)
