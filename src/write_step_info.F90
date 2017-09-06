@@ -136,6 +136,7 @@ subroutine check_blowup(istep)
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
+	use i_ARRAYS
 	use g_comm_auto
 	implicit none
 	
@@ -238,6 +239,9 @@ subroutine check_blowup(istep)
 					write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
 					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
 					write(*,*)
+					write(*,*) 'm_ice       = ',m_ice(n)
+					write(*,*) 'm_ice_old   = ',m_ice_old(n)
+					write(*,*)
 					write(*,*) 'hnode       = ',hnode(:,n)
 					write(*,*) 'hnode_new   = ',hnode_new(:,n)
 					write(*,*)
@@ -274,7 +278,11 @@ subroutine check_blowup(istep)
 					write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
 					write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
 					write(*,*)
+					write(*,*) 'hnode       = ',hnode(:,n)
 					write(*,*) 'hnode_new   = ',hnode_new(:,n)
+					write(*,*)
+					write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
+					write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,n)
 					write(*,*)
