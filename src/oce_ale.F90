@@ -436,6 +436,7 @@ subroutine update_thickness_ale
 			end do
 		end do
 	endif
+	
 end subroutine update_thickness_ale
 !
 !
