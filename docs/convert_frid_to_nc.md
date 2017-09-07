@@ -8,7 +8,7 @@ Clone spheRlab
 ```bash
 git clone https://github.com/FESOM/spheRlab.git spheRlab
 ```
-Buiild package:
+Build package:
 ```bash
 cd spheRlab/
 R CMD build spheRlab
@@ -22,16 +22,15 @@ Load library:
 ```R
 R>library(spheRlab)
 ```
-You can get help by typing:
+You can get help (for any function) by typing, e.g.:
 ```R
-R>?sl.grid. #will give you help
+R>?sl.grid.writeCDO
 ```
-
 Define path to the mesh
 ```R
 R>meshpath="/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/"
 ```
-Read the grid in to R structure:
+Read the grid in to R structure (the arguments `rot` etc. might be different for different meshes, but this is the standard):
 ```R
 R>grid = sl.grid.readFESOM(griddir=meshpath,rot=TRUE,rot.invert=TRUE,rot.abg=c(50,15,-90))
 ```
@@ -39,16 +38,22 @@ Define path to the output file:
 ```R
 R>ofile = paste0(meshpath, "sl.grid.CDO")
 ```
-Write netCDF file with mesh:
+Write ascii mesh:
 ```R
 R>sl.grid.writeCDO(grid,ofile=ofile)
+```
+Convert ascii to NetCDF via system call:
+```R
 R>system(paste0("cdo -f nc const,0,",ofile," ",ofile,".nc"))
 ```
-This step might be ignored, it might also not work if netcdf libraries are not loaded.
+You could end here. However, `sl.grid.readFESOM` has generated other useful information on the grid that can be added to the NetCDF mesh file now as follows:
 ```R
+R>install.packages("ncdf") # only needed if not yet installed
+R>library(ncdf)
 R>sl.grid.addinfo(grid,ncdf.file.in=paste0(ofile,".nc"))
 ```
-Conservative remaping with cdo (interpolate topography to mesh)
+
+Conservative remapping with cdo (interpolate topography to mesh)
 ---------------------------------------------------------------
 ```bash
 $bash> export MESHPATH=/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/
