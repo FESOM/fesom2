@@ -48,8 +48,7 @@ R>system(paste0("cdo -f nc const,0,",ofile," ",ofile,".nc"))
 ```
 You could end here. However, `sl.grid.readFESOM` has generated other useful information on the grid that can be added to the NetCDF mesh file now as follows:
 ```R
-R>install.packages("ncdf") # only needed if not yet installed
-R>library(ncdf)
+R>install.packages("ncdf4") # only needed if not yet installed
 R>sl.grid.addinfo(grid,ncdf.file.in=paste0(ofile,".nc"))
 ```
 
