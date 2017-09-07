@@ -6,26 +6,52 @@ We are going to use spheRlab for conversion. You have to have R already installe
 Clone spheRlab
 
 ```bash
-$bash> git clone https://github.com/FESOM/spheRlab.git spheRlab
+git clone https://github.com/FESOM/spheRlab.git spheRlab
 ```
 Buiild package:
 ```bash
-$bash>cd spheRlab/
-$bash>R CMD build spheRlab
+cd spheRlab/
+R CMD build spheRlab
 ```
-Make sure you have cdo installed (`cdo -V`) and launch R (type `R`)
-#make sure that you have cdo installed:
-#cdo -V
+Make sure you have cdo installed (`cdo -V`) and launch R (type `R`).
+Install the package:
+```R
 R>install.packages("spheRlab_1.1.0.tar.gz",repos=NULL)
+```
+Load library:
+```R
 R>library(spheRlab)
+```
+You can get help by typing:
+```R
 R>?sl.grid. #will give you help
+```
+
+Define path to the mesh
+```R
 R>meshpath="/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/"
+```
+Read the grid in to R structure:
+```R
 R>grid = sl.grid.readFESOM(griddir=meshpath,rot=TRUE,rot.invert=TRUE,rot.abg=c(50,15,-90))
+```
+Define path to the output file:
+```R
 R>ofile = paste0(meshpath, "sl.grid.CDO")
+```
+Write netCDF file with mesh:
+```R
 R>sl.grid.writeCDO(grid,ofile=ofile)
 R>system(paste0("cdo -f nc const,0,",ofile," ",ofile,".nc"))
-R>sl.grid.addinfo(grid,ncdf.file.in=paste0(ofile,".nc")) #This step might be ignored, it might also not work if netcdf libraries are not loaded.
-
+```
+This step might be ignored, it might also not work if netcdf libraries are not loaded.
+```R
+R>sl.grid.addinfo(grid,ncdf.file.in=paste0(ofile,".nc"))
+```
+Conservative remaping with cdo (interpolate topography to mesh)
+---------------------------------------------------------------
+```bash
 $bash> export MESHPATH=/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/
 $bash> export DATAPATH=/work/ollie/dsidoren/ETOPO5/etopo5_lonlat.nc
 $bash> cdo remapycon,$MESHPATH/sl.grid.CDO.nc -selname,topo $DATAPATH $MESHPATH/topo.nc
+```
