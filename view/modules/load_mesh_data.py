@@ -155,7 +155,13 @@ class fesom_mesh(object):
     voltri
 
     existing instances are: path, n2d, e2d,
-    nlev, zlevs, x2, y2, elem, no_cyclic_elem, alpha, beta, gamma"""
+    nlev, zlevs, x2, y2, elem, no_cyclic_elem, alpha, beta, gamma
+    
+    Returns
+    -------
+    mesh : object
+        fesom_mesh object
+    """
     def __init__(self, path, abg = [50, 15, -90]):
         self.path=os.path.abspath(path)
 
