@@ -23,13 +23,41 @@ import logging
 import time
 import pickle
 import pyresample
+import joblib
 
-def load_mesh(path, abg = [50, 15, -90], usepickle = True):
+def load_mesh(path, abg = [50, 15, -90], usepickle = True,
+              usejoblib = False):
+    ''' Loads FESOM mesh 
+
+    Parameters
+    ----------
+    path : str
+        Path to the directory with mesh files
+    abg : list
+        alpha, beta and gamma Euler angles. Default [50, 15, -90]
+    get3d : bool
+        do we load complete 3d mesh or only 2d nodes.
+
+    Returns
+    -------
+    mesh : object
+        fesom_mesh object
+    '''
     path=os.path.abspath(path)
-    pickle_file = os.path.join(path,'pickle_mesh')
+    if (usepickle==True) and (usejoblib==True):
+        raise ValueError("Both `usepickle` and `usejoblib` set to True, select only one")
+    
+    if usepickle:    
+        pickle_file = os.path.join(path,'pickle_mesh_py3_fesom2')
+        print(pickle_file)
 
+    if usejoblib:
+        joblib_file = os.path.join(path, 'joblib_mesh_fesom2')
+    
     if usepickle and (os.path.isfile(pickle_file)):
-        print("The *usepickle = True* and the pickle file (*pickle_mesh*) exists.\n We load the mesh from it.")
+        print("The usepickle == True)")
+        print("The pickle file for FESOM2 exists.")
+        print("The mesh will be loaded from {}".format(pickle_file))
 
         ifile = open(pickle_file, 'rb')
         mesh = pickle.load(ifile)
@@ -37,18 +65,45 @@ def load_mesh(path, abg = [50, 15, -90], usepickle = True):
         return mesh
 
     elif (usepickle==True) and (os.path.isfile(pickle_file)==False):
-        print('The *usepickle = True*, but the pickle file (*pickle_mesh*) do not exist.')
+        print('The usepickle == True')
+        print('The pickle file for FESOM2 DO NOT exists')
+        print('The mesh will be saved to {}'.format(pickle_file))
+
         mesh = fesom_mesh(path=path, abg=abg)
         logging.info('Use pickle to save the mesh information')
         print('Save mesh to binary format')
-        outfile = open(os.path.join(path,'pickle_mesh'), 'wb')
+        outfile = open(pickle_file, 'wb')
         pickle.dump(mesh, outfile)
         outfile.close()
         return mesh
-
-    elif usepickle==False:
-        mesh = fesom_mesh(path=path, abg=abg)
+    
+    elif (usepickle==False) and (usejoblib==False):
+        mesh = fesom_mesh(path=path, abg=abg, get3d=get3d)
         return mesh
+
+    if (usejoblib==True) and (os.path.isfile(joblib_file)):
+        print("The usejoblib == True)")
+        print("The joblib file for FESOM2 exists.")
+        print("The mesh will be loaded from {}".format(joblib_file))
+
+        mesh = joblib.load(joblib_file)
+        return mesh
+
+    elif (usejoblib==True) and (os.path.isfile(joblib_file)==False):
+        print('The usejoblib == True')
+        print('The joblib file for FESOM2 DO NOT exists')
+        print('The mesh will be saved to {}'.format(joblib_file))
+
+        mesh = fesom_mesh(path=path, abg=abg)
+        logging.info('Use joblib to save the mesh information')
+        print('Save mesh to binary format')
+        joblib.dump(mesh, joblib_file)
+        
+        return mesh
+
+
+
+
 
 
 class fesom_mesh(object):
