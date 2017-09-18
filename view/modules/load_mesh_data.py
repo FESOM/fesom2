@@ -267,7 +267,21 @@ number of 2d elements = {}
         return __repr__(self)
     
 def ind_for_depth(depth, mesh):
-    # find the model depth index that is closest to the required depth
+    '''
+    Find the model depth index that is closest to the required depth
+    
+    Parameters
+    ----------
+    depth : float
+        desired depth. 
+    mesh : object
+        FESOM mesh object
+
+    Returns
+    dind : int
+        index that corresponds to the model depth level closest to `depth`.
+    -------
+    '''
     arr=([abs(abs(z)-abs(depth)) for z in mesh.zlev])
     v, i= min((v, i) for (i, v) in enumerate(arr))    
     dind=i
@@ -340,3 +354,47 @@ def read_fesom_sect(str_id, records, year, mesh, result_path, runid, p1, p2, N, 
                            sigmas=250000, fill_value=None)*oce_mask
     
     return(sx, sy, sz)
+
+def cut_region(mesh, nlevels, box=[13, 30, 53, 66], depth=0 ):
+    '''
+    Cut region from the mesh.
+
+    Parameters
+    ----------
+    mesh : object
+        FESOM mesh object
+    nlevels : array
+        array of size `elem` with number of levels for each element.
+        Usually read from *mesh.diag.nc file (`nlevels`) field.
+    box : list
+        Coordinates of the box in [-180 180 -90 90] format.
+        Default set to [13, 30, 53, 66], Baltic Sea.
+    depth : float
+        depth
+
+    Returns
+    -------
+    elem_no_nan : array
+        elements that belong to the region defined by `box`.
+    no_nan_triangles : array
+        boolian array of size elem2d with True for elements 
+        that belong to the region defines by `box`.
+    '''
+
+    nlevels = np.array([nlevels,]*3).transpose()
+    left, right, down, up = box
+    ind_depth = ind_for_depth(depth, mesh)
+    elem2 = mesh.elem
+    xx = mesh.x2[elem2]
+    yy = mesh.y2[elem2]
+    dind = ind_for_depth(depth, mesh)
+    
+    mask = ( (nlevels > dind) & (xx >= left) & (xx <= right) & (yy >= down) & (yy <= up))
+
+    mask_elem = mask.mean(axis=1)
+    mask_elem[mask_elem!=1] = np.nan
+
+    no_nan_triangles = np.invert(np.isnan(mask_elem))
+    elem_no_nan = elem2[no_nan_triangles,:]
+
+    return elem_no_nan, no_nan_triangles
