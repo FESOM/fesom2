@@ -81,6 +81,11 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
     n_jobs : int, optional
         Number of jobs to schedule for parallel processing. If -1 is given
         all processors are used. Default: 1.
+    
+    Returns
+    -------
+    data_interpolated : 2d array
+        array with data interpolated to the target grid.
 
     '''
     #print distances
@@ -110,4 +115,43 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
         data_interpolated = np.ma.masked_invalid(data_interpolated)
     
     return data_interpolated
+
+def fesom2clim(data, depth, mesh, climatology, verbose=True, radius_of_influence=100000):
+    '''
+    Interpolation of fesom data to grid of the climatology.
+    !NOTE! there is no interpolation to the climatology level, we interpolate
+    the model level that is closest to level in climatology. 
+
+    Parameters
+    ----------
+    data  : array
+        1d array of FESOM 2d data slice
+    depth : int 
+        depth of the slice
+    mesh  : mesh object
+        FESOM mesh object        
+    climatology: climatology object
+        FESOM climatology object
+
+    Returns
+    -------
+    iz : the index of the closest depth in climatology to the input depth
+    xx : 2d array longitudes
+    yy : 2d array latitudes
+    out_data : 2d array
+       array with data interpolated to climatology level
+
+    '''
+    xx,yy = np.meshgrid(climatology.x, climatology.y)
+    out_data=np.copy(climatology.T)
+    distances, inds = create_indexes_and_distances(mesh, xx, yy,\
+                                                k=10, n_jobs=2)
+    
+    #import pdb
+    #pdb.set_trace()
+    iz=abs(abs(climatology.z)-abs(depth)).argmin()
+    print('the model depth is: ', depth, '; the closest depth in climatology is: ', climatology.z[iz])
+    out_data=fesom2regular(data, mesh, xx, yy, distances=distances, inds=inds, radius_of_influence=radius_of_influence)
+    out_data[np.isnan(climatology.T[iz,:,:])]=np.nan
+    return iz, xx, yy, out_data
 
