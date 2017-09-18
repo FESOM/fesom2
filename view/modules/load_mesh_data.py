@@ -23,13 +23,41 @@ import logging
 import time
 import pickle
 import pyresample
+import joblib
 
-def load_mesh(path, abg = [50, 15, -90], usepickle = True):
+def load_mesh(path, abg = [50, 15, -90], usepickle = True,
+              usejoblib = False):
+    ''' Loads FESOM mesh 
+
+    Parameters
+    ----------
+    path : str
+        Path to the directory with mesh files
+    abg : list
+        alpha, beta and gamma Euler angles. Default [50, 15, -90]
+    get3d : bool
+        do we load complete 3d mesh or only 2d nodes.
+
+    Returns
+    -------
+    mesh : object
+        fesom_mesh object
+    '''
     path=os.path.abspath(path)
-    pickle_file = os.path.join(path,'pickle_mesh')
+    if (usepickle==True) and (usejoblib==True):
+        raise ValueError("Both `usepickle` and `usejoblib` set to True, select only one")
+    
+    if usepickle:    
+        pickle_file = os.path.join(path,'pickle_mesh_py3_fesom2')
+        print(pickle_file)
 
+    if usejoblib:
+        joblib_file = os.path.join(path, 'joblib_mesh_fesom2')
+    
     if usepickle and (os.path.isfile(pickle_file)):
-        print("The *usepickle = True* and the pickle file (*pickle_mesh*) exists.\n We load the mesh from it.")
+        print("The usepickle == True)")
+        print("The pickle file for FESOM2 exists.")
+        print("The mesh will be loaded from {}".format(pickle_file))
 
         ifile = open(pickle_file, 'rb')
         mesh = pickle.load(ifile)
@@ -37,18 +65,45 @@ def load_mesh(path, abg = [50, 15, -90], usepickle = True):
         return mesh
 
     elif (usepickle==True) and (os.path.isfile(pickle_file)==False):
-        print('The *usepickle = True*, but the pickle file (*pickle_mesh*) do not exist.')
+        print('The usepickle == True')
+        print('The pickle file for FESOM2 DO NOT exists')
+        print('The mesh will be saved to {}'.format(pickle_file))
+
         mesh = fesom_mesh(path=path, abg=abg)
         logging.info('Use pickle to save the mesh information')
         print('Save mesh to binary format')
-        outfile = open(os.path.join(path,'pickle_mesh'), 'wb')
+        outfile = open(pickle_file, 'wb')
         pickle.dump(mesh, outfile)
         outfile.close()
         return mesh
-
-    elif usepickle==False:
-        mesh = fesom_mesh(path=path, abg=abg)
+    
+    elif (usepickle==False) and (usejoblib==False):
+        mesh = fesom_mesh(path=path, abg=abg, get3d=get3d)
         return mesh
+
+    if (usejoblib==True) and (os.path.isfile(joblib_file)):
+        print("The usejoblib == True)")
+        print("The joblib file for FESOM2 exists.")
+        print("The mesh will be loaded from {}".format(joblib_file))
+
+        mesh = joblib.load(joblib_file)
+        return mesh
+
+    elif (usejoblib==True) and (os.path.isfile(joblib_file)==False):
+        print('The usejoblib == True')
+        print('The joblib file for FESOM2 DO NOT exists')
+        print('The mesh will be saved to {}'.format(joblib_file))
+
+        mesh = fesom_mesh(path=path, abg=abg)
+        logging.info('Use joblib to save the mesh information')
+        print('Save mesh to binary format')
+        joblib.dump(mesh, joblib_file)
+        
+        return mesh
+
+
+
+
 
 
 class fesom_mesh(object):
@@ -100,7 +155,13 @@ class fesom_mesh(object):
     voltri
 
     existing instances are: path, n2d, e2d,
-    nlev, zlevs, x2, y2, elem, no_cyclic_elem, alpha, beta, gamma"""
+    nlev, zlevs, x2, y2, elem, no_cyclic_elem, alpha, beta, gamma
+    
+    Returns
+    -------
+    mesh : object
+        fesom_mesh object
+    """
     def __init__(self, path, abg = [50, 15, -90]):
         self.path=os.path.abspath(path)
 
@@ -206,7 +267,21 @@ number of 2d elements = {}
         return __repr__(self)
     
 def ind_for_depth(depth, mesh):
-    # find the model depth index that is closest to the required depth
+    '''
+    Find the model depth index that is closest to the required depth
+    
+    Parameters
+    ----------
+    depth : float
+        desired depth. 
+    mesh : object
+        FESOM mesh object
+
+    Returns
+    dind : int
+        index that corresponds to the model depth level closest to `depth`.
+    -------
+    '''
     arr=([abs(abs(z)-abs(depth)) for z in mesh.zlev])
     v, i= min((v, i) for (i, v) in enumerate(arr))    
     dind=i
@@ -279,3 +354,47 @@ def read_fesom_sect(str_id, records, year, mesh, result_path, runid, p1, p2, N, 
                            sigmas=250000, fill_value=None)*oce_mask
     
     return(sx, sy, sz)
+
+def cut_region(mesh, nlevels, box=[13, 30, 53, 66], depth=0 ):
+    '''
+    Cut region from the mesh.
+
+    Parameters
+    ----------
+    mesh : object
+        FESOM mesh object
+    nlevels : array
+        array of size `elem` with number of levels for each element.
+        Usually read from *mesh.diag.nc file (`nlevels`) field.
+    box : list
+        Coordinates of the box in [-180 180 -90 90] format.
+        Default set to [13, 30, 53, 66], Baltic Sea.
+    depth : float
+        depth
+
+    Returns
+    -------
+    elem_no_nan : array
+        elements that belong to the region defined by `box`.
+    no_nan_triangles : array
+        boolian array of size elem2d with True for elements 
+        that belong to the region defines by `box`.
+    '''
+
+    nlevels = np.array([nlevels,]*3).transpose()
+    left, right, down, up = box
+    ind_depth = ind_for_depth(depth, mesh)
+    elem2 = mesh.elem
+    xx = mesh.x2[elem2]
+    yy = mesh.y2[elem2]
+    dind = ind_for_depth(depth, mesh)
+    
+    mask = ( (nlevels > dind) & (xx >= left) & (xx <= right) & (yy >= down) & (yy <= up))
+
+    mask_elem = mask.mean(axis=1)
+    mask_elem[mask_elem!=1] = np.nan
+
+    no_nan_triangles = np.invert(np.isnan(mask_elem))
+    elem_no_nan = elem2[no_nan_triangles,:]
+
+    return elem_no_nan, no_nan_triangles
