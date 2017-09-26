@@ -200,7 +200,7 @@ subroutine init_thickness_ale
 			end do
 		end do
 		do elem=1,myDim_elem2D
-			dhe(elem)=0.0_8
+			dhe(elem)=0.0_WP
 			do nz=1,nlevels(elem)-2
 				helem(nz,elem)=(zbar(nz)-zbar(nz+1))
 			end do
@@ -341,24 +341,23 @@ subroutine update_thickness_ale
 			elnodes=elem2D_nodes(:, elem)
 			!___________________________________________________________________
 			! actualize elemental layer thinkness in first lzstar_lev layers
-			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1)) /= 0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2)) /= 0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3)) /= 0.0_WP)==.True.      &
+			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP)==.True. .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP)==.True. .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)==.True.      &
 				) then
-				
 				! --> case local zstar
 				! try to limitate over how much layers i realy need to distribute
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
-				nz    = max(1 ,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(1))-hnode(1:lzstar_lev,elnodes(1)) /= 0.0_WP)))
-				nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(2))-hnode(1:lzstar_lev,elnodes(2)) /= 0.0_WP)))
-				nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(3))-hnode(1:lzstar_lev,elnodes(3)) /= 0.0_WP)))
+				nz    = max(1 ,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(1))-hnode(1:lzstar_lev,elnodes(1))/=0.0_WP)))
+				nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(2))-hnode(1:lzstar_lev,elnodes(2))/=0.0_WP)))
+				nz    = max(nz,maxval(pack(idx,hnode_new(1:lzstar_lev,elnodes(3))-hnode(1:lzstar_lev,elnodes(3))/=0.0_WP)))
 				nzmax = min(nz,nlevels(elem)-2)
 				do nz=1,nzmax
 					helem(nz,elem)=sum(hnode_new(nz,elnodes))/3.0_WP
 				end do
 			!___________________________________________________________________
-			! only actualize elemental layer thinkness in first layer 
+			! only actualize elemental layer thickness in first layer 
 			else
 				! --> case normal zlevel
 				helem(1,elem)=sum(hnode_new(1,elnodes))/3.0_WP
@@ -369,12 +368,12 @@ subroutine update_thickness_ale
 		do n=1,myDim_nod2D+eDim_nod2D
 			!___________________________________________________________________
 			! actualize layer thinkness in first lzstar_lev layers
-			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n) /= 0.0_WP)==.True.) ) then
+			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)==.True.) ) then
 				! --> case local zstar 
 				! try to limitate over how much layers i realy need to distribute
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
-				nz = max(1,maxval(pack(idx,hnode_new(1:lzstar_lev,n)-hnode(1:lzstar_lev,n) /= 0.0_WP)))
+				nz = max(1,maxval(pack(idx,hnode_new(1:lzstar_lev,n)-hnode(1:lzstar_lev,n)/=0.0_WP)))
 				
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
 				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
@@ -393,6 +392,9 @@ subroutine update_thickness_ale
 				Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode_new(1,n)/2.0_WP
 			end if
 		end do
+		
+		!_______________________________________________________________________
+		deallocate(idx)
 		
 	!___________________________________________________________________________
 	! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
@@ -474,7 +476,7 @@ subroutine restart_thickness_ale
 				! --> case local zstar 
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
-				nz  = maxval(pack(idx,hnode(1:lzstar_lev,n)/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))))
+				nz  = max(1,maxval(pack(idx,hnode(1:lzstar_lev,n)/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
 				
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
 				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
@@ -488,7 +490,7 @@ subroutine restart_thickness_ale
 				zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
 				Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
 			end if
-		end do
+		end do ! --> do n=1,myDim_nod2D+eDim_nod2D
 		
 		!_______________________________________________________________________
 		! restart element layer thinkness (helem) and The increment of total 
@@ -504,7 +506,7 @@ subroutine restart_thickness_ale
 				! try to limitate over how much layers i realy need to distribute
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
-				nz    =        maxval(pack(idx,hnode(1:lzstar_lev,elnodes(1))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))))
+				nz    = max(1 ,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(1))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
 				nz    = max(nz,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(2))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
 				nz    = max(nz,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(3))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
 				nzmax = min(nz,nlevels_nod2D_min(n)-2)
@@ -519,7 +521,11 @@ subroutine restart_thickness_ale
 			!___________________________________________________________________
 			dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
 			
-		end do
+		end do ! --> do elem=1,myDim_elem2D
+		
+		!_______________________________________________________________________
+		deallocate(idx)
+		
 	!___________________________________________________________________________
 	! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
 	!___________________________________________________________________________
@@ -949,6 +955,15 @@ subroutine compute_ssh_rhs_ale
 		do nz=1, nlevels(el(1))-1
 			c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
 						 (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
+						 
+! 			if (mype==3 .and. mstep==7044 .and. (enodes(1)==440 .or. enodes(2)==440) ) then
+! 				write(*,*) ' -->nz=',nz
+! 				write(*,*) '	c1=',c1
+! 				write(*,*) '    enodes=',enodes
+! 				write(*,*) '   (UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1=',(UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1
+! 				write(*,*) '   (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1=',(UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1
+! 				write(*,*) '   helem(nz,el(1))=',helem(nz,el(1))
+! 			endif
 		end do
 		
 		!_______________________________________________________________________
@@ -963,6 +978,15 @@ subroutine compute_ssh_rhs_ale
 			do nz=1, nlevels(el(2))-1
 				c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
 							 (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+				
+! 				if (mype==3 .and. mstep==7044 .and. (enodes(1)==440 .or. enodes(2)==440) ) then
+! 					write(*,*) ' -->nz=',nz
+! 					write(*,*) '	c2=',c2
+! 					write(*,*) '    enodes=',enodes
+! 					write(*,*) '   (UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX1=',(UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX1
+! 					write(*,*) '   (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY1=',(UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY1
+! 					write(*,*) '   helem(nz,el(2))=',helem(nz,el(2))
+! 				endif
 			end do
 		end if
 		
@@ -983,7 +1007,33 @@ subroutine compute_ssh_rhs_ale
 	! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	if ( .not. trim(which_ALE)=='linfs') then
 		do n=1,myDim_nod2D
+			
+! 			if (abs(ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n))>1e8 .and. mstep>6100) then
+! 				write(*,*) ' --> WTF happend: ssh_rhs way to big it prepares to blow up???'
+! 				write(*,*) '        mype  =',mype
+! 				write(*,*) '        mstep =',mstep
+! 				write(*,*) '         node =',n
+! 				write(*,*) '  myDim_nod2D =',myDim_nod2D
+! 				write(*,*) ' myDim_elem2D =',myDim_elem2D
+! 				write(*,*) '    ssh_rhs(n)=',ssh_rhs(n)
+! 				write(*,*) 'ssh_rhs_old(n)=',ssh_rhs_old(n)
+! 				write(*,*) ' water_flux(n)=',water_flux(n)
+! 				write(*,*)
+! 				do ed=1,nod_in_elem2D_num(n)
+! 					nz = nod_in_elem2D(ed,n)
+! 					write(*,*) ' elem#=',ed,', elemidx=',nz
+! 					write(*,*) ' --> helem =',helem(:,nz)
+! 					write(*,*) ' --> U =',UV(1,:,nz)
+! 					write(*,*) ' --> V =',UV(2,:,nz)
+! 					write(*,*) ' --> U_rhs =',UV_rhs(1,:,nz)
+! 					write(*,*) ' --> V_rhs =',UV_rhs(2,:,nz)
+! 				end do
+! 				write(*,*)
+! 			endif
+			
 			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+			
+			
 		end do
 	else
 		do n=1,myDim_nod2D
@@ -1150,7 +1200,7 @@ subroutine vert_vel_ale
 				end if  
 			end do
 		end if
-	end do
+	end do ! --> do ed=1, myDim_edge2D
 	! |
 	! |
 	! +--> until here Wvel contains the thickness divergence div(u)
@@ -1182,12 +1232,14 @@ subroutine vert_vel_ale
 	! |
 	! |--> (A) linear free surface: dh/dt=0 ; W_t-W_b = -div(hu)
 	! |
-	! |--> (B) Full free surface: k=1 --> W_t-W_b = -div(hu) - dh/dt - Wflux_k1
-	! |                           k>1 --> W_t-W_b = -div(hu)
+	! |		Full free surface cases:
+	! |		------------------------
+	! |--> (B) ZLEVEL:  k=1 --> W_t-W_b = -div(hu) - dh/dt - Wflux_k1
+	! |                 k>1 --> W_t-W_b = -div(hu)
 	! |
-	! |--> (C) ZSTAR:             W_t-W_b = -div(hu) - dh/dt - Wflux_k1
-	!                                                    |
-	!                                                    |--> (dh/dt)_k = 1/H*dh/dt
+	! |--> (C) ZSTAR:  W_t-W_b = -div(hu) - dh/dt - Wflux_k1
+	!                                         |
+	!                                         |--> (dh/dt)_k = 1/H*dh/dt
 	
 	!___________________________________________________________________________
 	! Correct for free surface (zlevel and zstar)
@@ -1203,6 +1255,8 @@ subroutine vert_vel_ale
 		! depth layers change in ssh needs to be distributed
 		allocate(max_dhbar2distr(lzstar_lev),distrib_dhbar(lzstar_lev),idx(lzstar_lev),cumsum_maxdhbar(lzstar_lev))
 		idx = (/(nz,nz=1,lzstar_lev,1)/)
+		!!PS allocate(max_dhbar2distr(nl-1),distrib_dhbar(nl-1),idx(nl-1),cumsum_maxdhbar(nl-1))
+		!!PS idx = (/(nz,nz=1,nl-1,1)/)
 		
 		do n=1, myDim_nod2D
 			!___________________________________________________________________
@@ -1216,7 +1270,7 @@ subroutine vert_vel_ale
 			! --> otherwise it can happen, especially with floating ice, that 
 			!     layerthickness becomes to small or even negativ and model 
 			!     blows up
-			if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=(zbar(1)-zbar(2))*min_hnode ) then 
+			if (dhbar_total<0.0_WP .and. hnode(1,n)+dhbar_total<=(zbar(1)-zbar(2))*min_hnode ) then 
 				! --> do local zstar case 
 				!_______________________________________________________________
 				! max_dhbar2distr ... how much negative ssh change can be maximal 
@@ -1225,6 +1279,12 @@ subroutine vert_vel_ale
 				max_dhbar2distr = 0.0_WP
 				max_dhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
 				where (max_dhbar2distr>=0.0_WP) max_dhbar2distr=0.0_WP
+				
+				!_______________________________________________________________
+				! if vertical CFL criteria at a certain node is at its limit 
+				! don't take away further layer thickness --> take it than better 
+				! from a deeper layer
+				where (CFL_z(1:lzstar_lev,n)>=0.95_WP) max_dhbar2distr=0.0_WP
 				
 				!_______________________________________________________________
 				! try to limitate over how much layers i realy need to distribute
@@ -1252,43 +1312,27 @@ subroutine vert_vel_ale
 					dhbar_rest        = min(0.0_WP,dhbar_rest)
 				end do
 				
-				if ( abs(sum(distrib_dhbar)-dhbar_total)>1e-10 ) then
-					write(*,*) " --> problems with conservation of dhbar distribution over depth"
-					write(*,*) "             mype =",mype
-					write(*,*) "             node =",n
-					write(*,*) "            nzmax =",nzmax
-					write(*,*) "            mstep =",mstep
-					write(*,*)
-					write(*,*) "  max_dhbar2distr =",max_dhbar2distr
-					write(*,*) "  cumsum_maxdhbar =",cumsum_maxdhbar
-					write(*,*) "              idx =",idx
-					write(*,*) "       dhbar_rest =",dhbar_rest
-					write(*,*)
-					write(*,*) "      dhbar_total =",dhbar_total
-					write(*,*) "             hbar =",hbar(n)
-					write(*,*) "         hbar_old =",hbar_old(n)
-					write(*,*) "         eta_n(n) =",eta_n(n)
-					write(*,*) "          ssh_rhs =",ssh_rhs(n)
-					write(*,*) "      ssh_rhs_old =",ssh_rhs_old(n)
-					write(*,*)
-					write(*,*) "distrib_dhbar     =",distrib_dhbar
-					write(*,*) "sum(distrib_dhbar)=",sum(distrib_dhbar)
-					write(*,*)
-					write(*,*) "       hnode(:,n) =",hnode(:,n)
-					write(*,*) "   hnode_new(:,n) =",hnode_new(:,n)
-					write(*,*)
-					write(*,*) "        glon,glat =",geo_coord_nod2D(:,n)/rad
-					write(*,*)
-! 					call restart(1,.true.,.false.)
-! 					call par_ex(1)
+				!_______________________________________________________________
+				if ( abs(sum(distrib_dhbar)-dhbar_total)>1.0e-10 ) then
+					write(*,*) " --> problem <-- with conservation of dhbar distribution over depth"
+					write(*,*) "				 there are not enough layers to distribute all "
+					write(*,*) "				 all change in ssh "
+					write(*,*) "				  > mype        =",mype
+					write(*,*) "				  > node        =",n
+					write(*,*) "				  > mstep       =",mstep
+					write(*,*) "				  > dhbar_total =",dhbar_total
+					write(*,*) "				  > dhbar_rest  =",dhbar_rest
 				end if 
 				
 				!_______________________________________________________________
-				! distribute change in ssh over layers in hnode and Wvel
 				distrib_dhbar_int = 0.0_WP
 				do nz=nzmax,1,-1
+					!___________________________________________________________
 					! --> integrate ssh distribution from down to up
 					distrib_dhbar_int = distrib_dhbar_int + distrib_dhbar(nz)
+					
+					!___________________________________________________________
+					! --> distribute change in ssh over layers in hnode and Wvel
 					Wvel(nz,n)        = Wvel(nz,n) - distrib_dhbar_int/dt
 					hnode_new(nz,n)   = hnode(nz,n)+ distrib_dhbar(nz)
 				end do
@@ -1298,7 +1342,7 @@ subroutine vert_vel_ale
 			! positive ssh change to return to the normal zlevel case, that means
 			! to first "refill" the subsurface layerthickness and with the rest 
 			! than the surface layerthickness
-			elseif (dhbar_total>0 .and. & 
+			elseif (dhbar_total>0.0_WP .and. & 
 					any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. &
 					) then
 				! --> do return to zlevel
@@ -1325,7 +1369,7 @@ subroutine vert_vel_ale
 				nzmax = min(nz,nlevels_nod2D_min(n)-2)
 				
 				!_______________________________________________________________
-				! calc weighting array for distribution of ssh change over layers
+				! calc array for distribution of ssh change over layers
 				dhbar_rest        = dhbar_total
 				distrib_dhbar     = 0.0_WP
 				distrib_dhbar_int = 0.0_WP
@@ -1339,7 +1383,8 @@ subroutine vert_vel_ale
 					! --> integrate ssh distribution from down to up
 					distrib_dhbar_int = distrib_dhbar_int + distrib_dhbar(nz)
 					
-					! distribute change in ssh over layers in hnode and Wvel
+					!___________________________________________________________
+					! --> distribute change in ssh over layers in hnode and Wvel
 					Wvel(nz,n)        = Wvel(nz,n) - distrib_dhbar_int/dt
 					hnode_new(nz,n)   = hnode(nz,n)+ distrib_dhbar(nz)
 					
@@ -1352,14 +1397,19 @@ subroutine vert_vel_ale
 				! surface layer
 				Wvel(1,n)      = Wvel(1,n) -dhbar_total/dt
 				hnode_new(1,n) = hnode(1,n)+dhbar_total
-			end if 
+				
+			end if ! --> if (dhbar_total<0 .and. hnode(1,n)+dhbar_total<=... ) then 
 			
 			!___________________________________________________________________
 			! Add surface fresh water flux as upper boundary condition for continutity
 			Wvel(1,n) = Wvel(1,n)-water_flux(n)
 				
-		end do
+		end do ! --> do n=1, myDim_nod2D
 		
+		!_______________________________________________________________________
+		deallocate(max_dhbar2distr,distrib_dhbar,idx,cumsum_maxdhbar)
+		
+	!___________________________________________________________________________
 	elseif (trim(which_ALE)=='zstar') then
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
 		do n=1, myDim_nod2D
@@ -1401,14 +1451,15 @@ subroutine vert_vel_ale
 			! continutity
 			Wvel(1,n)=Wvel(1,n)-water_flux(n) 
 			
-		end do
+		end do ! --> do n=1, myDim_nod2D
 		! The implementation here is a bit strange, but this is to avoid 
 		! unnecessary multiplications and divisions by area. We use the fact 
 		! that we apply stretching only over the part of the column
 		! where area(nz,n)=area(1,n)
-	endif
+		
+	endif ! --> if(trim(which_ALE)=='....') then
 	
-	if (any(hnode_new<0.0)) then
+	if (any(hnode_new<0.0_WP)) then
 		write(*,*) ' --> fatal problem <--: layerthickness of a layer became smaller zero'
 	endif
 	
@@ -1416,6 +1467,22 @@ subroutine vert_vel_ale
 	call exchange_nod(Wvel) 
 	call exchange_nod(hnode_new)   ! Or extend cycles above  
 	if (Fer_GM) call exchange_nod(fer_Wvel)
+	
+	!___________________________________________________________________________
+	! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
+	do n=1, myDim_nod2D+eDim_nod2D
+		do nz=1,nlevels_nod2D(n)-1
+			! CFL from positiv bottom face prism veloctiy
+			c1=max(0.0_WP,Wvel(nz+1,n))*dt/hnode_new(nz,n)
+			! CFL from negative top face prism veloctiy
+			c2=abs(min(0.0_WP,Wvel(nz  ,n))*dt/hnode_new(nz,n))
+			! maximum CFL
+			CFL_z(nz,n)=max(c1, c2)
+		end do
+	end do
+	if (any(CFL_z>1.0_WP)) then
+		write(*,*) ' --> MAX CFL_z=',maxval(CFL_z),' , mstep=',mstep,' , mype=',mype
+	end if
 	
 	!___________________________________________________________________________
 	! Split implicit vertical velocity onto implicit and explicit components
@@ -1717,6 +1784,7 @@ subroutine oce_timestep_ale(n)
 	! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
 	! will be primarily used for computing Redi diffusivities. etc?
 	call compute_neutral_slope
+	
 	!___________________________________________________________________________
 	call status_check
 	
@@ -1794,7 +1862,7 @@ subroutine oce_timestep_ale(n)
 	t7=MPI_Wtime() 
 	
 	!___________________________________________________________________________
-	! solve tracer equation 
+	! solve tracer equation
 	call solve_tracers_ale
 	t8=MPI_Wtime() 
 	
@@ -1805,7 +1873,7 @@ subroutine oce_timestep_ale(n)
 	
 	!___________________________________________________________________________
 	! write out global fields for debugging
-	call write_step_info(n)
+	call write_step_info(n,logfile_outfreq)
 	
 	! check model for blowup --> ! write_step_info and check_blowup require 
 	! togeather around 2.5% of model runtime

@@ -32,7 +32,7 @@ subroutine pressure_bv
 	
 	!___________________________________________________________________________
 	if(a<0.) then
-		write (*,*)'s<0 happens!', a
+		write (*,*)' --> pressure_bv: s<0 happens!', a
 		pe_status=1
 		do node=1, myDim_nod2D+eDim_nod2D
 			do nz=1, nlevels_nod2d(node)-1

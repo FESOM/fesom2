@@ -36,6 +36,7 @@ MODULES = oce_modules.o \
           gen_input.o \
           io_meandata.o \
           io_restart.o \
+          io_blowup.o \
           io_mesh_info.o
 
 OBJECTS=  fvom_main.o 		\
