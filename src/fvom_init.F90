@@ -17,7 +17,7 @@ program MAIN
   use g_CONFIG
   use g_rotate_grid
   implicit none
-  character(len=100)   :: nmlfile  !> name of configuration namelist file
+  character(len=1000)   :: nmlfile  !> name of configuration namelist file
   
   nmlfile ='../config/namelist.config'
   open (20,file=nmlfile)

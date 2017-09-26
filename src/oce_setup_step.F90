@@ -131,6 +131,7 @@ if (use_ice .and. mo_on) mixlength=0.
 ! ================
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
+allocate(CFL_z(nl-1, node_size)) ! vertical CFL criteria
 ! ================
 ! Temperature and salinity
 ! ================
@@ -237,6 +238,7 @@ end if
     Wvel=0.0_WP
     Wvel_e	=0.0_WP
     Wvel_i	=0.0_WP
+    CFL_z   =0.0_WP
     hpressure=0.0_WP
 !
     T_rhs=0.0_WP

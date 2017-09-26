@@ -346,7 +346,7 @@ else
 			rhs_m(elem2D_nodes(:,el)) = rhs_m(elem2D_nodes(:,el))-aa*elevation_dy
 		end if
 	enddo
- endif
+endif ! --> if ( .not. trim(which_ALE)=='linfs') then
  
 do n=1,myDim_nod2D 
     rhs_a(n) = rhs_a(n)/area(1,n)

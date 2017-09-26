@@ -108,7 +108,10 @@ subroutine thermodynamics
      ce	     = Ce_atm_oce_arr(i)
      ch_i    = Ch_atm_ice
      ce_i    = Ce_atm_ice
+!!PS     h_ml    = 10.0_WP       	         ! 10.0 or 30. used previously
+!!PS     h_ml    = 5.0_WP       	         ! 10.0 or 30. used previously
      h_ml    = 2.5_WP       	         ! 10.0 or 30. used previously
+!!PS     h_ml    = 1.25_WP       	         ! 10.0 or 30. used previously
      fw      = 0.0_WP
      ehf     = 0.0_WP
      lid_Clo=h0

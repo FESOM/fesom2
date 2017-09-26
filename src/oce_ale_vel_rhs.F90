@@ -13,8 +13,8 @@ integer          :: elem, elnodes(3), nz
 real(kind=WP)    :: eta(3), ff, mm 
 real(kind=WP)    :: Fx, Fy, pre(3)
 logical, save    :: lfirst=.true.
-real(kind=8)     :: t1, t2, t3, t4
-real(kind=8)     :: p_ice(3)
+real(kind=WP)     :: t1, t2, t3, t4
+real(kind=WP)     :: p_ice(3)
 integer          :: use_pice
 
 t1=MPI_Wtime()
@@ -43,25 +43,27 @@ do elem=1, myDim_elem2D
    
    ff=coriolis(elem)*elem_area(elem)
    !mm=metric_factor(elem)*gg
-   !____________________________________________________________________________
-   ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
-   ! to account for floating ice
-   if (use_pice > 0) then
-      p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
-      ! limit maximum ice loading like in FESOM1.4
-      p_ice = g*min(p_ice,max_ice_loading)
-   else
-      p_ice = 0._WP
-   endif
-   DO nz=1,nlevels(elem)-1
-      pre = -(eta+hpressure(nz,elnodes)/density_0+p_ice)!+atmospheric pressure etc.
-      Fx  = sum(gradient_sca(1:3,elem)*pre)
-      Fy  = sum(gradient_sca(4:6,elem)*pre)
-      UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + Fx*elem_area(elem) 
-      UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + Fy*elem_area(elem)
-      UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
-      UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
-   END DO
+	!____________________________________________________________________________
+	! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
+	! to account for floating ice
+	if (use_pice > 0) then
+		p_ice = 0.0_WP
+		p_ice = (m_ice(elnodes)*rhoice+m_snow(elnodes)*rhosno)*inv_rhowat
+		! limit maximum ice loading like in FESOM1.4
+		p_ice = g*min(p_ice,max_ice_loading)
+	else
+		p_ice = 0.0_WP
+	endif
+
+	DO nz=1,nlevels(elem)-1
+		pre = -(eta+hpressure(nz,elnodes)/density_0+p_ice)!+atmospheric pressure etc.
+		Fx  = sum(gradient_sca(1:3,elem)*pre)
+		Fy  = sum(gradient_sca(4:6,elem)*pre)
+		UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + Fx*elem_area(elem) 
+		UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + Fy*elem_area(elem)
+		UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
+		UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
+	END DO
 END DO
 t2=MPI_Wtime() 
 ! ====================

@@ -68,7 +68,7 @@ IMPLICIT NONE
   !compute secant bulk modulus
 
   if (s.lt.0.) then
-     write (*,*)'s<0 happens!',t,s
+     write (*,*)' --> densityJM: s<0 happens!',t,s
      pe_status=1
      DO n=1, myDim_nod2D+eDim_nod2D
          DO nz=1, nlevels_nod2d(n)-1
