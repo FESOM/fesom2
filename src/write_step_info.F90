@@ -204,8 +204,6 @@ subroutine check_blowup(istep)
 					write(*,*) ' 	 helem =',helem(:,elidx)
 					write(*,*) ' 	     U =',UV(1,:,elidx)
 					write(*,*) ' 	     V =',UV(2,:,elidx)
-					write(*,*) ' 	 U_rhs =',UV_rhsPS(1,:,elidx)
-					write(*,*) ' 	 V_rhs =',UV_rhsPS(2,:,elidx)
 				enddo
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
