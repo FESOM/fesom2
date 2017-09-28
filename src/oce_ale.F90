@@ -400,33 +400,16 @@ subroutine update_thickness_ale
 	! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
 	!___________________________________________________________________________
 	elseif (trim(which_ale)=='zstar' ) then
-		! --> update layer thinkness at depth layer and node
-		zbar_3d_n=0.0_WP
-		Z_3d_n   =0.0_WP
+		
+		! --> update layer thinkness, depth layer  and mid-depth layer at node
 		do n=1, myDim_nod2D+eDim_nod2D
-! ! 			do nz=1,nlevels_nod2D_min(n)-2
-! ! 				hnode(nz,n) = hnode_new(nz,n)
-! ! 			end do
-! ! 			
-! ! 			! actualize 3d depth levels and mid-depth levels from bottom to top
-! ! 			nzmax=nlevels_nod2D(n)
-! ! 			zbar_3d_n(nzmax,n)=zbar(nzmax)
-! ! 			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
-! ! 			do nz=nzmax-1,2,-1
-! ! 				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
-! ! 				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
-! ! 			end do
-! ! 			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
-			
 			! actualize 3d depth levels and mid-depth levels from bottom to top
-			nzmax               =nlevels_nod2D(n)-1
-			zbar_3d_n(nzmax+1,n)=zbar(nzmax+1)
+			nzmax = nlevels_nod2D_min(n)-2
 			do nz=nzmax,1,-1
-				hnode(nz,n)     =hnode_new(nz,n)
-				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
-				Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
+				hnode(nz,n)     = hnode_new(nz,n)
+				zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode_new(nz,n)
+				Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n) + hnode_new(nz,n)/2.0_WP
 			end do
-			
 		end do
 		
 		!_______________________________________________________________________
@@ -534,14 +517,12 @@ subroutine restart_thickness_ale
 		zbar_3d_n=0.0_WP
 		Z_3d_n   =0.0_WP
 		do n=1, myDim_nod2D+eDim_nod2D
-			nzmax=nlevels_nod2D(n)
-			zbar_3d_n(nzmax,n)=zbar(nzmax)
-			Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax,n) + hnode(nzmax-1,n)/2.0_WP
-			do nz=nzmax-1,2,-1
+			nzmax               =nlevels_nod2D(n)-1
+			zbar_3d_n(nzmax+1,n)=zbar(nzmax+1)
+			do nz=nzmax,1,-1
 				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
-				Z_3d_n(nz-1,n)  =zbar_3d_n(nz  ,n) + hnode(nz-1,n)/2.0_WP
+				Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
 			end do
-			zbar_3d_n(1,n) =zbar_3d_n(2,n) + hnode(1,n)
 		end do
 		
 		!_______________________________________________________________________
@@ -1403,7 +1384,7 @@ subroutine vert_vel_ale
 			!___________________________________________________________________
 			! Add surface fresh water flux as upper boundary condition for continutity
 			Wvel(1,n) = Wvel(1,n)-water_flux(n)
-				
+			
 		end do ! --> do n=1, myDim_nod2D
 		
 		!_______________________________________________________________________
@@ -1413,9 +1394,11 @@ subroutine vert_vel_ale
 	elseif (trim(which_ALE)=='zstar') then
 		! distribute total change in ssh (hbar(n)-hbar_old(n)) over all layers 
 		do n=1, myDim_nod2D
+			!___________________________________________________________________
 			! --> be careful Sergey suggest in his paper to use the unperturbed
 			!     ocean levels NOT the actual one !!! but spoke with Sergey its not 
-			!     so important which to use as long as volume is conserved
+			!     so important which to use as long as it is consistent and 
+			!     volume is conserved
 			! dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
 			dd1=zbar(nlevels_nod2D_min(n)-1)
 			
@@ -1427,26 +1410,31 @@ subroutine vert_vel_ale
 			! 1/H*dhbar
 			dd=(hbar(n)-hbar_old(n))/dd
 			
+			!___________________________________________________________________
 			! 1/H*dhbar/dt
 			dddt=dd/dt
+			
+			!___________________________________________________________________
 			do nz=1,nlevels_nod2D_min(n)-2
 				! why  *(zbar(nz)-dd1) ??? 
 				! because here Wvel_k = SUM_k:kmax(div(h_k*v_k))/V_k
 				! but Wvel_k = Wvel_k+1 - div(h_k*v_k) - h⁰_k/H*dhbar/dt
-				! 				|--> Wvel_k+1 = Wvel_k+2 - div(h_k+1*v_k+1) - h⁰_k+1/H*dhbar/dt
-				! 				                  |--> Wvel_k+2 = Wvel_k+3 - div(h_k+2*v_k+2) - h⁰_k+2/H*dhbar/dt
+				!                |--> Wvel_k+1 = Wvel_k+2 - div(h_k+1*v_k+1) - h⁰_k+1/H*dhbar/dt
+				!                                  |--> Wvel_k+2 = Wvel_k+3 - div(h_k+2*v_k+2) - h⁰_k+2/H*dhbar/dt
 				!
-				!     Wvel_k = SUM_i=k:kmax(div(h_i*v_i)) + 1/H*dhbar/dt*SUM_i=k:kmax(h⁰_k)
-				! SUM_i=k:kmax(h⁰_k) == (zbar(nz)-dd1)
+				! Wvel_k             = SUM_i=k:kmax(div(h_i*v_i)) + 1/H*dhbar/dt*SUM_i=k:kmax(h⁰_k)
+				! SUM_i=k:kmax(h⁰_k) = (zbar(nz)-dd1)
 				! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from 
 				!     the vertical integration bottom to top of Wvel
 				
 				! Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
 				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
+				
 				! hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
 				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
 			end do
 			
+			!___________________________________________________________________
 			! Add surface fresh water flux as upper boundary condition for 
 			! continutity
 			Wvel(1,n)=Wvel(1,n)-water_flux(n) 

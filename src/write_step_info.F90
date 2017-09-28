@@ -12,7 +12,7 @@ subroutine write_step_info(istep,outfreq)
 	
 	integer								:: n, istep,outfreq
 	real(kind=WP)						:: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
-	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2
+	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2,max_cfl_z
 	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, max_wvel,max_hnode,max_deta,max_wvel2,max_hnode2
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
@@ -114,6 +114,8 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_hnode , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		loc = maxval(hnode(2,1:myDim_nod2D),MASK=(hnode(2,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , max_hnode2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+		loc = maxval(CFL_z(:,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_cfl_z , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
 		
 		!_______________________________________________________________________
 		if (mype==0) then
@@ -133,7 +135,7 @@ subroutine write_step_info(istep,outfreq)
 			write(*,*) '	 int(deta )-int(wflux)*dt =', int_deta-int_wflux*dt*(-1.0)
 			write(*,*) '	 int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux*dt*(-1.0)
 			write(*,*)
-			write(*,*) '	___global min/max/mean_____________________________'
+			write(*,*) '	___global min/max/mean  --> mstep=',mstep,'____________'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	       eta= ', min_eta  ,' | ',max_eta  ,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	      deta= ', min_deta ,' | ',max_deta ,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	      hbar= ', min_hbar ,' | ',max_hbar ,' | ','N.A.'
@@ -145,6 +147,7 @@ subroutine write_step_info(istep,outfreq)
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then
@@ -198,15 +201,17 @@ subroutine check_blowup(istep)
 				write(*,*) 'm_ice       = ',m_ice(n)
 				write(*,*) 'm_ice_old   = ',m_ice_old(n)
 				write(*,*)
-				do el=1,nod_in_elem2d_num(n)
-					elidx = nod_in_elem2D(el,n)
-					write(*,*) ' elem#=',el,', elemidx=',elidx
-					write(*,*) ' 	 helem =',helem(:,elidx)
-					write(*,*) ' 	     U =',UV(1,:,elidx)
-					write(*,*) ' 	     V =',UV(2,:,elidx)
-				enddo
+! 				do el=1,nod_in_elem2d_num(n)
+! 					elidx = nod_in_elem2D(el,n)
+! 					write(*,*) ' elem#=',el,', elemidx=',elidx
+! 					write(*,*) ' 	 helem =',helem(:,elidx)
+! 					write(*,*) ' 	     U =',UV(1,:,elidx)
+! 					write(*,*) ' 	     V =',UV(2,:,elidx)
+! 				enddo
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
+				write(*,*)
+				write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
 				write(*,*)
 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
 				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
@@ -291,13 +296,15 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'W           = ',Wvel(:,n)
 					write(*,*)
-					do el=1,nod_in_elem2d_num(n)
-						elidx = nod_in_elem2D(el,n)
-						write(*,*) ' elem#=',el,', elemidx=',elidx
-						write(*,*) ' 	 helem =',helem(:,elidx)
-						write(*,*) ' 	     U =',UV(1,:,elidx)
-						write(*,*) ' 	     V =',UV(2,:,elidx)
-					enddo
+					write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
+					write(*,*)
+! 					do el=1,nod_in_elem2d_num(n)
+! 						elidx = nod_in_elem2D(el,n)
+! 						write(*,*) ' elem#=',el,', elemidx=',elidx
+! 						write(*,*) ' 	 helem =',helem(:,elidx)
+! 						write(*,*) ' 	     U =',UV(1,:,elidx)
+! 						write(*,*) ' 	     V =',UV(2,:,elidx)
+! 					enddo
 					write(*,*)
 					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,n)/rad
 				endif ! --> if ( (tr_arr(nz, n,1) /= tr_arr(nz, n,1)) .or. & ...
@@ -338,14 +345,16 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,n)
 					write(*,*)
-					do el=1,nod_in_elem2d_num(n)
-						elidx = nod_in_elem2D(el,n)
-						write(*,*) ' elem#=',el,', elemidx=',elidx
-						write(*,*) ' 	 helem =',helem(:,elidx)
-						write(*,*) ' 	     U =',UV(1,:,elidx)
-						write(*,*) ' 	     V =',UV(2,:,elidx)
-					enddo
+! 					do el=1,nod_in_elem2d_num(n)
+! 						elidx = nod_in_elem2D(el,n)
+! 						write(*,*) ' elem#=',el,', elemidx=',elidx
+! 						write(*,*) ' 	 helem =',helem(:,elidx)
+! 						write(*,*) ' 	     U =',UV(1,:,elidx)
+! 						write(*,*) ' 	     V =',UV(2,:,elidx)
+! 					enddo
 					write(*,*) 'Wvel        = ',Wvel(:,n)
+					write(*,*)
+					write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 					write(*,*)
