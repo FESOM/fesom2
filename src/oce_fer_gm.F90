@@ -71,7 +71,8 @@ subroutine fer_solve_Gamma
           end if
           ! Switch off GM within a BL in NH (a strategy following FESOM 1.4)
           if (scaling_FESOM14) then
-             scaling(1:MLD1_ind(n)+1)=0.0_WP
+             !scaling(1:MLD1_ind(n)+1)=0.0_WP
+              if (bvfreq(nz, n) < 1.e-5) scaling=0.0_WP
           end if
 
           DO nz=2, nzmax-1
