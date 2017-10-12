@@ -8,7 +8,7 @@
 subroutine fer_solve_Gamma
    USE o_MESH
    USE o_PARAM
-   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new, MLD1_ind
+   USE o_ARRAYS, ONLY: sigma_xy, bvfreq, fer_gamma, fer_c, fer_K, zbar_n, Z_n, hnode_new, MLD1_ind, neutral_slope
    USE g_PARSUP
    USE g_CONFIG
    use g_comm_auto
