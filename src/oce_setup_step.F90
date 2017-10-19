@@ -202,7 +202,7 @@ allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_si
 
 do n=1, node_size
 !  Ki(n)=K_hor*area(1,n)/scale_area
-   Ki(n)=K_hor*mesh_resolution(n)/100000.0_WP
+   Ki(n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
 end do
 call exchange_nod(Ki)
 
