@@ -1070,7 +1070,7 @@ subroutine diff_part_hor_redi
 			Ty=0.5_WP*(tr_xy(2,nz,el(1))+tr_xy(2,nz,el(2)))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=((deltaX2-deltaX1)*Ty-(deltaY2-deltaY1)*Tx)*dz
+			c=((deltaX2-deltaX1)*Fy-(deltaY2-deltaY1)*Fx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		enddo
@@ -1085,7 +1085,7 @@ subroutine diff_part_hor_redi
 			Ty=tr_xy(2,nz,el(1))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=(-deltaX1*Ty+deltaY1*Tx)*dz
+			c=(-deltaX1*Fy+deltaY1*Fx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		end do
@@ -1098,7 +1098,7 @@ subroutine diff_part_hor_redi
 			Ty=tr_xy(2,nz,el(2))
 			Fx=Kh*(Tx+SxTz*isredi)
 			Fy=Kh*(Ty+SyTz*isredi)
-			c=(deltaX2*Ty-deltaY2*Tx)*dz
+			c=(deltaX2*Fy-deltaY2*Fx)*dz
 			rhs1(nz) = rhs1(nz) + c
 			rhs2(nz) = rhs2(nz) - c
 		end do
