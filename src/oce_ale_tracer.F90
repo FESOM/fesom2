@@ -684,6 +684,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
+        use o_mixing_KPP_mod !for ghats _GO_		
 		
 	implicit none
 	
@@ -854,12 +855,38 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
 		tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 		!tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
+
+
+		! *******************************************************************
+		! nonlocal transport to the rhs (only T and S currently) _GO_
+		! *******************************************************************
+		! rsss will be used later to compute:
+		! 1. the virtual salinity flux 
+		! 2. the contribution from the nonlocal term in KPP for salinity
+		if (tr_num==2) then 
+			rsss=ref_sss
+	        	if (ref_sss_local) rsss=tr_arr(1,n,2)
+		end if
+
+
 		do nz=2,nzmax-2
 			dz=hnode_new(nz,n)
 			tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 			!tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
 			!       -c(nz)*tr_arr(nz+1,n,tr_num) &
 			!       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
+
+			! *******************************************************************
+			! nonlocal transport to the rhs (only T and S currently) _GO_
+			! *******************************************************************
+
+               		if (trim(mix_scheme)=='KPP') then
+               			if (tr_num==1) then ! T
+                  			tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+      				elseif (tr_num==2) then ! S
+         				tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+      				end if
+			end if 
 		end do
 		nz=nzmax-1
 		dz=hnode_new(nz,n)
