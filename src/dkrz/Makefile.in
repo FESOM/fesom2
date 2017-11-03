@@ -1,6 +1,6 @@
 # Compiler and Linker
-CC = mpiicc 
-FC = mpiifort 
+CC = icc 
+FC = ifort 
 LD = $(FC)
 
 # Optimization specs for compiler
