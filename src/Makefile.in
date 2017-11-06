@@ -14,10 +14,10 @@ MPI_INCLUDE        = -I$(MPIROOT)/include
 
 # NetCDF library and include definitions
 NCFDIR   = /sw/rhel6-x64/netcdf/netcdf_fortran-4.4.3-intel14
-NCFLIB   = -L$(NCFDIR)/lib -lnetcdff
+NCFLIB   = -Wl,-rpath -Wl,$(NCFDIR)/lib -L$(NCFDIR)/lib -lnetcdff
 NCFINC   = -I$(NCFDIR)/include
 NCDIR   = /sw/rhel6-x64/netcdf/netcdf_c-4.4.0-gcc48
-NCLIB   = -L$(NCDIR)/lib -lnetcdf 
+NCLIB   = -Wl,-rpath -Wl,$(NCDIR)/lib -L$(NCDIR)/lib -lnetcdf 
 NCINC   = -I$(NCDIR)/include
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
@@ -50,7 +50,7 @@ LIB_PARMS = -L$(PARMS_DIR)/lib -lparms
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include
-METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
+METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=98451 #35243
 # METISRANDDOMSEED: any integer
 
 ######################################################
