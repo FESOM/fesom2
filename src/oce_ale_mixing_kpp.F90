@@ -727,21 +727,27 @@ contains
            IF(Kv0_const) THEN
               diffK(nz,node,1) = diff_sh_limit * frit + K_ver
            ELSE
-
-      !  ANY REFERENCE?
-              dep = zbar(nz) ! Kv is defined on the levels 
-              lat = ABS(geo_coord_nod2D(2,node)) / rad
-              IF (lat < 5.0_WP) THEN
+              dep = abs(zbar(nz)) ! Kv is defined on the levels 
+              lat = geo_coord_nod2D(2,node)/ rad
+              IF (abs(lat) < 5.0_WP) THEN
                  ratio = 1.0_WP
               ELSE
-                 ratio = MIN( 1.0_WP + 9.0_WP * (lat - 5.0_WP) / 10.0_WP, 10.0_WP )
+                 ratio = MIN( 1.0_WP + 9.0_WP * (abs(lat) - 5.0_WP) / 10.0_WP, 10.0_WP )
               END IF
-              aux = ( 0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (ABS(dep) - 2500.0_WP) ) ) * 1e-5_WP
-          
+              if (lat < 70.0) then
+                 aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
+              else
+                 aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6
+                 ratio=3.0
+                 if (dep < 80.0)     then
+                    ratio=1.0
+                 elseif(dep < 100.0) then
+                    ratio=2.0  
+                 endif   
+              end if
               diffK(nz,node,1) =  diff_sh_limit * frit + aux * ratio
            END IF
-        diffK(nz,node,2) = diffK(nz,node,1)  
-
+           diffK(nz,node,2) = diffK(nz,node,1)  
         END DO
 
 !      *******************************************************************

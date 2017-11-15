@@ -91,7 +91,7 @@ integer           :: n, nz, nlev
 if (use_ALE) then
 DO n=1, myDim_nod2D+eDim_nod2D
    nlev=nlevels_nod2D(n)
-   DO nz=2, nlev
+   DO nz=2,  nlev-1
       dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
       tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
    END DO
@@ -101,7 +101,7 @@ END DO
 else
 DO n=1, myDim_nod2D+eDim_nod2D
      nlev=nlevels_nod2D(n)
-     DO nz=2, nlev
+     DO nz=2, nlev-1
         dz=0.5_WP*(Z(nz-1)-Z(nz))
         tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
      END DO
