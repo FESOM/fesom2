@@ -19,7 +19,7 @@ def fesom_plot2d_data(mesh,data):
 	from set_inputarray import inputarray
 	
 	#___________________________________________________________________________
-	fig = plt.figure(figsize=(14, 12))
+	fig = plt.figure(figsize=(13, 13))
 	#fig.patch.set_alpha(0.0)
 	ax  = plt.gca()
 	resolution = 'c'
@@ -104,20 +104,22 @@ def fesom_plot2d_data(mesh,data):
 		idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
 		idxbox_n  = np.array(idxbox_n).squeeze()
 		idxbox_n  = np.unique(idxbox_n)
-		idx_box   = idxbox_n
+		idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
+		idx_box[idxbox_n]=True
 		del idxbox_n 
 		del idxbox_e
 	# case of element data
 	elif data.value.size ==mesh.n2dea:
 		idx_box   = idxbox_e
 		del idxbox_e
-		
+	
 	#___________________________________________________________________________
 	# make triangle mask arrays from flat triangles and nan trinagles
 	mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
 	if np.any(np.isnan(data.value)):
 		mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
-		
+		idx_box = np.logical_and(idx_box,np.isnan(data.value)==False)
+	
 	if data.proj=='npstere':
 		mask_tri = np.logical_or(mask_tri,np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3<setbndlat)
 	elif data.proj=='spstere':	
@@ -160,6 +162,7 @@ def fesom_plot2d_data(mesh,data):
 			cmin = 0
 			cref = cmin + (cmax-cmin)/2
 			cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
+			data.cmap='wbgyr'
 	else:
 		cmax = np.max(data.value[idx_box])
 		cmin = np.min(data.value[idx_box])

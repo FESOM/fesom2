@@ -30,6 +30,7 @@ def set_inputarray():
 	inputarray['mesh_focus'	 	 ] = 0
 	
 	inputarray['which_mask'	 	 ] = 'fesom' # 'fesom', 'bluemarble', 'etopo'
+	#inputarray['which_mask'	 	 ] = 'bluemarble' # 'fesom', 'bluemarble', 'etopo'
 	
 	inputarray['save_fig'        ] = False
 	inputarray['save_figpath'    ] = ''

@@ -35,7 +35,7 @@ inputarray['proj_lat' ] = 75 #only for ortho
 #+_____________________________________________________________________________+
 # setup variable name, runid and data path
 data 			= fesom_init_data(inputarray) # init fesom2.0 data object
-data.var 		= 'a_ice'
+data.var 		= 'temp'
 #data.crange     = []
 #data.crange     = [0.0,5000.0,1000.0] # [cmin, cmax, cref]
 #data.cmap       ='wbgyr'
@@ -43,12 +43,15 @@ data.var 		= 'a_ice'
 #+_____________________________________________________________________________+
 # select year, records, and depth range of which should be average
 data.year		= [1948,1948]
+
 # selct month to average over
-#data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
+data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
 #data.month		= [1,2,12]
-data.month		= [9]
+#data.month		= [9]
+
 # select interpolate depth layers to average over
 data.depth		= [0,10,20,30,40,50,75,100]
+#data.depth		= [500]
 
 #+_____________________________________________________________________________+
 #|                                                                             |
