@@ -277,7 +277,7 @@ def fesom_load_data_horiz(mesh,data):
 			
 		# month info 
 		if nmi == 1 and nrec>=12:
-			str_time_1 = str_time_1+' ['+mon_list2[data.month-1][0]+']'
+			str_time_1 = str_time_1+' ['+mon_list2[np.array(data.month)-1][0]+']'
 		elif nmi>1 and nmi<12 and nrec>=12:
 			str_mon=''
 			for ii in range(0,nmi):

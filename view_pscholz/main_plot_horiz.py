@@ -24,7 +24,7 @@ inputarray=set_inputarray()
 #inputarray['save_fig'] = False
 
 # set plot box for cyl projection (default: [-180,180,-90,90])
-inputarray['which_box'] = [-180,180,-90,-50]
+inputarray['which_box'] = [-180,180,50,90]
 
 # set projection variable --> the lon/lat projection plot ranges are set via 
 # inputarray['which_box'] = [lonmin,lonmax,latmin,latmax]
@@ -45,7 +45,8 @@ data.var 		= 'a_ice'
 data.year		= [1948,1948]
 # selct month to average over
 #data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
-data.month		= [1,2,12]
+#data.month		= [1,2,12]
+data.month		= [9]
 # select interpolate depth layers to average over
 data.depth		= [0,10,20,30,40,50,75,100]
 
