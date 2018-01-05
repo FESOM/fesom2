@@ -27,21 +27,21 @@ data.year	= [1948,1948]
 data.month	= [1,2,12]
 
 # select linear interpolated depth layers to average over, empty mean use all layers
-#data.depth	= []
+data.depth	= []
 
 #+_____________________________________________________________________________+
 #+_____________________________________________________________________________+
 # predefine section lines or leave it empty in this case interactive selection 
 line 		= fesom_init_line()
 
-line.line_refxy    =  list([[],[]]) 
-#line.line_refxy    =  list([[]]) 
-line.line_refxy[0] = [ [-75.188, -72.875, -65.875, -57.75, -50.156],
-					   [39.531, 36.594, 34.094, 34.312, 32.094],
-					   'test1' ]
-line.line_refxy[1] = [ [-25.8,-29.3,-32.2,-35.9,-38.2,-40.3,-41.1,-42.5,-45.9,-50.6,-53.4,-55.3,-57.6,-60.2],
-					   [67.3,65.4,65.1,63.7,62.9,61.9,59.6,58.6,58.4,60.8,62.5,62.7,61.91,60.8],
-					   'test2' ] 
+#line.line_refxy    =  list([[],[]]) 
+##line.line_refxy    =  list([[]]) 
+#line.line_refxy[0] = [ [-75.188, -72.875, -65.875, -57.75, -50.156],
+					   #[39.531, 36.594, 34.094, 34.312, 32.094],
+					   #'test1' ]
+#line.line_refxy[1] = [ [-25.8,-29.3,-32.2,-35.9,-38.2,-40.3,-41.1,-42.5,-45.9,-50.6,-53.4,-55.3,-57.6,-60.2],
+					   #[67.3,65.4,65.1,63.7,62.9,61.9,59.6,58.6,58.4,60.8,62.5,62.7,61.91,60.8],
+					   #'test2' ] 
 
 #+_____________________________________________________________________________+
 #|                         *** LOAD FVSOM MESH ***                             |
@@ -82,9 +82,11 @@ fig.canvas.draw()
 #		[right mouse] ... zoom out completly
 #		button [+] ... zoom in
 #		button [-] ... zoom out
-#		button [L] ... first time push start line selection, second time push
+#		button [L] ... first time push [l] - start line selection, line points can 
+#					   now be selected with left mouse button, second time push of [L]
 #					   finishes selection of a single line. If this is repeated 
 #					   several lines can be selected
+#		button [d] ... delete point that was just selected
 #		button [q] ... finshes entire selection process, goes on with the calculation 
 #					   of the cross-section
 #					   
