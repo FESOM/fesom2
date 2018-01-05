@@ -204,7 +204,8 @@ class fesom_line:
 					plt.draw(),self.figure.canvas.draw()
 					self.press = 'None'
 					self.line.set_color([0.0,0.8,0.0])
-					self.line.set_linewidth(8)
+					#self.line.set_color('w')
+					self.line.set_linewidth(0.5)
 					plt.xscale('linear')
 					plt.yscale('linear')
 					self.figure.canvas.draw()

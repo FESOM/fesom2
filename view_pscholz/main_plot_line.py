@@ -26,8 +26,8 @@ data.year	= [1948,1948]
 # select month to average over
 data.month	= [1,2,12]
 
-# select linear interpolated depth layers to average over
-data.depth	= []
+# select linear interpolated depth layers to average over, empty mean use all layers
+#data.depth	= []
 
 #+_____________________________________________________________________________+
 #+_____________________________________________________________________________+
@@ -76,15 +76,26 @@ plt.yscale('linear')
 plt.show(block=False)
 fig.canvas.draw()
 
-
 #+_____________________________________________________________________________+
 # --> interactive figure line selection 
+#		[left mouse]  ... preselect area, move window
+#		[right mouse] ... zoom out completly
+#		button [+] ... zoom in
+#		button [-] ... zoom out
+#		button [L] ... first time push start line selection, second time push
+#					   finishes selection of a single line. If this is repeated 
+#					   several lines can be selected
+#		button [q] ... finshes entire selection process, goes on with the calculation 
+#					   of the cross-section
+#					   
 # you need to close window to proceed
 if len(line.line_refxy)==0:
+	# interactively
 	line.cid_pressb = fig.canvas.mpl_connect('button_press_event', line.anybutton)
 	line.cid_pressk = fig.canvas.mpl_connect('key_press_event', line.anykey)
 	line.connect(fig,ax,map)
 else:
+	# predefined
 	for ii in range(0,len(line.line_refxy)):
 		ax.plot(line.line_refxy[ii][0],line.line_refxy[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
 		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='o',mfc=[0.0,0.8,0.0],mec='k',axes=ax)
@@ -93,7 +104,7 @@ else:
 	fig.canvas.draw()
 
 #+_____________________________________________________________________________+
-# analyse selected lines, calculate interpoaltion points
+# analyse selected lines, calculate interpolation points
 print(' --> calculate interpolation points')
 line.analyse_lines(npoints=100)
 #print(input.line_ipxy)
@@ -107,7 +118,7 @@ print(' --> load 3d fesom2.0 data')
 data=fesom_load_data_horiz(mesh,data)
 
 #+_____________________________________________________________________________+
-# interpolate points on fesom2.0 data
+# interpolate points on fesom2.0 data, use routine of Nikolay fesom2regular(...)
 print(' --> do interpolation on data')
 line.interp_lines(mesh,data)
 
