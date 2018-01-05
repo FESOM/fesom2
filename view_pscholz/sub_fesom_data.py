@@ -22,6 +22,7 @@ def fesom_init_data(inputarray):
 	data.proj_lat	= inputarray['proj_lat']
 	data.cmap		= 'grads'
 	data.crange		= []
+	data.cnumb      = []
 	data.anom		= False
 	data.str_time 	= ''
 	data.str_dep 	= ''
@@ -31,6 +32,7 @@ def fesom_init_data(inputarray):
 	data.value      = []
 	data.value2     = []
 	data.which_plot	= inputarray['which_plot']
+	data.levels     = []
 	#___________________________________________________________________________
 	return data
 	
@@ -65,6 +67,7 @@ class fesom_data(object):
 		self.levels         = []
 		self.cmap           = []
 		self.crange         = []
+		self.cnumb          = []
 		self.which_plot     = []
 		
 		#____data varaible___________________________
@@ -140,8 +143,16 @@ def fesom_load_data_horiz(mesh,data):
 		#_______________________________________________________________________
 		# at first loaded year allocate matrices to calc means
 		if yi==0:
-			# allocate array for mean data
-			mean_data = np.zeros((nsmple,),dtype='float32')
+			
+			# if data are 3d and no loadable depth layers are given load all fesom 
+			# layers
+			if dim_num==3 and len(data.depth)==0:
+				# allocate array for mean data
+				mean_data = np.zeros((nsmple,ncdims[2]),dtype='float32')
+			else:
+				# allocate array for mean data
+				mean_data = np.zeros((nsmple,),dtype='float32')
+			
 			if data.var.find('vec')==0:
 				mean_data2 = np.zeros((nsmple),dtype='float32')
 		
@@ -288,7 +299,7 @@ def fesom_load_data_horiz(mesh,data):
 	else: 
 		data.str_time = 'rec_i: '+str(data.record[0])
 	
-	if dim_num==3:
+	if dim_num==3 and len(data.depth)!=0:
 		if len(data.depth)<=1:
 			data.str_dep=', dep: '+str(data.depth[0])+'m'
 		else:
@@ -384,13 +395,13 @@ def fesom_time_depth_mean(mesh,ncval,sel_time):
 	# do no time selection
 	if len(sel_time)==0:
 		if dim_num==2:
-			# case 3d variable
+			# case 2d variable
 			ncval= ncval[:,:].mean(axis=0)
 		elif dim_num==3:
 			# case 3d variable
 			ncval= ncval[:,:,:].mean(axis=0)
-			# do vertical interpolation of certain layer
-			ncval=fesom_vinterp(ncval,mesh)
+			# do vertical interpolation of certain layer if data.depth is not empty
+			if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
 	#___________________________________________________________________________
@@ -402,8 +413,8 @@ def fesom_time_depth_mean(mesh,ncval,sel_time):
 		elif dim_num==3:
 			# case 3d variable
 			ncval= ncval[sel_time,:,:].mean(axis=0)
-			# do vertical interpolation of certain layer
-			ncval=fesom_vinterp(ncval,mesh)
+			# do vertical interpolation of certain layer if data.depth is not empty
+			if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
 	return(ncval)

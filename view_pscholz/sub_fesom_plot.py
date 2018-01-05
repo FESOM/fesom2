@@ -29,20 +29,16 @@ def fesom_plot2d_data(mesh,data):
 	#| SET PROJECTION PARAMETERS                                               |
 	#+_________________________________________________________________________+
 	if (data.proj=='ortho' or data.proj=='stere'):
-		map = Basemap(projection = data.proj,
-					  resolution = resolution,
-					  lat_0      = data.proj_lat,
-					  lon_0      = data.proj_lon)
+		map = Basemap(projection = data.proj, resolution = resolution,
+					  lat_0      = data.proj_lat, lon_0 = data.proj_lon)
 		ylabels= [0,0,0,0]
 		xlabels= [1,1,1,1]
 		xticks = np.arange(-180,180,20)
 		yticks = np.arange(-90,90,15)
 	elif data.proj=='npstere':
 		setbndlat = np.max([0.0,inputarray['which_box'][2]])
-		map = Basemap(projection = data.proj,
-					  resolution = resolution,
-					  lon_0      = 0, 
-					  boundinglat= setbndlat,
+		map = Basemap(projection = data.proj, resolution = resolution,
+					  lon_0      = 0, boundinglat = setbndlat,
 					  round      = True)
 		ylabels=[0,0,0,0]
 		xlabels=[1,1,1,1]
@@ -50,22 +46,18 @@ def fesom_plot2d_data(mesh,data):
 		yticks = np.arange(-90.,90.,15.)
 	elif data.proj=='spstere':
 		setbndlat = np.min([0.0,inputarray['which_box'][3]])
-		map = Basemap(projection = data.proj,
-					  resolution = resolution,
-					  boundinglat= setbndlat,
-					  lon_0      = 180,
+		map = Basemap(projection = data.proj, resolution = resolution,
+					  boundinglat= setbndlat, lon_0      = 180,
 					  round      = True)
 		ylabels=[0,0,0,0]
 		xlabels=[1,1,1,1]
 		xticks = np.arange(0.,360.,20.)
 		yticks = np.arange(-90.,90.,15.)
 	else:	
-		map = Basemap(projection = data.proj,
-					  resolution = resolution,
-					  llcrnrlon  = inputarray['which_box'][0],
-					  urcrnrlon  = inputarray['which_box'][1],
-					  llcrnrlat  = inputarray['which_box'][2],
-					  urcrnrlat  = inputarray['which_box'][3],)
+		map = Basemap(projection = data.proj,resolution = resolution,
+						llcrnrlon  = inputarray['which_box'][0], urcrnrlon  = inputarray['which_box'][1],
+						llcrnrlat  = inputarray['which_box'][2], urcrnrlat  = inputarray['which_box'][3],
+						)
 		ylabels=[1,0,0,0]
 		xlabels=[0,0,0,1]
 		ticknr   = 8
@@ -130,7 +122,9 @@ def fesom_plot2d_data(mesh,data):
 	#| set minimum, maximum and reference values for the creation of the       |
 	#| adjustable colormap                                                     |
 	#+_________________________________________________________________________+
-	cnumb    = 20; # minimum number of colors
+	cnumb    = 40; # minimum number of colors
+	if np.size(data.cnumb)!=0:
+		cnumb = data.cnumb
 	# predined color ranges
 	if data.sname=='a_ice':
 		cmax = 100.0
@@ -189,11 +183,15 @@ def fesom_plot2d_data(mesh,data):
 	print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
 	cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
 	print('clevel = ',clevel)
-	if data.sname=='a_ice' or data.sname=='m_ice':
+	if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0 :
 		# make no sea ice transparent
 		from matplotlib.colors import ListedColormap
 		auxcmap = cmap0(np.arange(cmap0.N))
-		auxcmap[0,-1]=0.0
+		if data.sname=='a_ice' or data.sname=='m_ice' :
+			auxcmap[0,-1]=0.0
+		elif data.sname.find('MLD')==0 :
+			auxcmap[-1,-1]=0.0
+			
 		cmap0 = ListedColormap(auxcmap)
 
 	#___________________________________________________________________________
@@ -201,31 +199,30 @@ def fesom_plot2d_data(mesh,data):
 	# in the plot
 	data.value[data.value<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
 	data.value[data.value>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
-	
+	data.levels = clevel
 	#+_________________________________________________________________________+
 	#| plot data on triangluar grid                                            |
 	#+_________________________________________________________________________+
 	# plot data defined on nodes 
 	if data.value.size==mesh.n2dna:
 		if data.which_plot=='pcolor':
-			hp1=plt.tripcolor(tri,
-						data.value,
-						antialiased='False',
+			hp1=plt.tripcolor(tri,data.value,
+						antialiased=False,
 						edgecolors='None',
 						cmap=cmap0,
 						shading='gouraud')
+						#shading='flat')
+						#shading='gouraud')
 		elif data.which_plot=='contourf':
-			hp1=plt.tricontourf(tri,
-						data.value,
+			hp1=plt.tricontourf(tri,data.value,
 						levels=clevel, 
 						antialiased=True,
 						extend='both',
 						cmap=cmap0)
-			hp2=plt.tricontour(tri,
-						data.value,
+			hp2=plt.tricontour(tri,data.value,
 						levels=clevel, 
 						colors='k',
-						linewidths=0.25,
+						linewidths=[0.05],
 						antialiased=True, #True,
 						linestyles='solid')
 	# plot data defined on elements
@@ -251,11 +248,30 @@ def fesom_plot2d_data(mesh,data):
 	
 	# label lon lat grid for ortho projection 
 	if (data.proj=='ortho'   or data.proj=='stere'):
+		map.drawparallels([0.0],
+						linewidth=1.0,
+						dashes=[1,1e-10],
+						fontsize=fsize)
+		map.drawmeridians([0.0],
+						linewidth=1.0,
+						dashes=[1,1e-10],
+						fontsize=fsize)
 		for i in np.arange(len(xticks)):
-			plt.annotate(np.str(xticks[i]),xy=map(xticks[i],0),xycoords='data')
+			xt,yt=xy=map(xticks[i],0)
+			if xticks[i]>0 :
+				plt.text(xt,yt,' {:.1f}$^{{\\circ}}$W'.format(xticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
+			elif xticks[i]<0: 
+				plt.text(xt,yt,' {:.1f}$^{{\\circ}}$W'.format(xticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
+			else: 
+				plt.text(xt,yt,' {:.1f}$^{{\\circ}}$'.format(xticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
+			plt.plot(xt,yt,'o',linestyle='None',color='k')	
 		for i in np.arange(len(yticks)):
-			plt.annotate(np.str(yticks[i]),xy=map(0,yticks[i]),xycoords='data')
-	
+			xt,yt=xy=map(0,yticks[i])
+			if yticks[i]>0 :
+				plt.text(xt,yt,' {:.1f}$^{{\\circ}}$N'.format(yticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
+			elif yticks[i]<0: 
+				plt.text(xt,yt,' {:.1f}$^{{\\circ}}$S'.format(yticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
+			plt.plot(xt,yt,'o',linestyle='None',color='k')		
 	#___________________________________________________________________________
 	# draw land mask patch
 	if inputarray['which_mask'] == 'fesom':
@@ -286,11 +302,15 @@ def fesom_plot2d_data(mesh,data):
 	
 	# kickout some colormap labels if there are to many
 	ncbar_l=len(cbar.ax.get_yticklabels()[:])
+	idx_cref = np.where(clevel==cref)[0]
+	idx_cref = np.asscalar(idx_cref)
+	
 	nmax_cbar_l = 10
 	nstep = ncbar_l/nmax_cbar_l
 	plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-	plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
-	
+	#plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
+	plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+	plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
 	#___________________________________________________________________________
 	ax.tick_params(axis='both', direction='out')
 	ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
@@ -311,7 +331,7 @@ def fesom_plot2d_data(mesh,data):
 	plt.show(block=False)
 	
 	#___________________________________________________________________________
-	return cmap0
+	return(fig,ax,map,cbar)
 	#return map
 	
 	
@@ -541,6 +561,9 @@ def fesom_plot2dvec_data(mesh,data):
 	
 	# kickout some colormap labels if there are to many
 	ncbar_l=len(cbar.ax.get_yticklabels()[:])
+	
+	
+	#print(cbar_ticks)
 	nmax_cbar_l = 15
 	nstep = ncbar_l/nmax_cbar_l
 	plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
@@ -564,7 +587,7 @@ def fesom_plot2dvec_data(mesh,data):
 	plt.show(block=False)
 	
 	#___________________________________________________________________________
-	return map
+	return(fig,ax,cbar)
 	
 	
 #___PLOT 2D FESOM MESH IN GEO COORDINATES_______________________________________
@@ -705,7 +728,7 @@ def fesom_plot2d_rotmesh(mesh):
 #
 #
 #_______________________________________________________________________________
-def fesom_plot_lmask(map,mesh,ax,fcolor):
+def fesom_plot_lmask(map,mesh,ax,fcolor,ecolor='k'):
 	
 	#___________________________________________________________________________
 	m_patches=[]
@@ -809,7 +832,7 @@ def fesom_plot_lmask(map,mesh,ax,fcolor):
 			
 			ax.add_collection(PatchCollection(	m_patches,			\
 											facecolor=fcolor,	\
-											edgecolor='k',		\
+											edgecolor=ecolor,		\
 											linewidths=1.0, 	\
 											zorder=1))
 			

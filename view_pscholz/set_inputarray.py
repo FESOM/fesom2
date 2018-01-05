@@ -35,6 +35,7 @@ def set_inputarray():
 	inputarray['save_fig'        ] = False
 	inputarray['save_figpath'    ] = ''
 	
+	#inputarray['which_plot'     ]  = 'pcolor' #contourf/pcolor
 	inputarray['which_plot'     ]  = 'contourf' #contourf/pcolor
 	
 	inputarray['which_box']        = [-180,180,-90,90]

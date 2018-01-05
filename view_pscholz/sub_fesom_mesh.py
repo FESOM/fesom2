@@ -1,4 +1,5 @@
 # Patrick Scholz, 14.12.2017
+import time
 import numpy as np
 import pandas as pa
 import math
@@ -47,7 +48,7 @@ def fesom_init_mesh(inputarray):
 	mesh = fesom_grid_rot_g2r(mesh)
 	
 	# calc triangle area in km^2 
-	#mesh = fesom_calc_triarea(mesh)
+	mesh = fesom_calc_triarea(mesh)
 	
 	# calc triangle resol in km interpolated to nodes
 	#mesh = fesom_calc_triresol(mesh)
@@ -491,16 +492,17 @@ def fesom_remove_pbnd(mesh):
 	
 	#___________________________________________________________________________
 	# check if there are still any abnormal triangles an kick them out
-	maxt = np.max(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)
-	mint = np.min(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)
-	mind = np.squeeze(np.array([maxt-mint<=180]))
-	if any(mind==False):
-		mesh.abnormtri_2d_i = np.where(mind==False)
-	mesh.elem_2d_i= mesh.elem_2d_i[np.where(mind==True)[0],:]
+	mesh.abnormtri_2d_i=[]
+	#maxt = np.max(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)
+	#mint = np.min(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)
+	#mind = np.squeeze(np.array([maxt-mint<=180]))
+	#if any(mind==False):
+		#mesh.abnormtri_2d_i = np.where(mind==False)
+	#mesh.elem_2d_i= mesh.elem_2d_i[np.where(mind==True)[0],:]
+	#del maxt
+	#del mint
+	#del mind	
 	mesh.n2dea    = mesh.elem_2d_i.shape[0]
-	del maxt
-	del mint
-	del mind	
 	
 	#___________________________________________________________________________
 	mesh.n2dna=mesh.n2dn+mesh.pbndn_2d_i.size # new (augmented) n2d
@@ -596,15 +598,15 @@ def fesom_calc_triresol(mesh):
 	#___________________________________________________________________________
 	# mean resolutiuon per element
 	mesh.elem_2d_resol = jacobian.mean(axis=1)
+	mesh.nodes_2d_resol= fesom_interp_e2n(mesh,mesh.elem_2d_resol)
 	
-	#___________________________________________________________________________
-	jacobian 	= jacobian.reshape((mesh.n2dea*3))
-	interp_e2n_mat,interp_e2n_corector = fesom_e2n_interp(mesh)
-	
-	#___________________________________________________________________________
-	# mesh resolution interpolated to node points
-	mesh.nodes_2d_resol = jacobian[interp_e2n_mat] * interp_e2n_corector
-	mesh.nodes_2d_resol = np.sum(mesh.nodes_2d_resol,axis=1) / np.sum(interp_e2n_corector,axis=1)
+	##___________________________________________________________________________
+	#jacobian 	= jacobian.reshape((mesh.n2dea*3))
+	#interp_e2n_mat,interp_e2n_corector = fesom_e2n_interp(mesh)
+	##___________________________________________________________________________
+	## mesh resolution interpolated to node points
+	#mesh.nodes_2d_resol = jacobian[interp_e2n_mat] * interp_e2n_corector
+	#mesh.nodes_2d_resol = np.sum(mesh.nodes_2d_resol,axis=1) / np.sum(interp_e2n_corector,axis=1)
 	
 	return mesh
 	
@@ -621,8 +623,8 @@ def fesom_calc_triarea(mesh):
 	#___________________________________________________________________________
 	nodes_2d_x 	= np.concatenate((mesh.nodes_2d_xg[:mesh.n2dn] , mesh.nodes_2d_xg[mesh.pbndn_2d_i]))
 	nodes_2d_y 	= np.concatenate((mesh.nodes_2d_yg[:mesh.n2dn] , mesh.nodes_2d_yg[mesh.pbndn_2d_i]))
-	elem_2d_x 	= nodes_2d_x[mesh.elem_2d_i]
-	elem_2d_y 	= nodes_2d_y[mesh.elem_2d_i]
+	elem_2d_x 	= nodes_2d_x[mesh.elem0_2d_i]
+	elem_2d_y 	= nodes_2d_y[mesh.elem0_2d_i]
 	elem_2d_xy 	= np.array([elem_2d_x,elem_2d_y])
 	del nodes_2d_x
 	del nodes_2d_y
@@ -655,87 +657,109 @@ def fesom_calc_triarea(mesh):
 	#___________________________________________________________________________
 	# calc triangle area through vector product
 	mesh.elem_2d_area = 0.5*np.abs(jacobian[0,0,:]*jacobian[1,1,:]-jacobian[0,1,:]*jacobian[1,0,:])
+	mesh.elem_2d_area = np.concatenate((mesh.elem_2d_area,mesh.elem_2d_area[mesh.pbndtri_2d_i]))
 	
 	#___________________________________________________________________________
-	aux_area 	= np.repeat(mesh.elem_2d_area,3,axis=0)
-	interp_e2n_mat,interp_e2n_corector = fesom_e2n_interp(mesh)
+	# calc node cluster area 
+	mesh.nodes_2d_area=np.zeros(mesh.n2dna)
+	for i in range(3):
+		for j in range(mesh.n2de):
+			n=mesh.elem0_2d_i[j,i]
+			mesh.nodes_2d_area[n]=mesh.nodes_2d_area[n]+mesh.elem_2d_area[j]
+	mesh.nodes_2d_area=mesh.nodes_2d_area/3.
+	mesh.nodes_2d_area[mesh.n2dn:mesh.n2dna] = mesh.nodes_2d_area[mesh.pbndn_2d_i]
 	
 	#___________________________________________________________________________
-	# mesh resolution interpolated to node points
-	mesh.nodes_2d_area = aux_area[interp_e2n_mat] * interp_e2n_corector
-	mesh.nodes_2d_area = np.sum(mesh.nodes_2d_area,axis=1) / np.sum(interp_e2n_corector,axis=1)
-	
-	#___________________________________________________________________________
+	#if len(mesh.abnormtri_2d_i)!=0:
+			#mesh.elem_2d_area = np.delete(mesh.elem_2d_area,mesh.abnormtri_2d_i)
 	return mesh
 	
 	
 #___CALCULATE INTERPOLATION MATRIX FROM ELEMENTS TO NODE POINTS RESOLUTION______
 # interpolate from triangle values to node values
-#
+#	
 #_______________________________________________________________________________
-def fesom_e2n_interp(mesh):
+def fesom_interp_e2n(mesh,data_e):
+	if data_e.size==mesh.n2de:
+		data_e=data_e*mesh.elem_2d_area[0:mesh.n2de]
+	elif data_e.size==mesh.n2dea:
+		data_e=data_e*mesh.elem_2d_area 
 	
-	print(' --> calc. interpolation matrix elem2d-->nodes')
-	outstep        		= 10.0;
-	#___________________________________________________________________________
-	aux					= np.array(mesh.elem_2d_i)
-	aux					= np.squeeze(aux.reshape((aux.shape[0]*aux.shape[1],1)))
+	data_n=np.zeros((mesh.n2dna,))
+	for ii in range(mesh.n2de):     
+		data_n[mesh.elem0_2d_i[ii,:]]=data_n[mesh.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii] 
+	data_n[0:mesh.n2dn]=data_n[0:mesh.n2dn]/mesh.nodes_2d_area[0:mesh.n2dn]/3. 
+	data_n[mesh.n2dn:mesh.n2dna] = data_n[mesh.pbndn_2d_i]
 	
-	#___________________________________________________________________________
-	sort_index 			= np.argsort(aux)
-	sort_aux			= aux[sort_index]
-	kk_s				= 0;
-	del aux
+	return data_n
 	
-	##__________________________________________________________________________
-	# calc max number of neighbouring elemts of a node points
-	daux 				= sort_aux[1:mesh.n2dea*3]-sort_aux[0:mesh.n2dea*3-1]
-	idaux 				= np.linspace(1,mesh.n2dea*3-1,mesh.n2dea*3-1,dtype='uint32')
-	jdaux 				= idaux[daux==1]
-	kk_max 				= np.max(jdaux[1:]-jdaux[:-1])
-	del daux
-	del idaux
-	del jdaux
+##___CALCULATE INTERPOLATION MATRIX FROM ELEMENTS TO NODE POINTS RESOLUTION______
+## interpolate from triangle values to node values
+##
+##_______________________________________________________________________________
+#def fesom_e2n_interp(mesh):
 	
-	#___________________________________________________________________________
-	# allocate interoplation matrices
-	interp_e2n_mat      = np.zeros((mesh.n2dna,10),'uint32')
-	interp_e2n_corector = np.zeros((mesh.n2dna,10),'uint8')
+	#print(' --> calc. interpolation matrix elem2d-->nodes')
+	#outstep        		= 10.0;
+	##___________________________________________________________________________
+	#aux					= np.array(mesh.elem_2d_i)
+	#aux					= np.squeeze(aux.reshape((aux.shape[0]*aux.shape[1],1)))
 	
-	#___________________________________________________________________________
-	# for loop over surface nodes
-	#print( '     |',end=''),
-	print( '     |'),
-	for ii in range(0, mesh.n2dna):
-		#_______________________________________________________________________
-		if np.mod(ii,np.floor(  mesh.n2dna*(outstep/100) ))==0:
-			#print('{:2.0f}%|'.format(ii/np.floor(mesh['n2dna']*(outstep/100))*outstep),end='')
-			print('{:2.0f}%|'.format(ii/np.floor(mesh.n2dna*(outstep/100))*outstep)),
-		#_______________________________________________________________________
-		if (kk_s+kk_max < 3*mesh.n2dea):
-			sect_index = sort_index[kk_s:kk_s+kk_max]
-			sect_aux   = sort_aux[kk_s:kk_s+kk_max]
-		else:
-			sect_index = sort_index[kk_s:]
-			sect_aux   = sort_aux[kk_s:]
-		#_______________________________________________________________________
-		elemofnode  = sect_index[sect_aux==ii]
+	##___________________________________________________________________________
+	#sort_index 			= np.argsort(aux)
+	#sort_aux			= aux[sort_index]
+	#kk_s				= 0;
+	#del aux
+	
+	###__________________________________________________________________________
+	## calc max number of neighbouring elemts of a node points
+	#daux 				= sort_aux[1:mesh.n2dea*3]-sort_aux[0:mesh.n2dea*3-1]
+	#idaux 				= np.linspace(1,mesh.n2dea*3-1,mesh.n2dea*3-1,dtype='uint32')
+	#jdaux 				= idaux[daux==1]
+	#kk_max 				= np.max(jdaux[1:]-jdaux[:-1])
+	#del daux
+	#del idaux
+	#del jdaux
+	
+	##___________________________________________________________________________
+	## allocate interoplation matrices
+	#interp_e2n_mat      = np.zeros((mesh.n2dna,10),'uint32')
+	#interp_e2n_corector = np.zeros((mesh.n2dna,10),'uint8')
+	
+	##___________________________________________________________________________
+	## for loop over surface nodes
+	##print( '     |',end=''),
+	#print( '     |'),
+	#for ii in range(0, mesh.n2dna):
+		##_______________________________________________________________________
+		#if np.mod(ii,np.floor(  mesh.n2dna*(outstep/100) ))==0:
+			##print('{:2.0f}%|'.format(ii/np.floor(mesh['n2dna']*(outstep/100))*outstep),end='')
+			#print('{:2.0f}%|'.format(ii/np.floor(mesh.n2dna*(outstep/100))*outstep)),
+		##_______________________________________________________________________
+		#if (kk_s+kk_max < 3*mesh.n2dea):
+			#sect_index = sort_index[kk_s:kk_s+kk_max]
+			#sect_aux   = sort_aux[kk_s:kk_s+kk_max]
+		#else:
+			#sect_index = sort_index[kk_s:]
+			#sect_aux   = sort_aux[kk_s:]
+		##_______________________________________________________________________
+		#elemofnode  = sect_index[sect_aux==ii]
 		
-		#_______________________________________________________________________
-		interp_e2n_mat[ii,0:elemofnode.shape[0]]=elemofnode
+		##_______________________________________________________________________
+		#interp_e2n_mat[ii,0:elemofnode.shape[0]]=elemofnode
 		
-		#_______________________________________________________________________
-		kk_s = kk_s + elemofnode.shape[0]
-		del elemofnode
-		del sect_aux
-		del sect_index
+		##_______________________________________________________________________
+		#kk_s = kk_s + elemofnode.shape[0]
+		#del elemofnode
+		#del sect_aux
+		#del sect_index
 		
-	print('')
-	#___________________________________________________________________________
-	interp_e2n_corector[np.where(interp_e2n_mat!=0)]=1
+	#print('')
+	##___________________________________________________________________________
+	#interp_e2n_corector[np.where(interp_e2n_mat!=0)]=1
 	
-	#___________________________________________________________________________
-	return(interp_e2n_mat,interp_e2n_corector) 
+	##___________________________________________________________________________
+	#return(interp_e2n_mat,interp_e2n_corector) 
 	
 	
 #___CALCULATE LAND MASK CONOURLINE______________________________________________
@@ -1108,7 +1132,7 @@ def ismember_rows(a, b):
 #............
 #_______________________________________________________________________________
 def geo2cart(glon,glat):
-	Rearth=12735/2;
+	Rearth=12735.0/2.0;
 	x_cart=Rearth * np.cos(np.radians(glat)) * np.cos(np.radians(glon))
 	y_cart=Rearth * np.cos(np.radians(glat)) * np.sin(np.radians(glon))
 	z_cart=Rearth * np.sin(np.radians(glat))

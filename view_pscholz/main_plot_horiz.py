@@ -21,35 +21,37 @@ from colormap_c2c    import *
 #|                                                                             |
 #+_____________________________________________________________________________+
 inputarray=set_inputarray()
-#inputarray['save_fig'] = False
+inputarray['save_fig'] = False
 
 # set plot box for cyl projection (default: [-180,180,-90,90])
-inputarray['which_box'] = [-180,180,50,90]
+inputarray['which_box'] = [-180,180,-90,90]
 
 # set projection variable --> the lon/lat projection plot ranges are set via 
 # inputarray['which_box'] = [lonmin,lonmax,latmin,latmax]
-inputarray['proj'     ] = 'npstere' # 'ortho', 'cyl', 'npstere' , 'spstere'
-inputarray['proj_lon' ] = 0 #only for ortho
-inputarray['proj_lat' ] = 75 #only for ortho
+inputarray['proj'     ] = 'ortho' # 'ortho', 'cyl', 'npstere' , 'spstere'
+inputarray['proj_lon' ] = -45 #only for ortho
+inputarray['proj_lat' ] = 45 #only for ortho
 
 #+_____________________________________________________________________________+
 # setup variable name, runid and data path
 data 			= fesom_init_data(inputarray) # init fesom2.0 data object
-data.var 		= 'temp'
+data.var 		= 'ssh'
+
 #data.crange     = []
-#data.crange     = [0.0,5000.0,1000.0] # [cmin, cmax, cref]
-#data.cmap       ='wbgyr'
+#data.crange     = [-1000.0,0.0,-500.0] # [cmin, cmax, cref]
+#data.cmap       = 'rygbw'
+#data.cnumb      = 25
 
 #+_____________________________________________________________________________+
-# select year, records, and depth range of which should be average
+# select year to average over [start_yr, end_yr]
 data.year		= [1948,1948]
 
-# selct month to average over
-data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
-#data.month		= [1,2,12]
+# select month to average over
+#data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
+data.month		= [1,2,12]
 #data.month		= [9]
 
-# select interpolate depth layers to average over
+# select linear interpolated depth layers to average over
 data.depth		= [0,10,20,30,40,50,75,100]
 #data.depth		= [500]
 
@@ -117,7 +119,10 @@ else:
 #+_____________________________________________________________________________+
 # plot 2d and 2dvec data
 if len(data.value2)==0:
-	test=fesom_plot2d_data(mesh,data)
+	if data.value.size == mesh.n2dea:
+		data.value = fesom_interp_e2n(mesh,np.array(data.value))
+		
+	fig,ax,map,cbar=fesom_plot2d_data(mesh,data)
 else:
 	fesom_plot2dvec_data(mesh,data)
 	

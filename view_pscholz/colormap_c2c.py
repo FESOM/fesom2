@@ -171,12 +171,14 @@ def colormap_c2c(cmin,cmax,cref,cnumb,cname):
 					((cref-clevel[0])/cdelta2						, [0.0   ,    1.0000,    0.6000]),
 					((cref-clevel[0]+(clevel[-1]-cref)*0.5)/cdelta2	, [1.0000,    1.0000,       0.0]),
 					((clevel[-1]-clevel[0])/cdelta2					, [1.0000,       0.0,       0.0])]		
-		#cmap_def = [((clevel[0])/cdelta2							, [1.0000,    1.0000,    1.0000]),
-					#(((cref-clevel[0])*0.5)/cdelta2					, [0.2000,    0.6000,    1.0000]),
-					#((cref-clevel[0])/cdelta2						, [0.0   ,    1.0000,    0.6000]),
-					#((cref-clevel[0]+(clevel[-1]-cref)*0.5)/cdelta2	, [1.0000,    1.0000,       0.0]),
-					#((clevel[-1]-clevel[0])/cdelta2					, [1.0000,       0.0,       0.0])]		
-
+	#-->________________________________________________________________________
+	elif cname=='rygbw':	
+		cmap_def = [(0.0											, [1.0000,       0.0,       0.0]),
+					(((cref-clevel[0])*0.5)/cdelta2					, [1.0000,    1.0000,       0.0]),
+					((cref-clevel[0])/cdelta2						, [0.0   ,    1.0000,    0.6000]),
+					((cref-clevel[0]+(clevel[-1]-cref)*0.5)/cdelta2	, [0.2000,    0.6000,    1.0000]),
+					((clevel[-1]-clevel[0])/cdelta2					, [1.0000,    1.0000,    1.0000])]		
+	
 	#-->________________________________________________________________________
 	elif cname=='odv':	
 		cmap_def = [(0.0												, [0.9373,    0.7765,    0.9373]),
