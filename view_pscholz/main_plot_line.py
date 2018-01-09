@@ -21,12 +21,13 @@ data 		= fesom_init_data(inputarray) # init fesom2.0 data object
 data.var 	= 'temp'
 #+_____________________________________________________________________________+
 # select year to average over [start_yr, end_yr]
-data.year	= [1948,1948]
+data.year	= [1990,2000]
 
 # select month to average over
-data.month	= [1,2,12]
+data.month	= [1,2,3,4,5,6,7,8,9,10,11,12]
 
 # select linear interpolated depth layers to average over, empty mean use all layers
+# don't touch here, should be empty !
 data.depth	= []
 
 #+_____________________________________________________________________________+
@@ -35,18 +36,19 @@ data.depth	= []
 line 		= fesom_init_line()
 
 #line.line_refxy    =  list([[],[]]) 
-##line.line_refxy    =  list([[]]) 
+line.line_refxy    =  list([[]]) 
 #line.line_refxy[0] = [ [-75.188, -72.875, -65.875, -57.75, -50.156],
 					   #[39.531, 36.594, 34.094, 34.312, 32.094],
 					   #'test1' ]
-#line.line_refxy[1] = [ [-25.8,-29.3,-32.2,-35.9,-38.2,-40.3,-41.1,-42.5,-45.9,-50.6,-53.4,-55.3,-57.6,-60.2],
-					   #[67.3,65.4,65.1,63.7,62.9,61.9,59.6,58.6,58.4,60.8,62.5,62.7,61.91,60.8],
-					   #'test2' ] 
+line.line_refxy[0] = [ [-25.8,-29.3,-32.2,-35.9,-38.2,-40.3,-41.1,-42.5,-45.9,-50.6,-53.4,-55.3,-57.6,-60.2],
+					   [67.3,65.4,65.1,63.7,62.9,61.9,59.6,58.6,58.4,60.8,62.5,62.7,61.91,60.8],
+					   'test2' ] 
 
 #+_____________________________________________________________________________+
 #|                         *** LOAD FVSOM MESH ***                             |
 #+_____________________________________________________________________________+
 inputarray['which_plot']  = 'pcolor'
+#inputarray['which_plot']  = 'contourf'
 try:
 	mesh
 except NameError:
@@ -89,27 +91,59 @@ fig.canvas.draw()
 #		button [d] ... delete point that was just selected
 #		button [q] ... finshes entire selection process, goes on with the calculation 
 #					   of the cross-section
-#					   
+#	   
 # you need to close window to proceed
 if len(line.line_refxy)==0:
 	# interactively
 	line.cid_pressb = fig.canvas.mpl_connect('button_press_event', line.anybutton)
 	line.cid_pressk = fig.canvas.mpl_connect('key_press_event', line.anykey)
 	line.connect(fig,ax,map)
-else:
-	# predefined
+	
+	# redraw map
+	fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
+	map 	= Basemap(projection = 'cyl',resolution = 'c',
+				llcrnrlon = -180, urcrnrlon = 180, llcrnrlat = -90, urcrnrlat = 90)
+	mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+	map.drawmapboundary(fill_color='0.9',linewidth=1.0)
+	map.bluemarble()
+	fesom_plot_lmask(map,mesh,ax,'none','r')
+	ax.grid(color='k', linestyle='-', linewidth=0.5)
+	xmax,xmin,ymax,ymin = -180.0,180.0,-90.0,90.0
 	for ii in range(0,len(line.line_refxy)):
 		ax.plot(line.line_refxy[ii][0],line.line_refxy[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='o',mfc=[0.0,0.8,0.0],mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][-1],line.line_refxy[ii][1][-1] ,color='k',linewidth=0.5,marker='o',mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
+		ax.plot(line.line_refxy[ii][0][-1],line.line_refxy[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+		xmax = np.max([xmax,np.max(line.line_refxy[ii][0])])
+		xmin = np.min([xmin,np.min(line.line_refxy[ii][0])])
+		ymax = np.max([ymax,np.max(line.line_refxy[ii][1])])
+		ymin = np.min([ymin,np.min(line.line_refxy[ii][1])])
+	ax.set_xlim(xmin-10.0,xmax+10.0)
+	ax.set_ylim(ymin-10.0,ymax+10.0)
+	plt.show(block=False)
+	fig.canvas.draw()
+else:
+	# predefined
+	xmax,xmin,ymax,ymin = -180.0,180.0,-90.0,90.0
+	for ii in range(0,len(line.line_refxy)):
+		ax.plot(line.line_refxy[ii][0],line.line_refxy[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
+		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
+		ax.plot(line.line_refxy[ii][0][-1],line.line_refxy[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+		xmax = np.max([xmax,np.max(line.line_refxy[ii][0])])
+		xmin = np.min([xmin,np.min(line.line_refxy[ii][0])])
+		ymax = np.max([ymax,np.max(line.line_refxy[ii][1])])
+		ymin = np.min([ymin,np.min(line.line_refxy[ii][1])])
+	ax.set_xlim(xmin-10.0,xmax+10.0)
+	ax.set_ylim(ymin-10.0,ymax+10.0)
 	plt.show(block=False)
 	fig.canvas.draw()
 
 #+_____________________________________________________________________________+
 # analyse selected lines, calculate interpolation points
 print(' --> calculate interpolation points')
-line.analyse_lines(npoints=100)
-#print(input.line_ipxy)
+# which   ... res/npoints
+# res     ... interpolation resolution in km
+# npoints ... use npoints per line segment for interpolation
+line.analyse_lines(which='res',res=20)
 
 
 #+_____________________________________________________________________________+
@@ -140,8 +174,9 @@ for ii in range(0,len(line.line_refxy)):
 	cmin = np.nanmin(line.line_data[ii])
 	cmax = np.nanmax(line.line_data[ii])
 	cref = cmin + (cmax-cmin)/2
-	#cref =0.0
 	cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
+	#cref =0.0
+	
 	cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,'grads')
 	do_drawedges=True
 	if clevel.size>30: do_drawedges=False
@@ -170,8 +205,13 @@ for ii in range(0,len(line.line_refxy)):
 	else: 
 		hp=plt.contourf(xx,yy,line.line_data[ii],levels=clevel,
 					antialiased=False,
-					edgecolor='None',
 					cmap=cmap0,
+					vmin=np.nanmin(line.line_data[ii]), vmax=np.nanmax(line.line_data[ii]))
+		plt.contour(xx,yy,line.line_data[ii],levels=clevel,
+					antialiased=True,
+					colors='k',
+					linewidths=0.5,
+					linestyles='solid',
 					vmin=np.nanmin(line.line_data[ii]), vmax=np.nanmax(line.line_data[ii]))
 	hp.cmap.set_under([0.4,0.4,0.4])
 	

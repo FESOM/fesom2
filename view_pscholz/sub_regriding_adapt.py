@@ -23,7 +23,7 @@ def lon_lat_to_cartesian(lon, lat, R = 6371000):
     z = R * np.sin(lat_r)
     return x,y,z
 
-def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2, ):
+def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2,which='nodes'):
     '''
     Creates KDTree object and query it for indexes of points in FESOM mesh that are close to the
     points of the target grid. Also return distances of the original points to target points.
@@ -49,7 +49,12 @@ def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2, ):
         The locations of the neighbors in data.
 
     '''
-    xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+    if which=='node':
+        xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+    elif which=='elem':
+        xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3, 
+        								mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3)
+    
     xt, yt, zt = lon_lat_to_cartesian(lons.flatten(), lats.flatten())
     
     tree = cKDTree(list(zip(xs, ys, zs)))
@@ -88,17 +93,20 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
     -------
     data_interpolated : 2d array
         array with data interpolated to the target grid.
-
     '''
+    which='node'
+    if data.shape[0]==mesh.n2dea:
+        which='elem'
+    
     #print distances
     if (distances is None) or (inds is None):
         
         if how=='nn':
             distances, inds = create_indexes_and_distances(mesh, lons, lats,\
-                                                           k=1, n_jobs=n_jobs)
+                                                           k=1, n_jobs=n_jobs,which=which)
         elif how=='idist':
             distances, inds = create_indexes_and_distances(mesh, lons, lats,\
-                                                           k=k, n_jobs=n_jobs)
+                                                           k=k, n_jobs=n_jobs,which=which)
 
     if distances.ndim == 1:
         #distances_ma = np.ma.masked_greater(distances, radius_of_influence)

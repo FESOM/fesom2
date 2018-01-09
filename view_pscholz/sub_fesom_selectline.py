@@ -205,7 +205,7 @@ class fesom_line:
 					self.press = 'None'
 					self.line.set_color([0.0,0.8,0.0])
 					#self.line.set_color('w')
-					self.line.set_linewidth(0.5)
+					self.line.set_linewidth(2.0)
 					plt.xscale('linear')
 					plt.yscale('linear')
 					self.figure.canvas.draw()
@@ -224,7 +224,7 @@ class fesom_line:
 		
 	#+_________________________________________________________________________+
 	# analyse slected lines and calculate interpolation points ip
-	def analyse_lines(self,npoints=50):
+	def analyse_lines(self,which='res',npoints=50,res=10):
 		#self.line_ipxy  =[[],[]]
 		#self.line_ipdist=[0.0]
 		
@@ -243,15 +243,26 @@ class fesom_line:
 				
 				#+_____________________________________________________________+
 				P1    = [self.line_refxy[ii][0][jj],self.line_refxy[ii][1][jj]]
-				evec  = [self.line_refxy[ii][0][jj+1]-self.line_refxy[ii][0][jj],
-						 self.line_refxy[ii][1][jj+1]-self.line_refxy[ii][1][jj],]
+				P2    = [self.line_refxy[ii][0][jj+1],self.line_refxy[ii][1][jj+1]]
+				#evec  = [self.line_refxy[ii][0][jj+1]-self.line_refxy[ii][0][jj],
+						 #self.line_refxy[ii][1][jj+1]-self.line_refxy[ii][1][jj],]
+				evec  = [P2[0]-P1[0],
+						 P2[1]-P1[1]]
 				evec  = np.array(evec)
 				evecn = (evec[0]**2+evec[1]**2)**0.5
-				evec  = evec/evecn
-				evecnl = np.linspace(0,evecn,npoints)
 				
+				if which=='npoints':
+					evec  = evec/evecn
+					evecnl = np.linspace(0,evecn,npoints)
+					loop_pts = npoints
+				elif which=='res':
+					Rearth=6371.0
+					dr = np.pi*Rearth*evecn/180.0
+					evec  = evec/dr
+					evecnl = np.arange(0,dr,res)
+					loop_pts=evecnl.size
 				#+_____________________________________________________________+
-				for kk in range(0,npoints):
+				for kk in range(0,loop_pts):
 					# lon/lat coordinates of interpolation points
 					self.line_ipxy[ii][0].append(P1[0]+evecnl[kk]*evec[0])
 					self.line_ipxy[ii][1].append(P1[1]+evecnl[kk]*evec[1])
@@ -278,15 +289,20 @@ class fesom_line:
 			
 			self.line_data.append([])
 			npts    = len(line.line_ipxy[ii][0])
-			linedata = np.zeros((npts,mesh.nlev-1))
+			nlev    = mesh.nlev-1
+			linedata = np.zeros((npts,nlev))
 			
-			for di in range(0,mesh.nlev-1):
+			for di in range(0,nlev):
 				data_di   = np.array(data.value[:,di])
-				data_di[di>=mesh.nodes_2d_iz]=np.nan
-				data_di[data_di==0]=np.nan
+				if data.value.shape[0]==mesh.n2dna:
+					data_di[di>=mesh.nodes_2d_iz-1]=np.nan
+				elif data.value.shape[0]==mesh.n2dea:
+					data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
+				#data_di[data_di==0]=np.nan
 				
 				linedata[:,di]=fesom2regular(data_di, mesh, 
 								np.array(line.line_ipxy[ii][0]), 
 								np.array(line.line_ipxy[ii][1]))
+								#how='idist',k=10)
 			
 			self.line_data[ii] = linedata
