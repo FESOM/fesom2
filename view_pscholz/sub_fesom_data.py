@@ -4,80 +4,49 @@ import time
 from netCDF4 import Dataset
 from set_inputarray import *
 from sub_fesom_mesh import fesom_vector_rot
-#___INIT DATA OBJECT____________________________________________________________
-#
-#_______________________________________________________________________________
-def fesom_init_data(inputarray):
-	global data
-	#___________________________________________________________________________
-	# initialise data object
-	data = fesom_data
+global inputarray
 	
-	#___________________________________________________________________________
-	# set default values
-	data.runid		= inputarray['data_id']
-	data.path		= inputarray['data_dir1']
-	data.proj		= inputarray['proj']
-	data.proj_lon	= inputarray['proj_lon']
-	data.proj_lat	= inputarray['proj_lat']
-	data.cmap		= 'grads'
-	data.crange		= []
-	data.cnumb      = []
-	data.anom		= False
-	data.str_time 	= ''
-	data.str_dep 	= ''
-	data.which_mean = 'monthly'
-	data.month      = []
-	data.record     = []
-	data.value      = []
-	data.value2     = []
-	data.which_plot	= inputarray['which_plot']
-	data.levels     = []
-	#___________________________________________________________________________
-	return data
-	
-	
+#+_____________________________________________________________________________+
+#|                                                                             |
+#|                        *** FESOM DATA CLASS ***                             |
+#|                                                                             |
+#+_____________________________________________________________________________+
 class fesom_data(object):
-	"""existing instances are: path, n2d, e2d, nlev, zlevs, x2, y2, elem, n32, no_cyclic_elem, alpha, beta, gamma"""
-	def __init__(self):
-		#____data run variables______________________
-		self.var 		    = ''
-		self.runid 		    = ''
-		self.path 	 	    = ''
-		
-		#____data time variables_____________________
-		self.year		    = []
-		self.month		    = []
-		self.record		    = []
-		self.depth 		    = []
-		self.str_time		= []
-		self.str_dep		= []
-		
-		#____data projection variables_______________
-		self.proj		    = []
-		self.proj_lon	    = 0
-		self.proj_lat	    = 90
-		
-		#____data description info___________________
-		self.sname		    = []
-		self.lname		    = []
-		self.units		    = []
-		
-		#____data plot varaibles_____________________
-		self.levels         = []
-		self.cmap           = []
-		self.crange         = []
-		self.cnumb          = []
-		self.which_plot     = []
-		
-		#____data varaible___________________________
-		self.value          = []
-		self.value2         = []
-		self.which_mean     = []
-		self.anom           = []
-		
-	def __str__(self):
-		return "data path=%s" % self.path
+	#____data run variables______________________
+	var                         = ''
+	runid, path, descript       = '', '', ''
+	
+	#____data time variables_____________________
+	year,  month, record, depth = [], [], [], []
+	str_time, str_dep           = '', ''
+	
+	#____data projection variables_______________
+	proj, proj_lon, proj_lat    = '', 0.0, 90.0
+	
+	#____data description info___________________
+	sname, lname, unit	        = '', '', ''
+	
+	#____data plot varaibles_____________________
+	cmap, crange, cnumb         = 'grads', [], []
+	which_plot                  = ''
+	
+	#____data varaible___________________________
+	value, value2               = [], []
+	which_mean                  = 'monthly'
+	anom                        = False
+	
+	
+	#___INIT DATA OBJECT_______________________________________________________#
+	#
+	#__________________________________________________________________________#
+	def __init__(self,inputarray):
+		if len(inputarray)!=0:
+			self.runid		= inputarray['data_id']
+			self.path		= inputarray['data_dir1']
+			self.proj		= inputarray['proj']
+			self.proj_lon	= inputarray['proj_lon']
+			self.proj_lat	= inputarray['proj_lat']
+			self.which_plot	= inputarray['which_plot']
 	
 	
 #___LOAD FESOM2.0 DATA__________________________________________________________
@@ -100,6 +69,8 @@ def fesom_load_data_horiz(mesh,data):
 	print('     -----+-----------------------------------+------------')
 	print('     Year |               MON                 |')
 	print('     -----+-----------------------------------+------------')
+	print('     --> '+data.path)
+	print('     --> '+data.var)
 	#____START YEAR LOOP________________________________________________________
 	aux_datavar = data.var
 	for yi in range(0, nyi):
@@ -185,17 +156,17 @@ def fesom_load_data_horiz(mesh,data):
 				#_______________________________________________________________
 				# select from monthly data
 				if nrec==12 : 
-					ncval=fesom_time_depth_mean(mesh,ncval,np.array(data.month)-1)
+					ncval=fesom_time_depth_mean(mesh,ncval,np.array(data.month)-1,data.depth)
 					if data.var.find('vec')==0: 
-						ncval2=fesom_time_depth_mean(mesh,ncval2,np.array(data.month)-1)
+						ncval2=fesom_time_depth_mean(mesh,ncval2,np.array(data.month)-1,data.depth)
 				#___________________________________________________________________
 				# select from daily data
 				elif nrec==365 : 
 					# find out which day belongs to selected subset
 					idx_sel = sel_timesubset_daily(data)
-					ncval=fesom_time_depth_mean(mesh,ncval,idx_sel==True)
+					ncval=fesom_time_depth_mean(mesh,ncval,idx_sel==True,data.depth)
 					if data.var.find('vec')==0: 
-						ncval2=fesom_time_depth_mean(mesh,ncval2,idx_sel==True)
+						ncval2=fesom_time_depth_mean(mesh,ncval2,idx_sel==True,data.depth)
 					del idx_sel
 					
 			#_______________________________________________________________________
@@ -203,9 +174,9 @@ def fesom_load_data_horiz(mesh,data):
 			else:	
 				if nrec>=12: 
 					for ii in data.month: print('{:d}|'.format(ii)),
-				ncval=fesom_time_depth_mean(mesh,ncval,[])
+				ncval=fesom_time_depth_mean(mesh,ncval,[],data.depth)
 				if data.var.find('vec')==0: 
-					ncval2=fesom_time_depth_mean(mesh,ncval2,[])
+					ncval2=fesom_time_depth_mean(mesh,ncval2,[],data.depth)
 		#_______________________________________________________________________
 		# yes ?  --> use data.record to select time slice
 		else:
@@ -214,9 +185,9 @@ def fesom_load_data_horiz(mesh,data):
 				break
 			print('select single record time slice|'),
 			for ii in data.record: print('{:d}|'.format(ii)),
-			ncval=fesom_time_depth_mean(mesh,ncval,data.record[0]-1)
+			ncval=fesom_time_depth_mean(mesh,ncval,data.record[0]-1,data.depth)
 			if data.var.find('vec')==0: 
-				ncval2=fesom_time_depth_mean(mesh,ncval2,data.record[0]-1)
+				ncval2=fesom_time_depth_mean(mesh,ncval2,data.record[0]-1,data.depth)
 		#_______________________________________________________________________
 		# setup variable name, description and unit
 		ncvar = ncid.variables[aux_datavar]
@@ -238,18 +209,17 @@ def fesom_load_data_horiz(mesh,data):
 		if data.var.find('vec')==0: 
 			mean_data2 = mean_data2 + ncval2/nyi
 			del ncval2 
-		#_______________________________________________________________________
-		# in case of ice data set no ice to nan
-		#if (data.var=='a_ice' or data.var=='m_ice'):
-			#mean_data[mean_data==0.0]=np.nan
-		if (data.var=='a_ice'):
-			mean_data=mean_data*100.0
-			
 		
 		#_______________________________________________________________________
 		tend = time.time();		
 		print(' --> t={:2.2f}s'.format(tend-tstart))
-		
+	#_______________________________________________________________________
+	# in case of ice data set no ice to nan
+	if (data.var=='a_ice'):
+		mean_data=mean_data*100.0
+	#if (data.var=='a_ice' or data.var=='m_ice'):
+		#mean_data[mean_data==0.0]=np.nan
+	
 	#____ROTATE VECTORES FROM ROT TO GEO________________________________________
 	# in future check if rotation is s till neccessary -> we want to/should write out 
 	# the data already rotated ?!
@@ -311,7 +281,7 @@ def fesom_load_data_horiz(mesh,data):
 #___DO VERTICAL INTERPOLATE AVERAGE OVER CERTAIN LAYERS_________________________
 #
 #_______________________________________________________________________________
-def fesom_vinterp(data_in,mesh):
+def fesom_vinterp(data_in,mesh,levels):
 	
 	#___________________________________________________________________________
 	# do vertical linear interpolation of certain layer
@@ -320,16 +290,19 @@ def fesom_vinterp(data_in,mesh):
 	
 	data_out = np.zeros((nsmple,),dtype='float32')
 	aux_div  = np.zeros((nsmple,),dtype='float32')
-	for di in range(0,len(data.depth)):
+	#for di in range(0,len(data.depth)):
+	for di in range(0,len(levels)):
 		# find upper and lower layer indices
-		idx_dwn = np.array(np.where( data.depth[di]<=abs(mesh.zlev))).squeeze()
+		#idx_dwn = np.array(np.where( data.depth[di]<=abs(mesh.zlev))).squeeze()
+		idx_dwn = np.array(np.where( levels[di]<=abs(mesh.zlev))).squeeze()
 		idx_dwn = idx_dwn[0]
 		idx_up  = idx_dwn-1
 		if idx_up<0: idx_up=0
 		
 		# linear vertical interpolant
 		deltaz   = abs(mesh.zlev[idx_dwn])-abs(mesh.zlev[idx_up])
-		deltaz_i = abs(mesh.zlev[idx_dwn])-data.depth[di]
+		#deltaz_i = abs(mesh.zlev[idx_dwn])-data.depth[di]
+		deltaz_i = abs(mesh.zlev[idx_dwn])-levels[di]
 		
 		# data_in is defined on nodes temp, salt, ssh ...
 		if nsmple==mesh.n2dn:
@@ -388,7 +361,7 @@ def sel_timesubset_daily(data):
 #___SELECT SUBSET AND DO TEMPORAL AND VERTICAL AVERAGE__________________________
 #
 #_______________________________________________________________________________
-def fesom_time_depth_mean(mesh,ncval,sel_time):
+def fesom_time_depth_mean(mesh,ncval,sel_time,levels):
 	
 	dim_num = len(ncval.shape)
 	#___________________________________________________________________________
@@ -401,7 +374,8 @@ def fesom_time_depth_mean(mesh,ncval,sel_time):
 			# case 3d variable
 			ncval= ncval[:,:,:].mean(axis=0)
 			# do vertical interpolation of certain layer if data.depth is not empty
-			if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
+			#if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
+			if len(levels)!=0 : ncval=fesom_vinterp(ncval,mesh,levels)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
 	#___________________________________________________________________________
@@ -414,7 +388,49 @@ def fesom_time_depth_mean(mesh,ncval,sel_time):
 			# case 3d variable
 			ncval= ncval[sel_time,:,:].mean(axis=0)
 			# do vertical interpolation of certain layer if data.depth is not empty
-			if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
+			#if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
+			if len(levels)!=0 : ncval=fesom_vinterp(ncval,mesh,levels)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
 	return(ncval)
+	
+	
+#___CALCULATE ANOMALY BETWEEN TWO DATA OBJECTS__________________________________
+#
+#_______________________________________________________________________________
+def fesom_data_anom(data,data2):
+	anom = fesom_data([])
+	
+	#____data run variables______________________
+	anom.var                            = data.var
+	anom.runid, anom.path               = data.runid, data.path
+	anom.descript                       = data2.descript+'-'+data.descript
+	
+	#____data time variables_____________________
+	anom.year,  anom.month, anom.record = data.year, data.month, data.record
+	anom.depth                          = data.depth
+	if data.str_time!=data2.str_time:
+		anom.str_time = data2.str_time+'-'+data.str_time
+	else:
+		anom.str_time = data.str_time
+	anom.str_dep                        = data.str_dep
+	
+	#____data projection variables_______________
+	anom.proj                           = data.proj
+	anom.proj_lon, anom.proj_lat        = data.proj_lon, data.proj_lat
+	
+	#____data description info___________________
+	anom.sname, anom.lname, anom.unit   = data.sname, data.lname, data.unit
+	
+	#____data plot varaibles_____________________
+	#anom.cmap, anom.crange, anom.cnumb  = data.cmap, data.crange, data.cnumb
+	anom.which_plot                     = data.which_plot 
+	#if len(data.crange)!=0 :anom.crange=[]
+	#____data varaible___________________________
+	anom.value                          = data2.value-data.value
+	anom.anom                           = True
+	anom.value2                         = data.value2
+	anom.which_mean                     = data.which_mean
+	
+	#___________________________________________________________________________
+	return(anom)

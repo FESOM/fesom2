@@ -122,14 +122,12 @@ def fesom_plot2d_data(mesh,data):
 	#| set minimum, maximum and reference values for the creation of the       |
 	#| adjustable colormap                                                     |
 	#+_________________________________________________________________________+
-	cnumb    = 40; # minimum number of colors
+	cnumb    = 20; # minimum number of colors
 	if np.size(data.cnumb)!=0:
 		cnumb = data.cnumb
 	# predined color ranges
 	if data.sname=='a_ice':
-		cmax = 100.0
-		cmin = 0.0
-		cref = 50.0
+		cmax,cmin,cref = 100.0, 0.0, 50.0
 		data.cmap='wbgyr'
 	elif data.sname=='ssh':
 		cmax = np.max(data.value[idx_box])
@@ -137,7 +135,7 @@ def fesom_plot2d_data(mesh,data):
 		cref = 0.0
 	elif data.sname=='salt' or data.sname=='sss':
 		cmax = np.max(data.value[idx_box])
-		cmin = 30.0
+		cmin = 20.0
 		cref = cmin + (cmax-cmin)/2
 		cref = np.round_(cref, np.int32(np.floor(np.log10(np.abs(cref)))) ) 
 	elif data.sname=='triresol' or data.sname=='triarea' or data.sname=='depth':
@@ -153,7 +151,7 @@ def fesom_plot2d_data(mesh,data):
 		 data.cmap = 'blue2red'
 	elif data.sname=='norm_uv':
 			cmax = np.max(data.value[idx_box])
-			cmin = 0
+			cmin = 0.0
 			cref = cmin + (cmax-cmin)/2
 			cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
 			data.cmap='wbgyr'
@@ -162,7 +160,12 @@ def fesom_plot2d_data(mesh,data):
 		cmin = np.min(data.value[idx_box])
 		cref = cmin + (cmax-cmin)/2
 		cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
-		
+	#___________________________________________________________________________
+	# if anomaly data
+	if data.anom==True: 
+		cmax,cmin,cref = np.max(data.value[idx_box]), np.min(data.value[idx_box]), 0.0
+		data.cmap='blue2red'
+	
 	#___________________________________________________________________________
 	# if predefined color range
 	if len(data.crange)!=0:
@@ -183,16 +186,17 @@ def fesom_plot2d_data(mesh,data):
 	print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
 	cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
 	print('clevel = ',clevel)
-	if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0 :
-		# make no sea ice transparent
-		from matplotlib.colors import ListedColormap
-		auxcmap = cmap0(np.arange(cmap0.N))
-		if data.sname=='a_ice' or data.sname=='m_ice' :
-			auxcmap[0,-1]=0.0
-		elif data.sname.find('MLD')==0 :
-			auxcmap[-1,-1]=0.0
-			
-		cmap0 = ListedColormap(auxcmap)
+	if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
+		if data.anom==False:
+			# make no sea ice transparent
+			from matplotlib.colors import ListedColormap
+			auxcmap = cmap0(np.arange(cmap0.N))
+			if data.sname=='a_ice' or data.sname=='m_ice' :
+				auxcmap[0,-1]=0.0
+			elif data.sname.find('MLD')==0 :
+				auxcmap[-1,-1]=0.0
+				
+			cmap0 = ListedColormap(auxcmap)
 
 	#___________________________________________________________________________
 	# limit minimum and maximum of data vector to setted colorrange avoid holes 
@@ -315,14 +319,18 @@ def fesom_plot2d_data(mesh,data):
 	ax.tick_params(axis='both', direction='out')
 	ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
 	ax.get_yaxis().tick_left()
-	
+	plt.sca(ax)
+	plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
 	#+_________________________________________________________________________+
 	#| SAVE FIGURE                                                             |
 	#+_________________________________________________________________________+
 	if inputarray['save_fig']==True:
 		print(' --> save figure: png')
 		#print(fig.dpi)
-		plt.savefig('plot_'+data.proj+'_'+data.sname+'.png', \
+		str_times= data.str_time.replace(' ','').replace(':','')
+		str_deps = data.str_dep.replace(' ','').replace(',','').replace(':','')
+		sfname = 'plot_'+data.descript+'_'+data.proj+'_'+data.sname+'_'+str_times+'_'+str_deps+'.png'
+		plt.savefig(sfname, \
 		            format='png', dpi=600, \
 					bbox_inches='tight', pad_inches=0,\
 					transparent=True,frameon=True)
