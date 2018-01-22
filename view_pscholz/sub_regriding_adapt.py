@@ -23,7 +23,7 @@ def lon_lat_to_cartesian(lon, lat, R = 6371000):
     z = R * np.sin(lat_r)
     return x,y,z
 
-def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2,which='nodes'):
+def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2,which='node'):
     '''
     Creates KDTree object and query it for indexes of points in FESOM mesh that are close to the
     points of the target grid. Also return distances of the original points to target points.

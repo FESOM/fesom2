@@ -1,4 +1,5 @@
 # Patrick Scholz, 14.12.2017
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -129,6 +130,12 @@ def fesom_plot2d_data(mesh,data):
 	if data.sname=='a_ice':
 		cmax,cmin,cref = 100.0, 0.0, 50.0
 		data.cmap='wbgyr'
+	if data.sname=='m_ice':
+		cmax = np.max(data.value[idx_box])
+		cmin = np.min(data.value[idx_box])
+		cref = cmin + (cmax-cmin)/2
+		cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
+		data.cmap='wbgyr'	
 	elif data.sname=='ssh':
 		cmax = np.max(data.value[idx_box])
 		cmin = np.min(data.value[idx_box])
@@ -201,8 +208,9 @@ def fesom_plot2d_data(mesh,data):
 	#___________________________________________________________________________
 	# limit minimum and maximum of data vector to setted colorrange avoid holes 
 	# in the plot
-	data.value[data.value<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
-	data.value[data.value>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
+	data_plot = np.copy(data.value)
+	data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
+	data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
 	data.levels = clevel
 	#+_________________________________________________________________________+
 	#| plot data on triangluar grid                                            |
@@ -210,7 +218,7 @@ def fesom_plot2d_data(mesh,data):
 	# plot data defined on nodes 
 	if data.value.size==mesh.n2dna:
 		if data.which_plot=='pcolor':
-			hp1=plt.tripcolor(tri,data.value,
+			hp1=plt.tripcolor(tri,data_plot,
 						antialiased=False,
 						edgecolors='None',
 						cmap=cmap0,
@@ -218,20 +226,20 @@ def fesom_plot2d_data(mesh,data):
 						#shading='flat')
 						#shading='gouraud')
 		elif data.which_plot=='contourf':
-			hp1=plt.tricontourf(tri,data.value,
+			hp1=plt.tricontourf(tri,data_plot,
 						levels=clevel, 
-						antialiased=True,
+						antialiased=False,
 						extend='both',
 						cmap=cmap0)
-			hp2=plt.tricontour(tri,data.value,
-						levels=clevel, 
-						colors='k',
-						linewidths=[0.05],
-						antialiased=True, #True,
-						linestyles='solid')
+			#hp2=plt.tricontour(tri,data_plot,
+						#levels=clevel, 
+						#colors='k',
+						#linewidths=[0.05],
+						#antialiased=True, #True,
+						#linestyles='solid')
 	# plot data defined on elements
 	elif data.value.size==mesh.n2dea:
-			hp1=plt.tripcolor(tri,data.value,
+			hp1=plt.tripcolor(tri,data_plot,
 							antialiased=False,
 							shading='flat',
 							cmap=cmap0)
@@ -330,10 +338,12 @@ def fesom_plot2d_data(mesh,data):
 		str_times= data.str_time.replace(' ','').replace(':','')
 		str_deps = data.str_dep.replace(' ','').replace(',','').replace(':','')
 		sfname = 'plot_'+data.descript+'_'+data.proj+'_'+data.sname+'_'+str_times+'_'+str_deps+'.png'
-		plt.savefig(sfname, \
+		sdname = inputarray['save_figpath']
+		if os.path.isdir(sdname)==False: os.mkdir(sdname)
+		plt.savefig(sdname+sfname, \
 		            format='png', dpi=600, \
 					bbox_inches='tight', pad_inches=0,\
-					transparent=True,frameon=True)
+					transparent=False,frameon=True)
 	
 	#___________________________________________________________________________
 	plt.show(block=False)
@@ -421,6 +431,8 @@ def fesom_plot2dvec_data(mesh,data):
 	#___________________________________________________________________________
 	# go from geo coord. to projection coord.
 	mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+	data_plotu = np.copy(data.value)
+	data_plotv = np.copy(data.value2)
 	
 	#___________________________________________________________________________
 	# limit value range to plotable box
@@ -432,29 +444,38 @@ def fesom_plot2dvec_data(mesh,data):
 		idx_e  = mesh.elem_2d_i[mask_e,:].flatten().transpose()
 		idx_e  = np.array(idx_e).squeeze()
 		idx_e  = np.unique(idx_e)
-		data.value[idx_e]=np.nan
+		data_plotu[idx_e]=np.nan
+		data_plotv[idx_e]=np.nan
 	elif data.value.size ==mesh.n2dea:
-		data.value[mask_e]=np.nan
+		data_plotu[mask_e]=np.nan
+		data_plotv[mask_e]=np.nan
 		
 	#___________________________________________________________________________
 	# calc triangle mid points in case of data on elements
-	if data.value.size==mesh.n2dea:
+	if data_plotu.size==mesh.n2dea:
 		mx = np.sum(mx[mesh.elem_2d_i],axis=1)/3
 		my = np.sum(my[mesh.elem_2d_i],axis=1)/3
 	
 	#___________________________________________________________________________
 	# limit all arrays to plotable box 
-	idx 		= ~np.isnan(data.value)
+	idx 		= ~np.isnan(data_plotu)
 	mx 			= mx[idx]
 	my 			= my[idx]
-	data.value  = data.value[idx]
-	data.value2 = data.value2[idx]
-	norm        = np.sqrt(data.value**2.0+data.value2**2.0)
+	data_plotu  = data_plotu[idx]
+	data_plotv  = data_plotv[idx]
+	norm        = np.sqrt(data_plotu**2.0+data_plotv**2.0)
 	
+	#idx = np.arange(0,norm.size,2)
+	#mx 			= mx[idx]
+	#my 			= my[idx]
+	#data_plotu  = data_plotu[idx]
+	#data_plotv  = data_plotv[idx]
+	#norm        = norm[idx]
 	#___________________________________________________________________________
 	cnumb    = 20; #minimum number of colors
 	cmin     = 0 ; 
 	cmax     = np.max(norm)
+	cmax     = 0.25
 	cref     = cmin + (cmax-cmin)/2
 	cref     = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
 	data.cmap = 'wbgyr'
@@ -488,25 +509,27 @@ def fesom_plot2dvec_data(mesh,data):
 	idx 		= norm>=clevel[-1]*0.02
 	mx 			= mx[idx]
 	my 			= my[idx]
-	data.value  = data.value[idx]
-	data.value2 = data.value2[idx]
+	data_plotu  = data_plotu[idx]
+	data_plotv  = data_plotv[idx]
 	norm        = norm[idx]
 	del idx 
 	
 	# normalize vector components
-	data.value  = data.value/clevel[-1]
-	data.value2 = data.value2/clevel[-1]
+	data_plotu  = data_plotu/clevel[-1]
+	data_plotv  = data_plotv/clevel[-1]
 	
 	# limit smalles size of vectors
-	limit = cmax/5
-	aux = (data.value**2.0+data.value2**2.0)**0.5
-	data.value[aux<limit]=data.value[aux<limit]/aux[aux<limit]*limit
-	data.value2[aux<limit]=data.value2[aux<limit]/aux[aux<limit]*limit
+	#limit = cmax/5
+	#limit = cmax/2
+	limit = cmax
+	aux = (data_plotu**2.0+data_plotv**2.0)**0.5
+	data_plotu[aux<limit]=data_plotu[aux<limit]/aux[aux<limit]*limit
+	data_plotv[aux<limit]=data_plotv[aux<limit]/aux[aux<limit]*limit
 	del aux
 	
 	#___________________________________________________________________________
-	hp1=plt.quiver(mx,my,data.value,data.value2,norm,#	
-				scale_units='width',scale=25,#scale_units='xy',scale=clevel[-1],
+	hp1=plt.quiver(mx,my,data_plotu,data_plotv,norm,#	
+				scale_units='width',scale=50, #25,#scale_units='xy',scale=clevel[-1],
 				edgecolor='k',
 				linewidth=0.1,
 				cmap = cmap0,#alpha=0.9,
@@ -586,8 +609,10 @@ def fesom_plot2dvec_data(mesh,data):
 	if inputarray['save_fig']==True:
 		print(' --> save figure: png')
 		#print(fig.dpi)
-		plt.savefig('plot_'+data.proj+'_'+data.sname+'.png', \
-		            format='png', dpi=600, \
+		sdname = inputarray['save_figpath']
+		if os.path.isdir(sdname)==False: os.mkdir(sdname)
+		plt.savefig(sdname+'plot_'+data.proj+'_'+data.sname+'.png', \
+					format='png', dpi=600, \
 					bbox_inches='tight', pad_inches=0,\
 					transparent=True,frameon=True)
 	
@@ -665,7 +690,8 @@ def fesom_plot2d_geomesh(mesh):
 	if inputarray['save_fig']==True:
 		print(' --> save figure')
 		#fig.savefig('mesh_resolution.eps',dpi=300)
-		plt.savefig('mesh_geo_coord.png', \
+		sdname = inputarray['save_figpath']
+		plt.savefig(sdname+'mesh_geo_coord.png', \
 					format='png', dpi=600, \
 					bbox_inches='tight', pad_inches=0,\
 					transparent=True,frameon=True)
@@ -726,8 +752,9 @@ def fesom_plot2d_rotmesh(mesh):
 	#___________________________________________________________________________
 	if inputarray['save_fig']==True:
 		print(' --> save figure')
+		sdname = inputarray['save_figpath']
 		#fig.savefig('mesh_resolution.eps',dpi=300)
-		plt.savefig('mesh_rot_coord.png', format='png', dpi=600)
+		plt.savefig(sdname+'mesh_rot_coord.png', format='png', dpi=600)
 		
 	#___________________________________________________________________________
 	return map

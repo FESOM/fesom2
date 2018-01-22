@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 import cmocean
 import matplotlib.gridspec as gridspec
+import copy as cp
 
 #+____IMPORT FESOM RELATET ROUTINES____________________________________________+
 from set_inputarray 		import *
@@ -15,13 +16,25 @@ from sub_regriding_adapt 	import *
 from colormap_c2c			import *
 
 #+_____________________________________________________________________________+
-#+_____________________________________________________________________________+
 inputarray  = set_inputarray()
-data 		= fesom_init_data(inputarray) # init fesom2.0 data object
-data.var 	= 'temp'
+inputarray['save_fig'] = False
+#inputarray['save_fig'] = True
+inputarray['save_figpath'] = '/scratch/users/pscholz/AWI_PAPER/PAPER_FESOM2.0_evaluation/figures/withoutPC-2/zlevel-linfs/lines/'
+
+#+_____________________________________________________________________________+
+data 		= fesom_data(inputarray) # init fesom2.0 data object
+data.descript,data.path = 'linfs' , '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'
+#data.descript,data.path = 'linfs' , '/scratch/users/pscholz/AWI_DATA/result_fvom_test/withPC-1/'
+data.var 	= 'salt'  # 
+#data.var 	= 'vec_uv'  # --> volume flux
+#data.var 	= 'vec_tuv' # --> heat flux
+#data.var 	= 'vec_suv' # --> liquid freshwater flux
+#data.var 	= '.....'   # --> all other 3d fesom2.0 variable (temp, salt, u,v,w,...)
 #+_____________________________________________________________________________+
 # select year to average over [start_yr, end_yr]
-data.year	= [1990,2000]
+data.year	= [1960,2009]
+#data.year	= [2000,2009]
+#data.year	= [1948,1948]
 
 # select month to average over
 data.month	= [1,2,3,4,5,6,7,8,9,10,11,12]
@@ -31,18 +44,29 @@ data.month	= [1,2,3,4,5,6,7,8,9,10,11,12]
 data.depth	= []
 
 #+_____________________________________________________________________________+
+# make anomaly
+do_anomaly      = True
+#do_anomaly      = False
+if do_anomaly==True:
+	data2 			= fesom_data(inputarray) # init fesom2.0 data object
+	data2.descript,data2.path = 'zlevel','/media/pscholz/data_ext_2/DATA_FESOM2.0/zlevel/withoutPC-2/'
+	data2.var, data2.year, data2.month, data2.depth = data.var, data.year, data.month, data.depth
+	data2.crange, data2.cmap, data2.cnumb = data.crange, data.cmap, data.cnumb
+	#data2.var, data2.year, data2.month, data2.depth = data.var, data.year, [6,7,8], data.depth
+
+
+#+_____________________________________________________________________________+
 #+_____________________________________________________________________________+
 # predefine section lines or leave it empty in this case interactive selection 
-line 		= fesom_init_line()
+line 		= fesom_line()
 
-#line.line_refxy    =  list([[],[]]) 
-line.line_refxy    =  list([[]]) 
-#line.line_refxy[0] = [ [-75.188, -72.875, -65.875, -57.75, -50.156],
-					   #[39.531, 36.594, 34.094, 34.312, 32.094],
-					   #'test1' ]
-line.line_refxy[0] = [ [-25.8,-29.3,-32.2,-35.9,-38.2,-40.3,-41.1,-42.5,-45.9,-50.6,-53.4,-55.3,-57.6,-60.2],
-					   [67.3,65.4,65.1,63.7,62.9,61.9,59.6,58.6,58.4,60.8,62.5,62.7,61.91,60.8],
-					   'test2' ] 
+#line.line_define    =  list([[],[]]) 
+line.line_define    =  list([[]])
+
+#line.line_define[0] = [ [-75.0, -5.0],[42.0,42.0],'E-W' ]
+#line.line_define[0] = [ [-75.0, -0.0],[40.0,50.0],'E-W' ]
+#line.line_define[0] = [ [ -40.0,-50.0],[50.0,40.0],'N-S' ]
+line.line_define[0] = [[-72.5, -64.625], [41.781, 32.469], 'GS']
 
 #+_____________________________________________________________________________+
 #|                         *** LOAD FVSOM MESH ***                             |
@@ -65,10 +89,11 @@ map 	= Basemap(projection = 'cyl',resolution = 'c',
 mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
 
 #tri     = Triangulation(mx, my,mesh.elem_2d_i)
-#hp1		=plt.tripcolor(tri,-mesh.nodes_2d_z,cmap=cmocean.cm.deep)
+#hp1		= plt.tripcolor(tri,-mesh.nodes_2d_z,cmap=cmocean.cm.deep)
+#hp1		=plt.tripcolor(tri,data_anom.value,cmap=cmocean.cm.balance)
+#plt.clim(-0.50,0.50)
 
 map.drawmapboundary(fill_color='0.9',linewidth=1.0)
-#fesom_plot_lmask(map,mesh,ax,'0.6')
 map.bluemarble()
 #map.etopo()
 fesom_plot_lmask(map,mesh,ax,'none','r')
@@ -93,11 +118,11 @@ fig.canvas.draw()
 #					   of the cross-section
 #	   
 # you need to close window to proceed
-if len(line.line_refxy)==0:
+if len(line.line_define)==0:
 	# interactively
-	line.cid_pressb = fig.canvas.mpl_connect('button_press_event', line.anybutton)
-	line.cid_pressk = fig.canvas.mpl_connect('key_press_event', line.anykey)
-	line.connect(fig,ax,map)
+	line._cid_pressb = fig.canvas.mpl_connect('button_press_event', line._anybutton_)
+	line._cid_pressk = fig.canvas.mpl_connect('key_press_event', line._anykey_)
+	line._connect_(fig,ax,map)
 	
 	# redraw map
 	fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
@@ -109,14 +134,14 @@ if len(line.line_refxy)==0:
 	fesom_plot_lmask(map,mesh,ax,'none','r')
 	ax.grid(color='k', linestyle='-', linewidth=0.5)
 	xmax,xmin,ymax,ymin = -180.0,180.0,-90.0,90.0
-	for ii in range(0,len(line.line_refxy)):
-		ax.plot(line.line_refxy[ii][0],line.line_refxy[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][-1],line.line_refxy[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
-		xmax = np.max([xmax,np.max(line.line_refxy[ii][0])])
-		xmin = np.min([xmin,np.min(line.line_refxy[ii][0])])
-		ymax = np.max([ymax,np.max(line.line_refxy[ii][1])])
-		ymin = np.min([ymin,np.min(line.line_refxy[ii][1])])
+	for ii in range(0,len(line.line_define)):
+		ax.plot(line.line_define[ii][0],line.line_define[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
+		ax.plot(line.line_define[ii][0][0],line.line_define[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
+		ax.plot(line.line_define[ii][0][-1],line.line_define[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+		xmax = np.max([xmax,np.max(line.line_define[ii][0])])
+		xmin = np.min([xmin,np.min(line.line_define[ii][0])])
+		ymax = np.max([ymax,np.max(line.line_define[ii][1])])
+		ymin = np.min([ymin,np.min(line.line_define[ii][1])])
 	ax.set_xlim(xmin-10.0,xmax+10.0)
 	ax.set_ylim(ymin-10.0,ymax+10.0)
 	plt.show(block=False)
@@ -124,14 +149,14 @@ if len(line.line_refxy)==0:
 else:
 	# predefined
 	xmax,xmin,ymax,ymin = -180.0,180.0,-90.0,90.0
-	for ii in range(0,len(line.line_refxy)):
-		ax.plot(line.line_refxy[ii][0],line.line_refxy[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][0],line.line_refxy[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
-		ax.plot(line.line_refxy[ii][0][-1],line.line_refxy[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
-		xmax = np.max([xmax,np.max(line.line_refxy[ii][0])])
-		xmin = np.min([xmin,np.min(line.line_refxy[ii][0])])
-		ymax = np.max([ymax,np.max(line.line_refxy[ii][1])])
-		ymin = np.min([ymin,np.min(line.line_refxy[ii][1])])
+	for ii in range(0,len(line.line_define)):
+		ax.plot(line.line_define[ii][0],line.line_define[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
+		ax.plot(line.line_define[ii][0][0],line.line_define[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
+		ax.plot(line.line_define[ii][0][-1],line.line_define[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+		xmax = np.max([xmax,np.max(line.line_define[ii][0])])
+		xmin = np.min([xmin,np.min(line.line_define[ii][0])])
+		ymax = np.max([ymax,np.max(line.line_define[ii][1])])
+		ymin = np.min([ymin,np.min(line.line_define[ii][1])])
 	ax.set_xlim(xmin-10.0,xmax+10.0)
 	ax.set_ylim(ymin-10.0,ymax+10.0)
 	plt.show(block=False)
@@ -141,9 +166,18 @@ else:
 # analyse selected lines, calculate interpolation points
 print(' --> calculate interpolation points')
 # which   ... res/npoints
-# res     ... interpolation resolution in km
+# res     ... interpolation resolution in deg
 # npoints ... use npoints per line segment for interpolation
-line.analyse_lines(which='res',res=20)
+line.analyse_lines(which='res',res=0.1)
+
+for ii in range(0,len(line.line_define)):
+	ax.plot(line.line_interp_pm[ii][0],line.line_interp_pm[ii][1] ,
+			color='r',linewidth=4,marker='+',linestyle='None',axes=ax,markersize=6,mfc='r')
+	step=10
+	ax.quiver(line.line_interp_pm[ii][0][0::step],line.line_interp_pm[ii][1][0::step],
+			  line.line_interp_pm_nvec[ii][0][0::step],line.line_interp_pm_nvec[ii][1][0::step],color='r')
+plt.show(block=False)
+fig.canvas.draw()
 
 
 #+_____________________________________________________________________________+
@@ -152,150 +186,64 @@ line.analyse_lines(which='res',res=20)
 # load 3d fesom2.0 data on original depth layers --> data.value
 print(' --> load 3d fesom2.0 data')
 data=fesom_load_data_horiz(mesh,data)
+if do_anomaly==True:
+	data2=fesom_load_data_horiz(mesh,data2)
+	#if data.var.find('vec')==-1: anom = fesom_data_anom(data,data2)
+
 
 #+_____________________________________________________________________________+
 # interpolate points on fesom2.0 data, use routine of Nikolay fesom2regular(...)
 print(' --> do interpolation on data')
-line.interp_lines(mesh,data)
+if do_anomaly==False:
+	line.interp_lines(mesh,data)
+	if data.var.find('vec')!=-1: line.calc_flux()
+else:
+	if data.var.find('vec')!=-1:
+		
+		# calculate data on line and line2 data
+		line.interp_lines(mesh,data)
+		line2 = cp.deepcopy(line)
+		line2.interp_lines(mesh,data2)
+		
+		# calculate flux through line and line2
+		line.calc_flux()
+		line2.calc_flux()
+		
+		# calculate anomaly line2-line ... 
+		#anom  = cp.deepcopy(line)
+		anom  = cp.deepcopy(line)
+		anom.data_anom(line,line2)
+	else:
+		line.interp_lines(mesh,data)
+		
+		line2 = cp.deepcopy(line)
+		line2.interp_lines(mesh,data2)
+		
+		anom  = cp.deepcopy(line)
+		anom.data_anom(line,line2)
+
 
 #+_____________________________________________________________________________+
 #|                  *** PLOT LINE OVER DEPTH ***                               |
 #+_____________________________________________________________________________+
-for ii in range(0,len(line.line_refxy)):
+print(' --> plot line data')
+if  do_anomaly==True and data.var.find('vec')!=-1:
+	line.plot_lines_dist_x_z()
+	line2.plot_lines_dist_x_z()
+	anom.plot_lines_dist_x_z()
+else:
 	
-	fsize=14
-	fig = plt.figure(figsize=(20, 13))
-	ax1  = plt.gca()
-	# duplicate x-axes
-	ax2  = ax1.twiny()
-	
-	#--------------------------------------------------------------------------#
-	cnumb= 25
-	cmin = np.nanmin(line.line_data[ii])
-	cmax = np.nanmax(line.line_data[ii])
-	cref = cmin + (cmax-cmin)/2
-	cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
-	#cref =0.0
-	
-	cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,'grads')
-	do_drawedges=True
-	if clevel.size>30: do_drawedges=False
-	
-	# overwrite discrete colormap
-	#cmap0 = cmocean.cm.balance
-	#do_drawedges=False
-	
-	#--------------------------------------------------------------------------#
-	# make pcolor or contour plot 
-	xxx = np.array(line.line_ipdist[ii])
-	xxx1= np.array(line.line_ipxy[ii][0])
-	yyy = mesh.zlev[0:-1] + (mesh.zlev[1::]-mesh.zlev[0:-1])/2.0
-	yyy = -yyy
-	yyylim = np.sum(~np.isnan(line.line_data[ii]),axis=1).max()+1
-	if yyylim==yyy.shape: yyylim=yyylim-1
-	yy,xx = np.meshgrid(yyy,xxx)
-	
-	if inputarray['which_plot']=='pcolor':
-		hp=plt.pcolormesh(xx,yy,line.line_data[ii],
-					shading='flat',#flat
-					antialiased=False,
-					edgecolor='None',
-					cmap=cmap0,
-					vmin=np.nanmin(line.line_data[ii]), vmax=np.nanmax(line.line_data[ii]))
-	else: 
-		hp=plt.contourf(xx,yy,line.line_data[ii],levels=clevel,
-					antialiased=False,
-					cmap=cmap0,
-					vmin=np.nanmin(line.line_data[ii]), vmax=np.nanmax(line.line_data[ii]))
-		plt.contour(xx,yy,line.line_data[ii],levels=clevel,
-					antialiased=True,
-					colors='k',
-					linewidths=0.5,
-					linestyles='solid',
-					vmin=np.nanmin(line.line_data[ii]), vmax=np.nanmax(line.line_data[ii]))
-	hp.cmap.set_under([0.4,0.4,0.4])
-	
-	#--------------------------------------------------------------------------#
-	# plot position of section points
-	plt.plot(line.line_refdist[ii][0] ,0.0,        color='k',linewidth=0.5,marker="^",markersize=10,mfc=[0.0,0.8,0.0], clip_on=False)
-	plt.plot(line.line_refdist[ii][0] ,yyy[yyylim],color='k',linewidth=0.5,marker="v",markersize=10,mfc=[0.0,0.8,0.0], clip_on=False)
-	plt.plot(line.line_refdist[ii][-1],0.0,        color='k',linewidth=0.5,marker="^",markersize=10,mfc=[0.8,0.0,0.0], clip_on=False)
-	plt.plot(line.line_refdist[ii][-1],yyy[yyylim],color='k',linewidth=0.5,marker="v",markersize=10,mfc=[0.8,0.0,0.0], clip_on=False)
-	if len(line.line_refdist[ii])>2:
-		for jj in range(1,len(line.line_refdist[ii])-1):
-			plt.plot(np.ones((2,))*line.line_refdist[ii][jj],np.array([0.0,yyy[yyylim]]),color='k',linewidth=0.5,linestyle='--',marker=None)
-			plt.plot(line.line_refdist[ii][jj],0.0,        color='k',linewidth=0.5,marker="^",markersize=8,mfc='k', clip_on=False)
-			plt.plot(line.line_refdist[ii][jj],yyy[yyylim],color='k',linewidth=0.5,marker="v",markersize=8,mfc='k', clip_on=False)
-	
-	#--------------------------------------------------------------------------#
-	# set main axes
-	ax1.set_xlim(xxx.min(),xxx.max())
-	ax1.set_ylim(0,yyy[yyylim])
-	ax1.invert_yaxis()
-	ax1.set_axis_bgcolor([0.25,0.25,0.25])
-	ax1.tick_params(axis='both',which='major',direction='out',length=8)
-	ax1.minorticks_on()
-	ax1.tick_params(axis='both',which='minor',direction='out',length=4)
-	ax1.set_xlabel('Distance from start point [km]',fontdict=dict(fontsize=12))
-	ax1.set_ylabel('Depth [km]',fontdict=dict(fontsize=12))
-	
-	#--------------------------------------------------------------------------#
-	# set upper secondary x-axes
-	ax2.set_xlim(xxx.min(),xxx.max())
-	ax2.set_ylim(0,yyy[yyylim])
-	ax2.invert_yaxis()
-	
-	#lonticks = np.arange(-180.0,180.0,5.0)
-	#lonticks = lonticks[lonticks>=xxx1.min()]
-	#lonticks = lonticks[lonticks<=xxx1.max()]
-	#lonticklabels=[]
-	#for jj in lonticks: lonticklabels.append(str(jj))
-	#xticks   = np.interp(lonticks,line.line_ipxy[ii][0],line.line_ipdist[ii])
-	#ax2.set_xticks(xticks)
-	#ax2.set_xticklabels(lonticklabels)
-	#ax2.set_xlabel('Longitude [deg]',fontdict=dict(fontsize=12))
-	#ax2.tick_params(axis='both',which='major',direction='out',length=8)
-	
-	lonticklabels=[]
-	for jj in range(0,len(line.line_refxy[ii][0])): 
-		strlon='E' 
-		if line.line_refxy[ii][0][jj]<0:strlon='W'
-		strlat='N' ; 
-		if line.line_refxy[ii][1][jj]<0:strlon='S'
-		lonticklabels.append('{:2.2f}$^{{\\circ}}${:s}\n{:2.2f}$^{{\\circ}}${:s}'.format(np.abs(line.line_refxy[ii][0][jj]),strlon,np.abs(line.line_refxy[ii][1][jj]),strlat))
-	ax2.set_xticks(line.line_refdist[ii])
-	ax2.set_xticklabels(lonticklabels,fontdict=dict(fontsize=10))
-	ax2.set_xlabel('Longitude/Latitude [deg]',fontdict=dict(fontsize=12))
-	ax2.tick_params(axis='both',which='major',direction='out',length=8)
-	
-	#--------------------------------------------------------------------------#
-	# draw colorbar
-	divider = make_axes_locatable(ax1)
-	cax     = divider.append_axes("right", size="2.5%", pad=0.5)
-	plt.clim(clevel[0],clevel[-1])
-	
-	cbar = plt.colorbar(hp,ax=[ax1,ax2],cax=cax,ticks=clevel,drawedges=do_drawedges)
-	cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time, size=fsize+2)
-	
-	cl = plt.getp(cbar.ax, 'ymajorticklabels')
-	plt.setp(cl, fontsize=fsize)
-	
-	# kickout some colormap labels if there are to many
-	ncbar_l=len(cbar.ax.get_yticklabels()[:])
-	idx_cref = np.where(clevel==cref)[0]
-	idx_cref = np.asscalar(idx_cref)
-	nmax_cbar_l = 10
-	nstep = ncbar_l/nmax_cbar_l
-	plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-	plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-	plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
-	
-	#--------------------------------------------------------------------------#
-	# bug fix workaround to proper draw secondary axes
-	fig.canvas.draw()
-	ax2.set_position(ax1.get_position())
-	
-	#--------------------------------------------------------------------------#
-	plt.show(block=False)
-	print('finish')
-	
+	if do_anomaly==True:
+		# do common crange for line and lin2
+		cmax = np.max([np.nanmax(line.value[0]),np.nanmax(line2.value[0])])
+		cmin = np.min([np.nanmin(line.value[0]),np.nanmin(line2.value[0])])
+		cref = cmin + (cmax-cmin)/2
+		cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
+		line.crange=[cmin,cmax,cref]	
+		line2.crange=[cmin,cmax,cref]
+		
+		line.plot_lines_dist_x_z()
+		line2.plot_lines_dist_x_z()
+		anom.plot_lines_dist_x_z()
+	else:
+		line.plot_lines_dist_x_z()

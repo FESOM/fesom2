@@ -1079,42 +1079,63 @@ def fesom_vector_rot(mesh,u,v):
 	u = np.squeeze(np.array(u))
 	v = np.squeeze(np.array(v))
 	#___________________________________________________________________________
-	if u.size==mesh.n2dna:
+	if u.shape[0]==mesh.n2dna:
 		rlat = np.radians(mesh.nodes_2d_yr)
 		rlon = np.radians(mesh.nodes_2d_xr)
 		lat  = np.radians(mesh.nodes_2d_yg)
 		lon  = np.radians(mesh.nodes_2d_xg)
-	elif u.size==mesh.n2dn:
+	elif u.shape[0]==mesh.n2dn:
 		rlat = np.radians(mesh.nodes_2d_yr[0:mesh.n2dn])
 		rlon = np.radians(mesh.nodes_2d_xr[0:mesh.n2dn])
 		lat  = np.radians(mesh.nodes_2d_yg[0:mesh.n2dn])
 		lon  = np.radians(mesh.nodes_2d_xg[0:mesh.n2dn])
-	elif u.size==mesh.n2dea:
+	elif u.shape[0]==mesh.n2dea:
 		rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem_2d_i],axis=1)/3)
 		rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem_2d_i],axis=1)/3)
 		lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3)
 		lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3)
-	elif u.size==mesh.n2de:
+	elif u.shape[0]==mesh.n2de:
 		rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem0_2d_i],axis=1)/3)
 		rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem0_2d_i],axis=1)/3)
 		lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem0_2d_i],axis=1)/3)
 		lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem0_2d_i],axis=1)/3)
-	#___________________________________________________________________________
-	txg = -v*np.sin(rlat)*np.cos(rlon) - u*np.sin(rlon)
-	tyg = -v*np.sin(rlat)*np.sin(rlon) + u*np.cos(rlon)
-	tzg =  v*np.cos(rlat)
-	
-	txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
-	tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
-	tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
-	
-	#___________________________________________________________________________
-	v = txr*(-np.sin(lat))*np.cos(lon) - tyr*np.sin(lat)*np.sin(lon) + tzr*np.cos(lat)
-	u = txr*(-np.sin(lon)) + tyr*np.cos(lon)
-	
-	#___________________________________________________________________________
-	u = np.transpose(np.array(u,ndmin=2));
-	v = np.transpose(np.array(v,ndmin=2));
+		
+	ndims = u.shape
+	if len(ndims)==1:
+		#___________________________________________________________________________
+		txg = -v*np.sin(rlat)*np.cos(rlon) - u*np.sin(rlon)
+		tyg = -v*np.sin(rlat)*np.sin(rlon) + u*np.cos(rlon)
+		tzg =  v*np.cos(rlat)
+		
+		txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
+		tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
+		tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
+		
+		#___________________________________________________________________________
+		v = txr*(-np.sin(lat))*np.cos(lon) - tyr*np.sin(lat)*np.sin(lon) + tzr*np.cos(lat)
+		u = txr*(-np.sin(lon)) + tyr*np.cos(lon)
+		
+		#___________________________________________________________________________
+		u = np.transpose(np.array(u,ndmin=2)).squeeze();
+		v = np.transpose(np.array(v,ndmin=2)).squeeze();
+	elif len(ndims)	== 2:
+		
+		#___________________________________________________________________________
+		txg,tyg,tzg = np.zeros(u.shape), np.zeros(u.shape), np.zeros(u.shape)
+		for ii in range(0,u.shape[1]):
+			txg[:,ii] = -v[:,ii]*np.sin(rlat)*np.cos(rlon) - u[:,ii]*np.sin(rlon)
+			tyg[:,ii] = -v[:,ii]*np.sin(rlat)*np.sin(rlon) + u[:,ii]*np.cos(rlon)
+			tzg[:,ii] =  v[:,ii]*np.cos(rlat)
+		
+		txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
+		tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
+		tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
+		
+		#___________________________________________________________________________
+		for ii in range(0,u.shape[1]):
+			v[:,ii] = txr[:,ii]*(-np.sin(lat))*np.cos(lon) - tyr[:,ii]*np.sin(lat)*np.sin(lon) + tzr[:,ii]*np.cos(lat)
+			u[:,ii] = txr[:,ii]*(-np.sin(lon)) + tyr[:,ii]*np.cos(lon)
+		
 	
 	return(u,v)
 	
@@ -1132,8 +1153,8 @@ def ismember_rows(a, b):
 #............
 #_______________________________________________________________________________
 def geo2cart(glon,glat):
-	Rearth=12735.0/2.0;
-	x_cart=Rearth * np.cos(np.radians(glat)) * np.cos(np.radians(glon))
-	y_cart=Rearth * np.cos(np.radians(glat)) * np.sin(np.radians(glon))
-	z_cart=Rearth * np.sin(np.radians(glat))
+	Rearth=6371.0;
+	x_cart=Rearth*np.cos(np.radians(glat))*np.cos(np.radians(glon))
+	y_cart=Rearth*np.cos(np.radians(glat))*np.sin(np.radians(glon))
+	z_cart=Rearth*np.sin(np.radians(glat))
 	return np.array([x_cart,y_cart,z_cart])

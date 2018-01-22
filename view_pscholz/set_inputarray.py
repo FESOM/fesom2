@@ -12,6 +12,7 @@ def set_inputarray():
 	#inputarray['data_dir1'		 ] = '/media/pscholz/data_ext_bckp/data_big/data_big/result_fvom_test/'
 	inputarray['data_dir1'		 ] = '/scratch/users/pscholz/AWI_DATA/result_fvom_test/withPC-1/'    
 	#inputarray['data_dir1'		 ] = '/scratch/users/pscholz/AWI_DATA/result_fvom_test/'
+	#inputarray['data_dir1'		 ] = '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'    
 	
 	#____FESOM MESH INFO________________________________________________________
 	inputarray['mesh_id'		 ] = 'COREv2'
@@ -31,6 +32,7 @@ def set_inputarray():
 	
 	inputarray['which_mask'	 	 ] = 'fesom' # 'fesom', 'bluemarble', 'etopo'
 	#inputarray['which_mask'	 	 ] = 'bluemarble' # 'fesom', 'bluemarble', 'etopo'
+	#inputarray['which_mask'	 	 ] = 'etopo' # 'fesom', 'bluemarble', 'etopo'
 	
 	inputarray['save_fig'        ] = False
 	inputarray['save_figpath'    ] = ''
