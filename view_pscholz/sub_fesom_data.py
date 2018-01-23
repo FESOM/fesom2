@@ -1,4 +1,4 @@
-# Patrick Scholz, 14.12.2017
+# Patrick Scholz, 23.01.2018
 import numpy as np
 import time
 from netCDF4 import Dataset
@@ -12,9 +12,12 @@ global inputarray
 #|                                                                             |
 #+_____________________________________________________________________________+
 class fesom_data(object):
+	
+	which_obj					= 'data'
+	
 	#____data run variables______________________
 	var                         = ''
-	runid, path, descript       = '', '', ''
+	runid, path, descript       = 'fesom', '', ''
 	
 	#____data time variables_____________________
 	year,  month, record, depth = [], [], [], []
@@ -273,7 +276,7 @@ def fesom_load_data_horiz(mesh,data):
 		# close netcdf file
 		ncid.close()
 		if data.var.find('vec')!=-1: ncid2.close()
-		
+		if data.var.find('vec_tuv')!=-1 or data.var.find('vec_suv')!=-1:ncid3.close()
 		#_______________________________________________________________________
 		# now average over yearly subset
 		mean_data = mean_data + ncval/nyi
@@ -385,7 +388,7 @@ def fesom_load_data_horiz(mesh,data):
 #___LOAD FESOM2.0 DATA OVER TIME IN INDEX BOX___________________________________
 #
 #_______________________________________________________________________________
-def fesom_load_data_overtime(mesh,data,box_idx):
+def fesom_load_data_overtime(mesh,data):
 	#___________________________________________________________________________
 	# number of years to average 
 	nyi = data.year[1]-data.year[0]+1
@@ -550,7 +553,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 			#___________________________________________________________________
 			# select data like they are stored in the file 
 			if 		data.which_mean=='None':
-				ncval = ncval[:,np.where(box_idx[0:mesh.n2dn])[0],:]
+				ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
 				ncval = np.nanmean(ncval,axis=1)
 				data.value[count_ti:count_ti+nrec,:] = ncval
 				data.time[count_ti:count_ti+nrec   ] = ayi[yi]+np.arange(0.0,nrec,1.0)/nrec
@@ -563,7 +566,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 				# select from monthly data
 				if nrec==12 : 
 					# calc mean over points in box
-					ncval = ncval[:,np.where(box_idx[0:mesh.n2dn])[0],:]
+					ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
 					ncval = np.nanmean(ncval, axis=1)
 					
 					# select month subset
@@ -573,7 +576,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 				# select from daily data
 				elif nrec==365 : 
 					# calc mean over points in box
-					ncval = ncval[:,np.where(box_idx[0:mesh.n2dn])[0],:]
+					ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
 					ncval =np.nanmean(ncval,axis=1)
 					
 					# find out which day belongs to selected subset
@@ -592,7 +595,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 				# select from monthly data
 				if nrec==12 : 
 					# calc mean over points in box
-					ncval = ncval[:,np.where(box_idx[0:mesh.n2dn])[0],:]
+					ncval = ncval[:,np.where(data.box_idx[0:mesh.n2dn])[0],:]
 					ncval = np.nanmean(ncval,axis=1)
 					
 					# select month subset
@@ -602,7 +605,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 				# select from daily data
 				elif nrec==365 : 
 					# calc mean over points in box
-					ncval = ncval[:,np.where(box_idx[0:mesh.n2dn])[0],:]
+					ncval = ncval[:,np.where(data.box_idx[0:mesh.n2dn])[0],:]
 					ncval = np.nanmean(ncval,axis=1)
 					
 					# find out which day belongs to selected subset
@@ -618,7 +621,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 			# calculate annual mean from daily, monthly or annual data
 			elif 	data.which_mean=='annual' or nrec==1:
 				# calc mean over points in box
-				ncval = ncval[:,box_idx[0:mesh.n2dn]==True,:]
+				ncval = ncval[:,data.box_idx[0:mesh.n2dn]==True,:]
 				ncval = np.nanmean(ncval,axis=1)
 				
 				#_______________________________________________________________
@@ -639,6 +642,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 	# cut of time_data
 	data.value = data.value[0:count_ti,:]
 	data.time  = data.time[0:count_ti]
+	if len(data.depth)==0: data.depth = mesh.zlev
 	
 	#___________________________________________________________________________
 	# set up descriptiv variable names
@@ -663,7 +667,7 @@ def fesom_load_data_overtime(mesh,data,box_idx):
 		data.str_time = str_time_1
 	else: 
 		data.str_time = 'rec_i: '+str(data.record[0])
-		
+	
 	#___________________________________________________________________________
 	return(data)
 	

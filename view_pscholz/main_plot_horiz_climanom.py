@@ -1,4 +1,4 @@
-# Patrick Scholz, 14.12.2017
+# Patrick Scholz, 23.01.2018
 #+____IMPORT RELATED LIBRARYS__________________________________________________+
 #get_ipython().magic('matplotlib notebook')
 #get_ipython().magic('load_ext autoreload')
@@ -27,14 +27,14 @@ inputarray['save_fig'] = False
 inputarray['save_figpath'] = '/scratch/users/pscholz/AWI_PAPER/PAPER_FESOM2.0_evaluation/figures/withoutPC-2/linfs-clim/'
 
 # set plot box for cyl projection (default: [-180,180,-90,90])
-inputarray['which_box'] = [-180,180,-90,90]
-#inputarray['which_box'] = [-80,45,0,90]
-#inputarray['which_box'] = [-180,180,50,90]
+#inputarray['which_box'] = [-180,180,-90,90]
+#inputarray['which_box'] = [-90,35,20,85]
+inputarray['which_box'] = [-180,180,15,90]
 #inputarray['which_box'] = [-180,180,-90,-50]
 
 # set projection variable --> the lon/lat projection plot ranges are set via 
 # inputarray['which_box'] = [lonmin,lonmax,latmin,latmax]
-inputarray['proj'     ] = 'cyl' # 'ortho', 'cyl', 'npstere' , 'spstere'
+inputarray['proj'     ] = 'npstere' # 'ortho', 'cyl', 'npstere' , 'spstere'
 inputarray['proj_lon' ] = -45 #only for ortho
 inputarray['proj_lat' ] = 45 #only for ortho
 
@@ -48,7 +48,8 @@ data.descript,data.path = 'linfs', '/media/pscholz/data_ext_2/DATA_FESOM2.0/linf
 data.var 		= 'temp'
 
 #data.crange     = []
-data.crange     = [-2.0,2.0,0.0] # [cmin, cmax, cref]
+data.crange     = [-7.0,7.0,0.0] # [cmin, cmax, cref]
+#data.crange     = [-2.0,2.0,0.0] # [cmin, cmax, cref]
 #data.crange     = [-1.0,1.0,0.0] # [cmin, cmax, cref]
 data.cmap       = 'blue2red'
 #data.cnumb      = 25
@@ -64,12 +65,12 @@ data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
 #data.month		= [9]
 
 # select linear interpolated depth layers to average over
-#data.depth		= [0]
+#data.depth		= []
 #data.depth		= np.arange(   0, 200+1,10)
 #data.depth		= np.arange( 200, 500+1,20)
 #data.depth		= np.arange( 500,1000+1,50)
-data.depth		= np.arange(1000,1500+1,50)
-#data.depth		= [500]
+#data.depth		= np.arange(1000,1500+1,50)
+data.depth		= [300]
 	
 	
 #+_____________________________________________________________________________+
@@ -119,7 +120,9 @@ data_fesom      = np.zeros(data_clim.shape)
 mlon,mlat       = np.meshgrid(clim.lon, clim.lat)
 distances, inds = create_indexes_and_distances(mesh, mlon, mlat,k=10, n_jobs=2)
 data_fesom      = fesom2regular(data.value, mesh, mlon, mlat, distances=distances, inds=inds, radius_of_influence=100000)
+data_fesom      = data_fesom.data
 data_fesom[np.isnan(data_clim)]=np.nan
+
     
 #+_____________________________________________________________________________+
 #| calc anomaly between fesom and climatology data                             |                                       

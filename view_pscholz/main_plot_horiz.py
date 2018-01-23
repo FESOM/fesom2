@@ -1,4 +1,4 @@
-# Patrick Scholz, 14.12.2017
+# Patrick Scholz, 23.01.2018
 #+____IMPORT RELATED LIBRARYS__________________________________________________+
 #get_ipython().magic('matplotlib notebook')
 #get_ipython().magic('load_ext autoreload')
@@ -27,14 +27,14 @@ inputarray['save_figpath'] = '/scratch/users/pscholz/AWI_PAPER/PAPER_FESOM2.0_ev
 
 # set plot box for cyl projection (default: [-180,180,-90,90])
 #inputarray['which_box'] = [-180,180,-90,90]
-inputarray['which_box'] = [-90,35,20,85]
+#inputarray['which_box'] = [-90,35,20,85]
 #inputarray['which_box'] = [-75,0,30,55]
-#inputarray['which_box'] = [-180,180,50,90]
+inputarray['which_box'] = [-180,180,35,90]
 #inputarray['which_box'] = [-180,180,-90,-50]
 
 # set projection variable --> the lon/lat projection plot ranges are set via 
 # inputarray['which_box'] = [lonmin,lonmax,latmin,latmax]
-inputarray['proj'     ] = 'cyl' # 'ortho', 'cyl', 'npstere' , 'spstere'
+inputarray['proj'     ] = 'npstere' # 'ortho', 'cyl', 'npstere' , 'spstere'
 inputarray['proj_lon' ] = -45 #only for ortho
 inputarray['proj_lat' ] = 45 #only for ortho
 
@@ -53,8 +53,8 @@ data.var 		= 'temp'
 
 #+_____________________________________________________________________________+
 # select year to average over [start_yr, end_yr]
-data.year		= [2000,2009]
-#data.year		= [1998,2007]
+#data.year		= [2000,2009]
+data.year		= [1998,2007]
 #data.year		= [2000,2000]
 
 # select month to average over
@@ -66,10 +66,10 @@ data.month		= [1,2,3,4,5,6,7,8,9,10,11,12]
 # select linear interpolated depth layers to average over
 #data.depth		= [0,10,20,30,40,50,75,100]
 #data.depth		= np.arange(   0, 200+1,10)
-#data.depth		= np.arange( 200, 500+1,20)
+data.depth		= np.arange( 200, 500+1,20)
 #data.depth		= np.arange( 500,1000+1,50)
 #data.depth		= np.arange(1000,1500+1,50)
-data.depth		= [50]
+#data.depth		= [50]
 
 #+_____________________________________________________________________________+
 # make anomaly

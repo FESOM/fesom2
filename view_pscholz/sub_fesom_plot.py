@@ -1,4 +1,4 @@
-# Patrick Scholz, 14.12.2017
+# Patrick Scholz, 23.01.2018
 import os
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,3 +1,4 @@
+# Patrick Scholz, 23.01.2018
 import numpy as np
 import time
 from netCDF4 import Dataset
@@ -132,7 +133,7 @@ def clim_plot_anom(clim):
 	fig = plt.figure(figsize=(13, 13))
 	#fig.patch.set_alpha(0.0)
 	ax  = plt.gca()
-	resolution = 'i'
+	resolution = 'c'
 	fsize = 14
 	#+_________________________________________________________________________+
 	#| SET PROJECTION PARAMETERS                                               |
@@ -195,6 +196,7 @@ def clim_plot_anom(clim):
 
 	#___________________________________________________________________________
 	# calculate index of which data points are within boi
+	#idx_box = ~np.isnan(clim.anom)
 	idx_box = mlon<inputarray['which_box'][0]
 	idx_box = np.logical_or(idx_box,mlon>inputarray['which_box'][1])
 	idx_box = np.logical_or(idx_box,mlat<inputarray['which_box'][2])
@@ -241,13 +243,15 @@ def clim_plot_anom(clim):
 	#+_____________________________________________________________________________+
 	#| plot data on triangluar grid                                                |
 	#+_____________________________________________________________________________+
-	#hp1=map.pcolormesh(mlon,mlat,anom,
+	#hp1=map.pcolormesh(mlon,mlat,data_plot,
+	#hp1=map.pcolormesh(mlon,mlat,data_plot,latlon=True,
 	hp1=map.contourf(mlon,mlat,data_plot,clevel,#				shading='gouraud',#flat
+					latlon=True,
 					antialiased=False,
 					edgecolor='None',
 					cmap=cmap0,
 					vmin=clevel[0], vmax=clevel[-1])
-	hp1.cmap.set_under([1.,1.,1.])
+	#hp1.cmap.set_under([1.,1.,1.])
 
 	#______________________________________________________________________________+
 	# arange zonal & meriodional gridlines and labels

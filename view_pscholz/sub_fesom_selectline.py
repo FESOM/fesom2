@@ -1,17 +1,24 @@
+# Patrick Scholz, 23.01.2018
 import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.basemap import Basemap
+import matplotlib.gridspec as gridspec
 from sub_fesom_mesh 		import * 
+from sub_fesom_plot 		import *
 from sub_regriding_adapt 	import *
 from colormap_c2c			import *
 
 #+_____________________________________________________________________________+
 class fesom_line:
+	
+	which_obj					= 'line'
+	
 	#____data run variables______________________
 	var                         = ''
-	runid, path, descript       = '', '', ''
+	runid, path, descript       = 'fesom', '', ''
 	
 	#____data time variables_____________________
 	year,  month, record, depth = [], [], [], []
@@ -55,7 +62,7 @@ class fesom_line:
 	def __init__(self):
 		#____selection variable______________________
 		self._x, self._y, self._xc, self._yc  = [], [], [], []
-		self._b, self._k, 					  =  [] ,[]
+		self._b, self._k, 					  = [] ,[]
 		self._cid_pressb, self._cid_pressk	  = [], [],
 		self._zoomfac, self._press			  = 20.0, 'None'
 		self._fig, self._ax, self._map		  = [], [], []
@@ -65,8 +72,10 @@ class fesom_line:
 	#+_________________________________________________________________________+
 	def _connect_(self,fig,ax,map):
 		print(' --> start interactive line selection')
-		self._figure = plt.gcf()
-		self._ax     = plt.gca()
+		#self._figure = plt.gcf()
+		#self._ax     = plt.gca()
+		self._figure = fig
+		self._ax     = ax
 		self._map    = map
 		#self.canvas = FigureCanvas(self._figure)
 		self._xlim   = self._ax.get_xlim()
@@ -342,12 +351,13 @@ class fesom_line:
 	#|																		   |
 	#+_________________________________________________________________________+
 	# interpolate line points on fesom data
-	def interp_lines(self,mesh,data,usemidpts=True):
+	def interp_lines(self,mesh,usemidpts=True):
 		
 		#+_____________________________________________________________________+
-		self.value  = [];
-		if len(data.value2)!=0 : self.value2  = [];
-		if len(data.value3)!=0 : self.value3  = [];
+		bckp_value,bckp_value2,bckp_value3 = [],[],[]
+		bckp_value,self.value  = self.value,[]
+		if len(self.value2)!=0 : bckp_value2,self.value2  = self.value2,[]
+		if len(self.value3)!=0 : bckp_value3,self.value3  = self.value3,[]
 		
 		for ii in range(0,len(self.line_define)):
 			
@@ -361,19 +371,19 @@ class fesom_line:
 			#___________________________________________________________________
 			self.value.append([])
 			self.value[ii]=np.zeros((npts,nlev))
-			if len(data.value2)!=0: 
+			if len(bckp_value2)!=0: 
 				self.value2.append([]) 
 				self.value2[ii]=np.zeros((npts,nlev))
-			if len(data.value3)!=0: 
+			if len(bckp_value3)!=0: 
 				self.value3.append([])
 				self.value3[ii]=np.zeros((npts,nlev))
 			
 			#___________________________________________________________________
 			for di in range(0,nlev):
-				data_di   = np.copy(data.value[:,di])
-				if data.value.shape[0]==mesh.n2dna:
+				data_di   = np.copy(bckp_value[:,di])
+				if bckp_value.shape[0]==mesh.n2dna:
 					data_di[di>=mesh.nodes_2d_iz-1]=np.nan
-				elif data.value.shape[0]==mesh.n2dea:
+				elif bckp_value.shape[0]==mesh.n2dea:
 					data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
 				#data_di[data_di==0]=np.nan
 				
@@ -398,11 +408,11 @@ class fesom_line:
 								
 				#_______________________________________________________________
 				# also interpolate second value
-				if len(data.value2)!=0:
-					data_di   = np.copy(data.value2[:,di])
-					if data.value2.shape[0]==mesh.n2dna:
+				if len(bckp_value2)!=0:
+					data_di   = np.copy(bckp_value2[:,di])
+					if bckp_value2.shape[0]==mesh.n2dna:
 						data_di[di>=mesh.nodes_2d_iz-1]=np.nan
-					elif data.value2.shape[0]==mesh.n2dea:
+					elif bckp_value2.shape[0]==mesh.n2dea:
 						data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
 					#data_di[data_di==0]=np.nan
 					
@@ -419,11 +429,11 @@ class fesom_line:
 									
 				#_______________________________________________________________
 				# also interpolate third value
-				if len(data.value3)!=0:
-					data_di   = np.copy(data.value3[:,di])
-					if data.value3.shape[0]==mesh.n2dna:
+				if len(bckp_value3)!=0:
+					data_di   = np.copy(bckp_value3[:,di])
+					if bckp_value3.shape[0]==mesh.n2dna:
 						data_di[di>=mesh.nodes_2d_iz-1]=np.nan
-					elif data.value3.shape[0]==mesh.n2dea:
+					elif bckp_value3.shape[0]==mesh.n2dea:
 						data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
 					#data_di[data_di==0]=np.nan
 					
@@ -450,24 +460,24 @@ class fesom_line:
 			
 			#___________________________________________________________________
 			# copy metainfo from data object to line object
-			self.var 		= data.var
-			self.runid 		= data.runid
-			self.path 		= data.path
+			#self.var 		= data.var
+			#self.runid 		= data.runid
+			#self.path 		= data.path
 			
-			self.descript	= data.descript
-			self.sname 		= data.sname
-			self.lname 		= data.lname
-			self.unit 		= data.unit
-			self.str_time 	= data.str_time
-			self.str_dep 	= data.str_dep
+			#self.descript	= data.descript
+			#self.sname 		= data.sname
+			#self.lname 		= data.lname
+			#self.unit 		= data.unit
+			#self.str_time 	= data.str_time
+			#self.str_dep 	= data.str_dep
 			
-			self.cmap		= data.cmap
-			self.cnumb		= data.cnumb
-			self.crange		= data.crange
+			#self.cmap		= data.cmap
+			#self.cnumb		= data.cnumb
+			#self.crange		= data.crange
 			
-			self.anom 		= data.anom
+			#self.anom 		= data.anom
 			
-			self.depth 		= data.depth
+			#self.depth 		= data.depth
 	
 	#+_________________________________________________________________________+
 	#|																		   |
@@ -778,4 +788,59 @@ class fesom_line:
 			
 			#___________________________________________________________________
 			plt.show(block=False)
+		
+		
+	#+_________________________________________________________________________+
+	#|						 PLOT LINE OVER DEPTH 							   |
+	#+_________________________________________________________________________+
+	def plot_lines_position(self,mesh):
+		from set_inputarray import inputarray
+		# draw position of line 
+		for ii in range(0,len(self.line_define)):
+			#___________________________________________________________________
+			xmin,xmax = np.min(self.line_define[ii][0]), np.max(self.line_define[ii][0])
+			ymin,ymax = np.min(self.line_define[ii][1]), np.max(self.line_define[ii][1])
+			xmin,xmax,ymin,ymax = xmin-20.0, xmax+20.0, ymin-20.0, ymax+20.0
+			xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
 			
+			#___________________________________________________________________
+			fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
+			map 	= Basemap(projection = 'cyl',resolution = 'c',
+						llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
+			mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+			map.drawmapboundary(fill_color='0.9',linewidth=1.0)
+			
+			xlabels,ylabels=[0,0,0,1],[1,0,0,0]
+			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
+			map.drawparallels(yticks,labels=ylabels,fontsize=14)
+			map.drawmeridians(xticks,labels=xlabels,fontsize=14)
+			map.bluemarble()
+			fesom_plot_lmask(map,mesh,ax,'none','r')
+			ax.grid(color='k', linestyle='-', linewidth=0.5)
+			
+			#___________________________________________________________________
+			ax.plot(self.line_define[ii][0],self.line_define[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
+			ax.plot(self.line_define[ii][0][0],self.line_define[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
+			ax.plot(self.line_define[ii][0][-1],self.line_define[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+			
+			ax.plot(self.line_interp_pm[ii][0],self.line_interp_pm[ii][1] ,
+			color='r',linewidth=4,marker='+',linestyle='None',axes=ax,markersize=6,mfc='r')
+			step=10
+			ax.quiver(self.line_interp_pm[ii][0][0::step],self.line_interp_pm[ii][1][0::step],
+					  self.line_interp_pm_nvec[ii][0][0::step],self.line_interp_pm_nvec[ii][1][0::step],color='r')
+			
+			#___________________________________________________________________
+			# save figure
+			if inputarray['save_fig']==True:
+				print(' --> save figure: png')
+				sfname = 'lineplot_'+self.line_define[ii][2]+'_position'+'.png'
+				sdname = inputarray['save_figpath']
+				if os.path.isdir(sdname)==False: os.mkdir(sdname)
+				plt.savefig(sdname+sfname, \
+							format='png', dpi=600, \
+							bbox_inches='tight', pad_inches=0,\
+							transparent=True,frameon=True)
+			
+			#___________________________________________________________________
+			plt.show(block=False)
+			fig.canvas.draw()
