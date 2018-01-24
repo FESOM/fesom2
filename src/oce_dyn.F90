@@ -973,7 +973,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
  
  Do ed=1,myDim_elem2D
-    len=0.02*sqrt(elem_area(ed))                     
+    len=0.01*sqrt(elem_area(ed))                     
     Do nz=1,nlevels(ed)-1
      vi=dt*abs(min(Visc(nz,ed)-len,0.0))    
      U_c(nz,ed)=-U_c(nz,ed)*vi                             

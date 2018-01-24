@@ -161,10 +161,15 @@ subroutine fer_compute_C_K
       end if
       !Scale K_GM with resolution (referenced to 100,000m)
       if (scaling_resolution) then
-         scaling=scaling*mesh_resolution(n)/100000._WP
+         scaling=scaling*(mesh_resolution(n)/100000._WP)**2 !put to repo
       end if
-      fer_k(n)=K_GM*scaling
-      fer_c(n)=c1
+      if (mesh_resolution(n) < 40000.0_WP) then
+         scaling=scaling*max((mesh_resolution(n)/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
+      end if
+
+      fer_k(n)=min(K_GM*scaling, 2000.0_WP) !put to repo
+      fer_k(n)=max(K_GM*scaling, 2.0_WP)    !put to repo
+      fer_c(n)=c1*c1                        !put to repo
    END DO
    call exchange_nod(fer_c)
    call exchange_nod(fer_k)
