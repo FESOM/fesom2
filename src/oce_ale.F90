@@ -737,11 +737,11 @@ subroutine stiff_mat_ale
 	
 	! number of nonzero entries at every CPU
 	pnza(mype+1)=ssh_stiff%nza
-	call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
+	call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
 	!collect this number from all CPUs into rpnza
 	call MPI_AllREDUCE( pnza, rpnza, &
 		npes, MPI_INTEGER,MPI_SUM, &
-		MPI_COMM_WORLD, MPIerr)
+		MPI_COMM_FESOM, MPIerr)
 		
 	if (mype==0) then
 		offset=0
@@ -791,7 +791,7 @@ subroutine stiff_mat_ale
 		read(fileID, *) mapping
 		close(fileID) 
 	end if
-	call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+	call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 	
 	! (ii) global PE contiguous: 
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
@@ -1529,7 +1529,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
      soltol,   &
      part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
      ssh_rhs, d_eta, &
-     rinfo, MPI_COMM_WORLD)
+     rinfo, MPI_COMM_FESOM)
 	!
 	!
 	!___USE PARMS SOLVER (recommended)__________________________________________
@@ -1598,7 +1598,7 @@ if (lfirst) then
    call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
-        ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_WORLD)
+        ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
    lfirst=.false.
 end if
 

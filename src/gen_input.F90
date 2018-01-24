@@ -138,9 +138,9 @@ subroutine read_init_ts
      ! read reg. grid
      read(fileID, *) num_lon_reg, num_lat_reg, num_lay_reg
   end if
-  call MPI_BCast(num_lon_reg,    1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(num_lat_reg,    1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(num_lay_reg,    1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(num_lon_reg,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(num_lat_reg,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(num_lay_reg,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
   allocate(lon_reg(num_lon_reg))
   allocate(lat_reg(num_lat_reg))
@@ -152,9 +152,9 @@ subroutine read_init_ts
      read(fileID, *) lat_reg
      read(fileID, *) lay_reg
   end if
-  call MPI_BCast(lon_reg, num_lon_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(lat_reg, num_lat_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(lay_reg, num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(lon_reg, num_lon_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(lat_reg, num_lat_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(lay_reg, num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
   allocate(raw_data(num_lon_reg,num_lat_reg,num_lay_reg))
 
@@ -179,7 +179,7 @@ subroutine read_init_ts
         end do
      end do  
   end if
-  call MPI_BCast(raw_data(1,1,1), num_lon_reg*num_lat_reg*num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(raw_data(1,1,1), num_lon_reg*num_lat_reg*num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
   call interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
        lon_reg, lat_reg, lay_reg, raw_data, nl-1, myDim_nod2D+eDim_nod2D, &
@@ -197,7 +197,7 @@ subroutine read_init_ts
         end do
      end do  
   end if
-  call MPI_BCast(raw_data(1,1,1), num_lon_reg*num_lat_reg*num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(raw_data(1,1,1), num_lon_reg*num_lat_reg*num_lay_reg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
   call interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
        lon_reg, lat_reg, lay_reg,raw_data, nl-1, myDim_nod2d+eDim_nod2D, &

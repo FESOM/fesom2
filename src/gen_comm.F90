@@ -639,7 +639,7 @@ use g_parsup
 implicit none
 integer :: res
 res=0
-call MPI_Allreduce (pe_status, res, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, MPIerr)
+call MPI_Allreduce (pe_status, res, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 if (res /= 0 ) then
     if (mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
 !!! a restart file must be written here !!!

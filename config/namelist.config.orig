@@ -7,10 +7,10 @@ runid='fesom'
 &timestep
 !    96    100    108    120    128    135    144    150    160    180    240    
 !   288    360    480    720   1440
-step_per_day=96
+step_per_day=120 !288 !96
 
-run_length=1
-run_length_unit='m'		! y, m, d, s
+run_length=20 !24
+run_length_unit='y'		! y, m, d, s
 /
 
 &clockinit			! the model starts at
@@ -20,14 +20,16 @@ yearnew=1948
 /
 
 &paths
-MeshPath='/mnt/lustre01/work/ba1035/a270092/core2/'
-
+!MeshPath='/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/'
+MeshPath='/work/ollie/pscholz/mesh_fesom2.0/mesh_CORE2_final/'
+!MeshPath='/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_topo_smooth_77/'
+!MeshPath='/work/ollie/pscholz/mesh_fesom2.0/mesh_CORE2_topo_smooth_77/'
 
 OpbndPath=''
-ClimateDataPath='/mnt/lustre01/work/ba1035/a270092/input/hydrography/'
-ForcingDataPath='/mnt/lustre01/work/ba1035/a270092/input/forcing/'
-TideForcingPath='/mnt/lustre01/work/ba1035/a270092/input/tide_forcing/'
-ResultPath='/mnt/lustre01/work/ab0995/a270029/fesom2output/'
+ClimateDataPath='/work/ollie/dsidoren/input/hydrography/'
+ForcingDataPath='/work/ollie/dsein/input/forcing/'
+TideForcingPath='/work/ollie/dsein/input/tide_forcing/'
+ResultPath='../results/git/'
 /
 
 &initialization
@@ -43,7 +45,7 @@ output_length=1		        !only required for d,h,s cases,  y, m take 1
 output_length_unit='d'   	!output period: y,  d, h, s 
 output_offset=64
 restart_length=1		!only required for d,h,s cases,  y, m take 1
-restart_length_unit='y'   	!output period: y,  d, h, s 
+restart_length_unit='m'   	!output period: y,  d, h, s 
 restart_offset=64
 logfile_outfreq=600  	        !in logfile info. output frequency, # steps
 use_means=.true.                !average output, if false prints out snapshots
@@ -88,8 +90,8 @@ toy_ocean=.false.               ! use toy forcing/initialization
 ! system_arch=1
 n_levels=3
 !n_part= 18, 2, 10            ! number of partitions on each hierarchy level
-!n_part= 18, 2, 12            ! 432 number of partitions on each hierarchy level
+n_part= 18, 2, 12            ! 432 number of partitions on each hierarchy level
 ! n_part= 15, 2, 12            ! 360 number of partitions on each hierarchy level
-n_part= 12, 2, 12            ! 288 number of partitions on each hierarchy level
+!n_part= 12, 2, 12            ! 288 number of partitions on each hierarchy level
 
 /

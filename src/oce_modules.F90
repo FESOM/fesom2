@@ -59,7 +59,7 @@ logical                       :: double_diffusion=.false.  !for KPP,dd switch
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 
-logical                       :: hbl_diag =.false.   ! write boundary layer depth
+logical                       :: hbl_diag =.false.   ! writen boundary layer depth
 
 ! Time stepping                               
 ! real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
@@ -210,6 +210,10 @@ integer,allocatable,dimension(:,:)            :: nn_pos
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 
+#if defined (__oasis)
+  real(kind=8), allocatable, dimension(:)      :: lump2d_south, lump2d_north  
+  integer, allocatable, dimension(:)           :: ind_south, ind_north    
+#endif  
 end module o_MESH
 !==========================================================
 

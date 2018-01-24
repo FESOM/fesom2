@@ -40,7 +40,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
      soltol,   &
      part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
      ssh_rhs, d_eta, &
-     rinfo, MPI_COMM_WORLD)
+     rinfo, MPI_COMM_FESOM)
 
 #elif defined(PARMS)
 
@@ -107,7 +107,7 @@ if (lfirst) then
    call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part, ssh_stiff%rowptr, &
-        ssh_stiff%colind, ssh_stiff%values, reuse, MPI_COMM_WORLD)
+        ssh_stiff%colind, ssh_stiff%values, reuse, MPI_COMM_FESOM)
    lfirst=.false.
 
 ! Back to Fortran numbering
@@ -472,10 +472,10 @@ pnza(1:npes)=0
 rpnza=0
   
 pnza(mype+1)=ssh_stiff%nza
-call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
+call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
 call MPI_AllREDUCE( pnza, rpnza, &
      npes, MPI_INTEGER,MPI_SUM, &
-     MPI_COMM_WORLD, MPIerr)
+     MPI_COMM_FESOM, MPIerr)
        
 if (mype==0) then
    offset=0
@@ -524,7 +524,7 @@ IMPLICIT NONE
 real(kind=WP) :: c1,c2
 c1=sum(ssh_rhs(1:mydim_nod2d))
 c2=0d0
-call MPI_Allreduce (c1, c2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_WORLD, MPIerr)
+call MPI_Allreduce (c1, c2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 if (mype==0) write(*,*) 'DBG:sum(ssh_rhs)=',c2
 end subroutine test_ssh_rhs
 ! ===================================================================================

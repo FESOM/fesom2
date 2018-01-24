@@ -31,21 +31,21 @@ contains
 
     DO n=1,rn    
        call MPI_TYPE_SIZE(r_mpitype(n), rdebug, MPIerr)
-       CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_WORLD, request, MPIerr)
+       CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_FESOM, request, MPIerr)
     END DO
 
     DO n=1, sn
-       call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, MPI_COMM_WORLD,    &
+       call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, MPI_COMM_FESOM,    &
             status, MPIerr)
        call MPI_TYPE_SIZE(s_mpitype(n), rdebug, MPIerr)
        if (sdebug /= rdebug) then
           print *, "Mismatching MPI send/recieve message lengths."
           print *,"Send/receive process numbers: ", mype, '/', sPE(n)
           print *,"Number of send/receive bytes: ", sdebug, '/', rdebug
-          call MPI_ABORT( MPI_COMM_WORLD, 1 )
+          call MPI_ABORT( MPI_COMM_FESOM, 1 )
        end if
     END DO
-    CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+    CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
   END SUBROUTINE check_mpi_comm
 #endif
@@ -90,13 +90,13 @@ subroutine exchange_nod2D_i_begin(nod_array2D)
      DO n=1,rn    
 
         call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
-             com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
+             com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
      END DO
 
      DO n=1, sn
 
         call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
-             mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
+             mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
      END DO
 
      com_nod2D%nreq = rn+sn
@@ -146,11 +146,11 @@ subroutine exchange_nod2D_begin(nod_array2D)
 
      DO n=1,rn         
         call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-             com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
+             com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-             mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
+             mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
      END DO
 
      com_nod2D%nreq = rn+sn
@@ -202,17 +202,17 @@ IMPLICIT NONE
 
   DO n=1,rn         
      call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n),      MPI_COMM_WORLD, com_nod2D%req(2*n-1), MPIerr) 
+               com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr) 
  
      call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n)+npes, MPI_COMM_WORLD, com_nod2D%req(2*n),   MPIerr) 
+               com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n),   MPIerr) 
   END DO  
   DO n=1, sn
      call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype,      MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n-1), MPIerr)
+                    mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
 
      call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype+npes, MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n),   MPIerr)
+                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n),   MPIerr)
   END DO
 
    com_nod2D%nreq = 2*(rn+sn)
@@ -268,23 +268,23 @@ IMPLICIT NONE
 
   DO n=1,rn         
      call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n),        MPI_COMM_WORLD, com_nod2D%req(3*n-2), MPIerr) 
+               com_nod2D%rPE(n),        MPI_COMM_FESOM, com_nod2D%req(3*n-2), MPIerr) 
  
      call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n)+npes,   MPI_COMM_WORLD, com_nod2D%req(3*n-1), MPIerr) 
+               com_nod2D%rPE(n)+npes,   MPI_COMM_FESOM, com_nod2D%req(3*n-1), MPIerr) 
 
      call MPI_IRECV(nod3_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n)+2*npes, MPI_COMM_WORLD, com_nod2D%req(3*n),   MPIerr) 
+               com_nod2D%rPE(n)+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*n),   MPIerr) 
   END DO  
   DO n=1, sn
      call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype,        MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n-2), MPIerr)
+                    mype,        MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-2), MPIerr)
 
      call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype+npes,   MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n-1), MPIerr)
+                    mype+npes,   MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-1), MPIerr)
 
      call MPI_ISEND(nod3_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype+2*npes, MPI_COMM_WORLD, com_nod2D%req(3*rn+3*n),   MPIerr)
+                    mype+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n),   MPIerr)
   END DO
 
    com_nod2D%nreq = 3*(rn+sn)
@@ -345,12 +345,12 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:)
 
     DO n=1,rn    
        call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
+            com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
     END DO
 
     DO n=1, sn
        call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-            mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
+            mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
     END DO
 
     com_nod2D%nreq = rn+sn
@@ -420,18 +420,18 @@ real(kind=WP), intent(inout) :: nod2_array3D(:,:)
 
     DO n=1,rn    
        call MPI_IRECV(nod1_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n),      MPI_COMM_WORLD, com_nod2D%req(2*n-1), MPIerr)  
+            com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)  
 
        call MPI_IRECV(nod2_array3D, 1, r_mpitype_nod3D(n,nl2,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n)+npes, MPI_COMM_WORLD, com_nod2D%req(2*n  ), MPIerr) 
+            com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n  ), MPIerr) 
     END DO
 
     DO n=1, sn
        call MPI_ISEND(nod1_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-            mype,      MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n-1), MPIerr)
+            mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
 
        call MPI_ISEND(nod2_array3D, 1, s_mpitype_nod3D(n,nl2,1), com_nod2D%sPE(n), &
-            mype+npes, MPI_COMM_WORLD, com_nod2D%req(2*rn+2*n), MPIerr)
+            mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n), MPIerr)
     END DO
 
     com_nod2D%nreq = 2*(rn+sn)
@@ -498,12 +498,12 @@ if (npes>1) then
 
   DO n=1,rn    
      call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
-          com_nod2D%rPE(n), MPI_COMM_WORLD, com_nod2D%req(n), MPIerr) 
+          com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
   END DO
  
   DO n=1, sn
      call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
-          mype, MPI_COMM_WORLD, com_nod2D%req(rn+n), MPIerr)
+          mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
   END DO
 
   com_nod2D%nreq = rn+sn
@@ -582,7 +582,7 @@ END SUBROUTINE exchange_elem_end
 !!$     offset=(com_edge2D%sptr(n+1) - nini)*(nl-1)
 !!$
 !!$     call MPI_ISEND(s_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-!!$          MPI_COMM_WORLD, sreq(n), MPIerr)
+!!$          MPI_COMM_FESOM, sreq(n), MPIerr)
 !!$  end do
 !!$  do n=1, rn
 !!$     source=com_edge2D%rPE(n)
@@ -590,7 +590,7 @@ END SUBROUTINE exchange_elem_end
 !!$     offset=(com_edge2D%rptr(n+1) - nini)*(nl-1)
 !!$
 !!$     call MPI_IRECV(r_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-!!$          source, MPI_COMM_WORLD, rreq(n), MPIerr) 
+!!$          source, MPI_COMM_FESOM, rreq(n), MPIerr) 
 !!$  end do
 !!$
 !!$  call MPI_WAITALL(sn,sreq,sstat, MPIerr)
@@ -630,11 +630,11 @@ END SUBROUTINE exchange_elem_end
 !!$
 !!$  DO n=1,rn         
 !!$     call MPI_IRECV(edge_array2D, 1, r_mpitype_edge2D(n), com_edge2D%rPE(n), &
-!!$               com_edge2D%rPE(n), MPI_COMM_WORLD, com_edge2D%req(n), MPIerr) 
+!!$               com_edge2D%rPE(n), MPI_COMM_FESOM, com_edge2D%req(n), MPIerr) 
 !!$  END DO  
 !!$  DO n=1, sn
 !!$     call MPI_ISEND(edge_array2D, 1, s_mpitype_edge2D(n), com_edge2D%sPE(n), &
-!!$                    mype, MPI_COMM_WORLD, com_edge2D%req(rn+n), MPIerr)
+!!$                    mype, MPI_COMM_FESOM, com_edge2D%req(rn+n), MPIerr)
 !!$  END DO
 !!$  
 !!$  call MPI_WAITALL(rn+sn,com_edge2D%req,MPI_STATUSES_IGNORE, MPIerr)
@@ -687,12 +687,12 @@ if (npes> 1) then
 
          DO n=1,rn         
             call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,1), com_elem2D%rPE(n), &
-                 com_elem2D%rPE(n), MPI_COMM_WORLD, &
+                 com_elem2D%rPE(n), MPI_COMM_FESOM, &
                  com_elem2D%req(n), MPIerr)
          END DO
          DO n=1, sn
             call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,1), com_elem2D%sPE(n), &
-                 mype,    MPI_COMM_WORLD, &
+                 mype,    MPI_COMM_FESOM, &
                  com_elem2D%req(rn+n), MPIerr)
          END DO
 
@@ -707,12 +707,12 @@ if (npes> 1) then
 
          DO n=1,rn         
             call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D(n,nl1), com_elem2D%rPE(n), &
-                 com_elem2D%rPE(n), MPI_COMM_WORLD, &
+                 com_elem2D%rPE(n), MPI_COMM_FESOM, &
                  com_elem2D%req(n), MPIerr) 
          END DO
          DO n=1, sn
             call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D(n,nl1), com_elem2D%sPE(n), &
-                 mype,    MPI_COMM_WORLD, &
+                 mype,    MPI_COMM_FESOM, &
                  com_elem2D%req(rn+n), MPIerr)
          END DO
       else
@@ -739,13 +739,13 @@ if (npes> 1) then
          DO n=1,rn         
             call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,1), &
                  com_elem2D_full%rPE(n), &
-                 com_elem2D_full%rPE(n), MPI_COMM_WORLD, &
+                 com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
                  com_elem2D_full%req(n), MPIerr) 
          END DO
          DO n=1, sn
             call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,1), &
                  com_elem2D_full%sPE(n), & 
-                 mype,    MPI_COMM_WORLD, &
+                 mype,    MPI_COMM_FESOM, &
                  com_elem2D_full%req(rn+n), MPIerr)
          END DO
       elseif (nl1 <= 4) then
@@ -759,13 +759,13 @@ if (npes> 1) then
          DO n=1,rn         
             call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D_full(n,nl1), &
                  com_elem2D_full%rPE(n), &
-                 com_elem2D_full%rPE(n), MPI_COMM_WORLD, &
+                 com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
                  com_elem2D_full%req(n), MPIerr) 
          END DO
          DO n=1, sn
             call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D_full(n,nl1), &
                  com_elem2D_full%sPE(n), & 
-                 mype,    MPI_COMM_WORLD, &
+                 mype,    MPI_COMM_FESOM, &
                  com_elem2D_full%req(rn+n), MPIerr)
          END DO
       else
@@ -844,11 +844,11 @@ IMPLICIT NONE
 
      DO n=1,rn         
         call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,n_val), com_elem2D%rPE(n), &
-                       com_elem2D%rPE(n), MPI_COMM_WORLD, com_elem2D%req(n), MPIerr) 
+                       com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,n_val), com_elem2D%sPE(n), &
-                       mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
+                       mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
      END DO
 
      com_elem2D%nreq = rn+sn
@@ -868,11 +868,11 @@ IMPLICIT NONE
 
      DO n=1,rn         
         call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%rPE(n), &
-                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
+                       com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%sPE(n), &
-                       mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
+                       mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
      END DO
 
      com_elem2D_full%nreq = rn+sn
@@ -928,11 +928,11 @@ IMPLICIT NONE
 
      DO n=1,rn         
         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n,1), com_elem2D%rPE(n), &
-                       com_elem2D%rPE(n), MPI_COMM_WORLD, com_elem2D%req(n), MPIerr) 
+                       com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
-                       mype, MPI_COMM_WORLD, com_elem2D%req(rn+n), MPIerr)
+                       mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
      END DO
 
      com_elem2D%nreq = rn+sn
@@ -951,11 +951,11 @@ IMPLICIT NONE
 
      DO n=1,rn         
         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n,1), com_elem2D_full%rPE(n), &
-                       com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
+                       com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr) 
      END DO
      DO n=1, sn
         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
-                       mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
+                       mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
      END DO
 
      com_elem2D_full%nreq = rn+sn
@@ -1008,13 +1008,13 @@ IMPLICIT NONE
 
     DO n=1,rn       
        call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full_i(n), com_elem2D_full%rPE(n), &
-            com_elem2D_full%rPE(n), MPI_COMM_WORLD, com_elem2D_full%req(n), MPIerr) 
+            com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr) 
     END DO
  
     DO n=1, sn
      
        call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
-            mype, MPI_COMM_WORLD, com_elem2D_full%req(rn+n), MPIerr)
+            mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
     END DO
 
     com_elem2D_full%nreq = rn+sn
@@ -1053,12 +1053,12 @@ IF ( mype == 0 ) THEN
     end if
     DO  n = 1, npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
+                     0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
        counter=0
        DO i = 1, nTS
           DO nz=1, nl1
@@ -1068,18 +1068,18 @@ IF ( mype == 0 ) THEN
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
-                   sender, 2, MPI_COMM_WORLD, MPIerr )
+                   sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
 
     ALLOCATE(recvbuf(node_size*nl1))
     CALL MPI_RECV( recvbuf(1), node_size*nl1, MPI_DOUBLE_PRECISION, 0, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
     counter=0
     DO n = 1, node_size
        DO nz=1, nl1
@@ -1090,7 +1090,7 @@ ELSE
 
     DEALLOCATE(recvbuf)
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_nod3D
 !
 !============================================================================
@@ -1117,29 +1117,29 @@ IF ( mype == 0 ) THEN
     end if
     DO  n = 1, npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
+                     0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
        DO i = 1, nTS
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
-                   sender, 2, MPI_COMM_WORLD, MPIerr )
+                   sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
     CALL MPI_RECV( arr2D(1), node_size, MPI_DOUBLE_PRECISION, 0, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_nod2D
 !
 !============================================================================
@@ -1168,12 +1168,12 @@ IF ( mype == 0 ) THEN
     end if
     DO  n = 1, npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
+                     0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
        counter=0
        DO i = 1, nTS
           DO nz=1, nl1
@@ -1183,18 +1183,18 @@ IF ( mype == 0 ) THEN
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
-                   sender, 2, MPI_COMM_WORLD, MPIerr )
+                   sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
 
     ALLOCATE(recvbuf(elem_size*nl1))
     CALL MPI_RECV( recvbuf(1), elem_size*nl1, MPI_DOUBLE_PRECISION, 0, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
     counter=0
     DO n = 1, elem_size
        DO nz=1, nl1
@@ -1205,7 +1205,7 @@ ELSE
 
     DEALLOCATE(recvbuf)
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_elem3D
 !
 !============================================================================
@@ -1234,29 +1234,29 @@ IF ( mype == 0 ) THEN
     end if
     DO  n = 1, npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_WORLD, status, MPIerr )
+                     0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(1:nTS), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
        DO i = 1, nTS
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
-                   sender, 2, MPI_COMM_WORLD, MPIerr )
+                   sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
     CALL MPI_RECV( arr2D(1), elem_size, MPI_DOUBLE_PRECISION, 0, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_elem2D
 !
 !============================================================================
@@ -1283,7 +1283,7 @@ integer        :: req(npes-1)
 integer        :: start, n3D
 
  if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
 
@@ -1297,7 +1297,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
          start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
@@ -1315,7 +1315,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1341,7 +1341,7 @@ integer        :: start, n2D
 
  if (npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
@@ -1352,7 +1352,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
@@ -1370,7 +1370,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND( arr2D, myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1401,7 +1401,7 @@ integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
 
  if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
 
@@ -1418,7 +1418,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
          start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
@@ -1437,7 +1437,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1463,7 +1463,7 @@ integer        :: start, e2D
 
 
  if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
@@ -1476,7 +1476,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
          start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
@@ -1496,7 +1496,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   call MPI_SEND( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 end if
@@ -1528,7 +1528,7 @@ integer        :: start, n3D, ierr
 
  if (npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
@@ -1542,7 +1542,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
          start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
@@ -1563,7 +1563,7 @@ ELSE
    allocate(sendbuf(nl1,myDim_nod2D))
    sendbuf(1:nl1,1:myDim_nod2D) = arr3D(1:nl1,1:myDim_nod2D)
    
-   call MPI_SEND(sendbuf, myDim_nod2D*nl1, MPI_REAL, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND(sendbuf, myDim_nod2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    deallocate(sendbuf)
    
 ENDIF
@@ -1592,7 +1592,7 @@ integer        :: start, n2D
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
  if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
@@ -1600,7 +1600,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
@@ -1619,7 +1619,7 @@ IF ( mype == 0 ) THEN
 ELSE
    sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),4)
 
-   call MPI_SEND(sendbuf, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND(sendbuf, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1651,7 +1651,7 @@ integer        :: start, e3D
 
 
  if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
@@ -1664,7 +1664,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
          start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
@@ -1684,7 +1684,7 @@ ELSE
    allocate(sendbuf(nl1,myDim_elem2D))
    sendbuf(1:nl1,1:myDim_elem2D) = arr3D(1:nl1,1:myDim_elem2D)
    
-   call MPI_SEND(sendbuf, myDim_elem2D*nl1, MPI_REAL, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND(sendbuf, myDim_elem2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    deallocate(sendbuf)
 ENDIF
 
@@ -1712,7 +1712,7 @@ integer        :: start, e2D
 
  if (npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
 IF ( mype == 0 ) THEN
@@ -1723,7 +1723,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
          start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
@@ -1744,7 +1744,7 @@ IF ( mype == 0 ) THEN
 ELSE
    
    sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),4)
-   call MPI_SEND(sendbuf, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND(sendbuf, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1763,7 +1763,7 @@ subroutine gather_elem2D_i(arr2D, arr2D_global)
   integer, allocatable          :: recvbuf(:)
   integer                       :: req(npes-1)
   integer                       :: start, e2D
-  CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
   ! Consider MPI-datatypes to recv directly into arr2D_global!
   IF ( mype == 0 ) THEN
      if (npes > 1) then
@@ -1771,7 +1771,7 @@ subroutine gather_elem2D_i(arr2D, arr2D_global)
         do  n = 1, npes-1
             e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
             start = remPtr_elem2D(n)
-            call MPI_IRECV(recvbuf(start), e2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+            call MPI_IRECV(recvbuf(start), e2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
         enddo      
         arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
         call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
@@ -1782,7 +1782,7 @@ subroutine gather_elem2D_i(arr2D, arr2D_global)
         arr2D_global(:) = arr2D(:)
      endif
   ELSE
-     call MPI_SEND(arr2D, myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
+     call MPI_SEND(arr2D, myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
   ENDIF
 end subroutine gather_elem2D_i
 !============================================================================
@@ -1804,7 +1804,7 @@ integer  :: start, n2D
 
 if (npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
@@ -1815,7 +1815,7 @@ IF ( mype == 0 ) THEN
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, req(n), MPIerr)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
       enddo
       
       arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
@@ -1833,7 +1833,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
+   call MPI_SEND( arr2D, myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
@@ -1858,26 +1858,26 @@ IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
     DO  n = 1, npes-1
        CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                      0, MPI_COMM_WORLD, status, MPIerr )
+                      0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(rbuf(buf_size), ibuf(buf_size))
 
        CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
 
        CALL MPI_RECV(rbuf(1), buf_size, MPI_DOUBLE_PRECISION, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
        arr2Dglobal(ibuf)=rbuf
        DEALLOCATE(ibuf, rbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D
 !
 !============================================================================
@@ -1898,26 +1898,26 @@ IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
     DO  n = 1, npes-1
        CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                      0, MPI_COMM_WORLD, status, MPIerr )
+                      0, MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(ibuf(buf_size), vbuf(buf_size))
 
        CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
-                      1, MPI_COMM_WORLD, status, MPIerr )
+                      1, MPI_COMM_FESOM, status, MPIerr )
 
        CALL MPI_RECV(vbuf(1), buf_size, MPI_INTEGER, sender, &
-                      2, MPI_COMM_WORLD, status, MPIerr )
+                      2, MPI_COMM_FESOM, status, MPIerr )
        arr2Dglobal(ibuf)=vbuf
        DEALLOCATE(ibuf, vbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
+    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_INTEGER, 0, 2,&
-                   MPI_COMM_WORLD, MPIerr )
+                   MPI_COMM_FESOM, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_WORLD,MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D_i
 !==============================================
 

@@ -99,6 +99,14 @@ endif
  allocate(elevation(n_size))           ! =ssh  of ocean        
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
+#if defined (__oasis)
+  allocate(oce_heat_flux(n2), ice_heat_flux(n2))
+  allocate(tmp_oce_heat_flux(n2), tmp_ice_heat_flux(n2))
+  oce_heat_flux=0.
+  ice_heat_flux=0.
+  tmp_oce_heat_flux=0.
+  tmp_ice_heat_flux=0.
+#endif /* (__oasis) */
 end subroutine ice_array_setup
 !==========================================================================
 subroutine ice_timestep(step)
