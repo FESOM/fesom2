@@ -18,7 +18,7 @@ ulimit -s unlimited
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun --mpi=pmi2 --ntasks=288 ./fesom > "fesom.out"
+srun --mpi=pmi2 --ntasks=288 ../build/src/fesom > "fesom.out"
 date
 # qstat -f $PBS_JOBID
 

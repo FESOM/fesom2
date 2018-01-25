@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(METIS)
 
 #set(GKLIB_PATH "GKlib" CACHE PATH "path to GKlib")
-set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/fesom2.0/lib/metis-5.1.0/GKlib" CACHE PATH "path to GKlib")
+set(GKLIB_PATH "${CMAKE_SOURCE_DIR}/lib/metis-5.1.0/GKlib" CACHE PATH "path to GKlib")
 set(SHARED FALSE CACHE BOOL "build a shared library")
 
 #if(MSVC)

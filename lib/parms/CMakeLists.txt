@@ -6,7 +6,7 @@ project(parms C)
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB all_sources ${src_home}/src/*.c ${src_home}/src/DDPQ/*.c)
 
-include("${CMAKE_CURRENT_LIST_DIR}/../../../cmake/FindBLAS.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindBLAS.cmake")
 
 # create our library (set its name to name of this project)
 add_library(${PROJECT_NAME} ${all_sources})

@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.4)
 
 project(fesom C Fortran)
 
-set(FESOM_STANDALONE ON CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
-
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB sources_Fortran ${src_home}/*.F90)
@@ -21,7 +19,7 @@ include_directories(../lib/metis-5.1.0/include)
 # depends on the parms library
 add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
-include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
 target_compile_definitions(${PROJECT_NAME}_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
@@ -41,7 +39,6 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} psmile)
 if(NOT ${FESOM_STANDALONE})
    target_link_libraries(${PROJECT_NAME} psmile)
 endif()
