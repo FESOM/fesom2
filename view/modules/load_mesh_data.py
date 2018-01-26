@@ -35,8 +35,6 @@ def load_mesh(path, abg = [50, 15, -90], usepickle = True,
         Path to the directory with mesh files
     abg : list
         alpha, beta and gamma Euler angles. Default [50, 15, -90]
-    get3d : bool
-        do we load complete 3d mesh or only 2d nodes.
 
     Returns
     -------
@@ -78,7 +76,7 @@ def load_mesh(path, abg = [50, 15, -90], usepickle = True,
         return mesh
     
     elif (usepickle==False) and (usejoblib==False):
-        mesh = fesom_mesh(path=path, abg=abg, get3d=get3d)
+        mesh = fesom_mesh(path=path, abg=abg)
         return mesh
 
     if (usejoblib==True) and (os.path.isfile(joblib_file)):
