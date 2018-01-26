@@ -21,9 +21,19 @@ use g_forcing_arrays
 use io_RESTART
 use io_MEANDATA
 use io_mesh_info
+#if defined (__oasis)
+use cpl_driver
+#endif
 IMPLICIT NONE
 
-integer :: n, nsteps,offset,row,i
+integer :: n, nsteps, offset, row, i
+
+call MPI_INIT(i)
+!cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+#if defined (__oasis)
+        call cpl_oasis3mct_init(MPI_COMM_FESOM)
+#endif
+
 	call par_init 
 	!=====================
 	! Read configuration data,  
@@ -73,7 +83,7 @@ integer :: n, nsteps,offset,row,i
 	! Time stepping
 	!=====================
 	if (mype==0) write(*,*) 'start interation before the barrier...'
-		call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
+		call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
 	if (mype==0) write(*,*) 'start interation after the barrier...'
 	
 	

@@ -438,8 +438,8 @@ subroutine was_error(entry)
   type(Meandata), intent(inout) :: entry
   integer                       :: k, status, ierror
 
-  call MPI_BCast(entry%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(entry%error_status(1), entry%error_count, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(entry%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(entry%error_status(1), entry%error_count, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
   do k=1, entry%error_count
      status=entry%error_status(k)

@@ -449,8 +449,8 @@ MODULE io_BLOWUP
 		type(nc_file),  intent(inout) :: id
 		integer                       :: k, status, ierror
 		
-		call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-		call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+		call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+		call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 		
 		do k=1, id%error_count
 			status=id%error_status(k)

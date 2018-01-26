@@ -58,7 +58,7 @@ implicit none
   integer, pointer           :: pid
 
   
-  call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+  call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 
   filename=trim(ResultPath)//runid//'.mesh.diag.nc'
   call my_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid)
@@ -237,7 +237,7 @@ if (mype==0) then
    status =  nf_def_dim(ncid, trim(short_name), value, id)
 end if
 
-call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_def_dim
@@ -256,14 +256,14 @@ if (mype==0) then
    status = nf_def_var(ncid, trim(short_name), vtype, dsize, dids, id)
 end if
 
-call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 
 if (mype==0) then
    status = nf_put_att_text(ncid, id, 'long_name', len_trim(att_text), trim(att_text));
 end if
 
-call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_def_var
@@ -279,7 +279,7 @@ if (mype==0) then
    status = nf_enddef(ncid)
 end if
 
-call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 end subroutine my_nf_enddef
 !
@@ -294,7 +294,7 @@ integer              :: ierror, status
 
 
   if (mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_put_vara_double_1D
@@ -309,7 +309,7 @@ real(kind=WP)        :: var(:)
 integer              :: ierror, status
 
   if (mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_put_vara_double_2D
@@ -325,7 +325,7 @@ integer              :: ierror, status
 
 
   if (mype==0) status=nf_put_vara_int(ncid, varid, start, N, var)
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_put_vara_int_1D
@@ -340,7 +340,7 @@ integer              :: var(:)
 integer              :: ierror, status
 
   if (mype==0) status=nf_put_vara_int(ncid, varid, start, N, var)
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status)
 
 end subroutine my_put_vara_int_2D
@@ -357,7 +357,7 @@ integer                    :: ierror, status
      status = nf_create(filename, opt, ncid)
      if (status.ne.nf_noerr) call handle_err(status)
   end if
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status .ne. nf_noerr) call handle_err(status)
 end subroutine my_create
 !
@@ -370,7 +370,7 @@ integer                    :: ierror, status
 
 if (mype==0) status = nf_close(ncid)
 
-call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 end subroutine my_close
 

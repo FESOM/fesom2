@@ -82,7 +82,7 @@ IMPLICIT NONE
      close(fileID)
   end if
   ! check the error status
-  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
@@ -93,7 +93,7 @@ IMPLICIT NONE
   if (mype/=0) then
      allocate(part(npes+1))
   end if
-  call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (mype==0) write(*,*) mype,'rpart is read'
 
   !===========================
@@ -141,7 +141,7 @@ IMPLICIT NONE
     write(*,*) 'reading '// trim(file_name)   
   end if
   ! check the error status
-  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: nod2D/=part(npes+1)-1'
@@ -168,9 +168,9 @@ IMPLICIT NONE
            read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
         end do
      end if
-     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-     call MPI_BCast(rbuff(1:k,2), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(rbuff(1:k,2), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
      ! fill the local arrays
      do n=1, k
         x=rbuff(n,1)*rad
@@ -205,7 +205,7 @@ IMPLICIT NONE
      read(fileID,*) elem2d
      write(*,*) 'reading '// trim(file_name)   
   end if
-  call MPI_BCast(elem2d, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   allocate(elem2D_nodes(3, myDim_elem2D))
 
   ! 0 proc reads the data in chunks and distributes it between other procs
@@ -226,9 +226,9 @@ IMPLICIT NONE
         end do
      end if
 
-     call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-     call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+     call MPI_BCast(ibuff(1:k,1), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
      do n=1, k
         if (mapping(n)>0) then
@@ -274,10 +274,10 @@ IMPLICIT NONE
     open(fileID, file=file_name)
     read(fileID,*) nl  ! the number of levels 
  end if
- call MPI_BCast(nl, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+ call MPI_BCast(nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
  allocate(zbar(nl))              ! allocate the array for storing the standard depths
  if (mype==0) read(fileID,*) zbar
- call MPI_BCast(zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+ call MPI_BCast(zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
  if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
  allocate(Z(nl-1))
  Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
@@ -301,7 +301,7 @@ IMPLICIT NONE
           read(fileID,*) rbuff(n,1)
        end do
     end if
-    call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
     do n=1, k
        x=rbuff(n,1)
@@ -400,7 +400,7 @@ IMPLICIT NONE
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
-CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
  if (mype==0) then
     write(*,*) '========================='
@@ -465,7 +465,7 @@ IMPLICIT NONE
           read(fileID,*) ibuff(n)
        end do
     end if
-    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
     ! fill the local arrays
     do n=1, k      
        if (mapping(n)>0) then
@@ -507,7 +507,7 @@ IMPLICIT NONE
           read(fileID,*) ibuff(n)
        end do
     end if
-    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
     ! fill the local arrays
     do n=1, k      
        if (mapping(n)>0) then
@@ -525,7 +525,7 @@ IMPLICIT NONE
  deallocate(ibuff)
  deallocate(mapping)
  !============================== 
-CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
 
  if (mype==0) then
@@ -622,8 +622,8 @@ chunk_size=100000
     write(*,*) '2D mesh info : edge2D=', edge2D
     close(fileID)
   end if
-  call MPI_BCast(edge2D,    1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(edge2D_in, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(edge2D,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(edge2D_in, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
   allocate(edges(2,myDim_edge2D+eDim_edge2D))
   allocate(edge_tri(2,myDim_edge2D+eDim_edge2D))
@@ -658,10 +658,10 @@ chunk_size=100000
           read(fileID+1,*) ibuff(3:4,n) !edge elements
        end do
     end if
-    call MPI_BCast(ibuff(1:4,1:k), 4*k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-!    call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-!    call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-!    call MPI_BCast(ibuff(1:k,4), k, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+    call MPI_BCast(ibuff(1:4,1:k), 4*k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+!    call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+!    call MPI_BCast(ibuff(1:k,3), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+!    call MPI_BCast(ibuff(1:k,4), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
     ! fill the local arrays
     do n=1, k      
        if (mapping(n)>0) then
@@ -824,7 +824,7 @@ integer               :: elem, eledges(3), elem1, j, n, node, enum,elems(3),coun
 integer, allocatable  :: temp_i(:)
 integer               :: mymax(npes), rmax(npes)
 real(kind=WP)         :: t0, t1
-CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 t0=MPI_Wtime()
 
  ! =============
@@ -857,14 +857,14 @@ END DO
     nod_in_elem2D_num(node)=nod_in_elem2D_num(node)+1
     end do
  end do
-CALL MPI_BARRIER(MPI_COMM_WORLD, MPIerr)
+CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 
  mymax=0
  rmax=0
  mymax(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
  call MPI_AllREDUCE( mymax, rmax, &
        npes, MPI_INTEGER,MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
+       MPI_COMM_FESOM, MPIerr)
  
  allocate(nod_in_elem2D(maxval(rmax),myDim_nod2D+eDim_nod2D))
  nod_in_elem2D=0
@@ -1074,7 +1074,7 @@ end do
  end do
  ocean_area=0.0
  call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
+       MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
  write(*,*)  mype, 'Mesh statistics:'
@@ -1120,9 +1120,10 @@ IMPLICIT NONE
 integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3)
 real(kind=WP)	     :: a(2), b(2), ax, ay, dfactor, lon, lat
 real(kind=WP)	     :: deltaX31, deltaX21, deltaY31, deltaY21
-real(kind=WP)         :: x(3), y(3), cxx, cxy, cyy, d
+real(kind=WP)        :: x(3), y(3), cxx, cxy, cyy, d
 real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:) 
-real(kind=WP)                             :: t0, t1
+real(kind=WP)              :: t0, t1
+integer                    :: i, nn, ns
 
 t0=MPI_Wtime()
 
@@ -1303,6 +1304,39 @@ END DO
       gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
     END DO
     deallocate(center_y, center_x)
+
+
+#if defined (__oasis)
+  nn=0
+  ns=0  
+  allocate(lump2d_north(myDim_nod2D), lump2d_south(myDim_nod2D))
+  lump2d_north=0.
+  lump2d_south=0.
+  do i=1, myDim_nod2D
+     if (geo_coord_nod2D(2, i) > 0) then
+        nn=nn+1
+        lump2d_north(n)=area(1, i)
+     else
+        ns=ns+1     
+        lump2d_south(n)=area(1, i)
+     end if	   
+  end do   
+
+  if (nn>0) allocate(ind_north(nn))
+  if (ns>0) allocate(ind_south(ns))
+  ns=0
+  nn=0
+  do i=1, myDim_nod2D
+     if (geo_coord_nod2D(2, i) > 0) then
+        nn=nn+1
+	ind_north(nn)=i
+     else
+        ns=ns+1
+	ind_south(ns)=i	
+     end if	     
+  end do     
+#endif 
+
     t1=MPI_Wtime()
     if (mype==0) then
        write(*,*) 'mesh_auxiliary_arrays finished in ', t1-t0, ' seconds'
@@ -1338,7 +1372,7 @@ real(kind=8)	     :: vol_n(nl), vol_e(nl), aux(nl)
       end do
    end do
    call MPI_AllREDUCE(aux, vol_n, nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
+       MPI_COMM_FESOM, MPIerr)
 
    aux=0.
    do elem=1, myDim_elem2D
@@ -1349,7 +1383,7 @@ real(kind=8)	     :: vol_n(nl), vol_e(nl), aux(nl)
       end do
    end do
    call MPI_AllREDUCE(aux, vol_e, nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
+       MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
 write(*,*) '***start level area_test***'

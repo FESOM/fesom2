@@ -27,7 +27,7 @@ subroutine read_CORE_NetCDF(file,vari,itime,ncdata)
        io=nf_open(file, nf_nowrite, ncid)
   end if
 
-  call MPI_BCast(io, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(io, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (io.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ FORCING FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
@@ -41,7 +41,7 @@ subroutine read_CORE_NetCDF(file,vari,itime,ncdata)
        io=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
        io=nf_close(ncid)
   end if
-  call MPI_BCast(ncdata, nci*ncj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(ncdata, nci*ncj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   return
 end subroutine read_CORE_NetCDF
 
@@ -80,7 +80,7 @@ subroutine read_NCEP_NetCDF(file,vari,itime,ncdata)
      io=nf_open(file, nf_nowrite, ncid)
   end if
 
-  call MPI_BCast(io, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(io, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (io.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ FORCING FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
@@ -102,7 +102,7 @@ subroutine read_NCEP_NetCDF(file,vari,itime,ncdata)
      ! close file 
      io=nf_close(ncid)
   end if
-  call MPI_BCast(iuw, nci*ncj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(iuw, nci*ncj, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
   ! ncdata
   do j=1,ncj
@@ -177,7 +177,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      status=nf_open(file, nf_nowrite, ncid)
   end if
 
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
@@ -193,8 +193,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      status=nf_inq_dimid(ncid, 'lon', lonid)
      status=nf_inq_dimlen(ncid, lonid, lonlen)
   end if
-  call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
   ! lat
   allocate(lat(latlen))
@@ -202,7 +202,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      status=nf_inq_varid(ncid, 'lat', varid)
      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
   end if
-  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)  
+  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
@@ -210,7 +210,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      status=nf_inq_varid(ncid, 'lon', varid)
      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
   end if
-  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)  
+  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! make sure range 0. - 360.
   do n=1,lonlen
@@ -233,8 +233,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
     ! close file
     status=nf_close(ncid)
   end if
-  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   !write(*,*)'miss', miss
   !write(*,*)'raw',minval(ncdata),maxval(ncdata)
   ncdata_temp=ncdata
@@ -320,7 +320,7 @@ end subroutine read_other_NetCDF
      status=nf_open(file, nf_nowrite, ncid)
   end if
 
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
@@ -343,7 +343,7 @@ end subroutine read_other_NetCDF
      status=nf_inq_varid(ncid, 'lat', varid)
      status=nf_get_vara_double(ncid,varid,1,latlen,lat)
    end if
-  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)  
+  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
@@ -351,7 +351,7 @@ end subroutine read_other_NetCDF
      status=nf_inq_varid(ncid, 'lon', varid)
      status=nf_get_vara_double(ncid,varid,1,lonlen,lon)
   end if
-  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)  
+  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! make sure range 0. - 360.
   do n=1,lonlen
@@ -376,8 +376,8 @@ end subroutine read_other_NetCDF
      !close file
      status=nf_close(ncid)
   end if
-  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
-  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   ! the next step is to interpolate data to model grids
   ! model grid coordinates
   num=myDim_nod2d+eDim_nod2d
@@ -427,7 +427,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray)
     ! open file
     status=nf_open(file, nf_nowrite, ncid)
   end if
-  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
@@ -443,7 +443,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray)
      status=nf_get_vara_double(ncid,varid,istart,icount,ncdata)
      status=nf_close(ncid)
   end if      
-  call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierror)
+  call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D)     
 end subroutine read_2ddata_on_grid_NetCDF
   

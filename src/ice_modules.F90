@@ -63,6 +63,13 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
+#if defined (__oasis)
+  real(kind=8),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
+  real(kind=8),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
+							!temporary flux fields
+							!(for flux correction)
+#endif /* (__oasis) */
+
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y

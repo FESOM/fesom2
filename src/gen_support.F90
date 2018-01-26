@@ -190,7 +190,7 @@ subroutine integrate_nod_2D(data, int2D)
 
   int2D=0.0
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_WORLD, MPIerr)
+       MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_2D
 end module g_support
 

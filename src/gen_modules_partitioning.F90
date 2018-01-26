@@ -11,6 +11,7 @@ save
  include 'mpif.h'
 #endif
 
+ integer                                :: MPI_COMM_FESOM
  integer, parameter   :: MAX_LAENDERECK=8
   type com_struct
      integer    :: rPEnum                    ! the number of PE I receive info from 
@@ -78,18 +79,20 @@ save
 
 contains
 subroutine par_init    ! initializes MPI
-
   implicit none
 
 
   integer :: i
 
-  call MPI_INIT(i);
+#ifndef __oasis
   call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
   call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
-#ifdef PETSC
-  call PETSCInitialize(PETSC_NULL_CHARACTER,i);
-#endif
+  MPI_COMM_FESOM=MPI_COMM_WORLD
+#else
+  call MPI_Comm_Size(MPI_COMM_FESOM,npes, i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,mype, i)
+#endif  
+
   if(mype==0) then
   write(*,*) 'MPI has been initialized'
   write(*, *) 'Running on ', npes, ' PEs'
@@ -101,9 +104,9 @@ subroutine par_ex(abort)       ! finalizes MPI
   integer,optional :: abort
   if (present(abort)) then
    write(*,*) 'Run finished unexpectedly!'
-   call MPI_ABORT( MPI_COMM_WORLD, 1 )
+   call MPI_ABORT( MPI_COMM_FESOM, 1 )
   else
-  call  MPI_Barrier(MPI_COMM_WORLD,MPIerr)
+  call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
   call  MPI_Finalize(MPIerr)
   endif
 end subroutine par_ex
@@ -129,7 +132,7 @@ subroutine set_par_support_ini
   ! Construct partitioning vector
   if (n_levels<1 .OR. n_levels>10) then
      print *,'Number of hierarchic partition levels is out of range [1-10]! Aborting...'
-     call MPI_ABORT( MPI_COMM_WORLD, 1 )
+     call MPI_ABORT( MPI_COMM_FESOM, 1 )
   end if
 
   np(:) = n_part(:)               ! Number of partitions on each hierarchy level
@@ -754,8 +757,8 @@ subroutine init_gatherLists
         remPtr_elem2D(1) = 1
         
         do n=1, npes-1
-           call MPI_RECV(n2D, 1, MPI_INTEGER, n, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE, MPIerr )
-           call MPI_RECV(e2D, 1, MPI_INTEGER, n, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, MPIerr )
+           call MPI_RECV(n2D, 1, MPI_INTEGER, n, 0, MPI_COMM_FESOM, MPI_STATUS_IGNORE, MPIerr )
+           call MPI_RECV(e2D, 1, MPI_INTEGER, n, 1, MPI_COMM_FESOM, MPI_STATUS_IGNORE, MPIerr )
 
            remPtr_nod2D(n+1)  = remPtr_nod2D(n)  + n2D
            remPtr_elem2D(n+1) = remPtr_elem2D(n) + e2D 
@@ -771,21 +774,21 @@ subroutine init_gatherLists
         do n=1, npes-1
            nstart = remPtr_nod2D(n)
            n2D    = remPtr_nod2D(n+1) - remPtr_nod2D(n) 
-           call MPI_RECV(remList_nod2D(nstart), n2D, MPI_INTEGER, n, 2, MPI_COMM_WORLD, &
+           call MPI_RECV(remList_nod2D(nstart), n2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, &
                                                            MPI_STATUS_IGNORE, MPIerr ) 
            estart = remPtr_elem2D(n)
            e2D    = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-           call MPI_RECV(remList_elem2D(estart),e2D, MPI_INTEGER, n, 3, MPI_COMM_WORLD, &
+           call MPI_RECV(remList_elem2D(estart),e2D, MPI_INTEGER, n, 3, MPI_COMM_FESOM, &
                                                            MPI_STATUS_IGNORE, MPIerr ) 
 
         enddo
      end if
   else
 
-     call MPI_SEND(myDim_nod2D,   1,            MPI_INTEGER, 0, 0, MPI_COMM_WORLD, MPIerr )
-     call MPI_SEND(myDim_elem2D,  1,            MPI_INTEGER, 0, 1, MPI_COMM_WORLD, MPIerr )
-     call MPI_SEND(myList_nod2D,  myDim_nod2D,  MPI_INTEGER, 0, 2, MPI_COMM_WORLD, MPIerr )
-     call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_WORLD, MPIerr )
+     call MPI_SEND(myDim_nod2D,   1,            MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
+     call MPI_SEND(myDim_elem2D,  1,            MPI_INTEGER, 0, 1, MPI_COMM_FESOM, MPIerr )
+     call MPI_SEND(myList_nod2D,  myDim_nod2D,  MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
+     call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_FESOM, MPIerr )
 
   endif
 

@@ -517,7 +517,7 @@ allocate(nlevels_nod2D(nod2D))
 ! ===================
    DO n=1, elem2D
       nodes=elem2D_nodes(1:3,n)
-      dmean=minval(depth(nodes))
+      dmean=maxval(depth(nodes))
       exit_flag=0
           DO nz=1,nl-1
                  if(Z(nz)<dmean) then

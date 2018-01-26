@@ -739,9 +739,9 @@ subroutine ini_global_ocean
     minlat=min(minlat, lat)
  END DO
 
- call MPI_AllREDUCE(minlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, MPIerr)
+ call MPI_AllREDUCE(minlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
  minlat=val
- call MPI_AllREDUCE(maxlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, MPIerr)
+ call MPI_AllREDUCE(maxlat, val, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
  maxlat=val
 
  ! Stratification

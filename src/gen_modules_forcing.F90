@@ -69,6 +69,15 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
+
+#if defined (__oasis)
+  real(kind=8), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
+  real(kind=8), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
+  real(kind=8), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
+  real(kind=8), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
+  real(kind=8), allocatable, dimension(:)         :: oce_net_fluxes_north, oce_net_fluxes_south
+  real(kind=8), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
+#endif
   
   real(kind=WP), allocatable, dimension(:)         :: runoff_landice
   real(kind=WP)                                    :: landice_season(12)
