@@ -734,7 +734,7 @@ subroutine fct_ale(ttf, iter_yn)
 end subroutine fct_ale
 !
 !===============================================================================
-! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
+! implicit vertical advection with wvel_i to solve for fct_LO
 subroutine fct_LO_impl_ale
 	use o_MESH
 	use o_PARAM
