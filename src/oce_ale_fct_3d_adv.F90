@@ -7,6 +7,7 @@ subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
 	use o_MESH
 	use o_PARAM
 	use g_PARSUP
+	use g_comm_auto
 	implicit none
 	
 	real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), ttf(nl-1, myDim_nod2D+eDim_nod2D)
@@ -14,7 +15,11 @@ subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
 	integer        :: i
 	! 1st. first calculate Low and High order solution
 	call fct_ale_muscl_LH(ttfAB,ttf,num_ord)
-
+        
+        if (w_split) then
+           call fct_LO_impl_ale
+           call exchange_nod(fct_LO)
+        end if
 !just for using the low order:
 !	fct_adf_h = 0.
 !	fct_adf_v = 0.
@@ -74,7 +79,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 	integer       :: n2, nl1, nl2,tr_num
 	real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
 	real(kind=WP) :: qc, qu, qd
-	real(kind=WP) :: tvert(nl), a, b, c, d, da, db, dg, vflux, Tupw1
+	real(kind=WP) :: tvert(nl), tvert_e(nl), a, b, c, d, da, db, dg, vflux, Tupw1
 	real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
 	real(kind=WP) :: ttfAB(nl-1,myDim_nod2D+eDim_nod2D), ttf(nl-1,myDim_nod2D+eDim_nod2D)
 	
@@ -90,7 +95,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 	!                   fct_adf_h
 	!                   fct_adf_v
 	! --------------------------------------------------------------------------
-	
+        !in case w_split is on:
+	!tvert_e is the explicit part of the vertical flux for LO
+        ! 
 	!___________________________________________________________________________
 	! Clean the low-order solution
 	fct_LO=0.0_WP 
@@ -315,19 +322,28 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! vert. flux at surface layer
 		nz=1
-		tvert(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
+                if (w_split) then
+                   tvert_e(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
+                end if
+		tvert(nz)  =-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
 		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
 		! vert. flux at surface + 1 layer --> centered differences
 		nz=2
 		! low order
-		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                if (w_split) then
+                   cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
 					 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+                   tvert_e(nz)=cLO*area(nz,n)
+                end if
+
+		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+					 ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
 		tvert(nz)=cLO*area(nz,n)
 		
 		! high order
-		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
+		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
 		fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
@@ -336,12 +352,17 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		! vert. flux at bottom - 1 layer --> centered differences
 		nz=nl1-1
 		! low order
-		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                if (w_split) then
+                   cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
 					 ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+                   tvert_e(nz)=cLO*area(nz,n)
+                end if
+		cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+					 ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
 		tvert(nz)=cLO*area(nz,n)
-		
+                		
 		! high order
-		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel_e(nz,n)
+		cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
 		
 		! antidiffusive flux: (HO-LO)
 		fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
@@ -349,7 +370,10 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! vert. flux at bottom layer --> zero bottom flux
 		nz=nl1
-		tvert(nz)=0.0_WP	
+		tvert(nz)=0.0_WP
+                if (w_split) then	
+		   tvert_e(nz)=0.0_WP
+                end if
 		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
@@ -360,12 +384,15 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! vert. flux at remaining levels    
 		do nz=3,nl1-2
-			
 			! low order --> First-order upwind estimate
-			cLO=-0.5*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-					  ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+                        if (w_split) then	
+			   cLO=-0.5*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                                     ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+			   tvert_e(nz)=cLO*area(nz,n)
+                        end if	
+			cLO=-0.5*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+					  ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
 			tvert(nz)=cLO*area(nz,n)
-			
 			! high order --> centered (4th order)
 			qc=(ttfAB(nz-1,n)-ttfAB(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
 			qu=(ttfAB(nz  ,n)-ttfAB(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
@@ -373,9 +400,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 			
 			Tmean1=ttfAB(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
 			Tmean2=ttfAB(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-			Tmean =(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))*Tmean1+ &
-				   (Wvel_e(nz,n)-abs(Wvel_e(nz,n)))*Tmean2
-			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel_e(nz,n)+(1.0_WP-num_ord)*Tmean)
+			Tmean =(Wvel(nz,n)+abs(Wvel(nz,n)))*Tmean1+ &
+				   (Wvel(nz,n)-abs(Wvel(nz,n)))*Tmean2
+			cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel(nz,n)+(1.0_WP-num_ord)*Tmean)
 			
 			! antidiffusive flux: (HO-LO)
 			fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
@@ -388,7 +415,11 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		!_______________________________________________________________________
 		! writing horizontal and vertical low order fct advection into rhs
 		do  nz=1,nlevels_nod2D(n)-1
-			fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(tvert(nz)-tvert(nz+1)))*dt/area(nz,n))/hnode_new(nz,n)
+                        if (w_split) then
+			   fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(tvert_e(nz)-tvert_e(nz+1)))*dt/area(nz,n))/hnode_new(nz,n)
+                        else
+			   fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(tvert(nz)-tvert(nz+1)))*dt/area(nz,n))/hnode_new(nz,n)
+                        end if
 		end do
 		
 	end do ! --> do n=1, myDim_nod2D
@@ -701,3 +732,130 @@ subroutine fct_ale(ttf, iter_yn)
 		end do
 	end do
 end subroutine fct_ale
+!
+!===============================================================================
+! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
+subroutine fct_LO_impl_ale
+	use o_MESH
+	use o_PARAM
+	use o_ARRAYS
+	use i_ARRAYS
+	use g_PARSUP
+	use g_CONFIG
+	use g_forcing_arrays
+        use o_mixing_KPP_mod !for ghats _GO_		
+		
+	implicit none
+	
+	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
+	real(kind=WP)       :: cp(nl), tp(nl)
+	integer             :: nz, n, nzmax,tr_num
+	real(kind=WP)       :: m, zinv, dt_inv, dz
+	real(kind=WP)       :: c1, v_adv
+	
+	dt_inv=1.0_WP/dt
+	
+	!___________________________________________________________________________
+	! loop over local nodes
+	do n=1,myDim_nod2D  
+		
+		! initialise
+		a  = 0.0_WP
+		b  = 0.0_WP
+		c  = 0.0_WP
+		tr = 0.0_WP
+		tp = 0.0_WP
+		cp = 0.0_WP
+		
+		! max. number of levels at node n
+		nzmax=nlevels_nod2D(n)
+		
+		!___________________________________________________________________________
+		! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because  
+		! they be calculate from the actualized mesh with hnode_new
+		! calculate new zbar (depth of layers) and Z (mid depths of layers) 
+		! depending on layer thinkness over depth at node n
+		! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
+		zbar_n=0.0_WP
+		Z_n=0.0_WP
+		zbar_n(nzmax)=zbar(nzmax)
+		Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+		do nz=nzmax-1,2,-1
+			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
+			Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+		end do
+		zbar_n(1) = zbar_n(2) + hnode_new(1,n)
+		
+		!_______________________________________________________________________
+		! Regular part of coefficients: --> surface layer 
+		nz=1
+		
+		! 1/dz(nz)
+		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
+
+		a(1)=0.0_WP
+		v_adv=zinv*area(2,n)/area(1,n)
+		b(1)= hnode_new(1,n)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
+		c(1)=-max(0._WP, Wvel_i(2, n))*v_adv
+		!_______________________________________________________________________
+		! Regular part of coefficients: --> 2nd...nl-2 layer
+		do nz=2, nzmax-2
+			! update from the vertical advection
+			a(nz)=min(0._WP, Wvel_i(nz, n))*zinv
+			b(nz)=hnode_new(nz,n)+max(0._WP, Wvel_i(nz, n))*zinv
+			
+			v_adv=zinv*area(nz+1,n)/area(nz,n)
+			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+			c(nz)=     -max(0._WP, Wvel_i(nz+1, n))*v_adv
+		end do ! --> do nz=2, nzmax-2
+		
+		!_______________________________________________________________________
+		! Regular part of coefficients: --> nl-1 layer
+		nz=nzmax-1
+		! update from the vertical advection
+		a(nz)=                min(0._WP, Wvel_i(nz, n))*zinv
+		b(nz)=hnode_new(nz,n)+max(0._WP, Wvel_i(nz, n))*zinv
+		c(nz)=0.0_WP
+		
+                nz=1
+		dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
+		tr(nz)=-(b(nz)-dz)*fct_LO(nz,n)-c(nz)*fct_LO(nz+1,n)
+
+		do nz=2,nzmax-2
+			dz=hnode_new(nz,n)
+			tr(nz)=-a(nz)*fct_LO(nz-1,n)-(b(nz)-dz)*fct_LO(nz,n)-c(nz)*fct_LO(nz+1,n)
+		end do
+		nz=nzmax-1
+		dz=hnode_new(nz,n)
+		tr(nz)=-a(nz)*fct_LO(nz-1,n)-(b(nz)-dz)*fct_LO(nz,n)
+
+
+		cp(1) = c(1)/b(1)
+		tp(1) = tr(1)/b(1)
+		
+		! solve for vectors c-prime and t, s-prime
+		do nz = 2,nzmax-1
+			m = b(nz)-cp(nz-1)*a(nz)
+			cp(nz) = c(nz)/m
+			tp(nz) = (tr(nz)-tp(nz-1)*a(nz))/m
+		end do
+		
+		! start with back substitution 
+		tr(nzmax-1) = tp(nzmax-1)
+		
+		! solve for x from the vectors c-prime and d-prime
+		do nz = nzmax-2, 1, -1
+			tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
+		end do
+		
+		!_______________________________________________________________________
+		! update tracer
+		do nz=1,nzmax-1
+			fct_LO(nz,n)=fct_LO(nz,n)+tr(nz)
+		end do
+	end do ! --> do n=1,myDim_nod2D   
+end subroutine fct_LO_impl_ale
+!
+!
+!===============================================================================
+

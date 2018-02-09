@@ -65,8 +65,8 @@ subroutine ini_mean_io
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
   call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'm')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'm')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
@@ -78,6 +78,9 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'uice',  'ice velocity x',          'm/s',    u_ice,                         1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm')
@@ -85,6 +88,17 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm')
+
+  call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',      'N/m2',   stress_atmice_x(:),            1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',      'N/m2',   stress_atmice_y(:),            1, 'm')
+
+  call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',      'N/m2',   stress_atmoce_x(:),            1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',      'N/m2',   stress_atmoce_y(:),            1, 'm')
+
+  call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',      'N/m2',   stress_iceoce_x(:),            1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm')
+
+
   call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y')
@@ -98,12 +112,12 @@ subroutine ini_mean_io
 
 
   if (Fer_GM) then
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U', 'm/s',     fer_uv(1,:,:),  1, 'm')
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V', 'm/s',     fer_uv(2,:,:),  1, 'm')
-     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W', 'm/s',     fer_Wvel(:,:),  1, 'm')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U', 'm/s',     fer_uv(1,:,:),  1, 'y')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V', 'm/s',     fer_uv(2,:,:),  1, 'y')
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W', 'm/s',     fer_Wvel(:,:),  1, 'y')
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'fer_K', 'GM, stirring diffusivity',     'm2/s',        fer_k(1:myDim_nod2D),           1, 'm')
-     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'y')
+     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
   end if
 end subroutine ini_mean_io
 !

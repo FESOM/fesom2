@@ -268,7 +268,8 @@ subroutine check_blowup(istep)
 					write(*,*) 'mstep       = ',istep
 					write(*,*) 'node        = ',n
 					write(*,*) 'nz          = ',nz
-					write(*,*)
+					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
+					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'temp(nz, n) = ',tr_arr(nz, n,1)
 					write(*,*) 'temp(: , n) = ',tr_arr(:, n,1)
 					write(*,*) 'temp_old(nz,n)= ',tr_arr_old(nz, n,1)
@@ -320,7 +321,8 @@ subroutine check_blowup(istep)
 					write(*,*) 'mstep       = ',istep
 					write(*,*) 'node        = ',n
 					write(*,*) 'nz          = ',nz
-					write(*,*)
+					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
+					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'salt(nz, n) = ',tr_arr(nz, n,2)
 					write(*,*) 'salt(: , n) = ',tr_arr(:, n,2)
 					write(*,*)

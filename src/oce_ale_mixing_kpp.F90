@@ -355,7 +355,7 @@ contains
   END DO    
 
 ! OVER ELEMENTS 
-
+  call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      DO nz=1,nlevels(elem)-1

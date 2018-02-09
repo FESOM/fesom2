@@ -141,7 +141,7 @@ REAL(kind=8) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
  
  DO n=1, myDim_nod2D
     mass = area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)) 
-    if(mass>0.) then 
+    if(mass > 1.e-3) then 
          U_rhs_ice(n) = U_rhs_ice(n) / mass
          V_rhs_ice(n) = V_rhs_ice(n) / mass
       else
@@ -252,7 +252,7 @@ ay=sin(theta_io)
 ! Precompute values that are never changed during the iteration
  do n=1,myDim_nod2D 
 
-    if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 0._WP) then
+    if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 1.e-3_WP) then
        inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n))) 
     else
        inv_areamass(n) = 0._WP
