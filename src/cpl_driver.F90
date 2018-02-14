@@ -114,6 +114,8 @@ contains
     
     grid_name = 'feom'
 
+write(*,*) 'before prism_init_comp_proto'
+
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
@@ -121,6 +123,9 @@ contains
     IF (ierror /= 0) THEN
         CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
+
+write(*,*) 'after prism_init_comp_proto'
+
     ! Unit for output messages : one file for each process
     CALL MPI_Comm_Rank ( MPI_COMM_WORLD, commRank, ierror )
     IF (ierror /= 0) THEN
@@ -131,7 +136,7 @@ contains
     IF (ierror /= 0) THEN
         CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
-  
+
     ! Get MPI size and rank
     CALL MPI_Comm_Size ( localCommunicator, npes, ierror )
     IF (ierror /= 0) THEN
