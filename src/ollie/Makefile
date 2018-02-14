@@ -31,7 +31,6 @@ MODULES = oce_modules.o \
           oce_ale_mixing_kpp.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
-          gen_str2unstr.o \
 	  fort_part.o \
           gen_input.o \
           io_meandata.o \
@@ -49,7 +48,6 @@ OBJECTS=  fvom_main.o 		\
 	  oce_fer_gm.o 		\
           oce_muscl_adv.o 	\
           oce_ale_fct_3d_adv.o 	\
-	  oce_fct_muscl_adv.o 	\
           oce_ice_init_state.o 	\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\
@@ -58,13 +56,15 @@ OBJECTS=  fvom_main.o 		\
           ice_evp.o 		\
           ice_fct.o 		\
           ice_oce_coupling.o 	\
-          ice_thermodynamics.o 	\
+          ice_thermo_oce.o      \
+          ice_thermo_cpl.o      \
           gen_model_setup.o 	\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\
           gen_forcing_couple.o 	\
           gen_interpolation.o 	\
           gen_events.o 		\
+          io_blowup.o           \
           write_step_info.o
 
 

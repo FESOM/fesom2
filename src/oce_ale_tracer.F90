@@ -19,6 +19,7 @@ subroutine solve_tracers_ale
 	if (Fer_GM) then
 		UV    =UV    +fer_UV
 		Wvel_e=Wvel_e+fer_Wvel
+		Wvel  =Wvel  +fer_Wvel
 	end if
 	!___________________________________________________________________________
 	! loop over all tracers 
@@ -36,13 +37,14 @@ subroutine solve_tracers_ale
 		! relax to salt and temp climatology
 		call relax_to_clim(tr_num)
 		
-		call exchange_nod(tr_arr(:,:,tr_num))		
+		call exchange_nod(tr_arr(:,:,tr_num))
 	end do
 	
 	! subtract the the bolus velocities back from 3D velocities:
 	if (Fer_GM) then
 		UV    =UV    -fer_UV
 		Wvel_e=Wvel_e-fer_Wvel
+		Wvel  =Wvel  -fer_Wvel
 	end if
 	
 end subroutine solve_tracers_ale
@@ -783,10 +785,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! update from the vertical advection --> comes from splitting of vert 
 		! velocity into explicite and implicite contribution
-		v_adv=zinv*area(2,n)/area(1,n)
-		b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
-		c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
-		
+                if (tracer_adv/=2) then
+                   v_adv=zinv*area(2,n)/area(1,n)
+                   b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
+                   c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
+                end if		
 		! backup zinv2 for next depth level
 		zinv1=zinv2
 		
@@ -812,13 +815,14 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			zinv1=zinv2
 			
 			! update from the vertical advection
-			v_adv=zinv
-			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
-			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-			
-			v_adv=v_adv*area(nz+1,n)/area(nz,n)
-			b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
-			c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+                        if (tracer_adv/=2) then
+                           v_adv=zinv
+                           a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
+                           b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+                           v_adv=v_adv*area(nz+1,n)/area(nz,n)
+                           b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+                           c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+                        end if
 		end do ! --> do nz=2, nzmax-2
 		
 		!_______________________________________________________________________
@@ -837,9 +841,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		b(nz)=-a(nz)+hnode_new(nz,n)
 		
 		! update from the vertical advection
-		v_adv=zinv
-		a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
-		b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+                if (tracer_adv/=2) then
+                   v_adv=zinv
+                   a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
+                   b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+                end if
 		
 		!_______________________________________________________________________
 		! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...tr_arr
