@@ -84,14 +84,18 @@ subroutine par_init    ! initializes MPI
 
   integer :: i
 
+  write(*,*) 'Check5'
+
 #ifndef __oasis
   call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
   call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
   MPI_COMM_FESOM=MPI_COMM_WORLD
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes, i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype, i)
+  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
 #endif  
+
+  write(*,*) 'Check6'
 
   if(mype==0) then
   write(*,*) 'MPI has been initialized'

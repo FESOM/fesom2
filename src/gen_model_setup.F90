@@ -24,7 +24,7 @@ subroutine read_namelist
   character(len=100)   :: nmlfile
   namelist /clockinit/ timenew, daynew, yearnew
 
-  nmlfile ='../config/namelist.config'    ! name of general configuration namelist file
+  nmlfile ='config/namelist.config'    ! name of general configuration namelist file
 !  nmlfile ='/home-nfs/ollie/ogurses/fesom2.0/config/namelist.config'
   open (20,file=nmlfile)
   read (20,NML=modelname)
@@ -54,14 +54,14 @@ subroutine read_namelist
 
 ! =================================
  
-  nmlfile ='../config/namelist.oce'    ! name of ocean namelist file
+  nmlfile ='config/namelist.oce'    ! name of ocean namelist file
 !  nmlfile ='/home-nfs/ollie/ogurses/fesom2.0/config/namelist.oce'
   open (20,file=nmlfile)
   read (20,NML=oce_dyn)
   read (20,NML=oce_tra)
   close (20)
 
-  nmlfile ='../config/namelist.forcing'    ! name of forcing namelist file
+  nmlfile ='config/namelist.forcing'    ! name of forcing namelist file
 ! nmlfile ='/home-nfs/ollie/ogurses/fesom2.0/config/namelist.forcing'
   open (20,file=nmlfile)
   read (20,NML=forcing_exchange_coeff)
@@ -71,7 +71,7 @@ subroutine read_namelist
   close (20)
 
   if(use_ice) then
-  nmlfile ='../config/namelist.ice'    ! name of ice namelist file
+  nmlfile ='config/namelist.ice'    ! name of ice namelist file
 ! nmlfile ='/home-nfs/ollie/ogurses/fesom2.0/config/namelist.ice'
   open (20,file=nmlfile)
   read (20,NML=ice_dyn)
