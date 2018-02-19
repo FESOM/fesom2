@@ -114,8 +114,6 @@ contains
     
     grid_name = 'feom'
 
- write(*,*) 'Check1'
-
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
@@ -124,14 +122,9 @@ contains
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
 
- write(*,*) 'Check2'
 
     ! Unit for output messages : one file for each process
-#ifndef __oasis
     CALL MPI_Comm_Rank ( MPI_COMM_WORLD, commRank, ierror )
-#else
-    CALL MPI_Comm_Rank ( MPI_COMM_FESOM, commRank, ierror )
-#endif
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
