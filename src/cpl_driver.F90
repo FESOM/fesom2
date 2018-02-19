@@ -129,8 +129,6 @@ contains
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
- write(*,*) 'Check3'
-
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
@@ -152,8 +150,6 @@ contains
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
-
- write(*,*) 'Check4'
 
   end subroutine cpl_oasis3mct_init
 
