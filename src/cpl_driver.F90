@@ -170,7 +170,7 @@ contains
 
   subroutine cpl_oasis3mct_define_unstr
     
-    use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
+    use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
     use o_mesh
     use g_rotate_grid
     
