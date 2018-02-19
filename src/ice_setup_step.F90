@@ -17,11 +17,8 @@ implicit none
   Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                       ! it always enters 
   ! ================
-write(*,*) 'before ice_array_setup'
   call ice_array_setup
-write(*,*) 'after ice_array_setup'
   call ice_fct_init 
-write(*,*) 'after ice_fct_init'
   ! ================
   ! Initialization routine, user input is required 
   ! ================
@@ -47,7 +44,6 @@ USE g_CONFIG
 
 implicit none
 integer   :: n_size, e_size, mn, k, n, n1, n2
-write(*,*) 'check1'
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
@@ -60,7 +56,6 @@ e_size=myDim_elem2D+eDim_elem2D
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
-write(*,*) 'check2'
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
  m_ice_old=0.0_WP !PS
@@ -92,7 +87,6 @@ if (use_means) then
  U_ice_mean=0.0_WP
  V_ice_mean=0.0_WP
 endif
-write(*,*) 'check3'
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
@@ -102,12 +96,9 @@ write(*,*) 'check3'
  allocate(elevation(n_size))           ! =ssh  of ocean        
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
-write(*,*) 'check4'
 #if defined (__oasis)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
-write(*,*) 'check4a'
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
-write(*,*) 'check5'
   oce_heat_flux=0.
   ice_heat_flux=0.
   tmp_oce_heat_flux=0.
