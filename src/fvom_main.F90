@@ -29,7 +29,7 @@ IMPLICIT NONE
 integer :: n, nsteps, offset, row, i
 
 
-	call MPI_INIT(i)
+	!call MPI_INIT(i)
 
 
 !cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
