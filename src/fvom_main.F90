@@ -63,6 +63,10 @@ integer :: n, nsteps, offset, row, i
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
 	endif
+
+	call cpl_oasis3mct_define_unstr
+	if(mype==0)  write(*,*) '---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+
 	call clock_newyear                    	! check if it is a new year
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
 	! The interface to the restart module is made via call restart !
