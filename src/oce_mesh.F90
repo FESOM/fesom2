@@ -1315,10 +1315,10 @@ END DO
   do i=1, myDim_nod2D
      if (geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-        lump2d_north(n)=area(1, i)
+        lump2d_north(i)=area(1, i)
      else
         ns=ns+1     
-        lump2d_south(n)=area(1, i)
+        lump2d_south(i)=area(1, i)
      end if	   
   end do   
 

@@ -12,7 +12,7 @@ module cpl_driver
   !----------------------------------------------------------------------
   ! Modules used
   !
-  use mod_prism                    ! prism module
+  use mod_oasis                    ! oasis module
   use g_config, only : dt
   use o_param,  only : rad
   use g_PARSUP
@@ -43,10 +43,10 @@ module cpl_driver
   integer                    :: localSize      ! local MPI size
   integer                    :: localComm      ! local MPI size
   logical                    :: commRank       ! true for ranks doing OASIS communication
-  integer                    :: comp_id        ! id returned by prism_init_comp
+  integer                    :: comp_id        ! id returned by oasis_init_comp
 
-  logical, save              :: prism_was_initialized
-  logical, save              :: prism_was_terminated
+  logical, save              :: oasis_was_initialized
+  logical, save              :: oasis_was_terminated
   integer, save              :: write_grid
 
   integer, save              :: seconds_til_now=0
@@ -119,33 +119,37 @@ write(*,*) 'before prism_init_comp_proto'
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
-    CALL prism_init_comp_proto(comp_id, comp_name, ierror )
+    CALL oasis_init_comp(comp_id, comp_name, ierror )
     IF (ierror /= 0) THEN
-        CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
-
-write(*,*) 'after prism_init_comp_proto'
 
     ! Unit for output messages : one file for each process
     CALL MPI_Comm_Rank ( MPI_COMM_WORLD, commRank, ierror )
     IF (ierror /= 0) THEN
-        CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
-    CALL prism_get_localcomm_proto( localCommunicator, ierror )
     IF (ierror /= 0) THEN
-        CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
+    ENDIF
+
+
+
+    CALL oasis_get_localcomm( localCommunicator, ierror )
+    IF (ierror /= 0) THEN
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
 
     ! Get MPI size and rank
     CALL MPI_Comm_Size ( localCommunicator, npes, ierror )
     IF (ierror /= 0) THEN
-        CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'comm_size failed.')
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_size failed.')
     ENDIF
     
     CALL MPI_Comm_Rank ( localCommunicator, mype, ierror )
     IF (ierror /= 0) THEN
-        CALL prism_abort_proto(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
+        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
   end subroutine cpl_oasis3mct_init
@@ -156,7 +160,7 @@ write(*,*) 'after prism_init_comp_proto'
 
   subroutine cpl_oasis3mct_define_unstr
     
-    use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
+    use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
     use o_mesh
     use g_rotate_grid
     
@@ -176,12 +180,12 @@ write(*,*) 'after prism_init_comp_proto'
     integer, parameter         :: nbr_masks   = 1
     integer, parameter         :: nbr_methods = 1
 
-    integer                    :: grid_id(nbr_grids)    ! ids returned by prism_def_grid
-    integer                    :: part_id(nbr_parts)    ! ids returned by prism_def_grid
+    integer                    :: grid_id(nbr_grids)    ! ids returned by oasis_def_grid
+    integer                    :: part_id(nbr_parts)    ! ids returned by oasis_def_grid
 
-    integer                    :: point_id(nbr_methods) ! ids returned by prism_set_points
+    integer                    :: point_id(nbr_methods) ! ids returned by oasis_set_points
 
-    integer                    :: mask_id(nbr_masks)    ! ids returned by prism_set_mask
+    integer                    :: mask_id(nbr_masks)    ! ids returned by oasis_set_mask
 
     integer                    :: shape(2,3)     ! shape of arrays passed to OASIS4
     integer                    :: total_shape(4) ! shape of arrays passed to OASIS3MCT
@@ -271,13 +275,13 @@ write(*,*) 'after prism_init_comp_proto'
     if (mype .eq. 0) then
       print *, 'FESOM  before def partition'
     endif
-    CALL prism_def_partition_proto( part_id(1), ig_paral, ierror )
+    CALL oasis_def_partition( part_id(1), ig_paral, ierror )
     if (mype .eq. 0) then
       print *, 'FESOM  after def partition'
     endif
     if ( ierror /= 0 ) then
        print *, 'FESOM commRank def_partition failed'
-       call prism_abort_proto(comp_id, 'cpl_oasis3mct_define_unstr', 'def_partition failed')
+       call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_partition failed')
     endif
       
     ALLOCATE(my_x_coords(my_number_of_points))
@@ -328,18 +332,18 @@ write(*,*) 'after prism_init_comp_proto'
 
     if (mype .eq. localroot) then
       print *, 'FESOM  before start_grids_writing'
-       CALL prism_start_grids_writing(il_flag)
+       CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
       print *, 'FESOM  before write grid'
-          CALL prism_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+          CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
       print *, 'FESOM  before write mask'
-          CALL prism_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
+          CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
        end if
       print *, 'FESOM  before terminate_grids_writing'
-      call prism_terminate_grids_writing()
+      call oasis_terminate_grids_writing()
       print *, 'FESOM  after terminate_grids_writing'
     endif !localroot
      
@@ -373,7 +377,7 @@ write(*,*) 'after prism_init_comp_proto'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
 
-    data_type = PRISM_DOUBLE
+    data_type = oasis_DOUBLE
 !     nodim(1): the overall number of dimensions of array that is going
 !               to be transferred with var_id, i.e. same than grid_nodims
 !               except for bundle variables for which it is one more.
@@ -387,11 +391,11 @@ write(*,*) 'after prism_init_comp_proto'
     total_shape(2) = 1
 
     do i = 1, nsend
-       call prism_def_var_proto(send_id(i), cpl_send(i), part_id(1), &
-            nodim, PRISM_Out, total_shape, PRISM_Double, ierror)
-       if (ierror /= PRISM_Ok) then
+       call oasis_def_var(send_id(i), cpl_send(i), part_id(1), &
+            nodim, oasis_Out, total_shape, oasis_Double, ierror)
+       if (ierror /= oasis_Ok) then
           print *, 'Failed to define transient ', i, trim(cpl_send(i))
-          call prism_abort_proto(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
+          call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
        endif
     enddo
 !
@@ -399,11 +403,11 @@ write(*,*) 'after prism_init_comp_proto'
 ! ... Announce recv variables, all on T points
 !
     do i = 1, nrecv
-       call prism_def_var_proto(recv_id(i), cpl_recv(i), part_id(1), &
-            nodim, PRISM_In, total_shape, PRISM_Double, ierror)
-       if (ierror /= PRISM_Ok) then
+       call oasis_def_var(recv_id(i), cpl_recv(i), part_id(1), &
+            nodim, oasis_In, total_shape, oasis_Double, ierror)
+       if (ierror /= oasis_Ok) then
           print *, 'Failed to define transient ', i, trim(cpl_recv(i))
-          call prism_abort_proto(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
+          call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
        endif
     enddo
 ! ---------------------------------------------------------------
@@ -412,15 +416,15 @@ write(*,*) 'after prism_init_comp_proto'
 !     (structured) grid
 ! ---------------------------------------------------------------
     if (ierror > 0) then
-       call prism_abort_proto(comp_id, 'cpl_oasis3mct_define_unstr', 'Buffer allocation failed')
+       call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'Buffer allocation failed')
        return
     endif
 
 !------------------------------------------------------------------
 ! 4th End of definition phase
 !------------------------------------------------------------------
-   call prism_enddef_proto(ierror)
-   if (commRank) print *, 'fesom prism_enddef: COMPLETED'
+   call oasis_enddef(ierror)
+   if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
 
    if (commRank) print *, 'FESOM: calling exchange_roots'
    call exchange_roots(source_root, target_root, 1, MPI_COMM_FESOM, MPI_COMM_WORLD)
@@ -482,9 +486,9 @@ write(*,*) 'after prism_init_comp_proto'
 
     t2=MPI_Wtime()
 #ifdef VERBOSE
-    print *, 'prism_send: ', cpl_send(ind)        
+    print *, 'oasis_send: ', cpl_send(ind)        
 #endif
-    call prism_put_proto(send_id(ind), seconds_til_now, exfld, info)
+    call oasis_put(send_id(ind), seconds_til_now, exfld, info)
 
     action=(info==4 .OR. info==8)
     if (action) then
@@ -539,10 +543,10 @@ write(*,*) 'after prism_init_comp_proto'
     ! receive data from OASIS3-MCT on local root
     !
 #ifdef VERBOSE
-    print *, 'prism_get: ', cpl_recv(ind)    
+    print *, 'oasis_get: ', cpl_recv(ind)    
 #endif
 
-    call prism_get_proto(recv_id(ind), seconds_til_now, exfld,info)
+    call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
 
     t2=MPI_Wtime()
  !
@@ -643,7 +647,7 @@ END SUBROUTINE exchange_roots
       call fesom_flush
 !!!!#endif /* VERBOSE */
 
-      call prism_terminate_proto( ierror )
+      call oasis_terminate( ierror )
 
   end subroutine cpl_oasis3mct_finalize
 

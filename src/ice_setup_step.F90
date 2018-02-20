@@ -44,7 +44,6 @@ USE g_CONFIG
 
 implicit none
 integer   :: n_size, e_size, mn, k, n, n1, n2
-
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
@@ -57,7 +56,6 @@ e_size=myDim_elem2D+eDim_elem2D
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
-
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
  m_ice_old=0.0_WP !PS
@@ -89,7 +87,6 @@ if (use_means) then
  U_ice_mean=0.0_WP
  V_ice_mean=0.0_WP
 endif
-
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
@@ -100,8 +97,8 @@ endif
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
 #if defined (__oasis)
-  allocate(oce_heat_flux(n2), ice_heat_flux(n2))
-  allocate(tmp_oce_heat_flux(n2), tmp_ice_heat_flux(n2))
+  allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
+  allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
   oce_heat_flux=0.
   ice_heat_flux=0.
   tmp_oce_heat_flux=0.
