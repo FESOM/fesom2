@@ -1476,7 +1476,8 @@ subroutine vert_vel_ale
 	! Split implicit vertical velocity onto implicit and explicit components
 	if (w_split) then
 		do n=1, myDim_nod2D+eDim_nod2D
-			do nz=1,nlevels_nod2D(n)-1
+! 			do nz=1,nlevels_nod2D(n)-1
+			do nz=1,nlevels_nod2D(n)
 				Wvel_e(nz,n)=min(max(Wvel(nz,n), -w_exp_max), w_exp_max)
 			end do
 		end do
@@ -1634,7 +1635,10 @@ DO elem=1,myDim_elem2D
 	! they run over elements here 
 	zbar_n=0.0_WP
 	Z_n=0.0_WP
-	zbar_n(nzmax)=zbar(nzmax)
+	! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
+	! zbar_n(nzmax) is now -sum(helem(1:nzmax-1,elem)), 
+	zbar_n(nzmax)=-sum(helem(1:nzmax-1,elem))
+	
 	Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
 	do nz=nzmax-1,2,-1
 		zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
