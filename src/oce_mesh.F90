@@ -823,6 +823,7 @@ implicit none
 integer               :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz
 integer, allocatable  :: temp_i(:)
 integer               :: mymax(npes), rmax(npes)
+real(kind=WP)         :: gx,gy,rx,ry
 real(kind=WP)         :: t0, t1
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 t0=MPI_Wtime()
@@ -865,7 +866,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  call MPI_AllREDUCE( mymax, rmax, &
        npes, MPI_INTEGER,MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
- 
+
  allocate(nod_in_elem2D(maxval(rmax),myDim_nod2D+eDim_nod2D))
  nod_in_elem2D=0
  nod_in_elem2D_num=0
@@ -920,6 +921,25 @@ DO elem=1,myDim_elem2D
     STOP
    end if
 END DO
+
+
+#if defined (__oasis)
+    allocate(x_corners(myDim_nod2D, maxval(rmax)))
+    allocate(y_corners(myDim_nod2D, maxval(rmax)))
+    DO n=1, myDim_nod2D
+       DO j=1, nod_in_elem2D_num(n)
+           elem=nod_in_elem2D(j,n)
+           call elem_center(elem, rx, ry)
+           call r2g(gx, gy, rx, ry)
+           x_corners(n, j)=gx/rad
+           y_corners(n, j)=gy/rad
+       END DO
+       x_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=x_corners(n,nod_in_elem2D_num(n)) !or -999?
+       y_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=y_corners(n,nod_in_elem2D_num(n)) !or -999?
+       ! to get the max number of corners use size(x_corners, 2)
+    END DO
+#endif
+
 t1=MPI_Wtime()
 if (mype==0) then
    write(*,*) 'find_neighbors finished in ', t1-t0, ' seconds'

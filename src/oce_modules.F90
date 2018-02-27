@@ -147,6 +147,7 @@ real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
 real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
 integer,allocatable,dimension(:,:)         ::   elem_neighbors
 integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
+real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
 integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
 real(kind=WP),allocatable,dimension(:)     ::   depth
                                               ! depth(n) is the depths at 

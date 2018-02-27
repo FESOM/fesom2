@@ -63,8 +63,9 @@ write(*,*) 'after cpl_oasis3mct_init'
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
 	endif
-
+#if defined (__oasis)
 	call cpl_oasis3mct_define_unstr
+#endif
 	if(mype==0)  write(*,*) '---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 
 	call clock_newyear                    	! check if it is a new year
