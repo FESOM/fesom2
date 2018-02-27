@@ -21,7 +21,7 @@ module cpl_driver
   !
   ! Exchange parameters for coupling FESOM with ECHAM6
   !
-  integer, parameter         :: nsend = 4
+  integer, parameter         :: nsend = 6
   integer, parameter         :: nrecv = 12
   
   integer, dimension(nsend)  :: send_id
@@ -342,6 +342,9 @@ write(*,*) 'before prism_init_comp_proto'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
        end if
+      print *, 'FESOM  before write corners'
+          CALL oasis_write_corner(grid_name, number_of_all_points, 1, 3, all_x_coords(:,:), all_y_coords(:,:))
+       end if
       print *, 'FESOM  before terminate_grids_writing'
       call oasis_terminate_grids_writing()
       print *, 'FESOM  after terminate_grids_writing'
@@ -359,7 +362,10 @@ write(*,*) 'before prism_init_comp_proto'
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
-    cpl_send( 4)='snt_feom' ! 3. sea ice extent [%-100]            ->       
+    cpl_send( 4)='snt_feom' ! 3. sea ice extent [%-100]            ->
+    cpl_send( 5)='ste_feom' ! 3. sea ice temperature [K]           ->
+    cpl_send( 6)='sia_feom' ! 3. sea ice albedo [%-100]            ->
+    
 !
 ! ...  Define symbolic names for transient fields received by the ocean.
 !      These must be identical to the names specified in the SMIOC file.
