@@ -220,6 +220,9 @@ write(*,*) 'before prism_init_comp_proto'
     real(kind=8), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=8), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
 
+    real(kind=8), allocatable :: all_x_corners(:, :, :)     ! longitude coordinates
+    real(kind=8), allocatable :: all_y_corners(:, :, :)     ! latitude  coordinates
+
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -299,9 +302,13 @@ write(*,*) 'before prism_init_comp_proto'
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, size(x_corners, 3)))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, size(x_corners, 3)))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
+      ALLOCATE(all_x_corners(1, 1, 1))
+      ALLOCATE(all_y_corners(1, 1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -330,6 +337,14 @@ write(*,*) 'before prism_init_comp_proto'
       print *, 'FESOM  after Barrier'
     endif
 
+    do k=1, size(x_corners, 3)
+    CALL MPI_GATHERV(x_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:, 1, k),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(y_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:, 1, k),  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    end do
+
+
     if (mype .eq. localroot) then
       print *, 'FESOM  before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
@@ -342,7 +357,7 @@ write(*,*) 'before prism_init_comp_proto'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
        print *, 'FESOM  before write corners'
-          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 3),  x_corners(:,:,:), & 					y_corners(:,:,:))
+          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 3),  all_x_corners, all_y_corners)
        end if
       print *, 'FESOM  before terminate_grids_writing'
       call oasis_terminate_grids_writing()

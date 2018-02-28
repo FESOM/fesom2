@@ -818,7 +818,6 @@ SUBROUTINE find_neighbors
 USE o_PARAM
 USE o_MESH
 USE g_PARSUP
-USE g_ROTATE_grid
   use g_comm_auto
 implicit none
 integer               :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz
@@ -925,19 +924,19 @@ END DO
 
 
 #if defined (__oasis)
-    allocate(x_corners(myDim_nod2D,1, maxval(rmax)))
-    allocate(y_corners(myDim_nod2D,1, maxval(rmax)))
+    allocate(x_corners(myDim_nod2D, maxval(rmax)))
+    allocate(y_corners(myDim_nod2D, maxval(rmax)))
     DO n=1, myDim_nod2D
        DO j=1, nod_in_elem2D_num(n)
            elem=nod_in_elem2D(j,n)
            call elem_center(elem, rx, ry)
            call r2g(gx, gy, rx, ry)
-           x_corners(n, 1, j)=gx/rad
-           y_corners(n, 1, j)=gy/rad
+           x_corners(n, j)=gx/rad
+           y_corners(n, j)=gy/rad
        END DO
-       x_corners(n, 1, nod_in_elem2D_num(n)+1:maxval(rmax))=x_corners(n,1,nod_in_elem2D_num(n)) !or -999?
-       y_corners(n, 1, nod_in_elem2D_num(n)+1:maxval(rmax))=y_corners(n,1,nod_in_elem2D_num(n)) !or -999?
-       ! to get the max number of corners use size(x_corners, 3)
+       x_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=x_corners(n,nod_in_elem2D_num(n)) !or -999?
+       y_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=y_corners(n,nod_in_elem2D_num(n)) !or -999?
+       ! to get the max number of corners use size(x_corners, 2)
     END DO
 #endif
 
