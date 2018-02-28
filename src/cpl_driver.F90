@@ -209,6 +209,7 @@ write(*,*) 'before prism_init_comp_proto'
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
+    real(kind=8),allocatable   :: unstr_area(:,:)
     real(kind=8)               :: this_x_coord     ! longitude coordinates
     real(kind=8)               :: this_y_coord     ! latitude coordinates
     !
@@ -302,8 +303,8 @@ write(*,*) 'before prism_init_comp_proto'
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_x_corners(number_of_all_points, 1, size(x_corners, 3)))
-      ALLOCATE(all_y_corners(number_of_all_points, 1, size(x_corners, 3)))
+      ALLOCATE(all_x_corners(number_of_all_points, 1, size(x_corners, 2)))
+      ALLOCATE(all_y_corners(number_of_all_points, 1, size(x_corners, 2)))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
@@ -337,7 +338,7 @@ write(*,*) 'before prism_init_comp_proto'
       print *, 'FESOM  after Barrier'
     endif
 
-    do k=1, size(x_corners, 3)
+    do k=1, size(x_corners, 2)
     CALL MPI_GATHERV(x_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:, 1, k),  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
     CALL MPI_GATHERV(y_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:, 1, k),  &
@@ -357,13 +358,20 @@ write(*,*) 'before prism_init_comp_proto'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
        print *, 'FESOM  before write corners'
-          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 3),  all_x_corners, all_y_corners)
+          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 2),  all_x_corners, all_y_corners)
+       print *, 'FESOM  before write area'
+	  ALLOCATE(unstr_area(number_of_all_points, 1))
+          unstr_area=1
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, unstr_area)
+	  DEALLOCATE(unstr_area)
        end if
       print *, 'FESOM  before terminate_grids_writing'
       call oasis_terminate_grids_writing()
       print *, 'FESOM  after terminate_grids_writing'
     endif !localroot
      
+
+
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, all_x_corners, all_y_corners) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
@@ -461,12 +469,9 @@ write(*,*) 'before prism_init_comp_proto'
 !------------------------------------------------------------------
 ! 4th End of definition phase
 !------------------------------------------------------------------
-   call oasis_enddef(ierror)
-   if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
 
-   if (commRank) print *, 'FESOM: calling exchange_roots'
-   call exchange_roots(source_root, target_root, 1, MPI_COMM_FESOM, MPI_COMM_WORLD)
-   if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
+      call oasis_enddef(ierror)
+
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 
@@ -476,8 +481,10 @@ write(*,*) 'before prism_init_comp_proto'
    o2a_call_count=0
 
    CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
-   print *, 'Survived cpl_oasis3mct_define'
-   
+   if (mype .eq. 0) then 
+      print *, 'Survived cpl_oasis3mct_define'
+   endif   
+
   end subroutine cpl_oasis3mct_define_unstr
 
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
