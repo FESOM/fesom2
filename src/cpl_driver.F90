@@ -334,23 +334,22 @@ write(*,*) 'before prism_init_comp_proto'
       print *, 'FESOM  before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
-      print *, 'FESOM  before write grid'
+       print *, 'FESOM  before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
-      print *, 'FESOM  before write mask'
+       print *, 'FESOM  before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
-       end if
-      print *, 'FESOM  before write corners'
-          CALL oasis_write_corner(grid_name, number_of_all_points, 1, 3, all_x_coords(:,:), all_y_coords(:,:))
+       print *, 'FESOM  before write corners'
+          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 3),  x_corners(:,:,:), & 					y_corners(:,:,:))
        end if
       print *, 'FESOM  before terminate_grids_writing'
       call oasis_terminate_grids_writing()
       print *, 'FESOM  after terminate_grids_writing'
     endif !localroot
      
-    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
+    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, x_corners ,y_corners) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
@@ -383,6 +382,10 @@ write(*,*) 'before prism_init_comp_proto'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
 
+    if (mype .eq. 0) then 
+       print *, 'FESOM  after declaring the transient variables'
+    endif
+
     data_type = oasis_DOUBLE
 !     nodim(1): the overall number of dimensions of array that is going
 !               to be transferred with var_id, i.e. same than grid_nodims
@@ -404,6 +407,11 @@ write(*,*) 'before prism_init_comp_proto'
           call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
        endif
     enddo
+
+    if (mype .eq. 0) then 
+       print *, 'FESOM  after announcing send variables'
+    endif
+
 !
 !
 ! ... Announce recv variables, all on T points
@@ -416,14 +424,23 @@ write(*,*) 'before prism_init_comp_proto'
           call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'def_var failed')
        endif
     enddo
+
+    if (mype .eq. 0) then 
+       print *, 'FESOM  after announcing revieved variables'
+    endif
+
 ! ---------------------------------------------------------------
-! ... Allocate memory for data exchange with OASIS4
+! ... Allocate memory for data exchange with OASIS3-MCT
 !     VarStrGlob* is used to keep data only on the exchange
 !     (structured) grid
 ! ---------------------------------------------------------------
     if (ierror > 0) then
        call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'Buffer allocation failed')
        return
+    endif
+
+    if (mype .eq. 0) then 
+       print *, 'FESOM after allocating memory for data exchange with OASIS'
     endif
 
 !------------------------------------------------------------------
