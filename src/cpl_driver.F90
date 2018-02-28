@@ -364,7 +364,7 @@ write(*,*) 'before prism_init_comp_proto'
       print *, 'FESOM  after terminate_grids_writing'
     endif !localroot
      
-    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, x_corners ,y_corners) 
+    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, all_x_corners, all_y_corners) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
