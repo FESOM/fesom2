@@ -114,8 +114,6 @@ contains
     
     grid_name = 'feom'
 
-write(*,*) 'before prism_init_comp_proto'
-
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
@@ -258,12 +256,12 @@ write(*,*) 'before prism_init_comp_proto'
     my_number_of_points = myDim_nod2d
     number_of_all_points = nod2d
     if (mype .eq. 0) then 
-      print *, 'FESOM  Before ALLGATHERV'
+      print *, 'FESOM Before ALLGATHERV'
     endif
     CALL MPI_ALLGATHER(my_number_of_points, 1, MPI_INTEGER, & 
                        counts_from_all_pes, 1, MPI_INTEGER, MPI_COMM_FESOM, ierror)
     if (mype .eq. 0) then
-      print *, 'FESOM  after ALLGATHERV'
+      print *, 'FESOM after ALLGATHERV'
     endif
 
     if (mype .eq. 0) then
@@ -277,11 +275,11 @@ write(*,*) 'before prism_init_comp_proto'
     ig_paral(3) = my_number_of_points     ! Local Extent
 
     if (mype .eq. 0) then
-      print *, 'FESOM  before def partition'
+      print *, 'FESOM before def partition'
     endif
     CALL oasis_def_partition( part_id(1), ig_paral, ierror )
     if (mype .eq. 0) then
-      print *, 'FESOM  after def partition'
+      print *, 'FESOM after def partition'
     endif
     if ( ierror /= 0 ) then
        print *, 'FESOM commRank def_partition failed'
@@ -318,24 +316,24 @@ write(*,*) 'before prism_init_comp_proto'
     enddo  
 
     if (mype .eq. 0) then 
-      print *, 'FESOM  before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
+      print *, 'FESOM before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
     CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 1) then 
-      print *, 'FESOM  before 2nd GatherV'
+      print *, 'FESOM before 2nd GatherV'
     endif
     CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 1) then 
-      print *, 'FESOM  after 2nd GatherV'
+      print *, 'FESOM after 2nd GatherV'
     endif
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
     if (mype .eq. 1) then 
-      print *, 'FESOM  after Barrier'
+      print *, 'FESOM after Barrier'
     endif
 
     do k=1, size(x_corners, 2)
@@ -347,27 +345,27 @@ write(*,*) 'before prism_init_comp_proto'
 
 
     if (mype .eq. localroot) then
-      print *, 'FESOM  before start_grids_writing'
+      print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
-       print *, 'FESOM  before write grid'
+       print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
-       print *, 'FESOM  before write mask'
+       print *, 'FESOM before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
-       print *, 'FESOM  before write corners'
+       print *, 'FESOM before write corners'
           CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 2),  all_x_corners, all_y_corners)
-       print *, 'FESOM  before write area'
+       print *, 'FESOM before write area'
 	  ALLOCATE(unstr_area(number_of_all_points, 1))
           unstr_area=1
           CALL oasis_write_area(grid_name, number_of_all_points, 1, unstr_area)
 	  DEALLOCATE(unstr_area)
        end if
-      print *, 'FESOM  before terminate_grids_writing'
+      print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
-      print *, 'FESOM  after terminate_grids_writing'
+      print *, 'FESOM after terminate_grids_writing'
     endif !localroot
      
 
@@ -406,7 +404,7 @@ write(*,*) 'before prism_init_comp_proto'
     cpl_recv(12) = 'hydr_oce'
 
     if (mype .eq. 0) then 
-       print *, 'FESOM  after declaring the transient variables'
+       print *, 'FESOM after declaring the transient variables'
     endif
 
     data_type = oasis_DOUBLE
@@ -432,7 +430,7 @@ write(*,*) 'before prism_init_comp_proto'
     enddo
 
     if (mype .eq. 0) then 
-       print *, 'FESOM  after announcing send variables'
+       print *, 'FESOM after announcing send variables'
     endif
 
 !
@@ -449,7 +447,7 @@ write(*,*) 'before prism_init_comp_proto'
     enddo
 
     if (mype .eq. 0) then 
-       print *, 'FESOM  after announcing revieved variables'
+       print *, 'FESOM after announcing revieved variables'
     endif
 
 ! ---------------------------------------------------------------
