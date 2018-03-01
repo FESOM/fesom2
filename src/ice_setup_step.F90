@@ -58,6 +58,7 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(t_skin(n_size))
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+
  m_ice_old=0.0_WP !PS
  a_ice_old=0.0_WP !PS
  m_snow_old=0.0_WP !PS
@@ -99,6 +100,9 @@ endif
 #if defined (__oasis)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
+  allocate(ice_alb(n_size), ice_temp(n_size))
+  ice_alb=0.
+  ice_temp=0.
   oce_heat_flux=0.
   ice_heat_flux=0.
   tmp_oce_heat_flux=0.

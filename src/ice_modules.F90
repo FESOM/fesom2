@@ -64,6 +64,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
+  real(kind=8),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=8),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
   real(kind=8),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields

@@ -384,9 +384,9 @@ write(*,*) 'before prism_init_comp_proto'
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
-    cpl_send( 4)='snt_feom' ! 3. sea ice extent [%-100]            ->
-    cpl_send( 5)='ste_feom' ! 3. sea ice temperature [K]           ->
-    cpl_send( 6)='sia_feom' ! 3. sea ice albedo [%-100]            ->
+    cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+    cpl_send( 5)='ste_feom' ! 5. sea ice temperature [K]           ->
+    cpl_send( 6)='sia_feom' ! 6. sea ice albedo [%-100]            ->
     
 !
 ! ...  Define symbolic names for transient fields received by the ocean.

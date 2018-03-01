@@ -163,7 +163,7 @@ subroutine update_atm_forcing(istep)
          exchange =0.0
          if (i.eq.1) then
             do n=1,myDim_nod2D+eDim_nod2D
-               exchange(n)=tr_arr(1, n, 1)       ! sea surface temperature deg C
+               exchange(n)=tr_arr(1, n, 1)                          ! sea surface temperature deg C
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -171,6 +171,10 @@ subroutine update_atm_forcing(istep)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
+            elseif (i.eq.5) then
+            exchange(:) = ice_temp(:)                               ! ice temperature
+            elseif (i.eq.6) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
          endif

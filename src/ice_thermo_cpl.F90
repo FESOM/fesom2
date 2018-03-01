@@ -59,7 +59,7 @@ subroutine thermodynamics
 
   integer :: inod
   !---- prognostic variables (updated in `ice_growth')
-  real*8  :: A, h, hsn
+  real*8  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real*8  :: a2ohf, a2ihf
   !---- evaporation and sublimation (provided by ECHAM)
@@ -84,7 +84,7 @@ subroutine thermodynamics
   evaporation = evap_no_ifrac*(1.-a_ice) + sublimation*a_ice
 
   !---- loop over all surface node
-  do inod=1,myDim_nod2d+eDim_nod2d   
+  do inod=1,myDim_nod2d+eDim_nod2d
 
 #ifdef use_cavity
      if (cavity_flag_nod2d(inod).eq.1) cycle
@@ -124,10 +124,13 @@ subroutine thermodynamics
 !     endif
 
      call ice_growth
+     call ice_albedo(hsn,t,alb)
 
      a_ice(inod)         = A
      m_ice(inod)         = h
      m_snow(inod)        = hsn
+     ice_alb(inod)	 = alb
+     ice_temp(inod)      = t
 
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
@@ -409,6 +412,34 @@ contains
 
     return
   end subroutine ice_growth
+
+
+ subroutine ice_albedo (hsn,t,alb)
+  ! INPUT:
+  ! hsn - snow thickness, used for albedo parameterization [m]
+  use i_therm_param
+  implicit none
+
+  real*8  hsn    
+  real*8  t    
+  real*8  alb             ! Albedo of sea ice
+
+  ! set albedo
+  ! ice and snow, freezing and melting conditions are distinguished.
+  if (t<0.0) then	        ! freezing condition    
+     if (hsn.gt.0.0) then	!   snow cover present  
+        alb=albsn         	
+     else              		!   no snow cover       
+        alb=albi       	
+     endif
+  else			        ! melting condition     
+     if (hsn.gt.0.0) then	!   snow cover present  
+        alb=albsnm	    	
+     else			!   no snow cover       
+        alb=albim		
+     endif
+  endif
+ end subroutine ice_albedo
 
 end subroutine thermodynamics
 #endif
