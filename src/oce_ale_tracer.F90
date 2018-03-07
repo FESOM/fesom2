@@ -70,13 +70,10 @@ subroutine adv_tracers_ale(tr_num)
 	! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
 	select case (tracer_adv)
 		case(1) !MUSCL
-			! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.75)
-!			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0) ! use only third order
-			!	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
-			!	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
-			call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
-			
+                       ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
+                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0)
+                      call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
+
 		case(2) !MUSCL+FCT(3D)
  			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0)
 		case default !unknown
@@ -338,7 +335,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	use g_forcing_arrays
 	implicit none
 	integer       :: n, nz, nzmax
-	real(kind=WP) :: tvert(nl), tv(nl)
+	real(kind=WP) :: tvert(nl), tv(nl), aL, aR, aj, x
 	real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
 	
@@ -350,12 +347,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	! non-uniformity into account, but this is more cumbersome. This is the version for AB
 	! time stepping
 	! --------------------------------------------------------------------------
-	
+
 	do n=1, myDim_nod2D
 		!_______________________________________________________________________
 		!Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
 		! calculated on mid depth levels 
-		
 		! nzmax ... number of depth levels at node n
 		nzmax=nlevels_nod2D(n)
 		
@@ -363,13 +359,13 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		tv(1)=ttf(1,n)
 		
 		! tracer at surface+1 layer
-		tv(2)=0.5_WP*(ttf(1,n)+ttf(2,n))
+		tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
 		
 		! tacer at bottom-2 layer
-		tv(nzmax-2)=0.5_WP*(ttf(nzmax-3,n)+ttf(nzmax-2,n))
+		tv(nzmax-2)=-ttf(nzmax-3,n)*min(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)+ttf(nzmax-2,n)*max(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)
 		
 		! tacer at bottom-1 layer
-		tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+		tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
 		
 		! tracer at bottom layer
 		tv(nzmax)=ttf(nzmax-1,n) 
@@ -377,8 +373,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		!_______________________________________________________________________
 		! calc tracer for surface+2 until depth-2 layer
 		! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
-! 		do nz=2,nzmax-3
-		do nz=3,nzmax-3
+ 		do nz=2,nzmax-3
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
@@ -388,11 +383,15 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
 			! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
 			! --> full equation (1.6), (1.7) and (1.8)
-			dzjm1    = Z_3d_n(nz-1,n)
-			dzj      = Z_3d_n(nz,n)
-			dzjp1    = Z_3d_n(nz+1,n)
-			dzjp2    = Z_3d_n(nz+2,n)
-			
+!			dzjm1    = Z_3d_n(nz-1,n)
+!			dzj      = Z_3d_n(nz,n)
+!			dzjp1    = Z_3d_n(nz+1,n)
+!			dzjp2    = Z_3d_n(nz+2,n)
+
+			dzjm1    = zbar_3d_n(nz-1,n)-zbar_3d_n(nz,  n)
+			dzj      = zbar_3d_n(nz,n)  -zbar_3d_n(nz+1,n)
+			dzjp1    = zbar_3d_n(nz+1,n)-zbar_3d_n(nz+2,n)
+			dzjp2    = zbar_3d_n(nz+2,n)-zbar_3d_n(nz+3,n)
 			!___________________________________________________________________
 			! equation (1.7)
 			! --> Here deltaj is the average slope in the jth zone of the parabola 
@@ -400,74 +399,100 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			! --> a_j^n
 			deltaj   = dzj/(dzjm1+dzj+dzjp1)* &
 					  ( &
-					   (2*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
-					   (dzj    +2*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
+					   (2.*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
+					   (dzj    +2.*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
 					  )
 			! --> a_(j+1)^n		  
 			deltajp1 = dzjp1/(dzj+dzjp1+dzjp2)* &
 					  ( &
-					   (2*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
-					   (dzjp1+2*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
+					   (2.*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
+					   (dzjp1+2.*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
 					  )
 			!___________________________________________________________________
 			! condition (1.8)
 			! --> This modification leads to a somewhat steeper representation of 
 			!     discontinuities in the solution. It also guarantees that a_(j+0.5)
 			!     lies in the range of values defined by a_j; and a_(j+1);
-			if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n))>0 ) then
+			if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n)) > 0. ) then
 				deltaj = min(  abs(deltaj), &
-							 2*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
-							 2*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
+							 2.*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
+							 2.*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
 							 )*sign(1.0_WP,deltaj)
 			else
 				deltaj = 0.0_WP
 			endif
-			if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n))>0 ) then
+			if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n)) > 0. ) then
 				deltajp1 = min(  abs(deltajp1),&
-							   2*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
-							   2*abs(ttf(nz+1,n)-ttf(nz,n)) &
+							   2.*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
+							   2.*abs(ttf(nz+1,n)-ttf(nz,n)) &
 							   )*sign(1.0_WP,deltajp1)
 			else
 				deltajp1 = 0.0_WP
 			endif
-			
 			!___________________________________________________________________
 			! equation (1.6)
 			! --> calcualte a_(j+0.5)
 			tv(nz)=	ttf(nz,n) &
 					+ dzj/(dzj+dzjp1)*(ttf(nz+1,n)-ttf(nz,n)) &
-					+ 1/(dzjm1+dzj+dzjp1+dzjp2) * &
+					+ 1./(dzjm1+dzj+dzjp1+dzjp2) * &
 					( &
-						(2*dzjp1*dzj)/(dzj+dzjp1)* &
-							((dzjm1+dzj)/(2*dzj+dzjp1) - (dzjp2+dzjp1)/(2*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
-					   - dzj*(dzjm1+dzj)/(2*dzj+dzjp1)*deltajp1 &
-					   + dzjp1*(dzjp1+dzjp2)/(dzj+2*dzjp1)*deltaj &
+						(2.*dzjp1*dzj)/(dzj+dzjp1)* &
+							((dzjm1+dzj)/(2.*dzj+dzjp1) - (dzjp2+dzjp1)/(2.*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
+					   - dzj*(dzjm1+dzj)/(2.*dzj+dzjp1)*deltajp1 &
+					   + dzjp1*(dzjp1+dzjp2)/(dzj+2.*dzjp1)*deltaj &
 					)
-		end do ! --> do nz=3,nzmax-2
-		
+                        tv(nz)=max(min(ttf(nz, n), ttf(nz+1, n)), min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz)))
+		end do ! --> do nz=2,nzmax-3
+
 		!_______________________________________________________________________
 		! Surface flux
+                tvert(1:nzmax)=0._WP
 		tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
-		
+		tvert(2)= -tv(2)*Wvel_e(2,n)*area(2,n)		
 		!_______________________________________________________________________
-		! Other levels
-		do nz=2, nzmax-1
-			tvert(nz)= -tv(nz)*Wvel_e(nz,n)*area(nz,n)
-		end do
-		
+ 	        tvert(nzmax-2)= -tv(nzmax-2)*Wvel_e(nzmax-2,n)*area(nzmax-2,n)
+ 	        tvert(nzmax-1)= -tv(nzmax-1)*Wvel_e(nzmax-1,n)*area(nzmax-1,n)
 		!_______________________________________________________________________
 		! Zero bottom flux
 		tvert(nzmax)=0.0_WP
+
+		! Other levels
+		do nz=2, nzmax-3
+                   if ((Wvel_e(nz,n)<=0.) .AND. (Wvel_e(nz+1,n)>=0.)) CYCLE
+		   aL=tv(nz)
+		   aR=tv(nz+1)
+ 	           if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0.) then
+                      aL =ttf(nz, n)
+                      aR =ttf(nz, n)
+                   end if
+                   if ((aR-aL)*(ttf(nz, n)-0.5_WP*(aL+aR))> (aR-aL)**2/6._WP) then
+                      aL =3._WP*ttf(nz, n)-2._WP*aR
+                   end if
+                   if ((aR-aL)*(ttf(nz, n)-0.5_WP*(aR+aL))<-(aR-aL)**2/6._WP) then
+                      aR =3._WP*ttf(nz, n)-2._WP*aL
+                   end if
+
+                   dzj   = zbar_3d_n(nz,n)  -zbar_3d_n(nz+1,n)
+                   aj=6.0_WP*(ttf(nz, n)-0.5_WP*(aL+aR))
+
+		   if (Wvel_e(nz,n)>0.) then
+                      x=Wvel_e(nz,n)*dt/dzj
+                      tvert(nz)=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))*area(nz,n)*Wvel_e(nz,n)
+                   end if
+
+		   if (Wvel_e(nz+1,n)<0.) then 
+                      x=-Wvel_e(nz+1,n)*dt/dzj
+                      tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))*area(nz+1,n)*Wvel_e(nz+1,n)
+                   end if
+		end do
 		
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
 		do nz=1, nzmax-1
-			! no division over thickness in ALE !!!
-			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
-		end do         
-		
+                   ! no division over thickness in ALE !!!
+                   del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
+		end do
 	end do ! --> do n=1, myDim_nod2D
-	
 end subroutine adv_tracers_vert_ppm_ale
 !
 !
