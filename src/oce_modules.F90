@@ -203,7 +203,7 @@ real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_v, fct_adf_v2    ! Anti
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num
+integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num, nboundary_lay
 real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
 integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction

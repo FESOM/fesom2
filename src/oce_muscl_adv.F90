@@ -24,7 +24,7 @@ use g_comm_auto
 use g_config
 IMPLICIT NONE
 integer     :: n, k, n1, n2, n_num
-
+integer     :: nz
 call find_up_downwind_triangles
 n_num=0
   DO n=1, myDim_nod2D
@@ -32,6 +32,7 @@ n_num=0
   if(k>n_num) n_num=k
   END DO
   allocate(nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+  allocate(nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer nboundary_lay(n)
   allocate(nn_num(myDim_nod2D), nn_pos(n_num,myDim_nod2D))
                     !! These are the same arrays that we also use in quadratic
 		    !! reconstruction
@@ -40,6 +41,9 @@ n_num=0
      nn_num(n)=1
      nn_pos(1,n)=n
   end do   
+
+  nboundary_lay=nl-1
+
   Do n=1, myDim_edge2D
      n1=edges(1,n)
      n2=edges(2,n)
@@ -50,6 +54,12 @@ n_num=0
      if(n2<=myDim_nod2D) then
      nn_pos(nn_num(n2)+1,n2)=n1
      nn_num(n2)=nn_num(n2)+1
+     end if
+     if (any(edge_tri(:,n)<=0)) then
+        nboundary_lay(edges(:,n))=1
+     else
+	nboundary_lay(edges(1,n))=min(nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
+	nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
      end if
   END DO  
   DO n=1, myDim_nod2d
@@ -265,7 +275,7 @@ real(kind=8)   :: tvol, tx, ty
 	ty=0.0
 	DO k=1, nod_in_elem2D_num(ednodes(1))
            elem=nod_in_elem2D(k,ednodes(1))
-           if(nlevels(elem)-1<nz) cycle
+           if(nlevels(elem)-1 < nz) cycle
            tvol=tvol+elem_area(elem)
            tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -279,7 +289,7 @@ real(kind=8)   :: tvol, tx, ty
 	ty=0.0
 	DO k=1, nod_in_elem2D_num(ednodes(2))
            elem=nod_in_elem2D(k,ednodes(2))
-           if(nlevels(elem)-1<nz) cycle
+           if(nlevels(elem)-1 < nz) cycle
            tvol=tvol+elem_area(elem)
            tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)

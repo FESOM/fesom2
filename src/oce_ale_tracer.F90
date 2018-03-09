@@ -108,7 +108,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 	implicit none
 	integer       :: el(2), enodes(2), n, nz, ed
 	integer       :: nl1, nl2, n2
-	real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP 
+	real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
+	real(kind=WP) :: c_lo(2)
 	real(kind=WP) :: Tmean1, Tmean2, a
 	real(kind=WP) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
 	real(kind=WP) :: num_ord
@@ -188,11 +189,14 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!     of up and dn wind triangle
 			! --> Tmean2 ... edge center interpolated Tracer using tracer
 			!     gradient info from upwind triangle
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+
 			Tmean2=ttfAB(nz, enodes(2))- &
 					(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 					 edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
 					 edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed) &
-					)/6.0_WP    
+					)/6.0_WP*c_lo(2)
 			
 			! use upwind triangle to interpolate Tracer to edge center with 
 			! fancy scheme --> Linear upwind reconstruction
@@ -205,7 +209,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 					(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 					 edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
 					 edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed) &
-					)/6.0_WP   
+					)/6.0_WP*c_lo(1)
 					
 			!___________________________________________________________________
 			! volume flux along the edge segment ed
@@ -258,15 +262,18 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!                     skip the previouse do loop and always end up 
 			!                     in this part of the if condition
 			do nz=1+n2,nl1
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP*c_lo(2)
 				
 				Tmean1=ttfAB(nz, enodes(1))+ &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP*c_lo(1)
 						
 				!_______________________________________________________________
 				! volume flux across the segments
@@ -289,15 +296,18 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			end do ! --> do nz=1+n2,nl1
 		else
 			do nz=n2+1,nl2
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP*c_lo(2)
 				
 				Tmean1=ttfAB(nz, enodes(1))+ &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP 
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP*c_lo(1)
 						
 				!_______________________________________________________________
 				! volume flux across the segments
@@ -319,7 +329,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
 				
 			end do ! --> do nz=n2+1,nl2
-		end if ! --> if(nl1>nl2) then 
+		end if ! --> if(nl1>nl2) then
 	end do ! --> do ed=1, myDim_edge2D
 end subroutine adv_tracers_muscle_ale
 !
