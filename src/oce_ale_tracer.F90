@@ -162,14 +162,22 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! check if upwind or downwind triagle is necessary
 			!
 			! cross product between velocity vector and cross vector edge-elem-center
+			!        o
+			!       / \
+			!      /   \
+			!     /     \
+			!    /   x   \
+			!   /    |____\_____(dx,dy)
+			!  o-----v-----o
+			!  1   edge    2
 			! cross product > 0 --> angle vec_v and (dx,dy) --> [0   180] --> upwind triangle
 			! cross product < 0 --> angle vec_v and (dx,dy) --> [180 360] --> downwind triangle 
 			!
-			!	 	o                  o      !	 	o                  o
-			!	   / \                / \     !	   / \                / \
-			!	  /   \    \ vec_v   /   \    !	  /   \        /     /   \
-			!	 /  up \    \       / dn  \   !	 /  up \      /     / dn  \
-			!	o-------o----+---->o-------o  !	o-------o----+---->o-------o
+			!       o                  o      !     o                  o
+			!      / \                / \     !    / \                / \
+			!     /   \    \ vec_v   /   \    !   /   \        /     /   \
+			!    /  up \    \       / dn  \   !  /  up \      /     / dn  \
+			!   o-------o----+---->o-------o  ! o-------o----+---->o-------o
 			!           1   /      2          !         1     \vec_v
 			!              /vec_v             !                \
 			!   --> downwind triangle         ! --> upwind triangle 
@@ -178,6 +186,15 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!  edge_up_dn_grad(2,nz,edge) ... gradTR_x downwind
 			!  edge_up_dn_grad(3,nz,edge) ... gradTR_y upwind
 			!  edge_up_dn_grad(4,nz,edge) ... gradTR_y downwind
+			
+			!___________________________________________________________________
+			! in case there is either no upwind or downwind triangle, than 
+			! calculate only low order solution 
+			! no upwind   triangle --> c_lo(1)=0, otherwise = 1
+			! no downwind triangle --> c_lo(2)=0, otherwise = 1
+			! (real(...) --> convert from integer to float)
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
 			
 			!___________________________________________________________________
 			! use downwind triangle to interpolate Tracer to edge center with 
@@ -189,9 +206,6 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!     of up and dn wind triangle
 			! --> Tmean2 ... edge center interpolated Tracer using tracer
 			!     gradient info from upwind triangle
-			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
-			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
-
 			Tmean2=ttfAB(nz, enodes(2))- &
 					(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 					 edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
@@ -262,9 +276,12 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!                     skip the previouse do loop and always end up 
 			!                     in this part of the if condition
 			do nz=1+n2,nl1
+				!_______________________________________________________________
+				! check if upwind or downwind triangle exist, decide if high or 
+				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
 				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
 				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
-
+				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
@@ -293,12 +310,16 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! write horizontal ale advection into rhs
 				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
 				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2)) 
+				
 			end do ! --> do nz=1+n2,nl1
 		else
 			do nz=n2+1,nl2
+				!_______________________________________________________________
+				! check if upwind or downwind triangle exist, decide if high or 
+				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
 				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
 				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
-
+				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
