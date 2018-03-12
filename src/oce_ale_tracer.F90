@@ -193,8 +193,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! no upwind   triangle --> c_lo(1)=0, otherwise = 1
 			! no downwind triangle --> c_lo(2)=0, otherwise = 1
 			! (real(...) --> convert from integer to float)
-			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
-			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
 			
 			!___________________________________________________________________
 			! use downwind triangle to interpolate Tracer to edge center with 
@@ -259,8 +259,11 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! combined with centered
 			! num_ord is the fraction of fourth-order contribution in the HO solution
 			! (1-num_ord) is done with 3rd order upwind
-			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-			
+			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+			!                                            |____________|
+			!                                                  v
+			!                                           dont use fourth order solution
+			!                                           if its at the boundary
 			!___________________________________________________________________
 			! write horizontal ale advection into rhs
 			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
@@ -279,8 +282,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -304,8 +307,11 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-				
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				!                                            |____________|
+				!                                                  v
+				!                                           dont use fourth order solution
+				!                                           if its at the boundary
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
 				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
@@ -317,8 +323,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz-1), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz-1), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -342,8 +348,11 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-				
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				!                                            |____________|
+				!                                                  v
+				!                                           dont use fourth order solution
+				!                                           if its at the boundary
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
 				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))

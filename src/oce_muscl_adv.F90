@@ -42,31 +42,36 @@ n_num=0
      nn_pos(1,n)=n
   end do   
 
-  nboundary_lay=nl-1
-
-  Do n=1, myDim_edge2D
-     n1=edges(1,n)
-     n2=edges(2,n)
-     if(n1<=myDim_nod2D) then
-     nn_pos(nn_num(n1)+1,n1)=n2
-     nn_num(n1)=nn_num(n1)+1
-     end if
-     if(n2<=myDim_nod2D) then
-     nn_pos(nn_num(n2)+1,n2)=n1
-     nn_num(n2)=nn_num(n2)+1
-     end if
-     if (any(edge_tri(:,n)<=0)) then
-        nboundary_lay(edges(:,n))=1
-     else
-	nboundary_lay(edges(1,n))=min(nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
-	nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
-     end if
-  END DO  
-  DO n=1, myDim_nod2d
-     k=nod_in_elem2D_num(n)
-     nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
-  END DO
-  call exchange_nod(nlevels_nod2D_min)
+	nboundary_lay=nl-1
+	Do n=1, myDim_edge2D
+		n1=edges(1,n)
+		n2=edges(2,n)
+		if(n1<=myDim_nod2D) then
+			nn_pos(nn_num(n1)+1,n1)=n2
+			nn_num(n1)=nn_num(n1)+1
+		end if
+		if(n2<=myDim_nod2D) then
+			nn_pos(nn_num(n2)+1,n2)=n1
+			nn_num(n2)=nn_num(n2)+1
+		end if
+		if (any(edge_tri(:,n)<=0)) then
+			! this edge nodes is already at the surface at the boundary ...
+			! later here ...sign(1, nboundary_lay(enodes(1))-nz) for nz=1 must be negativ
+			! thats why here nboundary_lay(edges(:,n))=0
+			nboundary_lay(edges(:,n))=0
+		else
+			! this edge nodes become boundary edge with increasing depth due to bottom topography
+			! at the depth nboundary_lay the edge (edgepoints) still has two valid ocean triangles
+			! below that depth, edge becomes boundary edge
+			nboundary_lay(edges(1,n))=min(nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
+			nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
+		end if
+	END DO  
+	DO n=1, myDim_nod2d
+		k=nod_in_elem2D_num(n)
+		nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
+	END DO
+	call exchange_nod(nlevels_nod2D_min)
 end SUBROUTINE muscl_adv_init
 !=======================================================================
 SUBROUTINE find_up_downwind_triangles
