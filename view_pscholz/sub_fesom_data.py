@@ -55,7 +55,7 @@ class fesom_data(object):
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
 #_______________________________________________________________________________
-def fesom_load_data_horiz(mesh,data):
+def fesom_load_data_horiz(mesh,data,do_output=True):
 	
 	#___________________________________________________________________________
 	# number of years to average 
@@ -68,16 +68,17 @@ def fesom_load_data_horiz(mesh,data):
 	# array with month
 	ami = np.array(data.month)
 	
-	print('')
-	print('     -----+-----------------------------------+------------')
-	print('     Year |               MON                 |')
-	print('     -----+-----------------------------------+------------')
+	if do_output==True:
+		print('')
+		print('     -----+-----------------------------------+------------')
+		print('     Year |               MON                 |')
+		print('     -----+-----------------------------------+------------')
 	print('     --> '+data.path)
 	print('     --> '+data.var)
 	#____START YEAR LOOP________________________________________________________
 	aux_datavar = data.var
 	for yi in range(0, nyi):
-		print('     {:4.0f} |'.format(ayi[yi])),
+		if do_output==True: print('     {:4.0f} |'.format(ayi[yi])),
 		tstart = time.time();
 		if data.var.find('norm')!=-1 or data.var.find('vec')!=-1 or data.var=='ptemp':
 			if data.var.find('tuv')!=-1 or data.var.find('suv')!=-1:
@@ -140,7 +141,7 @@ def fesom_load_data_horiz(mesh,data):
 			
 			# if data are 3d and no loadable depth layers are given load all fesom 
 			# layers
-			if dim_num==3 and len(data.depth)==0:
+			if dim_num==3 and  (len(data.depth)==0 or np.all(data.depth==mesh.zlev)==True):
 				# allocate array for mean data
 				mean_data = np.zeros((nsmple,ncdims[2]),dtype='float32')
 				if data.var.find('vec')!=-1:
@@ -215,20 +216,21 @@ def fesom_load_data_horiz(mesh,data):
 		if len(data.record)==0:
 			#___________________________________________________________________
 			if nrec==1:
-				print('annual |'),
+				if do_output==True: print('annual |'),
 			elif nrec==12:
-				print('monthly|'),
+				if do_output==True: print('monthly|'),
 			#elif nrec==73:
 				#print('5daily |'),
 			elif nrec==365:
-				print('daily  |'),
+				if do_output==True: print('daily  |'),
 			else:	
 				print(' --> error: temporal length of data unclear or not supported!!!|'),
 				break
 			#___________________________________________________________________
 			# select monthly or seasonal subset of data
 			if nmi<12 and nrec>=12:
-				for ii in data.month: print('{:d}|'.format(ii)),
+				if do_output==True: 
+					for ii in data.month: print('{:d}|'.format(ii)),
 				#_______________________________________________________________
 				# select from monthly data
 				if nrec==12 : 
@@ -253,7 +255,8 @@ def fesom_load_data_horiz(mesh,data):
 			# select full data
 			else:	
 				if nrec>=12: 
-					for ii in data.month: print('{:d}|'.format(ii)),
+					if do_output==True: 
+						for ii in data.month: print('{:d}|'.format(ii)),
 				ncval=fesom_time_depth_mean(mesh,ncval,[],data.depth)
 				if data.var.find('vec')!=-1: 
 					ncval2=fesom_time_depth_mean(mesh,ncval2,[],data.depth)
@@ -290,7 +293,7 @@ def fesom_load_data_horiz(mesh,data):
 		
 		#_______________________________________________________________________
 		tend = time.time();		
-		print(' --> t={:2.2f}s'.format(tend-tstart))
+		if do_output==True: print(' --> t={:2.2f}s'.format(tend-tstart))
 	#___________________________________________________________________________
 	# in case of ice data set no ice to nan
 	if (data.var=='a_ice'):
@@ -388,7 +391,7 @@ def fesom_load_data_horiz(mesh,data):
 #___LOAD FESOM2.0 DATA OVER TIME IN INDEX BOX___________________________________
 #
 #_______________________________________________________________________________
-def fesom_load_data_overtime(mesh,data):
+def fesom_load_data_overtime(mesh,data,do_output=True):
 	#___________________________________________________________________________
 	# number of years to average 
 	nyi = data.year[1]-data.year[0]+1
@@ -406,17 +409,17 @@ def fesom_load_data_overtime(mesh,data):
 	for ii in range(0,mesh.n2dn):
 		lsmask3d[ii,0:mesh.nodes_2d_iz[ii]-1]=1
 	
-	print('')
-	print('     -----+-----------------------------------+------------')
-	print('     Year |               MON                 |')
-	print('     -----+-----------------------------------+------------')
+	if do_output==True:
+		print('     -----+-----------------------------------+------------')
+		print('     Year |               MON                 |')
+		print('     -----+-----------------------------------+------------')
 	print('     --> '+data.path)
 	print('     --> '+data.var)
 	#____START YEAR LOOP________________________________________________________
 	aux_datavar = data.var
 	count_ti=0
 	for yi in range(0, nyi):
-		print('     {:4.0f} |'.format(ayi[yi])),
+		if do_output==True: print('     {:4.0f} |'.format(ayi[yi])),
 		tstart = time.time();
 		if data.var.find('norm')!=-1 or data.var=='ptemp':
 			aux_datavar,aux_datavar2 = 'u','v'
@@ -478,12 +481,25 @@ def fesom_load_data_overtime(mesh,data):
 			#___________________________________________________________________
 			# if data are 3d and no loadable depth layers are given load all fesom 
 			# layers
-			if dim_num==3 and len(data.depth)==0:
-				# allocate array for mean data
-				data.value = np.zeros((nti,ncdims[2]),dtype='float32')
+			if dim_num==3 and (len(data.depth)==0 or np.all(data.depth==mesh.zlev)==True):
+				# allocate array for mean box index data
+				if data.which_obj=='box':
+					data.value = []
+					for ii in range(0,len(data.box_define)):
+						data.value.append([])
+						data.value[ii] = np.zeros((nti,ncdims[2]),dtype='float32')
+				else:
+					data.value = np.zeros((nti,ncdims[2]),dtype='float32')
 			else:
-				# allocate array for mean data
-				data.value = np.zeros((nti,),dtype='float32')
+				# allocate array for mean box index  data
+				if data.which_obj=='box':
+					data.value = []
+					for ii in range(0,len(data.box_define)):
+						data.value.append([])
+						data.value[ii] = np.zeros((nti,),dtype='float32')
+				else:
+					data.value = np.zeros((nti,),dtype='float32')
+				
 			data.time  = np.zeros((nti,),dtype='float32')
 			
 			#___________________________________________________________________
@@ -539,13 +555,13 @@ def fesom_load_data_overtime(mesh,data):
 		if len(data.record)==0:
 			#___________________________________________________________________
 			if nrec==1:
-				print('annual |'),
+				if do_output==True: print('annual |'),
 			elif nrec==12:
-				print('monthly|'),
+				if do_output==True: print('monthly|'),
 			#elif nrec==73:
 				#print('5daily |'),
 			elif nrec==365:
-				print('daily  |'),
+				if do_output==True: print('daily  |'),
 			else:	
 				print(' --> error: temporal length of data unclear or not supported!!!|'),
 				break
@@ -553,79 +569,72 @@ def fesom_load_data_overtime(mesh,data):
 			#___________________________________________________________________
 			# select data like they are stored in the file 
 			if 		data.which_mean=='None':
-				ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
-				ncval = np.nanmean(ncval,axis=1)
-				data.value[count_ti:count_ti+nrec,:] = ncval
+				if data.which_obj=='box':
+					for ii in range(0,len(data.box_define)):
+						ncval2 = np.nanmean(ncval[:,np.where(data.box_idx[ii][0:mesh.n2dn])[0],:],axis=1)
+						data.value[ii][count_ti:count_ti+nrec,:] = ncval2
 				data.time[count_ti:count_ti+nrec   ] = ayi[yi]+np.arange(0.0,nrec,1.0)/nrec
 				count_ti = count_ti+nrec
-			
+				
 			#___________________________________________________________________
 			# select data by data.month calculate monthly mean from
 			elif 	data.which_mean=='monthly' and nrec!=1:
-				#_______________________________________________________________
-				# select from monthly data
-				if nrec==12 : 
-					# calc mean over points in box
-					ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
-					ncval = np.nanmean(ncval, axis=1)
-					
-					# select month subset
-					ncval = fesom_time_depth_mean(mesh,ncval,np.array(data.month)-1,[],do_tmean=False)
-					
-				#_______________________________________________________________
-				# select from daily data
-				elif nrec==365 : 
-					# calc mean over points in box
-					ncval = ncval[:,np.where(data.box_idx[0][0:mesh.n2dn])[0],:]
-					ncval =np.nanmean(ncval,axis=1)
-					
-					# find out which day belongs to selected subset
-					idx_sel = sel_timesubset_daily(data)
-					ncval=fesom_time_depth_mean(mesh,ncval,idx_sel==True,[],do_tmean=False)
-					
-				#_______________________________________________________________
-				data.value[count_ti:count_ti+ncval.shape[0],:] = ncval[:,:]
+				if data.which_obj=='box':
+					for ii in range(0,len(data.box_define)):
+						#_______________________________________________________________
+						# calc mean over points in box
+						ncval2 = np.nanmean(ncval[:,np.where(data.box_idx[ii][0:mesh.n2dn])[0],:],axis=1)
+						#_______________________________________________________________
+						# select from monthly data
+						if   nrec==12 : 
+							# select month subset
+							ncval2 = fesom_time_depth_mean(mesh,ncval2,np.array(data.month)-1,[],do_tmean=False) 
+						# select from daily data
+						elif nrec==365 : 
+							# find out which day belongs to selected subset
+							idx_sel = sel_timesubset_daily(data)
+							ncval2=fesom_time_depth_mean(mesh,ncval2,idx_sel==True,[],do_tmean=False)
+						#_______________________________________________________________
+						data.value[ii][count_ti:count_ti+ncval.shape[0],:] = ncval2[:,:]
+						
 				data.time[count_ti:count_ti+ncval.shape[0]   ] = ayi[yi]+np.arange(0.0,ncval.shape[0],1.0)/ncval.shape[0]
 				count_ti = count_ti+ncval.shape[0]
 				
 			#___________________________________________________________________
 			# select data by data.month calculate seasonal mean from
 			elif 	data.which_mean=='seasonal' and nrec!=1:
-				#_______________________________________________________________
-				# select from monthly data
-				if nrec==12 : 
-					# calc mean over points in box
-					ncval = ncval[:,np.where(data.box_idx[0:mesh.n2dn])[0],:]
-					ncval = np.nanmean(ncval,axis=1)
-					
-					# select month subset
-					ncval = fesom_time_depth_mean(mesh,ncval,np.array(data.month)-1,[],do_tmean=True)
-					
-				#_______________________________________________________________
-				# select from daily data
-				elif nrec==365 : 
-					# calc mean over points in box
-					ncval = ncval[:,np.where(data.box_idx[0:mesh.n2dn])[0],:]
-					ncval = np.nanmean(ncval,axis=1)
-					
-					# find out which day belongs to selected subset
-					idx_sel = sel_timesubset_daily(data)
-					ncval=fesom_time_depth_mean(mesh,ncval,idx_sel==True,[],do_tmean=True)
-					
-				#_______________________________________________________________
-				data.value[count_ti:count_ti+1,:] = ncval[:,:]
+				if data.which_obj=='box':
+					for ii in range(0,len(data.box_define)):
+						#_______________________________________________________________
+						# calc mean over points in box
+						ncval2 = np.nanmean(ncval[:,np.where(data.box_idx[ii][0:mesh.n2dn])[0],:],axis=1)
+						#_______________________________________________________________
+						# select from monthly data
+						if nrec==12 : 
+							# select month subset
+							ncval2 = fesom_time_depth_mean(mesh,ncval2,np.array(data.month)-1,[],do_tmean=True)
+						#_______________________________________________________________
+						# select from daily data
+						elif nrec==365 : 
+							# find out which day belongs to selected subset
+							idx_sel = sel_timesubset_daily(data)
+							ncval2=fesom_time_depth_mean(mesh,ncval2,idx_sel==True,[],do_tmean=True)
+							
+						#_______________________________________________________________
+						data.value[ii][count_ti:count_ti+1,:] = ncval2[:,:]
 				data.time[count_ti:count_ti+1   ] = ayi[yi]
 				count_ti = count_ti+1
 			
 			#___________________________________________________________________
 			# calculate annual mean from daily, monthly or annual data
 			elif 	data.which_mean=='annual' or nrec==1:
-				# calc mean over points in box
-				ncval = ncval[:,data.box_idx[0:mesh.n2dn]==True,:]
-				ncval = np.nanmean(ncval,axis=1)
-				
-				#_______________________________________________________________
-				data.value[count_ti:count_ti+1,:] = ncval.mean(axis=0)
+				if data.which_obj=='box':
+					for ii in range(0,len(data.box_define)):
+						#_______________________________________________________________
+						# calc mean over points in box
+						ncval2 = np.nanmean(ncval[:,np.where(data.box_idx[ii][0:mesh.n2dn])[0],:],axis=1)
+						#_______________________________________________________________
+						data.value[ii][count_ti:count_ti+1,:] = ncval2.mean(axis=0)
 				data.time[count_ti:count_ti+1   ] = ayi[yi]
 				count_ti = count_ti+1
 		
@@ -636,11 +645,14 @@ def fesom_load_data_overtime(mesh,data):
 		
 		#_______________________________________________________________________
 		tend = time.time();		
-		print(' --> t={:2.2f}s'.format(tend-tstart))
+		if do_output==True: print(' --> t={:2.2f}s'.format(tend-tstart))
 		
 	#___________________________________________________________________________
 	# cut of time_data
-	data.value = data.value[0:count_ti,:]
+	if data.which_obj=='box':
+		for ii in range(0,len(data.box_define)):
+			data.value[ii] = data.value[ii][0:count_ti,:]
+			
 	data.time  = data.time[0:count_ti]
 	if len(data.depth)==0: data.depth = mesh.zlev
 	
@@ -670,6 +682,103 @@ def fesom_load_data_overtime(mesh,data):
 	
 	#___________________________________________________________________________
 	return(data)
+	
+	
+#___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
+#
+#_______________________________________________________________________________
+def fesom_load_blowup(mesh,data,do_output=True):
+	
+	#___________________________________________________________________________
+	# number of years to average 
+	nyi = data.year[1]-data.year[0]+1
+	
+	# array with years
+	ayi = np.linspace(data.year[0],data.year[1],nyi,dtype='uint16')
+	# number of month to average
+	nmi = np.array(data.month).size
+	# array with month
+	ami = np.array(data.month)
+	
+	#____START YEAR LOOP________________________________________________________
+	fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.blowup.nc'
+	print('     --> '+fname)
+	print('     --> '+data.var)
+	
+	#_______________________________________________________________________
+	# open netcdf file --> read NETCDF4
+	ncid = Dataset(fname, 'r') 
+	
+	
+	# read dimension of variable 
+	ncdims=ncid.variables[data.var].shape
+	#print(ncdims)
+	
+	# number of dimension is 2d or 3d
+	dim_num = len(ncdims)
+	
+	# check time dimension of loaded data aka number of records
+	nrec  = ncdims[0]
+	nsmple= ncdims[1]
+	
+	#_______________________________________________________________________
+	# allocate array for mean data
+	if dim_num==3 and  (len(data.depth)==0 or np.all(data.depth==mesh.zlev)==True):
+		# allocate array for mean data
+		mean_data = np.zeros((nsmple,ncdims[2]),dtype='float32')
+	else:
+		# allocate array for mean data
+		mean_data = np.zeros((nsmple,),dtype='float32')
+	
+	#___________________________________________________________________
+	# setup variable name, description and unit
+	ncvar = ncid.variables[data.var]
+	#data.sname=ncvar.name
+	data.sname=data.var
+	for attrname in ncvar.ncattrs():
+		if attrname=='description':
+			data.lname=ncvar.getncattr(attrname)
+		elif attrname=='units':
+			data.unit='['+ncvar.getncattr(attrname)+']'
+	if data.var =='ptemp': data.lname='potential temperature'
+	if data.var.find('tuv')!=-1: data.lname='temperature advection'
+	if data.var.find('suv')!=-1: data.lname='salt advection'
+	
+	#_______________________________________________________________________
+	ncval = np.copy(ncid.variables[data.var][:])
+	ncval = fesom_time_depth_mean(mesh,ncval,data.record[0]-1,data.depth,do_tmean=False)
+	
+	#_______________________________________________________________________
+	# close netcdf file
+	ncid.close()
+	
+	#_______________________________________________________________________
+	# now average over yearly subset
+	mean_data = mean_data + ncval/nyi
+	
+	#___________________________________________________________________________
+	# in case of ice data set no ice to nan
+	if (data.var=='a_ice'):
+		mean_data=mean_data*100.0
+	#if (data.var=='a_ice' or data.var=='m_ice'):
+		#mean_data[mean_data==0.0]=np.nan
+	
+	#___________________________________________________________________________
+	# augment periodic boundary of data.value
+	if nsmple==mesh.n2dn:
+		# augment node data
+		data.value = np.concatenate((mean_data,mean_data[mesh.pbndn_2d_i]))
+		del mean_data
+	else:
+		# augment elem data
+		data.value = np.concatenate((mean_data,mean_data[mesh.pbndtri_2d_i]))
+		del mean_data
+		# delete trinangle that are seen as abnormal 
+		if len(mesh.abnormtri_2d_i)!=0:
+			data.value = np.delete(data.value,mesh.abnormtri_2d_i)
+	
+	#___________________________________________________________________________
+	return data
 	
 	
 #___DO VERTICAL INTERPOLATE AVERAGE OVER CERTAIN LAYERS_________________________
@@ -797,23 +906,34 @@ def sel_timesubset_daily(data):
 def fesom_time_depth_mean(mesh,ncval,sel_time,levels=[],do_tmean=True,do_zmean=True):
 	
 	dim_num = len(ncval.shape)
+	if np.isscalar(sel_time)==True:
+		nselt = 0
+	else:
+		nselt = len(sel_time)
+	
 	#___________________________________________________________________________
 	# do no time selection
-	if len(sel_time)==0:
+	#if len(sel_time)==0:
+	if nselt==0:
 		if dim_num==2:
 			# case 2d variable
 			#ncval= ncval[:,:]
+			if np.isscalar(sel_time)==True:ncval= ncval[sel_time,:]
 			if do_tmean==True: ncval=ncval.mean(axis=0)
 		elif dim_num==3:
 			# case 3d variable
 			#ncval= ncval[:,:,:]
+			if np.isscalar(sel_time)==True:ncval= ncval[sel_time,:,:]
 			if do_tmean==True: ncval=ncval.mean(axis=0)
 			# do vertical interpolation of certain layer if data.depth is not empty
 			#if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
 			if do_zmean==True:
-				if len(levels)!=0 : ncval=fesom_vinterp(ncval,mesh,levels)
+				#if len(levels)!=0 : 
+				if len(levels)!=0 and np.all(levels==mesh.zlev)==False:
+					ncval=fesom_vinterp(ncval,mesh,levels)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
+	
 	#___________________________________________________________________________
 	# select certain time slice and average
 	else:
@@ -828,7 +948,9 @@ def fesom_time_depth_mean(mesh,ncval,sel_time,levels=[],do_tmean=True,do_zmean=T
 			# do vertical interpolation of certain layer if data.depth is not empty
 			#if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
 			if do_zmean==True:
-				if len(levels)!=0 : ncval=fesom_vinterp(ncval,mesh,levels)
+				#if len(levels)!=0 : 
+				if len(levels)!=0 and np.all(levels==mesh.zlev)==False:
+					ncval=fesom_vinterp(ncval,mesh,levels)
 		else:
 			print(' --> error: more than 3 variable dimensions are not supported' )
 	return(ncval)
@@ -841,7 +963,10 @@ def fesom_data_anom(data,data2):
 	anom = fesom_data([])
 	
 	#____data run variables______________________
-	anom.var                            = data.var
+	if data.var!=data2.var:
+		anom.var                            = data2.var+'-'+data.var
+	else:
+		anom.var                            = data.var
 	anom.runid, anom.path               = data.runid, data.path
 	anom.descript                       = data2.descript+'-'+data.descript
 	
@@ -859,8 +984,16 @@ def fesom_data_anom(data,data2):
 	anom.proj_lon, anom.proj_lat        = data.proj_lon, data.proj_lat
 	
 	#____data description info___________________
-	anom.sname, anom.lname, anom.unit   = data.sname, data.lname, data.unit
-	
+	#anom.sname, anom.lname, anom.unit   = data.sname, data.lname, data.unit
+	if data.sname!=data2.sname:
+		anom.sname = data2.sname+'-'+data.sname
+	else:
+		anom.sname = data.sname
+	if data.lname!=data2.lname:
+		anom.lname = data2.lname+'-'+data.lname
+	else:
+		anom.lname = data.lname
+	anom.unit   = data.unit
 	#____data plot varaibles_____________________
 	#anom.cmap, anom.crange, anom.cnumb  = data.cmap, data.crange, data.cnumb
 	anom.which_plot                     = data.which_plot 

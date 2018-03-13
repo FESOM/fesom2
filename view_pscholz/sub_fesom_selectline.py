@@ -2,6 +2,8 @@
 import sys
 import os
 import numpy as np
+import cmocean
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.basemap import Basemap
@@ -11,6 +13,10 @@ from sub_fesom_plot 		import *
 from sub_regriding_adapt 	import *
 from colormap_c2c			import *
 
+#+_____________________________________________________________________________+
+#|                                                                             |
+#|                    *** FESOM2.0 LINE-SECTION CLASS ***                      |
+#|                                                                             |
 #+_____________________________________________________________________________+
 class fesom_line:
 	
@@ -40,13 +46,6 @@ class fesom_line:
 	which_mean                  = 'monthly'
 	anom                        = False
 	
-	##____selection variable______________________
-	#x, y, xc, yc				= [], [], [], []
-	#b, k, cid_pressb, cid_pressk= [], [], [] ,[]
-	#zoomfac, press				= 20.0, 'None'
-	#fig, ax, xlim, ylim			= [], [], [], []
-	#ptsx, ptsy, drawline 		= [], [], []
-		
 	#____line variable___________________________
 	line_define, line_define_dist	 = [], []
 	line_interp_p, line_interp_pm    = [], []
@@ -56,9 +55,9 @@ class fesom_line:
 	line_interp_pm_nvec				 = []
 	line_interp_pm_evec				 = []
 	
-	#___INIT LINE OBJECT_______________________________________________________#
-	#
-	#__________________________________________________________________________#
+	#+___INIT LINE OBJECT______________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	def __init__(self):
 		#____selection variable______________________
 		self._x, self._y, self._xc, self._yc  = [], [], [], []
@@ -69,15 +68,16 @@ class fesom_line:
 		self._xlim, self._ylim				  = [], [],
 		self._ptsx, self._ptsy, self._drawline= [], [], []
 		self._text							  = []
+		self.line_define                      = []
+		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	def _connect_(self,fig,ax,map):
 		print(' --> start interactive line selection')
-		#self._figure = plt.gcf()
-		#self._ax     = plt.gca()
 		self._figure = fig
 		self._ax     = ax
 		self._map    = map
-		#self.canvas = FigureCanvas(self._figure)
 		self._xlim   = self._ax.get_xlim()
 		self._ylim   = self._ax.get_ylim()
 		self._text   = plt.figtext(0.5,0.05,'Interactive Selection',
@@ -86,15 +86,36 @@ class fesom_line:
 							horizontalalignment='center',
 							bbox=dict(facecolor='w',edgecolor='k'),
 							)
+		
+		self._cid_pressb = self._figure.canvas.mpl_connect('button_press_event', self._anybutton_)
+		self._cid_pressk = self._figure.canvas.mpl_connect('key_press_event', self._anykey_)
+		
+		self._drawline, = plt.plot([], [],color='w',linewidth=2,marker='o')
+		
 		# This line stops proceeding of the code...
 		plt.show(block=True)
-		
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	def _disconnect_(self):
+		self._figure.canvas.mpl_disconnect(self._cid_pressb)
+		self._figure.canvas.mpl_disconnect(self._cid_pressk)
+		plt.show(block=False)
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# change zoom factor to zoom in 
 	def _drawzoom_in_(self):	
 		print(' zoom_in')
 		self._zoomfac = self._zoomfac/2.0
-		
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# change zoom factor to zoom out 
 	def _drawzoom_out_(self):	
@@ -102,15 +123,17 @@ class fesom_line:
 		self._zoomfac = self._zoomfac*2.0
 		
 	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	# zoom full out
 	def _drawzoom_outfull_(self):	
 		print(' zoom_fullout')
 		self._ax.set_xlim(self._xlim[0],self._xlim[1])
 		self._ax.set_ylim(self._ylim[0],self._ylim[1])
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# aplly actual zoom factor
 	def _zoom_(self, k):
@@ -121,32 +144,32 @@ class fesom_line:
 			self._drawzoom_out_()
 		self._ax.set_xlim(np.max([self._xc-self._zoomfac,-180.0]), np.min([self._xc+self._zoomfac,180.0]))
 		self._ax.set_ylim(np.max([self._yc-self._zoomfac, -90.0]), np.min([self._yc+self._zoomfac, 90.0]))
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# update center position with left mouse click 
 	def _update_center_(self, xc, yc):
 		self._xc, self._yc, = xc, yc
 		
 	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	# center new leftclick point
 	def _move_center_(self):
 		self._ax.set_xlim(np.max([self._xc-self._zoomfac,-180.0]), np.min([self._xc+self._zoomfac,180.0]))
 		self._ax.set_ylim(np.max([self._yc-self._zoomfac, -90.0]), np.min([self._yc+self._zoomfac, 90.0]))
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# LineBuilder
 	def _Linebuilder_(self,x,y,mode='add'):
 		if np.size(x)==0 or np.size(y)==0: 
 			self._ptsx = list(self._drawline.get_xdata())
 			self._ptsy = list(self._drawline.get_ydata())
-			plt.xscale('linear')
-			plt.yscale('linear')
 			return
 		if mode == 'add':
 			self._ptsx.append(np.float16(x))
@@ -157,20 +180,22 @@ class fesom_line:
 			
 		mptsx,mptsy = self._map(self._ptsx,self._ptsy)
 		self._drawline.set_data(mptsx, mptsy)
-		self._drawline.set_axes(self._ax)
 		self._drawline.figure.canvas.draw()
-		plt.xscale('linear')
-		plt.yscale('linear')
-		self._figure.canvas.draw()
-	
+		self._drawline.axes.set_xscale('linear')
+		self._drawline.axes.set_yscale('linear')
+		self._drawline.figure.canvas.draw()
+		
+		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# what should happen if a mouse button is clicked when cursor is over axis 
 	def _anybutton_(self,event):
-		#global self
+		
 		if event.inaxes:
 			x, y, b, k = event.xdata, event.ydata, event.button, []
 			#print('button=%d, xdata=%f, ydata=%f' % ( event.button, event.xdata, event.ydata))
-			#+___left mouse button_____________________________________________+
+			#____left mouse button______________________________________________
 			if event.button==1 : 
 				xc, yc = x, y
 				if self._press=='None':
@@ -178,17 +203,21 @@ class fesom_line:
 					self._move_center_()
 				elif self._press=='Line':
 					self._Linebuilder_(x,y)
-			#+___middle mouse button___________________________________________+
+					
+			#____middle mouse button____________________________________________
 			if event.button==2 : return
 			if (event.xdata is None): return
 			
-			#+___right mouse button____________________________________________+
+			#____right mouse button_____________________________________________
 			if event.button==3 : 
-				self._drawzoom_out_full()
+				self._drawzoom_outfull_()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# what should happen if a keboard button is pressed when cursor is over axis 
 	def _anykey_(self,event):
+		
 		#global self
 		if event.inaxes:
 			x, y , b, k = event.xdata, event.ydata, [], event.key
@@ -206,43 +235,44 @@ class fesom_line:
 				self._drawzoom_outfull_()
 				
 				# disconnects button and key events
-				self._figure.canvas.mpl_disconnect(self._cid_pressb)
-				self._figure.canvas.mpl_disconnect(self._cid_pressk)
+				self._disconnect_()
 				
 				# This line allows proceeding of the code...
 				plt.close(self._figure)
+				plt.close('all')
 				
 			#___LINE MODE [l]___________________________________________________
 			elif k=='l':
 				#---------------------------------------------------------------
 				# activate line mode, start line 
 				if self._press == 'None':
+					self._press = 'Line'
 					print('draw line: [ON]')
 					self._text.set_text('draw line: [ON]')
-					plt.draw(),self._figure.canvas.draw()
+					self._text.figure.canvas.draw()
 					
-					self._press = 'Line'
-					self._drawline, = plt.plot([], [],color='w',linewidth=2,marker='o',axes=self._ax)
 					self._Linebuilder_([],[])
-					#plt.xscale('linear'),
-					#plt.yscale('linear')
-					self._figure.canvas.draw()
+					self._drawline.axes.set_xscale('linear')
+					self._drawline.axes.set_yscale('linear')
+					self._drawline.axes.figure.canvas.draw()
+					
 				#---------------------------------------------------------------
 				# switch off line mode, end line
 				elif self._press =='Line': 
 					print('draw line: [OFF]')
 					self._text.set_text('draw line: [OFF]')
-					plt.draw(),self._figure.canvas.draw()
+					self._text.figure.canvas.draw()
 					self._press = 'None'
+					
 					self._drawline.set_color([0.0,0.8,0.0])
-					#self._drawline.set_color('w')
 					self._drawline.set_linewidth(2.0)
-					plt.xscale('linear')
-					plt.yscale('linear')
-					self._figure.canvas.draw()
+					self._drawline.axes.set_xscale('linear')
+					self._drawline.axes.set_yscale('linear')
+					self._drawline.figure.canvas.draw()
+					
 					#ask for name 
 					#self._text.set_text('enter name in command line')
-					#plt.draw(),self._figure.canvas.draw()
+					#self._text.figure.canvas.draw()
 					#name = raw_input("Enter Name of line: ")
 					if len(self._ptsx)!=0 :
 						name = 'default'
@@ -253,14 +283,15 @@ class fesom_line:
 			elif k=='d':
 				if self._press=='Line':
 					self._Linebuilder_(x,y,mode='remove')
-	
+		
+		
 	#+_________________________________________________________________________+
-	#|																		   |
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# analyse slected lines and calculate interpolation points ip
 	def analyse_lines(self,which='res',npoints=50,res=10):
 		
-		#+_____________________________________________________________________+
+		#_______________________________________________________________________
 		self.line_interp_p   	 = []
 		self.line_interp_p_dist  = []
 		self.line_interp_pm_dr   = []
@@ -271,7 +302,7 @@ class fesom_line:
 		self.line_define_dist	 = []
 		for ii in range(0,len(self.line_define)):
 			
-			#+_________________________________________________________________+
+			#___________________________________________________________________
 			self.line_interp_p.append([ [],[] ])
 			self.line_interp_p_dist.append([])
 			self.line_interp_p_dist[ii].append(0.0)
@@ -283,12 +314,12 @@ class fesom_line:
 			self.line_define_dist.append([])
 			for jj in range(0,len(self.line_define[ii][0])-1):
 				
-				#+_____________________________________________________________+
+				#_______________________________________________________________
 				P1    = [self.line_define[ii][0][jj],self.line_define[ii][1][jj]]
 				P2    = [self.line_define[ii][0][jj+1],self.line_define[ii][1][jj+1]]
 				#evec  = [self.line_define[ii][0][jj+1]-self.line_define[ii][0][jj],
 						 #self.line_define[ii][1][jj+1]-self.line_define[ii][1][jj],]
-				#+_____________________________________________________________+
+				#_______________________________________________________________
 				# unit vector of line
 				evec  = [P2[0]-P1[0],
 						 P2[1]-P1[1]]
@@ -314,15 +345,14 @@ class fesom_line:
 					self.line_interp_p[ii][0].append(P1[0]+evecnl[kk]*evec[0])
 					self.line_interp_p[ii][1].append(P1[1]+evecnl[kk]*evec[1])
 					
-					# lon/lat coordinates of midinterpolation points
 					if kk>0:
+						# lon/lat coordinates of midinterpolation points
 						aux_mid = evecnl[kk-1]+(evecnl[kk]-evecnl[kk-1])/2
 						self.line_interp_pm[ii][0].append(P1[0]+aux_mid*evec[0])
 						self.line_interp_pm[ii][1].append(P1[1]+aux_mid*evec[1])
 						del aux_mid
 					
-					# calc distance of interpolation points from start point
-					if len(self.line_interp_p[ii][1])>1:
+						# calc distance of interpolation points from start point
 						Rearth=6371.0
 						xc,yc,zc = geo2cart([self.line_interp_p[ii][0][-2],self.line_interp_p[ii][0][-1]],
 											[self.line_interp_p[ii][1][-2],self.line_interp_p[ii][1][-1]])
@@ -330,9 +360,7 @@ class fesom_line:
 						self.line_interp_p_dist[ii].append(self.line_interp_p_dist[ii][-1]+dr)
 						self.line_interp_pm_dr[ii].append(dr)
 						
-					# calc distance of mid-interpolation points from start point
-					if len(self.line_interp_pm[ii][1])>0:
-						Rearth=6371.0
+						# calc distance of mid-interpolation points from start point
 						xc,yc,zc = geo2cart([self.line_interp_pm[ii][0][-1],self.line_interp_p[ii][0][-1]],
 											[self.line_interp_pm[ii][1][-1],self.line_interp_p[ii][1][-1]])
 						dr = np.pi/180*Rearth*np.degrees(np.arccos( (xc[0]*xc[1]+yc[0]*yc[1]+zc[0]*zc[1])/(Rearth**2) ))
@@ -348,12 +376,12 @@ class fesom_line:
 			self.line_define_dist[ii].append(self.line_interp_p_dist[ii][-1])
 	
 	#+_________________________________________________________________________+
-	#|																		   |
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# interpolate line points on fesom data
 	def interp_lines(self,mesh,usemidpts=True):
 		
-		#+_____________________________________________________________________+
+		#_______________________________________________________________________
 		bckp_value,bckp_value2,bckp_value3 = [],[],[]
 		bckp_value,self.value  = self.value,[]
 		if len(self.value2)!=0 : bckp_value2,self.value2  = self.value2,[]
@@ -378,6 +406,32 @@ class fesom_line:
 				self.value3.append([])
 				self.value3[ii]=np.zeros((npts,nlev))
 			
+			
+			
+			#___________________________________________________________________
+			# precalculate distance ind indices for interpolation
+			which='node'
+			if bckp_value.shape[0]==mesh.n2dea: which='elem'
+			if usemidpts==True:
+				distances, inds = create_indexes_and_distances(mesh,
+												np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
+												k=10, n_jobs=2,which=which)
+			else:
+				distances, inds = create_indexes_and_distances(mesh,
+													np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),\
+													k=10, n_jobs=2,which=which)
+			if len(bckp_value3)!=0:
+				which='node'
+				if bckp_value3.shape[0]==mesh.n2dea: which='elem'
+				if usemidpts==True:
+					distances3, inds3 = create_indexes_and_distances(mesh,
+												np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
+												k=10, n_jobs=2,which=which)
+				else:
+					distances3, inds3 = create_indexes_and_distances(mesh,
+												np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),
+												k=10, n_jobs=2,which=which)
+				
 			#___________________________________________________________________
 			for di in range(0,nlev):
 				data_di   = np.copy(bckp_value[:,di])
@@ -385,27 +439,15 @@ class fesom_line:
 					data_di[di>=mesh.nodes_2d_iz-1]=np.nan
 				elif bckp_value.shape[0]==mesh.n2dea:
 					data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
-				#data_di[data_di==0]=np.nan
-				
-				which='node'
-				if data_di.shape[0]==mesh.n2dea: which='elem'
 				if usemidpts==True:
-					distances, inds = create_indexes_and_distances(mesh,
-													np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
-													k=10, n_jobs=2,which=which)
 					self.value[ii][:,di]=fesom2regular(data_di, mesh,
 									np.array(self.line_interp_pm[ii][0]),np.array(self.line_interp_pm[ii][1]),
 									distances=distances, inds=inds)
 									#how='idist',k=10)
 				else:
-					distances, inds = create_indexes_and_distances(mesh,
-													np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),\
-													k=10, n_jobs=2,which=which)
 					self.value[ii][:,di]=fesom2regular(data_di, mesh,
 									np.array(self.line_interp_p[ii][0]),np.array(self.line_interp_p[ii][1]),
 									distances=distances, inds=inds)
-					
-								
 				#_______________________________________________________________
 				# also interpolate second value
 				if len(bckp_value2)!=0:
@@ -414,19 +456,14 @@ class fesom_line:
 						data_di[di>=mesh.nodes_2d_iz-1]=np.nan
 					elif bckp_value2.shape[0]==mesh.n2dea:
 						data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
-					#data_di[data_di==0]=np.nan
-					
 					if usemidpts==True:
 						self.value2[ii][:,di]=fesom2regular(data_di, mesh, 
 										np.array(self.line_interp_pm[ii][0]),np.array(self.line_interp_pm[ii][1]),
 										distances=distances, inds=inds)
-										#how='idist',k=10)
 					else:
 						self.value2[ii][:,di]=fesom2regular(data_di, mesh, 
 									np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),
 									distances=distances, inds=inds)
-									#how='idist',k=10)
-									
 				#_______________________________________________________________
 				# also interpolate third value
 				if len(bckp_value3)!=0:
@@ -435,29 +472,14 @@ class fesom_line:
 						data_di[di>=mesh.nodes_2d_iz-1]=np.nan
 					elif bckp_value3.shape[0]==mesh.n2dea:
 						data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
-					#data_di[data_di==0]=np.nan
-					
-					which='node'
-					if data_di.shape[0]==mesh.n2dea: which='elem'
 					if usemidpts==True:
-						distances, inds = create_indexes_and_distances(mesh,
-													np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
-													k=10, n_jobs=2,which=which)
-					
 						self.value3[ii][:,di]=fesom2regular(data_di, mesh, 
 										np.array(self.line_interp_pm[ii][0]),np.array(self.line_interp_pm[ii][1]),
-										distances=distances, inds=inds)
-										#how='idist',k=10)
+										distances=distances3, inds=inds3)
 					else:
-						distances, inds = create_indexes_and_distances(mesh,
-													np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),
-													k=10, n_jobs=2,which=which)
-					
 						self.value3[ii][:,di]=fesom2regular(data_di, mesh, 
 									np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),
-									distances=distances, inds=inds)
-									#how='idist',k=10)
-			
+									distances=distances3, inds=inds3)
 			#___________________________________________________________________
 			# copy metainfo from data object to line object
 			#self.var 		= data.var
@@ -480,7 +502,7 @@ class fesom_line:
 			#self.depth 		= data.depth
 	
 	#+_________________________________________________________________________+
-	#|																		   |
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# calculate fluxes through section
 	def calc_flux(self, Tref=[], Sref=35.0):
@@ -580,7 +602,7 @@ class fesom_line:
 				self.lname='Liquit Freshwater Flux'
 				
 	#+_________________________________________________________________________+
-	#|																		   |
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# calculate fluxes through section
 	def data_anom(self, line, line2):
@@ -619,15 +641,21 @@ class fesom_line:
 	#+_________________________________________________________________________+
 	#|						 PLOT LINE OVER DEPTH 							   |
 	#+_________________________________________________________________________+
-	def plot_lines_dist_x_z(self):
+	def plot_lines_dist_x_z(self,numb=[],figsize=[]):
 		from set_inputarray import inputarray
-	
+		fsize = 16
+		
+		if len(figsize)==0 : figsize=[13,13]
+		#_______________________________________________________________________
+		if isinstance(numb,int)==True : numb = [numb]
+		if len(numb)==0 : numb=range(0,len(self.line_define))
+		
+		#_______________________________________________________________________
 		# loop over number of drawn section lines
-		for ii in range(0,len(self.line_define)):
+		for ii in numb:
 			
 			#___________________________________________________________________
-			fsize=14
-			fig = plt.figure(figsize=(20, 13))
+			fig = plt.figure(figsize=figsize)
 			ax1  = plt.gca()
 			# duplicate x-axes
 			ax2  = ax1.twiny()
@@ -654,7 +682,7 @@ class fesom_line:
 			
 			cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,cmap)
 			do_drawedges=True
-			if clevel.size>30: do_drawedges=False
+			if clevel.size>50: do_drawedges=False
 			
 			# overwrite discrete colormap
 			#cmap0 = cmocean.cm.balance
@@ -666,8 +694,9 @@ class fesom_line:
 			#xxx1= np.array(self.line_ipxy[ii][0])
 			yyy = self.depth[0:-1] + (self.depth[1::]-self.depth[0:-1])/2.0
 			yyy = -yyy
-			yyylim = np.sum(~np.isnan(data_plot),axis=1).max()+1
-			if yyylim==yyy.shape: yyylim=yyylim-1
+			yyylim = np.sum(~np.isnan(data_plot),axis=1).max()
+			yyylim=yyylim-1
+			if yyylim<yyy.shape[0]-1: yyylim=yyylim+1
 			yy,xx = np.meshgrid(yyy,xxx)
 			
 			if inputarray['which_plot']=='pcolor':
@@ -709,12 +738,12 @@ class fesom_line:
 			ax1.set_ylim(0,yyy[yyylim])
 			ax1.invert_yaxis()
 			ax1.set_axis_bgcolor([0.25,0.25,0.25])
-			ax1.tick_params(axis='both',which='major',direction='out',length=8)
+			ax1.tick_params(axis='both',which='major',direction='out',length=8,labelsize=fsize)
 			ax1.minorticks_on()
-			ax1.tick_params(axis='both',which='minor',direction='out',length=4)
-			ax1.set_xlabel('Distance from start point [km]',fontdict=dict(fontsize=12))
-			ax1.set_ylabel('Depth [km]',fontdict=dict(fontsize=12))
-			plt.title(self.descript+' - '+self.line_define[0][2]+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
+			ax1.tick_params(axis='both',which='minor',direction='out',length=4,labelsize=fsize)
+			ax1.set_xlabel('Distance from start point [km]',fontdict=dict(fontsize=fsize))
+			ax1.set_ylabel('Depth [km]',fontdict=dict(fontsize=fsize))
+			plt.title(self.descript+' - '+self.line_define[0][2]+'\n',fontdict= dict(fontsize=fsize*2),verticalalignment='bottom')
 			
 			#___________________________________________________________________
 			# set upper secondary x-axes
@@ -742,7 +771,7 @@ class fesom_line:
 				lonticklabels.append('{:2.2f}$^{{\\circ}}${:s}\n{:2.2f}$^{{\\circ}}${:s}'.format(np.abs(self.line_define[ii][0][jj]),strlon,np.abs(self.line_define[ii][1][jj]),strlat))
 			ax2.set_xticks(self.line_define_dist[ii])
 			ax2.set_xticklabels(lonticklabels,fontdict=dict(fontsize=10))
-			ax2.set_xlabel('Longitude/Latitude [deg]',fontdict=dict(fontsize=12),verticalalignment='top')
+			ax2.set_xlabel('Longitude/Latitude [deg]',fontdict=dict(fontsize=fsize),verticalalignment='top')
 			ax2.tick_params(axis='both',which='major',direction='out',length=8)
 			
 			#___________________________________________________________________
@@ -752,7 +781,7 @@ class fesom_line:
 			plt.clim(clevel[0],clevel[-1])
 			
 			cbar = plt.colorbar(hp,ax=[ax1,ax2],cax=cax,ticks=clevel,drawedges=do_drawedges)
-			cbar.set_label(self.lname+' '+self.unit+'\n'+self.str_time, size=fsize+2)
+			cbar.set_label(self.lname+' '+self.unit+'\n'+self.str_time, size=fsize)
 			
 			cl = plt.getp(cbar.ax, 'ymajorticklabels')
 			plt.setp(cl, fontsize=fsize)
@@ -791,43 +820,75 @@ class fesom_line:
 		
 		
 	#+_________________________________________________________________________+
-	#|						 PLOT LINE OVER DEPTH 							   |
+	#|						 PLOT LINE POSITION 							   |
 	#+_________________________________________________________________________+
-	def plot_lines_position(self,mesh):
+	def plot_lines_position(self,mesh,numb=[]):
 		from set_inputarray import inputarray
-		# draw position of line 
-		for ii in range(0,len(self.line_define)):
+		fsize=16
+		
+		#_______________________________________________________________________
+		if isinstance(numb,int)==True : numb = [numb]
+		if len(numb)==0 : numb=range(0,len(self.line_define))
+		
+		#_______________________________________________________________________
+		# draw position of line
+		for ii in numb:
+		
 			#___________________________________________________________________
 			xmin,xmax = np.min(self.line_define[ii][0]), np.max(self.line_define[ii][0])
 			ymin,ymax = np.min(self.line_define[ii][1]), np.max(self.line_define[ii][1])
 			xmin,xmax,ymin,ymax = xmin-20.0, xmax+20.0, ymin-20.0, ymax+20.0
 			xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
-			
+			print(xmin,xmax,ymin,ymax)
 			#___________________________________________________________________
 			fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
 			map 	= Basemap(projection = 'cyl',resolution = 'c',
 						llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
 			mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
-			map.drawmapboundary(fill_color='0.9',linewidth=1.0)
-			
-			xlabels,ylabels=[0,0,0,1],[1,0,0,0]
-			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
-			map.drawparallels(yticks,labels=ylabels,fontsize=14)
-			map.drawmeridians(xticks,labels=xlabels,fontsize=14)
-			map.bluemarble()
-			fesom_plot_lmask(map,mesh,ax,'none','r')
-			ax.grid(color='k', linestyle='-', linewidth=0.5)
 			
 			#___________________________________________________________________
-			ax.plot(self.line_define[ii][0],self.line_define[ii][1] ,color='w',linewidth=2,marker='o',mfc='w',mec='k',axes=ax)
+			tri     = Triangulation(mx, my,mesh.elem_2d_i)
+			idxbox_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<xmin
+			idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>xmax)
+			idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<ymin)
+			idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>ymax)
+			tri.set_mask(idxbox_e)
+			hp1		= plt.tripcolor(tri,-mesh.nodes_2d_z,
+						cmap=cmocean.cm.dense, #cm.gist_ncar, #cm.nipy_spectral, #cmocean.cm.deep,
+						antialiased=False,
+						edgecolors='None',
+						shading='gouraud')
+			
+			#___________________________________________________________________
+			xlabels,ylabels=[0,0,0,1],[1,0,0,0]
+			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
+			map.drawparallels(yticks,labels=ylabels,fontsize=fsize)
+			map.drawmeridians(xticks,labels=xlabels,fontsize=fsize)
+			fesom_plot_lmask(map,mesh,ax,'0.6','k')
+			#map.bluemarble()
+			map.drawmapboundary(fill_color='0.9',linewidth=1.0)
+			
+			#___________________________________________________________________
+			ax.plot(self.line_define[ii][0],self.line_define[ii][1] ,color='w',linewidth=4,marker='o',mfc='w',mec='k',axes=ax)
 			ax.plot(self.line_define[ii][0][0],self.line_define[ii][1][0] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',axes=ax)
 			ax.plot(self.line_define[ii][0][-1],self.line_define[ii][1][-1] ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',axes=ax)
+			ax.plot(self.line_interp_pm[ii][0],self.line_interp_pm[ii][1] ,color='k',marker='.',linestyle='None',linewidth=0.5,markersize=4,axes=ax)
 			
-			ax.plot(self.line_interp_pm[ii][0],self.line_interp_pm[ii][1] ,
-			color='r',linewidth=4,marker='+',linestyle='None',axes=ax,markersize=6,mfc='r')
-			step=10
-			ax.quiver(self.line_interp_pm[ii][0][0::step],self.line_interp_pm[ii][1][0::step],
-					  self.line_interp_pm_nvec[ii][0][0::step],self.line_interp_pm_nvec[ii][1][0::step],color='r')
+			#ax.plot(self.line_interp_pm[ii][0],self.line_interp_pm[ii][1] ,
+			#color='r',linewidth=4,marker='+',linestyle='None',axes=ax,markersize=6,mfc='r')
+			# plot arrow in middle of each line section element
+			for jj in range(0,len(self.line_define_dist[ii])-1):
+				middist = self.line_define_dist[ii][jj]+(self.line_define_dist[ii][jj+1]-self.line_define_dist[ii][jj])/2
+				mididx  = np.abs(np.array(self.line_interp_pm_dist[0]-middist)).argmin()
+				ax.quiver(self.line_interp_pm[ii][0][mididx],self.line_interp_pm[ii][1][mididx],
+					  self.line_interp_pm_nvec[ii][0][mididx],self.line_interp_pm_nvec[ii][1][mididx],color='w',scale=10.0)
+			plt.title(self.line_define[ii][2],fontdict=dict(fontsize=fsize*2),verticalalignment='bottom')
+			
+			#___________________________________________________________________
+			divider = make_axes_locatable(ax)
+			cax = divider.append_axes("right", size="2.5%", pad=0.1)
+			
+			cbar = plt.colorbar(hp1,cax=cax,ticks=np.arange(0,6500,500))
 			
 			#___________________________________________________________________
 			# save figure
@@ -843,4 +904,4 @@ class fesom_line:
 			
 			#___________________________________________________________________
 			plt.show(block=False)
-			fig.canvas.draw()
+			

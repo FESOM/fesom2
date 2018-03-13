@@ -14,15 +14,21 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #						   data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data):
-	print('')
-	print('___PLOT 2D DATA____________________________________________')
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False ):
+	if do_output==True:
+		print('')
+		print('___PLOT 2D DATA____________________________________________')
 	from set_inputarray import inputarray
 	
+	if len(figsize)==0 : figsize=[13,13]
 	#___________________________________________________________________________
-	fig = plt.figure(figsize=(13, 13))
-	#fig.patch.set_alpha(0.0)
-	ax  = plt.gca()
+	# plot is not part of subplot
+	if len(do_subplot)==0:
+		fig = plt.figure(figsize=figsize)
+		ax  = plt.gca()
+	else:
+		fig=do_subplot[0]
+		ax =do_subplot[1]
 	resolution = 'c'
 	fsize = 14
 	
@@ -130,7 +136,7 @@ def fesom_plot2d_data(mesh,data):
 	if data.sname=='a_ice':
 		cmax,cmin,cref = 100.0, 0.0, 50.0
 		data.cmap='wbgyr'
-	if data.sname=='m_ice':
+	elif data.sname=='m_ice':
 		cmax = np.max(data.value[idx_box])
 		cmin = np.min(data.value[idx_box])
 		cref = cmin + (cmax-cmin)/2
@@ -151,17 +157,19 @@ def fesom_plot2d_data(mesh,data):
 		cref = cmin + (cmax-cmin)/2
 		cref = np.around(cref, -np.int32(np.floor(np.log10(cref))) ) 
 	elif data.sname=='u' or data.sname=='v' or data.sname=='w' or \
-		 data.sname=='bolus_u' or data.sname=='bolus_v'  or data.sname=='bolus_w':	
-		 cmax = np.max(data.value[idx_box])
-		 cmin = np.min(data.value[idx_box])
-		 cref=0
-		 data.cmap = 'blue2red'
+		data.sname=='bolus_u' or data.sname=='bolus_v'  or data.sname=='bolus_w':	
+		cmax = np.max(data.value[idx_box])
+		cmin = np.min(data.value[idx_box])
+		cref=0
+		data.cmap = 'blue2red'
 	elif data.sname=='norm_uv':
-			cmax = np.max(data.value[idx_box])
-			cmin = 0.0
-			cref = cmin + (cmax-cmin)/2
-			cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
-			data.cmap='wbgyr'
+		cmax = np.max(data.value[idx_box])
+		cmin = 0.0
+		cref = cmin + (cmax-cmin)/2
+		cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
+		data.cmap='wbgyr'
+	elif data.var.find('MLD')!=-1:
+		data.cmap='rygbw'
 	else:
 		cmax = np.max(data.value[idx_box])
 		cmin = np.min(data.value[idx_box])
@@ -190,9 +198,12 @@ def fesom_plot2d_data(mesh,data):
 	
 	#___________________________________________________________________________
 	# make custom colormap
-	print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+	if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
 	cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
-	print('clevel = ',clevel)
+	if do_output==True:print('clevel = ',clevel)
+	do_drawedges=True
+	if clevel.size>50: do_drawedges=False
+	
 	if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
 		if data.anom==False:
 			# make no sea ice transparent
@@ -218,31 +229,28 @@ def fesom_plot2d_data(mesh,data):
 	# plot data defined on nodes 
 	if data.value.size==mesh.n2dna:
 		if data.which_plot=='pcolor':
-			hp1=plt.tripcolor(tri,data_plot,
+			hp1=ax.tripcolor(tri,data_plot,                              
 						antialiased=False,
 						edgecolors='None',
 						cmap=cmap0,
 						shading='gouraud')
 						#shading='flat')
 						#shading='gouraud')
+			if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)        
 		elif data.which_plot=='contourf':
-			hp1=plt.tricontourf(tri,data_plot,
+			hp1=ax.tricontourf(tri,data_plot,
 						levels=clevel, 
 						antialiased=False,
 						extend='both',
 						cmap=cmap0)
-			#hp2=plt.tricontour(tri,data_plot,
-						#levels=clevel, 
-						#colors='k',
-						#linewidths=[0.05],
-						#antialiased=True, #True,
-						#linestyles='solid')
+			if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)
 	# plot data defined on elements
 	elif data.value.size==mesh.n2dea:
-			hp1=plt.tripcolor(tri,data_plot,
+		hp1=ax.tripcolor(tri,data_plot,                          
 							antialiased=False,
 							shading='flat',
 							cmap=cmap0)
+		if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)
 	
 	#___________________________________________________________________________
 	# arange zonal & meriodional gridlines and labels
@@ -304,8 +312,14 @@ def fesom_plot2d_data(mesh,data):
 	else:
 		divider = make_axes_locatable(ax)
 		cax     = divider.append_axes("right", size="2.5%", pad=0.1)
-	plt.clim(clevel[0],clevel[-1])
-	cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=True,
+	
+	# give each subplot its own colorrange
+	#plt.clim(clevel[0],clevel[-1])
+	him = ax.get_images()
+	for im in ax.get_images():
+		im.set_clim(clevel[0],clevel[-1])
+	
+	cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,
 						extend='both')
 	
 	cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
@@ -319,6 +333,8 @@ def fesom_plot2d_data(mesh,data):
 	
 	nmax_cbar_l = 10
 	nstep = ncbar_l/nmax_cbar_l
+	nstep = np.int(np.floor(nstep))
+	if nstep==0:nstep=1
 	plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
 	#plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
 	plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)

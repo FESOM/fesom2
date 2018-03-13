@@ -12,8 +12,8 @@ from set_inputarray 		import *
 from sub_fesom_mesh 		import * 
 from sub_fesom_data 		import * 
 from sub_fesom_plot 		import *
-from sub_fesom_selectline 	import *
-from sub_regriding_adapt 	import *
+from sub_fesom_selectline	import *
+from sub_regriding_adapt	import *
 from colormap_c2c			import *
 
 #+_____________________________________________________________________________+
@@ -24,13 +24,16 @@ inputarray['save_figpath'] = '/scratch/users/pscholz/AWI_PAPER/PAPER_FESOM2.0_ev
 
 #+_____________________________________________________________________________+
 # predefine section lines or leave it empty in this case interactive selection 
-line 				= fesom_line()
+line				= fesom_line()
 line.line_define    =  list([[]]) # --> more line ,  list([[],[],...,...]) 
-line.line_define[0] = [[-72.5, -64.625], [41.781, 32.469], 'GS']
-
+#line.line_define[0]    = [[-81.75, -1.3398], [37.969, 32.156], 'default']
+#line.line_define[0] = [[-76.5, -64.625], [47.781, 32.469], 'GS']
+#line.line_define[0] = [[170.0, 130.0], [-30.0, 30.0], 'Test']
+#line.line_define[0] = [[-72.5, -64.625,-58.5], [43.781, 32.469, 28.5], 'GS']
+line.line_define[0] = [[-72.5, -64.625], [43.781, 32.469], 'GS']
 #+_____________________________________________________________________________+
 line.descript,line.path = 'linfs' , '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'
-#line.descript,line.path = 'linfs' , '/scratch/users/pscholz/AWI_DATA/result_fvom_test/withPC-1/'
+#line.descript,line.path = 'linfs' , '/scratch/users/pscholz/AWI_DATA/fesom2.0_results/linfs/withoutPC-2/'
 line.var 	= 'vec_uv'  # 
 #line.var 	= 'vec_uv'  # --> volume flux
 #line.var 	= 'vec_tuv' # --> heat flux
@@ -38,8 +41,8 @@ line.var 	= 'vec_uv'  #
 #line.var 	= '.....'   # --> all other 3d fesom2.0 variable (temp, salt, u,v,w,...)
 #+_____________________________________________________________________________+
 # select year to average over [start_yr, end_yr]
-line.year	= [1960,2009]
-#line.year	= [2000,2009]
+#line.year	= [1960,2009]
+line.year	= [2000,2009]
 #line.year	= [1948,1948]
 
 # select month to average over
@@ -51,8 +54,8 @@ line.depth	= []
 
 #+_____________________________________________________________________________+
 # make anomaly
-do_anomaly      = True
-#do_anomaly      = False
+#do_anomaly      = True
+do_anomaly      = False
 if do_anomaly==True:
 	line2 			= cp.copy(line) # init fesom2.0 data object
 	line2.descript,line2.path = 'zlevel','/media/pscholz/data_ext_2/DATA_FESOM2.0/zlevel/withoutPC-2/'
@@ -101,7 +104,7 @@ if len(line.line_define)==0:
 	
 	#___________________________________________________________________________
 	map.drawmapboundary(fill_color='0.9',linewidth=1.0)
-	map.bluemarble()
+	map.bluemarble(scale=0.25)
 	#map.etopo()
 	fesom_plot_lmask(map,mesh,ax,'none','r')
 	ax.grid(color='k', linestyle='-', linewidth=0.5)
@@ -124,12 +127,12 @@ print(' --> calculate interpolation points')
 # res     ... interpolation resolution in deg
 # npoints ... use npoints per line segment for interpolation
 line.analyse_lines(which='res',res=0.1)
+#line.analyse_lines(which='res',res=1.0)
 if do_anomaly==True:
 	line2.line_define = line.line_define
 	line2.analyse_lines(which='res',res=0.1)
 
 line.plot_lines_position(mesh)
-
 
 #+_____________________________________________________________________________+
 #|                            *** LOAD 3D DATA ***                             |
@@ -139,7 +142,6 @@ print(' --> load 3d fesom2.0 data')
 fesom_load_data_horiz(mesh,line)
 if do_anomaly==True:
 	fesom_load_data_horiz(mesh,line2)
-
 
 #+_____________________________________________________________________________+
 #|                *** INTERPOLATE 3D DATA ON LINESEGMENT ***                   |
