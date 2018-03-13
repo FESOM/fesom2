@@ -6,8 +6,8 @@ A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 laplacian=.false.      ! Use Laplacian viscosity 
 A_hor=0.               ! 500.      ! Background horizontal viscosity
 A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
-Div_c=.5  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
-Leith_c=.05	       ! The strength of the Leith viscosity
+Div_c=.2  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
+Leith_c=.01	       ! The strength of the Leith viscosity
 tau_c= 0.              ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
 Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
 biharmonic=.false.     ! Use biharmonic viscosity
@@ -17,7 +17,7 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.true.
-w_exp_max=1.e-3
+w_exp_max=5.e-4
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM=1500.                  ! GM thickness diffusivity (m2/s)
 scaling_Ferreira   =.false. ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)

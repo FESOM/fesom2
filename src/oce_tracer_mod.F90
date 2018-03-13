@@ -38,18 +38,17 @@ integer :: tr_num,n,nz
 del_ttf=0d0
 !AB interpolation
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-call tracer_gradient_elements(tr_arr(:,:,tr_num))
+call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
 call exchange_elem_begin(tr_xy)
-
 call tracer_gradient_z(tr_arr(:,:,tr_num))
+call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
 
-call exchange_elem_end()! tr_xy used in fill_up_dn_grad
 call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
-
 call fill_up_dn_grad
+call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
-call exchange_nod_end() ! tr_z halos should have arrived by now.
-
+call tracer_gradient_elements(tr_arr(:,:,tr_num)) !redefine tr_arr to the current timestep
+call exchange_elem(tr_xy)
 END SUBROUTINE init_tracers_AB
 !========================================================================================
 SUBROUTINE relax_to_clim(tr_num)

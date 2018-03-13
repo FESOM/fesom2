@@ -70,13 +70,10 @@ subroutine adv_tracers_ale(tr_num)
 	! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
 	select case (tracer_adv)
 		case(1) !MUSCL
-			! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.75)
-!			call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0) ! use only third order
-			!	call adv_tracers_vert_ppm_ale(tr_arr_old(:,:,tr_num))
-			!	call adv_tracers_vert_cdiff(tr_arr_old(:,:,tr_num))
-			call adv_tracers_vert_upw(tr_arr_old(:,:,tr_num))
-			
+                       ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
+                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0)
+                      call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
+
 		case(2) !MUSCL+FCT(3D)
  			call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0)
 		case default !unknown
@@ -111,7 +108,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 	implicit none
 	integer       :: el(2), enodes(2), n, nz, ed
 	integer       :: nl1, nl2, n2
-	real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP 
+	real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
+	real(kind=WP) :: c_lo(2)
 	real(kind=WP) :: Tmean1, Tmean2, a
 	real(kind=WP) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
 	real(kind=WP) :: num_ord
@@ -164,14 +162,22 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! check if upwind or downwind triagle is necessary
 			!
 			! cross product between velocity vector and cross vector edge-elem-center
+			!        o
+			!       / \
+			!      /   \
+			!     /     \
+			!    /   x   \
+			!   /    |____\_____(dx,dy)
+			!  o-----v-----o
+			!  1   edge    2
 			! cross product > 0 --> angle vec_v and (dx,dy) --> [0   180] --> upwind triangle
 			! cross product < 0 --> angle vec_v and (dx,dy) --> [180 360] --> downwind triangle 
 			!
-			!	 	o                  o      !	 	o                  o
-			!	   / \                / \     !	   / \                / \
-			!	  /   \    \ vec_v   /   \    !	  /   \        /     /   \
-			!	 /  up \    \       / dn  \   !	 /  up \      /     / dn  \
-			!	o-------o----+---->o-------o  !	o-------o----+---->o-------o
+			!       o                  o      !     o                  o
+			!      / \                / \     !    / \                / \
+			!     /   \    \ vec_v   /   \    !   /   \        /     /   \
+			!    /  up \    \       / dn  \   !  /  up \      /     / dn  \
+			!   o-------o----+---->o-------o  ! o-------o----+---->o-------o
 			!           1   /      2          !         1     \vec_v
 			!              /vec_v             !                \
 			!   --> downwind triangle         ! --> upwind triangle 
@@ -180,6 +186,15 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!  edge_up_dn_grad(2,nz,edge) ... gradTR_x downwind
 			!  edge_up_dn_grad(3,nz,edge) ... gradTR_y upwind
 			!  edge_up_dn_grad(4,nz,edge) ... gradTR_y downwind
+			
+			!___________________________________________________________________
+			! in case there is either no upwind or downwind triangle, than 
+			! calculate only low order solution 
+			! no upwind   triangle --> c_lo(1)=0, otherwise = 1
+			! no downwind triangle --> c_lo(2)=0, otherwise = 1
+			! (real(...) --> convert from integer to float)
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
 			
 			!___________________________________________________________________
 			! use downwind triangle to interpolate Tracer to edge center with 
@@ -195,7 +210,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 					(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 					 edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
 					 edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed) &
-					)/6.0_WP    
+					)/6.0_WP*c_lo(2)
 			
 			! use upwind triangle to interpolate Tracer to edge center with 
 			! fancy scheme --> Linear upwind reconstruction
@@ -208,7 +223,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 					(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 					 edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
 					 edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed) &
-					)/6.0_WP   
+					)/6.0_WP*c_lo(1)
 					
 			!___________________________________________________________________
 			! volume flux along the edge segment ed
@@ -244,8 +259,11 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! combined with centered
 			! num_ord is the fraction of fourth-order contribution in the HO solution
 			! (1-num_ord) is done with 3rd order upwind
-			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-			
+			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+			!                                            |____________|
+			!                                                  v
+			!                                           dont use fourth order solution
+			!                                           if its at the boundary
 			!___________________________________________________________________
 			! write horizontal ale advection into rhs
 			del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
@@ -261,15 +279,21 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!                     skip the previouse do loop and always end up 
 			!                     in this part of the if condition
 			do nz=1+n2,nl1
+				!_______________________________________________________________
+				! check if upwind or downwind triangle exist, decide if high or 
+				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP*c_lo(2)
 				
 				Tmean1=ttfAB(nz, enodes(1))+ &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP*c_lo(1)
 						
 				!_______________________________________________________________
 				! volume flux across the segments
@@ -283,24 +307,34 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-				
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				!                                            |____________|
+				!                                                  v
+				!                                           dont use fourth order solution
+				!                                           if its at the boundary
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
 				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
 				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2)) 
+				
 			end do ! --> do nz=1+n2,nl1
 		else
 			do nz=n2+1,nl2
+				!_______________________________________________________________
+				! check if upwind or downwind triangle exist, decide if high or 
+				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(2,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP    
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(4,nz,ed))/6.0_WP*c_lo(2)
 				
 				Tmean1=ttfAB(nz, enodes(1))+ &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
 						edge_dxdy(1,ed)*a*edge_up_dn_grad(1,nz,ed)+ &
-						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP 
+						edge_dxdy(2,ed)*r_earth*edge_up_dn_grad(3,nz,ed))/6.0_WP*c_lo(1)
 						
 				!_______________________________________________________________
 				! volume flux across the segments
@@ -314,15 +348,18 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-				
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				!                                            |____________|
+				!                                                  v
+				!                                           dont use fourth order solution
+				!                                           if its at the boundary
 				!_______________________________________________________________
 				! write horizontal ale advection into rhs
 				del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
 				del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
 				
 			end do ! --> do nz=n2+1,nl2
-		end if ! --> if(nl1>nl2) then 
+		end if ! --> if(nl1>nl2) then
 	end do ! --> do ed=1, myDim_edge2D
 end subroutine adv_tracers_muscle_ale
 !
@@ -338,7 +375,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	use g_forcing_arrays
 	implicit none
 	integer       :: n, nz, nzmax
-	real(kind=WP) :: tvert(nl), tv(nl)
+	real(kind=WP) :: tvert(nl), tv(nl), aLj, aRj, a6j, x
 	real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
 	
@@ -346,39 +383,57 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	! Vertical advection
 	! --------------------------------------------------------------------------
 	! A piecewise parabolic scheme for uniformly-spaced layers.
-	! See Colella and Woodward, JCP, 1984, 174-201. It can be coded so as to to take 
-	! non-uniformity into account, but this is more cumbersome. This is the version for AB
-	! time stepping
+	! See Colella and Woodward, JCP, 1984, 174-201.
 	! --------------------------------------------------------------------------
 	
 	do n=1, myDim_nod2D
 		!_______________________________________________________________________
 		!Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
 		! calculated on mid depth levels 
-		
 		! nzmax ... number of depth levels at node n
 		nzmax=nlevels_nod2D(n)
 		
 		! tracer at surface layer
 		tv(1)=ttf(1,n)
 		
-		! tracer at surface+1 layer
-		tv(2)=0.5_WP*(ttf(1,n)+ttf(2,n))
+		! tracer at surface+1 layer --> use an upwind scheme --> take as tracer
+		! at zbar_2, the tracer from the upwind region --> w_2*tr_12
+		! --> if w_2 > 0 --> tr_12 = tr_2
+		! --> if w_2 < 0 --> tr_12 = tr_1
+		! --> take tracer from where velocity comes !
+		!
+		! -------O w_1 -------- 
+		!
+		!        x tr_1
+		!        |
+		!        v
+		! -------O w_2,tr_12 -- 
+		!        ^                                 
+		!        |                                 
+		!        x tr_2                               
+		!
+		! -------O w_3 --------
+		!        :
+		!        :
+		tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
+		!               |________________________________|          |________________________________|
+		!               |-> Wvel_e(2,n)>0 ; == 0                    |-> Wvel_e(2,n)>0 ; == ttf(2,n)*1
+		!               |-> Wvel_e(2,n)<0 ; ==-ttf(1,n)*-1          |-> Wvel_e(2,n)<0 ; == 0
 		
 		! tacer at bottom-2 layer
-		tv(nzmax-2)=0.5_WP*(ttf(nzmax-3,n)+ttf(nzmax-2,n))
+		tv(nzmax-2)=-ttf(nzmax-3,n)*min(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)+ttf(nzmax-2,n)*max(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)
 		
 		! tacer at bottom-1 layer
-		tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+		tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
 		
-		! tracer at bottom layer
+		! tracer at bottom layer 
 		tv(nzmax)=ttf(nzmax-1,n) 
 		
 		!_______________________________________________________________________
-		! calc tracer for surface+2 until depth-2 layer
+		! calc tracer for surface+2 until depth-2 layer with Piecewise Parabolic 
+		! Method (PPM)
 		! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
-! 		do nz=2,nzmax-3
-		do nz=3,nzmax-3
+ 		do nz=2,nzmax-3
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
@@ -388,44 +443,45 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
 			! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
 			! --> full equation (1.6), (1.7) and (1.8)
-			dzjm1    = Z_3d_n(nz-1,n)
-			dzj      = Z_3d_n(nz,n)
-			dzjp1    = Z_3d_n(nz+1,n)
-			dzjp2    = Z_3d_n(nz+2,n)
+			dzjm1    = hnode(nz-1,n)
+			dzj      = hnode(nz,n)
+			dzjp1    = hnode(nz+1,n)
+			dzjp2    = hnode(nz+2,n)
 			
 			!___________________________________________________________________
 			! equation (1.7)
 			! --> Here deltaj is the average slope in the jth zone of the parabola 
-			!     with zone averages a_(j-1) and a_j, a_(j+1)
+			!     with zone averages a_(j-1) and a_j, a_(j+1) 
 			! --> a_j^n
 			deltaj   = dzj/(dzjm1+dzj+dzjp1)* &
 					  ( &
-					   (2*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
-					   (dzj    +2*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
+					   (2.*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
+					   (dzj    +2.*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
 					  )
-			! --> a_(j+1)^n		  
+			! --> a_(j+1)^n
 			deltajp1 = dzjp1/(dzj+dzjp1+dzjp2)* &
 					  ( &
-					   (2*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
-					   (dzjp1+2*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
+					   (2.*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
+					   (dzjp1+2.*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
 					  )
 			!___________________________________________________________________
 			! condition (1.8)
 			! --> This modification leads to a somewhat steeper representation of 
 			!     discontinuities in the solution. It also guarantees that a_(j+0.5)
 			!     lies in the range of values defined by a_j; and a_(j+1);
-			if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n))>0 ) then
+			if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n)) > 0. ) then
 				deltaj = min(  abs(deltaj), &
-							 2*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
-							 2*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
+							 2.*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
+							 2.*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
 							 )*sign(1.0_WP,deltaj)
 			else
 				deltaj = 0.0_WP
 			endif
-			if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n))>0 ) then
+			
+			if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n)) > 0. ) then
 				deltajp1 = min(  abs(deltajp1),&
-							   2*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
-							   2*abs(ttf(nz+1,n)-ttf(nz,n)) &
+							   2.*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
+							   2.*abs(ttf(nz+1,n)-ttf(nz,n)) &
 							   )*sign(1.0_WP,deltajp1)
 			else
 				deltajp1 = 0.0_WP
@@ -433,38 +489,116 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			
 			!___________________________________________________________________
 			! equation (1.6)
-			! --> calcualte a_(j+0.5)
+			! --> calcualte a_(j+0.5) 
 			tv(nz)=	ttf(nz,n) &
 					+ dzj/(dzj+dzjp1)*(ttf(nz+1,n)-ttf(nz,n)) &
-					+ 1/(dzjm1+dzj+dzjp1+dzjp2) * &
+					+ 1./(dzjm1+dzj+dzjp1+dzjp2) * &
 					( &
-						(2*dzjp1*dzj)/(dzj+dzjp1)* &
-							((dzjm1+dzj)/(2*dzj+dzjp1) - (dzjp2+dzjp1)/(2*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
-					   - dzj*(dzjm1+dzj)/(2*dzj+dzjp1)*deltajp1 &
-					   + dzjp1*(dzjp1+dzjp2)/(dzj+2*dzjp1)*deltaj &
+						(2.*dzjp1*dzj)/(dzj+dzjp1)* &
+							((dzjm1+dzj)/(2.*dzj+dzjp1) - (dzjp2+dzjp1)/(2.*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
+					   - dzj*(dzjm1+dzj)/(2.*dzj+dzjp1)*deltajp1 &
+					   + dzjp1*(dzjp1+dzjp2)/(dzj+2.*dzjp1)*deltaj &
 					)
-		end do ! --> do nz=3,nzmax-2
+			
+			!___________________________________________________________________ 
+			! --> constrain a_(j+0.5) to lie in the range of values defined 
+			!     by a_(j) and a_(j+1)
+			! --> force limitation of tv(nz) --> interpolated value tv(nz) at 
+			!     zbar_nz must be between ttf(nz, n), ttf(nz+1, n) 
+			! --> limit upper value range of tv(nz)
+			tv(nz)= min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz))
+			! --> limit lower value range of tv(nz)
+			tv(nz)= max(min(ttf(nz, n), ttf(nz+1, n)), tv(nz)) 
+			
+		end do ! --> do nz=2,nzmax-3
 		
 		!_______________________________________________________________________
-		! Surface flux
+		! calculate tracer fluxes for upper two and lower two levels and bottom
+		tvert(1:nzmax)=0._WP
+		
+		! tracer flux at surface
 		tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
 		
-		!_______________________________________________________________________
-		! Other levels
-		do nz=2, nzmax-1
-			tvert(nz)= -tv(nz)*Wvel_e(nz,n)*area(nz,n)
-		end do
+		! tracer flux at surface+1 layer
+		tvert(2)= -tv(2)*Wvel_e(2,n)*area(2,n)		
+		
+		! tacer flux at bottom-2 layer
+		tvert(nzmax-2)= -tv(nzmax-2)*Wvel_e(nzmax-2,n)*area(nzmax-2,n)
+		
+		! tacer flux at bottom-1 layer
+		tvert(nzmax-1)= -tv(nzmax-1)*Wvel_e(nzmax-1,n)*area(nzmax-1,n)
+		
+		! tacer flux at bottom == 0
+		tvert(nzmax)=0.0_WP
 		
 		!_______________________________________________________________________
-		! Zero bottom flux
-		tvert(nzmax)=0.0_WP
+		! calculate tracer flux in remaining levels
+		do nz=2, nzmax-3
+			if ((Wvel_e(nz,n)<=0.) .and. (Wvel_e(nz+1,n)>=0.)) CYCLE
+			
+			!___________________________________________________________________
+			aLj=tv(nz)
+			aRj=tv(nz+1)
+			! "... The value a_(j+0.5), will be assigned to a_L(j) and a_R(j-i) for 
+			! most values of j. There are some cases, however, where this would 
+			! lead to an interpolation function which takes on values not between 
+			! a_L(j) and a_R(j). In such cases, we reset one or both of these values. 
+			! There are two cases. First, if a_(j) is a local maximum or minimum, 
+			! then the interpolation function is set to be a constant. The second 
+			! case is where a_(j); is between a_R(j) and a_L(j), but sufficiently 
+			! close to one of the values so that the interpolated parabola takes on 
+			! a value which is not between a_R(j) and a_R(j). The condition on the
+			! coefficients of the interpolating parabola such that it does not 
+			! overshoot is that |da_(j)| >= |a_6_(j). When this condition fails to 
+			! hold, either  a_L(j) or a_R(j) is reset, so that the interpolation 
+			! parabola is monotone, and so that its derivative at the opposite edge 
+			! of the zone from the one where the value is being reset is zero. ..."
+			!________________________
+			! --> equation (1.10) A)
+			if ((aRj-ttf(nz, n))*(ttf(nz, n)-aLj)<=0.) then
+				aLj =ttf(nz, n)
+				aRj =ttf(nz, n)
+			end if
+			
+			!________________________
+			! --> equation (1.10) B)
+			if ((aRj-aLj)*(ttf(nz, n)-0.5_WP*(aLj+aRj))> (aRj-aLj)**2/6._WP) then
+				aLj =3._WP*ttf(nz, n)-2._WP*aRj
+			end if
+			
+			!________________________
+			! --> equation (1.10) C)
+			if ((aRj-aLj)*(ttf(nz, n)-0.5_WP*(aRj+aLj))<-(aRj-aLj)**2/6._WP) then
+				aRj =3._WP*ttf(nz, n)-2._WP*aLj
+			end if
+			
+			!___________________________________________________________________
+			! --> equation (1.12)
+			dzj   = hnode(nz,n)
+			a6j   = 6.0_WP*(ttf(nz  , n)-0.5_WP*(aLj  +aRj  ))
+			
+			! if positive velocity --> upwind --> need interpolant from right side
+			if (Wvel_e(nz,n)>0.) then
+				x=Wvel_e(nz,n)*dt/dzj
+				tvert(nz)=(-aLj-0.5_WP*x*(aRj-aLj+(1._WP-2._WP/3._WP*x)*a6j))*area(nz,n)*Wvel_e(nz,n)
+			end if
+			
+			! if negative velocity in next layer --> upwind --> use there interpolant from right side
+			! --> here you also reset tvert(nzmax-2) in case there is upwind 
+			! velocity downward --> tvert(nzmax-2) becomes higher order
+			if (Wvel_e(nz+1,n)<0.) then 
+				x=-Wvel_e(nz+1,n)*dt/dzj
+				tvert(nz+1)=(-aRj+0.5_WP*x*(aRj-aLj-(1._WP-2._WP/3._WP*x)*a6j))*area(nz+1,n)*Wvel_e(nz+1,n)
+			end if
+			
+		end do
 		
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
 		do nz=1, nzmax-1
 			! no division over thickness in ALE !!!
-			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
-		end do         
+			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
+		end do
 		
 	end do ! --> do n=1, myDim_nod2D
 	

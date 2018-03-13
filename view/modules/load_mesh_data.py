@@ -285,9 +285,10 @@ def ind_for_depth(depth, mesh):
     dind=i
     return dind
         
-def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, how='mean', verbose=False): 
+def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, how='mean', verbose=False, ncfile=''): 
         #print(['reading year '+str(year)+':'])
-    ncfile =result_path+'/'+str_id+'.'+runid+'.'+str(year)+'.nc'
+    if (ncfile==''):
+        ncfile =result_path+'/'+str_id+'.'+runid+'.'+str(year)+'.nc'
     if (verbose):
         print(['reading ', ncfile])
     f = Dataset(ncfile, 'r')
@@ -312,6 +313,8 @@ def read_fesom_slice(str_id, records, year, mesh, result_path, runid, ilev=0, ho
        data = data+f.variables[str_id][dim].mean(axis=0)
     elif how=='max':
         data = data+f.variables[str_id][dim].max(axis=0)
+    elif how=='min':
+        data = data+f.variables[str_id][dim].min(axis=0)
     f.close()
     return data
 
