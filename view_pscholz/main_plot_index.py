@@ -26,11 +26,16 @@ inputarray['save_figpath'] = '/scratch/users/pscholz/AWI_PAPER/PAPER_FESOM2.0_ev
 #+_____________________________________________________________________________+
 # predefine section lines or leave it empty in this case interactive selection 
 box 		      = fesom_box()
-box.box_define    =  list([[]]) 
-box.box_define[0] = [ [-55.00, -47.00, -47.00, -55.00],
-					 [ 55.00,  55.00,  60.00,  60.00],
-					   'LabSea Test' ]
-
+#box.box_define    =  list([[]]) # --> more boxes ,  list([[],[],...,...]) 
+#box.box_define[0] = [ [-53.156, -49.688, -47.0, -49.719, -51.281, -53.719, -55.812, -53.375],
+					  #[60.219, 59.656, 57.594, 53.531, 54.156, 55.406, 56.062, 60.438],
+					   #'Test Polygon' ]
+#box.box_define[0] = [ [-55.00, -47.00],
+					 #[ 55.00,  60.00],
+					   #'LabSea Test' ]
+#box.box_define[1] = [ [-40.00, -30.00],
+					 #[ 30.00,  40.00 ],
+					   #'central Atl' ]
 #+_____________________________________________________________________________+
 box.descript,box.path = 'linfs', '/scratch/users/pscholz/AWI_DATA/fesom2.0_results/linfs/withoutPC-2/'
 #box.descript,box.path = 'linfs', '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'
@@ -56,8 +61,8 @@ box.depth	= []
 
 #+_____________________________________________________________________________+
 # make anomaly
-do_anomaly      = True
-#do_anomaly      = False
+#do_anomaly      = True
+do_anomaly      = False
 if do_anomaly==True:
 	box2  = cp.deepcopy(box)
 	box2.descript,box2.path = 'zlevel','/media/pscholz/data_ext_2/DATA_FESOM2.0/zlevel/withoutPC-2/'
@@ -83,15 +88,18 @@ else:
 #		[right mouse] ... zoom out completly
 #		button [+] ... zoom in
 #		button [-] ... zoom out
-#		button [b] ... first time push [l] - start line selection, line points can 
-#					   now be selected with left mouse button, second time push of [L]
+#		button [1] ... first time push [1] - start line selection, line points can 
+#					   now be selected with left mouse button, second time push of [1]
 #					   finishes selection of a single line. If this is repeated 
 #					   several lines can be selected
+#		button [2] ... select polygon
 #		button [d] ... delete point or rectangle that was just selected
 #		button [q] ... finshes entire selection process, goes on with the calculation 
 #					   of the cross-section
 #	   
-# you need to close window to proceed
+# --> BE AWARE !!!:  IN ORDER TO PROCEED IN MOMENT AFTER THE INTERACTIVE SELECTION
+#					 ALL FIGURES THAT ARE STILL OPENED NEED TO BE CLOSED. OTHERWISE
+#					 THE PROGRAMM CAN NOT PROCEED!
 if len(box.box_define)==0:
 	#___________________________________________________________________________
 	fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
@@ -112,8 +120,8 @@ if len(box.box_define)==0:
 	
 	#___________________________________________________________________________
 	# interactively
-	box._cid_pressb = fig.canvas.mpl_connect('button_press_event', box._anybutton_)
-	box._cid_pressk = fig.canvas.mpl_connect('key_press_event', box._anykey_)
+	#box._cid_pressb = fig.canvas.mpl_connect('button_press_event', box._anybutton_)
+	#box._cid_pressk = fig.canvas.mpl_connect('key_press_event', box._anykey_)
 	box._connect_(fig,ax,map)
 
 
@@ -140,7 +148,7 @@ if do_anomaly==True:
 #|               *** PLOT INDEXBOX DATA OVER DEPTH AND TIME ***                |
 #+_____________________________________________________________________________+
 if do_anomaly==False:
-	fig,ax,cax = box.plot_index_t_x_z()
+	fig2,ax,cax = box.plot_index_t_x_z()
 if do_anomaly==True:
 	#___________________________________________________________________________
 	# do common crange for line and lin2
@@ -151,6 +159,6 @@ if do_anomaly==True:
 	box.crange=[cmin,cmax,cref]	
 	box2.crange=[cmin,cmax,cref]
 	#___________________________________________________________________________
-	fig,ax,cax = box.plot_index_t_x_z()
-	fig,ax,cax = box2.plot_index_t_x_z()
-	fig,ax,cax = anom.plot_index_t_x_z()
+	fig2,ax,cax = box.plot_index_t_x_z()
+	fig2,ax,cax = box2.plot_index_t_x_z()
+	fig2,ax,cax = anom.plot_index_t_x_z()

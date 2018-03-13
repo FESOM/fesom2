@@ -2,6 +2,7 @@
 import sys
 import os
 import numpy as np
+import copy as  cp
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 import matplotlib.gridspec as gridspec
@@ -11,6 +12,10 @@ from sub_fesom_plot 		import *
 from colormap_c2c			import *
 
 
+#+_____________________________________________________________________________+
+#|                                                                             |
+#|                    *** FESOM2.0 INDEXBOX CLASS ***                          |
+#|                                                                             |
 #+_____________________________________________________________________________+
 class fesom_box:
 	
@@ -44,20 +49,26 @@ class fesom_box:
 	box_define                  = []
 	box_idx                     = []
 	
-	#___INIT BOX OBJECT________________________________________________________#
-	#
-	#__________________________________________________________________________#
+	pause = True
+	
+	#+___INIT BOX OBJECT_______________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	def __init__(self):
 		#____selection variable______________________
 		self._x, self._y, self._xc, self._yc  = [], [], [], []
 		self._b, self._k, 					  = [] ,[]
 		self._cid_pressb, self._cid_pressk	  = [], [],
 		self._zoomfac, self._press			  = 20.0, 'None'
-		self._fig, self._ax, self._map		  = [], [], []
+		self._figure, self._ax, self._map	  = [], [], []
 		self._xlim, self._ylim				  = [], [],
 		self._ptsx, self._ptsy, self._drawline= [], [], []
 		self._text							  = []
-	
+		self.box_define, self.box_idx         = [],[]
+		
+		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	def _connect_(self,fig,ax,map):
 		print(' --> start interactive line selection')
@@ -75,9 +86,25 @@ class fesom_box:
 							horizontalalignment='center',
 							bbox=dict(facecolor='w',edgecolor='k'),
 							)
+		
+		self._cid_pressb = self._figure.canvas.mpl_connect('button_press_event', self._anybutton_)
+		self._cid_pressk = self._figure.canvas.mpl_connect('key_press_event', self._anykey_)
+		
 		# This line stops proceeding of the code...
 		plt.show(block=True)
-		
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	def _disconnect_(self):
+		self._figure.canvas.mpl_disconnect(self._cid_pressb)
+		self._figure.canvas.mpl_disconnect(self._cid_pressk)
+		plt.show(block=False)
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# change zoom factor to zoom in 
 	def _drawzoom_in_(self):	
@@ -85,21 +112,25 @@ class fesom_box:
 		self._zoomfac = self._zoomfac/2.0
 		
 	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	# change zoom factor to zoom out 
 	def _drawzoom_out_(self):	
 		print(' zoom_out')
 		self._zoomfac = self._zoomfac*2.0
 		
 	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
 	# zoom full out
 	def _drawzoom_outfull_(self):	
 		print(' zoom_fullout')
 		self._ax.set_xlim(self._xlim[0],self._xlim[1])
 		self._ax.set_ylim(self._ylim[0],self._ylim[1])
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# aplly actual zoom factor
 	def _zoom_(self, k):
@@ -110,53 +141,142 @@ class fesom_box:
 			self._drawzoom_out_()
 		self._ax.set_xlim(np.max([self._xc-self._zoomfac,-180.0]), np.min([self._xc+self._zoomfac,180.0]))
 		self._ax.set_ylim(np.max([self._yc-self._zoomfac, -90.0]), np.min([self._yc+self._zoomfac, 90.0]))
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# update center position with left mouse click 
 	def _update_center_(self, xc, yc):
 		self._xc, self._yc, = xc, yc
 		
+		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# center new leftclick point
 	def _move_center_(self):
 		self._ax.set_xlim(np.max([self._xc-self._zoomfac,-180.0]), np.min([self._xc+self._zoomfac,180.0]))
 		self._ax.set_ylim(np.max([self._yc-self._zoomfac, -90.0]), np.min([self._yc+self._zoomfac, 90.0]))
-		#plt.xscale('linear')
-		#plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._ax.figure.canvas.draw()
 		
+		
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# BoxBuilder
 	def _Boxbuilder_(self,x,y,mode='add'):
 		if np.size(x)==0 or np.size(y)==0: 
 			self._ptsx = list(self._drawbox.get_xdata())
 			self._ptsy = list(self._drawbox.get_ydata())
-			plt.xscale('linear')
-			plt.yscale('linear')
 			return
 		if mode == 'add':
-			self._ptsx.append(np.float16(x))
-			self._ptsy.append(np.float16(y))
-			if len(self._ptsx)>=4:
-				self._ptsx = [np.min(self._ptsx),np.max(self._ptsx),np.max(self._ptsx),np.min(self._ptsx),np.min(self._ptsx)]
-				self._ptsy = [np.min(self._ptsy),np.min(self._ptsy),np.max(self._ptsy),np.max(self._ptsy),np.min(self._ptsy)]
+			if len(self._ptsx)==2:
 				self._drawbox.set_linestyle('-')
+				#dist0 = np.sqrt((self._ptsx[0]-np.float16(x))**2+(self._ptsy[0]-np.float16(y))**2)
+				#dist1 = np.sqrt((self._ptsx[1]-np.float16(x))**2+(self._ptsy[1]-np.float16(y))**2)
+				dist0x = np.abs(self._ptsx[0]-np.float16(x))
+				dist0y = np.abs(self._ptsy[0]-np.float16(y))
+				dist1x = np.abs(self._ptsx[1]-np.float16(x))
+				dist1y = np.abs(self._ptsy[1]-np.float16(y))
+				if dist0x<=dist1x : self._ptsx[0]=np.float16(x)
+				else:				self._ptsx[1]=np.float16(x)
+				if dist0y<=dist1y : self._ptsy[0]=np.float16(y)
+				else:				self._ptsy[1]=np.float16(y)
+					
+				#self._ptsy.append(np.float16(y))
+				#self._ptsx.remove(self._ptsx[0])
+				#self._ptsy.remove(self._ptsy[0])
+				#self._ptsx.append(np.float16(x))
+				#self._ptsy.append(np.float16(y))
+				
+			else:
+				self._ptsx.append(np.float16(x))
+				self._ptsy.append(np.float16(y))
+			
+			#if len(self._ptsx)>=4:
+				#self._ptsx = [np.min(self._ptsx),np.max(self._ptsx),np.max(self._ptsx),\
+							  #np.min(self._ptsx),np.min(self._ptsx)]
+				#self._ptsy = [np.min(self._ptsy),np.min(self._ptsy),np.max(self._ptsy),\
+							  #np.max(self._ptsy),np.min(self._ptsy)]
+				#self._drawbox.set_linestyle('-')
 		elif mode == 'remove':
 			self._ptsx=[]
 			self._ptsy=[]
 			self._drawbox.set_linestyle('None')
 			
-		mboxx,mboxy = self._map(self._ptsx,self._ptsy)
-		self._drawbox.set_data(mboxx, mboxy)
+		auxboxx = [np.min(self._ptsx),np.max(self._ptsx),np.max(self._ptsx),\
+				   np.min(self._ptsx),np.min(self._ptsx)]
+		auxboxy = [np.min(self._ptsy),np.min(self._ptsy),np.max(self._ptsy),\
+				  np.max(self._ptsy),np.min(self._ptsy)]	
+		
+		self._drawbox.set_data(auxboxx,auxboxy)
 		self._drawbox.set_axes(self._ax)
 		self._drawbox.figure.canvas.draw()
-		plt.xscale('linear')
-		plt.yscale('linear')
-		self._figure.canvas.draw()
+		self._drawbox.axes.set_xscale('linear')
+		self._drawbox.axes.set_yscale('linear')
+		self._drawbox.axes.figure.canvas.draw()
 	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	# PolygonBuilder
+	def _Polygonbuilder_(self,x,y,mode='add'):
+		if np.size(x)==0 or np.size(y)==0: 
+			self._ptsx = list(self._drawbox.get_xdata())
+			self._ptsy = list(self._drawbox.get_ydata())
+			return
+		#_______________________________________________________________________
+		if mode == 'add':
+			self._ptsx.append(np.float16(x))
+			self._ptsy.append(np.float16(y))
+			if len(self._ptsx)>=2:
+				self._drawbox.set_linestyle('-')
+		#_______________________________________________________________________
+		elif mode == 'remove':
+			self._ptsx.remove(self._ptsx[-1])
+			self._ptsy.remove(self._ptsy[-1])
+			
+		#_______________________________________________________________________
+		# what happens if polygon is closed
+		if np.sqrt((self._ptsx[0]-self._ptsx[-1])**2 + (self._ptsy[0]-self._ptsy[-1])**2)<=0.5 and len(self._ptsx)>=3:
+			#___________________________________________________________________
+			self._text.set_text('draw polygon: [OFF]')
+			self._text.figure.canvas.draw()
+			self._press = 'None'
+			
+			#___________________________________________________________________
+			self._ptsx.remove(self._ptsx[-1])
+			self._ptsy.remove(self._ptsy[-1])
+			self._ptsx.append(self._ptsx[0])
+			self._ptsy.append(self._ptsy[0])
+			#mboxx,mboxy = self._map(self._ptsx,self._ptsy)
+			#self._drawbox.set_data(mboxx, mboxy)
+			self._drawbox.set_data(self._ptsx,self._ptsy)
+			self._drawbox.set_color([0.0,0.8,0.0])
+			self._drawbox.set_linewidth(2.0)
+			self._drawbox.axes.set_xscale('linear')
+			self._drawbox.axes.set_yscale('linear')
+			self._drawbox.axes.figure.canvas.draw()
+			
+			#___________________________________________________________________
+			#ask for name 
+			#self._text.set_text('enter name in command line')
+			#plt.draw(),self._figure.canvas.draw()
+			#name = raw_input("Enter Name of line: ")
+			name = 'default'
+			self.box_define.append([])
+			self.box_define[len(self.box_define)-1]=[self._ptsx,self._ptsy,name]
+		else:	
+			mboxx,mboxy = self._map(self._ptsx,self._ptsy)
+			self._drawbox.set_data(mboxx, mboxy)
+			self._drawbox.axes.set_xscale('linear')
+			self._drawbox.axes.set_yscale('linear')
+			self._drawbox.axes.figure.canvas.draw()
+			
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# what should happen if a mouse button is clicked when cursor is over axis 
 	def _anybutton_(self,event):
@@ -164,7 +284,7 @@ class fesom_box:
 		if event.inaxes:
 			x, y, b, k = event.xdata, event.ydata, event.button, []
 			#print('button=%d, xdata=%f, ydata=%f' % ( event.button, event.xdata, event.ydata))
-			#+___left mouse button_____________________________________________+
+			#____left mouse button______________________________________________
 			if event.button==1 : 
 				xc, yc = x, y
 				if self._press=='None':
@@ -172,14 +292,19 @@ class fesom_box:
 					self._move_center_()
 				elif self._press=='Box':
 					self._Boxbuilder_(x,y)
-			#+___middle mouse button___________________________________________+
+				elif self._press=='Polygon':
+					self._Polygonbuilder_(x,y)
+			#____middle mouse button____________________________________________
 			if event.button==2 : return
 			if (event.xdata is None): return
 			
-			#+___right mouse button____________________________________________+
+			#____right mouse button_____________________________________________
 			if event.button==3 : 
 				self._drawzoom_outfull_()
-		
+	
+	
+	#+_________________________________________________________________________+
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# what should happen if a keboard button is pressed when cursor is over axis 
 	def _anykey_(self,event):
@@ -199,15 +324,20 @@ class fesom_box:
 			elif k=='q':
 				self._drawzoom_outfull_()
 				
-				# dis_connect_s button and key events
-				self._figure.canvas.mpl_dis_connect_(self._cid_pressb)
-				self._figure.canvas.mpl_dis_connect_(self.cid_pressk)
+				# disconnects button and key events
+				self._disconnect_()
 				
 				# This line allows proceeding of the code...
+				#plt.close('all')
+				plt.show(block=False)
+				
 				plt.close(self._figure)
+				plt.close('all')
+				
+				return
 				
 			#___BOX MODE [l]___________________________________________________
-			elif k=='b':
+			elif k=='b' or k=='1':
 				#---------------------------------------------------------------
 				# activate line mode, start line 
 				if self._press == 'None':
@@ -224,8 +354,8 @@ class fesom_box:
 				#---------------------------------------------------------------
 				# switch off line mode, end line
 				elif self._press =='Box': 
-					print('draw line: [OFF]')
-					self._text.set_text('draw line: [OFF]')
+					print('draw box: [OFF]')
+					self._text.set_text('draw box: [OFF]')
 					plt.draw(),self._figure.canvas.draw()
 					self._press = 'None'
 					self._drawbox.set_color([0.0,0.8,0.0])
@@ -240,28 +370,78 @@ class fesom_box:
 					#name = raw_input("Enter Name of line: ")
 					name = 'default'
 					self.box_define.append([])
-					self.box_define[len(self.box_define)-1]=[self._ptsx[0:-1],self._ptsy[0:-1],name]
+					self.box_define[len(self.box_define)-1]=[list(np.sort(self._ptsx)),list(np.sort(self._ptsy)),name]
 					
+			#___BOX MODE [l]___________________________________________________
+			elif k=='p' or k=='2':
+				#---------------------------------------------------------------
+				# activate line mode, start line 
+				if self._press == 'None':
+					print('draw polygon: [ON]')
+					self._text.set_text('draw polygon: [ON]')
+					plt.draw(),self._figure.canvas.draw()
+					
+					self._press = 'Polygon'
+					self._drawbox, = plt.plot([], [],color='w',linestyle='None',linewidth=2,marker='o',axes=self._ax)
+					self._Polygonbuilder_([],[])
+					#plt.xscale('linear'),
+					#plt.yscale('linear')
+					self._figure.canvas.draw()
+				#---------------------------------------------------------------
+				## switch off line mode, end line
+				#elif self._press =='Polygon': 
+					#print('draw polygon: [OFF]')
+					#self._text.set_text('draw polygon: [OFF]')
+					#plt.draw(),self._figure.canvas.draw()
+					#self._press = 'None'
+					#self._drawbox.set_color([0.0,0.8,0.0])
+					##self.line.set_color('w')
+					#self._drawbox.set_linewidth(2.0)
+					#plt.xscale('linear')
+					#plt.yscale('linear')
+					#self._figure.canvas.draw()
+					##ask for name 
+					##self._text.set_text('enter name in command line')
+					##plt.draw(),self._figure.canvas.draw()
+					##name = raw_input("Enter Name of line: ")
+					#name = 'default'
+					#self.box_define.append([])
+					#self.box_define[len(self.box_define)-1]=[self._ptsx[0:-1],self._ptsy[0:-1],name]
 			#___DELETE DRAW POINTS [d]__________________________________________
 			elif k=='d':
-				if self._press=='Box':
+				if   self._press=='Box':
 					self._Boxbuilder_(x,y,mode='remove')
+				elif self._press=='Polygon':
+					self._Polygonbuilder_(x,y,mode='remove')
 	
 	
 	#+_________________________________________________________________________+
-	# interpolate line points on fesom data
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	# select which node points are within selected box/polygon
 	def select_pointsinbox(self,mesh):
+		from matplotlib import path
 		self.box_idx = []
 		for ii in range(0,len(self.box_define)):
+			if len(self.box_define[ii][0])>2:
+				p = path.Path(zip(self.box_define[ii][0],self.box_define[ii][1]))
+			else:
+				auxboxx = [ self.box_define[ii][0][0],\
+							self.box_define[ii][0][1],\
+							self.box_define[ii][0][1],\
+							self.box_define[ii][0][0]]
+				auxboxy = [ self.box_define[ii][1][0],\
+							self.box_define[ii][1][0],\
+							self.box_define[ii][1][1],\
+							self.box_define[ii][1][1]]
+				p = path.Path(zip(auxboxx,auxboxy))
+			
 			self.box_idx.append([])
-			self.box_idx[ii-1] = mesh.nodes_2d_xg >= np.min(self.box_define[ii][0])
-			self.box_idx[ii-1] = np.logical_and(self.box_idx[ii-1],mesh.nodes_2d_xg <= np.max(self.box_define[ii][0]))
-			self.box_idx[ii-1] = np.logical_and(self.box_idx[ii-1],mesh.nodes_2d_yg >= np.min(self.box_define[ii][1]))
-			self.box_idx[ii-1] = np.logical_and(self.box_idx[ii-1],mesh.nodes_2d_yg <= np.max(self.box_define[ii][1]))
-		self.box_idx[ii-1] = np.array(self.box_idx[ii-1])
+			self.box_idx[ii] = p.contains_points(np.array(zip(mesh.nodes_2d_xg,mesh.nodes_2d_yg)))
+		
 		
 	#+_________________________________________________________________________+
-	#|																		   |
+	#|                                                                         |
 	#+_________________________________________________________________________+
 	# calculate fluxes through section
 	def data_anom(self, box, box2):
@@ -272,24 +452,8 @@ class fesom_box:
 			self.str_time = box.str_time
 		self.str_dep = box.str_dep
 		#_______________________________________________________________________
-		#self.value   = []
-		#self.value2  = []
-		#self.value3  = []
-		#self.valueflx= []
-		#if len(box2.value)!=0:
-			#for ii in range(0,len(box2.value)):
-				#self.value.append([])
-				#self.value[ii] = box2.value[ii]-box.value[ii]
-				#if len(box2.value2)!=0:
-					#self.value2.append([])
-					#self.value2[ii]  = box2.value2[ii]-box.value2[ii]
-				#if len(box2.value3)!=0:
-					#self.value3.append([])
-					#self.value3[ii]  = box2.value3[ii]-box.value3[ii]
-				#if len(box2.valueflx)!=0:
-					#self.valueflx.append([])
-					#self.valueflx[ii]= box2.valueflx[ii]-box.valueflx[ii]
-		self.value = box2.value-box.value
+		for ii in range(0,len(self.box_define)):
+			self.value[ii] = box2.value[ii]-box.value[ii]
 		self.anom  = True
 		self.crange= []
 		self.cmap  = 'blue2red'
@@ -299,152 +463,164 @@ class fesom_box:
 		self.unit  = box.unit
 	
 	
-	#___PLOT FESOM2.0 DATA IN INDEX BOX OVER DEPTH AND TIME DATA________________
-	# 
-	#___________________________________________________________________________
-	def plot_index_t_x_z(self):
+	#+___PLOT FESOM2.0 DATA IN INDEX BOX OVER DEPTH AND TIME DATA______________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	def plot_index_t_x_z(self,numb=[]):
 		from set_inputarray import inputarray
+		fsize=16
+		#_______________________________________________________________________
+		if isinstance(numb,int)==True : numb = [numb]
+		if len(numb)==0 : numb=range(0,len(self.box_define))
 		
-		fsize=14
-		fig = plt.figure(figsize=(20, 13))
-		ax1  = plt.gca()
-		# duplicate x-axes
-		
-		#+______________________________________________________________________
-		cnumb= 25
-		cmin = np.nanmin(self.value)
-		cmax = np.nanmax(self.value)
-		cref = cmin + (cmax-cmin)/2
-		cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
-		#cref =0.0
-		
-		#+______________________________________________________________________
-		# if anomaly data	
-		if self.anom==True: 
-			cmax,cmin,cref = np.nanmax(self.value), np.nanmin(self.value), 0.0
-			self.cmap='blue2red'
-		#+______________________________________________________________________
-		# if predefined color range	
-		if len(self.crange)!=0:
-			if len(self.crange)==2:
-				cmin = np.float(self.crange[0])
-				cmax = np.float(self.crange[1])
-				cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
-			elif len(self.crange)==3:
-				cmin = np.float(self.crange[0])
-				cmax = np.float(self.crange[1])
-				cref = np.float(self.crange[2])
-			else:
-				print(' this colorrange definition is not supported !!!')
-				print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
-		
-		print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
-		cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,self.cmap)
-		print('clevel = ',clevel)
-		
-		do_drawedges=True
-		if clevel.size>30: do_drawedges=False
-		
-		# overwrite discrete colormap
-		#cmap0 = cmocean.cm.balance
-		#do_drawedges=False
-		
-		#+______________________________________________________________________
-		# make pcolor or contour plot 
-		depth = self.depth[:-1] + (self.depth[1:]-self.depth[:-1])/2.0
-		depth = -depth
-		depthlim = np.sum(~np.isnan(self.value[0,:])).max()
-		if depthlim==depth.shape: depthlim=depthlim-1
-		yy,xx = np.meshgrid(depth,self.time)
-		
-		#+______________________________________________________________________
-		data_plot = np.copy(self.value)
-		data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
-		data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
-		
-		#+______________________________________________________________________
-		if inputarray['which_plot']=='pcolor':
-			hp=plt.pcolormesh(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],
-						shading='flat',#flat
-						antialiased=False,
-						edgecolor='None',
-						cmap=cmap0),
-						#vmin=np.nanmin(data_plot), vmax=np.nanmax(data_plot))
-		else: 
-			hp=plt.contourf(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel,
-						antialiased=False,
-						cmap=cmap0,
-						vmin=clevel[0], vmax=clevel[-1])
-			#plt.contour(xx,yy,data.value,levels=clevel,
-						#antialiased=True,
-						#colors='k',
-						#linewidths=0.5,
-						#linestyles='solid',
-						#vmin=np.nanmin(data.value), vmax=np.nanmax(data.value))
-		#hp.cmap.set_under([0.4,0.4,0.4])
-		
-		#+______________________________________________________________________
-		# set main axes
-		ax1.set_xlim(self.time.min(),self.time.max())
-		ax1.set_ylim(0,depth[depthlim-1])
-		ax1.invert_yaxis()
-		ax1.set_axis_bgcolor([0.25,0.25,0.25])
-		ax1.tick_params(axis='both',which='major',direction='out',length=8)
-		ax1.minorticks_on()
-		ax1.tick_params(axis='both',which='minor',direction='out',length=4)
-		ax1.set_xlabel('Time [years]',fontdict=dict(fontsize=12))
-		ax1.set_ylabel('Depth [km]',fontdict=dict(fontsize=12))
-		plt.title(self.descript+' - '+self.box_define[0][2]+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
-		
-		#+______________________________________________________________________
-		# draw colorbar
-		divider = make_axes_locatable(ax1)
-		cax     = divider.append_axes("right", size="2.5%", pad=0.5)
-		plt.clim(clevel[0],clevel[-1])
-		
-		cbar = plt.colorbar(hp,ax=ax1,cax=cax,ticks=clevel,drawedges=do_drawedges)
-		cbar.set_label(self.lname+' '+self.unit+'\n'+self.str_time, size=fsize+2)
-		
-		cl = plt.getp(cbar.ax, 'ymajorticklabels')
-		plt.setp(cl, fontsize=fsize)
-		
-		# kickout some colormap labels if there are to many
-		ncbar_l=len(cbar.ax.get_yticklabels()[:])
-		idx_cref = np.where(clevel==cref)[0]
-		idx_cref = np.asscalar(idx_cref)
-		nmax_cbar_l = 10
-		nstep = ncbar_l/nmax_cbar_l
-		plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-		plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-		plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
-		
-		#___________________________________________________________________
-		# save figure
-		if inputarray['save_fig']==True:
-			print(' --> save figure: png')
-			str_times= self.str_time.replace(' ','').replace(':','')
-			str_deps = self.str_dep.replace(' ','').replace(',','').replace(':','')
-			sfname = 'boxplot_'+self.box_define[0][2]+'_'+self.descript+'_'+self.sname+'_'+str_times+'_'+str_deps+'.png'
-			sdname = inputarray['save_figpath']
-			if os.path.isdir(sdname)==False: os.mkdir(sdname)
-			plt.savefig(sdname+sfname, \
-						format='png', dpi=600, \
-						bbox_inches='tight', pad_inches=0,\
-						transparent=True,frameon=True)
-		#+______________________________________________________________________
-		plt.show(block=False)
+		#_______________________________________________________________________
+		for ii in numb:
+			fig = plt.figure(figsize=(20, 10))
+			ax1  = plt.gca()
+			# duplicate x-axes
+			
+			#___________________________________________________________________
+			cnumb= 25
+			cmin = np.nanmin(self.value[ii])
+			cmax = np.nanmax(self.value[ii])
+			cref = cmin + (cmax-cmin)/2
+			cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
+			#cref =0.0
+			
+			#___________________________________________________________________
+			# if anomaly data	
+			if self.anom==True: 
+				cmax,cmin,cref = np.nanmax(self.value[ii]), np.nanmin(self.value[ii]), 0.0
+				self.cmap='blue2red'
+			#___________________________________________________________________
+			# if predefined color range	
+			if len(self.crange)!=0:
+				if len(self.crange)==2:
+					cmin = np.float(self.crange[0])
+					cmax = np.float(self.crange[1])
+					cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
+				elif len(self.crange)==3:
+					cmin = np.float(self.crange[0])
+					cmax = np.float(self.crange[1])
+					cref = np.float(self.crange[2])
+				else:
+					print(' this colorrange definition is not supported !!!')
+					print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
+			
+			print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+			cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,self.cmap)
+			print('clevel = ',clevel)
+			
+			do_drawedges=True
+			if clevel.size>50: do_drawedges=False
+			
+			# overwrite discrete colormap
+			#cmap0 = cmocean.cm.balance
+			#do_drawedges=False
+			
+			#___________________________________________________________________
+			# make pcolor or contour plot 
+			depth = self.depth[:-1] + (self.depth[1:]-self.depth[:-1])/2.0
+			depth = -depth
+			depthlim = np.sum(~np.isnan(self.value[ii][0,:])).max()
+			if depthlim==depth.shape: depthlim=depthlim-1
+			yy,xx = np.meshgrid(depth,self.time)
+			
+			#___________________________________________________________________
+			data_plot = np.copy(self.value[ii])
+			data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
+			data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
+			
+			#___________________________________________________________________
+			if inputarray['which_plot']=='pcolor':
+				hp=plt.pcolormesh(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],
+							shading='flat',#flat
+							antialiased=False,
+							edgecolor='None',
+							cmap=cmap0),
+							#vmin=np.nanmin(data_plot), vmax=np.nanmax(data_plot))
+			else: 
+				hp=plt.contourf(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel,
+							antialiased=False,
+							cmap=cmap0,
+							vmin=clevel[0], vmax=clevel[-1])
+				#plt.contour(xx,yy,data.value[ii],levels=clevel,
+							#antialiased=True,
+							#colors='k',
+							#linewidths=0.5,
+							#linestyles='solid',
+							#vmin=np.nanmin(data.value[ii]), vmax=np.nanmax(data.value[ii]))
+			#hp.cmap.set_under([0.4,0.4,0.4])
+			
+			#___________________________________________________________________
+			# set main axes
+			ax1.set_xlim(self.time.min(),self.time.max())
+			ax1.set_ylim(0,depth[depthlim-1])
+			ax1.invert_yaxis()
+			ax1.set_axis_bgcolor([0.25,0.25,0.25])
+			ax1.tick_params(axis='both',which='major',direction='out',length=8,labelsize=fsize)
+			ax1.minorticks_on()
+			ax1.tick_params(axis='both',which='minor',direction='out',length=4,labelsize=fsize)
+			ax1.set_xlabel('Time [years]',fontdict=dict(fontsize=fsize))
+			ax1.set_ylabel('Depth [km]',fontdict=dict(fontsize=fsize))
+			plt.title(self.descript+' - '+self.box_define[0][2],fontdict= dict(fontsize=fsize*2),verticalalignment='bottom')
+			
+			#___________________________________________________________________
+			# draw colorbar
+			divider = make_axes_locatable(ax1)
+			cax     = divider.append_axes("right", size="2.5%", pad=0.5)
+			plt.clim(clevel[0],clevel[-1])
+			
+			cbar = plt.colorbar(hp,ax=ax1,cax=cax,ticks=clevel,drawedges=do_drawedges)
+			cbar.set_label(self.lname+' '+self.unit+'\n'+self.str_time, size=fsize)
+			
+			cl = plt.getp(cbar.ax, 'ymajorticklabels')
+			plt.setp(cl, fontsize=fsize)
+			
+			# kickout some colormap labels if there are to many
+			ncbar_l=len(cbar.ax.get_yticklabels()[:])
+			idx_cref = np.where(clevel==cref)[0]
+			idx_cref = np.asscalar(idx_cref)
+			nmax_cbar_l = 10
+			nstep = ncbar_l/nmax_cbar_l
+			plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+			plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+			plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+			
+			#___________________________________________________________________
+			# save figure
+			if inputarray['save_fig']==True:
+				print(' --> save figure: png')
+				str_times= self.str_time.replace(' ','').replace(':','')
+				str_deps = self.str_dep.replace(' ','').replace(',','').replace(':','')
+				sfname = 'boxplot_'+self.box_define[ii][2]+'_'+self.descript+'_'+self.sname+'_'+str_times+'_'+str_deps+'.png'
+				sdname = inputarray['save_figpath']
+				if os.path.isdir(sdname)==False: os.mkdir(sdname)
+				plt.savefig(sdname+sfname, \
+							format='png', dpi=600, \
+							bbox_inches='tight', pad_inches=0,\
+							transparent=True,frameon=True)
+			#___________________________________________________________________
+			plt.show(block=False)
+			print('finish')
 		
 		return(fig,ax1,cax)
-		print('finish')
 		
 		
-	#___PLOT FESOM2.0 DATA IN INDEX BOX POSITION________________________________
-	# 
-	#___________________________________________________________________________
-	def plot_index_position(self,mesh):
+	#+___PLOT FESOM2.0 DATA IN INDEX BOX POSITION______________________________+
+	#|                                                                         |
+	#+_________________________________________________________________________+
+	def plot_index_position(self,mesh,numb=[]):
 		from set_inputarray import inputarray
+		fsize=16
+		#_______________________________________________________________________
+		if isinstance(numb,int)==True : numb = [numb]
+		if len(numb)==0 : numb=range(0,len(self.box_define))
+		
+		#_______________________________________________________________________
 		# draw position of box 
-		for ii in range(0,len(self.box_define)):
+		for ii in numb:
+		
 			#___________________________________________________________________
 			xmin,xmax = np.min(self.box_define[ii][0]), np.max(self.box_define[ii][0])
 			ymin,ymax = np.min(self.box_define[ii][1]), np.max(self.box_define[ii][1])
@@ -452,7 +628,7 @@ class fesom_box:
 			xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
 			
 			#___________________________________________________________________
-			fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
+			figp, ax = plt.figure(figsize=(13, 13)), plt.gca()
 			map 	= Basemap(projection = 'cyl',resolution = 'c',
 						llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
 			mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -460,18 +636,36 @@ class fesom_box:
 			
 			xlabels,ylabels=[0,0,0,1],[1,0,0,0]
 			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
-			map.drawparallels(yticks,labels=ylabels,fontsize=14)
-			map.drawmeridians(xticks,labels=xlabels,fontsize=14)
+			map.drawparallels(yticks,labels=ylabels,fontsize=fsize)
+			map.drawmeridians(xticks,labels=xlabels,fontsize=fsize)
 			map.bluemarble()
 			fesom_plot_lmask(map,mesh,ax,'none','r')
 			ax.grid(color='k', linestyle='-', linewidth=0.5)
 			
 			#___________________________________________________________________
 			patch=[]
-			patch.append(Polygon(zip(self.box_define[ii][0],self.box_define[ii][1]),closed=True,clip_on=True) )
-			ax.plot(self.box_define[ii][0]    ,self.box_define[ii][1] ,linestyle='None'   ,color='w',linewidth=2.0,marker='o',mfc='w',mec='k',axes=ax)
+			if len(self.box_define[ii][0])>2:
+				ax.plot(self.box_define[ii][0]    ,self.box_define[ii][1] ,linestyle='None'   ,color='w',linewidth=2.0,marker='o',mfc='w',mec='k',axes=ax)
+				patch.append(Polygon(zip(self.box_define[ii][0],self.box_define[ii][1]),closed=True,clip_on=True) )
+			else:
+				auxboxx = [ self.box_define[ii][0][0],\
+							self.box_define[ii][0][1],\
+							self.box_define[ii][0][1],\
+							self.box_define[ii][0][0],\
+							self.box_define[ii][0][0]]
+				auxboxy = [ self.box_define[ii][1][0],\
+							self.box_define[ii][1][0],\
+							self.box_define[ii][1][1],\
+							self.box_define[ii][1][1],\
+							self.box_define[ii][1][0],]
+				ax.plot(auxboxx    ,auxboxy ,linestyle='None'   ,color='w',linewidth=2.0,marker='o',mfc='w',mec='k',axes=ax)
+				patch.append(Polygon(zip(auxboxx,auxboxy),closed=True,clip_on=True) )
 			ax.add_collection(PatchCollection(patch, alpha=1.0,facecolor='none',edgecolor='w',zorder=1,linewidth=2.0,hatch='/'))	
 			
+			# plot selected mesh points
+			#ax.plot(mesh.nodes_2d_xg[self.box_idx[ii]],mesh.nodes_2d_yg[self.box_idx[ii]],color='r',linestyle='None',marker='.')
+			plt.title(self.box_define[ii][2],fontdict= dict(fontsize=fsize*2),verticalalignment='bottom')
+		
 			#___________________________________________________________________
 			# save figure
 			if inputarray['save_fig']==True:
@@ -486,4 +680,4 @@ class fesom_box:
 			
 			#___________________________________________________________________
 			plt.show(block=False)
-			fig.canvas.draw()
+

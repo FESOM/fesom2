@@ -118,11 +118,14 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
         data_interpolated = np.ma.masked_invalid(data_interpolated)
     else:
         distances_ma = np.ma.masked_greater(distances, radius_of_influence)
+        #distances_ma = np.ma.masked_greater(distances, np.nan)
         
         w = 1.0 / distances_ma**2
         data_interpolated = np.ma.sum(w * data[inds], axis=1) / np.ma.sum(w, axis=1)
         data_interpolated.shape = lons.shape
         data_interpolated = np.ma.masked_invalid(data_interpolated)
+        #data_interpolated[distances[:,1]>=radius_of_influence] = np.nan
+        #data_interpolated[np.where(distances.min(axis=1)>=radius_of_influence)[0]] = np.nan
     
     return data_interpolated
 

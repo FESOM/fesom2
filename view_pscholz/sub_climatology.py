@@ -1,6 +1,7 @@
 # Patrick Scholz, 23.01.2018
 import numpy as np
 import time
+import sys
 from netCDF4 import Dataset
 from sub_regriding_adapt import *
 from mpl_toolkits.basemap import shiftgrid
@@ -130,11 +131,11 @@ def clim_plot_anom(clim):
 	from set_inputarray import inputarray
 	
 	#___________________________________________________________________________
-	fig = plt.figure(figsize=(13, 13))
+	fig = plt.figure(figsize=(9.5, 6))
 	#fig.patch.set_alpha(0.0)
 	ax  = plt.gca()
 	resolution = 'c'
-	fsize = 14
+	fsize = 12
 	#+_________________________________________________________________________+
 	#| SET PROJECTION PARAMETERS                                               |
 	#+_________________________________________________________________________+
@@ -168,7 +169,7 @@ def clim_plot_anom(clim):
 		map = Basemap(projection = clim.proj,resolution = resolution,
 						llcrnrlon  = inputarray['which_box'][0], urcrnrlon  = inputarray['which_box'][1],
 						llcrnrlat  = inputarray['which_box'][2], urcrnrlat  = inputarray['which_box'][3],
-						area_thresh=1000
+						area_thresh=10000
 						)
 		ylabels=[1,0,0,0]
 		xlabels=[0,0,0,1]
@@ -208,6 +209,7 @@ def clim_plot_anom(clim):
 	#| adjustable colormap                                                     |
 	#+_________________________________________________________________________+
 	cnumb = 20; # minimum number of colors
+	if len(clim.cnumb)!=0: cnumb=clim.cnumb[0]
 	cmax  = np.nanmax(clim.anom[idx_box])
 	cmin  = np.nanmin(clim.anom[idx_box])
 	cref  = 0
@@ -266,7 +268,7 @@ def clim_plot_anom(clim):
 						dashes=[1,1e-10],
 						fontsize=fsize)
 	map.drawmapboundary(fill_color='0.9',linewidth=1.0)
-	map.drawcoastlines(color='k',linewidth=1.0)
+	map.drawcoastlines(color='k',linewidth=0.5)
 	map.fillcontinents(color='0.6')
 
 	#___________________________________________________________________________
@@ -293,6 +295,9 @@ def clim_plot_anom(clim):
 
 	nmax_cbar_l = 10
 	nstep = ncbar_l/nmax_cbar_l
+	nstep = np.int(np.floor(nstep))
+	if nstep==0: nstep=1
+   
 	plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
 	#plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
 	plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
@@ -315,7 +320,7 @@ def clim_plot_anom(clim):
 		str_deps = clim.str_dep.replace(' ','').replace(',','').replace(':','')
 		sfname = 'plot_'+clim.descript+'_'+clim.proj+'_'+clim.sname+'_'+str_times+'_'+str_deps+'.png'
 		sdname = inputarray['save_figpath'] 
-		if os.path.isdir(sdname)==False: os.mkdir(sdname)
+		#if os.path.isdir(sdname)==False: os.mkdir(sdname)
 		plt.savefig(sdname+sfname, \
 		            format='png', dpi=600, \
 					bbox_inches='tight', pad_inches=0,\
