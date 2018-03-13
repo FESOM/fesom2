@@ -234,76 +234,96 @@ USE g_PARSUP
 IMPLICIT NONE
 integer        :: n, nz, elem, k, edge, ednodes(2)
 real(kind=8)   :: tvol, tx, ty
-
-  DO edge=1,myDim_edge2D
-     ednodes=edges(:,edge)
-    if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
-    
-     DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-        edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
-	edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
-     END DO
-     DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
-        tvol=0.0
-	tx=0.0
-	ty=0.0
-	DO k=1, nod_in_elem2D_num(ednodes(1))
-           elem=nod_in_elem2D(k,ednodes(1))
-           if(nlevels(elem)-1<nz) cycle
-           tvol=tvol+elem_area(elem)
-           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
-        END DO
-	edge_up_dn_grad(1,nz,edge)=tx/tvol
-	edge_up_dn_grad(3,nz,edge)=ty/tvol
-     END DO
-     DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
-        tvol=0.0
-	tx=0.0
-	ty=0.0
-	DO k=1, nod_in_elem2D_num(ednodes(2))
-           elem=nod_in_elem2D(k,ednodes(2))
-           if(nlevels(elem)-1<nz) cycle
-           tvol=tvol+elem_area(elem)
-           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
-        END DO
-	edge_up_dn_grad(2,nz,edge)=tx/tvol
-	edge_up_dn_grad(4,nz,edge)=ty/tvol
-     END DO
-    else
-    
-      ! Only linear reconstruction part
-     DO nz=1,nlevels_nod2D(ednodes(1))-1
-        tvol=0.0
-	tx=0.0
-	ty=0.0
-	DO k=1, nod_in_elem2D_num(ednodes(1))
-           elem=nod_in_elem2D(k,ednodes(1))
-           if(nlevels(elem)-1 < nz) cycle
-           tvol=tvol+elem_area(elem)
-           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
-        END DO
-	edge_up_dn_grad(1,nz,edge)=tx/tvol
-	edge_up_dn_grad(3,nz,edge)=ty/tvol
-     END DO
-     DO nz=1,nlevels_nod2D(ednodes(2))-1
-        tvol=0.0
-	tx=0.0
-	ty=0.0
-	DO k=1, nod_in_elem2D_num(ednodes(2))
-           elem=nod_in_elem2D(k,ednodes(2))
-           if(nlevels(elem)-1 < nz) cycle
-           tvol=tvol+elem_area(elem)
-           tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
-	   ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
-        END DO
-	edge_up_dn_grad(2,nz,edge)=tx/tvol
-	edge_up_dn_grad(4,nz,edge)=ty/tvol
-     END DO
-    end if  
-   END DO 
+	!___________________________________________________________________________
+	! loop over edge segments
+	DO edge=1,myDim_edge2D
+		ednodes=edges(:,edge)
+		!_______________________________________________________________________
+		! case when edge has upwind and downwind triangle on the surface
+		if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
+			
+			!___________________________________________________________________
+			! loop over shared depth levels
+			DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
+				! tracer gradx for upwind and downwind tri
+				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
+				! tracer grady for upwind and downwind tri
+				edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
+			END DO
+			
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 1 (ednodes(1))
+			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+				tvol=0.0
+				tx=0.0
+				ty=0.0
+				! loop over number triangles that share the nodeedge points ednodes(1)
+				! --> calculate mean gradient at ednodes(1) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(1))
+					elem=nod_in_elem2D(k,ednodes(1))
+					if(nlevels(elem)-1<nz) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(1,nz,edge)=tx/tvol
+				edge_up_dn_grad(3,nz,edge)=ty/tvol
+			END DO
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 2 (ednodes(2))
+			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+				tvol=0.0
+				tx=0.0
+				ty=0.0
+				! loop over number triangles that share the nodeedge points ednodes(2)
+				! --> calculate mean gradient at ednodes(2) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(2))
+					elem=nod_in_elem2D(k,ednodes(2))
+					if(nlevels(elem)-1<nz) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(2,nz,edge)=tx/tvol
+				edge_up_dn_grad(4,nz,edge)=ty/tvol
+			END DO
+		!_______________________________________________________________________
+		! case when edge either upwind or downwind triangle on the surface
+		! --> surface boundary edge
+		else
+			! Only linear reconstruction part
+			DO nz=1,nlevels_nod2D(ednodes(1))-1
+				tvol=0.0
+				tx=0.0
+				ty=0.0
+				DO k=1, nod_in_elem2D_num(ednodes(1))
+					elem=nod_in_elem2D(k,ednodes(1))
+					if(nlevels(elem)-1 < nz) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(1,nz,edge)=tx/tvol
+				edge_up_dn_grad(3,nz,edge)=ty/tvol
+			END DO
+			DO nz=1,nlevels_nod2D(ednodes(2))-1
+				tvol=0.0
+				tx=0.0
+				ty=0.0
+				DO k=1, nod_in_elem2D_num(ednodes(2))
+					elem=nod_in_elem2D(k,ednodes(2))
+					if(nlevels(elem)-1 < nz) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(2,nz,edge)=tx/tvol
+				edge_up_dn_grad(4,nz,edge)=ty/tvol
+			END DO
+		end if  
+	END DO 
    
 END SUBROUTINE fill_up_dn_grad
 !===========================================================================
