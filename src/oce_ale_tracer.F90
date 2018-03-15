@@ -71,7 +71,7 @@ subroutine adv_tracers_ale(tr_num)
 	select case (tracer_adv)
 		case(1) !MUSCL
                        ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.0)
+                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.75)
                       call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
 
 		case(2) !MUSCL+FCT(3D)
@@ -375,65 +375,41 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 	use g_forcing_arrays
 	implicit none
 	integer       :: n, nz, nzmax
-	real(kind=WP) :: tvert(nl), tv(nl), aLj, aRj, a6j, x
+	real(kind=WP) :: tvert(nl), tv(nl), aL, aR, aj, x
 	real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
 	real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	
+	integer       :: overshoot_counter, counter
 	! --------------------------------------------------------------------------
 	! Vertical advection
 	! --------------------------------------------------------------------------
 	! A piecewise parabolic scheme for uniformly-spaced layers.
-	! See Colella and Woodward, JCP, 1984, 174-201.
+	! See Colella and Woodward, JCP, 1984, 174-201. It can be coded so as to to take 
+	! non-uniformity into account, but this is more cumbersome. This is the version for AB
+	! time stepping
 	! --------------------------------------------------------------------------
-	
+        overshoot_counter=0
+        counter=0
 	do n=1, myDim_nod2D
 		!_______________________________________________________________________
 		!Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
 		! calculated on mid depth levels 
 		! nzmax ... number of depth levels at node n
 		nzmax=nlevels_nod2D(n)
-		
-		! tracer at surface layer
-		tv(1)=ttf(1,n)
-		
-		! tracer at surface+1 layer --> use an upwind scheme --> take as tracer
-		! at zbar_2, the tracer from the upwind region --> w_2*tr_12
-		! --> if w_2 > 0 --> tr_12 = tr_2
-		! --> if w_2 < 0 --> tr_12 = tr_1
-		! --> take tracer from where velocity comes !
-		!
-		! -------O w_1 -------- 
-		!
-		!        x tr_1
-		!        |
-		!        v
-		! -------O w_2,tr_12 -- 
-		!        ^                                 
-		!        |                                 
-		!        x tr_2                               
-		!
-		! -------O w_3 --------
-		!        :
-		!        :
-		tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
-		!               |________________________________|          |________________________________|
-		!               |-> Wvel_e(2,n)>0 ; == 0                    |-> Wvel_e(2,n)>0 ; == ttf(2,n)*1
-		!               |-> Wvel_e(2,n)<0 ; ==-ttf(1,n)*-1          |-> Wvel_e(2,n)<0 ; == 0
-		
-		! tacer at bottom-2 layer
-		tv(nzmax-2)=-ttf(nzmax-3,n)*min(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)+ttf(nzmax-2,n)*max(sign(1.0, Wvel_e(nzmax-2,n)), 0._WP)
-		
-		! tacer at bottom-1 layer
-		tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
-		
-		! tracer at bottom layer 
-		tv(nzmax)=ttf(nzmax-1,n) 
-		
+                ! tracer at surface layer
+                tv(1)=ttf(1,n)
+                ! tracer at surface+1 layer
+!               tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
+                tv(2)=0.5*(ttf(1,n)+ttf(2,n))
+                ! tacer at bottom-1 layer
+!               tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
+                tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+                ! tracer at bottom layer
+                tv(nzmax)=ttf(nzmax-1,n)
 		!_______________________________________________________________________
-		! calc tracer for surface+2 until depth-2 layer with Piecewise Parabolic 
-		! Method (PPM)
+		! calc tracer for surface+2 until depth-2 layer
 		! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
- 		do nz=2,nzmax-3
+		! loop over layers (segments)
+ 		do nz=2, nzmax-3
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
@@ -447,18 +423,17 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			dzj      = hnode(nz,n)
 			dzjp1    = hnode(nz+1,n)
 			dzjp2    = hnode(nz+2,n)
-			
 			!___________________________________________________________________
 			! equation (1.7)
 			! --> Here deltaj is the average slope in the jth zone of the parabola 
-			!     with zone averages a_(j-1) and a_j, a_(j+1) 
+			!     with zone averages a_(j-1) and a_j, a_(j+1)
 			! --> a_j^n
 			deltaj   = dzj/(dzjm1+dzj+dzjp1)* &
 					  ( &
 					   (2.*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
 					   (dzj    +2.*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
 					  )
-			! --> a_(j+1)^n
+			! --> a_(j+1)^n		  
 			deltajp1 = dzjp1/(dzj+dzjp1+dzjp2)* &
 					  ( &
 					   (2.*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
@@ -477,7 +452,6 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			else
 				deltaj = 0.0_WP
 			endif
-			
 			if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n)) > 0. ) then
 				deltajp1 = min(  abs(deltajp1),&
 							   2.*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
@@ -486,11 +460,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			else
 				deltajp1 = 0.0_WP
 			endif
-			
 			!___________________________________________________________________
 			! equation (1.6)
-			! --> calcualte a_(j+0.5) 
-			tv(nz)=	ttf(nz,n) &
+			! --> calcualte a_(j+0.5)
+			! nz+1 is the interface betweel layers (segments) nz and nz+1
+			tv(nz+1)=	ttf(nz,n) &
 					+ dzj/(dzj+dzjp1)*(ttf(nz+1,n)-ttf(nz,n)) &
 					+ 1./(dzjm1+dzj+dzjp1+dzjp2) * &
 					( &
@@ -499,109 +473,55 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 					   - dzj*(dzjm1+dzj)/(2.*dzj+dzjp1)*deltajp1 &
 					   + dzjp1*(dzjp1+dzjp2)/(dzj+2.*dzjp1)*deltaj &
 					)
-			
-			!___________________________________________________________________ 
-			! --> constrain a_(j+0.5) to lie in the range of values defined 
-			!     by a_(j) and a_(j+1)
-			! --> force limitation of tv(nz) --> interpolated value tv(nz) at 
-			!     zbar_nz must be between ttf(nz, n), ttf(nz+1, n) 
-			! --> limit upper value range of tv(nz)
-			tv(nz)= min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz))
-			! --> limit lower value range of tv(nz)
-			tv(nz)= max(min(ttf(nz, n), ttf(nz+1, n)), tv(nz)) 
-			
+                       !tv(nz+1)=max(min(ttf(nz, n), ttf(nz+1, n)), min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz+1)))
 		end do ! --> do nz=2,nzmax-3
-		
-		!_______________________________________________________________________
-		! calculate tracer fluxes for upper two and lower two levels and bottom
-		tvert(1:nzmax)=0._WP
-		
-		! tracer flux at surface
-		tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
-		
-		! tracer flux at surface+1 layer
-		tvert(2)= -tv(2)*Wvel_e(2,n)*area(2,n)		
-		
-		! tacer flux at bottom-2 layer
-		tvert(nzmax-2)= -tv(nzmax-2)*Wvel_e(nzmax-2,n)*area(nzmax-2,n)
-		
-		! tacer flux at bottom-1 layer
-		tvert(nzmax-1)= -tv(nzmax-1)*Wvel_e(nzmax-1,n)*area(nzmax-1,n)
-		
-		! tacer flux at bottom == 0
-		tvert(nzmax)=0.0_WP
-		
-		!_______________________________________________________________________
-		! calculate tracer flux in remaining levels
-		do nz=2, nzmax-3
-			if ((Wvel_e(nz,n)<=0.) .and. (Wvel_e(nz+1,n)>=0.)) CYCLE
-			
-			!___________________________________________________________________
-			aLj=tv(nz)
-			aRj=tv(nz+1)
-			! "... The value a_(j+0.5), will be assigned to a_L(j) and a_R(j-i) for 
-			! most values of j. There are some cases, however, where this would 
-			! lead to an interpolation function which takes on values not between 
-			! a_L(j) and a_R(j). In such cases, we reset one or both of these values. 
-			! There are two cases. First, if a_(j) is a local maximum or minimum, 
-			! then the interpolation function is set to be a constant. The second 
-			! case is where a_(j); is between a_R(j) and a_L(j), but sufficiently 
-			! close to one of the values so that the interpolated parabola takes on 
-			! a value which is not between a_R(j) and a_R(j). The condition on the
-			! coefficients of the interpolating parabola such that it does not 
-			! overshoot is that |da_(j)| >= |a_6_(j). When this condition fails to 
-			! hold, either  a_L(j) or a_R(j) is reset, so that the interpolation 
-			! parabola is monotone, and so that its derivative at the opposite edge 
-			! of the zone from the one where the value is being reset is zero. ..."
-			!________________________
-			! --> equation (1.10) A)
-			if ((aRj-ttf(nz, n))*(ttf(nz, n)-aLj)<=0.) then
-				aLj =ttf(nz, n)
-				aRj =ttf(nz, n)
-			end if
-			
-			!________________________
-			! --> equation (1.10) B)
-			if ((aRj-aLj)*(ttf(nz, n)-0.5_WP*(aLj+aRj))> (aRj-aLj)**2/6._WP) then
-				aLj =3._WP*ttf(nz, n)-2._WP*aRj
-			end if
-			
-			!________________________
-			! --> equation (1.10) C)
-			if ((aRj-aLj)*(ttf(nz, n)-0.5_WP*(aRj+aLj))<-(aRj-aLj)**2/6._WP) then
-				aRj =3._WP*ttf(nz, n)-2._WP*aLj
-			end if
-			
-			!___________________________________________________________________
-			! --> equation (1.12)
-			dzj   = hnode(nz,n)
-			a6j   = 6.0_WP*(ttf(nz  , n)-0.5_WP*(aLj  +aRj  ))
-			
-			! if positive velocity --> upwind --> need interpolant from right side
-			if (Wvel_e(nz,n)>0.) then
-				x=Wvel_e(nz,n)*dt/dzj
-				tvert(nz)=(-aLj-0.5_WP*x*(aRj-aLj+(1._WP-2._WP/3._WP*x)*a6j))*area(nz,n)*Wvel_e(nz,n)
-			end if
-			
-			! if negative velocity in next layer --> upwind --> use there interpolant from right side
-			! --> here you also reset tvert(nzmax-2) in case there is upwind 
-			! velocity downward --> tvert(nzmax-2) becomes higher order
-			if (Wvel_e(nz+1,n)<0.) then 
-				x=-Wvel_e(nz+1,n)*dt/dzj
-				tvert(nz+1)=(-aRj+0.5_WP*x*(aRj-aLj-(1._WP-2._WP/3._WP*x)*a6j))*area(nz+1,n)*Wvel_e(nz+1,n)
-			end if
-			
+
+                tvert(1:nzmax)=0._WP
+		! loop over layers (segments)
+		do nz=1, nzmax-1
+                   if ((Wvel_e(nz,n)<=0.) .AND. (Wvel_e(nz+1,n)>=0.)) CYCLE
+                   counter=counter+1
+		   aL=tv(nz)
+		   aR=tv(nz+1)
+ 	           if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0.) then
+!                     write(*,*) aL, ttf(nz, n), aR
+                      overshoot_counter=overshoot_counter+1
+                      aL =ttf(nz, n)
+                      aR =ttf(nz, n)
+                   end if
+                   if ((aR-aL)*(ttf(nz, n)-0.5_WP*(aL+aR))> (aR-aL)**2/6._WP) then
+                      aL =3._WP*ttf(nz, n)-2._WP*aR
+                   end if
+                   if ((aR-aL)*(ttf(nz, n)-0.5_WP*(aR+aL))<-(aR-aL)**2/6._WP) then
+                      aR =3._WP*ttf(nz, n)-2._WP*aL
+                   end if
+
+                   dzj   = hnode(nz,n)
+                   aj=6.0_WP*(ttf(nz, n)-0.5_WP*(aL+aR))
+
+		   if (Wvel_e(nz,n)>0.) then
+                      x=min(Wvel_e(nz,n)*dt/dzj, 1._WP)
+                      tvert(nz)=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))*area(nz,n)*Wvel_e(nz,n)
+                   end if
+
+		   if (Wvel_e(nz+1,n)<0.) then
+                      x=min(-Wvel_e(nz+1,n)*dt/dzj, 1._WP)
+                      tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))*area(nz+1,n)*Wvel_e(nz+1,n)
+                   end if
 		end do
-		
+		!_______________________________________________________________________
+		! Surface flux
+		tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
+		! Zero bottom flux
+		tvert(nzmax)=0.0_WP		
 		!_______________________________________________________________________
 		! writing vertical ale advection into rhs
 		do nz=1, nzmax-1
-			! no division over thickness in ALE !!!
-			del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
+                   ! no division over thickness in ALE !!!
+                   del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
 		end do
-		
 	end do ! --> do n=1, myDim_nod2D
-	
+!       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
 end subroutine adv_tracers_vert_ppm_ale
 !
 !
