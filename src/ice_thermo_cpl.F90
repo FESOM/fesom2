@@ -130,7 +130,7 @@ subroutine thermodynamics
      m_ice(inod)         = h
      m_snow(inod)        = hsn
      ice_alb(inod)	 = alb
-     ice_temp(inod)      = t
+     ice_temp(inod)      = t+tmelt
 
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw

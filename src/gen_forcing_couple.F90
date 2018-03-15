@@ -163,7 +163,7 @@ subroutine update_atm_forcing(istep)
          exchange =0.0
          if (i.eq.1) then
             do n=1,myDim_nod2D+eDim_nod2D
-               exchange(n)=tr_arr(1, n, 1)                          ! sea surface temperature deg C
+               exchange(n)=tr_arr(1, n, 1)+tmelt                          ! sea surface temperature deg C
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -279,9 +279,11 @@ subroutine update_atm_forcing(istep)
 		!runoff=0.
              end if
 	  end if  	  
-#ifdef VERBOSE
-	  if (mype==0) write(*,*) 'RECV: flux ', i, ', max val: ', maxval(exchange), ' . ACTION? ', action 	  
-#endif
+!#ifdef VERBOSE
+	  if (mype==0) then
+		write(*,*) 'RECV: flux ', i, ', max val: ', maxval(stress_atmoce_x)
+	  end if
+!#endif
       end do
 
       if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
@@ -991,7 +993,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
   real(kind=8)			:: weight(myDim_nod2D+eDim_nod2D)    
   real(kind=8)			:: flux_global(2), flux_local(2)
   real(kind=8)			:: eff_vol(2)
-
+return !!!OIFS
   if (mstep==1) then
 	if (mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
 	return
@@ -1094,7 +1096,7 @@ SUBROUTINE compute_residual(field2d, mask, n)
   
   real(kind=8)               :: flux_global(2), flux_local(2)
   real(kind=8)               :: eff_vol(2)
-  
+  write(*,*) 'c1'
   !compute net flux (for flux n) on ocean side
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
   oce_net_fluxes_north(n)=flux_global(1)
@@ -1104,7 +1106,7 @@ SUBROUTINE compute_residual(field2d, mask, n)
   flux_correction_north(n)= atm_net_fluxes_north(n) - oce_net_fluxes_north(n)
   flux_correction_south(n)= atm_net_fluxes_south(n) - oce_net_fluxes_south(n)
   flux_correction_total(n)= flux_correction_north(n) + flux_correction_south(n)
-  
+  write(*,*) 'c2'
 END SUBROUTINE compute_residual
 
 !
@@ -1184,7 +1186,7 @@ SUBROUTINE net_rec_from_atm(action)
   INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
   INTEGER                                         :: request(2)
   real(kind=8)                 			  :: aux(nrecv)
-
+RETURN !!!OIFS
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
      atm_net_fluxes_north=0.

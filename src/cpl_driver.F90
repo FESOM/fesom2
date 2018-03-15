@@ -590,7 +590,6 @@ contains
 #endif
 
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
-
     t2=MPI_Wtime()
  !
  ! FESOM's interpolation routine interpolates structured
