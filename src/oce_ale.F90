@@ -1865,7 +1865,7 @@ subroutine oce_timestep_ale(n)
 	
 	! check model for blowup --> ! write_step_info and check_blowup require 
 	! togeather around 2.5% of model runtime
-	call check_blowup(n)
+	!call check_blowup(n)
 	
 	!___________________________________________________________________________
 	! write out execution times for ocean step parts

@@ -281,7 +281,7 @@ subroutine update_atm_forcing(istep)
 	  end if  	  
 !#ifdef VERBOSE
 	  if (mype==0) then
-		write(*,*) 'RECV: flux ', i, ', max val: ', maxval(stress_atmoce_x)
+		write(*,*) 'RECV: flux ', i, ', max val: ', maxval(exchange)
 	  end if
 !#endif
       end do
