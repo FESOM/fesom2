@@ -259,7 +259,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! combined with centered
 			! num_ord is the fraction of fourth-order contribution in the HO solution
 			! (1-num_ord) is done with 3rd order upwind
-			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+			c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
 			!                                            |____________|
 			!                                                  v
 			!                                           dont use fourth order solution
@@ -307,7 +307,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
 				!                                            |____________|
 				!                                                  v
 				!                                           dont use fourth order solution
@@ -348,7 +348,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
 				!                                            |____________|
 				!                                                  v
 				!                                           dont use fourth order solution
@@ -398,11 +398,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
                 ! tracer at surface layer
                 tv(1)=ttf(1,n)
                 ! tracer at surface+1 layer
-!               tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
-                tv(2)=0.5*(ttf(1,n)+ttf(2,n))
+                tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
+!               tv(2)=0.5*(ttf(1,n)+ttf(2,n))
                 ! tacer at bottom-1 layer
-!               tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
-                tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+                tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
+!               tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
                 ! tracer at bottom layer
                 tv(nzmax)=ttf(nzmax-1,n)
 		!_______________________________________________________________________
