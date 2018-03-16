@@ -398,11 +398,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
                 ! tracer at surface layer
                 tv(1)=ttf(1,n)
                 ! tracer at surface+1 layer
-                tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
-!               tv(2)=0.5*(ttf(1,n)+ttf(2,n))
+!               tv(2)=-ttf(1,n)*min(sign(1.0, Wvel_e(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, Wvel_e(2,n)), 0._WP)
+                tv(2)=0.5*(ttf(1,n)+ttf(2,n))
                 ! tacer at bottom-1 layer
-                tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
-!               tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+!               tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
+                tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
                 ! tracer at bottom layer
                 tv(nzmax)=ttf(nzmax-1,n)
 		!_______________________________________________________________________
@@ -1088,7 +1088,7 @@ subroutine diff_ver_part_redi_expl
 		zbar_n=0.0_WP
 		Z_n   =0.0_WP
 		zbar_n(nl1+1)=zbar(nl1+1)
-		Z_n(nl1-1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+                Z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
 		do nz=nl1, 2, -1
 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
 			Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
