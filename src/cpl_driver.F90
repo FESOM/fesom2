@@ -529,10 +529,18 @@ contains
 
     t2=MPI_Wtime()
 #ifdef VERBOSE
-    print *, 'oasis_send: ', cpl_send(ind)        
+    if (mype==0) then
+        print *, 'FESOM oasis_send: ', cpl_send(ind)   
+    endif     
 #endif
+    if (mype==0) write(*,*)'FESOM time till now in seconds is (before put):',seconds_til_now, 'info:',info
     call oasis_put(send_id(ind), seconds_til_now, exfld, info)
-
+    if (mype==0) write(*,*)'FESOM time till now in seconds is (after put):',seconds_til_now, 'info:',info
+#ifdef VERBOSE
+    if (mype==0) then
+        write(*,*) 'FESOM after Oasis put'  
+    endif     
+#endif
     action=(info==4 .OR. info==8)
     if (action) then
        if (ind==nsend) then
@@ -586,7 +594,9 @@ contains
     ! receive data from OASIS3-MCT on local root
     !
 #ifdef VERBOSE
-    print *, 'oasis_get: ', cpl_recv(ind)    
+    if (mype==0) then
+        print *, 'oasis_get: ', cpl_recv(ind)
+    endif    
 #endif
 
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
