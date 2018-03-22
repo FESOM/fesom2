@@ -104,7 +104,8 @@ integer :: n, nsteps, offset, row, i
 			write(*,*)
 		end if
 #if defined (__oasis)
-     		seconds_til_now=INT(dt)*(nsteps-1)
+		if (mype==0) write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
+     		seconds_til_now=INT(dt)*(n-1)
 #endif
 
 		call clock
@@ -116,7 +117,6 @@ integer :: n, nsteps, offset, row, i
 		!___model sea-ice step__________________________________________________
 		if(use_ice) then
 			call ocean2ice
-			if (mype==0) write(*,*) 'FESOM before atm forcing'
 			call update_atm_forcing(n)
 			
 			if (ice_steps_since_upd>=ice_ave_steps-1) then

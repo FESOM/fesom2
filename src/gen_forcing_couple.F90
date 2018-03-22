@@ -148,6 +148,7 @@ subroutine update_atm_forcing(istep)
   real(kind=8), dimension(nci,ncj)      :: array_nc, array_nc2,array_nc3,x
   character(500)                        :: file
 
+
   t1=MPI_Wtime()
 #ifdef __oasis
      if (firstcall) then
@@ -188,27 +189,23 @@ subroutine update_atm_forcing(istep)
       mask=1.
       do i=1,nrecv
          exchange =0.0
-#ifdef VERBOSE
-	 if (mype==0) write(*,*) 'Trying to RECV: flux ', i 	  
-#endif
          call cpl_oasis3mct_recv (i,exchange,action)
 	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
 	 if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action)
          if (i.eq.1) then
      	     if (.not. action) cycle
-             stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
 	     do_rotate_oce_wind=.true.
          elseif (i.eq.2) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle
              stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
 	     do_rotate_oce_wind=.true.
          elseif (i.eq.3) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle	
              stress_atmice_x(:) =  exchange(:)                    ! taux_ice
 	     do_rotate_ice_wind=.true.
          elseif (i.eq.4) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle	
              stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
 	     do_rotate_ice_wind=.true.	     
          elseif (i.eq.5) then
@@ -273,17 +270,17 @@ subroutine update_atm_forcing(istep)
 	     call force_flux_consv(shortwave, mask, i, 0,action)
          elseif (i.eq.12) then
              if (action) then
+	     exchange=0	
 	        runoff(:)                   =  exchange(:)        ! runoff + calving
     	        mask=1.
 		call force_flux_consv(runoff, mask, i, 0,action)
-		!runoff=0.
              end if
 	  end if  	  
-!#ifdef VERBOSE
+#ifdef VERBOSE
 	  if (mype==0) then
-		write(*,*) 'RECV: flux ', i, ', max val: ', maxval(exchange)
+		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
 	  end if
-!#endif
+#endif
       end do
 
       if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
@@ -336,6 +333,7 @@ subroutine update_atm_forcing(istep)
 #endif /* (__oasis) */     
   end if
 #endif
+
 end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
