@@ -21,7 +21,12 @@ module cpl_driver
   !
   ! Exchange parameters for coupling FESOM with ECHAM6
   !
+
+#if defined (__oifs)
   integer, parameter         :: nsend = 6
+#else
+  integer, parameter         :: nsend = 4
+#endif
   integer, parameter         :: nrecv = 12
   
   integer, dimension(nsend)  :: send_id
@@ -157,8 +162,12 @@ contains
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   subroutine cpl_oasis3mct_define_unstr
-    
+   
+#ifdef __oifs
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
+#else
+    use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
+#endif
     use o_mesh
     use g_rotate_grid
     
@@ -383,8 +392,12 @@ contains
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+#if defined (__oifs)
     cpl_send( 5)='ste_feom' ! 5. sea ice temperature [K]           ->
     cpl_send( 6)='sia_feom' ! 6. sea ice albedo [%-100]            ->
+#endif
+
+
     
 !
 ! ...  Define symbolic names for transient fields received by the ocean.
@@ -596,7 +609,7 @@ contains
     t2=MPI_Wtime()
  !
  ! FESOM's interpolation routine interpolates structured
- ! VarStrLoc coming from OASIS4 to local unstructured data_array
+ ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
    if (action) then

@@ -124,7 +124,10 @@ subroutine thermodynamics
 !     endif
 
      call ice_growth
+#if defined (__oifs)
      call ice_albedo(hsn,t,alb)
+#endif
+
 
      a_ice(inod)         = A
      m_ice(inod)         = h

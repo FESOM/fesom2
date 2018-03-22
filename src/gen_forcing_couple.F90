@@ -164,7 +164,12 @@ subroutine update_atm_forcing(istep)
          exchange =0.0
          if (i.eq.1) then
             do n=1,myDim_nod2D+eDim_nod2D
-               exchange(n)=tr_arr(1, n, 1)+tmelt                          ! sea surface temperature deg C
+#if defined (__oifs)
+            exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+#else
+            exchange(n)=tr_arr(1, n, 1)		                    ! sea surface temperature [°C]
+#endif
+
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -270,7 +275,9 @@ subroutine update_atm_forcing(istep)
 	     call force_flux_consv(shortwave, mask, i, 0,action)
          elseif (i.eq.12) then
              if (action) then
-	     exchange=0	
+#if defined (__oifs)
+	        exchange=0	
+#endif
 	        runoff(:)                   =  exchange(:)        ! runoff + calving
     	        mask=1.
 		call force_flux_consv(runoff, mask, i, 0,action)
@@ -991,7 +998,11 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
   real(kind=8)			:: weight(myDim_nod2D+eDim_nod2D)    
   real(kind=8)			:: flux_global(2), flux_local(2)
   real(kind=8)			:: eff_vol(2)
-return !!!OIFS
+
+#if defined (__oifs)
+  return !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping instead
+#endif
+
   if (mstep==1) then
 	if (mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
 	return
@@ -1184,7 +1195,10 @@ SUBROUTINE net_rec_from_atm(action)
   INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
   INTEGER                                         :: request(2)
   real(kind=8)                 			  :: aux(nrecv)
-RETURN !!!OIFS
+#if defined (__oifs)
+  return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
+#endif
+
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
      atm_net_fluxes_north=0.

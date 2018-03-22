@@ -28,8 +28,12 @@ IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
 
-!call MPI_INIT(i)
-!cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+#ifndef __oifs
+  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+	!OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
+        call MPI_INIT(i) 
+#endif
+
 
 #if defined (__oasis)
         call cpl_oasis3mct_init(MPI_COMM_FESOM)
@@ -103,11 +107,9 @@ integer :: n, nsteps, offset, row, i
 			write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
 			write(*,*)
 		end if
-#if defined (__oasis)
-		if (mype==0) write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
-     		seconds_til_now=INT(dt)*(n-1)
+#if defined (__oifs)
+        	seconds_til_now=INT(dt)*(n-1)
 #endif
-
 		call clock
 		call forcing_index
 		call compute_vel_nodes 
