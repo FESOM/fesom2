@@ -83,14 +83,14 @@ default: run
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
 	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) $(NCFLIB) 
+	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) 
 	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 	@echo "======= Building FESOM paritioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
-	$(MPI_LIB) $(LIB_METIS) $(NCLIB) $(NCFLIB) 
+	$(MPI_LIB) $(LIB_METIS) $(NCLIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 
@@ -106,7 +106,7 @@ run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
 .F90.o :
 	@echo $@
 	$(FC) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
-	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC) $(NCFINC)  -c $*.F90
+	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
 
 clean :
 	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x

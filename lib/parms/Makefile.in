@@ -1,5 +1,5 @@
 # Include path for MPI header file
-MPIROOT            =  /sw/rhel6-x64/intel/impi/5.1.3.223/compilers_and_libraries/linux/mpi/intel64/
+MPIROOT            =   $(MPICH_DIR)
 MPI_INC            = -I$(MPIROOT)/include
 
 PARMS_DEFS = -DPARMS -DUSE_MPI -DREAL=double -DDBL -DFORTRAN_UNDERSCORE -DVOID_POINTER_SIZE_8 -DHAS_BLAS 
@@ -13,12 +13,14 @@ CPP = /usr/bin/cpp -P -C
 
 # Compiler and Linker
 CC = icc 
-FC = ifort -r8
+FC = ftn -r8
 LD = $FC
 
 # Optimization specs for compiler
-OPT  = -O3 -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise
-COPT = 
+OPT  = -O3 -xHost -ip -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise
+# OPT  =
+COPT =  -O3 -xHost -ip 
+# COPT=  -xHost -g -debug -traceback -check=conversions,stack,uninit -fpe:0 
 
 #######################################################
 # for pARMS-Library, archive and options
@@ -26,3 +28,4 @@ COPT =
 AR       = ar
 ARFLAGS  = -cr
 EXTFLAGS = 
+

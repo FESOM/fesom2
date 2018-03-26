@@ -8,17 +8,15 @@ OPT  = -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcende
 COPT = -O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude -xHost -traceback
 ######################################################
 # Include path for MPI header file
-MPIROOT            =  /sw/rhel6-x64/intel/impi/5.1.3.223/compilers_and_libraries/linux/mpi/intel64
-MPI_LIB            = -L$(MPIROOT)/lib
-MPI_INCLUDE        = -I$(MPIROOT)/include
+MPIROOT            = 
+MPI_LIB            = 
+MPI_INCLUDE        = 
 
 # NetCDF library and include definitions
-NCFDIR   = /sw/rhel6-x64/netcdf/netcdf_fortran-4.4.3-intel14
-NCFLIB   = -Wl,-rpath -Wl,$(NCFDIR)/lib -L$(NCFDIR)/lib -lnetcdff
-NCFINC   = -I$(NCFDIR)/include
-NCDIR   = /sw/rhel6-x64/netcdf/netcdf_c-4.4.0-gcc48
-NCLIB   = -Wl,-rpath -Wl,$(NCDIR)/lib -L$(NCDIR)/lib -lnetcdf 
-NCINC   = -I$(NCDIR)/include
+#    (use 'module load netcdf')
+NCDIR   = # /opt/cray/netcdf/4.3.0/INTEL/130
+NCLIB   = -L$(NETCDF_DIR)/lib -lnetcdff -lnetcdf 
+NCINC   = -I$(NETCDF_DIR)/include
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
 LIB_LAP = -mkl
@@ -50,7 +48,7 @@ LIB_PARMS = -L$(PARMS_DIR)/lib -lparms
 METIS_DIR = ../lib/metis-5.1.0
 LIB_METIS = -L$(METIS_DIR)/lib -lmetis
 METIS_INC = -I$(METIS_DIR)/include
-METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=98451 #35243
+METIS_DEFS = -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
 # METISRANDDOMSEED: any integer
 
 ######################################################
