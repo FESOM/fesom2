@@ -67,8 +67,9 @@ integer :: n, nsteps, offset, row, i
 	endif
 #if defined (__oasis)
 	call cpl_oasis3mct_define_unstr
-#endif
 	if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
+	
 
 	call clock_newyear                    	! check if it is a new year
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
