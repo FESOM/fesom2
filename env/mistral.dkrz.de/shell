@@ -2,9 +2,9 @@
 
 module load gcc/4.8.2
 export LD_LIBRARY_PATH=/sw/rhel6-x64/gcc/gcc-4.8.2/lib64:$LD_LIBRARY_PATH # avoid GLIBCXX_3.4.15 not found error
-module unload intel && module load intel/18.0.0
+module unload intel && module load intel/18.0.1
 
-export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2017.0.098
+export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2018.1.163
 #export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.3.3002 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.8.3
 #export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.4.3082 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.9.2
 

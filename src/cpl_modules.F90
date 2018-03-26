@@ -14,7 +14,7 @@ module cpl_config
   namelist /cpl_params/ CplLonMin,CplLonMax,CplLatMin,CplLatMax,CplIDim,CplJDim
 
   real(kind=8), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
- !real(kind=8)                                  :: time_send(2), time_recv(2)
+  real(kind=8)                                  :: time_send(2), time_recv(2)
   integer                                       :: o2a_call_count=0 
   real(kind=8), allocatable, dimension(:,:)     :: cplsnd
 end module cpl_config

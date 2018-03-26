@@ -28,8 +28,13 @@ IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
 
-call MPI_INIT(i)
-!cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+#ifndef __oifs
+  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+	!OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
+        call MPI_INIT(i) 
+#endif
+
+
 #if defined (__oasis)
         call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
@@ -44,7 +49,7 @@ call MPI_INIT(i)
 	call clock_init           ! read the clock file 
 	call get_run_steps(nsteps)
 	call mesh_setup
-	if (mype==0) write(*,*) 'mesh_setup... complete'
+	if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
 	
 	!=====================
 	! Allocate field variables 
@@ -53,13 +58,18 @@ call MPI_INIT(i)
 	!=====================
 	call check_mesh_consistency
 	call ocean_setup
-	if (mype==0) write(*,*) 'ocean_setup... complete'
+	if (mype==0) write(*,*) 'FESOM ocean_setup... complete'
 	call forcing_setup
 	if (use_ice) then 
 		call ice_setup
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
 	endif
+#if defined (__oasis)
+	call cpl_oasis3mct_define_unstr
+#endif
+	if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+
 	call clock_newyear                    	! check if it is a new year
 	!___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
 	! The interface to the restart module is made via call restart !
@@ -82,9 +92,9 @@ call MPI_INIT(i)
 	!=====================
 	! Time stepping
 	!=====================
-	if (mype==0) write(*,*) 'start interation before the barrier...'
+	if (mype==0) write(*,*) 'FESOM start interation before the barrier...'
 		call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
-	if (mype==0) write(*,*) 'start interation after the barrier...'
+	if (mype==0) write(*,*) 'FESOM start interation after the barrier...'
 	
 	
 	!___MODEL TIME STEPPING LOOP________________________________________________
@@ -92,12 +102,14 @@ call MPI_INIT(i)
 		
 		mstep = n
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-			write(*,*) '======================================================='
-! 			write(*,*) 'step:',n,' day:', n*dt/24./3600.,
-			write(*,*) 'step:',n,' day:', daynew,' year:',yearnew 
+			write(*,*) 'FESOM ======================================================='
+! 			write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
+			write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
 			write(*,*)
 		end if
-		
+#if defined (__oifs)
+        	seconds_til_now=INT(dt)*(n-1)
+#endif
 		call clock
 		call forcing_index
 		call compute_vel_nodes 
@@ -107,7 +119,6 @@ call MPI_INIT(i)
 		!___model sea-ice step__________________________________________________
 		if(use_ice) then
 			call ocean2ice
-			
 			call update_atm_forcing(n)
 			
 			if (ice_steps_since_upd>=ice_ave_steps-1) then
@@ -134,7 +145,7 @@ call MPI_INIT(i)
 	end do
 	
 	!___FINISH MODEL RUN________________________________________________________
-	if (mype==0) write(*,*) 'Run is finished, updating clock'
+	if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
   	call clock_finish  
 	call par_ex
 end program main

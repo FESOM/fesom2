@@ -89,8 +89,8 @@ subroutine par_init    ! initializes MPI
   call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
   MPI_COMM_FESOM=MPI_COMM_WORLD
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes, i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype, i)
+  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
 #endif  
 
   if(mype==0) then
