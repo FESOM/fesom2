@@ -126,15 +126,14 @@ subroutine thermodynamics
      call ice_growth
 #if defined (__oifs)
      call ice_albedo(hsn,t,alb)
+     ice_alb(inod)	 = alb
+     ice_temp(inod)      = t+tmelt
 #endif
 
 
      a_ice(inod)         = A
      m_ice(inod)         = h
      m_snow(inod)        = hsn
-     ice_alb(inod)	 = alb
-     ice_temp(inod)      = t+tmelt
-
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
 #ifdef use_fullfreesurf

@@ -100,9 +100,11 @@ endif
 #if defined (__oasis)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
+#if defined (__oifs)
   allocate(ice_alb(n_size), ice_temp(n_size))
   ice_alb=0.
   ice_temp=0.
+#endif /* (__oifs) */
   oce_heat_flux=0.
   ice_heat_flux=0.
   tmp_oce_heat_flux=0.

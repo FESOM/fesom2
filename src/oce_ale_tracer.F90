@@ -71,7 +71,7 @@ subroutine adv_tracers_ale(tr_num)
 	select case (tracer_adv)
 		case(1) !MUSCL
                        ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.75)
+                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.5)
                       call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
 
 		case(2) !MUSCL+FCT(3D)

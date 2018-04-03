@@ -120,7 +120,6 @@ subroutine update_atm_forcing(istep)
   use g_comm_auto
   use g_read_CORE_NetCDF
 #if defined (__oasis)
-  use cpl_config
   use cpl_driver
   use g_rotate_grid
 #endif
@@ -177,10 +176,12 @@ subroutine update_atm_forcing(istep)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
+#if defined (__oifs)
             elseif (i.eq.5) then
             exchange(:) = ice_temp(:)                               ! ice temperature
             elseif (i.eq.6) then
             exchange(:) = ice_alb(:)                                ! ice albedo
+#endif
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
          endif
@@ -200,6 +201,7 @@ subroutine update_atm_forcing(istep)
 	 if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action)
          if (i.eq.1) then
      	     if (.not. action) cycle
+             stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
 	     do_rotate_oce_wind=.true.
          elseif (i.eq.2) then
      	     if (.not. action) cycle
@@ -983,8 +985,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
 				flux_correction_total
   use g_parsup,	         only : myDim_nod2D, eDim_nod2D, mype
   use o_mesh,		 only :	geo_coord_nod2D
-  use cpl_driver,	 only : nrecv, cpl_recv
-  use cpl_config, only : a2o_fcorr_stat   
+  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
   use o_PARAM,           only : mstep
   IMPLICIT NONE
   

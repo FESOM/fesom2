@@ -72,6 +72,10 @@ module cpl_driver
 
   integer, dimension(1,3)    :: iextent    
   integer, dimension(1,3)    :: ioffset   
+
+ !
+  real(kind=8), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
+
   !
   ! Routine accessibility
   !
@@ -86,6 +90,7 @@ module cpl_driver
   public send_id, recv_id
   public nsend, nrecv, cpl_send, cpl_recv
   public source_root, target_root, commRank
+  public a2o_fcorr_stat
 
 contains
 
