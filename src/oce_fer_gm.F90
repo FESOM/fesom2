@@ -74,7 +74,7 @@ subroutine fer_solve_Gamma
              !scaling(1:MLD1_ind(n)+1)=0.0_WP
              DO nz=1, nzmax
 !               if (bvfreq(nz, n) < 1.e-5)         scaling(nz)=0.0_WP
-                if (neutral_slope(3,nz,n) > 5.e-3) scaling(nz)=0.0_WP
+                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3) scaling(nz)=0.0_WP
              END DO
           end if
 
