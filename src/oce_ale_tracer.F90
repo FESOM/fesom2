@@ -71,7 +71,7 @@ subroutine adv_tracers_ale(tr_num)
 	select case (tracer_adv)
 		case(1) !MUSCL
                        ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), 0.5)
+                      call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .5)
                       call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
 
 		case(2) !MUSCL+FCT(3D)
@@ -259,7 +259,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! combined with centered
 			! num_ord is the fraction of fourth-order contribution in the HO solution
 			! (1-num_ord) is done with 3rd order upwind
-			c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+			c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
 			!                                            |____________|
 			!                                                  v
 			!                                           dont use fourth order solution
@@ -307,7 +307,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
 				!                                            |____________|
 				!                                                  v
 				!                                           dont use fourth order solution
@@ -348,7 +348,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				! combined with centered
 				! num_ord is the fraction of fourth-order contribution in the HO solution
 				! (1-num_ord) is done with 3rd order upwind
-				c1=-0.5_WP*((1.0_WP-num_ord*minval(c_lo))*c1+vflux*num_ord*minval(c_lo)*(Tmean1+Tmean2))
+				c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
 				!                                            |____________|
 				!                                                  v
 				!                                           dont use fourth order solution
