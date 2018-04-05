@@ -341,9 +341,9 @@ subroutine update_thickness_ale
 			elnodes=elem2D_nodes(:, elem)
 			!___________________________________________________________________
 			! actualize elemental layer thinkness in first lzstar_lev layers
-			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)==.True.      &
+			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP)     .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP) .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)      &
 				) then
 				! --> case local zstar
 				! try to limitate over how much layers i realy need to distribute
@@ -368,7 +368,7 @@ subroutine update_thickness_ale
 		do n=1,myDim_nod2D+eDim_nod2D
 			!___________________________________________________________________
 			! actualize layer thinkness in first lzstar_lev layers
-			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)==.True.) ) then
+			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)) ) then
 				! --> case local zstar 
 				! try to limitate over how much layers i realy need to distribute
 				! the change in ssh, so that the next loops run only over the 
@@ -455,7 +455,7 @@ subroutine restart_thickness_ale
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
 		do n=1,myDim_nod2D+eDim_nod2D
 			if (any(hnode(2:lzstar_lev,n) /=  &
-					(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. ) then
+					(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) ) then
 				! --> case local zstar 
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
@@ -481,9 +481,9 @@ subroutine restart_thickness_ale
 		do elem=1,myDim_elem2D
 			elnodes=elem2D_nodes(:,elem)
 			!___________________________________________________________________
-			if (any(hnode(2:lzstar_lev,elnodes(1))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. .or. &
-				any(hnode(2:lzstar_lev,elnodes(2))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. .or. &
-				any(hnode(2:lzstar_lev,elnodes(3))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True.      &
+			if (any(hnode(2:lzstar_lev,elnodes(1))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))     .or. &
+				any(hnode(2:lzstar_lev,elnodes(2))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) .or. &
+				any(hnode(2:lzstar_lev,elnodes(3))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))      &
 				) then
 				! --> case local zstar 
 				! try to limitate over how much layers i realy need to distribute
@@ -1324,7 +1324,7 @@ subroutine vert_vel_ale
 			! to first "refill" the subsurface layerthickness and with the rest 
 			! than the surface layerthickness
 			elseif (dhbar_total>0.0_WP .and. & 
-					any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. &
+					any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) &
 					) then
 				! --> do return to zlevel
 				!_______________________________________________________________

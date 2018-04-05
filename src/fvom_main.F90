@@ -85,7 +85,7 @@ integer :: n, nsteps, offset, row, i
 
 	!___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
 	!___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
-	if (r_restart==.true. .and. use_ALE==.true.) then
+	if (r_restart .and. use_ALE) then
 		call restart_thickness_ale
 	end if
 	
