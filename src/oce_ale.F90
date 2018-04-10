@@ -1474,7 +1474,7 @@ subroutine vert_vel_ale
           do nz=1,nlevels_nod2D(n)-1
              if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
                 write(*,*) '***********************************************************'
-                write(*,*) 'max. CFL_z = ', cflmax, ' mstep = ', mstep
+                write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
 	            write(*,*) 'mstep      = ', mstep
                 write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
                 write(*,*) '2D node    = ', myList_nod2D(n)
