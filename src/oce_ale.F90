@@ -1115,7 +1115,7 @@ subroutine vert_vel_ale
 	implicit none
 	
 	integer       :: el(2), enodes(2), n, nz, ed
-	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt 
+	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
 	integer 	  :: nzmax 
 	
 	!_______________________________
@@ -1468,9 +1468,22 @@ subroutine vert_vel_ale
 			CFL_z(nz,n)=max(c1, c2)
 		end do
 	end do
-	if (any(CFL_z>1.0_WP)) then
-		write(*,*) ' --> MAX CFL_z=',maxval(CFL_z),' , mstep=',mstep,' , mype=',mype
-	end if
+    cflmax=maxval(CFL_z(:, 1:myDim_nod2D)) !local CFL maximum is different on each mype
+    if (cflmax>1.0) then
+       do n=1, myDim_nod2D
+          do nz=1,nlevels_nod2D(n)-1
+             if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
+                write(*,*) '***********************************************************'
+                write(*,*) 'max. CFL_z = ', cflmax, ' mstep = ', mstep
+	            write(*,*) 'mstep      = ', mstep
+                write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
+                write(*,*) '2D node    = ', myList_nod2D(n)
+                write(*,*) 'nz         = ', nz
+                write(*,*) '***********************************************************'
+             end if
+           end do
+       end do
+    end if
 	
 	!___________________________________________________________________________
 	! Split implicit vertical velocity onto implicit and explicit components
