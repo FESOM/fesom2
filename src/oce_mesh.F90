@@ -275,6 +275,11 @@ IMPLICIT NONE
     read(fileID,*) nl  ! the number of levels 
  end if
  call MPI_BCast(nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+ if (nl < 3) then
+    write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
+    call par_ex
+    stop
+ end if
  allocate(zbar(nl))              ! allocate the array for storing the standard depths
  if (mype==0) read(fileID,*) zbar
  call MPI_BCast(zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -1159,7 +1164,7 @@ t0=MPI_Wtime()
  allocate(coriolis(myDim_elem2D))
  allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
- 
+ allocate(bc_index_nod2D(myDim_nod2D+eDim_nod2D))                     ! To implement boundary conditions to FESOM2 
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
  
@@ -1326,6 +1331,14 @@ END DO
     END DO
     deallocate(center_y, center_x)
 
+    ! boundary conditions
+    bc_index_nod2D=1
+    do n=1,myDim_edge2D
+       ed=edges(:,n) 
+       if (myList_edge2D(n)<=edge2D_in) cycle 
+          bc_index_nod2D(ed(1))=0
+          bc_index_nod2D(ed(2))=0
+    end do
 
 #if defined (__oasis)
   nn=0
