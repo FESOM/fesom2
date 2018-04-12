@@ -1164,7 +1164,6 @@ t0=MPI_Wtime()
  allocate(coriolis(myDim_elem2D))
  allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
  allocate(geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
- allocate(bc_index_nod2D(myDim_nod2D+eDim_nod2D))                     ! To implement boundary conditions to FESOM2 
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
  
@@ -1330,15 +1329,6 @@ END DO
       gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
     END DO
     deallocate(center_y, center_x)
-
-    ! boundary conditions
-    bc_index_nod2D=1
-    do n=1,myDim_edge2D
-       ed=edges(:,n) 
-       if (myList_edge2D(n)<=edge2D_in) cycle 
-          bc_index_nod2D(ed(1))=0
-          bc_index_nod2D(ed(2))=0
-    end do
 
 #if defined (__oasis)
   nn=0
