@@ -40,7 +40,7 @@ subroutine diag_solver(mode)
   do n=1, myDim_nod2D
      is=ssh_stiff%rowptr_loc(n)
      ie=ssh_stiff%rowptr_loc(n+1)-1
-     rhs_diag(n)=sum(ssh_stiff%values_loc(is:ie)*d_eta(ssh_stiff%colind_loc(is:ie)))
+     rhs_diag(n)=sum(ssh_stiff%values(is:ie)*d_eta(ssh_stiff%colind_loc(is:ie)))
   end do
 end subroutine diag_solver
 ! ==============================================================
