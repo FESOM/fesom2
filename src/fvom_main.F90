@@ -64,6 +64,7 @@ integer :: n, nsteps, offset, row, i
 		call ice_setup
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
+                if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
 	endif
 #if defined (__oasis)
 	call cpl_oasis3mct_define_unstr
