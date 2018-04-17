@@ -158,6 +158,7 @@ real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec
 real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
                                               ! Coefficients to compute
 					      ! gradient of scalars on elements
+INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
 ! Vertical structure             
 integer                                    :: nl
 real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
