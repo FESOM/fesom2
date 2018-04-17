@@ -172,6 +172,7 @@ real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
      real(kind=8), allocatable, dimension(:)      :: values
      integer(KIND=4), allocatable,   dimension(:) :: colind
      integer(KIND=4), allocatable,   dimension(:) :: rowptr
+     integer(KIND=4), allocatable,   dimension(:) :: colind_loc
   end type sparse_matrix
 ! Elevation stiffness matrix
 type(sparse_matrix)                           :: ssh_stiff

@@ -21,6 +21,7 @@ use g_forcing_arrays
 use io_RESTART
 use io_MEANDATA
 use io_mesh_info
+use diagnostics
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -65,6 +66,7 @@ integer :: n, nsteps, offset, row, i
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
 	endif
+        call compute_diagnostics(0) ! allocate arrays for diagnostic
 #if defined (__oasis)
 	call cpl_oasis3mct_define_unstr
 	if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -139,7 +141,8 @@ integer :: n, nsteps, offset, row, i
 		
 
 		!___model ocean step____________________________________________________
-		call oce_timestep_ale(n)		
+		call oce_timestep_ale(n)
+                call compute_diagnostics(1)
 		!___prepare output______________________________________________________
 		call output (n)
 		call restart(n, .false., .false.)

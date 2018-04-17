@@ -24,6 +24,7 @@ subroutine ale_init
 	Implicit NONE
 	
 	integer             :: n, nzmax
+
 	
 	!___allocate________________________________________________________________
 	! hnode and hnode_new: layer thicknesses at nodes. 
@@ -627,9 +628,9 @@ subroutine stiff_mat_ale
 	! c)
 	! how many nonzero entries sparse matrix has
 	ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1								 
-	! allocate column and value array of sparse matrix, have length of nonzero 
+	! allocate column ancolindd value array of sparse matrix, have length of nonzero 
 	! entrie of sparse matrix 
-	allocate(ssh_stiff%colind(ssh_stiff%nza))
+	allocate(ssh_stiff%colind(ssh_stiff%nza), ssh_stiff%colind_loc(ssh_stiff%nza))
 	allocate(ssh_stiff%values(ssh_stiff%nza))
 	ssh_stiff%values=0.0_WP  
 	
@@ -644,7 +645,8 @@ subroutine stiff_mat_ale
 		! fill colind with local indices location from n_pos
 		ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
 	end do
-	
+        ssh_stiff%colind_loc=ssh_stiff%colind
+
 	!!! Thus far everything is in local numbering.	!!!
 	!!! We will update it later when the values are !!!
 	!!! filled in 									!!!
@@ -797,7 +799,7 @@ subroutine stiff_mat_ale
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
 		! convert global mesh node point numbering to global numbering of how the single 
 		! node points are contigous located on the CPUs
-		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
+		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))
 	end do	
 	
 	!___________________________________________________________________________
@@ -1753,7 +1755,6 @@ DO elem=1,myDim_elem2D
 		UV_rhs(1,nz,elem)=ur(nz)
 		UV_rhs(2,nz,elem)=vr(nz)
 	end do
-	
 end do   !!! cycle over elements
 end subroutine impl_vert_visc_ale
 !

@@ -9,6 +9,7 @@ module io_MEANDATA
   use g_forcing_arrays
   use i_ARRAYS
   use o_mixing_KPP_mod
+  use diagnostics
   implicit none
 #include "netcdf.inc"
   private
@@ -77,13 +78,14 @@ subroutine ini_mean_io
 !2D
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'd')
 !DS for frontier run
-  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
-  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
-  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'd')
-  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'd')
-  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
-  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
+!  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
+!  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
+!  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'd')
+!  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'd')
+!  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
+!  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
 !DS
+
   call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'd')
   call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'd')
   call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm')
@@ -124,6 +126,10 @@ subroutine ini_mean_io
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'fer_K', 'GM, stirring diffusivity',     'm2/s',        fer_k(1:myDim_nod2D),           1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
+  end if
+  if (ldiag_solver) then
+     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's')
+     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's')
   end if
 end subroutine ini_mean_io
 !
