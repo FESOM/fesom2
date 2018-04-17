@@ -65,6 +65,7 @@ integer :: n, nsteps, offset, row, i
 		call ice_setup
 		ice_steps_since_upd = ice_ave_steps-1
 		ice_update=.true.
+                if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
 	endif
         call compute_diagnostics(0) ! allocate arrays for diagnostic
 #if defined (__oasis)

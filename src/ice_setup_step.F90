@@ -47,7 +47,7 @@ integer   :: n_size, e_size, mn, k, n, n1, n2
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
-! Allocate memory for variables of ice model      
+! Allocate memory for variables of ice model
  allocate(u_ice(n_size), v_ice(n_size))
  if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
@@ -58,6 +58,14 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(t_skin(n_size))
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+ if (whichEVP > 0) then
+    allocate(u_ice_aux(n_size), v_ice_aux(n_size))
+    allocate(alpha_evp_array(myDim_elem2D))
+    allocate(beta_evp_array(n_size))
+ end if
+
+ alpha_evp_array=alpha_evp
+ beta_evp_array =alpha_evp  ! alpha=beta works most reliable
 
  m_ice_old=0.0_WP !PS
  a_ice_old=0.0_WP !PS
@@ -80,6 +88,8 @@ e_size=myDim_elem2D+eDim_elem2D
  sigma22=0.0_WP
  sigma12=0.0_WP
  t_skin=0.0_WP
+ u_ice_aux=0.0_WP
+ v_ice_aux=0.0_WP
 
 if (use_means) then
  m_ice_mean=0.0_WP
@@ -88,6 +98,7 @@ if (use_means) then
  U_ice_mean=0.0_WP
  V_ice_mean=0.0_WP
 endif
+
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
@@ -118,13 +129,25 @@ subroutine ice_timestep(step)
 !
 use o_param
 use g_parsup
-USE g_CONFIG
+use g_CONFIG
+use i_PARAM, only: whichEVP
 implicit none
 integer      :: step 
 REAL(kind=8) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
- call EVPdynamics
+SELECT CASE (whichEVP)
+   CASE (0)
+      call EVPdynamics
+   CASE (1)
+      call EVPdynamics_m
+   CASE (2)
+      call EVPdynamics_a
+   CASE DEFAULT
+      if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
+      call par_ex
+      stop
+END SELECT
  t1=MPI_Wtime()     
  ! ===== Advection part
  call ice_fct_solve
