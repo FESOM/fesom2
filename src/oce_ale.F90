@@ -585,7 +585,7 @@ subroutine stiff_mat_ale
 	!___________________________________________________________________________
 	! a)
 	ssh_stiff%dim=nod2D
-	allocate(ssh_stiff%rowptr(myDim_nod2D+1))
+	allocate(ssh_stiff%rowptr(myDim_nod2D+1), ssh_stiff%rowptr_loc(myDim_nod2D+1))
 	ssh_stiff%rowptr(1)=1               ! This has to be updated as
 										! contiguous numbering is required
 	
@@ -646,6 +646,7 @@ subroutine stiff_mat_ale
 		ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
 	end do
         ssh_stiff%colind_loc=ssh_stiff%colind
+        ssh_stiff%rowptr_loc=ssh_stiff%rowptr
 
 	!!! Thus far everything is in local numbering.	!!!
 	!!! We will update it later when the values are !!!

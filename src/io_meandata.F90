@@ -78,12 +78,12 @@ subroutine ini_mean_io
 !2D
   call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'd')
 !DS for frontier run
-!  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
-!  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
-!  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'd')
-!  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'd')
-!  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
-!  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
+  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
+  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
+  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'd')
+  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'd')
+  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
+  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
 !DS
 
   call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'd')
