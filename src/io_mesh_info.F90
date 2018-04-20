@@ -37,7 +37,7 @@ subroutine write_mesh_info
 implicit none
 
   integer                    :: status, ncid, j
-  integer                    :: nod_n_id, elem_n_id, edge_n_id
+  integer                    :: nod_n_id, elem_n_id, edge_n_id, nod_part_id, elem_part_id
   integer                    :: nl_id, nl1_id
   integer                    :: id_2, id_3, id_4, id_N
   integer                    :: i, k, N_max
@@ -82,7 +82,8 @@ implicit none
   call my_def_var(ncid, 'nlevels_nod2D',     NF_INT,    1, (/nod_n_id/),  nlevels_nod2D_id,     'number of levels below nodes'          )
   call my_def_var(ncid, 'nlevels',           NF_INT,    1, (/elem_n_id/), nlevels_id,           'number of levels below elements'       )
   call my_def_var(ncid, 'nod_in_elem2D_num', NF_INT,    1, (/nod_n_id/),  nod_in_elem2D_num_id, 'number of elements containing the node')
-
+  call my_def_var(ncid, 'nod_part',          NF_INT,    1, (/nod_n_id/),  nod_part_id,          'nodal partitioning at the cold start'  )
+  call my_def_var(ncid, 'elem_part',         NF_INT,    1, (/elem_n_id/), elem_part_id,         'element partitioning at the cold start')
   ! 2D
   call my_def_var(ncid, 'nod_area',        NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
   call my_def_var(ncid, 'elem',            NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
@@ -91,9 +92,8 @@ implicit none
   call my_def_var(ncid, 'edges',           NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges'                       )
   call my_def_var(ncid, 'edge_tri',        NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles'              )
   call my_def_var(ncid, 'edge_cross_dxdy', NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess'       )
-  call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id, 'x component of a gradient at nodes of an element')
-  call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id, 'y component of a gradient at nodes of an element')
-
+  call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element')
+  call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element')
   call my_nf_enddef(ncid)
 
   ! vercical levels/layers
@@ -159,6 +159,23 @@ implicit none
   END DO
   deallocate(lbuffer, ibuffer)
 
+  ! nodal partitioning
+  allocate(ibuffer(nod2D))
+  allocate(lbuffer(myDim_nod2D))  
+  lbuffer=mype
+  call gather_nod(lbuffer, ibuffer)
+  call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer)
+  deallocate(lbuffer, ibuffer)
+
+  ! element partitioning
+  allocate(ibuffer(elem2D))
+  allocate(lbuffer(myDim_elem2D))  
+  lbuffer=mype
+  call gather_elem(lbuffer, ibuffer)
+  call my_put_vara(ncid, elem_part_id, 1, elem2D, ibuffer)
+  deallocate(lbuffer, ibuffer)
+
+
   ! nodes (GEO coordinates)
   allocate(rbuffer(nod2D))
   do i=1, 2
@@ -219,7 +236,6 @@ implicit none
      call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
-
   call my_close(ncid)
 end subroutine write_mesh_info
 !
