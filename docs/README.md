@@ -4,26 +4,12 @@ FESOM2 tutorial
 Very fast version
 ----------------
 ```bash
-svn checkout --username yourusername https://swrepo1.awi.de/svn/awi-fvom/branches/fvom_ALE/ fesom2 
-
-cd fesom2/lib/metis-5.1.0
-make clean
-make
-
-cd ../parms/
-make cleanall
-make
-
-cd ../../src/
-make clean
-make
-
-cd ../
-mkdir results
-cd results
+git clone https://gitlab.dkrz.de/FESOM/fesom2.git fesom2 
+cd fesom2
+bash -l configure.sh
 ```
 
-creater file fesom.clock with the following content:
+creater file fesom.clock in the output directory with the following content:
 
 ```bash
   0 1  1948
@@ -38,7 +24,7 @@ sbatch job_ollie
 Longer version
 -------------
 
-First thing is to checkout FESOM 2 code from repository. Now it is located at AWI FORGE https://swrepo1.awi.de/, that is hosted by AWI. You have to register there and ask Dmitry Sidorenko to add you to the members of the project, that have access to the code.
+First thing is to checkout FESOM 2 code from repository. Now it is located at DKRZ gitlab (https://gitlab.dkrz.de/). You have to register there and ask Dmitry Sidorenko to add you to the members of the project, that have access to the code.
 
 The project with FESOM2 located here: 
 https://swrepo1.awi.de/scm/?group_id=61
