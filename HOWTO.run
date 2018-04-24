@@ -4,7 +4,7 @@
 cd $HOME
 
 1. get the code (DKRZ account aXXXXXX must be provided!):
-   git clone https://aXXXXXX@gitlab.dkrz.de/FESOM/fesom2.git fesom2.0_ALE
+   git clone https://aXXXXXX@gitlab.dkrz.de/FESOM/fesom2.git fesom2.0
 
 2.ollie: prepare the mesh:
    mkdir /work/ollie/$USER/mesh_F2GLO04
@@ -23,11 +23,16 @@ cd $HOME
        & run_config !from Vadym
 
 5. compile the code
-   cd lib/metis-5.1.0/; make clean;    make; cd ../../ # Metis 5 will be used to partition the mesh
+5.1 Simple way (use Cmake, Recomended):
+   cd fesom2.0
+   bash -l configure.sh
+5.2 Less simple way (use make, not recomended, you should have proper Makefile.in for your platform)
    cd lib/parms/;       make cleanall; make; cd ../../ # Solver for solving linear systems of equations
-   cd src/; make clean; make run_ini;  cd ../          # mesh partitioner
    cd src/; make clean; make run;      cd ../          # FESOM2.0
-
+5.3 Compile executable that is needed for mesh partitioning
+   cd lib/metis-5.1.0/; make clean;    make; cd ../../ # Metis 5 will be used to partition the mesh
+   cd src/; make clean; make run_ini;  cd ../          # mesh partitioner
+   
 6. run the model:
 cd bin/
 
