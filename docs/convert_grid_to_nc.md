@@ -18,38 +18,42 @@ Install the package:
 ```R
 R>install.packages("spheRlab_1.1.0.tar.gz",repos=NULL)
 ```
-Load library:
+If you don;t have netCDF library installed, you also have to do:
+
+```R
+R>install.packages("ncdf4")
+```
+
+Load libraries:
 ```R
 R>library(spheRlab)
+R>ibrary(ncdf4)
 ```
 You can get help (for any function) by typing, e.g.:
 ```R
 R>?sl.grid.writeCDO
 ```
+
 Define path to the mesh
 ```R
 R>meshpath="/work/ollie/dsidoren/input/fesom2.0/meshes/mesh_CORE2_final/"
 ```
 Read the grid in to R structure (the arguments `rot` etc. might be different for different meshes, but this is the standard):
+For rotated meshes:
 ```R
 R>grid = sl.grid.readFESOM(griddir=meshpath,rot=TRUE,rot.invert=TRUE,rot.abg=c(50,15,-90))
 ```
+For unrotated meshes:
+```R
+R>grid = sl.grid.readFESOM(griddir=meshpath,rot=FALSE,rot.invert=FALSE,rot.abg=c(0,0,0), threeD=FALSE)
+```
 Define path to the output file:
 ```R
-R>ofile = paste0(meshpath, "sl.grid.CDO")
+R>ofile = paste0(meshpath, "sl.grid.CDO", , sep = "")
 ```
-Write ascii mesh:
+Directrly write netCDF file with mesh description:
 ```R
-R>sl.grid.writeCDO(grid,ofile=ofile)
-```
-Convert ascii to NetCDF via system call:
-```R
-R>system(paste0("cdo -f nc const,0,",ofile," ",ofile,".nc"))
-```
-You could end here. However, `sl.grid.readFESOM` has generated other useful information on the grid that can be added to the NetCDF mesh file now as follows:
-```R
-R>install.packages("ncdf4") # only needed if not yet installed
-R>sl.grid.addinfo(grid,ncdf.file.in=paste0(ofile,".nc"))
+R>sl.grid.writeCDO(grid, ofile=ofile, netcdf=TRUE, depth=FALSE)
 ```
 
 Conservative remapping with cdo (interpolate topography to mesh)
