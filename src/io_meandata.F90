@@ -76,7 +76,7 @@ subroutine ini_mean_io
   call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y')
 
 !2D
-  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'd')
+  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         100, 's')
 !DS for frontier run
   call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
   call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
@@ -130,6 +130,9 @@ subroutine ini_mean_io
   if (ldiag_solver) then
      call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's')
      call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's')
+  end if
+  if (lcurt_stress_surf) then
+     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 's')
   end if
 end subroutine ini_mean_io
 !
