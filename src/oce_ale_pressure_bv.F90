@@ -201,8 +201,8 @@ subroutine pressure_force
 			!_______________________________________________________________________
 			! loop over depth levels at element elem
 			do nlz=1,nle
-				pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes))
-				pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes))
+				pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+				pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
 			end do 
 		end do
 	else 
