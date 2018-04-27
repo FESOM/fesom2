@@ -21,7 +21,7 @@ module diagnostics
   real(kind=8),  save, allocatable, target      :: curl_stress_surf(:)
 
   logical                                       :: ldiag_solver     =.false.
-  logical                                       :: lcurt_stress_surf=.true.
+  logical                                       :: lcurt_stress_surf=.false.
   contains
 
 ! ==============================================================
