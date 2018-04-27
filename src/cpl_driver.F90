@@ -138,12 +138,6 @@ contains
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
-    IF (ierror /= 0) THEN
-        CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
-    ENDIF
-
-
-
     CALL oasis_get_localcomm( localCommunicator, ierror )
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
@@ -221,7 +215,6 @@ contains
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=8),allocatable   :: unstr_area(:,:)
     real(kind=8)               :: this_x_coord     ! longitude coordinates
     real(kind=8)               :: this_y_coord     ! latitude coordinates
     !
@@ -232,10 +225,6 @@ contains
 
     real(kind=8), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=8), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
-
-    real(kind=8), allocatable :: all_x_corners(:, :, :)     ! longitude coordinates
-    real(kind=8), allocatable :: all_y_corners(:, :, :)     ! latitude  coordinates
-
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -315,13 +304,10 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_x_corners(number_of_all_points, 1, size(x_corners, 2)))
-      ALLOCATE(all_y_corners(number_of_all_points, 1, size(x_corners, 2)))
+
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
-      ALLOCATE(all_x_corners(1, 1, 1))
-      ALLOCATE(all_y_corners(1, 1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -350,14 +336,6 @@ contains
       print *, 'FESOM after Barrier'
     endif
 
-    do k=1, size(x_corners, 2)
-    CALL MPI_GATHERV(x_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_x_corners(:, 1, k),  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-    CALL MPI_GATHERV(y_corners(:, k), my_number_of_points, MPI_DOUBLE_PRECISION, all_y_corners(:, 1, k),  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-    end do
-
-
     if (mype .eq. localroot) then
       print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
@@ -369,13 +347,6 @@ contains
        print *, 'FESOM before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
-       print *, 'FESOM before write corners'
-          CALL oasis_write_corner(grid_name, number_of_all_points, 1, size(x_corners, 2),  all_x_corners, all_y_corners)
-       print *, 'FESOM before write area'
-	  ALLOCATE(unstr_area(number_of_all_points, 1))
-          unstr_area=1
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, unstr_area)
-	  DEALLOCATE(unstr_area)
        end if
       print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
@@ -384,7 +355,7 @@ contains
      
 
 
-    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, all_x_corners, all_y_corners) 
+    DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords) 
 !------------------------------------------------------------------
 ! 3rd Declare the transient variables
 !------------------------------------------------------------------
@@ -468,26 +439,18 @@ contains
        print *, 'FESOM after announcing revieved variables'
     endif
 
-! ---------------------------------------------------------------
-! ... Allocate memory for data exchange with OASIS3-MCT
-!     VarStrGlob* is used to keep data only on the exchange
-!     (structured) grid
-! ---------------------------------------------------------------
-    if (ierror > 0) then
-       call oasis_abort(comp_id, 'cpl_oasis3mct_define_unstr', 'Buffer allocation failed')
-       return
-    endif
-
-    if (mype .eq. 0) then 
-       print *, 'FESOM after allocating memory for data exchange with OASIS'
-    endif
-
 !------------------------------------------------------------------
 ! 4th End of definition phase
 !------------------------------------------------------------------
 
-      call oasis_enddef(ierror)
+   call oasis_enddef(ierror)
+   if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
 
+#ifndef __oifs
+   if (commRank) print *, 'FESOM: calling exchange_roots'
+   call exchange_roots(source_root, target_root, 1, MPI_COMM_FESOM, MPI_COMM_WORLD)
+   if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
+#endif
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 

@@ -1137,6 +1137,7 @@ SUBROUTINE mesh_auxiliary_arrays
 
 USE o_MESH
 USE o_PARAM
+USE i_PARAM
 USE g_PARSUP
 USE o_ARRAYS
 USE g_ROTATE_grid
@@ -1329,6 +1330,17 @@ END DO
       gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
     END DO
     deallocate(center_y, center_x)
+
+    !array of 2D boundary conditions is used in ice_maEVP
+    if (whichEVP > 0) then
+       allocate(bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+       bc_index_nod2D=1._WP
+       do n=1, myDim_edge2D
+          ed=edges(:, n)
+          if (myList_edge2D(n)<=edge2D_in) cycle
+          bc_index_nod2D(ed)=0.
+       end do
+    end if
 
 #if defined (__oasis)
   nn=0

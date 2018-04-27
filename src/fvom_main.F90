@@ -111,7 +111,7 @@ integer :: n, nsteps, offset, row, i
 			write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
 			write(*,*)
 		end if
-#if defined (__oifs)
+#if defined (__oifs) || defined (__oasis)
         	seconds_til_now=INT(dt)*(n-1)
 #endif
 		call clock

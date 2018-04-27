@@ -14,8 +14,10 @@ implicit none
   call forcing_index
   if (use_ice) then
      call forcing_array_setup
+#ifndef __oasis
      call init_forcing_interp      ! calculates the forcing interpolation weights
      call init_atm_forcing         ! initialize forcing fields
+#endif
   endif 
 end subroutine forcing_setup
 ! ==========================================================
