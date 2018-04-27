@@ -433,7 +433,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 		! calc tracer for surface+2 until depth-2 layer with Piecewise Parabolic 
 		! Method (PPM)
 		! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
- 		do nz=2,nzmax-3
+ 		do nz=3,nzmax-3
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
@@ -443,11 +443,12 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
 			! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
 			! --> full equation (1.6), (1.7) and (1.8)
-			dzjm1    = hnode(nz-1,n)
-			dzj      = hnode(nz,n)
-			dzjp1    = hnode(nz+1,n)
-			dzjp2    = hnode(nz+2,n)
-			
+			dzjm1    = hnode_new(nz-2,n)
+			dzj      = hnode_new(nz-1,n)
+			dzjp1    = hnode_new(nz,n)
+			dzjp2    = hnode_new(nz+1,n)
+			! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
+		
 			!___________________________________________________________________
 			! equation (1.7)
 			! --> Here deltaj is the average slope in the jth zone of the parabola 
@@ -574,7 +575,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			
 			!___________________________________________________________________
 			! --> equation (1.12)
-			dzj   = hnode(nz,n)
+			dzj   = hnode_new(nz,n)
 			a6j   = 6.0_WP*(ttf(nz  , n)-0.5_WP*(aLj  +aRj  ))
 			
 			! if positive velocity --> upwind --> need interpolant from right side
@@ -627,7 +628,7 @@ subroutine adv_tracers_vert_upw(ttf)
 		nl1=nlevels_nod2D(n)-1
 		!_______________________________________________________________________
 		! Surface flux
-		tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)		
+		tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)
 		!_______________________________________________________________________
 		! Zero bottom flux
 		tvert(nl1+1)=0.0_WP
@@ -892,7 +893,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
 		zbar_n=0.0_WP
 		Z_n=0.0_WP
-		zbar_n(nzmax)=zbar(nzmax)
+! 		zbar_n(nzmax)=zbar(nzmax)
+		zbar_n(nzmax)=zbar_n_bot(n)
 		Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
 		do nz=nzmax-1,2,-1
 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
@@ -919,11 +921,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		
 		! update from the vertical advection --> comes from splitting of vert 
 		! velocity into explicite and implicite contribution
-                if (tracer_adv/=2) then
-                   v_adv=zinv*area(2,n)/area(1,n)
-                   b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
-                   c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
-                end if		
+		if (tracer_adv/=2) then
+			v_adv=zinv*area(2,n)/area(1,n)
+			b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
+			c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
+		end if		
 		! backup zinv2 for next depth level
 		zinv1=zinv2
 		
@@ -949,14 +951,14 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			zinv1=zinv2
 			
 			! update from the vertical advection
-                        if (tracer_adv/=2) then
-                           v_adv=zinv
-                           a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
-                           b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-                           v_adv=v_adv*area(nz+1,n)/area(nz,n)
-                           b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
-                           c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
-                        end if
+			if (tracer_adv/=2) then
+				v_adv=zinv
+				a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
+				b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+				v_adv=v_adv*area(nz+1,n)/area(nz,n)
+				b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+				c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+			end if
 		end do ! --> do nz=2, nzmax-2
 		
 		!_______________________________________________________________________
@@ -975,11 +977,11 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		b(nz)=-a(nz)+hnode_new(nz,n)
 		
 		! update from the vertical advection
-                if (tracer_adv/=2) then
-                   v_adv=zinv
-                   a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
-                   b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-                end if
+		if (tracer_adv/=2) then
+			v_adv=zinv
+			a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
+			b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
+		end if
 		
 		!_______________________________________________________________________
 		! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...tr_arr
@@ -995,8 +997,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
 		tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 		!tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
-
-
+		
+		
 		! *******************************************************************
 		! nonlocal transport to the rhs (only T and S currently) _GO_
 		! *******************************************************************
@@ -1007,25 +1009,24 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			rsss=ref_sss
 	        	if (ref_sss_local) rsss=tr_arr(1,n,2)
 		end if
-
-
+		
 		do nz=2,nzmax-2
 			dz=hnode_new(nz,n)
 			tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
 			!tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
 			!       -c(nz)*tr_arr(nz+1,n,tr_num) &
 			!       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
-
+			
 			! *******************************************************************
 			! nonlocal transport to the rhs (only T and S currently) _GO_
 			! *******************************************************************
-
-               		if (trim(mix_scheme)=='KPP') then
-               			if (tr_num==1) then ! T
-                  			tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
-      				elseif (tr_num==2) then ! S
-         				tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
-      				end if
+			
+			if (trim(mix_scheme)=='KPP') then
+				if (tr_num==1) then ! T
+					tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+				elseif (tr_num==2) then ! S
+					tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+				end if
 			end if 
 		end do
 		nz=nzmax-1
@@ -1065,9 +1066,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 								)
 			
 		elseif (tr_num==2) then
-                ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
-                !     by forming/melting of sea ice
-
+			! --> real_salt_flux(:): salt flux due to containment/releasing of salt
+			!     by forming/melting of sea ice
 			tr(1)= tr(1)  +  zinv*( &
 									virtual_salt(n) & !--> is zeros for zlevel/zstar
 									+ relax_salt(n) &
@@ -1165,15 +1165,18 @@ subroutine diff_ver_part_redi_expl
 		nl1=nlevels_nod2D(n)-1
 		vd_flux=0d0
 		
+		!_______________________________________________________________________
 		zbar_n=0.0_WP
 		Z_n   =0.0_WP
-		zbar_n(nl1+1)=zbar(nl1+1)
-		Z_n(nl1-1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
+! 		zbar_n(nl1+1)=zbar(nl1+1)
+		zbar_n(nl1+1)=zbar_n_bot(n)
+		Z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
 		do nz=nl1, 2, -1
 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
 			Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
 		end do
 		zbar_n(1) = zbar_n(2) + hnode_new(1,n)
+		!_______________________________________________________________________
 		
 		do nz=2,nl1
 			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &

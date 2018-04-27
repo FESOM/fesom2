@@ -287,6 +287,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: helem
 
 ! --> thinkness of bottom elem (important for partial cells)
 real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness 
+real(kind=WP), allocatable,dimension(:)     :: bottom_node_thickness 
 
 ! --> The increment of total fluid depth on elements. It is used to update the matrix
 real(kind=WP), allocatable,dimension(:)     :: dhe
@@ -301,10 +302,20 @@ real(kind=WP), allocatable,dimension(:)     :: ssh_rhs_old !, ssh_rhs_old2 !PS
 !     layer thinkness at every node
 real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 
+! new bottom depth at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
+
 ! --> multiplication factor for surface boundary condition in 
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
 real(kind=WP)                               :: is_nonlinfs
+
+!_______________________________________________________________________________
+! Arrays added for pressure force calculation
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+
 
 !_______________________________________________________________________________
 !Monin-Obukhov correction

@@ -743,8 +743,8 @@ subroutine fct_LO_impl_ale
 	use g_PARSUP
 	use g_CONFIG
 	use g_forcing_arrays
-        use o_mixing_KPP_mod !for ghats _GO_		
-		
+	use o_mixing_KPP_mod !for ghats _GO_		
+	
 	implicit none
 	
 	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
@@ -778,7 +778,7 @@ subroutine fct_LO_impl_ale
 		! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
 		zbar_n=0.0_WP
 		Z_n=0.0_WP
-		zbar_n(nzmax)=zbar(nzmax)
+		zbar_n(nzmax)=zbar_n_bot(n)
 		Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
 		do nz=nzmax-1,2,-1
 			zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
@@ -792,7 +792,7 @@ subroutine fct_LO_impl_ale
 		
 		! 1/dz(nz)
 		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
-
+		
 		a(1)=0.0_WP
 		v_adv=zinv*area(2,n)/area(1,n)
 		b(1)= hnode_new(1,n)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv

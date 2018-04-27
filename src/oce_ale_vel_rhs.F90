@@ -56,11 +56,11 @@ do elem=1, myDim_elem2D
 	endif
 
 	DO nz=1,nlevels(elem)-1
-		pre = -(eta+hpressure(nz,elnodes)/density_0+p_ice)!+atmospheric pressure etc.
+		pre = -(eta+p_ice)!+atmospheric pressure etc.
 		Fx  = sum(gradient_sca(1:3,elem)*pre)
 		Fy  = sum(gradient_sca(4:6,elem)*pre)
-		UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + Fx*elem_area(elem) 
-		UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + Fy*elem_area(elem)
+		UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + (Fx-pgf_x(nz,elem))*elem_area(elem) 
+		UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + (Fy-pgf_y(nz,elem))*elem_area(elem)
 		UV_rhsAB(1,nz,elem) = UV(2,nz,elem)*ff! + mm*UV(1,nz,elem)*UV(2,nz,elem)
 		UV_rhsAB(2,nz,elem) =-UV(1,nz,elem)*ff! - mm*UV(1,nz,elem)*UV(2,nz,elem)
 	END DO

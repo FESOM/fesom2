@@ -276,6 +276,14 @@ end if
     Ssurf_t=0.0_WP
     tau_x_t=0.0_WP
     tau_y_t=0.0_WP
+    
+    ! init field for pressure force 
+    allocate(density_m_rho0(nl-1, node_size))
+    allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
+	density_m_rho0=0.0_WP
+	pgf_x = 0.0_WP
+	pgf_y = 0.0_WP
+	
 END SUBROUTINE array_setup
 !==========================================================================
 SUBROUTINE oce_initial_state

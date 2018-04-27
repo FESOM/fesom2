@@ -105,6 +105,10 @@ MODULE io_BLOWUP
 		call def_variable(bid, 'v_rhs'			, (/nl-1, elem2D/)	, 'meridional velocity', 'm/s', UV_rhs(2,:,:));
 		call def_variable(bid, 'urhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
 		call def_variable(bid, 'vrhs_AB'	, (/nl-1, elem2D/)	, 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+		call def_variable(bid, 'zbar_n_bot' , (/nod2D/)			, 'node bottom depth', 'm', zbar_n_bot);
+		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
+		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);
+		call def_variable(bid, 'bottom_elem_thickness' , (/elem2d/)		, 'elem bottom thickness', 'm', bottom_elem_thickness);
 		
 		do j=1,num_tracers
 			SELECT CASE (j) 
