@@ -1,9 +1,12 @@
 # Patrick Scholz, 23.01.2018
 import numpy as np
 import time
+import os
 from netCDF4 import Dataset
 from set_inputarray import *
-from sub_fesom_mesh import fesom_vector_rot
+from sub_fesom_mesh import *
+import matplotlib.pyplot as plt
+#from sub_fesom_mesh import fesom_vector_rot
 global inputarray
 	
 #+_____________________________________________________________________________+
@@ -871,7 +874,7 @@ def fesom_vinterp(data_in,mesh,levels):
 			
 	#___________________________________________________________________________
 	# do mean over averaged layers
-	data_out = data_out/aux_div
+	data_out[aux_div!=0] = data_out[aux_div!=0]/aux_div[aux_div!=0]
 	data_out[aux_div==0        ]=np.nan
 	data_out[np.isinf(data_out)]=np.nan
 	
@@ -1049,4 +1052,3 @@ def fesom_data_copy(data):
 	
 	#___________________________________________________________________________
 	return(copy)
-

@@ -66,8 +66,8 @@ class clim_data(object):
 			
 			#__________________________________________________________________#
 			# convert missing value to nan
-			valueT[valueT>=1e20]=np.nan
-			valueS[valueS>=1e20]=np.nan
+			valueT[valueT>=100]=np.nan
+			valueS[valueS>=100]=np.nan
 			
 			#__________________________________________________________________#
 			# shift coordinates from 0...360 --> -180...180
@@ -120,18 +120,21 @@ def clim_vinterp(data_in,levels):
 		data_out = data_out + auxval
 	
 	# calculate mean over depth levels
-	data_out = data_out/aux_div
+	idx = aux_div!=0.0
+	data_out[idx==True] = data_out[idx==True]/aux_div[idx==True]
+	data_out[idx==False] = np.nan
 	return(data_out)
 
 
 #___DO VERTICAL INTERPOLATE AVERAGE OVER CERTAIN LAYERS_________________________
 #
 #_______________________________________________________________________________
-def clim_plot_anom(clim):
+def clim_plot_anom(clim,figsize=[]):
 	from set_inputarray import inputarray
 	
+	if len(figsize)==0 : figsize=[14,10]
 	#___________________________________________________________________________
-	fig = plt.figure(figsize=(9.5, 6))
+	fig = plt.figure(figsize=figsize)
 	#fig.patch.set_alpha(0.0)
 	ax  = plt.gca()
 	resolution = 'c'
