@@ -27,11 +27,11 @@ MODULES = oce_modules.o \
           gen_modules_forcing.o \
           gen_halo_exchange.o \
           gen_support.o \
-          psolve.o \
           oce_ale_mixing_kpp.o \
+          gen_modules_diag.o \
+          psolve.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
-          gen_str2unstr.o \
 	  fort_part.o \
           gen_input.o \
           io_meandata.o \
@@ -54,11 +54,12 @@ OBJECTS=  fvom_main.o 		\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\
           oce_ale_tracer.o 	\
+          ice_evp.o             \
+          ice_maEVP.o 		\
           ice_setup_step.o 	\
-          ice_evp.o 		\
           ice_fct.o 		\
           ice_oce_coupling.o 	\
-          ice_thermodynamics.o 	\
+          ice_thermo_oce.o      \
           gen_model_setup.o 	\
           gen_forcing_init.o 	\
           gen_bulk_formulae.o 	\
@@ -73,7 +74,7 @@ OBJECTS=  fvom_main.o 		\
 #          oce_redi_gm.o \
 # Name of executables
 
-EXE     = fvom.x
+EXE     = fesom.x
 EXE_INI = fvom_ini.x
 
 # TARGETS
