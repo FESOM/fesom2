@@ -23,10 +23,10 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
         in_elemidx=[]
     else:    
         if len(in_elemidx)==0:
-            if which_moc=='amoc':
+            if which_moc=='amoc2':
                 box_moc = [-100.0,36.0,-30.0,79.0]
                 in_elemidx=calc_basindomain(mesh,box_moc)
-            if which_moc=='amoc2':
+            if which_moc=='amoc':
                 box_moc = [[-100.0,36.0,-30.0,79.0],[-180.0,180.0,65.0,90.0]]
                 in_elemidx=calc_basindomain(mesh,box_moc)    
             elif which_moc=='pmoc':
@@ -141,8 +141,8 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     
     #_________________________________________________________________________________________________
     # smooth bottom line a bit 
-    #filt=np.array([1,2,3,2,1])
-    filt=np.array([1,2,1])
+    filt=np.array([1,2,3,2,1])
+    #filt=np.array([1,2,1])
     filt=filt/np.sum(filt)
     aux = np.concatenate( (np.ones((filt.size,))*bottom[0],bottom,np.ones((filt.size,))*bottom[-1] ) )
     aux = np.convolve(aux,filt,mode='same')
@@ -166,7 +166,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
 #+____________________________________________________________________________________________________+
 def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[]):    
     
-    if len(figsize)==0: figsize=[14,6]
+    if len(figsize)==0: figsize=[13,6]
     fig= plt.figure(figsize=figsize)
     
     resolution = 'c'
@@ -235,7 +235,54 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     
     return(fig,ax1)
     
+
     
+#+___PLOT MERIDIONAL OVERTRUNING CIRCULATION TIME-SERIES______________________________________________+
+#|                                                                                                    |
+#+____________________________________________________________________________________________________+
+def plot_xmoc_tseries(time,moc_t,which_lat=['max'],which_moc='amoc',str_descript='',str_time='',figsize=[]):    
+    import matplotlib.patheffects as path_effects
+    from matplotlib.ticker import AutoMinorLocator
+
+    if len(figsize)==0: figsize=[13,4]
+    fig,ax= plt.figure(figsize=figsize),plt.gca()
+    
+    for ii in range(len(which_lat)):
+        if which_lat[ii]=='max':
+            str_label='max {:s}: 30°N<=lat<=45°N'.format(which_moc.upper(),which_lat[ii])
+        else:
+            str_label='max {:s} at: {:2.1f}°N'.format(which_moc.upper(),which_lat[ii])
+        hp=ax.plot(time,moc_t[:,ii],\
+                   linewidth=2,label=str_label,marker='o',markerfacecolor='w',\
+                   path_effects=[path_effects.SimpleLineShadow(offset=(1.5,-1.5),alpha=0.3),path_effects.Normal()])
+        # plot mean value with trinagle 
+        plt.plot(time[0]-(time[-1]-time[0])*0.015,moc_t[:,ii].mean(),\
+                 marker='<',markersize=8,markeredgecolor='k',markeredgewidth=0.5,\
+                 color=hp[0].get_color(),zorder=3,clip_box=False,clip_on=False)
+        
+        # plot std. range
+        plt.plot(time[0]-(time[-1]-time[0])*0.015,moc_t[:,ii].mean()+moc_t[:,ii].std(),\
+                 marker='^',markersize=6,markeredgecolor='k',markeredgewidth=0.5,\
+                 color=hp[0].get_color(),zorder=3,clip_box=False,clip_on=False)
+        
+        plt.plot(time[0]-(time[-1]-time[0])*0.015,moc_t[:,ii].mean()-moc_t[:,ii].std(),\
+                 marker='v',markersize=6,markeredgecolor='k',markeredgewidth=0.5,\
+                 color=hp[0].get_color(),zorder=3,clip_box=False,clip_on=False)
+        
+    ax.legend(loc='upper right', shadow=True,fancybox=True,frameon=True,mode='None')
+    ax.set_xlabel('Time [years]',fontsize=12)
+    ax.set_ylabel('{:s} in [Sv]'.format(which_moc.upper()),fontsize=12)
+    minor_locator = AutoMinorLocator(5)
+    ax.yaxis.set_minor_locator(AutoMinorLocator(4))
+    ax.xaxis.set_minor_locator(minor_locator)
+    plt.grid(which='major')
+    plt.xticks(np.arange(1940,2015,5))
+    plt.xlim(time[0]-(time[-1]-time[0])*0.015,time[-1]+(time[-1]-time[0])*0.015)    
+    plt.show(block=False)
+
+    return(fig,ax)
+
+
 #+___CALCULATE BASIN LIMITED DOMAIN___________________________________________________________________+
 #| to calculate the regional moc (amoc,pmoc,imoc) the domain needs be limited to corresponding basin.
 #| here the elemental index of the triangels in the closed basin is calcualted

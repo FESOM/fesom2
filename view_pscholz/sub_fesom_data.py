@@ -76,8 +76,8 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
 		print('     -----+-----------------------------------+------------')
 		print('     Year |               MON                 |')
 		print('     -----+-----------------------------------+------------')
-	print('     --> '+data.path)
-	print('     --> '+data.var)
+		print('     --> '+data.path)
+		print('     --> '+data.var)
 	#____START YEAR LOOP________________________________________________________
 	aux_datavar = data.var
 	for yi in range(0, nyi):
