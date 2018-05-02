@@ -231,9 +231,7 @@ subroutine EVPdynamics_m
          u_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsv-fc*rhsu)
      end do
-     
-     call exchange_nod(u_ice_aux)
-     call exchange_nod(v_ice_aux)
+     call exchange_nod(u_ice_aux, v_ice_aux)     
   end do
   
     do i=1, myDim_nod2D+eDim_nod2D   ! Added 28.10.14 for full compatibility with 
