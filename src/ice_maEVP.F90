@@ -23,13 +23,13 @@ subroutine stress_tensor_m
   
   val3=1.0_8/3.0_8
   vale=1.0_8/(ellipse**2)
-     det2=1.0_8/(1.0_8+alpha_evp)
-     det1=alpha_evp*det2
+  det2=1.0_8/(1.0_8+alpha_evp)
+  det1=alpha_evp*det2
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     !if(msum<=0.01) cycle
+     if(msum<=0.01) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -149,7 +149,7 @@ subroutine stress2rhs_m
 
   do elem=1,myDim_elem2d         
      elnodes=elem2D_nodes(:,elem)
-    ! if(sum(a_ice(elnodes))<0.01) cycle
+     if(sum(a_ice(elnodes)) < 0.01) cycle !DS
      
      vol=elem_area(elem)
      dx=gradient_sca(1:3,elem)
@@ -195,11 +195,9 @@ subroutine EVPdynamics_m
   use g_comm_auto
 
   implicit none
-  integer         :: steps, shortstep, i
+  integer         :: steps, shortstep, i, ed
   real(kind=8)    :: rdt, drag, det, fc
-  real(kind=8)    :: thickness, inv_thickness, umod, rhsu, rhsv
-  REAL(kind=8)    :: t0,t1, t2, t3, t4, t5, t00, txx
- 
+  real(kind=8)    :: inv_thickness, umod, rhsu, rhsv
 
   rdt=ice_dt/(1.0*evp_rheol_steps)
   steps=evp_rheol_steps
@@ -207,44 +205,51 @@ subroutine EVPdynamics_m
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
   call ssh2rhs
-  do shortstep=1, steps 
+  do shortstep=1, steps
      call stress_tensor_m
      call stress2rhs_m
-     do i=1,myDim_nod2D 
-         thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01)
-         thickness=max(thickness, 9.0)   ! Limit if it is too small (0.01 m)
-         inv_thickness=1.0_8/thickness
+     do i=1,myDim_nod2D
+        if (a_ice(i) >= 0.01) then                   ! Skip if ice is absent
 
-         umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-         drag=rdt*Cd_oce_ice*umod*density_0*inv_thickness
+        inv_thickness = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
+        inv_thickness = 1.0/max(inv_thickness, 9.0)  ! Limit the mass 
 
-         !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
-         rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
-         rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
+        umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
+        drag=rdt*Cd_oce_ice*umod*density_0*inv_thickness
 
-         rhsu=beta_evp*u_ice_aux(i)+rhsu
-	 rhsv=beta_evp*v_ice_aux(i)+rhsv
-         !solve (Coriolis and water stress are treated implicitly)
-         fc=rdt*coriolis_node(i)
-         det=(1.0_8+beta_evp+drag)**2+fc**2
-         det=bc_index_nod2D(i)/det
-         u_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsu+fc*rhsv)
-         v_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsv-fc*rhsu)
+        !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
+        rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
+        rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
+
+        rhsu=beta_evp*u_ice_aux(i)+rhsu
+	rhsv=beta_evp*v_ice_aux(i)+rhsv
+        !solve (Coriolis and water stress are treated implicitly)
+        fc=rdt*coriolis_node(i)
+        det=(1.0_8+beta_evp+drag)**2+fc**2
+        det=bc_index_nod2D(i)/det
+        u_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsu+fc*rhsv)
+        v_ice_aux(i)=det*((1.0+beta_evp+drag)*rhsv-fc*rhsu)
+        end if
      end do
-     call exchange_nod(u_ice_aux, v_ice_aux)     
+
+     do  ed=1, myDim_edge2D
+         ! boundary conditions
+         if (myList_edge2D(ed) > edge2D_in) then
+            u_ice_aux(edges(1:2,ed))=0.0_WP
+            v_ice_aux(edges(1:2,ed))=0.0_WP
+         endif
+     end do    
+     call exchange_nod(u_ice_aux, v_ice_aux)
   end do
-  
-    do i=1, myDim_nod2D+eDim_nod2D   ! Added 28.10.14 for full compatibility with 
-                                     ! the VP solver 
-    if(a_ice(i)<=0.01) then
-    u_ice_aux(i)=0.0
-    v_ice_aux(i)=0.0
-    end if
-    end do 
-    
-    u_ice=u_ice_aux
-    v_ice=v_ice_aux
- 
+
+  where (a_ice < 0.01) ! Added 28.10.14 for full compatibility with the VP solver 
+        u_ice_aux=0._WP
+        v_ice_aux=0._WP
+  end where
+
+  u_ice=u_ice_aux
+  v_ice=v_ice_aux
+
 end subroutine EVPdynamics_m
 !
 !
@@ -278,7 +283,7 @@ subroutine find_alpha_field_a
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     !if(msum<=0.01) cycle
+     if(msum<=0.01) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -341,7 +346,7 @@ subroutine stress_tensor_a
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     !if(msum<=0.01) cycle
+     if(msum<=0.01) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -408,7 +413,7 @@ use g_parsup
 use g_comm_auto
 
   implicit none
-  integer         :: steps, shortstep, i
+  integer         :: steps, shortstep, i, ed
   real(kind=8)    :: rdt, drag, det, fc
   real(kind=8)    :: thickness, inv_thickness, umod, rhsu, rhsv
   REAL(kind=8)    :: t0,t1, t2, t3, t4, t5, t00, txx
@@ -443,16 +448,21 @@ use g_comm_auto
          u_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
      end do
-     
-     call exchange_nod(u_ice_aux)
-     call exchange_nod(v_ice_aux)
+     do  ed=1, myDim_edge2D
+         ! boundary conditions
+         if (myList_edge2D(ed) > edge2D_in) then
+            u_ice_aux(edges(1:2,ed))=0.0_WP
+            v_ice_aux(edges(1:2,ed))=0.0_WP
+         endif
+     end do    
+     call exchange_nod(u_ice_aux, v_ice_aux)
   end do
   
     do i=1, myDim_nod2D+eDim_nod2D   ! Added 28.10.14 for full compatibility with 
                                      ! the VP solver 
-    if(a_ice(i)<=0.01) then
-    u_ice_aux(i)=0.0
-    v_ice_aux(i)=0.0
+    if (a_ice(i)<=0.01) then
+       u_ice_aux(i)=0.0
+       v_ice_aux(i)=0.0
     end if
     end do 
     
