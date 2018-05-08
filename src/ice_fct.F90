@@ -96,7 +96,6 @@ end subroutine ice_fct_init
 subroutine ice_fct_solve
   implicit none
   ! Driving routine
-  call ice_TG_rhs
   call ice_solve_high_order   ! uses arrays of low-order solutions as temp
                               ! storage. It should preceed the call of low
 			      ! order solution.  
@@ -484,5 +483,128 @@ SUBROUTINE ice_mass_matrix_fill
   deallocate(col_pos)
       
 END SUBROUTINE ice_mass_matrix_fill
+!
+!=========================================================
+!
+subroutine ice_TG_rhs_div
+  use o_MESH
+  use i_Arrays
+  use i_PARAM
+  use g_PARSUP
+  use o_PARAM
+  USE g_CONFIG
+  implicit none 
+   real(kind=8)     :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+   integer          :: n, q, row, elem, elnodes(3)
+   real(kind=8)     :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+ ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
+ ! correction for the advection operator)
+ ! In this version I tr to split divergent term off, so that FCT works without it.
 
-! ============================================================================ 
+  DO row=1, myDim_nod2D
+                  !! row=myList_nod2D(m)
+     rhs_m(row)=0.
+     rhs_a(row)=0.
+     rhs_ms(row)=0.
+     rhs_mdiv(row)=0.0
+     rhs_adiv(row)=0.0
+     rhs_msdiv(row)=0.0          
+  END DO
+  do elem=1,myDim_elem2D          !assembling rhs over elements
+                  !! elem=myList_elem2D(m)
+     elnodes=elem2D_nodes(:,elem)
+      !derivatives
+     dx=gradient_sca(1:3,elem)
+     dy=gradient_sca(4:6,elem)
+     vol=elem_area(elem)
+     um=sum(u_ice(elnodes))
+     vm=sum(v_ice(elnodes))
+      ! this is exact computation (no assumption of u=const on elements used 
+      ! in the standard version)
+     c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_8 
+     c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_8
+     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_8
+     c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
+       DO n=1,3
+        row=elnodes(n)
+	DO q = 1,3 
+	   entries(q)= vol*ice_dt*((1.0_8-0.5*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
+	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_8 - &
+                       0.5*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
+                       !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
+           entries2(q)=0.5*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
+	                        dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
+                                dy(q)*(vm+v_ice(row)))  
+        END DO
+        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_8
+	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_8
+	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_8
+        rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
+        rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
+        rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
+	rhs_mdiv(row)=rhs_mdiv(row)-cx1
+        rhs_adiv(row)=rhs_adiv(row)-cx2
+        rhs_msdiv(row)=rhs_msdiv(row)-cx3
+
+     END DO
+  end do   
+end subroutine ice_TG_rhs_div 
+!
+!=========================================================
+!
+subroutine ice_update_for_div
+  use o_MESH
+  use i_Arrays
+  use i_PARAM
+  use g_PARSUP
+  use o_PARAM
+  USE g_CONFIG
+  use g_comm_auto
+  implicit none
+  !
+  integer                                 :: n,i,clo,clo2,cn,location(100),row
+  real(kind=8)                            :: rhs_new
+  integer                                 :: num_iter_solve=3
+ 
+  ! Does Taylor-Galerkin solution
+  !
+  !the first approximation
+  do row=1,myDim_nod2D
+                 !! row=myList_nod2D(m)
+     dm_ice(row) =rhs_mdiv(row) /area(1,row)
+     da_ice(row) =rhs_adiv(row) /area(1,row)
+     dm_snow(row)=rhs_msdiv(row)/area(1,row)
+  end do
+     call exchange_nod(dm_ice)
+     call exchange_nod(da_ice)
+     call exchange_nod(dm_snow)
+  !iterate 
+  do n=1,num_iter_solve-1
+     do row=1,myDim_nod2D
+                  !! row=myList_nod2D(m)
+        clo=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
+        clo2=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+        cn=clo2-clo+1
+        location(1:cn)=nn_pos(1:cn, row)
+        rhs_new=rhs_mdiv(row) - sum(mass_matrix(clo:clo2)*dm_ice(location(1:cn)))
+        m_icel(row)=dm_ice(row)+rhs_new/area(1,row)
+        rhs_new=rhs_adiv(row) - sum(mass_matrix(clo:clo2)*da_ice(location(1:cn)))
+        a_icel(row)=da_ice(row)+rhs_new/area(1,row)
+        rhs_new=rhs_msdiv(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
+        m_snowl(row)=dm_snow(row)+rhs_new/area(1,row)
+   end do
+     do row=1,myDim_nod2D
+                  !! row=myList_nod2D(m)
+        dm_ice(row)=m_icel(row)
+        da_ice(row)=a_icel(row)
+	dm_snow(row)=m_snowl(row)
+     end do
+     call exchange_nod(dm_ice)
+     call exchange_nod(da_ice)
+     call exchange_nod(dm_snow)
+  end do
+  m_ice=m_ice+dm_ice
+  a_ice=a_ice+da_ice
+  m_snow=m_snow+dm_snow
+end subroutine ice_update_for_div
+! =============================================================
