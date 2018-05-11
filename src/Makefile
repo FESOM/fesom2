@@ -54,6 +54,7 @@ OBJECTS=  fvom_main.o 		\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\
           oce_ale_tracer.o 	\
+          ice_EVP.o             \
           ice_maEVP.o 		\
           ice_setup_step.o 	\
           ice_fct.o 		\
