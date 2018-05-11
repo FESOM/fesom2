@@ -198,7 +198,7 @@ subroutine EVPdynamics_m
   integer         :: steps, shortstep, i, ed
   real(kind=8)    :: rdt, drag, det, fc
   real(kind=8)    :: inv_thickness(myDim_nod2D), umod, rhsu, rhsv
-  logical         :: ice_el(myDim_elem2D)
+  logical         :: ice_el(myDim_elem2D), ice_nod(myDim_nod2D)
 
 !NR for stress_tensor_m
   integer        :: el, elnodes(3)
@@ -225,6 +225,7 @@ subroutine EVPdynamics_m
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
 
+
 !NR inlined, to have all initialization in one place.
 !  call ssh2rhs
   
@@ -249,6 +250,9 @@ subroutine EVPdynamics_m
 ! precompute thickness (the inverse is needed) and mass (scaled by area)
   do i=1,myDim_nod2D
      inv_thickness(i) = 0._8
+     mass(i) = 0._8
+     ice_nod(i) = .false.
+
      if (a_ice(i) >= 0.01_8) then
         inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
         inv_thickness(i) = 1.0_8/max(inv_thickness(i), 9.0_8)  ! Limit the mass
@@ -260,9 +264,18 @@ subroutine EVPdynamics_m
         rhs_a(i) = rhs_a(i)/area(1,i) 
         rhs_m(i) = rhs_m(i)/area(1,i) 
 
+        ice_nod(i) = .true.
      endif
   enddo
 
+! boundary nodes are skipped from computation
+  do  ed=1, Mydim_edge2D
+     ! boundary conditions
+     if (myList_edge2D(ed) > edge2D_in) then
+        if (edges(1,ed) <= myDim_nod2D) ice_nod(edges(1,ed)) =.false.
+        if (edges(2,ed) <= myDim_nod2D) ice_nod(edges(2,ed)) = .false.
+     endif
+  end do
 ! precompute pressure factor
   do el=1,myDim_elem2D
      elnodes=elem2D_nodes(:,el)
@@ -274,7 +287,7 @@ subroutine EVPdynamics_m
         ice_el(el) = .true.
         asum=sum(a_ice(elnodes))*val3     
      
-        pressure_fac(el) = pstar*msum*exp(-c_pressure*(1.0_8-asum))
+        pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_8-asum))
      endif
   end do
 
@@ -293,82 +306,71 @@ subroutine EVPdynamics_m
   !===================================================================
  
    do el=1,myDim_elem2D
-     elnodes=elem2D_nodes(:,el)
 
-     if(.not. ice_el(el)) cycle !DS
-
-!     if(sum(a_ice(elnodes)) < 0.01) cycle !DS
+     if(ice_el(el)) then
      
-     dx=gradient_sca(1:3,el)
-     dy=gradient_sca(4:6,el)     
-      ! METRICS:
-     meancos=metric_factor(el)
-      !  
-      ! ====== Deformation rate tensor on element elem:
-     eps11 = sum(dx*u_ice_aux(elnodes)) - val3*sum(v_ice_aux(elnodes))*meancos                !metrics
-     eps22 = sum(dy*v_ice_aux(elnodes))
-     eps12 = 0.5_8*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes)) &
-            +0.5_8*val3*sum(u_ice_aux(elnodes))*meancos          !metrics 
-     
-      ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
-     
-      ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_8*eps12**2)
-     delta=sqrt(delta)
-    
-     pressure = pressure_fac(el)/(delta+delta_min)
-    
-     r1 = pressure*(eps1-delta) 
-     r2 = pressure*eps2*vale
-     r3 = pressure*eps12*vale
-     si1=sigma11(el)+sigma22(el)
-     si2=sigma11(el)-sigma22(el)
+        elnodes=elem2D_nodes(:,el)
+        dx=gradient_sca(1:3,el)
+        dy=gradient_sca(4:6,el)     
+        ! METRICS:
+        meancos = val3*metric_factor(el)
+        !  
+        ! ====== Deformation rate tensor on element elem:
+        eps11 = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
+        eps22 = sum(dy(:)*v_ice_aux(elnodes))
+        eps12 = 0.5_8*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
+                         +sum(u_ice_aux(elnodes))*meancos )          !metrics 
+        
+        ! ======= Switch to eps1,eps2
+        eps1 = eps11 + eps22
+        eps2 = eps11 - eps22   
+        
+        ! ====== moduli:
+        delta = sqrt(eps1**2+vale*(eps2**2+4.0_8*eps12**2))
+        
+        pressure = pressure_fac(el)/(delta+delta_min)
+        
+!        si1 = det1*(sigma11(el)+sigma22(el)) + pressure*(eps1-delta) 
+!        si2 = det1*(sigma11(el)-sigma22(el)) + pressure*eps2*vale
+!        sigma11(el) = 0.5_8*(si1+si2)
+!        sigma22(el) = 0.5_8*(si1-si2)
+!NR directly insert si1, si2 cancels some operations and should increase accuracy
+        sigma12(el) = det1*sigma12(el) +       pressure*eps12*vale
+        sigma11(el) = det1*sigma11(el) + 0.5_8*pressure*(eps1 - delta + eps2*vale)
+        sigma22(el) = det1*sigma22(el) + 0.5_8*pressure*(eps1 - delta - eps2*vale)
 
-     si1 = det1*si1+det2*r1
-     si2 = det1*si2+det2*r2
-     sigma12(el) = det1*sigma12(el)+det2*r3
-     sigma11(el) = 0.5_8*(si1+si2)
-     sigma22(el) = 0.5_8*(si1-si2)
-!  end do   ! fuse loops
- ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
- ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
- ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
- ! and similarly for si2 and sigma12
+        !  end do   ! fuse loops
+        ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
+        ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
+        ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
+        ! and similarly for si2 and sigma12
 
-!NR inlining  call stress2rhs_m
-  ! add internal stress to the rhs
-  ! SD, 30.07.2014
+        !NR inlining  call stress2rhs_m
+        ! add internal stress to the rhs
+        ! SD, 30.07.2014
   !-----------------------------------------------------------------  
-
-!  do el=1,myDim_elem2d         
-!     elnodes=elem2D_nodes(:,el)
-     
-     vol=elem_area(el)
-
-     do k=1,3
-        row=elnodes(k)
-        u_rhs_ice(row)=u_rhs_ice(row) - vol* &
-             (sigma11(el)*dx(k)+sigma12(el)*dy(k))    &
-             -vol*sigma12(el)*val3*meancos                         !metrics
-
-        v_rhs_ice(row)=v_rhs_ice(row) - vol* &
-             (sigma12(el)*dx(k)+sigma22(el)*dy(k))    &
-             +vol*sigma11(el)*val3*meancos                         ! metrics
+      do k=1,3
+        u_rhs_ice(elnodes(k)) = u_rhs_ice(elnodes(k)) - elem_area(el)* &
+             (sigma11(el)*dx(k)+sigma12(el)*(dy(k) + meancos))                         !metrics 
+        v_rhs_ice(elnodes(k)) = v_rhs_ice(elnodes(k)) - elem_area(el)* &
+             (sigma12(el)*dx(k)+sigma22(el)*dy(k) - sigma11(el)*meancos)               ! metrics                                              
      end do
+
+
+     end if
   end do
   
   do i=1, myDim_nod2d 
-     if (a_ice(i) >= 0.01) then                   ! Skip if ice is absent              
+     if (ice_nod(i)) then                   ! Skip if ice is absent              
 
         u_rhs_ice(i) = u_rhs_ice(i)*mass(i) + rhs_a(i)
         v_rhs_ice(i) = v_rhs_ice(i)*mass(i) + rhs_m(i)
-!  end do   !NR fuse loops
+
+ ! end do   !NR fuse loops
  !============= stress2rhs_m ends ======================
 
-!     do i=1,myDim_nod2D
-
+ !    do i=1,myDim_nod2D
+ 
         umod = sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
         drag = rdt*Cd_oce_ice*umod*density_0*inv_thickness(i)
 
@@ -384,13 +386,15 @@ subroutine EVPdynamics_m
         end if
      end do
 
-     do  ed=1, myDim_edge2D
-         ! boundary conditions
-         if (myList_edge2D(ed) > edge2D_in) then
-            u_ice_aux(edges(1:2,ed))=0.0_WP
-            v_ice_aux(edges(1:2,ed))=0.0_WP
-         endif
-     end do    
+     !NR Boundary nodes are handled with ice_nod(i)
+     ! do  ed=1, Mydim_edge2D
+     !     ! boundary conditions
+     !     if (myList_edge2D(ed) > edge2D_in) then
+     !        u_ice_aux(edges(1:2,ed))=0.0_WP
+     !        v_ice_aux(edges(1:2,ed))=0.0_WP
+     !     endif
+     ! end do    
+
      call exchange_nod_begin(u_ice_aux, v_ice_aux)
 
      do row=1, myDim_nod2d 
