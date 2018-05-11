@@ -1106,7 +1106,6 @@ SUBROUTINE compute_residual(field2d, mask, n)
   
   real(kind=8)               :: flux_global(2), flux_local(2)
   real(kind=8)               :: eff_vol(2)
-  write(*,*) 'c1'
   !compute net flux (for flux n) on ocean side
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
   oce_net_fluxes_north(n)=flux_global(1)
@@ -1116,7 +1115,6 @@ SUBROUTINE compute_residual(field2d, mask, n)
   flux_correction_north(n)= atm_net_fluxes_north(n) - oce_net_fluxes_north(n)
   flux_correction_south(n)= atm_net_fluxes_south(n) - oce_net_fluxes_south(n)
   flux_correction_total(n)= flux_correction_north(n) + flux_correction_south(n)
-  write(*,*) 'c2'
 END SUBROUTINE compute_residual
 
 !

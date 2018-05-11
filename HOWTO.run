@@ -34,10 +34,12 @@ cd $HOME
    cd src/; make clean; make run_ini;  cd ../          # mesh partitioner
    
 6. run the model:
-cd bin/
+cd work/
 
 edit:
       job_ini_ollie # to run the mesh partitioning
       job_ollie     # to run FESOM2.0 model
 
 and run!
+      sbatch job_ini_ollie # for partitioning
+      sbatch job_ollie # for model run

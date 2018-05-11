@@ -19,7 +19,7 @@ program MAIN
   implicit none
   character(len=1000)   :: nmlfile  !> name of configuration namelist file
   
-  nmlfile ='../config/namelist.config'
+  nmlfile ='namelist.config'
   open (20,file=nmlfile)
   read (20,NML=paths)         ! We need MeshPath
   read (20,NML=geometry)      ! We need cyclic_length and cartesian

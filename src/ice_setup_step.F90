@@ -63,6 +63,8 @@ e_size=myDim_elem2D+eDim_elem2D
     allocate(alpha_evp_array(myDim_elem2D))
     allocate(beta_evp_array(n_size))
  end if
+ 
+ allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
 
  alpha_evp_array=alpha_evp
  beta_evp_array =alpha_evp  ! alpha=beta works most reliable
@@ -90,7 +92,9 @@ e_size=myDim_elem2D+eDim_elem2D
  t_skin=0.0_WP
  u_ice_aux=0.0_WP
  v_ice_aux=0.0_WP
-
+ rhs_mdiv=0.0_WP
+ rhs_adiv=0.0_WP
+ rhs_msdiv=0.0_WP
 if (use_means) then
  m_ice_mean=0.0_WP
  a_ice_mean=0.0_WP
@@ -150,8 +154,17 @@ SELECT CASE (whichEVP)
 END SELECT
  t1=MPI_Wtime()     
  ! ===== Advection part
+
+! old FCT routines
+! call ice_TG_rhs
+! call ice_fct_solve
+! call cut_off
+! new FCT routines from Sergey Danilov 08.05.2018
+ call ice_TG_rhs_div   
  call ice_fct_solve
+ call ice_update_for_div
  call cut_off
+
  t2=MPI_Wtime()
  ! ===== Thermodynamic part
  call thermodynamics

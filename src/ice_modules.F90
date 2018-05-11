@@ -32,7 +32,7 @@ MODULE i_PARAM
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
-  real(kind=8)              :: alpha_evp=275, beta_evp=275
+  real(kind=8)              :: alpha_evp=250, beta_evp=250
   real(kind=8)              :: c_aevp=0.15_8 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
@@ -62,7 +62,8 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux(:), v_ice_aux(:)  ! of the size of u_ice, v_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
@@ -94,7 +95,7 @@ save
 
 ! Mean arrays
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean,m_snow_mean
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean, m_snow_mean
   END MODULE i_ARRAYS
 !=====================================================================
 module i_therm_param

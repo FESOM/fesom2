@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=fesom2.0_INI
 #SBATCH -p mpp
-#SBATCH --ntasks=1440
+#SBATCH --ntasks=32
 #SBATCH --time=12:00:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
@@ -15,10 +15,17 @@ module load intel.compiler
 module load intel.mpi
 module load netcdf/4.4.0_intel
 
+ln -s ../bin/fvom_ini.x          .           # cp -n ../bin/fvom_ini.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+
+
 # determine JOBID
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun --mpi=pmi2 --ntasks=1440 ./fvom_ini.x > "fvom_ini.out"
+srun --mpi=pmi2 --ntasks=1 ./fvom_ini.x > "fvom_ini.out"
 date
 

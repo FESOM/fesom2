@@ -6,6 +6,8 @@
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 #SBATCH -A ab0995
+
+ulimit -s unlimited
 whichMPI=INTELMPI
 
 if test "${whichMPI}" == "INTELMPI"; then
@@ -54,22 +56,22 @@ set -x
 echo Submitted job: $jobid
 squeue -u $USER
 
-#SBATCH --qos=express
-
-
-ulimit -s unlimited
-
 # determine JOBID
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
-date
-srun --mpi=pmi2 --ntasks=7560 ../build/src/fesom > "fesom.out"
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
 
 date
+srun --mpi=pmi2 fesom.x > "fesom2.0.out"
+date
+
 # qstat -f $PBS_JOBID
-
 #export EXITSTATUS=$?
 #if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
-#sbatch job.ll_ollie
+#sbatch job_mistral
 #fi
 
