@@ -196,7 +196,7 @@ subroutine EVPdynamics_m
 
   implicit none
   integer         :: steps, shortstep, i, ed
-  real(kind=8)    :: rdt, drag, det, fc
+  real(kind=8)    :: rdt, drag, det
   real(kind=8)    :: inv_thickness(myDim_nod2D), umod, rhsu, rhsv
   logical         :: ice_el(myDim_elem2D), ice_nod(myDim_nod2D)
 
@@ -210,7 +210,7 @@ subroutine EVPdynamics_m
 !NR for stress2rhs_m  
   integer       :: k, row
   real(kind=8)  :: vol
-  real(kind=8)  :: mf, aa, bb
+  real(kind=8)  :: mf,aa, bb
   real(kind=8)  :: mass(myDim_nod2D)
 
 
@@ -296,6 +296,10 @@ subroutine EVPdynamics_m
      v_rhs_ice(row)=0.0
   end do
 
+!=======================================
+! Ice EVPdynamics Iteration main loop:
+!=======================================
+
   do shortstep=1, steps
 
 !NR inlining, to make it easier to have local arrays and fuse loops
@@ -354,7 +358,7 @@ subroutine EVPdynamics_m
              (sigma11(el)*dx(k)+sigma12(el)*(dy(k) + meancos))                         !metrics 
         v_rhs_ice(elnodes(k)) = v_rhs_ice(elnodes(k)) - elem_area(el)* &
              (sigma12(el)*dx(k)+sigma22(el)*dy(k) - sigma11(el)*meancos)               ! metrics                                              
-     end do
+    end do
 
 
      end if
@@ -381,8 +385,8 @@ subroutine EVPdynamics_m
         !solve (Coriolis and water stress are treated implicitly)        
         det = bc_index_nod2D(i) / ((1.0_8+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
 
-        u_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsu+fc*rhsv)
-        v_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsv-fc*rhsu)
+        u_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
+        v_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
         end if
      end do
 
