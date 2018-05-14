@@ -54,9 +54,9 @@ subroutine stress_tensor_m
      delta=eps1**2+vale*(eps2**2+4.0_8*eps12**2)
      delta=sqrt(delta)
     
-     pressure=pstar*msum*exp(-c_pressure*(1.0_8-asum))/(delta+delta_min)
+     pressure=pstar*msum*exp(-c_pressure*(1.0_8-asum))/max(delta,delta_min)
     
-        r1=pressure*(eps1-delta) 
+        r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12*vale
         si1=sigma11(elem)+sigma22(elem)
@@ -310,7 +310,7 @@ subroutine find_alpha_field_a
          
      pressure=pstar*exp(-c_pressure*(1.0_8-asum))/(delta+delta_min) ! no multiplication
                                                                     ! with thickness (msum) 
-     alpha_evp_array(elem)=max(50.0,sqrt(c_aevp*pressure/rhoice/elem_area(elem)))  
+     alpha_evp_array(elem)=max(50.0,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))  
       ! /voltriangle(elem) for FESOM1.4
       ! We do not allow alpha to be too small!
    end do
@@ -439,11 +439,11 @@ use g_comm_auto
          rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
          rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
 
-         rhsu=beta_evp*u_ice_aux(i)+rhsu
-	 rhsv=beta_evp*v_ice_aux(i)+rhsv
+         rhsu=beta_evp_array(i)*u_ice_aux(i)+rhsu
+	 rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
          !solve (Coriolis and water stress are treated implicitly)
          fc=rdt*coriolis_node(i)
-         det=(1.0_8+beta_evp+drag)**2+fc**2
+         det=(1.0_8+beta_evp_array(i)+drag)**2+fc**2
          det=bc_index_nod2D(i)/det
          u_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
