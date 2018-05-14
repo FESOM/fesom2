@@ -353,14 +353,26 @@ subroutine EVPdynamics_m
         ! add internal stress to the rhs
         ! SD, 30.07.2014
   !-----------------------------------------------------------------  
-      do k=1,3
-        u_rhs_ice(elnodes(k)) = u_rhs_ice(elnodes(k)) - elem_area(el)* &
-             (sigma11(el)*dx(k)+sigma12(el)*(dy(k) + meancos))                         !metrics 
-        v_rhs_ice(elnodes(k)) = v_rhs_ice(elnodes(k)) - elem_area(el)* &
-             (sigma12(el)*dx(k)+sigma22(el)*dy(k) - sigma11(el)*meancos)               ! metrics                                              
-    end do
+        if (elnodes(1) <= myDim_nod2D) then
+           u_rhs_ice(elnodes(1)) = u_rhs_ice(elnodes(1)) - elem_area(el)* &
+                (sigma11(el)*dx(1)+sigma12(el)*(dy(1) + meancos))                         !metrics 
+           v_rhs_ice(elnodes(1)) = v_rhs_ice(elnodes(1)) - elem_area(el)* &
+                (sigma12(el)*dx(1)+sigma22(el)*dy(1) - sigma11(el)*meancos)               ! metrics                                              
+        end if
 
+        if (elnodes(2) <= myDim_nod2D) then
+           u_rhs_ice(elnodes(2)) = u_rhs_ice(elnodes(2)) - elem_area(el)* &
+                (sigma11(el)*dx(2)+sigma12(el)*(dy(2) + meancos))                         !metrics 
+           v_rhs_ice(elnodes(2)) = v_rhs_ice(elnodes(2)) - elem_area(el)* &
+                (sigma12(el)*dx(2)+sigma22(el)*dy(2) - sigma11(el)*meancos)               ! metrics                                              
+        end if
 
+        if (elnodes(3) <= myDim_nod2D) then
+           u_rhs_ice(elnodes(3)) = u_rhs_ice(elnodes(3)) - elem_area(el)* &
+                (sigma11(el)*dx(3)+sigma12(el)*(dy(3) + meancos))                         !metrics 
+           v_rhs_ice(elnodes(3)) = v_rhs_ice(elnodes(3)) - elem_area(el)* &
+                (sigma12(el)*dx(3)+sigma22(el)*dy(3) - sigma11(el)*meancos)               ! metrics                                              
+        end if
      end if
   end do
   
