@@ -312,11 +312,9 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 real(kind=WP)                               :: is_nonlinfs
 
 !_______________________________________________________________________________
-! Arrays added for pressure force calculation
+! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
-
-
 !_______________________________________________________________________________
 !Monin-Obukhov correction
 real*8,allocatable :: mo(:,:),mixlength(:)

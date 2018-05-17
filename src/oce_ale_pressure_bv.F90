@@ -179,8 +179,8 @@ subroutine pressure_force
 	use g_config
 	implicit none
 	
-	integer 			:: elem, elnodes(3), nle, nlz, flag
-	integer 			:: ni, node
+	integer 			:: elem, elnodes(3), nle, nln(3), nlz, flag
+	integer 			:: ni, node, dens_ind,kk
 	real(kind=WP)		:: ze
 	integer				:: s_ind(4)
 	real(kind=WP)		:: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
@@ -211,7 +211,8 @@ subroutine pressure_force
 		do elem=1, myDim_elem2D
 			!_______________________________________________________________________
 			! number of levels at elem
-			nle=nlevels(elem)-1
+! 			nle=nlevels(elem)-1 !PS
+			nle=nlevels(elem)
 			
 			!_______________________________________________________________________
 			! calculate mid depth element level --> Z_e
@@ -230,22 +231,43 @@ subroutine pressure_force
 			elnodes = elem2D_nodes(:,elem)
 			
 			!_______________________________________________________________________
+			nln=nlevels_nod2D(elnodes)
+			if (any(nln>nle)) nln=nln+1
+			nln(1) = min(nln(1),nle)
+			nln(2) = min(nln(2),nle)
+			nln(3) = min(nln(3),nle)
+			
+			!_______________________________________________________________________
 			! loop over depth levels at element elem
 			p_grad=0.0_WP
-			do nlz=1,nle
+			do nlz=1,nle-1
 				
 				!___________________________________________________________________
 				rho_n = 0.0_WP
 				do ni=1,3
 					node = elnodes(ni)
+					
+					!_______________________________________________________________
+					dens_ind=0
+					do kk=1,nln(ni) 
+						! Z_n ... mid depth level at element
+						! Z_3d_n ... mid depth levels at nodes
+						if (Z_3d_n(kk,node)<=Z_n(nlz)) then
+							dens_ind=kk-1
+							if (kk==1) dens_ind=1
+							exit
+						end if
+					end do
+					
 					!_______________________________________________________________
 					! cubic spline interpolation 
-					s_ind=(/nlz-1,nlz,nlz+1,nlz+2/)
+! 					s_ind=(/nlz-1,nlz,nlz+1,nlz+2/)
+					s_ind=(/dens_ind-1,dens_ind,dens_ind+1,dens_ind+2/)
 					flag=0
 					if (nlz==1) then ! surface layer
 						flag = 1
 						s_ind(1)=nlz
-					elseif (nlz==nle) then ! bottom layer
+					elseif (nlz==nln(ni)-1 ) then ! bottom layer
 						flag = -1
 						s_ind(4)=nlz+1
 					end if 
@@ -254,6 +276,7 @@ subroutine pressure_force
 					s_H    = s_z(3)-s_z(2)
 					aux1   = (s_dens(3)-s_dens(2))/s_H
 					
+					!_______________________________________________________________
 					! calculate derivatives in a way to get monotonic profile
 					if     (flag==0) then ! subsurface/above bottom case
 						aux2=(s_dens(2)-s_dens(1))/(s_z(2)-s_z(1))

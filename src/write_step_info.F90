@@ -179,10 +179,10 @@ subroutine check_blowup(istep)
 			!___________________________________________________________________
 			! check ssh
 			if ( ((eta_n(n) /= eta_n(n)) .or. &
-				eta_n(n)<-10.0 .or. eta_n(n)>10.0)) then
+				eta_n(n)<-3.0 .or. eta_n(n)>3.0)) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
-				write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
+				write(*,*) ' --STOP--> found eta_n become NaN or <-3.0, >3.0'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n

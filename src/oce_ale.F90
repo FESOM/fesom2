@@ -162,8 +162,8 @@ subroutine init_bottom_elem_thickness
 			else
 				! case 1 : min(Z(nle-1),dd) = Z(nle-1)
 				! case 2 : min(Z(nle-1),dd) = dd
-! 				zbar_e_bot(elem) = min(Z(nle-1),dd)
-				zbar_e_bot(elem) = zbar(nlevels(elem))
+				zbar_e_bot(elem) = min(Z(nle-1),dd)
+! 				zbar_e_bot(elem) = zbar(nlevels(elem)) ! partial cells are not allowed to become smaller
 				
 			end if	    
 			dd1=zbar(nle-1)-zbar_e_bot(elem)
@@ -987,6 +987,7 @@ subroutine compute_ssh_rhs_ale
 	! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	integer       :: ed, el(2), enodes(2),  nz,n
 	real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+	real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
 	
 	ssh_rhs=0.0_WP
 	!___________________________________________________________________________
@@ -1048,6 +1049,7 @@ subroutine compute_ssh_rhs_ale
 			ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
 		end do
 	end if
+	
 end subroutine compute_ssh_rhs_ale
 !
 !
