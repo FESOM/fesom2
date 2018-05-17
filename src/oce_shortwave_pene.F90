@@ -54,7 +54,7 @@ subroutine cal_shortwave_rad
      nzmax=(nlevels(n2))
      sw_3d(1, n2)=swsurf
      do k=2, nzmax
-        aux=(v1*exp(zbar(k)/sc1)+v2*exp(zbar(k)/sc2))
+        aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
         if (aux < 1.e-5 .OR. k==nzmax) then 
            sw_3d(k, n2)=0._wp

@@ -47,14 +47,21 @@ subroutine ale_init
 	
 	! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
 	allocate(zbar_n(nl))
-	allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D)) 
+	allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
 	
 	! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
 	allocate(Z_n(nl-1))
 	allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
 	
 	! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
-	allocate(bottom_elem_thickness(myDim_elem2D))
+	allocate(bottom_elem_thickness(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+	allocate(zbar_e_bot(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
+	
+	! also change bottom thickness at nodes due to partial cell --> bottom 
+	! thickness at nodes is the volume weighted mean of sorounding elemental 
+	! thicknesses
+	allocate(bottom_node_thickness(myDim_nod2D+eDim_nod2D))
+	allocate(zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
 	
 	!___initialize______________________________________________________________
 	hbar=0.0_WP
@@ -62,6 +69,8 @@ subroutine ale_init
 	dhe=0.0_WP
 	
 	! calculate thickness of partial bottom layer cells
+	zbar_n_bot = 0.0
+	zbar_e_bot = 0.0
 	call init_bottom_elem_thickness
 	
 	! initialise 3d field of depth levels and mid-depth levels
@@ -70,8 +79,15 @@ subroutine ale_init
 	do n=1,myDim_nod2D+eDim_nod2D 
 		! max. number of levels at node n
 		nzmax=nlevels_nod2D(n)
-		zbar_3d_n(1:nzmax,n)=zbar(1:nzmax);
-		Z_3d_n(1:nzmax-1,n) =Z(1:nzmax-1);
+		
+		zbar_3d_n(1:nzmax-1,n)=zbar(1:nzmax-1);
+		! in case of partial cells bottom depth is different from zbar(nzmax)
+		zbar_3d_n(nzmax,n)=zbar_n_bot(n);
+		 
+		Z_3d_n(1:nzmax-2,n) =Z(1:nzmax-2);
+		! in case of partial cells bottom mid depth is different from Z(nzmax-1)
+		Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
+		
 	end do
 end subroutine ale_init
 !
@@ -83,17 +99,19 @@ subroutine init_bottom_elem_thickness
 	use g_PARSUP
 	use o_ARRAYS
 	use g_config,only: use_partial_cell
+	use g_comm_auto
 	implicit none
 	
-	integer :: elem, elnodes(3), nle
-	real(kind=WP) :: dd, dd1
+	integer :: elem, elnodes(3), nle, nln, n, k
+	real(kind=WP) :: dd, dd1, hnbot, tvol 
 	
+	!___________________________________________________________________________
 	! If we use partial cells, the thickness of bottom cell is adjusted.
 	! The adjustment is limited. It cannot be more than + (1/2) of the deeper
 	! layer, nor -(1/2) of the current layer. 
 	if(use_partial_cell) then 
-		!Adjust the thickness of bottom cells
-		DO elem=1, myDim_elem2D
+		!Adjust the thickness of elemental bottom cells
+		do elem=1, myDim_elem2D
 			elnodes=elem2D_nodes(:,elem) 
 			
 			! elemental topographic depth
@@ -121,11 +139,12 @@ subroutine init_bottom_elem_thickness
 			!  / / / / / /
 			if(dd<zbar(nle)) then 
 				if(nle==nl) then
-					dd1=zbar(nle-1)-dd   
+					zbar_e_bot(elem) = dd
+					
 				else
 					! case 1 : max(Z(nle),dd) = dd
 					! case 2 : max(Z(nle),dd) = Z(nle)
-					dd1=zbar(nle-1)-max(Z(nle),dd)
+					zbar_e_bot(elem) = max(Z(nle),dd)
 				end if
 			!___________________________________________________________________
 			! if topographic depth dd is shallower than depth of deepest full cell 
@@ -144,16 +163,46 @@ subroutine init_bottom_elem_thickness
 			else
 				! case 1 : min(Z(nle-1),dd) = Z(nle-1)
 				! case 2 : min(Z(nle-1),dd) = dd
-				dd1=zbar(nle-1)-min(Z(nle-1),dd) 
+				zbar_e_bot(elem) = min(Z(nle-1),dd)
+! 				zbar_e_bot(elem) = zbar(nlevels(elem)) ! partial cells are not allowed to become smaller
+				
 			end if	    
+			dd1=zbar(nle-1)-zbar_e_bot(elem)
 			bottom_elem_thickness(elem)=dd1
-		END DO
+			
+		end do
+		
+		!_______________________________________________________________________
+		! calculate bottom node thickness from weighted mean of sorounding elemental
+		! bottom thicknesses
+		call exchange_elem(bottom_elem_thickness)
+		do n=1,myDim_nod2D+eDim_nod2D
+			hnbot= 0.0_WP
+			tvol = 0.0_WP
+			do k=1, nod_in_elem2D_num(n)
+				elem=nod_in_elem2D(k,n)
+				tvol=tvol+elem_area(elem)
+				hnbot = hnbot + bottom_elem_thickness(elem)*elem_area(elem)
+			end do
+			bottom_node_thickness(n) = hnbot/tvol
+			zbar_n_bot(n)			 = zbar(nlevels_nod2D(n)-1)-bottom_node_thickness(n)
+		end do 
+		
 	else
-		DO elem=1, myDim_elem2D
+		do elem=1, myDim_elem2D
 			nle=nlevels(elem)
 			bottom_elem_thickness(elem)=zbar(nle-1)-zbar(nle)
+			zbar_e_bot(elem) = zbar(nle)
 		end do
+		
+		do n=1,myDim_nod2D+eDim_nod2D
+			nln = nlevels_nod2D(n)
+			bottom_node_thickness(n)=zbar(nln-1)-zbar(nln)
+			zbar_n_bot(n) = zbar(nln)
+		end do
+		
 	end if 
+	
 END subroutine init_bottom_elem_thickness
 !
 !
@@ -193,9 +242,14 @@ subroutine init_thickness_ale
 		! no layer thickness variation in any layer
 		do n=1,myDim_nod2D+eDim_nod2D
 			hnode(1,n)=(zbar(1)-zbar(2))
-			do nz=2,nlevels_nod2D(n)-1
+! 			do nz=2,nlevels_nod2D(n)-1
+			do nz=2,nlevels_nod2D(n)-2
 				hnode(nz,n)=(zbar(nz)-zbar(nz+1))
 			end do      
+			
+			! set bottom node thickness
+			hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
+			
 			do nz=nlevels_nod2D(n),nl-1
 				hnode(nz,n)=0.0_WP
 			end do
@@ -205,7 +259,10 @@ subroutine init_thickness_ale
 			do nz=1,nlevels(elem)-2
 				helem(nz,elem)=(zbar(nz)-zbar(nz+1))
 			end do
+			
+			! set bottom elem thickness
 			helem(nlevels(elem)-1,elem)=bottom_elem_thickness(elem)
+			
 			Do nz=nlevels(elem),nl-1
 				helem(nz,elem)=0.0_WP
 			end do
@@ -222,9 +279,13 @@ subroutine init_thickness_ale
 			hnode(1,n)=hbar(n)+(zbar(1)-zbar(2))
 			
 			! leave lower levels untouched
-			do nz=2,nlevels_nod2D(n)-1
-			hnode(nz,n)=(zbar(nz)-zbar(nz+1))
+! 			do nz=2,nlevels_nod2D(n)-1
+			do nz=2,nlevels_nod2D(n)-2
+				hnode(nz,n)=(zbar(nz)-zbar(nz+1))
 			end do 
+			
+			! set bottom node thickness
+			hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
 			
 			! layer thickness of bottom layer equal 0
 			do nz=nlevels_nod2D(n),nl-1
@@ -272,10 +333,13 @@ subroutine init_thickness_ale
 				hnode(nz,n)=(zbar(nz)-zbar(nz+1))*(1.0_WP+hbar(n)/dd)
 			end do
 			
-			! do not distrubute hbar into cells that intersect somehow with bottom layer 
+			! do not distribute hbar into cells that intersect somehow with bottom layer 
 			do nz=nlevels_nod2D_min(n)-1, nlevels_nod2D(n)-1
 				hnode(nz,n)=(zbar(nz)-zbar(nz+1))
 			end do
+			
+			! set bottom node thickness
+			hnode(nlevels_nod2D(n)-1,n)=bottom_node_thickness(n)
 			
 			! layer thickness of bottom layer equal 0
 			do nz=nlevels_nod2D(n),nl-1
@@ -379,6 +443,9 @@ subroutine update_thickness_ale
 				! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
 				! one is not allowed to change so go until nlevels_nod2D_min(n)-2
 				nzmax = min(nz,nlevels_nod2D_min(n)-2)
+				! do not touch zbars_3d_n that are involved in the bottom cell !!!!
+				! this ones are set up during initialisation and are not touched afterwards
+				! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
 				do nz=nzmax,1,-1
 					hnode(nz,n)     = hnode_new(nz,n)
 					zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode_new(nz,n)
@@ -406,6 +473,8 @@ subroutine update_thickness_ale
 		do n=1, myDim_nod2D+eDim_nod2D
 			! actualize 3d depth levels and mid-depth levels from bottom to top
 			nzmax = nlevels_nod2D_min(n)-2
+			! do not touch zbars_3d_n that are involved in the bottom cell !!!!
+			! --> nlevels_nod2D_min(n),nlevels_nod2D_min(n)-1
 			do nz=nzmax,1,-1
 				hnode(nz,n)     = hnode_new(nz,n)
 				zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode_new(nz,n)
@@ -515,11 +584,12 @@ subroutine restart_thickness_ale
 	!___________________________________________________________________________
 	elseif (trim(which_ale)=='zstar' ) then
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
-		zbar_3d_n=0.0_WP
-		Z_3d_n   =0.0_WP
+		! dont forget also at restart zbar_3d_n and Z_3d_n are first initialised 
+		! and filled up in ale_init there bottom depth zbar_3d_n(nlevels_nod2d) 
+		! ist set according if there are partial cells or not 
 		do n=1, myDim_nod2D+eDim_nod2D
 			nzmax               =nlevels_nod2D(n)-1
-			zbar_3d_n(nzmax+1,n)=zbar(nzmax+1)
+! 			nzmax               =nlevels_nod2D(n)-2
 			do nz=nzmax,1,-1
 				zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
 				Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
@@ -564,7 +634,7 @@ subroutine stiff_mat_ale
 	use o_PARAM
 	use o_MESH
 	use g_PARSUP
-	use o_ARRAYS, only:bottom_elem_thickness 
+	use o_ARRAYS, only:zbar_e_bot,bottom_elem_thickness
 	use g_CONFIG
 	implicit none
 	
@@ -680,6 +750,7 @@ subroutine stiff_mat_ale
 			! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
 			! at element el(i)
 			! Attention: here corrected with bottom depth of partial cells !!!
+! 			fy(1:3) = (zbar_e_bot(el(i)))* &
 			fy(1:3) = (zbar(nlevels(el(i))-1)-bottom_elem_thickness(el(i)))* &
 					  (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
 					 - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
@@ -919,6 +990,7 @@ subroutine compute_ssh_rhs_ale
 	! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	integer       :: ed, el(2), enodes(2),  nz,n
 	real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+	real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
 	
 	ssh_rhs=0.0_WP
 	!___________________________________________________________________________
@@ -939,15 +1011,6 @@ subroutine compute_ssh_rhs_ale
 		do nz=1, nlevels(el(1))-1
 			c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
 						 (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
-						 
-! 			if (mype==3 .and. mstep==7044 .and. (enodes(1)==440 .or. enodes(2)==440) ) then
-! 				write(*,*) ' -->nz=',nz
-! 				write(*,*) '	c1=',c1
-! 				write(*,*) '    enodes=',enodes
-! 				write(*,*) '   (UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1=',(UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1
-! 				write(*,*) '   (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1=',(UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1
-! 				write(*,*) '   helem(nz,el(1))=',helem(nz,el(1))
-! 			endif
 		end do
 		
 		!_______________________________________________________________________
@@ -962,15 +1025,6 @@ subroutine compute_ssh_rhs_ale
 			do nz=1, nlevels(el(2))-1
 				c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
 							 (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
-				
-! 				if (mype==3 .and. mstep==7044 .and. (enodes(1)==440 .or. enodes(2)==440) ) then
-! 					write(*,*) ' -->nz=',nz
-! 					write(*,*) '	c2=',c2
-! 					write(*,*) '    enodes=',enodes
-! 					write(*,*) '   (UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX1=',(UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX1
-! 					write(*,*) '   (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY1=',(UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY1
-! 					write(*,*) '   helem(nz,el(2))=',helem(nz,el(2))
-! 				endif
 			end do
 		end if
 		
@@ -991,39 +1045,14 @@ subroutine compute_ssh_rhs_ale
 	! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 	if ( .not. trim(which_ALE)=='linfs') then
 		do n=1,myDim_nod2D
-			
-! 			if (abs(ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n))>1e8 .and. mstep>6100) then
-! 				write(*,*) ' --> WTF happend: ssh_rhs way to big it prepares to blow up???'
-! 				write(*,*) '        mype  =',mype
-! 				write(*,*) '        mstep =',mstep
-! 				write(*,*) '         node =',n
-! 				write(*,*) '  myDim_nod2D =',myDim_nod2D
-! 				write(*,*) ' myDim_elem2D =',myDim_elem2D
-! 				write(*,*) '    ssh_rhs(n)=',ssh_rhs(n)
-! 				write(*,*) 'ssh_rhs_old(n)=',ssh_rhs_old(n)
-! 				write(*,*) ' water_flux(n)=',water_flux(n)
-! 				write(*,*)
-! 				do ed=1,nod_in_elem2D_num(n)
-! 					nz = nod_in_elem2D(ed,n)
-! 					write(*,*) ' elem#=',ed,', elemidx=',nz
-! 					write(*,*) ' --> helem =',helem(:,nz)
-! 					write(*,*) ' --> U =',UV(1,:,nz)
-! 					write(*,*) ' --> V =',UV(2,:,nz)
-! 					write(*,*) ' --> U_rhs =',UV_rhs(1,:,nz)
-! 					write(*,*) ' --> V_rhs =',UV_rhs(2,:,nz)
-! 				end do
-! 				write(*,*)
-! 			endif
-			
 			ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
-			
-			
 		end do
 	else
 		do n=1,myDim_nod2D
 			ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
 		end do
 	end if
+	
 end subroutine compute_ssh_rhs_ale
 !
 !
@@ -1402,12 +1431,10 @@ subroutine vert_vel_ale
 			!     ocean levels NOT the actual one !!! but spoke with Sergey its not 
 			!     so important which to use as long as it is consistent and 
 			!     volume is conserved
-			! dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
-			dd1=zbar(nlevels_nod2D_min(n)-1)
+			dd1=zbar_3d_n(nlevels_nod2D_min(n)-1,n)
 			
 			! This is the depth the stretching is applied (area(nz,n)=area(1,n))
-			! dd=zbar_3d_n(1,n)-dd1    
-			dd=zbar(1)-dd1    
+			dd=zbar_3d_n(1,n)-dd1    
 			
 			! how much of (hbar(n)-hbar_old(n)) is distributed into each layer
 			! 1/H*dhbar
@@ -1429,12 +1456,9 @@ subroutine vert_vel_ale
 				! SUM_i=k:kmax(h⁰_k) = (zbar(nz)-dd1)
 				! --> this strange term zbar_3d_n(nz,n)-dd1)*dddt --> comes from 
 				!     the vertical integration bottom to top of Wvel
+				Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
 				
-				! Wvel(nz,n)    =Wvel(nz,n) -(zbar_3d_n(nz,n)-dd1)*dddt
-				Wvel(nz,n)     =Wvel(nz,n) -(zbar(nz)-dd1)*dddt
-				
-				! hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
-				hnode_new(nz,n)=hnode(nz,n)+(zbar(nz)-zbar(nz+1))*dd
+				hnode_new(nz,n)=hnode(nz,n)+(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dd
 			end do
 			
 			!___________________________________________________________________
@@ -1644,17 +1668,16 @@ integer                    ::  nz, elem, nzmax, elnodes(3)
 real(kind=WP)              ::  zinv, m, friction, wu, wd
 DO elem=1,myDim_elem2D
 	elnodes=elem2D_nodes(:,elem)
-	nzmax=nlevels(elem)
 	
 	!___________________________________________________________________________
 	! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
 	! they run over elements here 
+	nzmax =nlevels(elem)
 	zbar_n=0.0_WP
-	Z_n=0.0_WP
+	Z_n   =0.0_WP
 	! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
-	! zbar_n(nzmax) is now -sum(helem(1:nzmax-1,elem)), 
-	zbar_n(nzmax)=-sum(helem(1:nzmax-1,elem))
-	
+	! zbar_n(nzmax) is now zbar_e_bot(elem), 
+	zbar_n(nzmax)=zbar_e_bot(elem)
 	Z_n(nzmax-1)=zbar_n(nzmax) + helem(nzmax-1,elem)/2.0_WP
 	do nz=nzmax-1,2,-1
 		zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
@@ -1779,7 +1802,7 @@ subroutine oce_timestep_ale(n)
 	t1=MPI_Wtime()
 	!___________________________________________________________________________
 	call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
-	
+	call pressure_force
 	!___________________________________________________________________________
 	! calculate alpha and beta
 	! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?

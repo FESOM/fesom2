@@ -1,9 +1,12 @@
 # Patrick Scholz, 23.01.2018
 import numpy as np
 import time
+import os
 from netCDF4 import Dataset
 from set_inputarray import *
-from sub_fesom_mesh import fesom_vector_rot
+from sub_fesom_mesh import *
+import matplotlib.pyplot as plt
+#from sub_fesom_mesh import fesom_vector_rot
 global inputarray
 	
 #+_____________________________________________________________________________+
@@ -73,8 +76,8 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
 		print('     -----+-----------------------------------+------------')
 		print('     Year |               MON                 |')
 		print('     -----+-----------------------------------+------------')
-	print('     --> '+data.path)
-	print('     --> '+data.var)
+		print('     --> '+data.path)
+		print('     --> '+data.var)
 	#____START YEAR LOOP________________________________________________________
 	aux_datavar = data.var
 	for yi in range(0, nyi):
@@ -871,7 +874,7 @@ def fesom_vinterp(data_in,mesh,levels):
 			
 	#___________________________________________________________________________
 	# do mean over averaged layers
-	data_out = data_out/aux_div
+	data_out[aux_div!=0] = data_out[aux_div!=0]/aux_div[aux_div!=0]
 	data_out[aux_div==0        ]=np.nan
 	data_out[np.isinf(data_out)]=np.nan
 	
@@ -982,6 +985,7 @@ def fesom_data_anom(data,data2):
 	#____data projection variables_______________
 	anom.proj                           = data.proj
 	anom.proj_lon, anom.proj_lat        = data.proj_lon, data.proj_lat
+	anom.cmap,anom.cnumb                = data.cmap,data.cnumb  
 	
 	#____data description info___________________
 	#anom.sname, anom.lname, anom.unit   = data.sname, data.lname, data.unit
@@ -1049,4 +1053,3 @@ def fesom_data_copy(data):
 	
 	#___________________________________________________________________________
 	return(copy)
-

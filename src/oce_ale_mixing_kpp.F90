@@ -436,7 +436,7 @@ contains
 ! Index of first grid level below hbl
         kbl(node) = nlevels_nod2D(node)      
 ! Boundary layer depth
-        hbl(node) = ABS( zbar( nlevels_nod2d(node) ) )
+        hbl(node) = ABS( zbar_3d_n( nlevels_nod2d(node),node ) )
      END DO
 
      DO node=1, myDim_nod2D+eDim_nod2D
@@ -451,8 +451,8 @@ contains
 
         DO nz=2,nk 
 
-           zk   = ABS( zbar(nz  ) )  
-           zkm1 = ABS( zbar(nz-1) ) 
+           zk   = ABS( zbar_3d_n(nz,node) )  
+           zkm1 = ABS( zbar_3d_n(nz-1,node) ) 
 
           ! bfsfc = Bo + sw contribution
            IF (use_sw_pene)  THEN     
@@ -528,7 +528,7 @@ contains
                 /vonk / (bfsfc(node) + epsln) 
            hlimit = stable(node) * AMIN1( hekman, hmonob )  
            hbl(node) = AMIN1( hbl(node), hlimit )
-           hbl(node) = MAX( hbl(node), ABS(zbar(2)) ) 
+           hbl(node) = MAX( hbl(node), ABS(zbar_3d_n(2,node)) ) 
         END IF
   END DO
 
@@ -541,7 +541,7 @@ contains
        !-----------------------------------------------------------------------
         kbl(node) = nk
         DO nz=2,nk  
-           IF (ABS(zbar(nz)) > hbl(node)) THEN
+           IF (ABS(zbar_3d_n(nz,node)) > hbl(node)) THEN
               kbl(node) = nz
               EXIT
            END IF
@@ -556,8 +556,8 @@ contains
                          ( sw_3d(1,node) - &
                                          ( sw_3d(kbl(node)-1, node) + &
                                                                     ( sw_3d(kbl(node), node) - sw_3d(kbl(node)-1, node) ) &
-                                                                    * ( hbl(node) + zbar( kbl(node)-1) ) &
-                                                                    / ( zbar( kbl(node)-1) - zbar(kbl(node)) ) ) )
+                                                                    * ( hbl(node) + zbar_3d_n( kbl(node)-1,node) ) &
+                                                                    / ( zbar_3d_n( kbl(node)-1,node) - zbar_3d_n(kbl(node),node) ) ) )
            stable(node)=0.5_WP + SIGN(0.5_WP, bfsfc(node))
            bfsfc(node) =bfsfc(node) + stable(node) * epsln 
         END IF
@@ -568,8 +568,8 @@ contains
        !-----------------------------------------------------------------------
 
 !        nz=kbl(node)
-        dzup         = zbar(kbl(node)-1) - zbar(kbl(node))
-        caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( zbar(kbl(node)) ) - 0.5_WP * dzup - hbl(node) )
+        dzup         = zbar_3d_n(kbl(node)-1,node) - zbar_3d_n(kbl(node),node)
+        caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
 
   END DO 
 
@@ -727,7 +727,7 @@ contains
            IF(Kv0_const) THEN
               diffK(nz,node,1) = diff_sh_limit * frit + K_ver
            ELSE
-              dep = abs(zbar(nz)) ! Kv is defined on the levels 
+              dep = abs(zbar_3d_n(nz,node)) ! Kv is defined on the levels 
               lat = geo_coord_nod2D(2,node)/ rad
               IF (abs(lat) < 5.0_WP) THEN
                  ratio = 1.0_WP
@@ -895,7 +895,7 @@ contains
         if(nl1<3) cycle  ! a temporary solution
 
       ! level thickness
-        dthick(2:nl1-1)=0.5*(ABS(zbar(3:nl1))-ABS(zbar(1:nl1-2)))
+        dthick(2:nl1-1)=0.5*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
         dthick(1)=dthick(2)
         dthick(nl1)=dthick(nl1-1)
 
@@ -1007,7 +1007,7 @@ contains
 !       Find diffusivities at kbl-1 grid level 
 !      *******************************************************************
 
-        sig   =  ABS(zbar(kbl(node)-1))  / (hbl(node) + epsln)
+        sig   =  ABS(zbar_3d_n(kbl(node)-1,node))  / (hbl(node) + epsln)
         sigma =  stable(node) * sig                  &
               + (1.0_WP - stable(node)) * MIN(sig, epsilon_kpp)
         zehat= vonk * sigma * hbl(node) * bfsfc(node)
@@ -1057,7 +1057,7 @@ contains
      DO node=1, myDim_nod2D+eDim_nod2D
 
         k     = kbl(node) - 1
-        delta = (hbl(node) + zbar(k)) / (zbar(k) - zbar(k+1))
+        delta = (hbl(node) + zbar_3d_n(k,node)) / (zbar_3d_n(k,node) - zbar_3d_n(k+1,node))
 
        ! momentum
         dkmp5 = caseA(node) * viscA(k,node)      &

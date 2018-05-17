@@ -1022,58 +1022,71 @@ real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
 integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
 real, allocatable :: aux(:,:) 
-  !  
-  if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
-  ! Fill in viscosity:
-  DO  elem=1, myDim_elem2D          !! m=1, myDim_elem2D
-                                    !! elem=myList_elem2D(m)
-      nl1=nlevels(elem)-1
-      elnodes=elem2D_nodes(:,elem)
-      do nz=1,nl1
-        dz=zbar(nz)-zbar(nz+1)
-	div_elem=(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/dz
-        xe=sum(gradient_sca(1:3,elem)*div_elem)
-	ye=sum(gradient_sca(4:6,elem)*div_elem)
-        div_elem=vorticity(nz,elnodes)
-        leithx=sum(gradient_sca(1:3,elem)*div_elem)
-	leithy=sum(gradient_sca(4:6,elem)*div_elem)
-	vi=A_hor*sqrt(elem_area(elem)/scale_area)
-	Visc(nz,elem)=0.2*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
-	     + Leith_c*(leithx**2+leithy**2))*elem_area(elem)) &
-	     + vi, elem_area(elem)/dt)
-      end do                        !! 0.1 here comes from (2S)^{3/2}/pi^3
-      do nz=nl1+1, nl-1
-        Visc(nz, elem)=0.0_WP
-      end do		    
-  END DO 
+	!  
+	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
+	! Fill in viscosity:
+	DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
+									!! elem=myList_elem2D(m)
+		!_______________________________________________________________________
+		! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
+		! they run over elements here 
+		nl1 =nlevels(elem)-1
+		zbar_n=0.0_WP
+		! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
+		! zbar_n(nzmax) is now zbar_e_bot(elem), 
+		zbar_n(nl1+1)=zbar_e_bot(elem)
+		do nz=nl1,2,-1
+			zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
+		end do
+		zbar_n(1) = zbar_n(2) + helem(1,elem)
+		
+		!_______________________________________________________________________
+		elnodes=elem2D_nodes(:,elem)
+		do nz=1,nl1
+			dz=zbar_n(nz)-zbar_n(nz+1)
+			div_elem=(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/dz
+			xe=sum(gradient_sca(1:3,elem)*div_elem)
+			ye=sum(gradient_sca(4:6,elem)*div_elem)
+			div_elem=vorticity(nz,elnodes)
+			leithx=sum(gradient_sca(1:3,elem)*div_elem)
+			leithy=sum(gradient_sca(4:6,elem)*div_elem)
+			vi=A_hor*sqrt(elem_area(elem)/scale_area)
+			Visc(nz,elem)=0.2*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
+				+ Leith_c*(leithx**2+leithy**2))*elem_area(elem)) &
+				+ vi, elem_area(elem)/dt)
+		end do                        !! 0.1 here comes from (2S)^{3/2}/pi^3
+		do nz=nl1+1, nl-1
+			Visc(nz, elem)=0.0_WP
+		end do		    
+	END DO 
     
-    allocate(aux(nl-1,myDim_nod2D+eDim_nod2D))
- DO nt=1,2 
-   DO n=1, myDim_nod2D 
-    DO nz=1, nlevels_nod2D(n)-1
-       dz=0.0_WP
-       vi=0.0_WP
-       DO k=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(k,n)
-           dz=dz+elem_area(elem)
-           vi=vi+Visc(nz,elem)*elem_area(elem)
-        END DO
-	aux(nz,n)=vi/dz
-    END DO
-    END DO 
-  call exchange_nod(aux)
-  do elem=1, myDim_elem2D
-         elnodes=elem2D_nodes(:,elem)
-         nl1=nlevels(elem)-1
-         Do nz=1, nl1 
-            Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_8
-         END DO
-         DO nz=nl1+1, nl-1
-            Visc(nz,elem)=0.0_8
-         END Do
-  end do
-  end do
-  call exchange_elem(Visc)  
-deallocate(aux)
+	allocate(aux(nl-1,myDim_nod2D+eDim_nod2D))
+	DO nt=1,2 
+		DO n=1, myDim_nod2D 
+			DO nz=1, nlevels_nod2D(n)-1
+				dz=0.0_WP
+				vi=0.0_WP
+				DO k=1, nod_in_elem2D_num(n)
+					elem=nod_in_elem2D(k,n)
+					dz=dz+elem_area(elem)
+					vi=vi+Visc(nz,elem)*elem_area(elem)
+				END DO
+				aux(nz,n)=vi/dz
+			END DO
+		END DO 
+		call exchange_nod(aux)
+		do elem=1, myDim_elem2D
+			elnodes=elem2D_nodes(:,elem)
+			nl1=nlevels(elem)-1
+			Do nz=1, nl1 
+				Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_8
+			END DO
+			DO nz=nl1+1, nl-1
+				Visc(nz,elem)=0.0_8
+			END Do
+		end do
+	end do
+	call exchange_elem(Visc)  
+	deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
