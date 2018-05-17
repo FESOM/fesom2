@@ -239,21 +239,21 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 shading='gouraud')
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
                     antialiased=False,
                     shading='flat',
                     cmap=cmap0)
-        if do_grid==True: ax.triplot(tri,color='k',linewidth=.05)
+        if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels

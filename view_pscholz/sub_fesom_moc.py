@@ -11,7 +11,7 @@ from colormap_c2c    import *
 #| Global MOC, Atlantik MOC, Indo-Pacific MOC, Indo MOC                                               |
 #|                                                                                                    |
 #+____________________________________________________________________________________________________+
-def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',in_elemidx=[], out_elemidx=False):
+def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
     
     #_________________________________________________________________________________________________
     t1=time.time()
@@ -47,10 +47,13 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     # supported on elements
     if do_onelem==True:
         
-        # ncfile  = Dataset(os.path.join(data.path, data.runid+'.mesh.diag.nc'))
-        # elem0_2d_iz=ncfile.variables['nlevels'][:]-1
-        # mat_2d_iz = np.concatenate((elem0_2d_iz,elem0_2d_iz[mesh.pbndtri_2d_i]))
-        mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1
+        if len(usemeshdiag)==0:
+            mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1
+        else:    
+            ncfile  = Dataset(os.path.join(usemeshdiag))
+            elem0_2d_iz=ncfile.variables['nlevels'][:]-1
+            mat_2d_iz = np.concatenate((elem0_2d_iz,elem0_2d_iz[mesh.pbndtri_2d_i]))
+            
     
         # calc triangle area if not alredy exist
         if len(mesh.elem_2d_area)==0: mesh.fesom_calc_triarea()

@@ -985,6 +985,7 @@ def fesom_data_anom(data,data2):
 	#____data projection variables_______________
 	anom.proj                           = data.proj
 	anom.proj_lon, anom.proj_lat        = data.proj_lon, data.proj_lat
+	anom.cmap,anom.cnumb                = data.cmap,data.cnumb  
 	
 	#____data description info___________________
 	#anom.sname, anom.lname, anom.unit   = data.sname, data.lname, data.unit
