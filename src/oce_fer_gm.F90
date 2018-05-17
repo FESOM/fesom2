@@ -82,26 +82,26 @@ subroutine fer_solve_Gamma
 			!scaling(1:MLD1_ind(n)+1)=0.0_WP
 			DO nz=1, nzmax
 !               if (bvfreq(nz, n) < 1.e-5)         scaling(nz)=0.0_WP
-				if (neutral_slope(3,nz,n) > 5.e-3) scaling(nz)=0.0_WP
-			END DO
-		end if
-		
-		DO nz=2, nzmax-1
-			r=g/density_0
-			tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n))*fer_K(n)*scaling(nz)
-			tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n))*fer_K(n)*scaling(nz)
-		END DO
-		! =============================================
-		! The sweep algorithm
-		! initialize c-prime and s,t-prime
-		cp(1) = c(1)/b(1)
-		tp(:,1) = tr(:,1)/b(1)
-		! solve for vectors c-prime and t, s-prime
-		DO nz = 2, nzmax
-			m = b(nz)-cp(nz-1)*a(nz)
-			cp(nz) = c(nz)/m
-			tp(:,nz) = (tr(:,nz)-tp(:,nz-1)*a(nz))/m
-		END DO
+                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3) scaling(nz)=0.0_WP
+             END DO
+          end if
+
+          DO nz=2, nzmax-1
+             r=g/density_0
+             tr(1, nz)=r*0.5_WP*sum(sigma_xy(1,nz-1:nz,n))*fer_K(n)*scaling(nz)
+             tr(2, nz)=r*0.5_WP*sum(sigma_xy(2,nz-1:nz,n))*fer_K(n)*scaling(nz)
+          END DO
+         ! =============================================
+          ! The sweep algorithm
+          ! initialize c-prime and s,t-prime
+          cp(1) = c(1)/b(1)
+          tp(:,1) = tr(:,1)/b(1)
+! solve for vectors c-prime and t, s-prime
+          DO nz = 2, nzmax
+           m = b(nz)-cp(nz-1)*a(nz)
+           cp(nz) = c(nz)/m
+           tp(:,nz) = (tr(:,nz)-tp(:,nz-1)*a(nz))/m
+          END DO
 ! initialize x
 		tr(:,nzmax) = tp(:,nzmax)
 		! solve for x from the vectors c-prime and d-prime

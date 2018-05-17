@@ -7,7 +7,6 @@
 #SBATCH -e slurm-err.out
 #SBATCH -Aab0246 
 #SBATCH --mail-type=FAIL
-#SBATCH --mail-user=jstreffi@awi.de
 
 set -x
 
@@ -16,13 +15,12 @@ ulimit -s unlimited
 # determine JOBID
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
+ln -s ../bin/fvom_ini.x          .           # cp -n ../bin/fvom_ini.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+
 date
 srun --mpi=pmi2 --ntasks=1 ./fvom_ini.x > "fesom_ini.out"
 date
-# qstat -f $PBS_JOBID
-
-#export EXITSTATUS=$?
-#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
-#sbatch job.ll_ollie
-#fi
-

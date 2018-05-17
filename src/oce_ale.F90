@@ -24,6 +24,7 @@ subroutine ale_init
 	Implicit NONE
 	
 	integer             :: n, nzmax
+
 	
 	!___allocate________________________________________________________________
 	! hnode and hnode_new: layer thicknesses at nodes. 
@@ -405,9 +406,9 @@ subroutine update_thickness_ale
 			elnodes=elem2D_nodes(:, elem)
 			!___________________________________________________________________
 			! actualize elemental layer thinkness in first lzstar_lev layers
-			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP)==.True. .or. &
-				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)==.True.      &
+			if (any(hnode_new(2:lzstar_lev,elnodes(1))-hnode(2:lzstar_lev,elnodes(1))/=0.0_WP)     .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(2))-hnode(2:lzstar_lev,elnodes(2))/=0.0_WP) .or. &
+				any(hnode_new(2:lzstar_lev,elnodes(3))-hnode(2:lzstar_lev,elnodes(3))/=0.0_WP)      &
 				) then
 				! --> case local zstar
 				! try to limitate over how much layers i realy need to distribute
@@ -432,7 +433,7 @@ subroutine update_thickness_ale
 		do n=1,myDim_nod2D+eDim_nod2D
 			!___________________________________________________________________
 			! actualize layer thinkness in first lzstar_lev layers
-			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)==.True.) ) then
+			if ( (any(hnode_new(2:lzstar_lev,n)-hnode(2:lzstar_lev,n)/=0.0_WP)) ) then
 				! --> case local zstar 
 				! try to limitate over how much layers i realy need to distribute
 				! the change in ssh, so that the next loops run only over the 
@@ -524,7 +525,7 @@ subroutine restart_thickness_ale
 		! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
 		do n=1,myDim_nod2D+eDim_nod2D
 			if (any(hnode(2:lzstar_lev,n) /=  &
-					(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. ) then
+					(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) ) then
 				! --> case local zstar 
 				! the change in ssh, so that the next loops run only over the 
 				! nesseccary levels and not over all lzstar_lev levels
@@ -550,9 +551,9 @@ subroutine restart_thickness_ale
 		do elem=1,myDim_elem2D
 			elnodes=elem2D_nodes(:,elem)
 			!___________________________________________________________________
-			if (any(hnode(2:lzstar_lev,elnodes(1))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. .or. &
-				any(hnode(2:lzstar_lev,elnodes(2))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. .or. &
-				any(hnode(2:lzstar_lev,elnodes(3))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True.      &
+			if (any(hnode(2:lzstar_lev,elnodes(1))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))     .or. &
+				any(hnode(2:lzstar_lev,elnodes(2))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) .or. &
+				any(hnode(2:lzstar_lev,elnodes(3))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))      &
 				) then
 				! --> case local zstar 
 				! try to limitate over how much layers i realy need to distribute
@@ -654,7 +655,7 @@ subroutine stiff_mat_ale
 	!___________________________________________________________________________
 	! a)
 	ssh_stiff%dim=nod2D
-	allocate(ssh_stiff%rowptr(myDim_nod2D+1))
+	allocate(ssh_stiff%rowptr(myDim_nod2D+1), ssh_stiff%rowptr_loc(myDim_nod2D+1))
 	ssh_stiff%rowptr(1)=1               ! This has to be updated as
 										! contiguous numbering is required
 	
@@ -697,9 +698,9 @@ subroutine stiff_mat_ale
 	! c)
 	! how many nonzero entries sparse matrix has
 	ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1								 
-	! allocate column and value array of sparse matrix, have length of nonzero 
+	! allocate column ancolindd value array of sparse matrix, have length of nonzero 
 	! entrie of sparse matrix 
-	allocate(ssh_stiff%colind(ssh_stiff%nza))
+	allocate(ssh_stiff%colind(ssh_stiff%nza), ssh_stiff%colind_loc(ssh_stiff%nza))
 	allocate(ssh_stiff%values(ssh_stiff%nza))
 	ssh_stiff%values=0.0_WP  
 	
@@ -714,7 +715,9 @@ subroutine stiff_mat_ale
 		! fill colind with local indices location from n_pos
 		ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
 	end do
-	
+        ssh_stiff%colind_loc=ssh_stiff%colind
+        ssh_stiff%rowptr_loc=ssh_stiff%rowptr
+
 	!!! Thus far everything is in local numbering.	!!!
 	!!! We will update it later when the values are !!!
 	!!! filled in 									!!!
@@ -868,7 +871,7 @@ subroutine stiff_mat_ale
 	do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
 		! convert global mesh node point numbering to global numbering of how the single 
 		! node points are contigous located on the CPUs
-		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
+		ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))
 	end do	
 	
 	!___________________________________________________________________________
@@ -1144,7 +1147,7 @@ subroutine vert_vel_ale
 	implicit none
 	
 	integer       :: el(2), enodes(2), n, nz, ed
-	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt 
+	real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
 	integer 	  :: nzmax 
 	
 	!_______________________________
@@ -1353,7 +1356,7 @@ subroutine vert_vel_ale
 			! to first "refill" the subsurface layerthickness and with the rest 
 			! than the surface layerthickness
 			elseif (dhbar_total>0.0_WP .and. & 
-					any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))==.True. &
+					any(hnode(2:lzstar_lev,n)/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) &
 					) then
 				! --> do return to zlevel
 				!_______________________________________________________________
@@ -1492,9 +1495,22 @@ subroutine vert_vel_ale
 			CFL_z(nz,n)=max(c1, c2)
 		end do
 	end do
-	if (any(CFL_z>1.0_WP)) then
-		write(*,*) ' --> MAX CFL_z=',maxval(CFL_z),' , mstep=',mstep,' , mype=',mype
-	end if
+    cflmax=maxval(CFL_z(:, 1:myDim_nod2D)) !local CFL maximum is different on each mype
+    if (cflmax>1.0) then
+       do n=1, myDim_nod2D
+          do nz=1,nlevels_nod2D(n)-1
+             if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
+                write(*,*) '***********************************************************'
+                write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
+	            write(*,*) 'mstep      = ', mstep
+                write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
+                write(*,*) '2D node    = ', myList_nod2D(n)
+                write(*,*) 'nz         = ', nz
+                write(*,*) '***********************************************************'
+             end if
+           end do
+       end do
+    end if
 	
 	!___________________________________________________________________________
 	! Split implicit vertical velocity onto implicit and explicit components
@@ -1763,7 +1779,6 @@ DO elem=1,myDim_elem2D
 		UV_rhs(1,nz,elem)=ur(nz)
 		UV_rhs(2,nz,elem)=vr(nz)
 	end do
-	
 end do   !!! cycle over elements
 end subroutine impl_vert_visc_ale
 !

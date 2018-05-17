@@ -120,7 +120,6 @@ subroutine update_atm_forcing(istep)
   use g_comm_auto
   use g_read_CORE_NetCDF
 #if defined (__oasis)
-  use cpl_config
   use cpl_driver
   use g_rotate_grid
 #endif
@@ -148,6 +147,7 @@ subroutine update_atm_forcing(istep)
   real(kind=8), dimension(nci,ncj)      :: array_nc, array_nc2,array_nc3,x
   character(500)                        :: file
 
+
   t1=MPI_Wtime()
 #ifdef __oasis
      if (firstcall) then
@@ -163,7 +163,12 @@ subroutine update_atm_forcing(istep)
          exchange =0.0
          if (i.eq.1) then
             do n=1,myDim_nod2D+eDim_nod2D
-               exchange(n)=tr_arr(1, n, 1)       ! sea surface temperature deg C
+#if defined (__oifs)
+            exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+#else
+            exchange(n)=tr_arr(1, n, 1)		                    ! sea surface temperature [°C]
+#endif
+
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -171,6 +176,12 @@ subroutine update_atm_forcing(istep)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
+#if defined (__oifs)
+            elseif (i.eq.5) then
+            exchange(:) = ice_temp(:)                               ! ice temperature
+            elseif (i.eq.6) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
+#endif
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
          endif
@@ -184,9 +195,6 @@ subroutine update_atm_forcing(istep)
       mask=1.
       do i=1,nrecv
          exchange =0.0
-#ifdef VERBOSE
-	 if (mype==0) write(*,*) 'Trying to RECV: flux ', i 	  
-#endif
          call cpl_oasis3mct_recv (i,exchange,action)
 	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
@@ -196,15 +204,15 @@ subroutine update_atm_forcing(istep)
              stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
 	     do_rotate_oce_wind=.true.
          elseif (i.eq.2) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle
              stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
 	     do_rotate_oce_wind=.true.
          elseif (i.eq.3) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle	
              stress_atmice_x(:) =  exchange(:)                    ! taux_ice
 	     do_rotate_ice_wind=.true.
          elseif (i.eq.4) then
-     	     if (.not. action) cycle	 
+     	     if (.not. action) cycle	
              stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
 	     do_rotate_ice_wind=.true.	     
          elseif (i.eq.5) then
@@ -269,14 +277,18 @@ subroutine update_atm_forcing(istep)
 	     call force_flux_consv(shortwave, mask, i, 0,action)
          elseif (i.eq.12) then
              if (action) then
+#if defined (__oifs)
+	        exchange=0	
+#endif
 	        runoff(:)                   =  exchange(:)        ! runoff + calving
     	        mask=1.
 		call force_flux_consv(runoff, mask, i, 0,action)
-		!runoff=0.
              end if
 	  end if  	  
 #ifdef VERBOSE
-	  if (mype==0) write(*,*) 'RECV: flux ', i, ', max val: ', maxval(exchange), ' . ACTION? ', action 	  
+	  if (mype==0) then
+		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
+	  end if
 #endif
       end do
 
@@ -330,6 +342,7 @@ subroutine update_atm_forcing(istep)
 #endif /* (__oasis) */     
   end if
 #endif
+
 end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
@@ -972,8 +985,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
 				flux_correction_total
   use g_parsup,	         only : myDim_nod2D, eDim_nod2D, mype
   use o_mesh,		 only :	geo_coord_nod2D
-  use cpl_driver,	 only : nrecv, cpl_recv
-  use cpl_config, only : a2o_fcorr_stat   
+  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
   use o_PARAM,           only : mstep
   IMPLICIT NONE
   
@@ -987,6 +999,10 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
   real(kind=8)			:: weight(myDim_nod2D+eDim_nod2D)    
   real(kind=8)			:: flux_global(2), flux_local(2)
   real(kind=8)			:: eff_vol(2)
+
+#if defined (__oifs)
+  return !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping instead
+#endif
 
   if (mstep==1) then
 	if (mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
@@ -1090,7 +1106,6 @@ SUBROUTINE compute_residual(field2d, mask, n)
   
   real(kind=8)               :: flux_global(2), flux_local(2)
   real(kind=8)               :: eff_vol(2)
-  
   !compute net flux (for flux n) on ocean side
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
   oce_net_fluxes_north(n)=flux_global(1)
@@ -1100,7 +1115,6 @@ SUBROUTINE compute_residual(field2d, mask, n)
   flux_correction_north(n)= atm_net_fluxes_north(n) - oce_net_fluxes_north(n)
   flux_correction_south(n)= atm_net_fluxes_south(n) - oce_net_fluxes_south(n)
   flux_correction_total(n)= flux_correction_north(n) + flux_correction_south(n)
-  
 END SUBROUTINE compute_residual
 
 !
@@ -1180,6 +1194,9 @@ SUBROUTINE net_rec_from_atm(action)
   INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
   INTEGER                                         :: request(2)
   real(kind=8)                 			  :: aux(nrecv)
+#if defined (__oifs)
+  return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
+#endif
 
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)

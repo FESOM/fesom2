@@ -19,7 +19,7 @@ program MAIN
   implicit none
   character(len=1000)   :: nmlfile  !> name of configuration namelist file
   
-  nmlfile ='../config/namelist.config'
+  nmlfile ='namelist.config'
   open (20,file=nmlfile)
   read (20,NML=paths)         ! We need MeshPath
   read (20,NML=geometry)      ! We need cyclic_length and cartesian
@@ -535,7 +535,7 @@ allocate(nlevels_nod2D(nod2D))
     do nz=4,nl
        exit_flag=0
        count1=0
-       do while((exit_flag==0).and.(count1<100))
+       do while((exit_flag==0).and.(count1<1000))
           exit_flag=1
           count1=count1+1
           do n=1,elem2D

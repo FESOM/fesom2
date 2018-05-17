@@ -2,11 +2,13 @@
 
 module load gcc/4.8.2
 export LD_LIBRARY_PATH=/sw/rhel6-x64/gcc/gcc-4.8.2/lib64:$LD_LIBRARY_PATH # avoid GLIBCXX_3.4.15 not found error
-module unload intel && module load intel/18.0.0
+module unload intel && module load intel/18.0.1
 
+#export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2018.1.163
 export FC=mpiifort CC=mpiicc CXX=mpiicpc; module unload intelmpi && module load intelmpi/2017.0.098
 #export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.3.3002 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.8.3
 #export FC=mpif90 CC=mpicc CXX=mpicxx; module load mxm/3.4.3082 fca/2.5.2393 bullxmpi_mlx/bullxmpi_mlx-1.2.9.2
+#export FC=mpif90 CC=mpicc CXX=mpicxx OPENMPI=TRUE;  module unload intelmpi && module load openmpi/2.0.2p1_hpcx-intel14
 
 # intelmpi settings from DKRZ
 export I_MPI_FABRICS=shm:dapl
@@ -27,6 +29,31 @@ export MXM_RDMA_PORTS=mlx5_0:1
 export MXM_LOG_LEVEL=FATAL
 # Disable GHC algorithm for collective communication
 export OMPI_MCA_coll=^ghc
+
+# openmpi settings from DKRZ (note, that some of above variables will be redefined)
+if test "${OPENMPI}" == "TRUE"; then
+export OMPI_MCA_pml=cm         # sets the point-to-point management layer
+export OMPI_MCA_mtl=mxm        # sets the matching transport layer (MPI-2 one-sided comm.)
+export MXM_RDMA_PORTS=mlx5_0:1
+export MXM_LOG_LEVEL=ERROR
+export MXM_HANDLE_ERRORS=bt
+export UCX_HANDLE_ERRORS=bt
+
+# enable HCOLL based collectives
+export OMPI_MCA_coll=^fca              # disable FCA for collective MPI routines
+export OMPI_MCA_coll_hcoll_enable=1    # enable HCOLL for collective MPI routines
+export OMPI_MCA_coll_hcoll_priority=95
+export OMPI_MCA_coll_hcoll_np=8        # use HCOLL for all communications with more than 8 tasks
+export HCOLL_MAIN_IB=mlx5_0:1
+export HCOLL_ENABLE_MCAST=1
+export HCOLL_ENABLE_MCAST_ALL=1
+
+# disable specific HCOLL functions (strongly depends on the application)
+export HCOLL_ML_DISABLE_BARRIER=1
+export HCOLL_ML_DISABLE_IBARRIER=1
+export HCOLL_ML_DISABLE_BCAST=1
+export HCOLL_ML_DISABLE_REDUCE=1
+fi
 
 module unload netcdf && module load netcdf_c/4.3.2-gcc48
 module unload cmake && module load cmake

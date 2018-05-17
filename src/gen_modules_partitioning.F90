@@ -89,8 +89,8 @@ subroutine par_init    ! initializes MPI
   call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
   MPI_COMM_FESOM=MPI_COMM_WORLD
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes, i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype, i)
+  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
 #endif  
 
   if(mype==0) then
@@ -100,15 +100,32 @@ subroutine par_init    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(abort)       ! finalizes MPI
+#if defined (__oasis)
+  use mod_prism 
+#endif
   implicit none
   integer,optional :: abort
+
+#ifndef __oasis
   if (present(abort)) then
-   write(*,*) 'Run finished unexpectedly!'
-   call MPI_ABORT( MPI_COMM_FESOM, 1 )
+     write(*,*) 'Run finished unexpectedly!'
+     call MPI_ABORT( MPI_COMM_FESOM, 1 )
   else
-  call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
-  call  MPI_Finalize(MPIerr)
+     call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
+     call  MPI_Finalize(MPIerr)
   endif
+#else
+  if (.not. present(abort)) then
+     print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
+     call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
+  end if
+  call prism_terminate_proto(MPIerr)
+  print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
+  call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
+  print *, 'FESOM calls MPI_Finalize'
+  call MPI_Finalize(MPIerr)
+#endif
+  print *, 'fesom should stop with exit status = 0'
 end subroutine par_ex
 !=================================================================
 subroutine set_par_support_ini

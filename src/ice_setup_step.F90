@@ -44,11 +44,10 @@ USE g_CONFIG
 
 implicit none
 integer   :: n_size, e_size, mn, k, n, n1, n2
-
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
-! Allocate memory for variables of ice model      
+! Allocate memory for variables of ice model
  allocate(u_ice(n_size), v_ice(n_size))
  if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
@@ -57,9 +56,21 @@ e_size=myDim_elem2D+eDim_elem2D
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
-
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
  allocate(m_ice_old(n_size), a_ice_old(n_size), m_snow_old(n_size), thdgr_old(n_size)) !PS
+ if (whichEVP > 0) then
+    allocate(u_ice_aux(n_size), v_ice_aux(n_size))
+    allocate(alpha_evp_array(myDim_elem2D))
+    allocate(beta_evp_array(n_size))
+
+    alpha_evp_array=alpha_evp
+    beta_evp_array =alpha_evp  ! alpha=beta works most reliable
+    u_ice_aux=0.0_WP
+    v_ice_aux=0.0_WP
+ end if
+ 
+ allocate(rhs_mdiv(n_size), rhs_adiv(n_size), rhs_msdiv(n_size))
+
  m_ice_old=0.0_WP !PS
  a_ice_old=0.0_WP !PS
  m_snow_old=0.0_WP !PS
@@ -81,7 +92,9 @@ e_size=myDim_elem2D+eDim_elem2D
  sigma22=0.0_WP
  sigma12=0.0_WP
  t_skin=0.0_WP
-
+ rhs_mdiv=0.0_WP
+ rhs_adiv=0.0_WP
+ rhs_msdiv=0.0_WP
 if (use_means) then
  m_ice_mean=0.0_WP
  a_ice_mean=0.0_WP
@@ -100,8 +113,13 @@ endif
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
 #if defined (__oasis)
-  allocate(oce_heat_flux(n2), ice_heat_flux(n2))
-  allocate(tmp_oce_heat_flux(n2), tmp_ice_heat_flux(n2))
+  allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
+  allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
+#if defined (__oifs)
+  allocate(ice_alb(n_size), ice_temp(n_size))
+  ice_alb=0.
+  ice_temp=0.
+#endif /* (__oifs) */
   oce_heat_flux=0.
   ice_heat_flux=0.
   tmp_oce_heat_flux=0.
@@ -115,17 +133,38 @@ subroutine ice_timestep(step)
 !
 use o_param
 use g_parsup
-USE g_CONFIG
+use g_CONFIG
+use i_PARAM, only: whichEVP
 implicit none
 integer      :: step 
 REAL(kind=8) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
- call EVPdynamics
+SELECT CASE (whichEVP)
+   CASE (0)
+      call EVPdynamics
+   CASE (1)
+      call EVPdynamics_m
+   CASE (2)
+      call EVPdynamics_a
+   CASE DEFAULT
+      if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
+      call par_ex
+      stop
+END SELECT
  t1=MPI_Wtime()     
  ! ===== Advection part
+
+! old FCT routines
+! call ice_TG_rhs
+! call ice_fct_solve
+! call cut_off
+! new FCT routines from Sergey Danilov 08.05.2018
+ call ice_TG_rhs_div   
  call ice_fct_solve
+ call ice_update_for_div
  call cut_off
+
  t2=MPI_Wtime()
  ! ===== Thermodynamic part
  call thermodynamics

@@ -9,6 +9,7 @@ module io_MEANDATA
   use g_forcing_arrays
   use i_ARRAYS
   use o_mixing_KPP_mod
+  use diagnostics
   implicit none
 #include "netcdf.inc"
   private
@@ -84,6 +85,7 @@ subroutine ini_mean_io
   call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
   call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
 !DS
+
   call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'd')
   call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'd')
   call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm')
@@ -96,22 +98,20 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm')
-
   call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',      'N/m2',   stress_atmice_x(:),            1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',      'N/m2',   stress_atmice_y(:),            1, 'm')
-
   call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',      'N/m2',   stress_atmoce_x(:),            1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',      'N/m2',   stress_atmoce_y(:),            1, 'm')
-
   call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',      'N/m2',   stress_iceoce_x(:),            1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm')
-
-
   call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y')
   call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm')
+#if defined (__oifs)
+  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm')
+#endif
 
   if (trim(mix_scheme)=='KPP') then
      call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm')
@@ -126,6 +126,13 @@ subroutine ini_mean_io
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'fer_K', 'GM, stirring diffusivity',     'm2/s',        fer_k(1:myDim_nod2D),           1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
+  end if
+  if (ldiag_solver) then
+     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's')
+     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's')
+  end if
+  if (lcurt_stress_surf) then
+     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 's')
   end if
 end subroutine ini_mean_io
 !

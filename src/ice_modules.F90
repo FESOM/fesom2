@@ -32,13 +32,16 @@ MODULE i_PARAM
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
+  real(kind=8)              :: alpha_evp=250, beta_evp=250
+  real(kind=8)              :: c_aevp=0.15_8 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
   real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
 
   logical                   :: ice_free_slip=.false.
+  integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real*8    :: ice_dt !ice step=ice_ave_steps*oce_step
-NAMELIST /ice_dyn/ Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
+NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
 END MODULE i_PARAM
 !
@@ -59,11 +62,14 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
+  real(kind=8),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=8),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
   real(kind=8),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
@@ -84,11 +90,12 @@ save
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)        :: icefluxes
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: icepplus, icepminus
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: mass_matrix  
-
+ REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: alpha_evp_array(:)   ! of myDim_elem2D
+ REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: beta_evp_array(:)    ! of myDim_node2D+eDim_node2D
 
 ! Mean arrays
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean,m_snow_mean
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean, m_snow_mean
   END MODULE i_ARRAYS
 !=====================================================================
 module i_therm_param

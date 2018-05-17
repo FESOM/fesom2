@@ -75,7 +75,7 @@ subroutine thermodynamics
   ! ================
   ! end: friction velocity 
   ! ================
-  
+
   do i=1, myDim_nod2d+eDim_nod2D
      h       = m_ice(i)
      hsn     = m_snow(i)

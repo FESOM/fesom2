@@ -147,6 +147,7 @@ real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
 real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
 integer,allocatable,dimension(:,:)         ::   elem_neighbors
 integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
+real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
 integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
 real(kind=WP),allocatable,dimension(:)     ::   depth
                                               ! depth(n) is the depths at 
@@ -157,6 +158,7 @@ real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec
 real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
                                               ! Coefficients to compute
 					      ! gradient of scalars on elements
+INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
 ! Vertical structure             
 integer                                    :: nl
 real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
@@ -171,6 +173,8 @@ real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
      real(kind=8), allocatable, dimension(:)      :: values
      integer(KIND=4), allocatable,   dimension(:) :: colind
      integer(KIND=4), allocatable,   dimension(:) :: rowptr
+     integer(KIND=4), allocatable,   dimension(:) :: colind_loc
+     integer(KIND=4), allocatable,   dimension(:) :: rowptr_loc
   end type sparse_matrix
 ! Elevation stiffness matrix
 type(sparse_matrix)                           :: ssh_stiff
