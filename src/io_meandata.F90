@@ -10,6 +10,7 @@ module io_MEANDATA
   use i_ARRAYS
   use o_mixing_KPP_mod
   use diagnostics
+  use i_PARAM, only: whichEVP
   implicit none
 #include "netcdf.inc"
   private
@@ -133,6 +134,11 @@ subroutine ini_mean_io
   end if
   if (lcurt_stress_surf) then
      call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 's')
+  end if
+
+  if (whichEVP==2) then
+     call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd')
+     call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd')
   end if
 end subroutine ini_mean_io
 !

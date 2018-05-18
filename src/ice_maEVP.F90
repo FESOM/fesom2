@@ -219,7 +219,7 @@ subroutine EVPdynamics_m
   vale=1.0_8/(ellipse**2)
   det2=1.0_8/(1.0_8+alpha_evp)
   det1=alpha_evp*det2
-  rdt=ice_dt/(1.0*evp_rheol_steps)
+  rdt=ice_dt
   steps=evp_rheol_steps
   
   u_ice_aux=u_ice    ! Initialize solver variables
@@ -268,14 +268,6 @@ subroutine EVPdynamics_m
      endif
   enddo
 
-! boundary nodes are skipped from computation
-  do  ed=1, Mydim_edge2D
-     ! boundary conditions
-     if (myList_edge2D(ed) > edge2D_in) then
-        if (edges(1,ed) <= myDim_nod2D) ice_nod(edges(1,ed)) =.false.
-        if (edges(2,ed) <= myDim_nod2D) ice_nod(edges(2,ed)) = .false.
-     endif
-  end do
 ! precompute pressure factor
   do el=1,myDim_elem2D
      elnodes=elem2D_nodes(:,el)
@@ -402,15 +394,6 @@ subroutine EVPdynamics_m
         end if
      end do
 
-     !NR Boundary nodes are handled with ice_nod(i)
-     ! do  ed=1, Mydim_edge2D
-     !     ! boundary conditions
-     !     if (myList_edge2D(ed) > edge2D_in) then
-     !        u_ice_aux(edges(1:2,ed))=0.0_WP
-     !        v_ice_aux(edges(1:2,ed))=0.0_WP
-     !     endif
-     ! end do    
-
      call exchange_nod_begin(u_ice_aux, v_ice_aux)
 
      do row=1, myDim_nod2d 
@@ -420,11 +403,6 @@ subroutine EVPdynamics_m
 
      call exchange_nod_end
   end do
-
-  where (a_ice < 0.01) ! Added 28.10.14 for full compatibility with the VP solver 
-        u_ice_aux=0._WP
-        v_ice_aux=0._WP
-  end where
 
   u_ice=u_ice_aux
   v_ice=v_ice_aux
@@ -488,10 +466,11 @@ subroutine find_alpha_field_a
      delta=sqrt(delta)
          
      pressure=pstar*exp(-c_pressure*(1.0_8-asum))/(delta+delta_min) ! no multiplication
-                                                                    ! with thickness (msum) 
-     alpha_evp_array(elem)=max(50.0,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))  
-      ! /voltriangle(elem) for FESOM1.4
-      ! We do not allow alpha to be too small!
+                                                                    ! with thickness (msum)
+     !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
+     alpha_evp_array(elem)=max(50.0,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
+     ! /voltriangle(elem) for FESOM1.4
+     ! We do not allow alpha to be too small!
    end do
   end subroutine find_alpha_field_a  
 ! ====================================================================
@@ -598,7 +577,7 @@ use g_comm_auto
   REAL(kind=8)    :: t0,t1, t2, t3, t4, t5, t00, txx
  
   steps=evp_rheol_steps
-  rdt=ice_dt/(1.0*evp_rheol_steps)  
+  rdt=ice_dt
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
   call ssh2rhs
@@ -627,24 +606,9 @@ use g_comm_auto
          u_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
      end do
-     do  ed=1, myDim_edge2D
-         ! boundary conditions
-         if (myList_edge2D(ed) > edge2D_in) then
-            u_ice_aux(edges(1:2,ed))=0.0_WP
-            v_ice_aux(edges(1:2,ed))=0.0_WP
-         endif
-     end do    
      call exchange_nod(u_ice_aux, v_ice_aux)
   end do
-  
-    do i=1, myDim_nod2D+eDim_nod2D   ! Added 28.10.14 for full compatibility with 
-                                     ! the VP solver 
-    if (a_ice(i)<=0.01) then
-       u_ice_aux(i)=0.0
-       v_ice_aux(i)=0.0
-    end if
-    end do 
-    
+     
     u_ice=u_ice_aux
     v_ice=v_ice_aux
  
@@ -655,7 +619,6 @@ end subroutine EVPdynamics_a
 !
 ! =================================================================
 !
- 
 subroutine find_beta_field_a 
 ! beta_evp_array is defined at nodes, and this is the only 
 ! reason we need it in addition to alpha_evp_array (we work with 

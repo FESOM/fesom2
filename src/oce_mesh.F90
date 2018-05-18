@@ -1178,6 +1178,9 @@ t0=MPI_Wtime()
  END DO
  DO n=1,myDim_nod2D+eDim_nod2D 
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
+ ! in case of numerical noise at the boundaries
+ if (lon > 2.*pi) lon=lon-2.*pi
+ if (lon <-2.*pi) lon=lon+2.*pi
  geo_coord_nod2D(1,n)=lon
  geo_coord_nod2D(2,n)=lat	 
  END DO
