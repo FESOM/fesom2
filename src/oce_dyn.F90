@@ -1021,7 +1021,7 @@ IMPLICIT NONE
 real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
 integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
-real, allocatable :: aux(:,:) 
+real(kind=WP), allocatable :: aux(:,:) 
 	!  
 	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
 	! Fill in viscosity:
