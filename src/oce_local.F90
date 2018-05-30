@@ -107,7 +107,7 @@ SUBROUTINE save_dist_mesh
 
   if(mype==0) then
      file_name=trim(dist_mesh_dir)//'rpart.out'  
-     fileID=10+mype  
+     fileID=103+mype !skip unit range 100--102  
      open(fileID, file=file_name)
      ncount=0;
      DO n=1, nod2D
@@ -121,7 +121,7 @@ SUBROUTINE save_dist_mesh
 
 
   file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
-  fileID=10+mype  
+  fileID=103+mype !skip unit range 100--102 
   ! =============================   
   ! lists of owned nodes and elements
   ! =============================
@@ -147,7 +147,7 @@ SUBROUTINE save_dist_mesh
   ! ========================= 
   call com_global2local   
   file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out' 
-  fileID=10+mype  
+  fileID=103+mype  !skip unit range 100--102 
   open(fileID, file=file_name)
   write(fileID,*) mype
   write(fileID,*) com_nod2D%rPEnum
@@ -200,7 +200,7 @@ SUBROUTINE save_dist_mesh
   ! ================================  
   if(mype==0) then
      file_name=trim(dist_mesh_dir)//'rpart.out'  
-     fileID=10+mype  
+     fileID=103+mype !skip unit range 100--102 
      open(fileID, file=file_name)
      ncount=0
      DO n=1, nod2D

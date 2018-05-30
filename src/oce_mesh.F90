@@ -102,7 +102,7 @@ IMPLICIT NONE
   !===========================
  
   file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
-  fileID=10+mype  
+  fileID=103+mype  !skip unit range 100--102
     
   open(fileID, file=trim(file_name))
   read(fileID,*) n
@@ -331,7 +331,7 @@ IMPLICIT NONE
  ! every proc reads its file
  ! ==============================
  file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
- fileID=10+mype  
+ fileID=103+mype !skip unit range 100--102  
  open(fileID, file=file_name)
  read(fileID,*)  n
  read(fileID,*) com_nod2D%rPEnum
