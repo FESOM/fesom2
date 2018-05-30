@@ -18,6 +18,9 @@ program MAIN
   use g_rotate_grid
   implicit none
   character(len=1000)   :: nmlfile  !> name of configuration namelist file
+  integer               :: start_t, interm_t, finish_t, rate_t
+  call system_clock(start_t, rate_t)
+  interm_t = start_t
   
   nmlfile ='namelist.config'
   open (20,file=nmlfile)
@@ -29,6 +32,10 @@ program MAIN
   call set_mesh_transform_matrix  !(rotated grid) 
 !!$  call par_init
   call read_mesh_ini
+  call system_clock(finish_t)
+  print '("**** Reading initial mesh time = ",f12.3," seconds. ****")', &
+       real(finish_t-interm_t)/real(rate_t)
+  interm_t = finish_t
   call test_tri_ini
   call find_edges_ini
   call find_elem_neighbors_ini
@@ -38,10 +45,23 @@ program MAIN
   deallocate(coord_nod2D)
   deallocate(edge_tri)
   deallocate(zbar,Z,nlevels,depth)
+  call system_clock(finish_t)
+  print '("**** Checking and initializing mesh time = ",f12.3," seconds. ****")', &
+       real(finish_t-interm_t)/real(rate_t)
+  interm_t = finish_t
 
   call stiff_mat_ini
   call set_par_support_ini
+  call system_clock(finish_t)
+  print '("**** Partitioning time = ",f12.3," seconds. ****")', &
+       real(finish_t-interm_t)/real(rate_t)
+  interm_t = finish_t
   call communication_ini
+  call system_clock(finish_t)
+  print '("**** Storing partitioned mesh time = ",f12.3," seconds. ****")', &
+       real(finish_t-interm_t)/real(rate_t)
+  print '("**** Total time = ",f12.3," seconds. ****")', &
+       real(finish_t-start_t)/real(rate_t)
 end program MAIN
 !=============================================================================
 !> @brief
@@ -770,6 +790,7 @@ subroutine communication_ini
   use o_MESH
   USE g_CONFIG
   USE g_PARSUP
+  use omp_lib
   implicit none
 
   integer        :: n
@@ -783,32 +804,25 @@ subroutine communication_ini
   INQUIRE(file=trim(dist_mesh_dir), EXIST=L_EXISTS)
   if (.not. L_EXISTS) call system('mkdir '//trim(dist_mesh_dir))
 
-!$OMP PARALLEL NUM_THREADS(8)
-!!$  if (OMP_GET_THREAD_NUM() == 0) then
-!!$     write(*,*) 'Setting up communication arrays using ', OMP_GET_NUM_THREADS(), ' threads'
-!!$  endif
-  allocate(myList_nod2D(nod2D))
-  allocate(myList_elem2D(elem2D))
-  allocate(myList_edge2D(edge2D))
+#ifdef OMP_MAX_THREADS
+!$OMP PARALLEL NUM_THREADS(OMP_MAX_THREADS)
+  if (OMP_GET_THREAD_NUM() == 0) then
+     write(*,*) 'Setting up communication arrays using ', OMP_GET_NUM_THREADS(), ' threads'
+  endif
+#else
+!$OMP PARALLEL NUM_THREADS(1)
+  write(*,*) 'Setting up communication arrays using 1 thread (serially)'
+#endif
   
 !$OMP DO
   do n = 0, npes-1
      mype = n ! mype is threadprivate and must not be iterator
-!!$     call communication_edgen
      call communication_nodn
      call communication_elemn
-!!$     call communication_elem_fulln
 
-     call mymesh
      call save_dist_mesh         ! Write out communication file com_infoxxxxx.out
-     !    call communication_edgen_old
-     !    call communication_edgen
   end do
 !$OMP END DO
-!!$  call par_ex
-  deallocate(myList_nod2D)
-  deallocate(myList_elem2D)
-  deallocate(myList_edge2D)
 !$OMP END PARALLEL
 
   deallocate(elem_neighbors)

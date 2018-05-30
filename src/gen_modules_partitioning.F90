@@ -13,17 +13,19 @@ save
 
  integer                                :: MPI_COMM_FESOM
  integer, parameter   :: MAX_LAENDERECK=8
+ integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
-     integer    :: rPEnum                    ! the number of PE I receive info from 
-     integer, dimension(:), allocatable :: rPE   ! their list
-     integer, dimension(:), allocatable :: rptr  ! allocatables to the list of nodes
-     integer, dimension(:), allocatable :: rlist ! the list of nodes
-     integer    :: sPEnum                    ! send part 
-     integer, dimension(:), allocatable :: sPE
-     integer, dimension(:), allocatable :: sptr
-     integer, dimension(:), allocatable :: slist
-     integer, dimension(:), allocatable :: req  ! request for MPI_Wait
-     integer    :: nreq  ! number of requests for MPI_Wait (to combine halo exchange of several fields)
+     integer                                       :: rPEnum ! the number of PE I receive info from 
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: rPE    ! their list
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS+1) :: rptr   ! allocatables to the list of nodes
+     integer, dimension(:), allocatable            :: rlist  ! the list of nodes
+     integer                                       :: sPEnum ! send part 
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sPE
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sptr
+     integer, dimension(:), allocatable            :: slist
+     integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
+     integer                                       :: nreq   ! number of requests for MPI_Wait
+                                                             ! (to combine halo exchange of several fields)
   end type com_struct
 
   type(com_struct)   :: com_nod2D
@@ -135,8 +137,8 @@ subroutine set_par_support_ini
   use g_config
   implicit none
 
-  integer   n, j, k, nini, nend, ierr
-  integer(idx_t)   :: np(10)
+  integer         :: n, j, k, nini, nend, ierr
+  integer(idx_t)  :: np(10)
 
   interface 
      subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
@@ -174,7 +176,7 @@ subroutine set_par_support_ini
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-  call check_partitioning
+!!$  call check_partitioning
 
   write(*,*) 'Partitioning is done.'
 
@@ -190,16 +192,16 @@ end subroutine set_par_support_ini
 
 subroutine check_partitioning
 
-! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
-!   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
-!   * lower maximum of weights per partition (better load balancing)
-!   * lower memory demand
-!
-! BUT: there might be outliers, single nodes connected to their partition by
-!      only one edge or even completely isolated. This spoils everything :-(
-!
-! This routine checks for isolated nodes and moves them to an adjacent partition,
-! trying not to spoil the load balance.
+  ! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
+  !   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
+  !   * lower maximum of weights per partition (better load balancing)
+  !   * lower memory demand
+  !
+  ! BUT: there might be outliers, single nodes connected to their partition by
+  !      only one edge or even completely isolated. This spoils everything :-(
+  !
+  ! This routine checks for isolated nodes and moves them to an adjacent partition,
+  ! trying not to spoil the load balance.
 
   use o_MESH
   integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
@@ -207,14 +209,11 @@ subroutine check_partitioning
   integer :: max_nod_per_part(2), min_nod_per_part(2)
   integer :: average_nod_per_part(2), node_neighb_part(100)
   logical :: already_counted, found_part
-  
+
   integer :: max_adjacent_nodes
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
 
-! call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-!             nlevels_nod2D, npes, part)
-
-! Check load balancing
+  ! Check load balancing
   do i=0,npes-1
      nod_per_partition(1,i) = count(part(:) == i)
      nod_per_partition(2,i) = sum(nlevels_nod2D,part(:) == i)
@@ -228,9 +227,9 @@ subroutine check_partitioning
 
   average_nod_per_part(1) = nod2D / npes
   average_nod_per_part(2) = sum(nlevels_nod2D(:)) / npes
-  
-! Now check for isolated nodes (connect by one or even no edge to other
-! nodes of its partition) and repair, if possible
+
+  ! Now check for isolated nodes (connect by one or even no edge to other
+  ! nodes of its partition) and repair, if possible
 
   max_adjacent_nodes = maxval(ssh_stiff%rowptr(2:nod2D+1) - ssh_stiff%rowptr(1:nod2D))
   allocate(ne_part(max_adjacent_nodes), ne_part_num(max_adjacent_nodes), &
@@ -251,14 +250,14 @@ subroutine check_partitioning
            print *,'Isolated node',n, 'in partition', part(n)
            print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
 
-        ! count the adjacent nodes of the other PEs
-        
+           ! count the adjacent nodes of the other PEs
+
            np=1
            ne_part(1) = node_neighb_part(1)
            ne_part_num(1) = 1
            ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
            ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
-           
+
            do i=1,ie-is
               if (node_neighb_part(i)==part(n)) cycle
               already_counted = .false.
@@ -277,15 +276,15 @@ subroutine check_partitioning
                  ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
               endif
            enddo
-        
-        ! Now, check for two things: The load balance, and if 
-        ! there is more than one node of that partition.
-        ! Otherwise, it would become isolated again.
 
-        ! Best choice would be the partition with most adjacent nodes (edgecut!)
-        ! Choose, if it does not decrease the load balance. 
-        !        (There might be two partitions with the same number of adjacent
-        !         nodes. Don't care about this here)
+           ! Now, check for two things: The load balance, and if 
+           ! there is more than one node of that partition.
+           ! Otherwise, it would become isolated again.
+
+           ! Best choice would be the partition with most adjacent nodes (edgecut!)
+           ! Choose, if it does not decrease the load balance. 
+           !        (There might be two partitions with the same number of adjacent
+           !         nodes. Don't care about this here)
 
            kmax = maxloc(ne_part_num(1:np),1)
 
@@ -298,45 +297,45 @@ subroutine check_partitioning
                 ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
               k = kmax
            else
-           ! Don't make it too compicated. Reject partitions that have only one
-           ! adjacent node. Take the next not violating the load balance.
+              ! Don't make it too compicated. Reject partitions that have only one
+              ! adjacent node. Take the next not violating the load balance.
               found_part = .false.
               do k=1,np
                  if (ne_part_num(k)==1 .or. k==kmax) cycle
-                 
+
                  if  (ne_part_load(1,k) <= max_nod_per_part(1) .and. &
                       ne_part_load(2,k) <= max_nod_per_part(2) ) then
-                    
+
                     found_part = .true.
                     exit
                  endif
               enddo
 
               if (.not. found_part) then
-              ! Ok, don't think to much. Simply go for minimized edge cut.
+                 ! Ok, don't think to much. Simply go for minimized edge cut.
                  k = kmax
               endif
            endif
-        
-! Adjust the load balancing
-        
+
+           ! Adjust the load balancing
+
            nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
            nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
            nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
            nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
 
-! And, finally, move nod n to other partition        
+           ! And, finally, move nod n to other partition        
            part(n) = ne_part(k)
            print *,'Node',n,'is moved to part',part(n)
         endif
-  enddo  
-  
-  if (n_iso==0) then
-     print *,'No isolated nodes found'
-     exit isolated_nodes_check 
-  endif
-  ! Check for isolated nodes again
-end do isolated_nodes_check
+     enddo
+
+     if (n_iso==0) then
+        print *,'No isolated nodes found'
+        exit isolated_nodes_check 
+     endif
+     ! Check for isolated nodes again
+  end do isolated_nodes_check
 
   deallocate(ne_part, ne_part_num, ne_part_load)
 
@@ -351,20 +350,17 @@ end do isolated_nodes_check
 
   print *,'=== LOAD BALANCING ==='
   print *,'2D nodes: min, aver, max per part',min_nod_per_part(1), &
-          average_nod_per_part(1),max_nod_per_part(1)
+       average_nod_per_part(1),max_nod_per_part(1)
 
   write(*,"('2D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
-          100.*real(min_nod_per_part(1)) / real(average_nod_per_part(1)), &
-          100.*real(max_nod_per_part(1)) / real(average_nod_per_part(1))
+       100.*real(min_nod_per_part(1)) / real(average_nod_per_part(1)), &
+       100.*real(max_nod_per_part(1)) / real(average_nod_per_part(1))
 
   print *,'3D nodes: Min, aver, max per part',min_nod_per_part(2), &
-          average_nod_per_part(2),max_nod_per_part(2)
+       average_nod_per_part(2),max_nod_per_part(2)
   write(*,"('3D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
-          100.*real(min_nod_per_part(2)) / real(average_nod_per_part(2)), &
-          100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
-
-
-
+       100.*real(min_nod_per_part(2)) / real(average_nod_per_part(2)), &
+       100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
 
 end subroutine check_partitioning
 !=======================================================================
