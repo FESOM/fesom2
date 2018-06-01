@@ -115,10 +115,13 @@ subroutine par_ex(abort)       ! finalizes MPI
      call  MPI_Finalize(MPIerr)
   endif
 #else
+#ifndef __oifs
+!for coupling with ECHAM only
   if (.not. present(abort)) then
      print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
   end if
+#endif
   call prism_terminate_proto(MPIerr)
   print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
