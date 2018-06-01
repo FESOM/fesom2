@@ -137,15 +137,22 @@ contains
   subroutine clock_finish
     implicit none
     !
-    if ((daynew==ndpyr) .and. (timenew==86400.)) then
-       timenew=0.0
-       daynew=1
-       yearnew=yearold+1
+    real(kind=8)             :: dum_timenew     !time in a day, unit: sec
+    integer                  :: dum_daynew       !day in a year
+    integer                  :: dum_yearnew     !year before and after time step
+    
+    dum_timenew = timenew
+    dum_daynew  = daynew
+    dum_yearnew = yearnew
+    if ((dum_daynew==ndpyr) .and. (dum_timenew==86400.)) then
+       dum_timenew=0.0
+       dum_daynew=1
+       dum_yearnew=yearold+1
     endif
 
     open(99,file=trim(ResultPath)//trim(runid)//'.clock',status='unknown')
     write(99,*) timeold, dayold, yearold
-    write(99,*) timenew, daynew, yearnew
+    write(99,*) dum_timenew, dum_daynew, dum_yearnew
     close(99)
   end subroutine clock_finish
   !
