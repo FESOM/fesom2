@@ -5,9 +5,9 @@ runid='fesom'
 /
 
 &timestep
-step_per_day=32
-run_length=1
-run_length_unit='y'		! y, m, d, s
+step_per_day=32 !288 !32
+run_length=1 !2 !1
+run_length_unit='y' ! y, m, d, s
 /
 
 &clockinit			! the model starts at
@@ -40,7 +40,7 @@ output_offset=64
 restart_length=1		!only required for d,h,s cases,  y, m take 1
 restart_length_unit='y'   	!output period: y,  d, h, s 
 restart_offset=64
-logfile_outfreq=64  	        !in logfile info. output frequency, # steps
+logfile_outfreq=960  	        !in logfile info. output frequency, # steps
 use_means=.true.                !average output, if false prints out snapshots
 /
 
@@ -68,7 +68,7 @@ force_rotation=.false.
 /
 
 &calendar
-include_fleapyear=.true.
+include_fleapyear=.false.
 /
 
 &run_config
