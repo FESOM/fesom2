@@ -12,16 +12,18 @@ module diagnostics
   implicit none
 
   private
-  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf
+  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
   real(kind=8),  save, allocatable, target      :: rhs_diag(:)
   real(kind=8),  save, allocatable, target      :: curl_stress_surf(:)
+  real(kind=8),  save, allocatable, target      :: curl_vel3(:,:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
+  logical                                       :: ldiag_curl_vel3  =.false.
   contains
 
 ! ==============================================================
@@ -88,6 +90,60 @@ subroutine diag_curl_stress_surf(mode)
   END DO
 end subroutine diag_curl_stress_surf
 ! ==============================================================
+!3D curl(velocity)
+subroutine diag_curl_vel3(mode)
+  implicit none
+  integer, intent(in)           :: mode
+  logical, save                 :: firstcall=.true.
+  integer        :: enodes(2), el(2), ed, n, nz, nl1, nl2
+  real(kind=8)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+
+!=====================
+  if (firstcall) then  !allocate the stuff at the first call
+     allocate(curl_vel3(nl-1, myDim_nod2D+eDim_nod2D))
+     firstcall=.false.
+     if (mode==0) return
+  end if
+
+  curl_vel3=0.
+
+  DO ed=1,myDim_edge2D
+     enodes=edges(:,ed)
+     el=edge_tri(:,ed)
+     nl1=nlevels(el(1))-1
+     deltaX1=edge_cross_dxdy(1,ed)
+     deltaY1=edge_cross_dxdy(2,ed)
+     nl2=0
+     if (el(2)>0) then
+        deltaX2=edge_cross_dxdy(3,ed)
+        deltaY2=edge_cross_dxdy(4,ed)
+        nl2=nlevels(el(2))-1
+      end if     
+      DO nz=1,min(nl1,nl2)
+         c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))- &
+         deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+         curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+         curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+      END DO
+      DO nz=min(nl1,nl2)+1,nl1
+         c1=deltaX1*UV(1,nz,el(1))+deltaY1*UV(2,nz,el(1))
+         curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+         curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+      END DO
+      DO nz=min(nl1,nl2)+1,nl2
+         c1= -deltaX2*UV(1,nz,el(2))-deltaY2*UV(2,nz,el(2))
+         curl_vel3(nz,enodes(1))=curl_vel3(nz,enodes(1))+c1
+         curl_vel3(nz,enodes(2))=curl_vel3(nz,enodes(2))-c1
+      END DO
+   END DO
+
+   DO n=1, myDim_nod2D
+      DO nz=1, nlevels_nod2D(n)-1
+         curl_vel3(nz,n)=curl_vel3(nz,n)/area(nz,n)
+      END DO
+   END DO    
+end subroutine diag_curl_vel3
+! ==============================================================
 subroutine compute_diagnostics(mode)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
@@ -96,5 +152,7 @@ subroutine compute_diagnostics(mode)
   if (ldiag_solver)      call diag_solver(mode)
   !2. compute curl(stress_surf)
   if (lcurt_stress_surf) call diag_curl_stress_surf(mode)
+  !3. compute curl(velocity)
+  if (ldiag_curl_vel3) call diag_curl_vel3(mode)
 end subroutine compute_diagnostics
 end module diagnostics
