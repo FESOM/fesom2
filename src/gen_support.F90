@@ -66,38 +66,45 @@ end subroutine smooth_nod2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_nod3D(arr, N)
+subroutine smooth_nod3D(arr, N_smooth)
   IMPLICIT NONE
-  integer, intent(in)                          :: N
-  real(KIND=WP), dimension(:,:), intent(inout) :: arr
-  integer                                      :: node, elem, nl, nz, j, q, elnodes(3)
-  real(kind=WP)                                :: vol
-  
-  allocate(work_array(myDim_nod2D))
-  nl=ubound(arr,1)
+  integer, intent(in)            :: N_smooth
+  real(KIND=WP), intent(inout)   :: arr(:,:)
 
-  DO q=1, N !apply mass matrix N times to smooth the field
-     DO nz=1, nl
-        DO node=1, myDim_nod2D
-           vol=0._WP
-           work_array(node)=0._WP
-           if (nlevels_nod2d(node) < nz) CYCLE
-           DO j=1, nod_in_elem2D_num(node)
-              elem=nod_in_elem2D(j, node)
-              if (elem<=0) CYCLE
-              elnodes=elem2D_nodes(:,elem)
-              work_array(node)=work_array(node)+sum(arr(nz, elnodes))/3._WP*elem_area(elem)
-              vol=vol+elem_area(elem)
-           END DO
-           work_array(node)=work_array(node)/vol
-        END DO
-        DO node=1,myDim_nod2D
-           arr(nz, node)=work_array(node)
-        ENDDO
-     END DO
-     call exchange_nod(arr)
+  integer                        :: n, el, nz, j, q, num_el, nlev, nl1
+  real(kind=WP)                  :: vol(myDim_nod2D)
+  real(kind=WP), allocatable     :: work_array(:,:)
+
+  nlev=ubound(arr,1)
+  allocate(work_array(nlev,myDim_nod2D))
+  
+  DO n=1, myDim_nod2D
+     num_el = nod_in_elem2D_num(n)
+     vol(n) = 1._WP / (3._WP * sum(elem_area(nod_in_elem2D(1:num_el, n))))
   END DO
+
+  DO q=1,N_smooth
+     DO n=1, myDim_nod2D
+
+        work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
+
+        DO j=1,nod_in_elem2D_num(n)
+           el = nod_in_elem2D(j,n)
+           DO nz=1, min(nlev, nlevels_nod2d(n))
+              work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
+                                                                   + arr(nz, elem2D_nodes(2,el)) &
+                                                                   + arr(nz, elem2D_nodes(3,el)))
+           END DO
+        ENDDO
+     ENDDO
+     DO n=1, myDim_nod2D
+        arr(1:min(nlev, nlevels_nod2d(n)), n) = work_array(1:min(nlev, nlevels_nod2d(n)), n) *vol(n)        
+     end DO
+     call exchange_nod(arr)
+  enddo
+
   deallocate(work_array)
+
 end subroutine smooth_nod3D
 !
 !--------------------------------------------------------------------------------------------
