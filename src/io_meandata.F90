@@ -77,18 +77,18 @@ subroutine ini_mean_io
   call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y')
 
 !2D
-  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'd')
+  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
 !DS for frontier run
-  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'd')
-  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'd')
-  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'd')
-  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'd')
-  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'd')
-  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'd')
+  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'm')
+  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'm')
+  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'm')
+  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'm')
+  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'm')
+  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'm')
 !DS
 
-  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'd')
-  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'd')
+  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'uice',  'ice velocity x',          'm/s',    u_ice,                         1, 'm')
   call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm')
@@ -134,6 +134,9 @@ subroutine ini_mean_io
   end if
   if (lcurt_stress_surf) then
      call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 's')
+  end if
+  if (ldiag_curl_vel3) then
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u', 'relative vorticity',         '1/s',   vorticity, 1, 'm')     
   end if
 
   if (whichEVP==2) then
