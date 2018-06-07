@@ -335,52 +335,76 @@ IMPLICIT NONE
  open(fileID, file=file_name)
  read(fileID,*)  n
  read(fileID,*) com_nod2D%rPEnum
- ALLOCATE(com_nod2D%rPE(com_nod2D%rPEnum))
- read(fileID,*) com_nod2D%rPE
- ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
- read(fileID,*) com_nod2D%rptr
+ if (com_nod2D%rPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$ ALLOCATE(com_nod2D%rPE(com_nod2D%rPEnum))
+ read(fileID,*) com_nod2D%rPE(1:com_nod2D%rPEnum)
+!!$  ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
+ read(fileID,*) com_nod2D%rptr(1:com_nod2D%rPEnum+1)
  ALLOCATE(com_nod2D%rlist(eDim_nod2D))
  read(fileID,*) com_nod2D%rlist
 	 
  read(fileID,*) com_nod2D%sPEnum
- ALLOCATE(com_nod2D%sPE(com_nod2D%sPEnum))
- read(fileID,*) com_nod2D%sPE
- ALLOCATE(com_nod2D%sptr(com_nod2D%sPEnum+1))
- read(fileID,*) com_nod2D%sptr
+ if (com_nod2D%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$  ALLOCATE(com_nod2D%sPE(com_nod2D%sPEnum))
+ read(fileID,*) com_nod2D%sPE(1:com_nod2D%sPEnum)
+!!$  ALLOCATE(com_nod2D%sptr(com_nod2D%sPEnum+1))
+ read(fileID,*) com_nod2D%sptr(1:com_nod2D%sPEnum+1)
  n=com_nod2D%sptr(com_nod2D%sPEnum+1)-1
  ALLOCATE(com_nod2D%slist(n))
  read(fileID,*) com_nod2D%slist
 	 
  read(fileID,*) com_elem2D%rPEnum
- ALLOCATE(com_elem2D%rPE(com_elem2D%rPEnum))
- read(fileID,*) com_elem2D%rPE
- ALLOCATE(com_elem2D%rptr(com_elem2D%rPEnum+1))
- read(fileID,*) com_elem2D%rptr
+ if (com_elem2D%rPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$  ALLOCATE(com_elem2D%rPE(com_elem2D%rPEnum))
+ read(fileID,*) com_elem2D%rPE(1:com_elem2D%rPEnum)
+!!$  ALLOCATE(com_elem2D%rptr(com_elem2D%rPEnum+1))
+ read(fileID,*) com_elem2D%rptr(1:com_elem2D%rPEnum+1)
  ALLOCATE(com_elem2D%rlist(eDim_elem2D))
  read(fileID,*) com_elem2D%rlist
 	 
  read(fileID,*) com_elem2D%sPEnum
- ALLOCATE(com_elem2D%sPE(com_elem2D%sPEnum))
- read(fileID,*) com_elem2D%sPE
- ALLOCATE(com_elem2D%sptr(com_elem2D%sPEnum+1))
- read(fileID,*) com_elem2D%sptr
+ if (com_elem2D%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$  ALLOCATE(com_elem2D%sPE(com_elem2D%sPEnum))
+ read(fileID,*) com_elem2D%sPE(1:com_elem2D%sPEnum)
+!!$  ALLOCATE(com_elem2D%sptr(com_elem2D%sPEnum+1))
+ read(fileID,*) com_elem2D%sptr(1:com_elem2D%sPEnum+1)
  n=com_elem2D%sptr(com_elem2D%sPEnum+1)-1
  ALLOCATE(com_elem2D%slist(n))
  read(fileID,*) com_elem2D%slist
 	 
  read(fileID,*) com_elem2D_full%rPEnum
- ALLOCATE(com_elem2D_full%rPE(com_elem2D_full%rPEnum))
- read(fileID,*) com_elem2D_full%rPE
- ALLOCATE(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1))
- read(fileID,*) com_elem2D_full%rptr
+ if (com_elem2D_full%rPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$  ALLOCATE(com_elem2D_full%rPE(com_elem2D_full%rPEnum))
+ read(fileID,*) com_elem2D_full%rPE(1:com_elem2D_full%rPEnum)
+!!$  ALLOCATE(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1))
+ read(fileID,*) com_elem2D_full%rptr(1:com_elem2D_full%rPEnum+1)
  ALLOCATE(com_elem2D_full%rlist(eDim_elem2D+eXDim_elem2D))
  read(fileID,*) com_elem2D_full%rlist
 	 
  read(fileID,*) com_elem2D_full%sPEnum
- ALLOCATE(com_elem2D_full%sPE(com_elem2D_full%sPEnum))
- read(fileID,*) com_elem2D_full%sPE
- ALLOCATE(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1))
- read(fileID,*) com_elem2D_full%sptr
+ if (com_elem2D_full%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
+    print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+    stop
+ endif
+!!$  ALLOCATE(com_elem2D_full%sPE(com_elem2D_full%sPEnum))
+ read(fileID,*) com_elem2D_full%sPE(1:com_elem2D_full%sPEnum)
+!!$  ALLOCATE(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1))
+ read(fileID,*) com_elem2D_full%sptr(1:com_elem2D_full%sPEnum+1)
  n=com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1
  ALLOCATE(com_elem2D_full%slist(n))
  read(fileID,*) com_elem2D_full%slist
