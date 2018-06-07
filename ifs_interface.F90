@@ -29,7 +29,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    LOGICAL :: lwrite
 
    WRITE(0,*)'Insert FESOM init here.'
-   CALL abort
+!   CALL abort
 
    ! Set information for the caller
 
@@ -39,6 +39,12 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    itini   = nit000
    itend   = nn_itend
    zstp    = rdttra(1)
+#else
+   inidate = 20170906
+   initime = 0
+   itini   = 1
+   itend   = 24
+   zstp    = 3600.0
 #endif
 
 END SUBROUTINE nemogcmcoup_init
@@ -73,7 +79,7 @@ SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
    LOGICAL :: lwritedist, lreaddist
    LOGICAL :: lcommout
    CHARACTER(len=128) :: commoutprefix
-   NAMELIST/namnemocoup/cdfile_gauss_to_T,&
+   NAMELIST/namfesomcoup/cdfile_gauss_to_T,&
       &                 cdfile_gauss_to_UV,&
       &                 cdfile_T_to_gauss,&
       &                 cdfile_UV_to_gauss,&
@@ -108,8 +114,8 @@ SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
    lreaddist         = .FALSE.
    lwritedist        = .FALSE.
 
-   OPEN(9,file='namnemocoup.in')
-   READ(9,namnemocoup)
+   OPEN(9,file='namfesomcoup.in')
+   READ(9,namfesomcoup)
    CLOSE(9)
 
    ! Global number of Gaussian gridpoints
