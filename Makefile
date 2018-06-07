@@ -34,20 +34,7 @@ clean:
 	rm -f *.o *.mod *~ *.x *.pp.f90 *.pp.f *.lst *.in *.nc *.grb *.a
 	rm -rf *.dSYM
 
-scripremap.o: nctools.o scrippar.o scripgrid.o
-scripgrid.o: nctools.o scrippar.o
-parinter.o: scripremap.o scrippar.o
-interinfo.o: parinter.o
-nemogcmcoup_mlflds_get.o: par_kind.o
-nemogcmcoup_exflds_get.o: par_kind.o
-nemogcmcoup_coup.o: par_kind.o
-nemogcmcoup_coupinit.o: scripremap.o parinter.o interinfo.o
-nemogcmcoup_wam_update.o: par_kind.o
-nemogcmcoup_wam_get.o: par_kind.o
-nemogcmcoup_wam_update_stress.o: par_kind.o
-nemogcmcoup_mlinit.o: par_kind.o
-nemogcmcoup_update_add.o: par_kind.o
-nemogcmcoup_update.o: par_kind.o
-nemogcmcoup_lim2_update.o: par_kind.o
-nemogcmcoup_get.o: par_kind.o
-nemogcmcoup_lim2_get.o: par_kind.o
+ifs_interface.o: ifs_modules.o 
+ifs_notused.o: ifs_modules.o
+
+
