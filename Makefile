@@ -6,12 +6,12 @@ FC=mpif90
 LD=$(FC)
 FCFLAGSFIXED=-g -c -O3 -fdefault-real-8 -fdefault-double-8 -fcray-pointer -fconvert=swap -fopenmp $(NETCDF_INCLUDE) $(GRIB_API_INCLUDE)
 FCFLAGSFREE=$(FCFLAGSFIXED)
-CPPFLAGS=-traditional -P -Dkey_mpp_mpi
+CPPFLAGS=-traditional -P
 LDFLAGS=-g -O3 -fdefault-real-8 -fdefault-double-8 -fcray-pointer -fconvert=swap -fopenmp $(MAGPLUSLIB_SHARED) $(NETCDF_LIB) $(GRIB_API_LIB)
 AR=ar
 ARFLAGS=-rv
 
-OBJ=scripremap.o scripgrid.o parinter.o nctools.o ifs_modules.o ifs_interface.o ifs_notused.o
+OBJ=ifs_modules.o ifs_interface.o ifs_notused.o
 
 all: libfesom.a
 

@@ -114,12 +114,8 @@ SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
 
    ! Global number of Gaussian gridpoints
 
-#if defined key_mpp_mpi
    CALL mpi_allreduce( npoints, nglopoints, 1, &
       &                mpi_integer, mpi_sum, icomm, ierr)
-#else
-   nglopoints=npoints
-#endif
 
    WRITE(0,*)'Update FESOM global scalar points'
    noglopoints=126858
