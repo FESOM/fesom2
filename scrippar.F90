@@ -1,5 +1,0 @@
-MODULE scrippar
-   INTEGER, PARAMETER :: scripdp = SELECTED_REAL_KIND(12,307)
-   INTEGER, PARAMETER :: scriplen = 80
-END MODULE scrippar
-
