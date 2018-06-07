@@ -1,3 +1,600 @@
+!=====================================================
+! IFS interface for calling FESOM2 as a subroutine.
+!
+! -Original code for NEMO by Kristian Mogensen, ECMWF.
+!-----------------------------------------------------
+
+SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
+   & lwaveonly, iatmunit, lwrite )
+
+   ! Initialize the NEMO model for single executable coupling 
+
+   USE par_kind
+
+   IMPLICIT NONE
+
+   ! Input arguments
+
+   ! Message passing information
+   INTEGER, INTENT(IN) :: icomm
+   ! Initial date, time, initial timestep and final time step
+   INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
+   ! Length of the time step
+   REAL(wp), INTENT(OUT) :: zstp
+   ! Coupling to waves only
+   LOGICAL, INTENT(IN) :: lwaveonly
+   ! Logfile unit (used if >=0)
+   INTEGER :: iatmunit
+   ! Write to this unit
+   LOGICAL :: lwrite
+
+   WRITE(0,*)'Insert FESOM init here.'
+   CALL abort
+
+   ! Set information for the caller
+
+#ifdef FESOM_TODO
+   inidate = nn_date0
+   initime = nn_time0*3600
+   itini   = nit000
+   itend   = nn_itend
+   zstp    = rdttra(1)
+#endif
+
+END SUBROUTINE nemogcmcoup_init
+
+
+SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
+   &                             npoints, nlocmsk, ngloind )
+
+   ! Initialize single executable coupling 
+   USE parinter
+   USE scripremap
+   USE interinfo
+   IMPLICIT NONE
+
+   ! Input arguments
+
+   ! Message passing information
+   INTEGER, INTENT(IN) :: mype,npes,icomm
+   ! Gaussian grid information   
+   ! Number of points
+   INTEGER, INTENT(IN) :: npoints
+   ! Integer mask and global indices
+   INTEGER, DIMENSION(npoints), INTENT(IN) :: nlocmsk, ngloind
+   INTEGER :: iunit = 0
+
+   ! Local variables
+
+   ! Namelist containing the file names of the weights
+   CHARACTER(len=256) :: cdfile_gauss_to_T, cdfile_gauss_to_UV, &
+      &                  cdfile_T_to_gauss, cdfile_UV_to_gauss
+   CHARACTER(len=256) :: cdpathdist
+   LOGICAL :: lwritedist, lreaddist
+   LOGICAL :: lcommout
+   CHARACTER(len=128) :: commoutprefix
+   NAMELIST/namnemocoup/cdfile_gauss_to_T,&
+      &                 cdfile_gauss_to_UV,&
+      &                 cdfile_T_to_gauss,&
+      &                 cdfile_UV_to_gauss,&
+      &                 cdpathdist, &
+      &                 lreaddist, &
+      &                 lwritedist, &
+      &                 lcommout, &
+      &                 commoutprefix,&
+      &                 lparbcast
+
+   ! Global number of gaussian gridpoints
+   INTEGER :: nglopoints
+   ! Ocean grids accessed with NEMO modules
+   INTEGER :: noglopoints,nopoints
+   INTEGER, ALLOCATABLE, DIMENSION(:) :: omask,ogloind
+   ! SCRIP remapping data structures.
+   TYPE(scripremaptype) :: remap_gauss_to_T, remap_T_to_gauss, &
+      & remap_gauss_to_UV, remap_UV_to_gauss
+   ! Misc variables
+   INTEGER :: i,j,k,ierr
+   LOGICAL :: lexists
+
+   ! Read namelists
+   
+   cdfile_gauss_to_T = 'gausstoT.nc'
+   cdfile_gauss_to_UV = 'gausstoUV.nc'
+   cdfile_T_to_gauss = 'Ttogauss.nc'
+   cdfile_UV_to_gauss = 'UVtogauss.nc'
+   lcommout          = .FALSE.
+   commoutprefix     = 'parinter_comm'
+   cdpathdist        = './'
+   lreaddist         = .FALSE.
+   lwritedist        = .FALSE.
+
+   OPEN(9,file='namnemocoup.in')
+   READ(9,namnemocoup)
+   CLOSE(9)
+
+   ! Global number of Gaussian gridpoints
+
+#if defined key_mpp_mpi
+   CALL mpi_allreduce( npoints, nglopoints, 1, &
+      &                mpi_integer, mpi_sum, icomm, ierr)
+#else
+   nglopoints=npoints
+#endif
+
+   WRITE(0,*)'Update FESOM global scalar points'
+   noglopoints=126858
+   IF (mype==0) THEN
+      nopoints=126858
+   ELSE
+      nopoints=0
+   ENDIF
+
+   ! Ocean mask and global indicies
+   
+   ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
+
+   omask(:) = 1
+   IF (mype==0) THEN
+      DO i=1,nopoints
+         ogloind(i)=i
+      ENDDO
+   ENDIF
+
+   ! Read the interpolation weights and setup the parallel interpolation
+   ! from atmosphere Gaussian grid to ocean T-grid
+   
+   IF (lreaddist) THEN
+      CALL parinter_read( mype, npes, nglopoints, noglopoints, gausstoT,  &
+         & cdpathdist,'ifs_to_fesom_gridT',lexists)
+   ENDIF
+   IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
+      IF (lparbcast) THEN
+         CALL scripremap_read_sgl(cdfile_gauss_to_T,remap_gauss_to_T,&
+            & mype,npes,icomm,.TRUE.)
+      ELSE
+         CALL scripremap_read(cdfile_gauss_to_T,remap_gauss_to_T)
+      ENDIF
+      CALL parinter_init( mype, npes, icomm, &
+         & npoints, nglopoints, nlocmsk, ngloind, &
+         & nopoints, noglopoints, omask, ogloind, & 
+         & remap_gauss_to_T, gausstoT, lcommout, TRIM(commoutprefix)//'_gtoT', &
+         & iunit )
+      CALL scripremap_dealloc(remap_gauss_to_T)
+      IF (lwritedist) THEN
+         CALL parinter_write( mype, npes, nglopoints, noglopoints, gausstoT,  &
+            & cdpathdist,'ifs_to_fesom_gridT')
+      ENDIF
+   ENDIF
+
+   ! From ocean T-grid to atmosphere Gaussian grid
+
+   IF (lreaddist) THEN
+      CALL parinter_read( mype, npes, noglopoints, nglopoints, Ttogauss,  &
+         & cdpathdist,'fesom_gridT_to_ifs',lexists)
+   ENDIF
+   IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
+      IF (lparbcast) THEN
+         CALL scripremap_read_sgl(cdfile_T_to_gauss,remap_T_to_gauss,&
+            & mype,npes,icomm,.TRUE.)
+      ELSE
+         CALL scripremap_read(cdfile_T_to_gauss,remap_T_to_gauss)
+      ENDIF
+
+      CALL parinter_init( mype, npes, icomm, &
+         & nopoints, noglopoints, omask, ogloind, & 
+         & npoints, nglopoints, nlocmsk, ngloind, &
+         & remap_T_to_gauss, Ttogauss, lcommout, TRIM(commoutprefix)//'_Ttog', &
+         & iunit )
+      CALL scripremap_dealloc(remap_T_to_gauss)
+      IF (lwritedist) THEN
+         CALL parinter_write( mype, npes, noglopoints, nglopoints, Ttogauss,  &
+            & cdpathdist,'fesom_gridT_to_ifs')
+      ENDIF
+   ENDIF
+   
+   DEALLOCATE(omask,ogloind)
+
+   WRITE(0,*)'Update FESOM global vector points'
+   noglopoints=244659
+   IF (mype==0) THEN
+      nopoints=244659
+   ELSE
+      nopoints=0
+   ENDIF
+
+   ! Ocean mask and global indicies
+   
+   ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
+
+   omask(:) = 1
+   IF (mype==0) THEN
+      DO i=1,nopoints
+         ogloind(i)=i
+      ENDDO
+   ENDIF
+
+   ! Read the interpolation weights and setup the parallel interpolation
+   ! from atmosphere Gaussian grid to ocean UV-grid
+   
+   IF (lreaddist) THEN
+      CALL parinter_read( mype, npes, nglopoints, noglopoints, gausstoUV,  &
+         & cdpathdist,'ifs_to_fesom_gridUV',lexists)
+   ENDIF
+   IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
+      IF (lparbcast) THEN
+         CALL scripremap_read_sgl(cdfile_gauss_to_UV,remap_gauss_to_UV,&
+            & mype,npes,icomm,.TRUE.)
+      ELSE
+         CALL scripremap_read(cdfile_gauss_to_UV,remap_gauss_to_UV)
+      ENDIF
+      CALL parinter_init( mype, npes, icomm, &
+         & npoints, nglopoints, nlocmsk, ngloind, &
+         & nopoints, noglopoints, omask, ogloind, & 
+         & remap_gauss_to_UV, gausstoUV, lcommout, TRIM(commoutprefix)//'_gtoUV', &
+         & iunit )
+      CALL scripremap_dealloc(remap_gauss_to_UV)
+      IF (lwritedist) THEN
+         CALL parinter_write( mype, npes, nglopoints, noglopoints, gausstoUV,  &
+            & cdpathdist,'ifs_to_fesom_gridUV')
+      ENDIF
+   ENDIF
+
+   ! From ocean UV-grid to atmosphere Gaussian grid
+
+   IF (lreaddist) THEN
+      CALL parinter_read( mype, npes, noglopoints, nglopoints, UVtogauss,  &
+         & cdpathdist,'fesom_gridUV_to_ifs',lexists)
+   ENDIF
+   IF ((.NOT.lreaddist).OR.(.NOT.lexists)) THEN
+      IF (lparbcast) THEN
+         CALL scripremap_read_sgl(cdfile_UV_to_gauss,remap_UV_to_gauss,&
+            & mype,npes,icomm,.TRUE.)
+      ELSE
+         CALL scripremap_read(cdfile_UV_to_gauss,remap_UV_to_gauss)
+      ENDIF
+
+      CALL parinter_init( mype, npes, icomm, &
+         & nopoints, noglopoints, omask, ogloind, & 
+         & npoints, nglopoints, nlocmsk, ngloind, &
+         & remap_UV_to_gauss, UVtogauss, lcommout, TRIM(commoutprefix)//'_UVtog', &
+         & iunit )
+      CALL scripremap_dealloc(remap_UV_to_gauss)
+      IF (lwritedist) THEN
+         CALL parinter_write( mype, npes, noglopoints, nglopoints, UVtogauss,  &
+            & cdpathdist,'fesom_gridUV_to_ifs')
+      ENDIF
+   ENDIF
+   
+   DEALLOCATE(omask,ogloind)
+         
+END SUBROUTINE nemogcmcoup_coupinit
+
+
+SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
+   &                             nopoints, pgsst, pgist, pgalb, &
+   &                             pgifr, pghic, pghsn, pgucur, pgvcur, &
+   &                             pgistl, licelvls )
+
+   ! Interpolate sst, ice: surf T; albedo; concentration; thickness,
+   ! snow thickness and currents from the ORCA grid to the Gaussian grid. 
+   
+   ! This routine can be called at any point in time since it does
+   ! the necessary message passing in parinter_fld. 
+
+   USE par_kind
+
+   IMPLICIT NONE
+   
+   ! Arguments
+   REAL(wp), DIMENSION(nopoints) :: pgsst, pgist, pgalb, pgifr, pghic, pghsn, pgucur, pgvcur
+   REAL(wp), DIMENSION(nopoints,3) :: pgistl
+   LOGICAL :: licelvls
+
+   ! Message passing information
+   INTEGER, INTENT(IN) :: mype, npes, icomm
+   ! Number Gaussian grid points
+   INTEGER, INTENT(IN) :: nopoints
+
+   ! Local variables
+
+#ifdef FESOM_TODO
+
+   ! Temporary array for packing of input data without halos.
+   REAL(wp), DIMENSION((nlei-nldi+1)*(nlej-nldj+1)) :: zsend
+   ! Arrays for rotation of current vectors from ij to ne.
+   REAL(wp), DIMENSION(jpi,jpj) :: zotx1, zoty1, ztmpx, ztmpy
+   ! Array for fraction of leads (i.e. ocean)
+   REAL(wp), DIMENSION(jpi,jpj) :: zfr_l 
+   REAL(wp) :: zt
+   ! Loop variables
+   INTEGER :: ji, jj, jk, jl
+   REAL(wp) :: zhook_handle ! Dr Hook handle
+   
+   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_get',0,zhook_handle)
+   IF(nn_timing == 1) CALL timing_start('nemogcmcoup_lim2_get')
+
+   zfr_l(:,:) = 1.- fr_i(:,:)
+   
+   IF (.NOT.ALLOCATED(zscplsst)) THEN
+      ALLOCATE(zscplsst(jpi,jpj))
+   ENDIF
+
+   ! Pack SST data and convert to K.
+
+   IF ( nsstlvl(1) == nsstlvl(2) ) THEN
+      jk = 0 
+      DO jj = nldj, nlej
+         DO ji = nldi, nlei
+            jk = jk + 1
+            zsend(jk) = tsn(ji,jj,nsstlvl(1),jp_tem) + rt0
+            zscplsst(ji,jj) = zsend(jk) - rt0
+         ENDDO
+      ENDDO
+   ELSE
+      jk = 0 
+      DO jj = nldj, nlej
+         DO ji = nldi, nlei
+            jk = jk + 1
+            zsend(jk) = SUM(&
+               & tsn(ji,jj,nsstlvl(1):nsstlvl(2),jp_tem) * &
+               & tmask(ji,jj,nsstlvl(1):nsstlvl(2)) * &
+               & fse3t(ji,jj,nsstlvl(1):nsstlvl(2)) ) / &
+               & MAX( SUM( &
+               & tmask(ji,jj,nsstlvl(1):nsstlvl(2)) * &
+               & fse3t(ji,jj,nsstlvl(1):nsstlvl(2))) , 1.0 ) + rt0
+            zscplsst(ji,jj) = zsend(jk) - rt0
+         ENDDO
+      ENDDO
+   ENDIF
+   CALL lbc_lnk( zscplsst, 'T', 1. )
+
+   ! Interpolate SST
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgsst )
+
+   ! Pack ice temperature data (already in K)
+
+#if defined key_lim2
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = tn_ice(ji,jj,1)
+      ENDDO
+   ENDDO
+#else
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = 0
+         zt=0.0
+         DO jl = 1, jpl
+            zsend(jk) = zsend(jk) + tn_ice(ji,jj,jl) * a_i(ji,jj,jl)
+            zt = zt + a_i(ji,jj,jl)
+         ENDDO
+         IF ( zt > 0.0 ) THEN
+            zsend(jk) = zsend(jk) / zt
+         ELSE
+            zsend(jk) = rt0
+         ENDIF
+      ENDDO
+   ENDDO
+#endif
+   
+   ! Interpolate ice temperature 
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgist )
+
+   ! Ice level temperatures
+
+   IF (licelvls) THEN
+
+#if defined key_lim2
+
+      DO jl = 1, 3
+         
+         ! Pack ice temperatures data at level jl(already in K)
+         
+         jk = 0 
+         DO jj = nldj, nlej
+            DO ji = nldi, nlei
+               jk = jk + 1
+               zsend(jk) = tbif (ji,jj,jl)
+            ENDDO
+         ENDDO
+         
+         ! Interpolate ice temperature  at level jl
+         
+         CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+            &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+            &               nopoints, pgistl(:,jl) )
+         
+      ENDDO
+
+#else
+      WRITE(0,*)'licelvls needs to be sorted for LIM3'
+      CALL abort
+#endif     
+
+   ENDIF
+
+   ! Pack ice albedo data 
+
+#if defined key_lim2
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = alb_ice(ji,jj,1)
+      ENDDO
+   ENDDO
+#else
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = 0
+         zt=0.0
+         DO jl = 1, jpl
+            zsend(jk) = zsend(jk) + alb_ice(ji,jj,jl) * a_i(ji,jj,jl)
+            zt = zt + a_i(ji,jj,jl)
+         ENDDO
+         IF ( zt > 0.0_wp ) THEN
+            zsend(jk) = zsend(jk) / zt
+         ELSE
+            zsend(jk) = albedo_oce_mix(ji,jj)
+         ENDIF
+      ENDDO
+   ENDDO
+#endif
+   
+   ! Interpolate ice albedo
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgalb )
+
+   ! Pack ice fraction data
+
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = fr_i(ji,jj)
+      ENDDO
+   ENDDO
+
+   ! Interpolation of ice fraction.
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgifr )
+
+   ! Pack ice thickness data
+
+#if defined key_lim2
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = hicif(ji,jj)
+      ENDDO
+   ENDDO
+#else
+   ! LIM3
+   ! Average over categories (to be revised).
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = 0
+         DO jl = 1, jpl
+            zsend(jk) = zsend(jk) + ht_i(ji,jj,jl) * a_i(ji,jj,jl)
+         ENDDO
+      ENDDO
+   ENDDO
+#endif
+
+   ! Interpolation of ice thickness
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pghic )  
+
+   ! Pack snow thickness data
+
+#if defined key_lim2
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = hsnif(ji,jj)
+      ENDDO
+   ENDDO
+#else
+   ! LIM3
+   ! Average over categories (to be revised).
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = 0
+         DO jl = 1, jpl
+            zsend(jk) = zsend(jk) + ht_s(ji,jj,jl) * a_i(ji,jj,jl)
+         ENDDO
+      ENDDO
+   ENDDO
+#endif
+
+   ! Interpolation of snow thickness
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pghsn )
+
+   ! Currents needs to be rotated from ij to ne first
+
+   DO jj = 2, jpjm1
+      DO ji = 2, jpim1
+         zotx1(ji,jj) = 0.5 * ( un(ji,jj,1) + un(ji-1,jj  ,1) )
+         zoty1(ji,jj) = 0.5 * ( vn(ji,jj,1) + vn(ji  ,jj-1,1) ) 
+      END DO
+   END DO
+   CALL lbc_lnk( zotx1, 'T', -1. )
+   CALL lbc_lnk( zoty1, 'T', -1. )
+   CALL rot_rep( zotx1, zoty1, 'T', 'ij->e', ztmpx )
+   CALL rot_rep( zotx1, zoty1, 'T', 'ij->n', ztmpy )
+
+   ! Pack U current
+
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = ztmpx(ji,jj)
+      ENDDO
+   ENDDO
+
+   ! Interpolate U current
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgucur )
+
+   ! Pack V current
+
+   jk = 0 
+   DO jj = nldj, nlej
+      DO ji = nldi, nlei
+         jk = jk + 1
+         zsend(jk) = ztmpy(ji,jj)
+      ENDDO
+   ENDDO
+
+   ! Interpolate V current
+
+   CALL parinter_fld( mype, npes, icomm, Ttogauss, &
+      &               ( nlei - nldi + 1 ) * ( nlej - nldj + 1 ), zsend, &
+      &               nopoints, pgvcur )
+
+   IF(nn_timing == 1) CALL timing_stop('nemogcmcoup_lim2_get')
+   IF(lhook) CALL dr_hook('nemogcmcoup_lim2_get',1,zhook_handle)
+
+#else
+
+   WRITE(0,*)'nemogcmcoup_lim2_get not done for FESOM yet'
+   CALL abort
+
+#endif
+
+END SUBROUTINE nemogcmcoup_lim2_get
+
+
 SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    &                                npoints,  &
    &                                taux_oce, tauy_oce, taux_ice, tauy_ice, &
@@ -665,5 +1262,51 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 #endif
 
 END SUBROUTINE nemogcmcoup_lim2_update
+
+
+SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
+
+   IMPLICIT NONE
+
+   ! Arguments
+
+   ! Time step
+   INTEGER, INTENT(IN) :: istp
+
+   ! Data and time from NEMO
+   INTEGER, INTENT(OUT) :: icdate, ictime
+
+   ! Local variables
+   
+   ! Advance the FESOM model 1 time step
+
+   WRITE(0,*)'Insert FESOM step here.'
+
+   ! Compute date and time at the end of the time step.
+
+#ifdef FESOM_TODO
+   iye = ndastp / 10000
+   imo = ndastp / 100 - iye * 100
+   ida = MOD( ndastp, 100 )
+   CALL greg2jul( 0, 0, 0, ida, imo, iye, zjul )
+   zjul = zjul + ( nsec_day + 0.5_wp * rdttra(1) ) / 86400.0_wp
+   CALL jul2greg( iss, imm, ihh, ida, imo, iye, zjul )
+   icdate = iye * 10000 + imo * 100 + ida
+   ictime = ihh * 10000 + imm * 100 + iss
+#endif
+
+END SUBROUTINE nemogcmcoup_step
+
+
+SUBROUTINE nemogcmcoup_final
+
+   ! Finalize the NEMO model
+
+   IMPLICIT NONE
+
+   WRITE(*,*)'Insert call to finalization of FESOM'
+   CALL abort
+
+END SUBROUTINE nemogcmcoup_final
 
    

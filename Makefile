@@ -11,7 +11,7 @@ LDFLAGS=-g -O3 -fdefault-real-8 -fdefault-double-8 -fcray-pointer -fconvert=swap
 AR=ar
 ARFLAGS=-rv
 
-OBJ=scrippar.o scripremap.o scripgrid.o parinter.o interinfo.o nemogcmcoup_mlflds_get.o par_kind.o nemogcmcoup_init_ioserver.o nemogcmcoup_init_ioserver_2.o nemogcmcoup_final.o nemogcmcoup_init.o nemogcmcoup_wam_coupinit.o nctools.o nemogcmcoup_step.o nemogcmcoup_exflds_get.o nemogcmcoup_wam_update.o nemogcmcoup_wam_update_stress.o nemogcmcoup_wam_get.o nemogcmcoup_coupinit.o nemogcmcoup_get_1way.o nemogcmcoup_mlinit.o nemogcmcoup_update_add.o nemogcmcoup_update.o nemogcmcoup_lim2_update.o nemogcmcoup_get.o nemogcmcoup_lim2_get.o
+OBJ=scripremap.o scripgrid.o parinter.o nctools.o ifs_modules.o ifs_interface.o ifs_notused.o
 
 all: libfesom.a
 
