@@ -22,31 +22,30 @@ program main
 
 end program main
 
+
+
+!=============================================================================!
+!                      Initialization
+!=============================================================================!
+
 subroutine main_initialize(nsteps)
   ! Split main into three major parts
   ! Coded by Thomas Rackow, 2018
   !----------------------------------
-  USE o_MESH
-  USE o_ARRAYS
-  USE o_PARAM
-  USE g_PARSUP
-  USE i_PARAM
-  use i_ARRAYS
-  use g_clock
-  use g_config
-  use g_forcing_index
-  use g_comm_auto
-  use g_forcing_arrays
-  use io_RESTART
-  use io_MEANDATA
-  use io_mesh_info
-  use diagnostics
+  USE g_PARSUP, only: mype, par_init
+  USE i_PARAM,  only: ice_ave_steps, whichEVP
+  use i_ARRAYS, only: ice_steps_since_upd, ice_update
+  use g_clock,  only: clock_init, clock_newyear
+  use g_config, only: use_ice, r_restart, use_ALE
+  use io_RESTART,   only: restart
+  use io_mesh_info, only: write_mesh_info
+  use diagnostics,  only: compute_diagnostics
 #if defined (__oasis)
   use cpl_driver
 #endif
   IMPLICIT NONE
 
-  integer :: n, offset, ierr
+  integer :: ierr
   integer, INTENT(OUT) :: nsteps
 
 #ifndef __oifs
@@ -60,7 +59,13 @@ subroutine main_initialize(nsteps)
         call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
 
+	! sets npes and mype
 	call par_init 
+	if (mype==0) write(*,*) '!=============================================================================!'
+	if (mype==0) write(*,*) '!                             Welcome to the					'
+	if (mype==0) write(*,*) '!                 Finite Volume Sea-ice Ocean Model (FESOM2)                   '
+	if (mype==0) write(*,*) '!=============================================================================!'
+
 	!=====================
 	! Read configuration data,  
 	! load the mesh and fill in 
@@ -107,13 +112,18 @@ subroutine main_initialize(nsteps)
 	if (.not. r_restart) call write_mesh_info
 
 	!___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
-	!___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
+	!___MIDDEPTH LEVELS NEEDS TO BE CALCULATED AT RESTART_______________________
 	if (r_restart .and. use_ALE) then
 		call restart_thickness_ale
 	end if
 
 end subroutine main_initialize
 
+
+
+!=============================================================================!
+!                      Timestepping
+!=============================================================================!
 
 subroutine main_timestepping(nsteps)
   ! Split main into three major parts
@@ -199,6 +209,11 @@ subroutine main_timestepping(nsteps)
 	end do
 end subroutine main_timestepping
 
+
+
+!=============================================================================!
+!                      Finalization
+!=============================================================================!
 
 subroutine main_finalize
   ! Split main into three major parts
