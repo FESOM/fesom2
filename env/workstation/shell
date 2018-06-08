@@ -1,0 +1,13 @@
+# used at ECMWF
+
+module load netcdf4
+module load hdf5
+#following 4 not needed?
+#module load eccodes
+#module load emos
+#module load fftw
+#module load boost
+module load openmpi
+
+export FC=mpif90 CC=mpicc CXX=mpicxx	# MPI wrappers for Fortran, cc and CC similarly
+#export FC=mpif90 CC=gcc CXX=mpicxx	# MPI wrappers for Fortran, cc and CC similarly
