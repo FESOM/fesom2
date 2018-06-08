@@ -46,13 +46,13 @@ subroutine main_initialize(nsteps)
 #endif
   IMPLICIT NONE
 
-  integer :: n, offset, row, i
+  integer :: n, offset, ierr
   integer, INTENT(OUT) :: nsteps
 
 #ifndef __oifs
   	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular 		!dependencies between modules (cpl_driver and g_PARSUP)
 	!OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
-        call MPI_INIT(i) 
+        call MPI_INIT(ierr) 
 #endif
 
 
@@ -139,7 +139,7 @@ subroutine main_timestepping(nsteps)
 #endif
   IMPLICIT NONE
 
-  integer :: n, offset, row, i
+  integer :: n
   integer, INTENT(IN) :: nsteps 
 
 	!=====================
@@ -204,30 +204,14 @@ subroutine main_finalize
   ! Split main into three major parts
   ! Coded by Thomas Rackow, 2018
   !----------------------------------
-  USE o_MESH
-  USE o_ARRAYS
-  USE o_PARAM
-  USE g_PARSUP
-  USE i_PARAM
-  use i_ARRAYS
-  use g_clock
-  use g_config
-  use g_forcing_index
-  use g_comm_auto
-  use g_forcing_arrays
-  use io_RESTART
-  use io_MEANDATA
-  use io_mesh_info
-  use diagnostics
-#if defined (__oasis)
-  use cpl_driver
-#endif
+
+  USE g_PARSUP, only: mype, par_ex
+  use g_clock, only: clock_finish
+
   IMPLICIT NONE
 
-  integer :: n, nsteps, offset, row, i
-
   !___FINISH MODEL RUN________________________________________________________
-  if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
+  if (mype==0) write(*,*) 'FESOM run is finished, updating clock'
   call clock_finish  
   call par_ex
 
