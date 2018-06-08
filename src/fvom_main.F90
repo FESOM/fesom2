@@ -7,30 +7,50 @@
 !=============================================================================!    
 
 program main
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE i_PARAM
-use i_ARRAYS
-use g_clock
-use g_config
-use g_forcing_index
-use g_comm_auto
-use g_forcing_arrays
-use io_RESTART
-use io_MEANDATA
-use io_mesh_info
-use diagnostics
-#if defined (__oasis)
-use cpl_driver
-#endif
-IMPLICIT NONE
 
-integer :: n, nsteps, offset, row, i
+  use g_PARSUP, only: mype
+  integer :: nsteps
+
+  call main_initialize(nsteps)
+  if (mype==0) write(*,*) 'Initialization complete.'
+
+  call main_timestepping(nsteps)
+  if (mype==0) write(*,*) 'Timestepping complete...'
+
+  call main_finalize
+  if (mype==0) write(*,*) 'Finalization complete...'
+
+end program main
+
+subroutine main_initialize(nsteps)
+  ! Split main into three major parts
+  ! Coded by Thomas Rackow, 2018
+  !----------------------------------
+  USE o_MESH
+  USE o_ARRAYS
+  USE o_PARAM
+  USE g_PARSUP
+  USE i_PARAM
+  use i_ARRAYS
+  use g_clock
+  use g_config
+  use g_forcing_index
+  use g_comm_auto
+  use g_forcing_arrays
+  use io_RESTART
+  use io_MEANDATA
+  use io_mesh_info
+  use diagnostics
+#if defined (__oasis)
+  use cpl_driver
+#endif
+  IMPLICIT NONE
+
+  integer :: n, offset, row, i
+  integer, INTENT(OUT) :: nsteps
 
 #ifndef __oifs
-  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular 		!dependencies between modules (cpl_driver and g_PARSUP)
 	!OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_INIT(i) 
 #endif
@@ -91,14 +111,43 @@ integer :: n, nsteps, offset, row, i
 	if (r_restart .and. use_ALE) then
 		call restart_thickness_ale
 	end if
-	
-	
+
+end subroutine main_initialize
+
+
+subroutine main_timestepping(nsteps)
+  ! Split main into three major parts
+  ! Coded by Thomas Rackow, 2018
+  !----------------------------------
+  USE o_MESH
+  USE o_ARRAYS
+  USE o_PARAM
+  USE g_PARSUP
+  USE i_PARAM
+  use i_ARRAYS
+  use g_clock
+  use g_config
+  use g_forcing_index
+  use g_comm_auto
+  use g_forcing_arrays
+  use io_RESTART
+  use io_MEANDATA
+  use io_mesh_info
+  use diagnostics
+#if defined (__oasis)
+  use cpl_driver
+#endif
+  IMPLICIT NONE
+
+  integer :: n, offset, row, i
+  integer, INTENT(IN) :: nsteps 
+
 	!=====================
 	! Time stepping
 	!=====================
-	if (mype==0) write(*,*) 'FESOM start interation before the barrier...'
+	if (mype==0) write(*,*) 'FESOM start integration before the barrier...'
 		call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
-	if (mype==0) write(*,*) 'FESOM start interation after the barrier...'
+	if (mype==0) write(*,*) 'FESOM start integration after the barrier...'
 	
 	
 	!___MODEL TIME STEPPING LOOP________________________________________________
@@ -148,9 +197,38 @@ integer :: n, nsteps, offset, row, i
 		call output (n)
 		call restart(n, .false., .false.)
 	end do
-	
-	!___FINISH MODEL RUN________________________________________________________
-	if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
-  	call clock_finish  
-	call par_ex
-end program main
+end subroutine main_timestepping
+
+
+subroutine main_finalize
+  ! Split main into three major parts
+  ! Coded by Thomas Rackow, 2018
+  !----------------------------------
+  USE o_MESH
+  USE o_ARRAYS
+  USE o_PARAM
+  USE g_PARSUP
+  USE i_PARAM
+  use i_ARRAYS
+  use g_clock
+  use g_config
+  use g_forcing_index
+  use g_comm_auto
+  use g_forcing_arrays
+  use io_RESTART
+  use io_MEANDATA
+  use io_mesh_info
+  use diagnostics
+#if defined (__oasis)
+  use cpl_driver
+#endif
+  IMPLICIT NONE
+
+  integer :: n, nsteps, offset, row, i
+
+  !___FINISH MODEL RUN________________________________________________________
+  if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
+  call clock_finish  
+  call par_ex
+
+end subroutine main_finalize
