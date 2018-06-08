@@ -6,6 +6,7 @@
 !                      The main driving routine
 !=============================================================================!    
 
+#ifndef __ifsinterface
 program main
 
   use g_PARSUP, only: mype
@@ -21,7 +22,7 @@ program main
   if (mype==0) write(*,*) 'Finalization complete...'
 
 end program main
-
+#endif
 
 
 !=============================================================================!

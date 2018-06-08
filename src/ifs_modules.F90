@@ -1,3 +1,4 @@
+#if defined (__ifsinterface)
 #define __MYFILE__ 'ifs_modules.F90'
 #define key_mpp_mpi
 ! Set of modules needed by the interface to IFS.
@@ -1855,3 +1856,4 @@ MODULE interinfo
    LOGICAL :: lparbcast = .FALSE.
 
 END MODULE interinfo
+#endif

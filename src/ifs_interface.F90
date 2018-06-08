@@ -1,3 +1,4 @@
+#if defined (__ifsinterface)
 !=====================================================
 ! IFS interface for calling FESOM2 as a subroutine.
 !
@@ -1310,5 +1311,4 @@ SUBROUTINE nemogcmcoup_final
    CALL abort
 
 END SUBROUTINE nemogcmcoup_final
-
-   
+#endif

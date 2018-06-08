@@ -1,3 +1,4 @@
+#if defined (__ifsinterface)
 ! Routines usually provided by the library that are currently
 ! not implemented for FESOM2.
 !
@@ -354,3 +355,4 @@ SUBROUTINE nemogcmcoup_wam_update_stress( mype, npes, icomm, npoints, &
    CALL abort
 
 END SUBROUTINE nemogcmcoup_wam_update_stress
+#endif
