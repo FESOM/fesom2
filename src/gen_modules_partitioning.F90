@@ -11,7 +11,7 @@ save
  include 'mpif.h'
 #endif
 
- integer                                :: MPI_COMM_FESOM
+ integer              :: MPI_COMM_FESOM
  integer, parameter   :: MAX_LAENDERECK=8
   type com_struct
      integer    :: rPEnum                    ! the number of PE I receive info from 
@@ -84,13 +84,13 @@ subroutine par_init    ! initializes MPI
 
   integer :: i
 
-#ifndef __oasis
+#if  defined __oasis || defined  __ifsinterface
+  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
+#else
   call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
   call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
   MPI_COMM_FESOM=MPI_COMM_WORLD
-#else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
 #endif  
 
   if(mype==0) then

@@ -37,6 +37,7 @@ module g_config
 
   ! *** in out ***
   character*4            :: restartflag='last'     !restart from record,'#','last'
+  logical		 :: ignore_timecheck=.false. !ignore time consistency check? (restart&clock)
   integer                :: output_length=1        !valid for d,h,s
   character              :: output_length_unit='m' !output period: y, m, d, h, s 
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
@@ -45,7 +46,7 @@ module g_config
   character              :: restart_length_unit='m'
   integer                :: output_offset=32, restart_offset=32
 
-  namelist /inout/ restartflag, output_length, output_length_unit, restart_length, restart_length_unit, &
+  namelist /inout/ restartflag, ignore_timecheck, output_length, output_length_unit, restart_length, restart_length_unit, &
 	logfile_outfreq, use_means, output_offset, restart_offset
 
   ! *** mesh ***

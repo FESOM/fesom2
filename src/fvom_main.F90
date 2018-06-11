@@ -63,9 +63,10 @@ subroutine main_initialize(nsteps)
         call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
 
+#endif
 	! sets npes and mype
 	call par_init 
-#endif
+
 
 	if (mype==0) write(*,*) '!=============================================================================!'
 	if (mype==0) write(*,*) '!                             Welcome to the					'

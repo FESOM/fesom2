@@ -484,7 +484,7 @@ subroutine read_restart(id, arg)
      end if
      write(*,*) 'restart from record ', rec2read, ' of ', id%rec_count
 
-     if (int(ctime)/=int(rtime)) then
+     if ((int(ctime)/=int(rtime)) .and. (.not. ignore_timecheck)) then
         write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'

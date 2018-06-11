@@ -14,7 +14,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    USE par_kind !in ifs_modules.F90
    USE g_PARSUP, only: MPI_COMM_FESOM
    USE g_config, only: dt
-   USE g_clock, only: timenew, daynew, yearnew
+   USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
    IMPLICIT NONE
 
    ! Input arguments
@@ -34,41 +34,28 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Write to this unit
    LOGICAL :: lwrite
 
-   WRITE(0,*)'!==================================='
-   WRITE(0,*)'! FESOM initialization from IFS.'
 
-   WRITE(0,*)'! get MPI_COMM_FESOM. =============='
+   WRITE(0,*)'!======================================'
+   WRITE(0,*)'! FESOM is initialized from within IFS.'
+
+   WRITE(0,*)'! get MPI_COMM_FESOM. ================='
    MPI_COMM_FESOM=icomm
 
    itini = 1
-   CALL main_initialize(itend)
-   WRITE(0,*)'! main_initialize done. ============'
+   CALL main_initialize(itend) !also sets mype and npes
+   WRITE(0,*)'! main_initialize done. ==============='
 
    ! Set more information for the caller
-   write(0,*)'! clock initialized at time ', timenew, daynew, yearnew*1000 + 9*10 + 6
-   inidate = 20170906
-   initime = 0 !hours?
-   WRITE(0,*)'! currently start only from 00:00 possible.'
    
+   ! initial date and time (time is not used)
+   inidate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
+   initime = 0
+   WRITE(0,*)'! FESOM initial date is ', inidate ,' ======'
+   
+   ! fesom timestep
    zstp = dt
-   WRITE(0,*)'! FESOM timestep is ', real(dt,4), 'sec'
-
-   WRITE(0,*)'! no coupling to waves implemented. '
-   WRITE(0,*)'!==================================='
-
-!#ifdef FESOM_TODO
-!   inidate = nn_date0
-!   initime = nn_time0*3600
-!   itini   = nit000
-!   itend   = nn_itend
-!   zstp    = rdttra(1)
-!#else
-!   inidate = 20170906
-!   initime = 0
-!   itini   = 1
-!   itend   = 24
-!   zstp    = 3600.0
-!#endif
+   WRITE(0,*)'! FESOM timestep is ', real(zstp,4), 'sec'
+   WRITE(0,*)'!======================================'
 
 END SUBROUTINE nemogcmcoup_init
 
@@ -76,13 +63,14 @@ END SUBROUTINE nemogcmcoup_init
 SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    &                             npoints, nlocmsk, ngloind )
 
+   ! FESOM modules
+   USE g_PARSUP, only: mype, npes, myDim_nod2D, myDim_elem2D, myList_nod2D, myList_elem2D
+   USE o_MESH,   only: nod2D, elem2D
+
    ! Initialize single executable coupling 
    USE parinter
    USE scripremap
    USE interinfo
-
-   ! FESOM modules
-   USE g_PARSUP, only: mype, npes
    IMPLICIT NONE
 
    ! Input arguments
@@ -128,9 +116,9 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    INTEGER :: i,j,k,ierr
    LOGICAL :: lexists
 
-   ! now FESOM knows about the (total number of) MPI tasks
-   mype=mypeIN
-   npes=npesIN
+
+   ! here FESOM knows about the (total number of) MPI tasks
+
    if(mype==0) then
    write(*,*) 'MPI has been initialized in the atmospheric model'
    write(*, *) 'Running on ', npes, ' PEs'
@@ -157,24 +145,25 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    CALL mpi_allreduce( npoints, nglopoints, 1, &
       &                mpi_integer, mpi_sum, icomm, ierr)
 
+
+   WRITE(0,*)'!======================================'
+   WRITE(0,*)'! SCALARS ============================='
+
    WRITE(0,*)'Update FESOM global scalar points'
-   noglopoints=126858
-   IF (mype==0) THEN
-      nopoints=126858
-   ELSE
-      nopoints=0
-   ENDIF
+   noglopoints=nod2D
+   nopoints=myDim_nod2d
 
    ! Ocean mask and global indicies
    
    ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
+   omask(:)= 1			! all points are ocean points
+   ogloind = myList_nod2D	! global index for local point number
 
-   omask(:) = 1
-   IF (mype==0) THEN
-      DO i=1,nopoints
-         ogloind(i)=i
-      ENDDO
-   ENDIF
+   ! Could be helpful later:
+   ! Replace global numbering with a local one
+   ! tmp(1:nod2d)=0
+   ! DO n=1, myDim_nod2D+eDim_nod2D
+   ! tmp(myList_nod2D(n))=n
 
    ! Read the interpolation weights and setup the parallel interpolation
    ! from atmosphere Gaussian grid to ocean T-grid
@@ -230,24 +219,20 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    
    DEALLOCATE(omask,ogloind)
 
+
+   WRITE(0,*)'!======================================'
+   WRITE(0,*)'! VECTORS ============================='
+
    WRITE(0,*)'Update FESOM global vector points'
-   noglopoints=244659
-   IF (mype==0) THEN
-      nopoints=244659
-   ELSE
-      nopoints=0
-   ENDIF
+   noglopoints=elem2D
+   nopoints=myDim_elem2D
 
    ! Ocean mask and global indicies
    
    ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
 
-   omask(:) = 1
-   IF (mype==0) THEN
-      DO i=1,nopoints
-         ogloind(i)=i
-      ENDDO
-   ENDIF
+   omask(:)= 1			! all elements are in the ocean 	
+   ogloind = myList_elem2D	! global index for local element number
 
    ! Read the interpolation weights and setup the parallel interpolation
    ! from atmosphere Gaussian grid to ocean UV-grid
