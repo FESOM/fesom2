@@ -1,12 +1,20 @@
 ! ==============================================================
 subroutine setup_model
   implicit none
+#ifdef __ifsinterface
+  call read_namelist_ifs    ! should be before clock_init
+#else
   call read_namelist    ! should be before clock_init
+#endif
   call define_prog_tracer
 
 end subroutine setup_model
 ! ==============================================================
+#ifdef __ifsinterface
+subroutine read_namelist_ifs
+#else
 subroutine read_namelist
+#endif
   ! Reads namelist files and overwrites default parameters.
   !
   ! Coded by Lars Nerger
@@ -78,7 +86,11 @@ subroutine read_namelist
   if(mype==0) write(*,*) 'Namelist files are read in'
 
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
+#ifdef __ifsinterface
+end subroutine read_namelist_ifs
+#else
 end subroutine read_namelist
+#endif
 ! =================================================================
 subroutine define_prog_tracer
   ! Coded by Qiang Wang
