@@ -3,25 +3,30 @@
 ! IFS interface for calling FESOM2 as a subroutine.
 !
 ! -Original code for NEMO by Kristian Mogensen, ECMWF.
+! -Adapted to FESOM2 by Thomas Rackow, AWI.
 !-----------------------------------------------------
 
 SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
-   ! Initialize the NEMO model for single executable coupling 
+   ! Initialize the FESOM model for single executable coupling 
 
-   USE par_kind
-
+   USE par_kind !in ifs_modules.F90
+   USE g_PARSUP, only: MPI_COMM_FESOM
+   USE g_config, only: dt
+   USE g_clock, only: timenew, daynew, yearnew
    IMPLICIT NONE
 
    ! Input arguments
 
    ! Message passing information
    INTEGER, INTENT(IN) :: icomm
-   ! Initial date, time, initial timestep and final time step
+   ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
    ! Length of the time step
    REAL(wp), INTENT(OUT) :: zstp
+
+   ! inherited from interface to NEMO, not used here:
    ! Coupling to waves only
    LOGICAL, INTENT(IN) :: lwaveonly
    ! Logfile unit (used if >=0)
@@ -29,41 +34,61 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Write to this unit
    LOGICAL :: lwrite
 
-   WRITE(0,*)'Insert FESOM init here.'
-!   CALL abort
+   WRITE(0,*)'!==================================='
+   WRITE(0,*)'! FESOM initialization from IFS.'
 
-   ! Set information for the caller
+   WRITE(0,*)'! get MPI_COMM_FESOM. =============='
+   MPI_COMM_FESOM=icomm
 
-#ifdef FESOM_TODO
-   inidate = nn_date0
-   initime = nn_time0*3600
-   itini   = nit000
-   itend   = nn_itend
-   zstp    = rdttra(1)
-#else
+   itini = 1
+   CALL main_initialize(itend)
+   WRITE(0,*)'! main_initialize done. ============'
+
+   ! Set more information for the caller
+   write(0,*)'! clock initialized at time ', timenew, daynew, yearnew*1000 + 9*10 + 6
    inidate = 20170906
-   initime = 0
-   itini   = 1
-   itend   = 24
-   zstp    = 3600.0
-#endif
+   initime = 0 !hours?
+   WRITE(0,*)'! currently start only from 00:00 possible.'
+   
+   zstp = dt
+   WRITE(0,*)'! FESOM timestep is ', real(dt,4), 'sec'
+
+   WRITE(0,*)'! no coupling to waves implemented. '
+   WRITE(0,*)'!==================================='
+
+!#ifdef FESOM_TODO
+!   inidate = nn_date0
+!   initime = nn_time0*3600
+!   itini   = nit000
+!   itend   = nn_itend
+!   zstp    = rdttra(1)
+!#else
+!   inidate = 20170906
+!   initime = 0
+!   itini   = 1
+!   itend   = 24
+!   zstp    = 3600.0
+!#endif
 
 END SUBROUTINE nemogcmcoup_init
 
 
-SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
+SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    &                             npoints, nlocmsk, ngloind )
 
    ! Initialize single executable coupling 
    USE parinter
    USE scripremap
    USE interinfo
+
+   ! FESOM modules
+   USE g_PARSUP, only: mype, npes
    IMPLICIT NONE
 
    ! Input arguments
 
    ! Message passing information
-   INTEGER, INTENT(IN) :: mype,npes,icomm
+   INTEGER, INTENT(IN) :: mypeIN,npesIN,icomm
    ! Gaussian grid information   
    ! Number of points
    INTEGER, INTENT(IN) :: npoints
@@ -102,6 +127,14 @@ SUBROUTINE nemogcmcoup_coupinit( mype, npes, icomm, &
    ! Misc variables
    INTEGER :: i,j,k,ierr
    LOGICAL :: lexists
+
+   ! now FESOM knows about the (total number of) MPI tasks
+   mype=mypeIN
+   npes=npesIN
+   if(mype==0) then
+   write(*,*) 'MPI has been initialized in the atmospheric model'
+   write(*, *) 'Running on ', npes, ' PEs'
+   end if
 
    ! Read namelists
    

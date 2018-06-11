@@ -49,8 +49,11 @@ subroutine main_initialize(nsteps)
   integer :: ierr
   integer, INTENT(OUT) :: nsteps
 
+#ifndef __ifsinterface
+	!MPI_INIT is done by IFS when ifsinterface is used (fesom is called as library)
 #ifndef __oifs
-  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular 		!dependencies between modules (cpl_driver and g_PARSUP)
+  	!ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular 		
+	!dependencies between modules (cpl_driver and g_PARSUP)
 	!OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_INIT(ierr) 
 #endif
@@ -62,6 +65,8 @@ subroutine main_initialize(nsteps)
 
 	! sets npes and mype
 	call par_init 
+#endif
+
 	if (mype==0) write(*,*) '!=============================================================================!'
 	if (mype==0) write(*,*) '!                             Welcome to the					'
 	if (mype==0) write(*,*) '!                 Finite Volume Sea-ice Ocean Model (FESOM2)                   '
