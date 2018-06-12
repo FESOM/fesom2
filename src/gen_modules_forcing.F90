@@ -239,7 +239,7 @@ module g_forcing_interp
     do row=1,n2 
        xmod(row)=geo_coord_nod2D(1,row)
        ymod(row)=geo_coord_nod2d(2,row)
-       if (xmod(row)<0.0) xmod(row)=2*pi+xmod(row)	
+       if (xmod(row)<0.0) xmod(row)=2.*pi+xmod(row)
     enddo
 
     ! linear interpolation: nodes and weight

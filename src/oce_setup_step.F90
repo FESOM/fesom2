@@ -194,17 +194,18 @@ allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 ! neutral slope etc. to be used in Redi formulation
 allocate(neutral_slope(3, nl-1, node_size))
 allocate(slope_tapered(3, nl-1, node_size))
-allocate(Ki(node_size))
+allocate(Ki(nl-1, node_size))
+
+do n=1, node_size
+!  Ki(n)=K_hor*area(1,n)/scale_area
+   Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+end do
+call exchange_nod(Ki)
+
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
 allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
-
-do n=1, node_size
-!  Ki(n)=K_hor*area(1,n)/scale_area
-   Ki(n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
-end do
-call exchange_nod(Ki)
 
 ! xy gradient of a neutral surface
 allocate(sigma_xy(2, nl-1, node_size))
@@ -216,7 +217,7 @@ sw_beta=0.0_WP
 sw_alpha=0.0_WP
 
 if (Fer_GM) then
-   allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(node_size))
+   allocate(fer_c(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
    allocate(fer_wvel(nl, node_size), fer_UV(2, nl-1, elem_size))
    fer_gamma=0.0_WP
    fer_uv=0.0_WP
