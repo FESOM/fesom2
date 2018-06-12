@@ -72,7 +72,7 @@ subroutine ini_mean_io
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'y')
+  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'm')
   call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'y')
   call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y')
 
@@ -119,13 +119,17 @@ subroutine ini_mean_io
      call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm')
   end if
 
+  if (Redi) then
+     call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'm')
+  end if
 
   if (Fer_GM) then
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U', 'm/s',     fer_uv(1,:,:),  1, 'y')
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V', 'm/s',     fer_uv(2,:,:),  1, 'y')
-     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W', 'm/s',     fer_Wvel(:,:),  1, 'y')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U',      'm/s',  fer_uv(1,:,:), 1, 'y')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V',      'm/s',  fer_uv(2,:,:), 1, 'y')
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W',      'm/s',  fer_Wvel(:,:), 1, 'y')
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diffusivity', 'm2/s', fer_k(:,:),    1, 'm')
+
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
-     call def_stream(nod2D, myDim_nod2D, 'fer_K', 'GM, stirring diffusivity',     'm2/s',        fer_k(1:myDim_nod2D),           1, 'm')
      call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
   end if
   if (ldiag_solver) then
@@ -133,7 +137,7 @@ subroutine ini_mean_io
      call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's')
   end if
   if (lcurt_stress_surf) then
-     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 's')
+     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 'm')
   end if
   if (ldiag_curl_vel3) then
      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u', 'relative vorticity',         '1/s',   vorticity, 1, 'm')     

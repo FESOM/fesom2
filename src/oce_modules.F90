@@ -279,7 +279,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
-real(kind=WP), allocatable :: Ki(:)
+real(kind=WP), allocatable :: Ki(:,:)
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
@@ -325,7 +325,7 @@ real*8,allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real*8,allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP), allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
-real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:), fer_gamma(:,:,:)
+real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:,:), fer_gamma(:,:,:)
 END MODULE o_ARRAYS
 !==========================================================

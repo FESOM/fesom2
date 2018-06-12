@@ -834,7 +834,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 		Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,  n)**2 + &
 			 (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
-		Ty1=Ki(n)*Ty1*isredi
+		Ty1=Ki(nz,n)*Ty1*isredi
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
 		a(nz)=0.0_WP
 		c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -861,8 +861,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
 			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
 			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
-			Ty =Ki(n)*Ty *isredi
-			Ty1=Ki(n)*Ty1*isredi
+			Ty =Ki(nz,n)*Ty *isredi
+			Ty1=Ki(nz,n)*Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 			a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -891,7 +891,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
 		Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
 			(zbar_n(nz)-Z_n(nz))  *zinv1 *slope_tapered(3,nz,n)**2
-		Ty =Ki(n)*Ty *isredi
+		Ty =Ki(nz,n)*Ty *isredi
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
 		c(nz)=0.0_WP
@@ -1106,7 +1106,7 @@ subroutine diff_ver_part_redi_expl
 				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
-			del_ttf(nz,n) = del_ttf(nz,n)+Ki(n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n)+Ki(nz,n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
 	end do
 end subroutine diff_ver_part_redi_expl!
@@ -1139,7 +1139,6 @@ subroutine diff_part_hor_redi
 		enodes=edges(:,edge)
 		nl1=nlevels(el(1))-1
 		elnodes=elem2d_nodes(:,el(1))
-		Kh=sum(Ki(enodes))/2.0_WP
 		!Kh=elem_area(el(1))
 		!_______________________________________________________________________
 		nl2=0
@@ -1153,6 +1152,7 @@ subroutine diff_part_hor_redi
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
+                        Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=sum(helem(nz, el))/2.0_WP
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
@@ -1168,6 +1168,7 @@ subroutine diff_part_hor_redi
 		
 		!_______________________________________________________________________
 		do nz=n2+1,nl1
+                        Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=helem(nz, el(1))
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
@@ -1181,6 +1182,7 @@ subroutine diff_part_hor_redi
 			rhs2(nz) = rhs2(nz) - c
 		end do
 		do nz=n2+1,nl2
+                        Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=helem(nz, el(2))
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
