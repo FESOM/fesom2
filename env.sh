@@ -37,7 +37,7 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
    STRATEGY="ecaccess.ecmwf.int"
-elif [[ $LOGINHOST =~ ^pecora+\.ecmwf\.int$ ]]; then
+elif [[ $LOGINHOST =~ ^[A-Za-z0-9]+\.ecmwf\.int$ ]]; then
    STRATEGY="workstation"
 else
    echo "can not determine environment for host: "$LOGINHOST
