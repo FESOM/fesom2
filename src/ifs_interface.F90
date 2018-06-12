@@ -3,7 +3,7 @@
 ! IFS interface for calling FESOM2 as a subroutine.
 !
 ! -Original code for NEMO by Kristian Mogensen, ECMWF.
-! -Adapted to FESOM2 by Thomas Rackow, AWI.
+! -Adapted to FESOM2 by Thomas Rackow, AWI, 2018.
 !-----------------------------------------------------
 
 SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
@@ -307,6 +307,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE i_arrays, ONLY : m_ice, a_ice, m_snow
    USE i_therm_param, ONLY : tmelt
    USE g_PARSUP, only: myDim_nod2D, myDim_elem2D
+   USE o_MESH, only: elem2D_nodes, coord_nod2D
+   USE g_rotate_grid, only: vector_r2g
    USE parinter
    USE scripremap
    USE interinfo
@@ -325,10 +327,12 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    ! Local variables
    REAL(wp), DIMENSION(myDim_nod2D)  :: zsend
-   REAL(wp), DIMENSION(myDim_elem2D) :: zsendUV
+   REAL(wp), DIMENSION(myDim_elem2D) :: zsendU, zsendV
+   INTEGER			     :: elnodes(3)
+   REAL(wp)			     :: rlon, rlat	
 
    ! Loop variables
-   INTEGER :: n
+   INTEGER :: n, elem
 
 
    ! =================================================================== !
@@ -395,19 +399,29 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    ! =================================================================== !
    ! Surface currents need to be rotated to geographical grid
 
-   ! Pack u surface current and interpolate: 'pgucur' on Gaussian grid.
-   zsendUV(:)=UV(1,1,1:myDim_elem2D) !UV includes eDim, leave away
+   ! Pack u(v) surface currents
+   zsendU(:)=UV(1,1,1:myDim_elem2D)
+   zsendV(:)=UV(2,1,1:myDim_elem2D) !UV includes eDim, leave those away here
 
+   do elem=1, myDim_elem2D
+
+      ! compute element midpoints
+      elnodes=elem2D_nodes(:,elem)
+      rlon=sum(coord_nod2D(1,elnodes))/3.0_WP
+      rlat=sum(coord_nod2D(2,elnodes))/3.0_WP
+
+      ! Rotate vectors to geographical coordinates (r2g)
+      call vector_r2g(zsendU(elem), zsendV(elem), rlon, rlat, 0) ! 0-flag for rot. coord
+
+   end do
+
+   ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
    CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-      &               myDim_elem2D, zsendUV, &
+      &               myDim_elem2D, zsendU, &
       &               nopoints, pgucur )
 
-
-   ! Pack v surface current and interpolate: 'pgvcur' on Gaussian grid.
-   zsendUV(:)=UV(2,1,1:myDim_elem2D) !UV includes eDim, leave away
-
    CALL parinter_fld( mype, npes, icomm, UVtogauss, &
-      &               myDim_elem2D, zsendUV, &
+      &               myDim_elem2D, zsendV, &
       &               nopoints, pgvcur )
 
 #ifndef FESOM_TODO
@@ -468,11 +482,15 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! Update fluxes in nemogcmcoup_data by parallel
    ! interpolation of the input gaussian grid data
    
-   USE par_kind
+   USE par_kind !in ifs_modules.F90
+   USE g_PARSUP, only: myDim_nod2D, myDim_elem2D
+   USE o_MESH, only: elem2D_nodes, coord_nod2D
+   USE g_rotate_grid, only: vector_r2g
 
    IMPLICIT NONE
 
-   ! Arguments
+   ! =================================================================== !
+   ! Arguments ========================================================= !
 
    ! MPI communications
    INTEGER, INTENT(IN) :: mype,npes,icomm
@@ -494,6 +512,13 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    LOGICAL, INTENT(IN) :: lqnsicefilt
 
    ! Local variables
+
+   ! Packed receive buffer
+   REAL(wp), DIMENSION(myDim_nod2D) :: zrecv
+   REAL(wp), DIMENSION(myDim_elem2D):: zrecvU, zrecvV
+
+
+   ! =================================================================== !
 
 #ifdef FESOM_TODO
 
