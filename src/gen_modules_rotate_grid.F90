@@ -17,7 +17,7 @@ module g_rotate_grid
   use g_config
   implicit none
   save
-  real(kind=WP)        :: r2g_matrix(3,3)
+  real(kind=WP)        :: r2g_matrix(3,3), r2g_matrix_inv(3,3)
 
  contains
   
@@ -31,7 +31,7 @@ module g_rotate_grid
     ! x-axis, and the third is by an angle G about the new z-axis.   
     use o_PARAM
     implicit none
-    real(kind=WP)      :: al, be, ga
+    real(kind=WP)      :: al, be, ga, det
 
     al=alphaEuler
     be=betaEuler
@@ -48,7 +48,48 @@ module g_rotate_grid
     r2g_matrix(3,2)=-sin(be)*cos(al)  
     r2g_matrix(3,3)=cos(be)
 
+    ! inverse for vector_r2g; for rotation matrix det=1 and R^T=R^-1
+    call matrix_inverse_3x3(r2g_matrix, r2g_matrix_inv, det)
+
   end subroutine set_mesh_transform_matrix
+  !
+  !----------------------------------------------------------------
+  !
+subroutine matrix_inverse_3x3(A, AINV, DET)
+  !
+  ! Coded by Sergey Danilov
+  ! Reviewed by Qiang Wang and Thomas Rackow
+  !-----------------------------------------
+  
+  implicit none
+  
+  real(kind=WP), dimension(3,3), intent(IN)  :: A
+  real(kind=WP), dimension(3,3), intent(OUT) :: AINV
+  real(kind=WP), intent(OUT)                 :: DET
+  
+  integer                                   :: i,j
+  
+  AINV(1,1) =  A(2,2)*A(3,3) - A(3,2)*A(2,3)
+  AINV(2,1) = -A(2,1)*A(3,3) + A(3,1)*A(2,3)
+  AINV(3,1) =  A(2,1)*A(3,2) - A(3,1)*A(2,2)
+  AINV(1,2) = -A(1,2)*A(3,3) + A(3,2)*A(1,3)
+  AINV(2,2) =  A(1,1)*A(3,3) - A(3,1)*A(1,3)
+  AINV(3,2) = -A(1,1)*A(3,2) + A(3,1)*A(1,2)
+  AINV(1,3) =  A(1,2)*A(2,3) - A(2,2)*A(1,3)
+  AINV(2,3) = -A(1,1)*A(2,3) + A(2,1)*A(1,3)
+  AINV(3,3) =  A(1,1)*A(2,2) - A(2,1)*A(1,2)
+  DET = A(1,1)*AINV(1,1) + A(1,2)*AINV(2,1) + A(1,3)*AINV(3,1)
+  
+  if ( DET .eq. 0.0 )  then
+     do j=1,3
+        write(*,*) (A(i,j),i=1,3)
+     end do
+     stop 'SINGULAR 3X3 MATRIX in matrix_inverse_3x3'
+  else
+     AINV = AINV/DET
+  endif
+  
+end subroutine matrix_inverse_3x3
 !
 !----------------------------------------------------------------
 !
@@ -156,8 +197,49 @@ module g_rotate_grid
     tlon=-sin(rlon)*txr + cos(rlon)*tyr
 
   end subroutine vector_g2r
-!
-!----------------------------------------------------------------------------
-!
+  !
+  !----------------------------------------------------------------------------
+  !
+  subroutine vector_r2g(tlon, tlat, lon, lat, flag_coord)
+   ! Transform a 2d vector with components (tlon, tlat) in
+   ! rotate 2d vector (tlon, tlat) to be in geo. coordinates
+   ! tlon, tlat (in)    :: lon & lat components of a vector in rotated coordinates
+   !            (out)   :: lon & lat components of the vector in geo. coordinates
+   ! lon, lat           :: [radian] coordinates
+   ! flag_coord         :: 1, (lon,lat) is the geographical coord.; else, rotated coord.
+   !
+   implicit none
+   integer, intent(in)            :: flag_coord
+   real(kind=WP), intent(inout)   :: tlon, tlat
+   real(kind=WP), intent(in)      :: lon, lat
+   real(kind=WP)                  :: rlon, rlat, glon, glat
+   real(kind=WP)                  :: txg, tyg, tzg, txr, tyr, tzr
+   !
+   ! geographical coordinate
+   if(flag_coord==1) then  ! input is in geographical coordinates
+      glon=lon
+      glat=lat
+      call g2r(glon,glat,rlon,rlat)
+   else                    ! input is in rotated coordinates
+      rlon=lon
+      rlat=lat
+      call r2g(glon,glat,rlon,rlat)
+   end if
+   !
+   ! vector rotated Cartesian
+   txg=-tlat*sin(rlat)*cos(rlon)-tlon*sin(rlon)
+   tyg=-tlat*sin(rlat)*sin(rlon)+tlon*cos(rlon)
+   tzg=tlat*cos(rlat)
+   !
+   ! vector in geo Cartesian
+   txr=r2g_matrix_inv(1,1)*txg + r2g_matrix_inv(1,2)*tyg + r2g_matrix_inv(1,3)*tzg
+   tyr=r2g_matrix_inv(2,1)*txg + r2g_matrix_inv(2,2)*tyg + r2g_matrix_inv(2,3)*tzg
+   tzr=r2g_matrix_inv(3,1)*txg + r2g_matrix_inv(3,2)*tyg + r2g_matrix_inv(3,3)*tzg
+   !
+   ! vector in geo coordinate
+   tlat=-sin(glat)*cos(glon)*txr - sin(glat)*sin(glon)*tyr + cos(glat)*tzr
+   tlon=-sin(glon)*txr + cos(glon)*tyr
+
+  end subroutine vector_r2g
 
 end module g_rotate_grid
