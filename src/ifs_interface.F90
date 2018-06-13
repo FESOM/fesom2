@@ -33,7 +33,12 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    INTEGER :: iatmunit
    ! Write to this unit
    LOGICAL :: lwrite
+   ! FESOM might perform substeps
+   INTEGER :: itend_fesom
+   INTEGER :: substeps !per IFS timestep
 
+   ! TODO hard-coded here, put in namelist
+   substeps=2
 
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! FESOM is initialized from within IFS.'
@@ -42,7 +47,8 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    MPI_COMM_FESOM=icomm
 
    itini = 1
-   CALL main_initialize(itend) !also sets mype and npes
+   CALL main_initialize(itend_fesom) !also sets mype and npes
+   itend=itend_fesom/substeps
    WRITE(0,*)'! main_initialize done. ==============='
 
    ! Set more information for the caller
@@ -52,9 +58,9 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    initime = 0
    WRITE(0,*)'! FESOM initial date is ', inidate ,' ======'
    
-   ! fesom timestep
-   zstp = dt
-   WRITE(0,*)'! FESOM timestep is ', real(zstp,4), 'sec'
+   ! fesom timestep (as seen by IFS)
+   zstp = real(substeps,wp)*dt
+   WRITE(0,*)'! FESOM timestep as seen by IFS is ', real(zstp,4), 'sec (',substeps,'xdt)'
    WRITE(0,*)'!======================================'
 
 END SUBROUTINE nemogcmcoup_init
@@ -476,16 +482,23 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    &                                taux_oce, tauy_oce, taux_ice, tauy_ice, &
    &                                qs___oce, qs___ice, qns__oce, qns__ice, dqdt_ice, &
    &                                evap_tot, evap_ice, prcp_liq, prcp_sol, &
-   &                                runoff, ocerunoff, tcc, lcc, tice_atm, &
+   &                                runoffIN, ocerunoff, tcc, lcc, tice_atm, &
    &                                kt, ldebug, loceicemix, lqnsicefilt )
 
    ! Update fluxes in nemogcmcoup_data by parallel
    ! interpolation of the input gaussian grid data
    
    USE par_kind !in ifs_modules.F90
-   USE g_PARSUP, only: myDim_nod2D, myDim_elem2D
-   USE o_MESH, only: elem2D_nodes, coord_nod2D
-   USE g_rotate_grid, only: vector_r2g
+   USE g_PARSUP, 	only: myDim_nod2D, myDim_elem2D, par_ex
+   USE o_MESH, 		only: elem2D_nodes, coord_nod2D
+   USE g_rotate_grid, 	only: vector_r2g
+   USE g_forcing_arrays, only: shortwave, longwave, prec_rain, prec_snow, runoff, evaporation, evap_no_ifrac, sublimation
+   USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, stress_atmoce_x, stress_atmoce_y, oce_heat_flux, ice_heat_flux 
+
+   ! all needed?
+   USE parinter
+   USE scripremap
+   USE interinfo
 
    IMPLICIT NONE
 
@@ -500,7 +513,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
       & taux_oce, tauy_oce, taux_ice, tauy_ice, &
       & qs___oce, qs___ice, qns__oce, qns__ice, &
       & dqdt_ice, evap_tot, evap_ice, prcp_liq, prcp_sol, &
-      & runoff, ocerunoff, tcc, lcc, tice_atm
+      & runoffIN, ocerunoff, tcc, lcc, tice_atm
 
    ! Current time step
    INTEGER, INTENT(in) :: kt
@@ -519,6 +532,41 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
 
    ! =================================================================== !
+   ! Sort out incoming arrays from the IFS and put them on the ocean grid
+   
+   !1. Interpolate ocean solar radiation to T grid
+
+   CALL parinter_fld( mype, npes, icomm, gausstoT, npoints, qs___oce,  &
+      &               myDim_nod2D, zrecv )
+   
+   if (mype==0) write(*,*) 'parinter_fld worked...'
+   ! Unpack ocean solar radiation
+   ! shortwave(:)=zrecv eDIM missing
+   shortwave(:)=0.
+
+
+   ! TODO
+   longwave(:)=0.
+   prec_rain(:)=0. 
+   prec_snow(:)=0.
+   runoff(:)=0.
+   evaporation(:)=0.
+   if (mype==0) write(*,*) 'First group worked...'
+
+   stress_atmice_x=0.
+   stress_atmice_y=0. ! push ice to the north
+   stress_atmoce_x=0. ! push ocean surface waters to the East
+   stress_atmoce_y=0.
+   if (mype==0) write(*,*) 'Second group worked...'
+
+   ice_heat_flux=0.
+   oce_heat_flux=0.
+   if (mype==0) write(*,*) 'Third group worked...'
+
+   evap_no_ifrac=0.
+   sublimation=0.  
+   if (mype==0) write(*,*) 'Fourth group worked...'
+   !thdgr, thdgrsn, flice
 
 #ifdef FESOM_TODO
 
@@ -1143,8 +1191,8 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 
 #else
 
-   WRITE(0,*)'nemogcmcoup_lim2_update not done for FESOM yet'
-   CALL abort
+   WRITE(0,*)'nemogcmcoup_lim2_update partially implemented. Proceeding...'
+   !CALL par_ex
 
 #endif
 
@@ -1153,6 +1201,7 @@ END SUBROUTINE nemogcmcoup_lim2_update
 
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
+   USE g_clock, only: yearnew, month, day_in_month
    IMPLICIT NONE
 
    ! Arguments
@@ -1164,12 +1213,20 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    INTEGER, INTENT(OUT) :: icdate, ictime
 
    ! Local variables
-   
-   ! Advance the FESOM model 1 time step
+   INTEGER		:: substeps
 
-   WRITE(0,*)'Insert FESOM step here.'
+   ! Advance the FESOM model 2 time steps here, still hard-coded
+   substeps=2
 
-   ! Compute date and time at the end of the time step.
+   WRITE(0,*)'! IFS at timestep ', istp, '. Do ', substeps , 'FESOM timesteps...'
+   CALL main_timestepping(substeps)
+
+   ! Compute date and time at the end of the time step
+
+   icdate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
+   ictime = 0 ! (time is not used)
+
+   WRITE(0,*)'! FESOM date at end of timestep is ', icdate ,' ======'
 
 #ifdef FESOM_TODO
    iye = ndastp / 10000
@@ -1187,12 +1244,12 @@ END SUBROUTINE nemogcmcoup_step
 
 SUBROUTINE nemogcmcoup_final
 
-   ! Finalize the NEMO model
+   ! Finalize the FESOM model
 
    IMPLICIT NONE
 
-   WRITE(*,*)'Insert call to finalization of FESOM'
-   CALL abort
+   WRITE(*,*)'Finalization of FESOM from IFS.'
+   CALL main_finalize
 
 END SUBROUTINE nemogcmcoup_final
 #endif

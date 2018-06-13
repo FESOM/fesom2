@@ -226,8 +226,8 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
 
    ! Local variables
 
-   WRITE(0,*)'nemogcmcoup_update_add should not be called when coupling to fesom.'
-   CALL abort
+   WRITE(0,*)'nemogcmcoup_update_add should not be called when coupling to fesom. Commented ABORT. Proceeding...'
+   !CALL abort
    
 
 END SUBROUTINE nemogcmcoup_update_add
