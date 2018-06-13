@@ -45,15 +45,17 @@ subroutine forcing_array_setup
   allocate(Tair(n2), shum(n2))
   allocate(runoff(n2), evaporation(n2))
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   allocate(sublimation(n2), evap_no_ifrac(n2))
+  sublimation=0.
+  evap_no_ifrac=0.
+#endif
+#if defined (__oasis)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
   allocate(flux_correction_north(nrecv), flux_correction_south(nrecv))
   allocate(flux_correction_total(nrecv))
-  sublimation=0.
-  evap_no_ifrac=0.
   tmp_sublimation = 0.
   tmp_evap_no_ifrac = 0.
   tmp_shortwave = 0.

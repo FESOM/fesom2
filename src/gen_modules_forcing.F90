@@ -70,8 +70,10 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
   real(kind=8), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
+#endif
+#if defined (__oasis)
   real(kind=8), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
   real(kind=8), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
   real(kind=8), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
