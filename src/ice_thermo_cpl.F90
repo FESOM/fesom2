@@ -1,4 +1,4 @@
-#if defined (__oasis)
+#if defined (__oasis) || defined (__ifsinterface)
 subroutine thermodynamics
 
   !===================================================================

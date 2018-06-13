@@ -17,7 +17,7 @@ where(m_ice<0.1e-8)
 end where
 
 end subroutine cut_off
-#if !defined (__oasis)
+#if !defined (__oasis) && !defined (__ifsinterface)
 !===================================================================
 ! Sea-ice thermodynamics routines
 !
