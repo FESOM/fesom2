@@ -134,7 +134,6 @@ end subroutine main_initialize
 
 subroutine main_timestepping(nsteps)
   ! Split main into three major parts
-  ! Coded by Thomas Rackow, 2018
   !----------------------------------
   USE o_MESH
   USE o_ARRAYS
@@ -181,20 +180,15 @@ subroutine main_timestepping(nsteps)
         	seconds_til_now=INT(dt)*(n-1)
 #endif
 		call clock
-		if (mype==0) write(*,*) 'called clock'
 		call forcing_index
-		if (mype==0) write(*,*) 'called forcing_index'
 		call compute_vel_nodes 
-		if (mype==0) write(*,*) 'called compute_vel_nodes'
 ! 		eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old !PS
 		
 		!___model sea-ice step__________________________________________________
 		if(use_ice) then
 			call ocean2ice
-		        if (mype==0) write(*,*) 'called ocean2ice'
 #ifndef __ifsinterface
 			call update_atm_forcing(n)
-		        if (mype==0) write(*,*) 'called update_atm_forcing'
 #endif			
 			if (ice_steps_since_upd>=ice_ave_steps-1) then
 				ice_update=.true.
@@ -205,26 +199,19 @@ subroutine main_timestepping(nsteps)
 			endif
 			
 			if (ice_update) call ice_timestep(n)
-		        if (ice_update .and. mype==0) write(*,*) 'called ice_timestep'
 			
 			call oce_fluxes_mom ! momentum only
-		        if (mype==0) write(*,*) 'called oce_fluxes_mom'
                         call oce_fluxes
-			if (mype==0) write(*,*) 'called oce_fluxes'
 		end if  
 		
 		
 
 		!___model ocean step____________________________________________________
 		call oce_timestep_ale(n)
-		if (mype==0) write(*,*) 'called oce_timestep_ale'
                 call compute_diagnostics(1)
-		if (mype==0) write(*,*) 'called compute_diagnostics'
 		!___prepare output______________________________________________________
 		call output (n)
-		if (mype==0) write(*,*) 'called output'
 		call restart(n, .false., .false.)
-		if (mype==0) write(*,*) 'called restart'
 	end do
 end subroutine main_timestepping
 
@@ -236,7 +223,6 @@ end subroutine main_timestepping
 
 subroutine main_finalize
   ! Split main into three major parts
-  ! Coded by Thomas Rackow, 2018
   !----------------------------------
 
   USE g_PARSUP, only: mype, par_ex
