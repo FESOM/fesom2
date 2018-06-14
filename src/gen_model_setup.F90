@@ -30,22 +30,27 @@ subroutine read_namelist
   implicit none
 
   character(len=100)   :: nmlfile
+#ifdef __ifsinterface
+  integer, parameter :: iunit = 21
+#else
+  integer, parameter :: iunit = 20
+#endif
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
-  open (20,file=nmlfile)
-  read (20,NML=modelname)
-  read (20,NML=timestep)
-  read (20,NML=clockinit) 
-  read (20,NML=paths)
-  read (20,NML=initialization)  
-  read (20,NML=inout)
-  read (20,NML=mesh_def)
-  read (20,NML=geometry)
-  read (20,NML=calendar)
-  read (20,NML=run_config)
-!!$  read (20,NML=machine)
-  close (20)
+  open (iunit,file=nmlfile)
+  read (iunit,NML=modelname)
+  read (iunit,NML=timestep)
+  read (iunit,NML=clockinit) 
+  read (iunit,NML=paths)
+  read (iunit,NML=initialization)  
+  read (iunit,NML=inout)
+  read (iunit,NML=mesh_def)
+  read (iunit,NML=geometry)
+  read (iunit,NML=calendar)
+  read (iunit,NML=run_config)
+!!$  read (iunit,NML=machine)
+  close (iunit)
   ! ==========
   ! compute dt
   ! ========== 
@@ -62,25 +67,25 @@ subroutine read_namelist
 ! =================================
  
   nmlfile ='namelist.oce'    ! name of ocean namelist file
-  open (20,file=nmlfile)
-  read (20,NML=oce_dyn)
-  read (20,NML=oce_tra)
-  close (20)
+  open (iunit,file=nmlfile)
+  read (iunit,NML=oce_dyn)
+  read (iunit,NML=oce_tra)
+  close (iunit)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
-  open (20,file=nmlfile)
-  read (20,NML=forcing_exchange_coeff)
-  read (20,NML=forcing_source)
-  read (20,NML=forcing_bulk)
-  read (20,NML=land_ice)
-  close (20)
+  open (iunit,file=nmlfile)
+  read (iunit,NML=forcing_exchange_coeff)
+  read (iunit,NML=forcing_source)
+  read (iunit,NML=forcing_bulk)
+  read (iunit,NML=land_ice)
+  close (iunit)
 
   if(use_ice) then
   nmlfile ='namelist.ice'    ! name of ice namelist file
-  open (20,file=nmlfile)
-  read (20,NML=ice_dyn)
-  read (20,NML=ice_therm)
-  close (20)
+  open (iunit,file=nmlfile)
+  read (iunit,NML=ice_dyn)
+  read (iunit,NML=ice_therm)
+  close (iunit)
   endif
 
   if(mype==0) write(*,*) 'Namelist files are read in'
