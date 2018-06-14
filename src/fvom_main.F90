@@ -169,7 +169,7 @@ subroutine main_timestepping(nsteps)
 	
 	!___MODEL TIME STEPPING LOOP________________________________________________
 	do n=1, nsteps
-		
+		if (mype==0) write(*,*) 'do n=', n, ' to ', nsteps
 		mstep = n
 		if (mod(n,logfile_outfreq)==0 .and. mype==0) then
 			write(*,*) 'FESOM ======================================================='
@@ -181,16 +181,21 @@ subroutine main_timestepping(nsteps)
         	seconds_til_now=INT(dt)*(n-1)
 #endif
 		call clock
+		if (mype==0) write(*,*) 'called clock'
 		call forcing_index
+		if (mype==0) write(*,*) 'called forcing_index'
 		call compute_vel_nodes 
-		
+		if (mype==0) write(*,*) 'called compute_vel_nodes'
 ! 		eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old !PS
 		
 		!___model sea-ice step__________________________________________________
 		if(use_ice) then
 			call ocean2ice
+		        if (mype==0) write(*,*) 'called ocean2ice'
+#ifndef __ifsinterface
 			call update_atm_forcing(n)
-			
+		        if (mype==0) write(*,*) 'called update_atm_forcing'
+#endif			
 			if (ice_steps_since_upd>=ice_ave_steps-1) then
 				ice_update=.true.
 				ice_steps_since_upd = 0
@@ -200,19 +205,26 @@ subroutine main_timestepping(nsteps)
 			endif
 			
 			if (ice_update) call ice_timestep(n)
+		        if (ice_update .and. mype==0) write(*,*) 'called ice_timestep'
 			
 			call oce_fluxes_mom ! momentum only
+		        if (mype==0) write(*,*) 'called oce_fluxes_mom'
                         call oce_fluxes
+			if (mype==0) write(*,*) 'called oce_fluxes'
 		end if  
 		
 		
 
 		!___model ocean step____________________________________________________
 		call oce_timestep_ale(n)
+		if (mype==0) write(*,*) 'called oce_timestep_ale'
                 call compute_diagnostics(1)
+		if (mype==0) write(*,*) 'called compute_diagnostics'
 		!___prepare output______________________________________________________
 		call output (n)
+		if (mype==0) write(*,*) 'called output'
 		call restart(n, .false., .false.)
+		if (mype==0) write(*,*) 'called restart'
 	end do
 end subroutine main_timestepping
 
@@ -235,6 +247,8 @@ subroutine main_finalize
   !___FINISH MODEL RUN________________________________________________________
   if (mype==0) write(*,*) 'FESOM run is finished, updating clock'
   call clock_finish  
+#if !defined (__ifsinterface)
   call par_ex
+#endif
 
 end subroutine main_finalize
