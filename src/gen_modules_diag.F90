@@ -12,7 +12,7 @@ module diagnostics
   implicit none
 
   private
-  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3
+  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wzmid, wzmidrho, rho
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -20,10 +20,12 @@ module diagnostics
   real(kind=8),  save, allocatable, target      :: rhs_diag(:)
   real(kind=8),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=8),  save, allocatable, target      :: curl_vel3(:,:)
+  real(kind=8),  save, allocatable, target      :: wzmid(:,:), wzmidrho(:,:), rho(:,:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
+  logical                                       :: ldiag_energy     =.false.
   contains
 
 ! ==============================================================
@@ -144,6 +146,32 @@ subroutine diag_curl_vel3(mode)
    END DO    
 end subroutine diag_curl_vel3
 ! ==============================================================
+!energy budget
+subroutine diag_energy(mode)
+  implicit none
+  integer, intent(in)           :: mode
+  logical, save                 :: firstcall=.true.
+  integer        :: enodes(2), el(2), ed, n, nz, nl1, nl2
+  real(kind=8)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+
+!=====================
+  if (firstcall) then  !allocate the stuff at the first call
+     allocate(wzmid(nl-1, myDim_nod2D), wzmidrho(nl-1, myDim_nod2D), rho(nl-1, myDim_nod2D))
+     firstcall=.false.
+     if (mode==0) return
+  end if
+  wzmid=0.
+  rho  =0.
+  wzmidrho=0.
+
+  wzmid=0.5*(Wvel(1:nl-1, 1:myDim_nod2D)+Wvel(2:nl, 1:myDim_nod2D))
+  rho  =density_m_rho0(1:nl-1, 1:myDim_nod2D)
+  where(abs(rho)>0.)
+     rho=rho+density_0
+  end where
+  wzmidrho=rho(1:nl-1, 1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
+end subroutine diag_energy
+! ==============================================================
 subroutine compute_diagnostics(mode)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
@@ -153,6 +181,8 @@ subroutine compute_diagnostics(mode)
   !2. compute curl(stress_surf)
   if (lcurt_stress_surf) call diag_curl_stress_surf(mode)
   !3. compute curl(velocity)
-  if (ldiag_curl_vel3) call diag_curl_vel3(mode)
+  if (ldiag_curl_vel3)   call diag_curl_vel3(mode)
+  !4. compute energy budget
+  if (ldiag_energy)      call diag_energy(mode)
 end subroutine compute_diagnostics
 end module diagnostics

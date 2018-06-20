@@ -64,6 +64,12 @@ module io_MEANDATA
 subroutine ini_mean_io
   implicit none
 !3D
+  if (ldiag_energy) then
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:),    1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmidrho', 'vertical velocity x density', 'kg/(s*m2)', wzmidrho(:,:), 1, 'm')
+  end if
+
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
   call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
