@@ -116,7 +116,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     # make triangle mask arrays from flat triangles and nan trinagles
     mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
     if np.any(np.isnan(data.value)):
-        mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
+        if data.value.size ==mesh.n2dna:
+            mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
+        elif data.value.size ==mesh.n2dea:    
+            mask_tri = np.logical_or(mask_tri,np.isnan(data.value))
         idx_box = np.logical_and(idx_box,np.isnan(data.value)==False)
     
     if data.proj=='npstere':
@@ -158,8 +161,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         cref = np.around(cref, -np.int32(np.floor(np.log10(cref))) ) 
     elif data.sname=='u' or data.sname=='v' or data.sname=='w' or \
          data.sname=='bolus_u' or data.sname=='bolus_v'  or data.sname=='bolus_w':    
-        cmax = np.max(data.value[idx_box])
-        cmin = np.min(data.value[idx_box])
+        cmax = np.nanmax(data.value[idx_box])
+        cmin = np.nanmin(data.value[idx_box])
         cref=0
         data.cmap = 'blue2red'
     elif data.sname=='norm_uv':
@@ -239,21 +242,22 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 shading='gouraud')
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
                     antialiased=False,
-                    shading='flat',
-                    cmap=cmap0)
-        if do_grid==True: ax.triplot(tri,color='k',linewidth=.25)
+                    cmap=cmap0,
+                    clim=[clevel[0],clevel[-1]])
+        plt.clim=[clevel[0],clevel[-1]]
+        if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
@@ -322,9 +326,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     for im in ax.get_images():
         im.set_clim(clevel[0],clevel[-1])
     
-    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,
-            extend='both')
-    
+    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,extend='neither',extendrect=True,extendfrac='auto')
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
     plt.setp(cl, fontsize=fsize)
