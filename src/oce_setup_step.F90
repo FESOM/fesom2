@@ -318,7 +318,8 @@ USE g_input
   DO i=3, num_tracers
      id=tracer_ID(i)
      SELECT CASE (id)
-       CASE (2)
+       CASE (101)       ! initialize tracer ID=101
+         tr_arr(:,:,i)=0.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id

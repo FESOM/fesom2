@@ -63,6 +63,8 @@ module io_MEANDATA
 !
 subroutine ini_mean_io
   implicit none
+  integer           :: i
+  character(len=10) :: id_string
 !3D
   if (ldiag_energy) then
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm')
@@ -90,6 +92,12 @@ subroutine ini_mean_io
 
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y')
+  
+  do i=3, num_tracers
+     write (id_string, "(I3.3)") tracer_id(i)
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,i), 1, 'm')
+  end do
+
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
