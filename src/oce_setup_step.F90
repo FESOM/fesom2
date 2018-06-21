@@ -151,7 +151,7 @@ allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 
-allocate(heat_flux_old(node_size), Tsurf_old(node_size)) !PS
+allocate(heat_flux_old(node_size),  Tsurf_old(node_size)) !PS
 allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
 allocate(real_salt_flux(node_size)) !PS
 ! =================
@@ -287,6 +287,8 @@ end if
 	
 END SUBROUTINE array_setup
 !==========================================================================
+! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
+! ID = 0 and 1 are reserved for temperature and salinity
 SUBROUTINE oce_initial_state
 USE o_MESH
 USE o_ARRAYS
@@ -297,19 +299,47 @@ USE g_input
   ! reads the initial state or the restart file for the ocean
   !
   implicit none
-  integer       :: i, node
+  integer           :: i, id
+  character(len=10) :: i_string, id_string
 
-  ! ===============
+  if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
+  if (mype==0) write(*,*) 'tracer IDs are: ', tracer_ID(1:num_tracers)
+  !
   ! read ocean state
-  ! ===============
-   if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
-   call read_init_ts
-!  call ini_global_ocean ! initialize T&S somehow differently for a particular test case !
+  ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
+  if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
+  call read_init_ts
+  Tclim=tr_arr(:,:,1)
+  Sclim=tr_arr(:,:,2)
+  Tsurf=tr_arr(1,:,1)
+  Ssurf=tr_arr(1,:,2)
+  relax2clim=0.0
   
-     Tclim=tr_arr(:,:,1)
-     Sclim=tr_arr(:,:,2)
-     Tsurf=tr_arr(1,:,1)
-     Ssurf=tr_arr(1,:,2)
-  relax2clim=0.0 
+  DO i=3, num_tracers
+     id=tracer_ID(i)
+     SELECT CASE (id)
+       CASE (2)
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (3)
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE DEFAULT
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
+            if (mype==0) write(*,*) 'the model will stop!'
+         end if
+         call par_ex
+         stop
+     END SELECT
+  END DO    
 end subroutine oce_initial_state
 !==========================================================================
