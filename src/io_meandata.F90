@@ -84,6 +84,9 @@ subroutine ini_mean_io
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm')
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm')
      call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
+    call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm')
+    call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm')
+    call def_stream(nod2D, myDim_nod2D, 'av_dudz_sq',  'int(Av * (du/dz)^2)',     'm^3/s^3', av_dudz_sq(1:myDim_nod2D), 1, 'm')
   else
      call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
      call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
