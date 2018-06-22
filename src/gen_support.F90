@@ -63,7 +63,7 @@ subroutine smooth_nod2D(arr, N)
   END DO
   deallocate(work_array)
 end subroutine smooth_nod2D
-!
+
 !--------------------------------------------------------------------------------------------
 !
 subroutine smooth_nod3D(arr, N_smooth)
@@ -71,34 +71,65 @@ subroutine smooth_nod3D(arr, N_smooth)
   integer, intent(in)            :: N_smooth
   real(KIND=WP), intent(inout)   :: arr(:,:)
 
-  integer                        :: n, el, nz, j, q, num_el, nlev, nl1
-  real(kind=WP)                  :: vol(myDim_nod2D)
+  integer                        :: n, el, nz, j, q, num_el, nlev, nl_loc
+  real(kind=WP)                  :: vol(nl,myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
 
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
   
+! Precompute area of patches on all levels (at the bottom, some neighbouring
+! nodes may vanish in the bathymetry) in the first smoothing step
   DO n=1, myDim_nod2D
-     num_el = nod_in_elem2D_num(n)
-     vol(n) = 1._WP / (3._WP * sum(elem_area(nod_in_elem2D(1:num_el, n))))
+     
+     vol(       1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
+     work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
+
+     DO j=1, nod_in_elem2D_num(n)
+        el = nod_in_elem2D(j,n)
+        nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
+        DO nz=1, nl_loc
+           vol(nz,n) = vol(nz,n) + elem_area(el)
+           work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
+                                                                + arr(nz, elem2D_nodes(2,el)) &
+                                                                + arr(nz, elem2D_nodes(3,el)))
+        END DO
+     ENDDO
+     DO nz=1,nlevels_nod2d(n)
+        vol(nz,n) = 1._WP / (3._WP * vol(nz,n))  ! Here, we need the inverse and scale by 1/3
+     END DO
   END DO
 
-  DO q=1,N_smooth
+  ! combined: scale by patch volume + copy back to original field
+  DO n=1, myDim_nod2D
+     DO nz=1, min(nlev, nlevels_nod2d(n))
+        arr(nz, n) = work_array(nz, n) *vol(nz,n) 
+     END DO
+  end DO
+  call exchange_nod(arr)
+
+! And the remaining smoothing sweeps
+
+  DO q=1,N_smooth-1
      DO n=1, myDim_nod2D
 
         work_array(1:min(nlev, nlevels_nod2d(n)),n) = 0._WP
 
         DO j=1,nod_in_elem2D_num(n)
            el = nod_in_elem2D(j,n)
-           DO nz=1, min(nlev, nlevels_nod2d(n))
+           nl_loc = min(nlev, minval(nlevels_nod2d(elem2D_nodes(1:3,el))))
+           DO nz=1, nl_loc
               work_array(nz,n) = work_array(nz,n) + elem_area(el) * (arr(nz, elem2D_nodes(1,el)) &
                                                                    + arr(nz, elem2D_nodes(2,el)) &
                                                                    + arr(nz, elem2D_nodes(3,el)))
            END DO
         ENDDO
      ENDDO
+! combined: scale by patch volume + copy back to original field
      DO n=1, myDim_nod2D
-        arr(1:min(nlev, nlevels_nod2d(n)), n) = work_array(1:min(nlev, nlevels_nod2d(n)), n) *vol(n)        
+        DO nz=1, min(nlev, nlevels_nod2d(n))
+           arr(nz, n) = work_array(nz, n) *vol(nz,n) 
+        END DO
      end DO
      call exchange_nod(arr)
   enddo
@@ -106,6 +137,7 @@ subroutine smooth_nod3D(arr, N_smooth)
   deallocate(work_array)
 
 end subroutine smooth_nod3D
+
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -132,7 +164,7 @@ subroutine smooth_elem2D(arr, N)
 
     DO elem=1, myDim_elem2D
        elnodes=elem2D_nodes(:, elem)
-       arr(elem)=sum(work_array(elnodes))/3.0_WP
+       arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
     ENDDO
     call exchange_elem(arr)
   END DO
