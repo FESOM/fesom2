@@ -745,7 +745,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
         use o_mixing_KPP_mod !for ghats _GO_		
 		
 	implicit none
-	
+	real(kind=WP)       :: bc_surface	
 	real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
 	real(kind=WP)       :: cp(nl), tp(nl)
 	integer             :: nz, n, nzmax,tr_num
@@ -976,25 +976,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		!  (BUT CHECK!)              |    |                         |    |
 		!                            v   (+)                        v   (+) 
 		!                            
-		!  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
-		!  --> is_nonlinfs=0.0 for linfs
-		!                            
-		zinv=1.0_WP*dt    !/(zbar(1)-zbar(2))  ! ale
-		if (tr_num==1) then
-			tr(1)= tr(1) - zinv*(&
-								heat_flux(n)/vcpw & 
-								+ tr_arr(1,n,1)*water_flux(n)*is_nonlinfs &
-								)
-			
-		elseif (tr_num==2) then
-			! --> real_salt_flux(:): salt flux due to containment/releasing of salt
-			!     by forming/melting of sea ice
-			tr(1)= tr(1)  +  zinv*( &
-									virtual_salt(n) & !--> is zeros for zlevel/zstar
-									+ relax_salt(n) &
-									- real_salt_flux(n)*is_nonlinfs)
-		endif
-		
+		!
+                tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))		
 		!_______________________________________________________________________
 		! The forward sweep algorithm to solve the three-diagonal matrix 
 		! problem
@@ -1203,3 +1186,41 @@ subroutine diff_part_hor_redi
 		
 	end do
 end subroutine diff_part_hor_redi
+!==========================================================================
+! this function returns a boundary conditions for a specified thacer ID and surface node
+! ID = 0 and 1 are reserved for temperature and salinity
+FUNCTION bc_surface(n, id)
+  USE o_ARRAYS
+  USE g_forcing_arrays
+  USE g_PARSUP, only: mype, par_ex
+  USE g_config
+  implicit none
+
+  REAL(kind=WP)     :: bc_surface
+  integer           :: n, id
+  character(len=10) :: id_string
+
+  !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
+  !  --> is_nonlinfs=0.0 for linfs
+  SELECT CASE (id)
+    CASE (0)
+      bc_surface=-dt*(heat_flux(n)/vcpw + tr_arr(1,n,1)*water_flux(n)*is_nonlinfs)
+    CASE (1)
+    ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
+    !     by forming/melting of sea ice
+    bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
+				+ relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+    CASE (101) ! apply boundary conditions to tracer ID=101
+    bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+
+    CASE DEFAULT
+      if (mype==0) then
+         write (id_string, "(I3)") id
+         if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified in boundary conditions'
+         if (mype==0) write(*,*) 'the model will stop!'
+      end if
+      call par_ex
+      stop
+  END SELECT
+  RETURN
+END FUNCTION

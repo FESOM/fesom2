@@ -132,7 +132,7 @@ def clim_vinterp(data_in,levels):
 def clim_plot_anom(clim,figsize=[]):
 	from set_inputarray import inputarray
 	
-	if len(figsize)==0 : figsize=[14,10]
+	if len(figsize)==0 : figsize=[12,8]
 	#___________________________________________________________________________
 	fig = plt.figure(figsize=figsize)
 	#fig.patch.set_alpha(0.0)
@@ -181,17 +181,17 @@ def clim_plot_anom(clim,figsize=[]):
 		idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
 		idx1      = np.array(np.where(tickstep>=idx))
 		if idx1.size==0 : 
-			xticks   = np.arange(0.,360.,tickstep[-1])
+			xticks   = np.arange(0.,360.+1,tickstep[-1])
 		else:
-			xticks   = np.arange(0.,360.,tickstep[idx1[0,0]])
+			xticks   = np.arange(0.,360.+1,tickstep[idx1[0,0]])
 		
 		del idx
 		idx      = (inputarray['which_box'][3]-inputarray['which_box'][2])/ticknr
 		idx1      = np.array(np.where(tickstep>=idx))
 		if idx1.size==0 : 
-			yticks   = np.arange(-90.,90.,tickstep[-1])
+			yticks   = np.arange(-90.,90.+1,tickstep[-1])
 		else:	
-			yticks   = np.arange(-90.,90.,tickstep[idx1[0,0]])
+			yticks   = np.arange(-90.,90.+1,tickstep[idx1[0,0]])
 		
 	#___________________________________________________________________________
 	# go from geo coord. to projection coord.
@@ -242,6 +242,7 @@ def clim_plot_anom(clim,figsize=[]):
 	if clevel.size>30: do_drawedges=False
 	
 	data_plot = np.copy(clim.anom)
+	data_plot = np.ma.masked_where(np.isnan(data_plot), data_plot)
 	data_plot[data_plot<clevel[ 0]]  = clevel[ 0]+np.finfo(np.float32).eps
 	data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
 		
@@ -250,12 +251,14 @@ def clim_plot_anom(clim,figsize=[]):
 	#+_____________________________________________________________________________+
 	#hp1=map.pcolormesh(mlon,mlat,data_plot,
 	#hp1=map.pcolormesh(mlon,mlat,data_plot,latlon=True,
-	hp1=map.contourf(mlon,mlat,data_plot,clevel,#				shading='gouraud',#flat
-					latlon=True,
-					antialiased=False,
-					edgecolor='None',
-					cmap=cmap0,
-					vmin=clevel[0], vmax=clevel[-1])
+#	hp1=map.contourf(mlon,mlat,data_plot,clevel,#				shading='gouraud',#flat
+#					latlon=True,
+#					antialiased=False,
+#					edgecolor='None',
+#					cmap=cmap0,
+#					vmin=clevel[0], vmax=clevel[-1])
+	hp1=ax.contourf(mlon,mlat,data_plot,clevel,#				shading='gouraud',#flat
+					cmap=cmap0,antialiased=False,extend='both')
 	#hp1.cmap.set_under([1.,1.,1.])
 
 	#______________________________________________________________________________+
@@ -283,7 +286,8 @@ def clim_plot_anom(clim,figsize=[]):
 	else:
 		divider = make_axes_locatable(ax)
 		cax     = divider.append_axes("right", size="2.5%", pad=0.1)
-	plt.clim(clevel[0],clevel[-1])
+	#plt.clim(clevel[0],clevel[-1])
+	for im in ax.get_images(): im.set_clim(clevel[0],clevel[-1])
 	cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,
 						extend='neither')
 

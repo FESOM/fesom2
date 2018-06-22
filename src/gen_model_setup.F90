@@ -2,8 +2,6 @@
 subroutine setup_model
   implicit none
   call read_namelist    ! should be before clock_init
-  call define_prog_tracer
-
 end subroutine setup_model
 ! ==============================================================
 subroutine read_namelist
@@ -99,35 +97,6 @@ subroutine read_namelist
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine read_namelist
 ! =================================================================
-subroutine define_prog_tracer
-  ! Coded by Qiang Wang
-  ! Reviewed by ??
-  !--------------------------------------------------------------
-  
-  use o_param
-  use o_arrays, only : prog_tracer_name
-  use g_parsup
-  implicit none
-
-  integer      :: j, num
-  character(1) :: cageind
-  character(4) :: tr_name
-
-  ! allocate prog_tracer_name
-
-  num_tracer=2  ! t and s
-
-  allocate(prog_tracer_name(num_tracer))
-
-  ! fill prog_tracer_name
-
-  num=2  ! t and s
-  prog_tracer_name(1)='temp'
-  prog_tracer_name(2)='salt'
-
-  if(mype==0) write(*,*) 'Number of prognostic ocean tracers: ',num
-end subroutine define_prog_tracer
-! ==============================================================
 subroutine get_run_steps(nsteps)
   ! Coded by Qiang Wang
   ! Reviewed by ??

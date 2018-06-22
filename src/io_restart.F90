@@ -122,7 +122,7 @@ subroutine ini_ocean_io(year)
          longname='salinity'
          units='psu'
        CASE DEFAULT
-         write(trname,'(A3,i1)') 'ptr', j
+         write(trname,'(A3,i1)') 'tra_', j
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
