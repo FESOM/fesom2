@@ -14,7 +14,7 @@ module diagnostics
 
   private
   public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wzmid, wzmidrho, rho, &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz
+            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -25,7 +25,7 @@ module diagnostics
   real(kind=8),  save, allocatable, target      :: wzmid(:,:), wzmidrho(:,:), rho(:,:)
   real(kind=8),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
   real(kind=8),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:)
-
+  real(kind=8),  save, allocatable, target      :: utau_surf(:), utau_bott(:), av_dudz_sq(:)
 
 
   logical                                       :: ldiag_solver     =.false.
@@ -158,7 +158,7 @@ subroutine diag_energy(mode)
   integer, intent(in)           :: mode
   logical, save                 :: firstcall=.true.
   integer            :: n, nz, k, i, elem, nzmax, elnodes(3)
-  real(kind=WP)      :: ux, vx, uy, vy, tvol
+  real(kind=WP)      :: ux, vx, uy, vy, tvol, rval(2), Av_nod(nl-1)
   real(kind=WP)      :: stress_surf_n(2), stress_bott_n(2)
   real(kind=WP)      :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
 
@@ -167,6 +167,7 @@ subroutine diag_energy(mode)
      allocate(wzmid(nl-1, myDim_nod2D), wzmidrho(nl-1, myDim_nod2D), rho(nl-1, myDim_nod2D))
      allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_nod2D), u_x_w(nl-1, myDim_nod2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl-1, myDim_nod2D), dvdz(nl-1, myDim_nod2D))
+     allocate(utau_surf(myDim_nod2D), utau_bott(myDim_nod2D), av_dudz_sq(myDim_nod2D))
      wzmid=0.
      rho  =0.
      wzmidrho=0.
@@ -180,29 +181,37 @@ subroutine diag_energy(mode)
      dvdx=0.
      dvdy=0.
      dudz=0.
-     dvdz=0.     
+     dvdz=0.
+     av_dudz_sq=0.
      firstcall=.false.
      if (mode==0) return
   end if
-
+  
+  !vertical velocity at the mid depths
   wzmid=0.5*(Wvel(1:nl-1, 1:myDim_nod2D)+Wvel(2:nl, 1:myDim_nod2D))
   rho  =density_m_rho0(1:nl-1, 1:myDim_nod2D)
   where(abs(rho)>0.)
      rho=rho+density_0
   end where
-  wzmidrho=rho(1:nl-1, 1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
 
+  !vertical velocity times density
+  wzmidrho=rho(1:nl-1, 1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
+  
+  ! etc.
   u_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(1,1:nl-1,1:myDim_nod2D)
   u_x_v=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
   v_x_v=Unode(2,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
   u_x_w=Unode(1,1:nl-1,1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
   v_x_w=Unode(2,1:nl-1,1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
 
+  utau_surf=0.
+  utau_bott=0.
+  ! this loop might be very expensive
   DO n=1, myDim_nod2D
      nzmax=nlevels_nod2D(n)
      stress_surf_n=0.
      stress_bott_n=0.
-
+     Av_nod=0.0_WP
      DO nz=1, nzmax-1
         tvol=0.0_WP
         ux  =0.0_WP
@@ -212,10 +221,21 @@ subroutine diag_energy(mode)
         DO k=1, nod_in_elem2D_num(n)
            elem=nod_in_elem2D(k,n)
 	   elnodes=elem2D_nodes(:, elem)
-           if (nz==1)                  stress_surf_n = stress_surf_n+stress_surf(:,elem)/density_0*elem_area(elem)
-           if (nlevels(elem)-1 == nz)  stress_bott_n = stress_bott_n-C_d*sqrt(UV(1, nz,elem)**2+ UV(2, nz, elem)**2)*UV(:,nz,elem)*elem_area(elem)
+           if (nz==1) then
+              rval=stress_surf(:,elem)/density_0*elem_area(elem)
+              stress_surf_n = stress_surf_n+rval/Av(2, elem)   !accumulation of: du/dz at the surface (du/dz=tau/Av)
+              utau_surf(n)=utau_surf(n)+sum(rval*UV(:,1,elem)) !a scalar product tau_surface times u 
+                                                               !shall rotation be considered? (scalar product)
+           end if
+           if (nlevels(elem)-1 == nz) then
+              rval=C_d*sqrt(UV(1, nz,elem)**2+ UV(2, nz, elem)**2)*UV(:,nz,elem)*elem_area(elem)
+              stress_bott_n = stress_bott_n-rval/Av(nz, elem)  !accumulation of: du/dz at the bottom (du/dz=tau/Av)
+              utau_bott(n)=utau_bott(n)-sum(rval*UV(:,nz,elem))!a scalar product tau_bottom times u 
+                                                               !shall rotation be considered? (scalar product)
+           end if
            if (nlevels(elem)-1 < nz) cycle
-           geo_grad_x=gradient_sca(1:3,elem)
+           Av_nod(nz)=Av_nod(nz)+Av(nz, elem)*elem_area(elem)  !we will need Av at nodes later
+           geo_grad_x=gradient_sca(1:3,elem)                   !reassign vector arrays to make the rotation possible (if required)
            geo_grad_y=gradient_sca(4:6,elem)
            geo_u=Unode(1,nz,elnodes)
            geo_v=Unode(2,nz,elnodes)
@@ -226,26 +246,30 @@ subroutine diag_energy(mode)
               END DO
            end if
            tvol=tvol+elem_area(elem)
-           ux=ux+sum(geo_grad_x*geo_u)*elem_area(elem)
+           ux=ux+sum(geo_grad_x*geo_u)*elem_area(elem)         !accumulate tensor of velocity derivatives
            vx=vx+sum(geo_grad_x*geo_v)*elem_area(elem)
            uy=uy+sum(geo_grad_y*geo_u)*elem_area(elem)
            vy=vy+sum(geo_grad_y*geo_v)*elem_area(elem)
         END DO
+        Av_nod(nz)=Av_nod(nz)/tvol !convert the accumulation over layers to actual nodal values
         dudx(nz,n)=ux/tvol
         dvdx(nz,n)=vx/tvol
         dudy(nz,n)=uy/tvol
         dvdy(nz,n)=vy/tvol
      END DO
 
+     Av_nod(1)   =Av_nod(2)        !convert the accumulation over surface to actual surface values at nodes
      stress_surf_n=stress_surf_n/area(1, n)*3. !*3. because of full areas were used in the loop
      stress_bott_n=stress_bott_n/area(1, n)*3.
+     utau_surf(n)=utau_surf(n)/area(1, n)*3.
+     utau_bott(n)=utau_bott(n)/area(1, n)*3.
 
      if (rotated_grid) then
         call vector_r2g(stress_surf_n(1), stress_surf_n(2), coord_nod2D(1, n), coord_nod2D(2, n), 0)
         call vector_r2g(stress_bott_n(1), stress_bott_n(2), coord_nod2D(1, n), coord_nod2D(2, n), 0)
      end if
 
-
+     ! compute Z_n which is the mid depth of prisms (ALE supports changing layer thicknesses)
      zbar_n=0.0_WP
      Z_n=0.0_WP
      zbar_n(nzmax)=zbar_n_bot(n)
@@ -256,12 +280,17 @@ subroutine diag_energy(mode)
      end do
      zbar_n(1) = zbar_n(2) + hnode_new(1,n)
 
-     dudz(2:nl-2, n)=(Unode(1, 1:nl-2, n)-Unode(1, 2:nl-1, n))/(Z_n(1:nzmax-2)-Z_n(2:nzmax-1))
-     dvdz(2:nl-2, n)=(Unode(2, 1:nl-2, n)-Unode(2, 2:nl-1, n))/(Z_n(1:nzmax-2)-Z_n(2:nzmax-1))
+     !compute du/dz & dv/dz
+     dudz(2:nzmax-2, n)=(Unode(1, 1:nzmax-3, n)-Unode(1, 3:nzmax-1, n))/(Z_n(1:nzmax-3)-Z_n(3:nzmax-1)) !central differences in vertical
+     dvdz(2:nzmax-2, n)=(Unode(2, 1:nzmax-3, n)-Unode(2, 3:nzmax-1, n))/(Z_n(1:nzmax-3)-Z_n(3:nzmax-1))
+
      dudz(1, n)=stress_surf_n(1)
      dvdz(1, n)=stress_surf_n(2)
      dudz(nl-1, n)=stress_bott_n(1)
      dvdz(nl-1, n)=stress_bott_n(2)
+
+     !compute int(Av * (du/dz)^2)
+     av_dudz_sq(n)=sum((dudz(1:nzmax-1, n)**2+dvdz(1:nzmax-1, n)**2)*Av_nod(1:nzmax-1)* hnode_new(1:nzmax-1,n))
   END DO  
 end subroutine diag_energy
 ! ==============================================================
