@@ -18,12 +18,17 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
+  integer, parameter  :: acc_real8=8, acc_real4=4
+
+
   type Meandata
     private
     integer                                            :: ndim
     integer                                            :: lcsize(2)
     integer                                            :: glsize(2)
-    real(kind=8),  public, allocatable, dimension(:,:) :: local_values
+    integer                                            :: accuracy
+    real(kind=8),  public, allocatable, dimension(:,:) :: local_values_r8
+    real(kind=4),  public, allocatable, dimension(:,:) :: local_values_r4
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:)
 
@@ -65,119 +70,120 @@ subroutine ini_mean_io
   implicit none
   integer           :: i
   character(len=10) :: id_string
+
 !3D
   if (ldiag_energy) then
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmidrho', 'vertical velocity x density', 'kg/(s*m2)', wzmidrho(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:),    1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',  'u times u', 'm2/s2', u_x_u(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',  'u times v', 'm2/s2', u_x_v(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',  'v times v', 'm2/s2', v_x_v(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uw',  'u times w', 'm2/s2', u_x_w(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vw',  'v times w', 'm2/s2', v_x_w(:,:), 1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudx','du/dx',     '1/s',   dudx(:,:),  1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudy','du/dy',     '1/s',   dudy(:,:),  1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdx','dv/dx',     '1/s',   dvdx(:,:),  1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy','dv/dy',     '1/s',   dvdy(:,:),  1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudz','du/dz',     '1/s',   dudz(:,:),  1, 'm')
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdz','dv/dz',     '1/s',   dvdz(:,:),  1, 'm')
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm')
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm')
-     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
-    call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm')
-    call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm')
-    call def_stream(nod2D, myDim_nod2D, 'av_dudz_sq',  'int(Av * (du/dz)^2)',     'm^3/s^3', av_dudz_sq(1:myDim_nod2D), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmidrho', 'vertical velocity x density', 'kg/(s*m2)', wzmidrho(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:),    1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',  'u times u', 'm2/s2', u_x_u(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',  'u times v', 'm2/s2', u_x_v(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',  'v times v', 'm2/s2', v_x_v(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uw',  'u times w', 'm2/s2', u_x_w(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vw',  'v times w', 'm2/s2', v_x_w(:,:), 1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudx','du/dx',     '1/s',   dudx(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudy','du/dy',     '1/s',   dudy(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdx','dv/dx',     '1/s',   dvdx(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy','dv/dy',     '1/s',   dvdy(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudz','du/dz',     '1/s',   dudz(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdz','dv/dz',     '1/s',   dvdz(:,:),  1, 'm', acc_real4)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm', acc_real4)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm', acc_real4)
+     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'y', acc_real4)
+    call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm', acc_real4)
+    call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm', acc_real4)
+    call def_stream(nod2D, myDim_nod2D, 'av_dudz_sq',  'int(Av * (du/dz)^2)',     'm^3/s^3', av_dudz_sq(1:myDim_nod2D), 1, 'm', acc_real4)
   else
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
-     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y', acc_real4)
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y', acc_real4)
+     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y', acc_real4)
   end if
 
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y', acc_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y', acc_real4)
   
   do i=3, num_tracers
      write (id_string, "(I3.3)") tracer_id(i)
-     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,i), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,i), 1, 'm', acc_real4)
   end do
 
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'm')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'y')
-  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y')
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y', acc_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y', acc_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y', acc_real4)
+  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'm', acc_real4)
+  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'y', acc_real4)
+  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',   'Vertical mixing A',   'm2/s',Av(:,:),       1, 'y', acc_real4)
 
 !2D
-  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm', acc_real4)
 !DS for frontier run
-  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'm')
-  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'm')
-  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'm')
-  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'm')
-  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'm')
-  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'm')
+  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1), 1, 'm', acc_real4)
+  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),    1, 'm', acc_real4)
+  call def_stream(elem2D, myDim_elem2D, 'v100',  'meridional velocity at 100m',      'm/s',    uv(2,12,1:myDim_elem2D),    1, 'm', acc_real4)
+  call def_stream(nod2D,  myDim_nod2D,   't30',  'temperature at 30m',                 'C',    tr_arr(5,1:myDim_nod2D,1),  1, 'm', acc_real4)
+  call def_stream(elem2D, myDim_elem2D,  'u30',  'horizontal velocity at 30m',       'm/s',    uv(1,5,1:myDim_elem2D),     1, 'm', acc_real4)
+  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),     1, 'm', acc_real4)
 !DS
 
-  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'uice',  'ice velocity x',          'm/s',    u_ice,                         1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'MLD1',   'Mixed Layer Depth',      'm',      MLD1(1:myDim_nod2D),           1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',      'N/m2',   stress_atmice_x(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',      'N/m2',   stress_atmice_y(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',      'N/m2',   stress_atmoce_x(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',      'N/m2',   stress_atmoce_y(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',      'N/m2',   stress_iceoce_x(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y')
-  call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm')
-  call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'uice',  'ice velocity x',          'm/s',    u_ice,                         1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'MLD1',   'Mixed Layer Depth',      'm',      MLD1(1:myDim_nod2D),           1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',      'N/m2',   stress_atmice_x(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',      'N/m2',   stress_atmice_y(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',      'N/m2',   stress_atmoce_x(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',      'N/m2',   stress_atmoce_y(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',      'N/m2',   stress_iceoce_x(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm', acc_real4)
+  call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm', acc_real4)
 #if defined (__oifs)
-  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm')
+  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', acc_real4)
 #endif
 
   if (trim(mix_scheme)=='KPP') then
-     call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm')
-     call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm', acc_real4)
+     call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm', acc_real4)
   end if
 
   if (Redi) then
-     call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'm')
+     call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'm', acc_real4)
   end if
 
   if (Fer_GM) then
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U',      'm/s',  fer_uv(1,:,:), 1, 'y')
-     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V',      'm/s',  fer_uv(2,:,:), 1, 'y')
-     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W',      'm/s',  fer_Wvel(:,:), 1, 'y')
-     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diffusivity', 'm2/s', fer_k(:,:),    1, 'm')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U',      'm/s',  fer_uv(1,:,:), 1, 'y', acc_real4)
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V',      'm/s',  fer_uv(2,:,:), 1, 'y', acc_real4)
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W',      'm/s',  fer_Wvel(:,:), 1, 'y', acc_real4)
+     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diffusivity', 'm2/s', fer_k(:,:),    1, 'm', acc_real4)
 
-     call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
-     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm', acc_real4)
+     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm', acc_real4)
   end if
   if (ldiag_solver) then
-     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's')
-     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's')
+     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's', acc_real4)
+     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's', acc_real4)
   end if
   if (lcurt_stress_surf) then
-     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 'm', acc_real4)
   end if
   if (ldiag_curl_vel3) then
-     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u', 'relative vorticity',         '1/s',   vorticity, 1, 'm')     
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u', 'relative vorticity',         '1/s',   vorticity, 1, 'm', acc_real4)
   end if
 
   if (whichEVP==2) then
-     call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd')
-     call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd')
+     call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', acc_real4)
+     call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', acc_real4)
   end if
 end subroutine ini_mean_io
 !
@@ -232,8 +238,13 @@ subroutine create_new_file(entry)
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
-  entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_DOUBLE, entry%ndim+1, &
-                       (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
+  if (entry%accuracy == acc_real8) then
+     entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_DOUBLE, entry%ndim+1, &
+                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
+  elseif (entry%accuracy == acc_real4) then
+     entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_REAL, entry%ndim+1, &
+                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
+  endif
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description); c=c+1
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units);       c=c+1
   entry%error_status(c)=nf_close(entry%ncid); c=c+1
@@ -302,7 +313,8 @@ end subroutine assoc_ids
 subroutine write_mean(entry)
   implicit none
   type(Meandata), intent(inout) :: entry
-  real(kind=8), allocatable     :: aux1(:), aux2(:,:) 
+  real(kind=8), allocatable     :: aux1_r8(:), aux2_r8(:,:) 
+  real(kind=4), allocatable     :: aux1_r4(:), aux2_r4(:,:) 
   integer                       :: i, size1, size2
   integer                       :: c
   ! Serial output implemented so far
@@ -315,24 +327,61 @@ subroutine write_mean(entry)
 !_______writing 2D fields________________________________________________
      if (entry%ndim==1) then
         size1=entry%glsize(1)
-        if (mype==0) allocate(aux1(size1))
-        if (size1==nod2D)  call gather_nod (entry%local_values(1:entry%lcsize(1),1), aux1)
-        if (size1==elem2D) call gather_elem(entry%local_values(1:entry%lcsize(1),1), aux1)
-        if (mype==0) then
-           entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1, 1); c=c+1
-        end if
-        if (mype==0) deallocate(aux1)
+!___________writing 8 byte real_________________________________________ 
+        if (entry%accuracy == acc_real8) then
+           if (mype==0) allocate(aux1_r8(size1))
+           if (size1==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1), aux1_r8)
+           if (size1==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1), aux1_r8)
+           if (mype==0) then
+              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1_r8, 1); c=c+1
+           end if
+           if (mype==0) deallocate(aux1_r8)
+        
+!___________writing real 4 byte real _________________________________________ 
+        elseif (entry%accuracy == acc_real4) then
+           if (mype==0) allocate(aux1_r4(size1))
+           if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux1_r4)
+           if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux1_r4)
+           if (mype==0) then
+              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1_r4, 1); c=c+1
+           end if
+           if (mype==0) deallocate(aux1_r4)
+        else
+           if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
+           call par_ex
+           stop
+           
+        endif
+
 !_______writing 3D fields________________________________________________
      elseif (entry%ndim==2) then
         size1=entry%glsize(1)
         size2=entry%glsize(2)
-        if (mype==0) allocate(aux2(size1, size2))
-        if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values(1:entry%lcsize(1),1:entry%lcsize(2)), aux2)
-        if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values(1:entry%lcsize(1),1:entry%lcsize(2)), aux2)
-        if (mype==0) then
-           entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
-        end if
-        if (mype==0) deallocate(aux2)
+!___________writing 8 byte real_________________________________________ 
+        if (entry%accuracy == acc_real8) then
+           if (mype==0) allocate(aux2_r8(size1, size2))
+           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r8)
+           if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r8)
+           if (mype==0) then
+              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2_r8, 2); c=c+1
+           end if
+           if (mype==0) deallocate(aux2_r8)
+ 
+!___________writing real 4 byte real _________________________________________ 
+        elseif (entry%accuracy == acc_real4) then
+           if (mype==0) allocate(aux2_r4(size1, size2))
+           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r4)
+           if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r4)
+           if (mype==0) then
+              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2_r4, 2); c=c+1
+           end if
+           if (mype==0) deallocate(aux2_r4)
+        else
+           if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
+           call par_ex
+           stop
+           
+        endif
      else
         if (mype==0) write(*,*) 'not supported shape of array in mean I/O file'
            call par_ex
@@ -355,15 +404,37 @@ subroutine update_means
 
   do n=1, io_NSTREAMS
      entry=>io_stream(n)
-     if (entry%ndim==1) then 
-        entry%local_values(:, 1) = entry%local_values(:, 1)+entry%ptr2(:)
-     elseif (entry%ndim==2) then 
-        entry%local_values = entry%local_values+entry%ptr3(:,:)
+!_____________ compute in 8 byte accuracy _________________________
+     if (entry%accuracy == acc_real8) then
+        if (entry%ndim==1) then 
+           entry%local_values_r8(:,1) = entry%local_values_r8(:,1) + entry%ptr2(:)
+        elseif (entry%ndim==2) then 
+           entry%local_values_r8(:,:) = entry%local_values_r8(:,:) + entry%ptr3(:,:)
+        else
+           if (mype==0) write(*,*) 'not supported size in update_means'
+           call par_ex
+           stop
+        end if
+
+!_____________ compute in 4 byte accuracy _________________________
+     elseif (entry%accuracy == acc_real4) then
+        if (entry%ndim==1) then 
+           entry%local_values_r4(:,1) = entry%local_values_r4(:,1) + real(entry%ptr2(:),4)
+        elseif (entry%ndim==2) then 
+           entry%local_values_r4(:,:) = entry%local_values_r4(:,:) + real(entry%ptr3(:,:),4)
+        else
+           if (mype==0) write(*,*) 'not supported size in update_means'
+           call par_ex
+           stop
+        end if
+
      else
-        if (mype==0) write(*,*) 'not supported size in update_means'
-        call par_ex
-        stop
-     end if
+
+           if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',entry%name
+           call par_ex
+           stop
+     endif
+
      entry%addcounter=entry%addcounter+1
   end do
 end subroutine update_means
@@ -412,28 +483,39 @@ subroutine output(istep)
         stop
      endif
 
-     if (.not. do_output) cycle
-     entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-     call assoc_ids(entry)
-     entry%local_values = entry%local_values /float(entry%addcounter) ! compute_means
-     call write_mean(entry)
-     entry%local_values = 0. ! clean_meanarrays
-     entry%addcounter   = 0  ! clean_meanarrays
+     if (do_output) then
+        entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+        call assoc_ids(entry)
+        if (entry%accuracy == acc_real8) then
+           entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,8) ! compute_means
+           call write_mean(entry)
+           entry%local_values_r8 = 0. ! clean_meanarrays
+        elseif (entry%accuracy == acc_real4) then
+           entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,4) ! compute_means
+           call write_mean(entry)
+           entry%local_values_r4 = 0. ! clean_meanarrays
+        endif
+
+        entry%addcounter   = 0  ! clean_meanarrays
+     endif
   end do
   lfirst=.false.
 end subroutine output
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit)
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy)
   implicit none
   integer                              :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(inout) :: data(:,:)
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
+
+
    ! add this instance to io_stream array
   if ( .not. allocated(io_stream)) then
     allocate(io_stream(1))
@@ -445,7 +527,14 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   end if
   entry=>io_stream(size(io_stream))
   entry%ptr3 => data
-  allocate(entry%local_values(lcsize(1), lcsize(2)))
+  entry%accuracy = accuracy
+  if (accuracy == acc_real8) then
+     allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+     entry%local_values_r8 = 0. 
+  elseif (accuracy == acc_real4) then
+     allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
+     entry%local_values_r4 = 0. 
+  endif
   entry%ndim=2
   entry%lcsize=lcsize
   entry%glsize=glsize
@@ -458,23 +547,25 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%freq=freq
   entry%freq_unit=freq_unit
   ! clean_meanarrays
-  entry%local_values = 0. 
   entry%addcounter   = 0
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
+
 end subroutine def_stream3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit)
+subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy)
   implicit none
-  integer                              :: glsize, lcsize
+  integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(inout) :: data(:)
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
+
    ! add this instance to io_stream array
   if ( .not. allocated(io_stream)) then
     allocate(io_stream(1))
@@ -486,7 +577,17 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   end if
   entry=>io_stream(size(io_stream))
   entry%ptr2 => data
-  allocate(entry%local_values(lcsize, 1))
+  entry%accuracy = accuracy
+  if (accuracy == acc_real8) then
+     allocate(entry%local_values_r8(lcsize, 1))
+     ! clean_meanarrays
+     entry%local_values_r8 = 0. 
+
+  elseif (accuracy == acc_real4) then
+     allocate(entry%local_values_r4(lcsize, 1))
+     ! clean_meanarrays
+     entry%local_values_r4 = 0. 
+  endif
   entry%ndim=1
   entry%lcsize=(/lcsize, 1/)
   entry%glsize=(/glsize, 1/)
@@ -498,11 +599,10 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%dimname(2)='unknown'
   entry%freq=freq
   entry%freq_unit=freq_unit
-  ! clean_meanarrays
-  entry%local_values = 0. 
   entry%addcounter   = 0
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
+
 end subroutine def_stream2D
 !
 !--------------------------------------------------------------------------------------------
