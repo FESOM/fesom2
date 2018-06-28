@@ -706,62 +706,66 @@ contains
        call smooth_nod(diffK(:,:,1), 3)
     end if
 
-! compute viscA and diffK
-     DO node=1, myDim_nod2D+eDim_nod2D
-        DO nz=2,nlevels_nod2d(node)-1
-
-!      *******************************************************************
-!       evaluate function of Ri# for shear instability eqn. (28b&c)
-!      *******************************************************************
-
-           Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
-           ratio = AMIN1( Rigg/Riinfty , 1.0_WP )
-           frit  = (1.0_WP - ratio*ratio)
-           frit  = frit*frit*frit
-      
-       ! viscosity
-           viscA(nz,node) =  visc_sh_limit * frit + A_ver  ! A_ver= 1.e-4 Vertical harm. visc.
-
-      !  diffusivity
-
-           IF(Kv0_const) THEN
-              diffK(nz,node,1) = diff_sh_limit * frit + K_ver
-           ELSE
-              dep = abs(zbar_3d_n(nz,node)) ! Kv is defined on the levels 
-              lat = geo_coord_nod2D(2,node)/ rad
-              IF (abs(lat) < 5.0_WP) THEN
-                 ratio = 1.0_WP
-              ELSE
-                 ratio = MIN( 1.0_WP + 9.0_WP * (abs(lat) - 5.0_WP) / 10.0_WP, 10.0_WP )
-              END IF
-              if (lat < 70.0) then
-                 aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
-              else
-                 aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6
-                 ratio=3.0
-                 if (dep < 80.0)     then
-                    ratio=1.0
-                 elseif(dep < 100.0) then
-                    ratio=2.0  
-                 endif   
-              end if
-              diffK(nz,node,1) =  diff_sh_limit * frit + aux * ratio
-           END IF
-           diffK(nz,node,2) = diffK(nz,node,1)  
-        END DO
-
-!      *******************************************************************
-!       No need to set surface and bottom diffusivity. diffK @ zbar
-!       Model do not use these levels !!!!!!!       
-!      *******************************************************************
-        viscA( 1, node    ) = viscA(2, node   )
-        diffK( 1, node, 1 ) = diffK(2, node, 1)
-        diffK( 1, node, 2 ) = diffK(2, node, 2)
-        viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
-        diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
-        diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
-
-     END DO
+	!___________________________________________________________________________
+	! compute viscA and diffK
+	do node=1, myDim_nod2D+eDim_nod2D
+		do nz=2,nlevels_nod2d(node)-1
+			!___________________________________________________________________
+			! evaluate function of Ri# for shear instability eqn. (28b&c)
+			Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
+			ratio = AMIN1( Rigg/Riinfty , 1.0_WP )
+			frit  = (1.0_WP - ratio*ratio)
+			frit  = frit*frit*frit
+			!___________________________________________________________________
+			! viscosity
+			viscA(nz,node) =  visc_sh_limit * frit + A_ver  ! A_ver= 1.e-4 Vertical harm. visc.
+			
+			!___________________________________________________________________
+			!  diffusivity
+			! set constant background diffusivity with namelist value K_ver
+			if(Kv0_const) then
+				diffK(nz,node,1) = diff_sh_limit * frit + K_ver
+				
+			! set latitudinal and depth dependent background diffusivity after Qiangs
+			! FESOM1.4 approach
+			else
+				dep = abs(zbar_3d_n(nz,node)) ! Kv is defined on the levels 
+				lat = geo_coord_nod2D(2,node)/ rad
+				! latitudinal equatorial scaling
+				if (abs(lat) < 5.0_WP) then
+					ratio = 1.0_WP
+				else
+					ratio = MIN( 1.0_WP + 9.0_WP * (abs(lat) - 5.0_WP) / 10.0_WP, 10.0_WP )
+				end if 
+				! latitudinal <70 scaling
+				if (lat < 70.0) then
+					aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
+				! latitudinal arctic scaling
+				else
+					aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6
+					ratio=3.0
+					if (dep < 80.0)     then
+						ratio=1.0
+					elseif(dep < 100.0) then
+						ratio=2.0  
+					endif   
+				end if
+				diffK(nz,node,1) =  diff_sh_limit * frit + aux * ratio
+			end if 
+			diffK(nz,node,2) = diffK(nz,node,1)  
+		end do ! --> do nz=2,nlevels_nod2d(node)-1
+		
+		!_______________________________________________________________________
+		!!! No need to set surface and bottom diffusivity. diffK @ zbar      !!!
+		!!! Model do not use these levels !!!!!!!                            !!!
+		viscA( 1, node    ) = viscA(2, node   )
+		diffK( 1, node, 1 ) = diffK(2, node, 1)
+		diffK( 1, node, 2 ) = diffK(2, node, 2)
+		viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
+		diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
+		diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+		
+	end do !-->do node=1, myDim_nod2D+eDim_nod2D
 
   end subroutine ri_iwmix
 

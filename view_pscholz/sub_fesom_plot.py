@@ -72,17 +72,17 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
-            xticks   = np.arange(0.,360.,tickstep[-1])
+            xticks   = np.arange(-180.+tickstep[-1],180.-tickstep[-1]+1,tickstep[-1])
         else:
-            xticks   = np.arange(0.,360.,tickstep[idx1[0,0]])
+            xticks   = np.arange(180.+tickstep[idx1[0,0]],180.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
 
         del idx
         idx      = (inputarray['which_box'][3]-inputarray['which_box'][2])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
-            yticks   = np.arange(-90.,90.,tickstep[-1])
+            yticks   = np.arange(-90.+tickstep[-1],90.-tickstep[-1]+1,tickstep[-1])
         else:    
-            yticks   = np.arange(-90.,90.,tickstep[idx1[0,0]])
+            yticks   = np.arange(-90.+tickstep[idx1[0,0]],90.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
     #___________________________________________________________________________
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -172,9 +172,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
         data.cmap='wbgyr'
     elif data.var.find('MLD')!=-1:
-        data.cmap='rygbw'
-        cmax = 0.0
-        cmin = np.min(data.value[idx_box])
+        #data.cmap='rygbw'
+        data.cmap='wbgyr'
+        cmin = 0.0
+        cmax = np.max(data.value[idx_box])
         cref = cmin + (cmax-cmin)/2
         cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
     else:
@@ -219,7 +220,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
             if data.sname=='a_ice' or data.sname=='m_ice' :
                 auxcmap[0,-1]=0.0
             elif data.sname.find('MLD')==0 :
-                auxcmap[-1,-1]=0.0
+                #auxcmap[-1,-1]=0.0
+                auxcmap[0,-1]=0.0
             cmap0 = ListedColormap(auxcmap)
 
     #___________________________________________________________________________
@@ -242,14 +244,14 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 shading='gouraud')
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
@@ -257,7 +259,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     cmap=cmap0,
                     clim=[clevel[0],clevel[-1]])
         plt.clim=[clevel[0],clevel[-1]]
-        if do_grid==True: ax.triplot(tri,color='k',linewidth=.25,alpha=0.25)
+        if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
@@ -895,7 +897,7 @@ def fesom_plot_lmask(map,mesh,ax,fcolor,ecolor='k'):
             ax.add_collection(PatchCollection(    m_patches,        \
                             facecolor=fcolor,    \
                             edgecolor=ecolor,    \
-                            linewidths=1.0,     \
+                            linewidths=0.5,     \
                             zorder=1))
         
     
