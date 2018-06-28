@@ -91,7 +91,7 @@ integer                       :: mom_adv=2
 
 logical                       :: open_b=.false.   ! Reserved    
 
-logical                       :: mo_on=.false. !Monin-Obukhov
+logical                       :: mo_on=.true. !.false. !Monin-Obukhov
 real*8 :: modiff=0.01                   !for PP, mixing coefficient within MO length
 
   ! *** active tracer cutoff

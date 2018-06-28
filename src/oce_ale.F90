@@ -1874,10 +1874,10 @@ subroutine oce_timestep_ale(n)
 	eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 	! --> eta_(n)
 	! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
-        
-        if (Fer_GM .or. Redi) then
-           call init_Redi_GM
-        end if
+	
+	if (Fer_GM .or. Redi) then
+		call init_Redi_GM
+	end if
 	
 	!___________________________________________________________________________
 	! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010

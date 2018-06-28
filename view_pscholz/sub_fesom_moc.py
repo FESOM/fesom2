@@ -236,6 +236,7 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
     plt.show(block=False)    
     
+    fig.canvas.draw()
     return(fig,ax1)
     
 
@@ -272,7 +273,7 @@ def plot_xmoc_tseries(time,moc_t,which_lat=['max'],which_moc='amoc',str_descript
                  marker='v',markersize=6,markeredgecolor='k',markeredgewidth=0.5,\
                  color=hp[0].get_color(),zorder=3,clip_box=False,clip_on=False)
         
-    ax.legend(loc='upper right', shadow=True,fancybox=True,frameon=True,mode='None')
+    ax.legend(loc='lower right', shadow=True,fancybox=True,frameon=True,mode='None')
     ax.set_xlabel('Time [years]',fontsize=12)
     ax.set_ylabel('{:s} in [Sv]'.format(which_moc.upper()),fontsize=12)
     minor_locator = AutoMinorLocator(5)
@@ -282,7 +283,8 @@ def plot_xmoc_tseries(time,moc_t,which_lat=['max'],which_moc='amoc',str_descript
     plt.xticks(np.arange(1940,2015,5))
     plt.xlim(time[0]-(time[-1]-time[0])*0.015,time[-1]+(time[-1]-time[0])*0.015)    
     plt.show(block=False)
-
+    
+    fig.canvas.draw()
     return(fig,ax)
 
 
