@@ -63,12 +63,44 @@ module io_MEANDATA
 !
 subroutine ini_mean_io
   implicit none
+  integer           :: i
+  character(len=10) :: id_string
 !3D
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
-  call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
+  if (ldiag_energy) then
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmidrho', 'vertical velocity x density', 'kg/(s*m2)', wzmidrho(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:),    1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',  'u times u', 'm2/s2', u_x_u(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',  'u times v', 'm2/s2', u_x_v(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',  'v times v', 'm2/s2', v_x_v(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uw',  'u times w', 'm2/s2', u_x_w(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vw',  'v times w', 'm2/s2', v_x_w(:,:), 1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudx','du/dx',     '1/s',   dudx(:,:),  1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudy','du/dy',     '1/s',   dudy(:,:),  1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdx','dv/dx',     '1/s',   dvdx(:,:),  1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy','dv/dy',     '1/s',   dvdy(:,:),  1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudz','du/dz',     '1/s',   dudz(:,:),  1, 'm')
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdz','dv/dz',     '1/s',   dvdz(:,:),  1, 'm')
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm')
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm')
+     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
+    call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm')
+    call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm')
+    call def_stream(nod2D, myDim_nod2D, 'av_dudz_sq',  'int(Av * (du/dz)^2)',     'm^3/s^3', av_dudz_sq(1:myDim_nod2D), 1, 'm')
+  else
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',    'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y')
+     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',    'meridional velocity', 'm/s', uv(2,:,:),     1, 'y')
+     call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y')
+  end if
+
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y')
+  
+  do i=3, num_tracers
+     write (id_string, "(I3.3)") tracer_id(i)
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,i), 1, 'm')
+  end do
+
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y')
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y')

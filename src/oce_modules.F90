@@ -77,6 +77,9 @@ real(kind=WP)                 :: w_exp_max=1.e-5_WP
 				! 1 MUSCL
 				! 2 MUSCL-FCT
 integer	                       :: num_tracers=2
+integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
+                                                                                 ! 0=temp, 1=salt etc.
+
 ! Momentum
 logical                       :: free_slip=.false.
                                 ! false=no slip 
@@ -98,7 +101,6 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
   namelist /tracer_cutoff/ limit_salinity, salinity_min, coeff_limit_salinity
 
 ! *** others ***
- integer                       :: num_tracer
  real*8                        :: time_sum=0.0 ! for runtime estimate
 
 
@@ -106,8 +108,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
                     Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-		    ref_sss_local, ref_sss, i_vert_diff, &
-		    tracer_adv
+		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
 END MODULE o_PARAM  
 !==========================================================
 
@@ -254,7 +255,6 @@ real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
 
 ! Passive and age tracers
- character(4), allocatable    :: prog_tracer_name(:)
 real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      
 real(kind=8), allocatable :: ttrhs(:,:)

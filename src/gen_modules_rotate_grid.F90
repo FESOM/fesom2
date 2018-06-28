@@ -30,6 +30,7 @@ module g_rotate_grid
     ! angle A around z-axis, the second is by an angle B about the new 
     ! x-axis, and the third is by an angle G about the new z-axis.   
     use o_PARAM
+    use g_PARSUP, only : mype
     implicit none
     real(kind=WP)      :: al, be, ga
 
@@ -47,7 +48,7 @@ module g_rotate_grid
     r2g_matrix(3,1)=sin(be)*sin(al) 
     r2g_matrix(3,2)=-sin(be)*cos(al)  
     r2g_matrix(3,3)=cos(be)
-
+    if(mype==0) write(*,*) 'rotation matrix for rotated model grids prepared'
   end subroutine set_mesh_transform_matrix
 !
 !----------------------------------------------------------------
@@ -156,8 +157,47 @@ module g_rotate_grid
     tlon=-sin(rlon)*txr + cos(rlon)*tyr
 
   end subroutine vector_g2r
-!
-!----------------------------------------------------------------------------
-!
-
+  !
+  !----------------------------------------------------------------------------
+  !
+  subroutine vector_r2g(tlon, tlat, lon, lat, flag_coord)
+   ! rotate 2d vector (tlon, tlat) to be in geo. coordinates
+   ! tlon, tlat (in)    :: lon & lat components of a vector in rotated coordinates
+   !            (out)   :: lon & lat components of the vector in geo. coordinates
+   ! lon, lat           :: [radian] coordinates
+   ! flag_coord         :: 1, (lon,lat) is the geographical coord.; else, rotated coord.
+   !
+   implicit none
+   integer, intent(in)           :: flag_coord
+   real(kind=8), intent(inout)   :: tlon, tlat
+   real(kind=8), intent(in)      :: lon, lat
+   real(kind=8)                  :: rlon, rlat, glon, glat
+   real(kind=8)                  :: txg, tyg, tzg, txr, tyr, tzr
+   !
+   ! geographical coordinate
+   if(flag_coord==1) then  ! input is geographical coordinates
+      glon=lon
+      glat=lat
+      call g2r(glon,glat,rlon,rlat)
+   else                    ! input is rotated coordinates
+      rlon=lon
+      rlat=lat
+      call r2g(glon,glat,rlon,rlat)
+   end if
+   !
+   ! vector rotated Cartesian
+   txg=-tlat*sin(rlat)*cos(rlon)-tlon*sin(rlon)
+   tyg=-tlat*sin(rlat)*sin(rlon)+tlon*cos(rlon)
+   tzg=tlat*cos(rlat)
+   !
+   ! vector in geo Cartesian
+   txr=r2g_matrix(1,1)*txg + r2g_matrix(2,1)*tyg + r2g_matrix(3,1)*tzg
+   tyr=r2g_matrix(1,2)*txg + r2g_matrix(2,2)*tyg + r2g_matrix(3,2)*tzg
+   tzr=r2g_matrix(1,3)*txg + r2g_matrix(2,3)*tyg + r2g_matrix(3,3)*tzg
+   !
+   ! vector in geo coordinate
+   tlat=-sin(glat)*cos(glon)*txr - sin(glat)*sin(glon)*tyr + cos(glat)*tzr
+   tlon=-sin(glon)*txr + cos(glon)*tyr
+  end subroutine vector_r2g
+!  
 end module g_rotate_grid

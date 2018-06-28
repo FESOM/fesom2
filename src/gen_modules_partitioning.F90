@@ -102,6 +102,8 @@ subroutine par_init    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(abort)       ! finalizes MPI
+#ifndef __oifs
+!For standalone and coupled ECHAM runs
 #if defined (__oasis)
   use mod_prism 
 #endif
@@ -117,13 +119,10 @@ subroutine par_ex(abort)       ! finalizes MPI
      call  MPI_Finalize(MPIerr)
   endif
 #else
-#ifndef __oifs
-!for coupling with ECHAM only
   if (.not. present(abort)) then
      if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
   end if
-#endif
   call prism_terminate_proto(MPIerr)
   if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
@@ -131,7 +130,21 @@ subroutine par_ex(abort)       ! finalizes MPI
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(MPIerr)
 #endif
-   if (mype==0) print *, 'fesom should stop with exit status = 0'
+  if (mype==0) print *, 'fesom should stop with exit status = 0'
+#endif
+#if defined (__oifs)
+!OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
+  implicit none
+  integer,optional :: abort
+  if (present(abort)) then
+	if (mype==0) write(*,*) 'Run finished unexpectedly!'
+	call MPI_ABORT( MPI_COMM_FESOM, 1 )
+  else
+	call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
+	call  MPI_Finalize(MPIerr)
+  endif
+#endif
+
 end subroutine par_ex
 !=================================================================
 subroutine set_par_support_ini

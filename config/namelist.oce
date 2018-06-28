@@ -45,5 +45,7 @@ clim_relax=0.0	                    ! 1/s, geometrical information has to be supp
 ref_sss_local=.true.
 ref_sss=34.
 i_vert_diff=.true.  ! true
-tracer_adv=2        ! 1=MUSCL, 2=MUSCL+FCT
+tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
+num_tracers=2       !number of all tracers
+tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
 /
