@@ -35,6 +35,8 @@ elif [[ $LOGINHOST =~ ^b[A-Za-z0-9]+\.hsn\.hlrn\.de$ ]]; then
    STRATEGY="blogin.hlrn.de"
 elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
+elif [[  $LOGINHOST =~ \.jureca$ ]]; then
+   STRATEGY="jureca"
 else
    echo "can not determine environment for host: "$LOGINHOST
    [ $BEING_EXECUTED = true ] && exit 1
