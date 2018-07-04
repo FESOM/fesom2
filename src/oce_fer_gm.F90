@@ -204,8 +204,8 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
       end if
    END DO
 
-   call exchange_nod(fer_c)
-   call exchange_nod(fer_k)
-   call exchange_nod(Ki)
+   if (Fer_GM) call exchange_nod(fer_c)
+   if (Fer_GM) call exchange_nod(fer_k)
+   if (Redi)   call exchange_nod(Ki)
 end subroutine init_Redi_GM
 !====================================================================

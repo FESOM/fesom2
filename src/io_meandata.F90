@@ -162,7 +162,7 @@ subroutine ini_mean_io
      call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diffusivity', 'm2/s', fer_k(:,:),    1, 'm')
 
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM, depth independent speed',  'm/s' ,        fer_c(1:myDim_nod2D),      1, 'm')
-     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'm')
+     call def_stream(nod2D, myDim_nod2D, 'reso',  'GM, mesh resolution',          'm2/s',        mesh_resolution(1:myDim_nod2D), 1, 'y')
   end if
   if (ldiag_solver) then
      call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's')
