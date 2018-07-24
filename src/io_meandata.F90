@@ -35,8 +35,10 @@ module io_MEANDATA
     integer(int16),  public, allocatable, dimension(:,:) :: local_values_i2
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:)
-    real(kind=4)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2
-    real(kind=4)                                       :: add_offset=0.    ! real4_value = int2_value * scale_factor + add_offset
+    real(kind=4)                                       :: min_value        ! lower and upper bound, used to compute scale_factor, add_offset 
+    real(kind=4)                                       :: max_value        !      keep for check if real life values remain in this interval
+    real(kind=4)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2:
+    real(kind=4)                                       :: add_offset=0.    !      real4_value = int2_value * scale_factor + add_offset
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -117,7 +119,7 @@ subroutine ini_mean_io
   end if
 
 !  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y', i_real4)
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 10, 's', i_int2,-10.,40.)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 10, 's', i_int2,-20.,60.)
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y', i_real4)
   
   do i=3, num_tracers
@@ -476,7 +478,7 @@ subroutine update_means
 
      else
 
-           if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',entry%name
+           if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',trim(entry%name)
            call par_ex
            stop
      endif
@@ -496,6 +498,8 @@ subroutine output(istep)
   integer       :: n
   logical       :: do_output
   type(Meandata), pointer :: entry
+  real(kind=8)  :: inv_addcounter_r8
+  real(kind=4)  :: inv_addcounter_r4, inv_scale_factor
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io
@@ -533,19 +537,39 @@ subroutine output(istep)
         entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         call assoc_ids(entry)
         if (entry%accuracy == i_real8) then
-           entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,8) ! compute_means
+           inv_addcounter_r8 = 1._WP/real(entry%addcounter,8)
+           entry%local_values_r8 = entry%local_values_r8 * inv_addcounter_r8  ! compute_means
            call write_mean(entry)
            entry%local_values_r8 = 0. ! clean_meanarrays
+
         elseif (entry%accuracy == i_real4) then
-           entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,4) ! compute_means
+           inv_addcounter_r4 = 1._WP/real(entry%addcounter,4)
+           entry%local_values_r4 = entry%local_values_r4 * inv_addcounter_r4 ! compute_means
            call write_mean(entry)
            entry%local_values_r4 = 0. ! clean_meanarrays
+
         elseif (entry%accuracy == i_int2) then
-           ! compute_means and compress to int2, use scale_factor and add_offset to maintain as much accuracy as possible 
-           entry%local_values_i2 = int( (entry%local_values_r4 /real(entry%addcounter,4) - entry%add_offset)/ entry%scale_factor,int16)  
+           ! compute_means and compress to int2, use scale_factor and add_offset to maintain as much accuracy as possible
+           inv_addcounter_r4 = 1./real(entry%addcounter,4)
+           inv_scale_factor  = 1./entry%scale_factor 
+           entry%local_values_i2 = nint( (entry%local_values_r4 * inv_addcounter_r4 - entry%add_offset)* inv_scale_factor,int16)
+  
+           ! write a warning if the values exceed the interval on which scale_factor and add_offset are based
+           if (minval(entry%local_values_r4) < entry%min_value) then
+              print *,'! WARNING ! Check output of ',trim(entry%name),'on MPI-task',mype,':'
+              print *,'            The minimum',minval(entry%local_values_r4),'is smaller than'
+              print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
+              print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
+           endif
+           if (maxval(entry%local_values_r4) > entry%max_value) then
+              print *,'! WARNING ! Check output of ',trim(entry%name),'on MPI-task',mype,':'
+              print *,'            The maximum',maxval(entry%local_values_r4),'is larger than'
+              print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
+              print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
+           endif
            call write_mean(entry)
            entry%local_values_r4 = 0. ! clean_meanarrays
-        endif
+        endif  ! accuracy
 
         entry%addcounter   = 0  ! clean_meanarrays
      endif
@@ -593,10 +617,14 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      entry%local_values_i2 = 0 
      if (present(minvalue) .and. present(maxvalue)) then
         entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,4)
-        entry%add_offset   = minvalue
+        entry%add_offset   = 0.5*(maxvalue + minvalue)
+        entry%min_value    = minvalue
+        entry%max_value    = maxvalue
      else
         entry%scale_factor = 1.
         entry%add_offset   = 0.
+        entry%min_value    = 0.
+        entry%max_value    = real(2**16,4)
         if (mype==0) then
            print *,'Warning: netcdf-output of',name,'is set to short integer,'
            print *,'but no interval [minvalue,maxvalue] is given, thus scale_factor=1., add_offset=0.'
