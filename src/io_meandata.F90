@@ -556,13 +556,13 @@ subroutine output(istep)
   
            ! write a warning if the values exceed the interval on which scale_factor and add_offset are based
            if (minval(entry%local_values_r4) < entry%min_value) then
-              print *,'! WARNING ! Check output of ',trim(entry%name),'on MPI-task',mype,':'
+              print *,'! WARNING ! Check output of ',trim(entry%name),' (MPI-task',mype,'):'
               print *,'            The minimum',minval(entry%local_values_r4),'is smaller than'
               print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
               print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
            endif
            if (maxval(entry%local_values_r4) > entry%max_value) then
-              print *,'! WARNING ! Check output of ',trim(entry%name),'on MPI-task',mype,':'
+              print *,'! WARNING ! Check output of ',trim(entry%name),' (MPI-task',mype,'):'
               print *,'            The maximum',maxval(entry%local_values_r4),'is larger than'
               print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
               print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
