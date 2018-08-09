@@ -503,7 +503,7 @@ use g_parsup
 implicit none
 INTEGER :: nodes(3), elems(3), eledges(3)
 integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=111
-real*8 :: x,dmean
+real(kind=WP) :: x,dmean
 integer :: thers_lev=5
 character*200 :: file_name
 ALLOCATE(depth(nod2D))

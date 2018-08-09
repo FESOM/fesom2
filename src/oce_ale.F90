@@ -1545,17 +1545,17 @@ implicit none
 #include "petscf.h"
 integer                         :: myrows
 integer                         :: Pmode
-real(kind=8)                    :: rinfo(20,20)
+real(kind=WP)                   :: rinfo(20,20)
 integer                         :: maxiter=2000
 integer                         :: restarts=15
 integer                         :: fillin=3
 integer                         :: lutype=2
 integer                         :: nrhs=1
-real(kind=8)                    :: droptol=1.e-7
-real(kind=8)                    :: soltol =1e-10  !1.e-10
+real(kind=WP)                   :: droptol=1.e-7
+real(kind=WP)                   :: soltol =1e-10  !1.e-10
 logical, save                   :: lfirst=.true.
 real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
-real(kind=8)                    :: cssh1,cssh2,crhs
+real(kind=WP)                   :: cssh1,cssh2,crhs
 integer                         :: i
 Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
 if (lfirst) then   
@@ -1796,7 +1796,7 @@ subroutine oce_timestep_ale(n)
 	use o_mixing_KPP_mod
 	
 	IMPLICIT NONE
-	real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
+	real(kind=WP)     :: t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
 	integer           :: n
 	
 	t1=MPI_Wtime()

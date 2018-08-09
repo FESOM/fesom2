@@ -26,7 +26,7 @@ subroutine pressure_bv
 	mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
 	!___________________________________________________________________________
 	! Screen salinity
-	a=0.0_8
+	a=0.0_WP
 	do node=1, myDim_nod2D+eDim_nod2D
 		do nz=1,nlevels_nod2d(node)-1
 			a=min(a,tr_arr(nz,node,2))
@@ -444,10 +444,11 @@ function ptheta(s,t,p,pr)
   ! Reviewed by ??
   !--------------------------------------------------------
   
+  use o_param, only: WP
   implicit none
-  real*8 			:: ptheta, s, t, p, pr
-  real*8 			:: h, xk, q
-  real*8, external	        :: atg
+  real(kind=WP) 			:: ptheta, s, t, p, pr
+  real(kind=WP) 			:: h, xk, q
+  real(kind=WP), external	        :: atg
 
   h = pr - p
   xk = h*atg(s,t,p)
@@ -482,9 +483,10 @@ function atg(s,t,p)
   ! Coded by ??
   ! Reviewed by ??
   !--------------------------------------------------------
-  
+
+  use o_param, only: WP
   implicit none
-  real*8  atg, s, t, p, ds
+  real(kind=WP)  atg, s, t, p, ds
 
   ds = s - 35.0
   atg = (((-2.1687e-16*t+1.8676e-14)*t-4.6206e-13)*p   &
@@ -545,7 +547,7 @@ subroutine sw_alpha_beta(TF1,SF1)
      t1_4 = t1_3*t1
      p1_2 = p1*p1
      p1_3 = p1_2*p1
-     s35 = s1-35.0_8
+     s35 = s1-35.0_WP
      s35_2 = s35*s35
 
      ! calculate beta

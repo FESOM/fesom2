@@ -346,7 +346,7 @@ subroutine def_variable_1d(id, name, dims, longname, units, data)
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(1)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=8),target,     intent(inout)        :: data(:)
+  real(kind=WP),target,     intent(inout)        :: data(:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
@@ -382,7 +382,7 @@ subroutine def_variable_2d(id, name, dims, longname, units, data)
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(2)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=8),target,     intent(inout) :: data(:,:)
+  real(kind=WP),target,     intent(inout) :: data(:,:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
@@ -416,7 +416,7 @@ subroutine write_restart(id, istep)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
-  real(kind=8), allocatable     :: aux1(:), aux2(:,:) 
+  real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
   integer                       :: i, size1, size2, shape
   integer                       :: c
   ! Serial output implemented so far
@@ -472,10 +472,10 @@ subroutine read_restart(id, arg)
   implicit none
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
-  real(kind=8), allocatable        :: aux1(:), aux2(:,:) 
+  real(kind=WP), allocatable        :: aux1(:), aux2(:,:) 
   integer                          :: i, size1, size2, shape
   integer                          :: rec2read, c
-  real(kind=8)                     :: rtime !timestamp of the record
+  real(kind=WP)                    :: rtime !timestamp of the record
   ! Serial output implemented so far
   c=1
   if (mype==0) then
@@ -547,7 +547,7 @@ subroutine assoc_ids(id)
   type(nc_file),  intent(inout) :: id
   character(500)                :: longname
   integer                       :: c, j, k
-  real(kind=8)                  :: rtime !timestamp of the record
+  real(kind=WP)                 :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
   c=1

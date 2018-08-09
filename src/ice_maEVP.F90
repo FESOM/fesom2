@@ -15,15 +15,15 @@ subroutine stress_tensor_m
   use g_parsup
   implicit none
 
-  integer        :: elem, elnodes(3)
-  real(kind=8)   :: dx(3), dy(3), msum, asum
-  real(kind=8)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
-  real(kind=8)   :: val3, meancos, usum, vsum, vale
-  real(kind=8)   :: det1, det2, r1, r2, r3, si1, si2
+  integer         :: elem, elnodes(3)
+  real(kind=WP)   :: dx(3), dy(3), msum, asum
+  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)   :: val3, meancos, usum, vsum, vale
+  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
   
-  val3=1.0_8/3.0_8
-  vale=1.0_8/(ellipse**2)
-  det2=1.0_8/(1.0_8+alpha_evp)
+  val3=1.0_WP/3.0_WP
+  vale=1.0_WP/(ellipse**2)
+  det2=1.0_WP/(1.0_WP+alpha_evp)
   det1=alpha_evp*det2
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
@@ -43,18 +43,18 @@ subroutine stress_tensor_m
      eps11=sum(dx*u_ice_aux(elnodes))
      eps11=eps11-val3*vsum*meancos                !metrics
      eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_8*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_8*val3*usum*meancos          !metrics 
+     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
      eps1=eps11+eps22
      eps2=eps11-eps22   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_8*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
      delta=sqrt(delta)
     
-     pressure=pstar*msum*exp(-c_pressure*(1.0_8-asum))/max(delta,delta_min)
+     pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
     
         r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
@@ -65,8 +65,8 @@ subroutine stress_tensor_m
         si1=det1*si1+det2*r1
         si2=det1*si2+det2*r2
         sigma12(elem)=det1*sigma12(elem)+det2*r3
-        sigma11(elem)=0.5_8*(si1+si2)
-        sigma22(elem)=0.5_8*(si1-si2)
+        sigma11(elem)=0.5_WP*(si1+si2)
+        sigma22(elem)=0.5_WP*(si1-si2)
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -89,12 +89,12 @@ subroutine ssh2rhs
   use g_parsup
   implicit none
   
-  integer       :: row, elem, elnodes(3)
-  real(kind=8)  :: dx(3), dy(3), vol
-  real(kind=8)  :: val3, meancos, aa, bb
-  real(kind=8)  :: elevation_elem(3)
+  integer        :: row, elem, elnodes(3)
+  real(kind=WP)  :: dx(3), dy(3), vol
+  real(kind=WP)  :: val3, meancos, aa, bb
+  real(kind=WP)  :: elevation_elem(3)
 
-  val3=1.0_8/3.0_8
+  val3=1.0_WP/3.0_WP
   
   ! use rhs_m and rhs_a for storing the contribution from elevation:
   do row=1, myDim_nod2d 
@@ -135,12 +135,12 @@ subroutine stress2rhs_m
   use g_parsup
   implicit none
   
-  integer       :: k, row, elem, elnodes(3)
-  real(kind=8)  :: dx(3), dy(3), vol
-  real(kind=8)  :: val3, mf, aa, bb
-  real(kind=8)  :: mass, cluster_area, elevation_elem(3)
+  integer        :: k, row, elem, elnodes(3)
+  real(kind=WP)  :: dx(3), dy(3), vol
+  real(kind=WP)  :: val3, mf, aa, bb
+  real(kind=WP)  :: mass, cluster_area, elevation_elem(3)
 
-  val3=1.0_8/3.0_8
+  val3=1.0_WP/3.0_WP
   
   do row=1, myDim_nod2d 
      u_rhs_ice(row)=0.0
@@ -169,7 +169,7 @@ subroutine stress2rhs_m
   
   do row=1, myDim_nod2d               
      mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-     mass=mass/(1.0_8+mass*mass)
+     mass=mass/(1.0_WP+mass*mass)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
   end do
@@ -195,29 +195,29 @@ subroutine EVPdynamics_m
   use g_comm_auto
 
   implicit none
-  integer         :: steps, shortstep, i, ed
-  real(kind=8)    :: rdt, drag, det
-  real(kind=8)    :: inv_thickness(myDim_nod2D), umod, rhsu, rhsv
-  logical         :: ice_el(myDim_elem2D), ice_nod(myDim_nod2D)
+  integer          :: steps, shortstep, i, ed
+  real(kind=WP)    :: rdt, drag, det
+  real(kind=WP)    :: inv_thickness(myDim_nod2D), umod, rhsu, rhsv
+  logical          :: ice_el(myDim_elem2D), ice_nod(myDim_nod2D)
 
 !NR for stress_tensor_m
-  integer        :: el, elnodes(3)
-  real(kind=8)   :: dx(3), dy(3), msum, asum
-  real(kind=8)   :: eps11, eps12, eps22, eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
-  real(kind=8)   :: val3, meancos, vale
-  real(kind=8)   :: det1, det2, r1, r2, r3, si1, si2
+  integer         :: el, elnodes(3)
+  real(kind=WP)   :: dx(3), dy(3), msum, asum
+  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
+  real(kind=WP)   :: val3, meancos, vale
+  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
 
 !NR for stress2rhs_m  
-  integer       :: k, row
-  real(kind=8)  :: vol
-  real(kind=8)  :: mf,aa, bb
-  real(kind=8)  :: mass(myDim_nod2D)
+  integer        :: k, row
+  real(kind=WP)  :: vol
+  real(kind=WP)  :: mf,aa, bb
+  real(kind=WP)  :: mass(myDim_nod2D)
 
 
   
-  val3=1.0_8/3.0_8
-  vale=1.0_8/(ellipse**2)
-  det2=1.0_8/(1.0_8+alpha_evp)
+  val3=1.0_WP/3.0_WP
+  vale=1.0_WP/(ellipse**2)
+  det2=1.0_WP/(1.0_WP+alpha_evp)
   det1=alpha_evp*det2
   rdt=ice_dt
   steps=evp_rheol_steps
@@ -249,16 +249,16 @@ subroutine EVPdynamics_m
 
 ! precompute thickness (the inverse is needed) and mass (scaled by area)
   do i=1,myDim_nod2D
-     inv_thickness(i) = 0._8
-     mass(i) = 0._8
+     inv_thickness(i) = 0._WP
+     mass(i) = 0._WP
      ice_nod(i) = .false.
 
-     if (a_ice(i) >= 0.01_8) then
+     if (a_ice(i) >= 0.01_WP) then
         inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-        inv_thickness(i) = 1.0_8/max(inv_thickness(i), 9.0_8)  ! Limit the mass
+        inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
 
         mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
-        mass(i) = mass(i)/((1.0_8+mass(i)*mass(i))*area(1,i))
+        mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
 
         ! scale rhs_a, rhs_m, too.
         rhs_a(i) = rhs_a(i)/area(1,i) 
@@ -272,14 +272,14 @@ subroutine EVPdynamics_m
   do el=1,myDim_elem2D
      elnodes=elem2D_nodes(:,el)
 
-     pressure_fac(el) = 0._8
+     pressure_fac(el) = 0._WP
      ice_el(el) = .false.
      msum=sum(m_ice(elnodes))*val3
      if(msum > 0.01) then
         ice_el(el) = .true.
         asum=sum(a_ice(elnodes))*val3     
      
-        pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_8-asum))
+        pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
      endif
   end do
 
@@ -314,7 +314,7 @@ subroutine EVPdynamics_m
         ! ====== Deformation rate tensor on element elem:
         eps11 = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
         eps22 = sum(dy(:)*v_ice_aux(elnodes))
-        eps12 = 0.5_8*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
+        eps12 = 0.5_WP*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
                          +sum(u_ice_aux(elnodes))*meancos )          !metrics 
         
         ! ======= Switch to eps1,eps2
@@ -322,18 +322,18 @@ subroutine EVPdynamics_m
         eps2 = eps11 - eps22   
         
         ! ====== moduli:
-        delta = sqrt(eps1**2+vale*(eps2**2+4.0_8*eps12**2))
+        delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12**2))
         
         pressure = pressure_fac(el)/(delta+delta_min)
         
 !        si1 = det1*(sigma11(el)+sigma22(el)) + pressure*(eps1-delta) 
 !        si2 = det1*(sigma11(el)-sigma22(el)) + pressure*eps2*vale
-!        sigma11(el) = 0.5_8*(si1+si2)
-!        sigma22(el) = 0.5_8*(si1-si2)
+!        sigma11(el) = 0.5_WP*(si1+si2)
+!        sigma22(el) = 0.5_WP*(si1-si2)
 !NR directly insert si1, si2 cancels some operations and should increase accuracy
         sigma12(el) = det1*sigma12(el) +       pressure*eps12*vale
-        sigma11(el) = det1*sigma11(el) + 0.5_8*pressure*(eps1 - delta + eps2*vale)
-        sigma22(el) = det1*sigma22(el) + 0.5_8*pressure*(eps1 - delta - eps2*vale)
+        sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
+        sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
 
         !  end do   ! fuse loops
         ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
@@ -387,7 +387,7 @@ subroutine EVPdynamics_m
         rhsv = v_ice(i)+drag*v_w(i)+rdt*(inv_thickness(i)*stress_atmice_y(i)+v_rhs_ice(i)) + beta_evp*v_ice_aux(i)
 
         !solve (Coriolis and water stress are treated implicitly)        
-        det = bc_index_nod2D(i) / ((1.0_8+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
+        det = bc_index_nod2D(i) / ((1.0_WP+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
 
         u_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
         v_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
@@ -430,12 +430,12 @@ subroutine find_alpha_field_a
   use g_parsup
   implicit none
 
-  integer        :: elem, elnodes(3)
-  real(kind=8)   :: dx(3), dy(3), msum, asum
-  real(kind=8)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
-  real(kind=8)   :: val3, meancos, usum, vsum, vale
-  val3=1.0_8/3.0_8
-  vale=1.0_8/(ellipse**2)
+  integer         :: elem, elnodes(3)
+  real(kind=WP)   :: dx(3), dy(3), msum, asum
+  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)   :: val3, meancos, usum, vsum, vale
+  val3=1.0_WP/3.0_WP
+  vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
 
@@ -454,18 +454,18 @@ subroutine find_alpha_field_a
      eps11=sum(dx*u_ice_aux(elnodes))
      eps11=eps11-val3*vsum*meancos                !metrics
      eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_8*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_8*val3*usum*meancos          !metrics 
+     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
      eps1=eps11+eps22
      eps2=eps11-eps22   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_8*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
      delta=sqrt(delta)
          
-     pressure=pstar*exp(-c_pressure*(1.0_8-asum))/(delta+delta_min) ! no multiplication
+     pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
                                                                     ! with thickness (msum)
      !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
      alpha_evp_array(elem)=max(50.0,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
@@ -489,16 +489,16 @@ subroutine stress_tensor_a
   use g_parsup
   implicit none
 
-  integer        :: elem, elnodes(3)
-  real(kind=8)   :: dx(3), dy(3), msum, asum
-  real(kind=8)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
-  real(kind=8)   :: val3, meancos, usum, vsum, vale
-  real(kind=8)   :: det1, det2, r1, r2, r3, si1, si2
+  integer         :: elem, elnodes(3)
+  real(kind=WP)   :: dx(3), dy(3), msum, asum
+  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)   :: val3, meancos, usum, vsum, vale
+  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
   
-  val3=1.0_8/3.0_8
-  vale=1.0_8/(ellipse**2)
+  val3=1.0_WP/3.0_WP
+  vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
-     det2=1.0_8/(1.0_8+alpha_evp_array(elem))     ! Take alpha from array
+     det2=1.0_WP/(1.0_WP+alpha_evp_array(elem))     ! Take alpha from array
      det1=alpha_evp_array(elem)*det2
   
      elnodes=elem2D_nodes(:,elem)
@@ -518,18 +518,18 @@ subroutine stress_tensor_a
      eps11=sum(dx*u_ice_aux(elnodes))
      eps11=eps11-val3*vsum*meancos                !metrics
      eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_8*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_8*val3*usum*meancos          !metrics 
+     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
      eps1=eps11+eps22
      eps2=eps11-eps22   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_8*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
      delta=sqrt(delta)
     
-     pressure=pstar*msum*exp(-c_pressure*(1.0_8-asum))/(delta+delta_min)
+     pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
     
         r1=pressure*(eps1-delta) 
         r2=pressure*eps2*vale
@@ -540,8 +540,8 @@ subroutine stress_tensor_a
         si1=det1*si1+det2*r1
         si2=det1*si2+det2*r2
         sigma12(elem)=det1*sigma12(elem)+det2*r3
-        sigma11(elem)=0.5_8*(si1+si2)
-        sigma22(elem)=0.5_8*(si1-si2)
+        sigma11(elem)=0.5_WP*(si1+si2)
+        sigma22(elem)=0.5_WP*(si1-si2)
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -571,10 +571,10 @@ use g_parsup
 use g_comm_auto
 
   implicit none
-  integer         :: steps, shortstep, i, ed
-  real(kind=8)    :: rdt, drag, det, fc
-  real(kind=8)    :: thickness, inv_thickness, umod, rhsu, rhsv
-  REAL(kind=8)    :: t0,t1, t2, t3, t4, t5, t00, txx
+  integer          :: steps, shortstep, i, ed
+  real(kind=WP)    :: rdt, drag, det, fc
+  real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
+  REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
  
   steps=evp_rheol_steps
   rdt=ice_dt
@@ -588,7 +588,7 @@ use g_comm_auto
      do i=1,myDim_nod2D 
          thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01)
          thickness=max(thickness, 9.0)   ! Limit if it is too small (0.01 m)
-         inv_thickness=1.0_8/thickness
+         inv_thickness=1.0_WP/thickness
 
          umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
          drag=rdt*Cd_oce_ice*umod*density_0*inv_thickness
@@ -601,7 +601,7 @@ use g_comm_auto
 	 rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
          !solve (Coriolis and water stress are treated implicitly)
          fc=rdt*coriolis_node(i)
-         det=(1.0_8+beta_evp_array(i)+drag)**2+fc**2
+         det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
          det=bc_index_nod2D(i)/det
          u_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsv-fc*rhsu)

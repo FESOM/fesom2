@@ -3,11 +3,14 @@
 ! modified by Dmitry Sidorenko for reading with 0 PE and broadcasting to others  
 module g_read_CORE_NetCDF
   ! read NetCDF data on T62 NCEP/NCAR grid
+
 contains 
 subroutine read_CORE_NetCDF(file,vari,itime,ncdata)
-    use g_config
-    use g_parsup
-    implicit none
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+  use g_config
+  use g_parsup
+  implicit none
 
 #include "netcdf.inc" 
 
@@ -15,7 +18,7 @@ subroutine read_CORE_NetCDF(file,vari,itime,ncdata)
   integer, dimension(3)               :: istart, icount
   integer			      :: ncid, varid, io
   integer                             :: i, j, itime
-  real(kind=8), dimension (nci,ncj)   :: ncdata
+  real(real64), dimension (nci,ncj)   :: ncdata
   character(15)                       :: vari
   character(300)                      :: file
   integer                             :: ierror           ! return error code
@@ -54,6 +57,9 @@ module g_read_NCEP_NetCDF
 contains 
 
 subroutine read_NCEP_NetCDF(file,vari,itime,ncdata)
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
   use g_config
   use g_parsup
   implicit none
@@ -64,9 +70,9 @@ subroutine read_NCEP_NetCDF(file,vari,itime,ncdata)
   integer			      :: ncid, varid, io
   integer                             :: i, j, itime
   integer, dimension(3)               :: istart, icount
-  integer(kind=2), dimension(nci,ncj) :: iuw 
-  real(kind=4)                        :: xscale, xoff, miss
-  real(kind=8), dimension(nci,ncj)    :: ncdata
+  integer(int16), dimension(nci,ncj) :: iuw 
+  real(real32)                        :: xscale, xoff, miss
+  real(real64), dimension(nci,ncj)    :: ncdata
   character(15)                       :: vari
   character(300)                      :: file
   integer                             :: ierror           ! return error code
@@ -116,11 +122,14 @@ end subroutine read_NCEP_NetCDF
 !--------------------------------------------------------------
 !
 subroutine upside_down(array,ni,nj)
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
   implicit none
   integer                         :: i, j, ji
   integer                         :: ni, nj
-  real(kind=8), dimension(ni,nj)  :: array
-  real(kind=8), dimension(nj)     :: ywrk
+  real(real64), dimension(ni,nj)  :: array
+  real(real64), dimension(nj)     :: ywrk
 
   do i=1,ni  
      do j=1,nj
@@ -149,6 +158,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
   ! The check_dummy part should be modified in new applications!
   ! if check_dummy=.true.,  missing value is replaced with a meaningful value nearby
   ! if check_dummy=.false., missing value is replaced with 0.0
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
   use g_config
   use o_param
   use o_mesh
@@ -162,11 +174,11 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
   integer                    :: status, ncid, varid
   integer                    :: lonid, latid
   integer                    :: istart(3), icount(3)
-  real(kind=8)               :: x, y, miss, aux
-  real(kind=8), allocatable  :: lon(:), lat(:)
-  real(kind=8), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
-  real(kind=8), allocatable  :: temp_x(:), temp_y(:)
-  real(kind=8)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)               :: x, y, miss, aux
+  real(real64), allocatable  :: lon(:), lat(:)
+  real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
+  real(real64), allocatable  :: temp_x(:), temp_y(:)
+  real(real64)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
   character(15)              :: vari
   character(300)             :: file
   logical                    :: check_dummy
@@ -240,14 +252,14 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
   ncdata_temp=ncdata
   do i=1,lonlen
      do j=1,latlen
-        if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_8) then  !!
+        if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP) then  !!
            if (check_dummy) then
               aux=0.0
               cnt=0
               do k=1,30
                  do ii=max(1,i-k),min(lonlen,i+k)
                     do jj=max(1,j-k),min(latlen,j+k)
-                       if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_8) then  !!
+                       if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_WP) then  !!
                           aux=aux+ncdata_temp(ii,jj)
                           cnt=cnt+1                         
                        end if
@@ -291,6 +303,8 @@ end subroutine read_other_NetCDF
     ! Coded by Qiang Wang
     ! Reviewed by ??
 
+  use, intrinsic :: ISO_FORTRAN_ENV
+
     use g_config
     use o_param
     use o_mesh
@@ -305,11 +319,11 @@ end subroutine read_other_NetCDF
   integer                       :: status, ncid, varid
   integer                       :: lonid, latid
   integer                       :: istart(4), icount(4)
-  real(kind=8)                  :: x, y, miss
-  real(kind=8), allocatable     :: lon(:), lat(:)
-  real(kind=8), allocatable     :: ncdata(:,:)
-  real(kind=8), allocatable     :: temp_x(:), temp_y(:)
-  real(kind=8)                  :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)                  :: x, y, miss
+  real(real64), allocatable     :: lon(:), lat(:)
+  real(real64), allocatable     :: ncdata(:,:)
+  real(real64), allocatable     :: temp_x(:), temp_y(:)
+  real(real64)                  :: model_2Darray(myDim_nod2d+eDim_nod2D)   
   character(15)                 :: vari
   character(300)                :: file
   logical                       :: check_dummy
@@ -404,6 +418,9 @@ end subroutine read_surf_hydrography_NetCDF
 !------------------------------------------------------------------------------------
 !
 subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray)  
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
   use g_config
   use o_param
   use o_mesh
@@ -417,8 +434,8 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray)
   integer                       :: itime
   integer                       :: status, ncid, varid
   integer                       :: istart(2), icount(2)
-  real(kind=8)                  :: ncdata(nod2D)
-  real(kind=8),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
+  real(real64)                  :: ncdata(nod2D)
+  real(real64),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
   character(300), intent(in) 	:: file
   character(15),  intent(in)    :: vari
   integer                       :: ierror           ! return error code

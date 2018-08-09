@@ -30,7 +30,7 @@ subroutine read_prepared_initial_ice
   integer                   :: uice_varid, vice_varid
   integer                   :: istart(2), icount(2)
   character(100)            :: filename
-  real(kind=8), allocatable :: aux2(:)
+  real(kind=WP), allocatable :: aux2(:)
 
   allocate(aux2(nod2D))  
 
@@ -117,11 +117,11 @@ subroutine read_init_ts
   !
   integer                     :: i, j, n, nz, fileID
   integer                     :: num_lat_reg, num_lon_reg, num_lay_reg
-  real(kind=8)                :: pp, pr, tt, ss, lon, lat, tbott, sbott
-  real(kind=8), external      :: ptheta
-  real(kind=8), allocatable   :: lon_reg(:), lat_reg(:), lay_reg(:)
-  real(kind=8), allocatable   :: raw_data(:,:,:)
-  real(kind=8), allocatable   :: temp_x(:), temp_y(:)
+  real(kind=WP)               :: pp, pr, tt, ss, lon, lat, tbott, sbott
+  real(kind=WP), external     :: ptheta
+  real(kind=WP), allocatable  :: lon_reg(:), lat_reg(:), lay_reg(:)
+  real(kind=WP), allocatable  :: raw_data(:,:,:)
+  real(kind=WP), allocatable  :: temp_x(:), temp_y(:)
   character*1000              :: filename
   real(kind=WP)               :: t0, t1
   integer                     :: ierror              ! return error code

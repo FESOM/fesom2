@@ -136,8 +136,8 @@ use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
 implicit none
-integer      :: step 
-REAL(kind=8) :: t0,t1, t2, t3
+integer       :: step 
+REAL(kind=WP) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
 SELECT CASE (whichEVP)
@@ -194,7 +194,7 @@ subroutine ice_initial_state
   !
   integer        :: i
   character*100  :: filename
-  real*8, external  :: TFrez  ! Sea water freeze temperature.
+  real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
   m_ice =0.
   a_ice =0.
   u_ice =0.

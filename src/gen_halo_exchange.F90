@@ -15,7 +15,10 @@
 ! ========================================================================
 
 module g_comm
-implicit none
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
+  implicit none
 
 contains
 
@@ -113,7 +116,7 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod_array2D(:)
+ real(real64), intent(inout)  :: nod_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_begin(nod_array2D)  
@@ -130,7 +133,7 @@ subroutine exchange_nod2D_begin(nod_array2D)
 
   ! General version of the communication routine for 2D nodal fields
 
-  real*8, intent(inout)  :: nod_array2D(:)
+  real(real64), intent(inout)  :: nod_array2D(:)
 
   integer  :: n, sn, rn
 
@@ -167,8 +170,8 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)  
@@ -185,8 +188,8 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
 
  integer  :: n, sn, rn
 
@@ -230,9 +233,9 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
- real*8, intent(inout)  :: nod3_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod3_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)  
@@ -249,9 +252,9 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
- real*8, intent(inout)  :: nod3_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod3_array2D(:)
 
 
  integer  :: n, sn, rn
@@ -300,7 +303,7 @@ subroutine exchange_nod3D(nod_array3D)
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -317,7 +320,7 @@ USE g_PARSUP
 IMPLICIT NONE
 
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -365,8 +368,8 @@ subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D)
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
-real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+real(real64), intent(inout) :: nod1_array3D(:,:) 
+real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -383,8 +386,8 @@ USE g_PARSUP
 IMPLICIT NONE
 
 
-real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
-real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+real(real64), intent(inout) :: nod1_array3D(:,:) 
+real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -445,7 +448,7 @@ USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:,:) 
  
 if (npes>1) then
    call exchange_nod3D_n_begin(nod_array3D)
@@ -461,7 +464,7 @@ USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -557,7 +560,7 @@ END SUBROUTINE exchange_elem_end
 !!$ INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
 !!$ integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
 !!$ integer  :: nz, nh, nc
-!!$ real(kind=WP) :: edge_array3D(nl-1,edge2D) 
+!!$ real(real64) :: edge_array3D(nl-1,edge2D) 
 !!$  
 !!$  sn=com_edge2D%sPEnum
 !!$  rn=com_edge2D%rPEnum
@@ -621,7 +624,7 @@ END SUBROUTINE exchange_elem_end
 !!$
 !!$! General version of the communication routine for 2D edge fields
 !!$! This routine is not split, it is used only once during setup. 
-!!$ real*8, intent(inout)  :: edge_array2D(:)
+!!$ real(real64), intent(inout)  :: edge_array2D(:)
 !!$
 !!$ integer  :: n, sn, rn
 !!$
@@ -649,7 +652,7 @@ subroutine exchange_elem3D(elem_array3D)
 USE g_PARSUP 
 IMPLICIT NONE
 
- real(kind=WP), intent(inout) :: elem_array3D(:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:) 
 
  call exchange_elem3D_begin(elem_array3D)
  call exchange_elem_end
@@ -664,7 +667,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
 
-real(kind=WP), intent(inout) :: elem_array3D(:,:) 
+real(real64), intent(inout) :: elem_array3D(:,:) 
 integer  :: n, sn, rn, nl1
 
 if (npes> 1) then
@@ -791,7 +794,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:,:) 
 
  if (npes> 1) then
     call exchange_elem3D_n_begin(elem_array3D)
@@ -807,7 +810,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:,:) 
  integer  :: n, sn, rn, n_val, nl1
 
  if (npes> 1) then
@@ -892,7 +895,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array2D(:) 
+ real(real64), intent(inout) :: elem_array2D(:) 
 
  if (npes> 1) then
     call exchange_elem2D_begin(elem_array2D)
@@ -909,7 +912,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array2D(:) 
+ real(real64), intent(inout) :: elem_array2D(:) 
  integer  :: n, sn, rn
 
  if (npes> 1) then
@@ -1041,9 +1044,9 @@ IMPLICIT NONE
 INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(kind=WP) ::  arr3D(:,:)
-real(kind=WP) ::  arr3Dglobal(:,:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3Dglobal(:,:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: node_size
 
 node_size=myDim_nod2D+eDim_nod2D
@@ -1102,12 +1105,12 @@ use g_PARSUP
 USE o_MESH
 IMPLICIT NONE
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
 
 integer                                  ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf
 integer       :: node_size
 
 node_size=myDim_nod2D+eDim_nod2D
@@ -1155,9 +1158,9 @@ IMPLICIT NONE
 INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(kind=WP) ::  arr3D(:,:)
-real(kind=WP) ::  arr3Dglobal(:,:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3Dglobal(:,:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: elem_size
 
 elem_size=myDim_elem2D+eDim_elem2D
@@ -1220,9 +1223,9 @@ IMPLICIT NONE
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf
 integer       :: elem_size
 
 elem_size=myDim_elem2D+eDim_elem2D
@@ -1277,9 +1280,9 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=8)  ::  arr3D(:,:)
-real(kind=8)  ::  arr3D_global(:,:)
-real(kind=8), allocatable :: recvbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3D_global(:,:)
+real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
@@ -1340,9 +1343,9 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=4)  ::  arr3D(:,:)
-real(kind=4)  ::  arr3D_global(:,:)
-real(kind=4), allocatable :: recvbuf(:,:)
+real(real32)  ::  arr3D(:,:)
+real(real32)  ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
@@ -1395,7 +1398,6 @@ subroutine gather_int2_nod3D(arr3D, arr3D_global)
 
 use g_PARSUP
 USE o_MESH
-use ISO_FORTRAN_ENV
 
 IMPLICIT NONE
 
@@ -1459,9 +1461,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=8)  ::  arr2D(:)
-real(kind=8)  ::  arr2D_global(:)
-real(kind=8)  :: recvbuf(nod2D)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2D_global(:)
+real(real64) :: recvbuf(nod2D)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1514,9 +1516,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=4)  ::  arr2D(:)
-real(kind=4)  ::  arr2D_global(:)
-real(kind=4)  :: recvbuf(nod2D)
+real(real32)  ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32)  :: recvbuf(nod2D)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1565,7 +1567,6 @@ subroutine gather_int2_nod2D(arr2D, arr2D_global)
 
 use g_PARSUP
 USE o_MESH
-use ISO_FORTRAN_ENV
 
 IMPLICIT NONE
 
@@ -1631,9 +1632,9 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=8)  ::  arr3D(:,:)
-real(kind=8)  ::  arr3D_global(:,:)
-real(kind=8), allocatable :: recvbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3D_global(:,:)
+real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
@@ -1692,7 +1693,6 @@ subroutine gather_real4_elem3D(arr3D, arr3D_global)
 
 use g_PARSUP
 USE o_MESH
-use ISO_FORTRAN_ENV
 
 
 IMPLICIT NONE
@@ -1762,7 +1762,6 @@ subroutine gather_int2_elem3D(arr3D, arr3D_global)
 
 use g_PARSUP
 USE o_MESH
-use ISO_FORTRAN_ENV
 
 
 IMPLICIT NONE
@@ -1834,9 +1833,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=8)  ::  arr2D(:)
-real(kind=8)  ::  arr2D_global(:)
-real(kind=8), allocatable :: recvbuf(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2D_global(:)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, e2D
 
@@ -1894,9 +1893,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=4)  ::  arr2D(:)
-real(kind=4)  ::  arr2D_global(:)
-real(kind=4), allocatable :: recvbuf(:)
+real(real32)  ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, e2D
 
@@ -1949,7 +1948,6 @@ subroutine gather_int2_elem2D(arr2D, arr2D_global)
 
 use g_PARSUP
 USE o_MESH
-use ISO_FORTRAN_ENV
 
 IMPLICIT NONE
 
@@ -2020,10 +2018,10 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=WP)  ::  arr3D(:,:)
-real(kind=4)   ::  arr3D_global(:,:)
-real(kind=4), allocatable :: recvbuf(:,:)
-real(kind=4), allocatable :: sendbuf(:,:)
+real(real64)  ::  arr3D(:,:)
+real(real32)   ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D, ierr
 
@@ -2083,9 +2081,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=WP)  ::  arr2D(:)
-real(kind=4)   ::  arr2D_global(:)
-real(kind=4)   :: recvbuf(nod2D), sendbuf(myDim_nod2D)
+real(real64)  ::  arr2D(:)
+real(real32)   ::  arr2D_global(:)
+real(real32)   :: recvbuf(nod2D), sendbuf(myDim_nod2D)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -2117,7 +2115,7 @@ IF ( mype == 0 ) THEN
    endif
 
 ELSE
-   sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),4)
+   sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),real32)
 
    call MPI_SEND(sendbuf, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
@@ -2142,10 +2140,10 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=8)  ::  arr3D(:,:)
-real(kind=4)  ::  arr3D_global(:,:)
-real(kind=4), allocatable :: recvbuf(:,:)
-real(kind=4), allocatable :: sendbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real32)  ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D
 
@@ -2202,10 +2200,10 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=8)  ::  arr2D(:)
-real(kind=4)  ::  arr2D_global(:)
-real(kind=4), allocatable :: recvbuf(:)
-real(kind=4)  :: sendbuf(myDim_elem2D)
+real(real64) ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32), allocatable :: recvbuf(:)
+real(real32)  :: sendbuf(myDim_elem2D)
 integer        :: req(npes-1)
 integer        :: start, e2D
 
@@ -2243,7 +2241,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),4)
+   sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),real32)
    call MPI_SEND(sendbuf, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
@@ -2347,12 +2345,12 @@ use g_PARSUP
 USE o_MESH
 IMPLICIT NONE
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
 
 integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf
-REAL(kind=WP), ALLOCATABLE, DIMENSION(:) ::  rbuf
+REAL(real64), ALLOCATABLE, DIMENSION(:) ::  rbuf
 
 IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)

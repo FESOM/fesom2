@@ -92,7 +92,7 @@ integer                       :: mom_adv=2
 logical                       :: open_b=.false.   ! Reserved    
 
 logical                       :: mo_on=.true. !.false. !Monin-Obukhov
-real*8 :: modiff=0.01                   !for PP, mixing coefficient within MO length
+real(kind=WP) :: modiff=0.01                   !for PP, mixing coefficient within MO length
 
   ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
@@ -102,7 +102,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
   namelist /tracer_cutoff/ limit_salinity, salinity_min, coeff_limit_salinity
 
 ! *** others ***
- real*8                        :: time_sum=0.0 ! for runtime estimate
+ real(kind=WP)                        :: time_sum=0.0 ! for runtime estimate
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
@@ -116,6 +116,7 @@ END MODULE o_PARAM
 !==========================================================
 MODULE o_MESH
 USE o_PARAM
+USE, intrinsic :: ISO_FORTRAN_ENV
 ! All variables used to keep the mesh structure +
 ! auxiliary variables involved in implementation 
 ! of open boundaries and advection schemes
@@ -163,20 +164,20 @@ real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
 INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
 ! Vertical structure             
 integer                                    :: nl
-real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
+real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
 integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
-real(kind=8), allocatable, dimension(:,:)  :: area, area_inv
+real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
 real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
 
 
   type sparse_matrix 
      integer :: nza
      integer :: dim
-     real(kind=8), allocatable, dimension(:)      :: values
-     integer(KIND=4), allocatable,   dimension(:) :: colind
-     integer(KIND=4), allocatable,   dimension(:) :: rowptr
-     integer(KIND=4), allocatable,   dimension(:) :: colind_loc
-     integer(KIND=4), allocatable,   dimension(:) :: rowptr_loc
+     real(kind=WP), allocatable, dimension(:)      :: values
+     integer(int32), allocatable,   dimension(:) :: colind
+     integer(int32), allocatable,   dimension(:) :: rowptr
+     integer(int32), allocatable,   dimension(:) :: colind_loc
+     integer(int32), allocatable,   dimension(:) :: rowptr_loc
   end type sparse_matrix
 ! Elevation stiffness matrix
 type(sparse_matrix)                           :: ssh_stiff
@@ -217,7 +218,7 @@ integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
 
 #if defined (__oasis)
-  real(kind=8), allocatable, dimension(:)      :: lump2d_south, lump2d_north  
+  real(kind=WP), allocatable, dimension(:)      :: lump2d_south, lump2d_north  
   integer, allocatable, dimension(:)           :: ind_south, ind_north    
 #endif  
 end module o_MESH
@@ -258,9 +259,9 @@ integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
 ! Passive and age tracers
 real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      
-real(kind=8), allocatable :: ttrhs(:,:)
-real(kind=8), allocatable :: tr_xy(:,:,:)
-real(kind=8), allocatable :: tr_z(:,:)
+real(kind=WP), allocatable :: ttrhs(:,:)
+real(kind=WP), allocatable :: tr_xy(:,:,:)
+real(kind=WP), allocatable :: tr_z(:,:)
 
 ! Auxiliary arrays for vector-invariant form of momentum advection
 real(kind=WP), allocatable,dimension(:,:)   :: vorticity
@@ -322,9 +323,9 @@ real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 !_______________________________________________________________________________
 !Monin-Obukhov correction
-real*8,allocatable :: mo(:,:),mixlength(:)
+real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
-real*8,allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
+real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
 real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:,:), fer_gamma(:,:,:)

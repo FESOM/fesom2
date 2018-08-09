@@ -168,11 +168,11 @@ module g_rotate_grid
    ! flag_coord         :: 1, (lon,lat) is the geographical coord.; else, rotated coord.
    !
    implicit none
-   integer, intent(in)           :: flag_coord
-   real(kind=8), intent(inout)   :: tlon, tlat
-   real(kind=8), intent(in)      :: lon, lat
-   real(kind=8)                  :: rlon, rlat, glon, glat
-   real(kind=8)                  :: txg, tyg, tzg, txr, tyr, tzr
+   integer, intent(in)            :: flag_coord
+   real(kind=WP), intent(inout)   :: tlon, tlat
+   real(kind=WP), intent(in)      :: lon, lat
+   real(kind=WP)                  :: rlon, rlat, glon, glat
+   real(kind=WP)                  :: txg, tyg, tzg, txr, tyr, tzr
    !
    ! geographical coordinate
    if(flag_coord==1) then  ! input is geographical coordinates

@@ -193,8 +193,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! no upwind   triangle --> c_lo(1)=0, otherwise = 1
 			! no downwind triangle --> c_lo(2)=0, otherwise = 1
 			! (real(...) --> convert from integer to float)
-			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 			
 			!___________________________________________________________________
 			! use downwind triangle to interpolate Tracer to edge center with 
@@ -282,8 +282,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -323,8 +323,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -413,7 +413,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
-			! tv(nz)=(7.0_8*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_8
+			! tv(nz)=(7.0_WP*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_WP
 			
 			!___________________________________________________________________
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 

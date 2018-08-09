@@ -20,14 +20,14 @@ module diagnostics
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
-  real(kind=8),  save, allocatable, target      :: rhs_diag(:)
-  real(kind=8),  save, allocatable, target      :: curl_stress_surf(:)
-  real(kind=8),  save, allocatable, target      :: curl_vel3(:,:)
-  real(kind=8),  save, allocatable, target      :: wzmid(:,:), wzmidrho(:,:), rho(:,:)
-  real(kind=8),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
-  real(kind=8),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:)
-  real(kind=8),  save, allocatable, target      :: utau_surf(:), utau_bott(:), av_dudz_sq(:)
-  real(kind=8),  save, allocatable, target      :: taux_nod(:), tauy_nod(:), tbotx_nod(:), tboty_nod(:), av_nod(:,:), u_bott(:), v_bott(:)
+  real(kind=WP),  save, allocatable, target      :: rhs_diag(:)
+  real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
+  real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
+  real(kind=WP),  save, allocatable, target      :: wzmid(:,:), wzmidrho(:,:), rho(:,:)
+  real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
+  real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:)
+  real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:), av_dudz_sq(:)
+  real(kind=WP),  save, allocatable, target      :: taux_nod(:), tauy_nod(:), tbotx_nod(:), tboty_nod(:), av_nod(:,:), u_bott(:), v_bott(:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
@@ -63,8 +63,8 @@ subroutine diag_curl_stress_surf(mode)
   implicit none
   integer, intent(in)           :: mode
   logical, save                 :: firstcall=.true.
-  integer        :: enodes(2), el(2), ed, n
-  real(kind=8)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+  integer         :: enodes(2), el(2), ed, n
+  real(kind=WP)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
 
 !=====================
 
@@ -104,8 +104,8 @@ subroutine diag_curl_vel3(mode)
   implicit none
   integer, intent(in)           :: mode
   logical, save                 :: firstcall=.true.
-  integer        :: enodes(2), el(2), ed, n, nz, nl1, nl2
-  real(kind=8)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+  integer         :: enodes(2), el(2), ed, n, nz, nl1, nl2
+  real(kind=WP)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call

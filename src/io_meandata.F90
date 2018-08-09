@@ -12,7 +12,7 @@ module io_MEANDATA
   use diagnostics
   use i_PARAM, only: whichEVP
 
-  use ISO_FORTRAN_ENV
+  use, intrinsic :: ISO_FORTRAN_ENV
 
   implicit none
 #include "netcdf.inc"
@@ -30,15 +30,15 @@ module io_MEANDATA
     integer                                            :: lcsize(2)
     integer                                            :: glsize(2)
     integer                                            :: accuracy
-    real(kind=8),  public, allocatable, dimension(:,:) :: local_values_r8
-    real(kind=4),  public, allocatable, dimension(:,:) :: local_values_r4
+    real(real64),  public, allocatable, dimension(:,:) :: local_values_r8
+    real(real32),  public, allocatable, dimension(:,:) :: local_values_r4
     integer(int16),  public, allocatable, dimension(:,:) :: local_values_i2
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:)
-    real(kind=4)                                       :: min_value        ! lower and upper bound, used to compute scale_factor, add_offset 
-    real(kind=4)                                       :: max_value        !      keep for check if real life values remain in this interval
-    real(kind=4)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2:
-    real(kind=4)                                       :: add_offset=0.    !      real4_value = int2_value * scale_factor + add_offset
+    real(real32)                                       :: min_value        ! lower and upper bound, used to compute scale_factor, add_offset 
+    real(real32)                                       :: max_value        !      keep for check if real life values remain in this interval
+    real(real32)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2:
+    real(real32)                                       :: add_offset=0.    !      real4_value = int2_value * scale_factor + add_offset
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -118,8 +118,8 @@ subroutine ini_mean_io
      call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y', i_real4)
   end if
 
-!  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y', i_real4)
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 10, 's', i_int2,-20.,60.)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 20, 's', i_real4)
+!  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 10, 's', i_int2,-20.,60.)
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y', i_real4)
   
   do i=3, num_tracers
@@ -284,7 +284,7 @@ subroutine assoc_ids(entry)
 
   type(Meandata), intent(inout) :: entry
   integer                       :: c, j, k
-  real(kind=8)                  :: rtime !timestamp of the record
+  real(real64)                  :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
@@ -338,10 +338,10 @@ end subroutine assoc_ids
 !
 subroutine write_mean(entry)
   implicit none
-  type(Meandata), intent(inout)    :: entry
-  real(kind=8), allocatable        :: aux1_r8(:), aux2_r8(:,:) 
-  real(kind=4), allocatable        :: aux1_r4(:), aux2_r4(:,:) 
-  integer(kind=int16), allocatable :: aux1_i2(:), aux2_i2(:,:) 
+  type(Meandata), intent(inout) :: entry
+  real(real64), allocatable     :: aux1_r8(:), aux2_r8(:,:) 
+  real(real32), allocatable     :: aux1_r4(:), aux2_r4(:,:) 
+  integer(int16), allocatable   :: aux1_i2(:), aux2_i2(:,:) 
   
   integer                       :: i, size1, size2
   integer                       :: c
@@ -467,9 +467,9 @@ subroutine update_means
 !_____________ compute in 4 byte accuracy _________________________
      elseif (entry%accuracy == i_real4 .or. entry%accuracy == i_int2) then
         if (entry%ndim==1) then 
-           entry%local_values_r4(:,1) = entry%local_values_r4(:,1) + real(entry%ptr2(:),4)
+           entry%local_values_r4(:,1) = entry%local_values_r4(:,1) + real(entry%ptr2(:),real32)
         elseif (entry%ndim==2) then 
-           entry%local_values_r4(:,:) = entry%local_values_r4(:,:) + real(entry%ptr3(:,:),4)
+           entry%local_values_r4(:,:) = entry%local_values_r4(:,:) + real(entry%ptr3(:,:),real32)
         else
            if (mype==0) write(*,*) 'not supported size in update_means'
            call par_ex
@@ -498,8 +498,8 @@ subroutine output(istep)
   integer       :: n
   logical       :: do_output
   type(Meandata), pointer :: entry
-  real(kind=8)  :: inv_addcounter_r8
-  real(kind=4)  :: inv_addcounter_r4, inv_scale_factor
+  real(real64)  :: inv_addcounter_r8
+  real(real32)  :: inv_addcounter_r4, inv_scale_factor
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io
@@ -537,20 +537,20 @@ subroutine output(istep)
         entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         call assoc_ids(entry)
         if (entry%accuracy == i_real8) then
-           inv_addcounter_r8 = 1._WP/real(entry%addcounter,8)
+           inv_addcounter_r8 = 1._WP/real(entry%addcounter,real64)
            entry%local_values_r8 = entry%local_values_r8 * inv_addcounter_r8  ! compute_means
            call write_mean(entry)
            entry%local_values_r8 = 0. ! clean_meanarrays
 
         elseif (entry%accuracy == i_real4) then
-           inv_addcounter_r4 = 1._WP/real(entry%addcounter,4)
+           inv_addcounter_r4 = 1._WP/real(entry%addcounter,real32)
            entry%local_values_r4 = entry%local_values_r4 * inv_addcounter_r4 ! compute_means
            call write_mean(entry)
            entry%local_values_r4 = 0. ! clean_meanarrays
 
         elseif (entry%accuracy == i_int2) then
            ! compute_means and compress to int2, use scale_factor and add_offset to maintain as much accuracy as possible
-           inv_addcounter_r4 = 1./real(entry%addcounter,4)
+           inv_addcounter_r4 = 1./real(entry%addcounter,real32)
            inv_scale_factor  = 1./entry%scale_factor 
            entry%local_values_i2 = nint( (entry%local_values_r4 * inv_addcounter_r4 - entry%add_offset)* inv_scale_factor,int16)
   
@@ -616,7 +616,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      entry%local_values_r4 = 0. 
      entry%local_values_i2 = 0 
      if (present(minvalue) .and. present(maxvalue)) then
-        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,4)
+        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,int32)
         entry%add_offset   = 0.5*(maxvalue + minvalue)
         entry%min_value    = minvalue
         entry%max_value    = maxvalue
@@ -624,7 +624,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
         entry%scale_factor = 1.
         entry%add_offset   = 0.
         entry%min_value    = 0.
-        entry%max_value    = real(2**16,4)
+        entry%max_value    = real(2**16-1,int32)
         if (mype==0) then
            print *,'Warning: netcdf-output of',name,'is set to short integer,'
            print *,'but no interval [minvalue,maxvalue] is given, thus scale_factor=1., add_offset=0.'
@@ -695,7 +695,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
      entry%local_values_i2 = 0  
 
      if (present(minvalue) .and. present(maxvalue)) then
-        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,4)
+        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,real32)
         entry%add_offset   = minvalue
      else
         entry%scale_factor = 1.

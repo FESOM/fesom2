@@ -59,24 +59,24 @@ subroutine thermodynamics
 
   integer :: inod
   !---- prognostic variables (updated in `ice_growth')
-  real*8  :: A, h, hsn, alb, t
+  real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
-  real*8  :: a2ohf, a2ihf
+  real(kind=WP)  :: a2ohf, a2ihf
   !---- evaporation and sublimation (provided by ECHAM)
-  real*8  :: evap, subli
+  real(kind=WP)  :: evap, subli
   !---- precipitation and runoff (provided by ECHAM)
-  real*8  :: rain, snow, runo
+  real(kind=WP)  :: rain, snow, runo
   !---- ocean variables (provided by FESOM)
-  real*8  :: T_oc, S_oc, ustar
+  real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
-  real*8  :: rsss
+  real(kind=WP)  :: rsss
   !---- output variables (computed in `ice_growth')
-  real*8  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
+  real(kind=WP)  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
 
   !---- geographical coordinates
-  real*8  :: geolon, geolat
+  real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
-  real*8  :: h0min = 0.50, h0max = 1.5
+  real(kind=WP)  :: h0min = 0.50, h0max = 1.5
 
   rsss = ref_sss
 
@@ -157,46 +157,46 @@ contains
     implicit none
 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
-    real*8  :: dsnow, dslat, dhice, dhiow, dcice, dciow
+    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
 
     !---- heat fluxes (positive upward, negative downward)
-    real*8  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
-    real*8  :: ahf, ohf
+    real(kind=WP)  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
+    real(kind=WP)  :: ahf, ohf
 
     !---- atmospheric freshwater fluxes (precipitation minus evaporation)
-    real*8  :: PmEice, PmEocn
+    real(kind=WP)  :: PmEice, PmEocn
 
     !---- local variables and dummys
-    real*8  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+    real(kind=WP)  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
     !---- cut-off ice thickness hmin=0.05 is set in `i_therm_parms'
     !---- and is questionable in terms of conservation of energy.
-    real*8, parameter :: hcutoff = 1.e-6
+    real(kind=WP), parameter :: hcutoff = 1.e-6
 
     !---- minimum ice concentration (Aimin) and ice thickness (himin)
-    real*8, parameter :: Aimin = 0.001, himin = 0.005
+    real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 
     !---- an arbitrary big value, but note that bigval*hcutoff should
     !---- be greater than one (= maximum ice concentration)
-    real*8, parameter :: bigval = 1.e10
+    real(kind=WP), parameter :: bigval = 1.e10
 
     !---- heat transfer rate (gamma_t = h_ml/tau0, where h_ml is the
     !---- mixed layer depth and tau0 is a damping time constant for a
     !---- delayed adaptation of the mixed layer temperature. We assume
     !---- this rate to be 10 meters per day. NOTE: tau0 should be
     !---- significantly greater than the time step dt
-    real*8, parameter :: gamma_t = 10./86400.
+    real(kind=WP), parameter :: gamma_t = 10./86400.
 
     !---- density of freshwater [kg/m**3].
-    real*8, parameter :: rhofwt = 1000.
+    real(kind=WP), parameter :: rhofwt = 1000.
 
     !---- freezing temperature of freshwater [deg C]
-    real*8, parameter :: Tfrez0 = 0.
+    real(kind=WP), parameter :: Tfrez0 = 0.
 
     !---- freezing temperature of sea-water [deg C]
-    real*8  :: Tfrezs
+    real(kind=WP)  :: Tfrezs
 
     !---- compute freezing temperature of sea-water from salinity
     TFrezs = -0.0575*S_oc + 1.7105e-3*sqrt(S_oc**3) - 2.155e-4*(S_oc**2)
@@ -422,9 +422,9 @@ contains
   use i_therm_param
   implicit none
 
-  real*8  hsn    
-  real*8  t    
-  real*8  alb             ! Albedo of sea ice
+  real(kind=WP)  hsn    
+  real(kind=WP)  t    
+  real(kind=WP)  alb             ! Albedo of sea ice
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished.
