@@ -32,7 +32,7 @@ module diagnostics
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
-  logical                                       :: ldiag_energy     =.true.
+  logical                                       :: ldiag_energy     =.false.
   contains
 
 ! ==============================================================
