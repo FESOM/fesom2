@@ -118,7 +118,9 @@ subroutine ini_mean_io
      call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),  'w',    'vertical velocity',   'm/s', Wvel(:,:),     1, 'y', i_real4)
   end if
 
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 20, 's', i_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y', i_real4)
+!NR As an example: very frequent output of temperature every 10 steps,
+!NR                with 16Byte integer per value, scaled for a range of -20 to 60 degree Celsius
 !  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 10, 's', i_int2,-20.,60.)
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y', i_real4)
   
