@@ -424,7 +424,7 @@ class fesom_box:
 		self.box_idx = []
 		for ii in range(0,len(self.box_define)):
 			if len(self.box_define[ii][0])>2:
-				p = path.Path(zip(self.box_define[ii][0],self.box_define[ii][1]))
+				p = path.Path(list(zip(self.box_define[ii][0],self.box_define[ii][1])))
 			else:
 				auxboxx = [ self.box_define[ii][0][0],\
 							self.box_define[ii][0][1],\
@@ -434,10 +434,10 @@ class fesom_box:
 							self.box_define[ii][1][0],\
 							self.box_define[ii][1][1],\
 							self.box_define[ii][1][1]]
-				p = path.Path(zip(auxboxx,auxboxy))
+				p = path.Path(list(zip(auxboxx,auxboxy)))
 			
 			self.box_idx.append([])
-			self.box_idx[ii] = p.contains_points(np.array(zip(mesh.nodes_2d_xg,mesh.nodes_2d_yg)))
+			self.box_idx[ii] = p.contains_points(np.array(list(zip(mesh.nodes_2d_xg,mesh.nodes_2d_yg))))
 		
 		
 	#+_________________________________________________________________________+
@@ -475,7 +475,7 @@ class fesom_box:
 		
 		#_______________________________________________________________________
 		for ii in numb:
-			fig = plt.figure(figsize=(20, 10))
+			fig = plt.figure(figsize=(14, 8))
 			ax1  = plt.gca()
 			# duplicate x-axes
 			
@@ -583,6 +583,7 @@ class fesom_box:
 			idx_cref = np.asscalar(idx_cref)
 			nmax_cbar_l = 10
 			nstep = ncbar_l/nmax_cbar_l
+			nstep = np.int(np.floor(nstep))
 			plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
 			plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
 			plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
@@ -638,7 +639,7 @@ class fesom_box:
 			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
 			map.drawparallels(yticks,labels=ylabels,fontsize=fsize)
 			map.drawmeridians(xticks,labels=xlabels,fontsize=fsize)
-			map.bluemarble()
+			#map.bluemarble()
 			fesom_plot_lmask(map,mesh,ax,'none','r')
 			ax.grid(color='k', linestyle='-', linewidth=0.5)
 			
@@ -646,7 +647,7 @@ class fesom_box:
 			patch=[]
 			if len(self.box_define[ii][0])>2:
 				ax.plot(self.box_define[ii][0]    ,self.box_define[ii][1] ,linestyle='None'   ,color='w',linewidth=2.0,marker='o',mfc='w',mec='k',axes=ax)
-				patch.append(Polygon(zip(self.box_define[ii][0],self.box_define[ii][1]),closed=True,clip_on=True) )
+				patch.append(Polygon(list(zip(self.box_define[ii][0],self.box_define[ii][1]),closed=True,clip_on=True) ))
 			else:
 				auxboxx = [ self.box_define[ii][0][0],\
 							self.box_define[ii][0][1],\
@@ -659,7 +660,7 @@ class fesom_box:
 							self.box_define[ii][1][1],\
 							self.box_define[ii][1][0],]
 				ax.plot(auxboxx    ,auxboxy ,linestyle='None'   ,color='w',linewidth=2.0,marker='o',mfc='w',mec='k',axes=ax)
-				patch.append(Polygon(zip(auxboxx,auxboxy),closed=True,clip_on=True) )
+				patch.append(Polygon(list(zip(auxboxx,auxboxy)),closed=True,clip_on=True) )
 			ax.add_collection(PatchCollection(patch, alpha=1.0,facecolor='none',edgecolor='w',zorder=1,linewidth=2.0,hatch='/'))	
 			
 			# plot selected mesh points

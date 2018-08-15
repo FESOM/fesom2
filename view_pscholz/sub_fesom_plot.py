@@ -50,7 +50,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         ylabels=[0,0,0,0]
         xlabels=[1,1,1,1]
         xticks = np.arange(0.,360.,20.)
-        yticks = np.arange(-90.,90.,15.)
+        yticks = np.arange(-90.,90.+1,10.)
     elif data.proj=='spstere':
         setbndlat = np.min([0.0,inputarray['which_box'][3]])
         map = Basemap(projection = data.proj, resolution = resolution,
@@ -59,7 +59,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         ylabels=[0,0,0,0]
         xlabels=[1,1,1,1]
         xticks = np.arange(0.,360.,20.)
-        yticks = np.arange(-90.,90.,15.)
+        yticks = np.arange(-90.,90.+1,10.)
     else:    
         map = Basemap(projection = data.proj,resolution = resolution,
                 llcrnrlon  = inputarray['which_box'][0], urcrnrlon  = inputarray['which_box'][1],
