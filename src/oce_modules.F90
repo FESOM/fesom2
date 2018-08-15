@@ -14,6 +14,7 @@ real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
+real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
 
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
