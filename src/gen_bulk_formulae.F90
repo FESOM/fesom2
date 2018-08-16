@@ -27,14 +27,14 @@ subroutine ncar_ocean_fluxes_mode
 
   integer, parameter :: n_itts = 2
   integer            :: i, j, m
-  real :: cd_n10, ce_n10, ch_n10, cd_n10_rt    ! neutral 10m drag coefficients
-  real :: cd, ce, ch, cd_rt                    ! full drag coefficients @ z
-  real :: zeta, x2, x, psi_m, psi_h, stab      ! stability parameters
-  real :: t, ts, q, qs, u, u10, tv, xx, dux, dvy
-  real :: tstar, qstar, ustar, bstar
-  real, parameter :: grav = 9.80, vonkarm = 0.40
-  real, parameter :: q1=640380., q2=-5107.4    ! for saturated surface specific humidity
-  real, parameter :: zz = 10.0
+  real(kind=WP) :: cd_n10, ce_n10, ch_n10, cd_n10_rt    ! neutral 10m drag coefficients
+  real(kind=WP) :: cd, ce, ch, cd_rt                    ! full drag coefficients @ z
+  real(kind=WP) :: zeta, x2, x, psi_m, psi_h, stab      ! stability parameters
+  real(kind=WP) :: t, ts, q, qs, u, u10, tv, xx, dux, dvy
+  real(kind=WP) :: tstar, qstar, ustar, bstar
+  real(kind=WP), parameter :: grav = 9.80, vonkarm = 0.40
+  real(kind=WP), parameter :: q1=640380., q2=-5107.4    ! for saturated surface specific humidity
+  real(kind=WP), parameter :: zz = 10.0
 
   do i=1,myDim_nod2d+eDim_nod2d       
      t=tair(i) + tmelt					      ! degree celcium to Kelvin
@@ -114,7 +114,7 @@ subroutine cal_wind_drag_coeff
   implicit none
 
   integer            :: i, m
-  real(kind=8)       :: ws
+  real(kind=WP)      :: ws
 
   do i=1,myDim_nod2d+eDim_nod2d    
      ws=sqrt(u_wind(i)**2+v_wind(i)**2)

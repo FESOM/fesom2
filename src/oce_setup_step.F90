@@ -166,7 +166,7 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
  
 !if(mom_adv==3) then
 allocate(vorticity(nl-1,node_size))
-vorticity=0.0_8
+vorticity=0.0_WP
 !end if
 
 ! =================

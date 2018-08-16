@@ -54,7 +54,7 @@ subroutine thermodynamics
   real(kind=WP)  :: lat
   integer        :: i, j, elem
   real(kind=WP), allocatable  :: ustar_aux(:)
-  real*8  lid_clo
+  real(kind=WP)  lid_clo
 
   rsss=ref_sss
 
@@ -200,14 +200,14 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   implicit none
 
   integer k
-  real*8  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
-  real*8  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
-  real*8  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
-  real*8  rhow,show,rhice,shice,sh,thick,thact,lat
-  real*8  rh,rA,qhst,sn,hsntmp,o2ihf,evap
-  real*8  iflice,hflatow,hfsenow,hflwrdout
-  real*8, external  :: TFrez  ! Sea water freeze temperature.
-  real*8  lid_clo
+  real(kind=WP)  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
+  real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
+  real(kind=WP)  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
+  real(kind=WP)  rhow,show,rhice,shice,sh,thick,thact,lat
+  real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
+  real(kind=WP)  iflice,hflatow,hfsenow,hflwrdout
+  real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+  real(kind=WP)  lid_clo
   ! Store ice thickness at start of growth routine
   dhgrowth=h  	  
 
@@ -416,12 +416,12 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
   implicit none
 
   integer iter, imax      ! Number of iterations
-  real*8  hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh
-  real*8  hfsen,hfrad,hflat,hftot,subli         
-  real*8  alb             ! Albedo of sea ice
-  real*8  q1, q2	  ! coefficients for saturated specific humidity
-  real*8  A1,A2,A3,B,C, d1, d2, d3   
-  real*8, external :: TFrez
+  real(kind=WP)  hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh
+  real(kind=WP)  hfsen,hfrad,hflat,hftot,subli         
+  real(kind=WP)  alb             ! Albedo of sea ice
+  real(kind=WP)  q1, q2	  ! coefficients for saturated specific humidity
+  real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
+  real(kind=WP), external :: TFrez
 
   data q1 /11637800.0/, q2 /-5897.8/ 
   data imax /5/
@@ -506,10 +506,10 @@ subroutine obudget (qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)
   use i_therm_param
   implicit none
 
-  real*8 qa,t,Ta,fsh,flo,ug,ch,ce,fh,evap
-  real*8 hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
-  real*8 q1, q2 		! coefficients for saturated specific humidity
-  real*8 c1, c4, c5
+  real(kind=WP) qa,t,Ta,fsh,flo,ug,ch,ce,fh,evap
+  real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
+  real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
+  real(kind=WP) c1, c4, c5
   logical :: standard_saturation_shum_formula = .true.
 
 
@@ -550,7 +550,7 @@ end subroutine obudget
 subroutine flooding (h,hsn)
   use i_therm_param
 
-  real*8 h,hsn,hdraft,hflood
+  real(kind=WP) h,hsn,hdraft,hflood
 
   hdraft=(rhosno*hsn+h*rhoice)*inv_rhowat ! Archimedes: displaced water
   hflood=hdraft-min(hdraft,h)         ! Increase in mean ice thickness due to flooding
@@ -570,8 +570,9 @@ end subroutine flooding
 function TFrez(S)
   ! Nonlinear correlation for the water freezing temperature.
   ! Millero (1978) - UNESCO. Reference - See A. Gill, 1982.
+  use o_param, only: WP
   implicit none
-  real*8 S, TFrez
+  real(kind=WP) :: S, TFrez
 
   TFrez= -0.0575*S+1.7105e-3 *sqrt(S**3)-2.155e-4 *S*S
 

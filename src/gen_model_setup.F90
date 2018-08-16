@@ -43,7 +43,7 @@ subroutine read_namelist
   
   if(mype==0) then
 	if (mod(86400,step_per_day)==0) then
-		write(*,*) 'time step size is set to ', real(dt,4), 'sec'
+		write(*,*) 'time step size is set to ', dt, 'sec'
 	else
 		write(*,*) ' ERROR: The used step_per_day variable is not valid, model'
 		write(*,*) '        simulation STOPS here. The variable step_per_day must be'

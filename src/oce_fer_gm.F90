@@ -15,10 +15,10 @@ subroutine fer_solve_Gamma
 	IMPLICIT NONE
 	
 	integer                         :: nz, n, nzmax
-	real*8                          :: zinv1,zinv2, zinv, m, r
-	real*8                          :: a(nl), b(nl), c(nl)
-	real*8                          :: cp(nl), tp(2,nl)
-	real*8, dimension(:,:), pointer :: tr
+	real(kind=WP)                          :: zinv1,zinv2, zinv, m, r
+	real(kind=WP)                          :: a(nl), b(nl), c(nl)
+	real(kind=WP)                          :: cp(nl), tp(2,nl)
+	real(kind=WP), dimension(:,:), pointer :: tr
 	
 	DO n=1,myDim_nod2D
 		tr=>fer_gamma(:,:,n)
@@ -104,8 +104,8 @@ subroutine fer_gamma2vel
   IMPLICIT NONE
 
    integer                         :: nz, nzmax, el, elnod(3)
-   real*8                          :: zinv
-   real*8                          :: onethird=1._WP/3._WP
+   real(kind=WP)                          :: zinv
+   real(kind=WP)                          :: onethird=1._WP/3._WP
 
    DO el=1, myDim_elem2D
       elnod=elem2D_nodes(:,el)
@@ -130,11 +130,11 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
   IMPLICIT NONE
 
    integer                         :: n, nz, nzmax
-   real*8                          :: reso, c1, rosb, scaling, rr_ratio
-   real*8                          :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
-   real*8                          :: c_min=0.5, f_min=1.e-6, r_max=200000.
-   real*8                          :: zscaling(nl)
-   real*8                          :: bvref
+   real(kind=WP)                          :: reso, c1, rosb, scaling, rr_ratio
+   real(kind=WP)                          :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
+   real(kind=WP)                          :: c_min=0.5, f_min=1.e-6, r_max=200000.
+   real(kind=WP)                          :: zscaling(nl)
+   real(kind=WP)                          :: bvref
 
 ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
 !******************************* F1(x,y) ***********************************************************
