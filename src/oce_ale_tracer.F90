@@ -16,6 +16,9 @@ subroutine solve_tracers_ale
 	! update 3D velocities with the bolus velocities:
 	! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
 	! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
+
+        if (SPP) call cal_rejected_salt
+        if (SPP) call app_rejected_salt
 	if (Fer_GM) then
 		UV    =UV    +fer_UV
 		Wvel_e=Wvel_e+fer_Wvel

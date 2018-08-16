@@ -226,6 +226,11 @@ if (Fer_GM) then
    fer_c=1.
 end if
 
+if (SPP) then
+   allocate(ice_rejected_salt(node_size))
+   ice_rejected_salt=0.
+end if
+
 ! =================
 ! Initialize with zeros 
 ! =================
