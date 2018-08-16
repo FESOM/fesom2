@@ -75,6 +75,8 @@ integer                       :: tracer_adv=1
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_exp_max=1.e-5_WP
 
+logical                       :: SPP=.false.
+
 				! 1 MUSCL
 				! 2 MUSCL-FCT
 integer	                       :: num_tracers=2
@@ -106,7 +108,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
-                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
+                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
@@ -329,5 +331,7 @@ real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
 real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:,:), fer_gamma(:,:,:)
+
+real(kind=WP),         allocatable    :: ice_rejected_salt(:)
 END MODULE o_ARRAYS
 !==========================================================
