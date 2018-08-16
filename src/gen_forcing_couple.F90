@@ -986,7 +986,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
   use g_parsup,	         only : myDim_nod2D, eDim_nod2D, mype
   use o_mesh,		 only :	geo_coord_nod2D
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-  use o_PARAM,           only : mstep
+  use o_PARAM,           only : mstep, WP
   IMPLICIT NONE
   
   real(kind=WP), INTENT (INOUT) 	:: field2d(myDim_nod2D+eDim_nod2D)
@@ -1097,7 +1097,8 @@ SUBROUTINE compute_residual(field2d, mask, n)
 				flux_correction_north, flux_correction_south,	&
 				flux_correction_total
   use g_parsup, 	only : 	myDim_nod2D, eDim_nod2D
-  
+  use o_PARAM, only : WP 
+ 
   IMPLICIT NONE
   
   real(kind=WP), INTENT(IN)   :: field2d(myDim_nod2D+eDim_nod2D)
@@ -1127,7 +1128,8 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
 
   use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
   use o_MESH,	only :	lump2d_north, lump2d_south
-  
+  use o_PARAM, only: WP
+ 
   IMPLICIT NONE
 
   real(kind=WP), INTENT(OUT)  :: flux_global(2), flux_local(2)
@@ -1185,6 +1187,7 @@ SUBROUTINE net_rec_from_atm(action)
   use g_forcing_arrays
   use g_parsup
   use cpl_driver
+  use o_PARAM, only: WP
 
   IMPLICIT NONE
 
