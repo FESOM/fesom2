@@ -1497,19 +1497,19 @@ subroutine vert_vel_ale
 	end do
     cflmax=maxval(CFL_z(:, 1:myDim_nod2D)) !local CFL maximum is different on each mype
     if (cflmax>1.0) then
-       do n=1, myDim_nod2D
-          do nz=1,nlevels_nod2D(n)-1
-             if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
-                write(*,*) '***********************************************************'
-                write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
-	            write(*,*) 'mstep      = ', mstep
-                write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
-                write(*,*) '2D node    = ', myList_nod2D(n)
-                write(*,*) 'nz         = ', nz
-                write(*,*) '***********************************************************'
-             end if
-           end do
-       end do
+        do n=1, myDim_nod2D
+            do nz=1,nlevels_nod2D(n)-1
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
+                    write(*,*) '***********************************************************'
+                    write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
+                    write(*,*) 'mstep      = ', mstep
+                    write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
+                    write(*,*) '2D node    = ', myList_nod2D(n)
+                    write(*,*) 'nz         = ', nz
+                    write(*,*) '***********************************************************'
+                end if
+            end do
+        end do
     end if
 	
 	!___________________________________________________________________________
@@ -1785,7 +1785,7 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n)
-	use g_config, only: logfile_outfreq
+	use g_config, only: logfile_outfreq, rtime_oce, rtime_tot
 	use o_MESH
 	use o_ARRAYS
 	use o_PARAM
@@ -1914,7 +1914,9 @@ subroutine oce_timestep_ale(n)
 	
 	!___________________________________________________________________________
 	! write out execution times for ocean step parts
-	t10=MPI_Wtime() 
+	t10=MPI_Wtime()
+	rtime_oce = rtime_oce + (t10-t1)-(t10-t9)
+	rtime_tot = rtime_tot + (t10-t1)-(t10-t9)
 	if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
 		write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
 		write(*,"(A, ES10.3)") ' 	Oce. Dynamics    :', t2-t1
