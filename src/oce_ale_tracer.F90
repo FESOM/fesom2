@@ -1086,13 +1086,13 @@ subroutine diff_ver_part_redi_expl
 		!_______________________________________________________________________
 		
 		do nz=2,nl1
-			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
-				*tr_xynodes(2,nz-1,n) ) &
-					+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
-				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
+			vd_flux(nz)=(Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
+                        vd_flux(nz)=vd_flux(nz)+&
+          			    (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n) 	*tr_xynodes(2,nz,n))  *Ki(nz,n)
+                        vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
-			del_ttf(nz,n) = del_ttf(nz,n)+Ki(nz,n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
 	end do
 end subroutine diff_ver_part_redi_expl!
