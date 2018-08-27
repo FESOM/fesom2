@@ -654,15 +654,17 @@ subroutine compute_neutral_slope
 	IMPLICIT NONE
 	real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
 	integer         :: edge
-	integer         :: n,nz,el(2),elnodes(3),enodes(2)
+	integer         :: n,nz,nl1,el(2),elnodes(3),enodes(2)
 	real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
 
 	!if sigma_xy is not computed
 	eps=5.0e-6
 	S_cr=1.0e-2
 	S_d=1.0e-3
+        slope_tapered=0.
 	do n=1, myDim_nod2D
-		do nz = 1,nl-1
+                nl1=nlevels_nod2d(n)-1
+		do nz = 2,nl1
 			ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
 			neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
 			neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
@@ -672,8 +674,11 @@ subroutine compute_neutral_slope
 			c=0.5*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
                         if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
 			slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
+!                       slope_tapered(:,nl1-1:nl1,n)=0.
+!                       slope_tapered(:,1:2,n)      =0.
 		enddo
 	enddo
+
         call exchange_nod(neutral_slope)
         call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope
