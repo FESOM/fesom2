@@ -323,9 +323,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		! vert. flux at surface layer
 		nz=1
                 if (w_split) then
-                   tvert_e(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
+                   tvert_e(nz)=0.!-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
                 end if
-		tvert(nz)  =-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
+		tvert(nz)  =0.!-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
 		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
