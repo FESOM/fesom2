@@ -10,6 +10,7 @@ module diagnostics
   use i_ARRAYS
   use o_mixing_KPP_mod
   use g_rotate_grid
+  use g_support
   implicit none
 
   private
@@ -33,6 +34,7 @@ module diagnostics
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
   logical                                       :: ldiag_energy     =.false.
+  logical                                       :: ldiag_salt3D     =.true.
   contains
 
 ! ==============================================================
@@ -336,6 +338,7 @@ end subroutine diag_energy
 subroutine compute_diagnostics(mode)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
+  real(kind=WP)                 :: val  
 
   !1. solver diagnostic
   if (ldiag_solver)      call diag_solver(mode)
@@ -345,5 +348,14 @@ subroutine compute_diagnostics(mode)
   if (ldiag_curl_vel3)   call diag_curl_vel3(mode)
   !4. compute energy budget
   if (ldiag_energy)      call diag_energy(mode)
+  !5. print integrated temperature 
+  if (ldiag_salt3d) then
+     if (mod(mstep,100)==0) then
+        call integrate_nod(tr_arr(:,:,2), val)
+        if (mype==0) then
+           write(*,*) 'total integral of salinity at timestep :', mstep, val
+        end if
+     end if
+  end if
 end subroutine compute_diagnostics
 end module diagnostics
