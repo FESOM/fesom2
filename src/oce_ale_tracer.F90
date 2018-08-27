@@ -32,8 +32,7 @@ subroutine solve_tracers_ale
 		call init_tracers_AB(tr_num)
 		
 		! advect tracers
-		call adv_tracers_ale(tr_num)
-		
+                call adv_tracers_ale(tr_num)
 		! diffuse tracers 
 		call diff_tracers_ale(tr_num)
 		
@@ -860,12 +859,12 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! 1/dz(nz)
 			zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
 			! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-			Ty = (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
-			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
-			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
-			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
-			Ty =Ki(nz,n)*Ty *isredi
-			Ty1=Ki(nz,n)*Ty1*isredi
+			Ty = (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n) + &
+			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2*Ki(nz,n)
+			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2*Ki(nz,n) + &
+			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+			Ty =Ty *isredi
+			Ty1=Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 			a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -944,14 +943,14 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! *******************************************************************
 			! nonlocal transport to the rhs (only T and S currently) _GO_
 			! *******************************************************************
-			
-			if (trim(mix_scheme)=='KPP') then
-				if (tr_num==1) then ! T
-					tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
-				elseif (tr_num==2) then ! S
-					tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
-				end if
-			end if 
+!leads to non conservation in 8th digit. needs to be checked!
+!			if (trim(mix_scheme)=='KPP') then
+!				if (tr_num==1) then ! T
+!					tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+!				elseif (tr_num==2) then ! S
+!					tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+!				end if
+!			end if 
 		end do
 		nz=nzmax-1
 		dz=hnode_new(nz,n)
@@ -1086,13 +1085,13 @@ subroutine diff_ver_part_redi_expl
 		!_______________________________________________________________________
 		
 		do nz=2,nl1
-			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
-				*tr_xynodes(2,nz-1,n) ) &
-					+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
-				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
+			vd_flux(nz)=(Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
+                        vd_flux(nz)=vd_flux(nz)+&
+          			    (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n) 	*tr_xynodes(2,nz,n))  *Ki(nz,n)
+                        vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
-			del_ttf(nz,n) = del_ttf(nz,n)+Ki(nz,n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
 	end do
 end subroutine diff_ver_part_redi_expl!
