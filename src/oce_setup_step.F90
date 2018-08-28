@@ -240,6 +240,7 @@ end if
     UV_rhsAB=0.0_WP
 !
     eta_n=0.0_WP
+    d_eta=0.0_WP
     ssh_rhs=0.0_WP
     Wvel=0.0_WP
     Wvel_e	=0.0_WP

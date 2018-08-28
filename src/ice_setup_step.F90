@@ -131,6 +131,7 @@ subroutine ice_timestep(step)
 ! 
 ! Sea ice model step
 !
+use g_config, only: rtime_ice, rtime_tot
 use o_param
 use g_parsup
 use g_CONFIG
@@ -169,6 +170,9 @@ END SELECT
  ! ===== Thermodynamic part
  call thermodynamics
  t3=MPI_Wtime()
+ rtime_ice = rtime_ice + (t3-t0)
+ rtime_tot = rtime_tot + (t3-t0)
+
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0

@@ -106,5 +106,6 @@ module g_config
   real(kind=WP)            	:: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
+  real(kind=WP)             	:: rtime_ice=0.0, rtime_oce=0.0, rtime_tot=0.0
 end module g_config
 
