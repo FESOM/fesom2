@@ -32,15 +32,15 @@ MODULE i_PARAM
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
-  real(kind=8)              :: alpha_evp=250, beta_evp=250
-  real(kind=8)              :: c_aevp=0.15_8 ! 0.1--0.2, but should be adjusted experimentally   
+  real(kind=WP)             :: alpha_evp=250, beta_evp=250
+  real(kind=WP)             :: c_aevp=0.15 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
   real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
 
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
-  real*8    :: ice_dt !ice step=ice_ave_steps*oce_step
+  real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
 END MODULE i_PARAM
@@ -69,9 +69,9 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
-  real(kind=8),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
-  real(kind=8),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
-  real(kind=8),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
+  real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
+  real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
+  real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
 							!(for flux correction)
 #endif /* (__oasis) */

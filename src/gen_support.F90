@@ -27,7 +27,7 @@ module g_support
 !--------------------------------------------------------------------------------------------
 ! computes 2D integral of a nodal field
   INTERFACE integrate_nod
-            MODULE PROCEDURE integrate_nod_2D
+            MODULE PROCEDURE integrate_nod_2D, integrate_nod_3D
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
@@ -231,5 +231,30 @@ subroutine integrate_nod_2D(data, int2D)
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_2D
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine integrate_nod_3D(data, int3D)
+  use o_MESH
+  use g_PARSUP
+  use g_comm_auto
+
+  IMPLICIT NONE
+  real(kind=WP), intent(in)       :: data(:,:)
+  real(kind=WP), intent(inout)    :: int3D
+
+  integer       :: k, row
+  real(kind=WP) :: lval
+
+  lval=0.0
+  do row=1, myDim_nod2D
+     do k=1, nlevels_nod2D(row)-1
+        lval=lval+data(k, row)*area(k,row)*hnode_new(k,row)
+     end do
+  end do
+  int3D=0.0
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_FESOM, MPIerr)
+end subroutine integrate_nod_3D
 end module g_support
 

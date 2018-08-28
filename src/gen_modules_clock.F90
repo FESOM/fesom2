@@ -4,7 +4,7 @@ module g_clock
   use g_config
   implicit none
   save
-  real(kind=8)             :: timeold, timenew     !time in a day, unit: sec
+  real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
   integer                  :: dayold, daynew       !day in a year
   integer                  :: yearold, yearnew     !year before and after time step
   integer                  :: month, day_in_month  !month and day in a month
@@ -23,8 +23,8 @@ contains
   subroutine clock
 
     implicit none
-    integer         :: i
-    real(kind=8)    :: aux1, aux2
+    integer          :: i
+    real(kind=WP)    :: aux1, aux2
     !
     timeold=timenew 
     dayold=daynew
@@ -69,8 +69,8 @@ contains
     use g_parsup
     use g_config
     implicit none
-    integer         :: i, daystart, yearstart
-    real(kind=8)    :: aux1, aux2, timestart
+    integer          :: i, daystart, yearstart
+    real(kind=WP)    :: aux1, aux2, timestart
  
     ! the model initialized at
     timestart=timenew
@@ -137,7 +137,7 @@ contains
   subroutine clock_finish
     implicit none
     !
-    real(kind=8)             :: dum_timenew     !time in a day, unit: sec
+    real(kind=WP)            :: dum_timenew     !time in a day, unit: sec
     integer                  :: dum_daynew       !day in a year
     integer                  :: dum_yearnew     !year before and after time step
     

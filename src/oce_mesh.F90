@@ -42,7 +42,7 @@ IMPLICIT NONE
  integer       :: ierror              ! return error code
  integer, allocatable, dimension(:)        :: mapping
  integer, allocatable, dimension(:,:)      :: ibuff
- real(kind=8), allocatable, dimension(:,:) :: rbuff
+ real(kind=WP), allocatable, dimension(:,:) :: rbuff
  integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
 
 
@@ -1027,7 +1027,7 @@ IMPLICIT NONE
 
 
 integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
-real(kind=8)	                          :: a(2), b(2), ax, ay, lon, lat, vol
+real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol
 real(kind=WP), allocatable,dimension(:)   :: work_array
 real(kind=WP)                             :: t0, t1
 
@@ -1178,7 +1178,7 @@ integer                    :: i, nn, ns
 
 t0=MPI_Wtime()
 
-!real*8,allocatable :: arr2Dglobal(:,:) 
+!real(kind=WP),allocatable :: arr2Dglobal(:,:) 
  
  allocate(edge_dxdy(2,myDim_edge2D+eDim_edge2D))
  allocate(edge_cross_dxdy(4,myDim_edge2D+eDim_edge2D))
@@ -1306,7 +1306,7 @@ DO elem=1, myDim_elem2D
    deltaY31=coord_nod2D(2,elnodes(3))-coord_nod2D(2,elnodes(1))
    deltaY21=coord_nod2D(2,elnodes(2))-coord_nod2D(2,elnodes(1))
    
-   dfactor=-0.5_8*r_earth/elem_area(elem)
+   dfactor=-0.5_WP*r_earth/elem_area(elem)
    gradient_sca(1,elem)=(-deltaY31+deltaY21)*dfactor
    gradient_sca(2,elem)=deltaY31*dfactor
    gradient_sca(3,elem)=-deltaY21*dfactor
@@ -1423,7 +1423,7 @@ IMPLICIT NONE
 
 
 integer              :: nz, n, elem , elnodes(3)
-real(kind=8)	     :: vol_n(nl), vol_e(nl), aux(nl)
+real(kind=WP)	     :: vol_n(nl), vol_e(nl), aux(nl)
 
    vol_n=0.
    vol_e=0.
@@ -1464,7 +1464,7 @@ subroutine trim_cyclic(b)
 use o_PARAM
 use g_config
 implicit none
-real(kind=8) :: b
+real(kind=WP) :: b
  if(b> cyclic_length/2.0_WP) b=b-cyclic_length
  if(b<-cyclic_length/2.0_WP) b=b+cyclic_length
 end subroutine trim_cyclic

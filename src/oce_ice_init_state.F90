@@ -23,12 +23,12 @@ subroutine initial_state_test
 
 ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  relax2clim=0.0
  
  elevation=0
@@ -45,7 +45,7 @@ subroutine initial_state_test
   DO n=1, myDim_nod2D+eDim_nod2D
      DO nz=1, nlevels_nod2D(n)-1 
    !  tr_arr(nz,n,1)=tr_arr(nz,n,1)- 8.2e-3*abs(Z(nz))
-     tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.95_8*20*tanh(abs(Z(nz))/300)-abs(Z(nz))/2400.0_8
+     tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.95_WP*20*tanh(abs(Z(nz))/300)-abs(Z(nz))/2400.0_WP
 
      END DO
   END DO   
@@ -82,8 +82,8 @@ Tsurf=tr_arr(1,:,1)
   if (wind==1) then
   DO elem=1, myDim_elem2D
      elnodes=elem2d_nodes(:,elem)
-     lat=sum(coord_nod2D(2,elnodes))/3.0_8
-     lon=sum(coord_nod2D(1,elnodes))/3.0_8
+     lat=sum(coord_nod2D(2,elnodes))/3.0_WP
+     lon=sum(coord_nod2D(1,elnodes))/3.0_WP
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(15.0*rad)) !(8.83*rad))  
           ! 40 is the south boundary of the hex box
   END DO
@@ -93,14 +93,14 @@ Tsurf=tr_arr(1,:,1)
   if (wind==1) then
   DO elem=1, myDim_elem2D
      elnodes=elem2d_nodes(:,elem)
-     lat=sum(coord_nod2D(2,elnodes))/3.0_8
-     lon=sum(coord_nod2D(1,elnodes))/3.0_8
+     lat=sum(coord_nod2D(2,elnodes))/3.0_WP
+     lon=sum(coord_nod2D(1,elnodes))/3.0_WP
       !stress_surf(1,elem)=0.1 *cos(pi*(lat-40.0*rad)/(1500000.0/r_earth))* &
       !     exp(-((lat-40.0*rad)/(1500000.0/r_earth))**2)   
           ! 40 is the center of domain
      stress_surf(1,elem)=0.1 *cos(pi*(lat-35.0*rad)/(1250000.0/r_earth))* &
            exp(-((lat-35.0*rad)/(1250000.0/r_earth))**2)* &
-           (1.0_8-0.5_8*((lat-35.0*rad)/(1250000.0/r_earth)))
+           (1.0_WP-0.5_WP*((lat-35.0*rad)/(1250000.0/r_earth)))
           ! 35 is the center of domain    
    END DO
   end if
@@ -121,17 +121,17 @@ subroutine initial_state_channel_test
   implicit none
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
-  real(kind=8)                       :: lon, lat, a, dst 
+  real(kind=WP)                      :: lon, lat, a, dst 
   
 
   ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  
   strat=1
   wind=0
@@ -241,17 +241,17 @@ subroutine initial_state_channel_narrow_test
   implicit none
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
-  real(kind=8)                       :: lon, lat, a, dst 
+  real(kind=WP)                      :: lon, lat, a, dst 
   
 
   ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  
   strat=1
   wind=0
@@ -359,21 +359,21 @@ subroutine init_fields_na_test
   !
   implicit none
   integer                            :: n, nz, nd
-  real(kind=8)                       :: maxlat, minlat, rwidth, lat,lon 
+  real(kind=WP)                      :: maxlat, minlat, rwidth, lat,lon 
   logical                            :: c_status
-  real(kind=8)                       :: p0, ss, tt,pr
+  real(kind=WP)                      :: p0, ss, tt,pr
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
   
   ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  
   ! ===================
   ! Initialize T, S from files
@@ -462,21 +462,21 @@ subroutine init_fields_global_test
   !
   implicit none
   integer                            :: n, nz, nd
-  real(kind=8)                       :: maxlat, minlat, rwidth, lat, lon 
+  real(kind=WP)                      :: maxlat, minlat, rwidth, lat, lon 
   logical                            :: c_status
-  real(kind=8)                       :: p0, ss, tt,pr
+  real(kind=WP)                      :: p0, ss, tt,pr
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
   
   ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  
   ! ===================
   ! Initialize T, S from files
@@ -551,17 +551,17 @@ subroutine initial_state_channel_dima_test
   implicit none
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
-  real(kind=8)                       :: lon, lat, a, dst 
+  real(kind=WP)                      :: lon, lat, a, dst 
   
 
   ! Default values
  stress_surf=0.0
- tr_arr(:,:,1)=20.0_8
+ tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
- heat_flux=0.0_8
- tr_arr(:,:,2)=35.0_8
+ heat_flux=0.0_WP
+ tr_arr(:,:,2)=35.0_WP
  Ssurf=tr_arr(1,:,2)
- water_flux=0.0_8
+ water_flux=0.0_WP
  
   strat=1
   wind=0

@@ -16,6 +16,9 @@ subroutine solve_tracers_ale
 	! update 3D velocities with the bolus velocities:
 	! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
 	! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
+
+        if (SPP) call cal_rejected_salt
+        if (SPP) call app_rejected_salt
 	if (Fer_GM) then
 		UV    =UV    +fer_UV
 		Wvel_e=Wvel_e+fer_Wvel
@@ -29,8 +32,7 @@ subroutine solve_tracers_ale
 		call init_tracers_AB(tr_num)
 		
 		! advect tracers
-		call adv_tracers_ale(tr_num)
-		
+                call adv_tracers_ale(tr_num)
 		! diffuse tracers 
 		call diff_tracers_ale(tr_num)
 		
@@ -193,8 +195,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			! no upwind   triangle --> c_lo(1)=0, otherwise = 1
 			! no downwind triangle --> c_lo(2)=0, otherwise = 1
 			! (real(...) --> convert from integer to float)
-			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+			c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+			c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 			
 			!___________________________________________________________________
 			! use downwind triangle to interpolate Tracer to edge center with 
@@ -282,8 +284,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -323,8 +325,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 				!_______________________________________________________________
 				! check if upwind or downwind triangle exist, decide if high or 
 				! low order solution is calculated c_lo=1 --> high order, c_lo=0-->low order
-				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0))
-				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0))
+				c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
+				c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
 				
 				Tmean2=ttfAB(nz, enodes(2))- &
 						(2.0_WP*(ttfAB(nz, enodes(2))-ttfAB(nz,enodes(1)))+ &
@@ -413,7 +415,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
 			!___________________________________________________________________
 			! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
 			! equation (1.9)
-			! tv(nz)=(7.0_8*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_8
+			! tv(nz)=(7.0_WP*(ttf(nz-1,n)+ttf(nz,n))-(ttf(nz-2,n)+ttf(nz+1,n)))/12.0_WP
 			
 			!___________________________________________________________________
 			! for non-uniformity spaced vertical grids --> piecewise parabolic 
@@ -832,9 +834,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-		Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,  n)**2 + &
-			 (zbar_n(nz+1)-Z_n(nz+1)   )*zinv2 *slope_tapered(3,nz+1,n)**2
-		Ty1=Ki(nz,n)*Ty1*isredi
+		Ty1= (Z_n(nz)     -zbar_n(nz+1))    *zinv2 *slope_tapered(3,nz,  n)**2*Ki(nz,n) + &
+			 (zbar_n(nz+1)-Z_n(nz+1))   *zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+		Ty1=Ty1*isredi
 		! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
 		a(nz)=0.0_WP
 		c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -857,12 +859,12 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! 1/dz(nz)
 			zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
 			! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-			Ty = (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
-			     (zbar_n(nz)-Z_n(nz))*zinv1 *slope_tapered(3,nz,n)**2
-			Ty1= (Z_n(nz)-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz,n)**2 + &
-			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2
-			Ty =Ki(nz,n)*Ty *isredi
-			Ty1=Ki(nz,n)*Ty1*isredi
+			Ty = (Z_n(nz-1)-zbar_n(nz))  *zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
+			     (zbar_n(nz)-Z_n(nz))    *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
+			Ty1= (Z_n(nz)-zbar_n(nz+1))  *zinv2 *slope_tapered(3,nz,n)**2  *Ki(nz,n)  + &
+			     (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+			Ty =Ty *isredi
+			Ty1=Ty1*isredi
 			! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 			a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
 			c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
@@ -889,9 +891,9 @@ subroutine diff_ver_part_impl_ale(tr_num)
 		zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 		
 		! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-		Ty= (Z_n(nz-1)-zbar_n(nz))*zinv1 *slope_tapered(3,nz-1,n)**2 + &
-			(zbar_n(nz)-Z_n(nz))  *zinv1 *slope_tapered(3,nz,n)**2
-		Ty =Ki(nz,n)*Ty *isredi
+		Ty= (Z_n(nz-1)-zbar_n(nz))   *zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n) + &
+			(zbar_n(nz)-Z_n(nz)) *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
+		Ty =Ty *isredi
 		! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 		a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
 		c(nz)=0.0_WP
@@ -941,14 +943,14 @@ subroutine diff_ver_part_impl_ale(tr_num)
 			! *******************************************************************
 			! nonlocal transport to the rhs (only T and S currently) _GO_
 			! *******************************************************************
-			
-			if (trim(mix_scheme)=='KPP') then
-				if (tr_num==1) then ! T
-					tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
-				elseif (tr_num==2) then ! S
-					tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
-				end if
-			end if 
+!leads to non conservation in 8th digit. needs to be checked!
+!			if (trim(mix_scheme)=='KPP') then
+!				if (tr_num==1) then ! T
+!					tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
+!				elseif (tr_num==2) then ! S
+!					tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
+!				end if
+!			end if 
 		end do
 		nz=nzmax-1
 		dz=hnode_new(nz,n)
@@ -1083,13 +1085,13 @@ subroutine diff_ver_part_redi_expl
 		!_______________________________________________________________________
 		
 		do nz=2,nl1
-			vd_flux(nz)=((Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n) &
-				*tr_xynodes(2,nz-1,n) ) &
-					+ (zbar_n(nz)-Z_n(nz))*(slope_tapered(1,nz,n)*tr_xynodes(1,nz,n)+slope_tapered(2,nz,n) &
-				*tr_xynodes(2,nz,n) ))/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
+			vd_flux(nz)=(Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
+                        vd_flux(nz)=vd_flux(nz)+&
+          			    (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n) 	*tr_xynodes(2,nz,n))  *Ki(nz,n)
+                        vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
 		enddo
 		do nz=1,nl1
-			del_ttf(nz,n) = del_ttf(nz,n)+Ki(nz,n)*(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+			del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
 		enddo
 	end do
 end subroutine diff_ver_part_redi_expl!

@@ -114,7 +114,7 @@ USE g_PARSUP
 
 IMPLICIT NONE
 INTEGER      :: n, elem, ed, elnodes(3), el(2), ednodes(2)  
-REAL(kind=8) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
+REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 
  DO n=1, myDim_nod2D
      U_rhs_ice(n)=0.0
@@ -176,7 +176,7 @@ USE i_arrays
 IMPLICIT NONE
 REAL(kind=WP), intent(in) :: inv_areamass(myDim_nod2D), ice_strength(mydim_elem2D)
 INTEGER      :: n, el,  k
-REAL(kind=8) :: val3
+REAL(kind=WP):: val3
 
 val3=1/3.0_WP
 

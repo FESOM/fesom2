@@ -18,6 +18,7 @@ free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.false.
 w_exp_max=1.e-3
+SPP=.false.                  ! Salt Plume Parameterization
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM=3000.                  ! GM thickness diffusivity (m2/s)
 scaling_Ferreira   =.true.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)

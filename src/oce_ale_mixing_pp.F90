@@ -187,15 +187,16 @@ subroutine mo_length(water_flux,heat_flux,stress_x,stress_y,  &
     ! vertical mixing scheme of Timmermann and Beckmann, 2004.
     ! computes the mixing length derived from the Monin-Obukhov length
     ! Ralph Timmermann, 14.06.2006
-
+  
+  USE o_PARAM, only: WP
     implicit none
 
-    real*8              :: water_flux, heat_flux, stress_x, stress_y
-    real*8              :: u_ice, v_ice, a_ice, uabs
-    real*8              :: dt, ret, rtc, mixlength
-    real*8              :: qfm, qtm, qw
-    real*8              :: ustar,tau, obuk
-    real(kind=8), parameter :: cosgam = 0.913632  ! cos(24.*3.14/180.)
+    real(kind=WP)             :: water_flux, heat_flux, stress_x, stress_y
+    real(kind=WP)             :: u_ice, v_ice, a_ice, uabs
+    real(kind=WP)             :: dt, ret, rtc, mixlength
+    real(kind=WP)             :: qfm, qtm, qw
+    real(kind=WP)             :: ustar,tau, obuk
+    real(kind=WP), parameter :: cosgam = 0.913632  ! cos(24.*3.14/180.)
 
     qfm            = water_flux * 34.       ! note that water_flux>0
     ![psu * m/s]   [m/s]   [psu]    ! f. upward fresh water flux
@@ -229,15 +230,16 @@ subroutine pmlktmo(qfm,qtm,qw,obuk)
     ! qtm  = Heat Flux into ML                                 [K m/s]
     ! qfm  = salinity flux into ML                             [psu m/s]
     ! qw   = production of turbulent kinetic energy 
-    !-----------------------------------------------------------------------
+    !-----------------------------------------------------------------------   
+  USE o_PARAM, only: WP
     implicit none
 
     integer           :: iter
-    real*8            :: qtm, qfm, qw, obuk
-    real*8, parameter :: qhw   = 1/7.0                 ! [1/m] !NR inverse
-    real*8, parameter :: betas = 0.0008
-    real*8, parameter :: betat = 0.00004
-    real*8            :: a1, f0, f1, ttmp, qrho
+    real(kind=WP)            :: qtm, qfm, qw, obuk
+    real(kind=WP), parameter :: qhw   = 1/7.0                 ! [1/m] !NR inverse
+    real(kind=WP), parameter :: betas = 0.0008
+    real(kind=WP), parameter :: betat = 0.00004
+    real(kind=WP)            :: a1, f0, f1, ttmp, qrho
 
     qrho=betas*qfm-betat*qtm
     ttmp=60.
