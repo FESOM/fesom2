@@ -139,7 +139,7 @@ contains
 !      *******************************************************************
 
 ! Vtc used in eqn. 23
-     Vtc = concv * sqrt(0.2/concs/epsilon_kpp) / vonk**2 / Ricr
+     Vtc = concv * sqrt(0.2_WP/concs/epsilon_kpp) / vonk**2 / Ricr
 
 !      *******************************************************************
 !       The nonlocal transport term is nonzero ONLY FOR SCALARS in
@@ -156,8 +156,8 @@ contains
 !       Construct the wm and ws lookup tables (eqn. 13 & B1)
 !      *******************************************************************
 
-     deltaz = (zmax-zmin)/real(nni+1) 
-     deltau = (umax-umin)/real(nnj+1)
+     deltaz = (zmax-zmin)/real(nni+1,WP) 
+     deltau = (umax-umin)/real(nnj+1,WP)
 
      do i=0,nni+1
        zehat = deltaz*(i) + zmin

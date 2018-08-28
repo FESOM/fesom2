@@ -15,17 +15,17 @@ implicit none
 #include "petscf.h"
 integer                         :: myrows
 integer                         :: Pmode
-real(kind=8)                    :: rinfo(20,20)
+real(kind=WP)                   :: rinfo(20,20)
 integer                         :: maxiter=2000
 integer                         :: restarts=15
 integer                         :: fillin=3
 integer                         :: lutype=2
 integer                         :: nrhs=1
-real(kind=8)                    :: droptol=1.e-7
-real(kind=8)                    :: soltol =1e-10  !1.e-10
+real(kind=WP)                   :: droptol=1.e-7
+real(kind=WP)                   :: soltol =1e-10  !1.e-10
 logical, save                   :: lfirst=.true.
 real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
-real(kind=8)                    :: cssh1,cssh2,crhs
+real(kind=WP)                   :: cssh1,cssh2,crhs
 integer                         :: i
 Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
 if (lfirst) then   
@@ -140,9 +140,9 @@ real(kind=WP) :: ff, c1, c2, deltaX1, deltaY1, deltaX2, deltaY2
 ! =================
 Do n=1, myDim_nod2D
    DO nz=1, nl
-      wvel(nz,n)=0.0_8
+      wvel(nz,n)=0.0_WP
       if (Fer_GM) then
-         fer_wvel(nz,n)=0.0_8
+         fer_wvel(nz,n)=0.0_WP
       end if
    END DO
 END DO
@@ -650,9 +650,9 @@ USE g_config
 USE g_comm_auto
 IMPLICIT NONE
 
-real(kind=8)  :: u1, v1, tau_inv, s, factor, factor1, factor2
+real(kind=WP) :: u1, v1, tau_inv, s, factor, factor1, factor2
 integer       :: ed, el(2), nz, elem
-real(kind=8)  :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D+eDim_elem2D)
+real(kind=WP) :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D+eDim_elem2D)
  
 ! Filter is applied twice. It should be approximately 
 ! equivalent to biharmonic operator with the coefficient
@@ -660,8 +660,8 @@ real(kind=8)  :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D
 ! with smoothness in places of mesh transition. *(it makes a^3 from a^4) 
 
 
-UV_c=0.0_8
-!NR UV_f=0.0_8
+UV_c=0.0_WP
+!NR UV_f=0.0_WP
 tau_inv=dt*tau_c/3600.0/24.0     ! SET IT experimentally 
   
 DO ed=1, myDim_edge2D+eDim_edge2D
@@ -807,7 +807,7 @@ USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 
-real(kind=8)  :: u1, v1, le(2), len, crosslen, vi 
+real(kind=WP) :: u1, v1, le(2), len, crosslen, vi 
 integer       :: nz, ed, el(2)
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -819,7 +819,7 @@ integer       :: nz, ed, el(2)
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
     le=edge_dxdy(:,ed)
-    le(1)=le(1)*sum(elem_cos(el))*0.25_8
+    le(1)=le(1)*sum(elem_cos(el))*0.25_WP
     len=sqrt(le(1)**2+le(2)**2)*r_earth
     le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
     le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
@@ -851,15 +851,15 @@ IMPLICIT NONE
 ! Also, we use the Leith viscosity
 !
 
-real(kind=8)  :: u1, v1, vi, len
+real(kind=WP) :: u1, v1, vi, len
 integer       :: ed, el(2), nz, option
-real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
 
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_8
- V_c=0.0_8
+ U_c=0.0_WP
+ V_c=0.0_WP
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -875,7 +875,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  if(option==1) then
  Do ed=1,myDim_elem2D
     len=sqrt(elem_area(ed))                     
-    len=dt*len/30.0_8
+    len=dt*len/30.0_WP
     Do nz=1,nlevels(ed)-1
      ! vi has the sense of harmonic viscosity coefficient because of 
      ! the division by area in the end 
@@ -891,7 +891,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
 if(option==2) then
  Do ed=1,myDim_elem2D
     len=sqrt(elem_area(ed))                     
-    len=dt*len/30.0_8
+    len=dt*len/30.0_WP
     Do nz=1,nlevels(ed)-1
      ! vi has the sense of harmonic viscosity coefficient because of 
      ! the division by area in the end 
@@ -938,19 +938,19 @@ IMPLICIT NONE
 ! biharmonic background viscosity
 !
 
-real(kind=8)  :: u1, v1, vi, len, crosslen, le(2)
+real(kind=WP) :: u1, v1, vi, len, crosslen, le(2)
 integer       :: ed, el(2), nz
-real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_8
- V_c=0.0_8
+ U_c=0.0_WP
+ V_c=0.0_WP
   DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
     le=edge_dxdy(:,ed)
-    le(1)=le(1)*sum(elem_cos(el))*0.25_8
+    le(1)=le(1)*sum(elem_cos(el))*0.25_WP
     len=sqrt(le(1)**2+le(2)**2)*r_earth
     le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
     le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
@@ -1021,7 +1021,7 @@ IMPLICIT NONE
 real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
 integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
-real, allocatable :: aux(:,:) 
+real(kind=WP), allocatable :: aux(:,:) 
 	!  
 	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
 	! Fill in viscosity:
@@ -1079,10 +1079,10 @@ real, allocatable :: aux(:,:)
 			elnodes=elem2D_nodes(:,elem)
 			nl1=nlevels(elem)-1
 			Do nz=1, nl1 
-				Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_8
+				Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_WP
 			END DO
 			DO nz=nl1+1, nl-1
-				Visc(nz,elem)=0.0_8
+				Visc(nz,elem)=0.0_WP
 			END Do
 		end do
 	end do

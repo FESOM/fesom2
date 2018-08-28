@@ -323,9 +323,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
 		! vert. flux at surface layer
 		nz=1
                 if (w_split) then
-                   tvert_e(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
+                   tvert_e(nz)=0.!-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
                 end if
-		tvert(nz)  =-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
+		tvert(nz)  =0.!-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
 		fct_adf_v(nz,n)=0.0_WP
 		
 		!_______________________________________________________________________
@@ -451,8 +451,8 @@ subroutine fct_ale(ttf, iter_yn)
 	integer                   :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
 	real(kind=WP)             :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
 	real(kind=WP), intent(in) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-	real*8                    :: flux_eps=1e-16
-	real*8                    :: bignumber=1e3
+	real(kind=WP)             :: flux_eps=1e-16
+	real(kind=WP)             :: bignumber=1e3
 	integer                   :: vlimit=1
         logical, intent(in)       :: iter_yn !more iterations to be made with fct_ale?
 	! --------------------------------------------------------------------------
@@ -630,7 +630,7 @@ subroutine fct_ale(ttf, iter_yn)
 	!Vertical
 	do n=1, myDim_nod2D
 		nz=1
-		ae=1.0_8
+		ae=1.0
 		flux=fct_adf_v(nz,n)
 		if(flux>=0.0) then 
 			ae=min(ae,fct_plus(nz,n))

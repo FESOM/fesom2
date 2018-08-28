@@ -233,7 +233,7 @@ USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
 integer        :: n, nz, elem, k, edge, ednodes(2)
-real(kind=8)   :: tvol, tx, ty
+real(kind=WP)  :: tvol, tx, ty
 	!___________________________________________________________________________
 	! loop over edge segments
 	DO edge=1,myDim_edge2D
@@ -339,11 +339,11 @@ use g_comm_auto
 IMPLICIT NONE
  integer      :: el(2), enodes(2), n, nz, edge
  integer      :: nl1, nl2,tr_num
- real(kind=8) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, flux=0.0 
- real(kind=8) :: tvert(nl), a, b, c, d, da, db, dg
- real(kind=8) :: Tx, Ty, Tmean, rdata=0.0
- real(kind=8) :: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
- real(kind=8) :: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
+ real(kind=WP):: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, flux=0.0 
+ real(kind=WP):: tvert(nl), a, b, c, d, da, db, dg
+ real(kind=WP):: Tx, Ty, Tmean, rdata=0.0
+ real(kind=WP):: ttf(nl-1, myDim_nod2D+eDim_nod2D), dttf(nl-1, myDim_nod2D+eDim_nod2D)
+ real(kind=WP):: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
 
 ! Clean the rhs
 ttrhs=0d0  
@@ -374,14 +374,14 @@ ttrhs=0d0
    ! ============
    if(UV(2,nz,el(1))*deltaX1- UV(1,nz,el(1))*deltaY1>0) then   
       Tmean=ttfold(nz, enodes(2))- &
-      (2.0_8*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
       edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_8    
+      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
    else
       Tmean=ttfold(nz, enodes(1))+ &
-      (2.0_8*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
       edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_8    
+      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP    
    end if
    c1=UV(2,nz,el(1))*Tmean*deltaX1- UV(1,nz,el(1))*Tmean*deltaY1
    ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1
@@ -397,14 +397,14 @@ ttrhs=0d0
    ! ============
    if(UV(2,nz,el(2))*deltaX2- UV(1,nz,el(2))*deltaY2<0) then   
       Tmean=ttfold(nz, enodes(2))- &
-      (2.0_8*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
       edge_dxdy(1,edge)*b*edge_up_dn_grad(2,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_8    
+      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
    else
       Tmean=ttfold(nz, enodes(1))+ &
-      (2.0_8*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
       edge_dxdy(1,edge)*b*edge_up_dn_grad(1,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_8     
+      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP     
    end if
    c2=-UV(2,nz,el(2))*Tmean*deltaX2+ UV(1,nz,el(2))*Tmean*deltaY2
    ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c2
@@ -435,7 +435,7 @@ ttrhs=0d0
       ! ============
       if(Wvel(nz,n)>0) then
         if(nz==nlevels_nod2D(n)-1) then
-	  Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))  ! or replace this with 
+	  Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))  ! or replace this with 
 	                                             ! the first order 
 						     ! upwind  tttfold(nz,n)
 	else
@@ -451,7 +451,7 @@ ttrhs=0d0
 
       if(Wvel(nz,n)<0) then
         if(nz==2) then
-	  Tmean=0.5_8*(ttfold(nz-1,n)+ttfold(nz,n))        ! or ttfold(nz-1,n)
+	  Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))        ! or ttfold(nz-1,n)
 	else  
 	a=zbar(nz)-Z(nz)
 	b=Z(nz-1)-zbar(nz)

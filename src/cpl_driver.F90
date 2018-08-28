@@ -62,19 +62,16 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=8), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
-  real(kind=8), allocatable, dimension(:,:)      :: cplsnd
+  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
-  real                       :: time_send(2), time_recv(2)
-
-
-  real                       :: date_incr
+  real(kind=WP)              :: time_send(2), time_recv(2)
 
   integer, dimension(1,3)    :: iextent    
   integer, dimension(1,3)    :: ioffset   
 
  !
-  real(kind=8), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
+  real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
 
   !
   ! Routine accessibility
@@ -215,16 +212,16 @@ contains
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=8)               :: this_x_coord     ! longitude coordinates
-    real(kind=8)               :: this_y_coord     ! latitude coordinates
+    real(kind=WP)               :: this_x_coord     ! longitude coordinates
+    real(kind=WP)               :: this_y_coord     ! latitude coordinates
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
-    real(kind=8), allocatable :: my_x_coords(:)     ! longitude coordinates
-    real(kind=8), allocatable :: my_y_coords(:)     ! latitude  coordinates
+    real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
+    real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
 
-    real(kind=8), allocatable :: all_x_coords(:, :)     ! longitude coordinates
-    real(kind=8), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
+    real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -489,13 +486,13 @@ contains
     !
     integer, intent( IN )          :: ind       ! variable Id
     logical, intent( OUT )         :: action    !
-    real(kind=8), intent(IN)       :: data_array(myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(IN)       :: data_array(myDim_nod2D+eDim_nod2D)
     !
     ! Local declarations
     !
     integer                :: info
     !
-    real (kind=8)          :: t1, t2, t3
+    real (kind=WP)          :: t1, t2, t3
     !
     !--------------------------------------------------------------------
     !
@@ -551,14 +548,14 @@ contains
     !
     integer, intent( IN )  :: ind       ! variable Id
     logical, intent( OUT ) :: action    ! 
-    real(kind=8), intent( OUT )    :: data_array(:)
+    real(kind=WP), intent( OUT )    :: data_array(:)
     !
     ! Local declarations
     !
     integer                :: info
     integer                :: j
     integer, save          :: ncount = 0
-    real (kind=8)          :: t1, t2, t3        
+    real (kind=WP)         :: t1, t2, t3        
     !
     !--------------------------------------------------------------------
     !    

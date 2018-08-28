@@ -71,12 +71,12 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
 
 #if defined (__oasis)
-  real(kind=8), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
-  real(kind=8), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
-  real(kind=8), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
-  real(kind=8), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
-  real(kind=8), allocatable, dimension(:)         :: oce_net_fluxes_north, oce_net_fluxes_south
-  real(kind=8), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
+  real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
+  real(kind=WP), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
+  real(kind=WP), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
+  real(kind=WP), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
+  real(kind=WP), allocatable, dimension(:)         :: oce_net_fluxes_north, oce_net_fluxes_south
+  real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
 #endif
   
   real(kind=WP), allocatable, dimension(:)         :: runoff_landice
@@ -99,7 +99,7 @@ use o_param
   ! drag coefficient Cd_atm_oce between atmosphere and ice
   real(kind=WP), allocatable, dimension(:)	  :: Cd_atm_ice_arr
   
-  real*8,allocatable,dimension(:) ::  aver_temp
+  real(kind=WP),allocatable,dimension(:)          ::  aver_temp
 end module g_forcing_arrays
 ! ====================================================================
 module g_forcing_index
@@ -127,9 +127,9 @@ module g_forcing_index
     use g_PARSUP, only : par_ex
     implicit none
 
-    real(kind=8)          :: sixhour_sec
-    real(kind=8)          :: oneday_sec
-    real(kind=8)          :: modtimeold
+    real(kind=WP)          :: sixhour_sec
+    real(kind=WP)          :: oneday_sec
+    real(kind=WP)          :: modtimeold
 
     data sixhour_sec /21600.0/, oneday_sec /86400.0/
 
@@ -165,9 +165,11 @@ module g_forcing_interp
   ! Modified by Qiang Wang for bilinear interpolation
   ! Reviewed by ??
   !------------------------------------------------------------------	
+  use, intrinsic :: ISO_FORTRAN_ENV
+
   implicit none
   integer, allocatable      :: lint_ind(:,:,:)
-  real(kind=8), allocatable :: lint_weight(:,:)
+  real(real64), allocatable :: lint_weight(:,:)
 
   contains
 
@@ -197,10 +199,10 @@ module g_forcing_interp
 
     integer, parameter 	:: ni=192, nj=94  ! NCEP and CORE are on the same grid.
     integer     	:: i, ii, j, n, row, n2
-    real(kind=8)      	:: rlon, rlat, aux
-    real(kind=8)      	:: cx(ni), cy(nj)
-    real(kind=8)      	:: xmod(myDim_nod2D+eDim_nod2D), ymod(myDim_nod2D+eDim_nod2D)
-    real(kind=8)        :: wt(4)
+    real(kind=WP)      	:: rlon, rlat, aux
+    real(kind=WP)      	:: cx(ni), cy(nj)
+    real(kind=WP)      	:: xmod(myDim_nod2D+eDim_nod2D), ymod(myDim_nod2D+eDim_nod2D)
+    real(kind=WP)        :: wt(4)
 
     n2=myDim_nod2D+eDim_nod2D     
 
@@ -264,8 +266,8 @@ module g_forcing_interp
        end if
        wt(1)=aux
        wt(2)=aux
-       wt(3)=1.0_8-aux
-       wt(4)=1.0_8-aux
+       wt(3)=1.0_WP-aux
+       wt(4)=1.0_WP-aux
 
        if(ymod(row)<cy(nj)) then
           do j=1,nj
@@ -283,11 +285,11 @@ module g_forcing_interp
           lint_ind(2,2,row)=nj
           lint_ind(3,2,row)=nj
           lint_ind(4,2,row)=nj
-          aux=1.0_8
+          aux=1.0_WP
        end if
        lint_weight(1,row)=wt(1)*aux
-       lint_weight(2,row)=wt(2)*(1.0_8-aux)
-       lint_weight(3,row)=wt(3)*(1.0_8-aux)
+       lint_weight(2,row)=wt(2)*(1.0_WP-aux)
+       lint_weight(3,row)=wt(3)*(1.0_WP-aux)
        lint_weight(4,row)=wt(4)*aux
     end do
 
@@ -313,12 +315,12 @@ module g_forcing_interp
     use g_parsup
     implicit none                                             
 
-    integer      :: idim, jdim, nmpt                          
-    integer      :: ind(4,2,nmpt)
-    integer      :: i, n                      
-    real(kind=8) :: zd(idim,jdim), zi(nmpt)
-    real(kind=8) :: weights(4,nmpt)
-    real(kind=8) :: fx
+    integer       :: idim, jdim, nmpt                          
+    integer       :: ind(4,2,nmpt)
+    integer       :: i, n                      
+    real(kind=WP) :: zd(idim,jdim), zi(nmpt)
+    real(kind=WP) :: weights(4,nmpt)
+    real(kind=WP) :: fx
 
     do n=1,nmpt
        fx=0.0

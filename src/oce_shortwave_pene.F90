@@ -17,9 +17,9 @@ subroutine cal_shortwave_rad
   IMPLICIT NONE
 
   integer      :: m, n2, n3, k, nzmax
-  real(kind=8) :: swsurf, aux
-  real(kind=8) :: c, c2, c3, c4, c5
-  real(kind=8) :: v1, v2, sc1, sc2
+  real(kind=WP):: swsurf, aux
+  real(kind=WP):: c, c2, c3, c4, c5
+  real(kind=WP):: v1, v2, sc1, sc2
 
   sw_3d=0.0
 

@@ -93,7 +93,7 @@ DO elem=1, myDim_elem2D
    DO j=1,3                !NR interchange loops => nz-loop vectorizes
       DO nz=1,nlevels(elem)-1 
          KE_node(nz,elnodes(j)) = KE_node(nz,elnodes(j))+(UV(1,nz,elem)*UV(1,nz,elem) &
-              +UV(2,nz,elem)*UV(2,nz,elem))*elem_area(elem)  !NR/6.0_8 below
+              +UV(2,nz,elem)*UV(2,nz,elem))*elem_area(elem)  !NR/6.0_WP below
       END DO
    END DO
 END DO
@@ -154,8 +154,8 @@ DO elem=1,  myDim_elem2D          !! P (b)  elem=1,elem2D
       Fx = sum(gradient_sca(1:3,elem)*pre)
       Fy = sum(gradient_sca(4:6,elem)*pre)
    
-      da = UV(2,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_8
-      db =-UV(1,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_8
+      da = UV(2,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_WP
+      db =-UV(1,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_WP
 
       UV_rhsAB(1,nz,elem)=(da+Fx)*gg
       UV_rhsAB(2,nz,elem)=(db+Fy)*gg
@@ -185,14 +185,14 @@ END DO
 !  uvert(nl1+1,1:2)=0d0
 !
 !  DO nz=2, nl1
-!     w=sum(Wvel(nz,elnodes))/3.0_8
-!     umean=0.5_8*(UV(1,nz-1,elem)+UV(1,nz,elem))
-!     vmean=0.5_8*(UV(2,nz-1,elem)+UV(2,nz,elem))
+!     w=sum(Wvel(nz,elnodes))/3.0_WP
+!     umean=0.5_WP*(UV(1,nz-1,elem)+UV(1,nz,elem))
+!     vmean=0.5_WP*(UV(2,nz-1,elem)+UV(2,nz,elem))
 !     uvert(nz,1)=-umean*w
 !     uvert(nz,2)=-vmean*w
 !  END DO
 !  DO nz=1,nl1
-!     da=sum(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/3.0_8
+!     da=sum(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/3.0_WP
 !     UV_rhsAB(1,nz,elem) = UV_rhsAB(1,nz,elem) + (uvert(nz,1)-uvert(nz+1,1)+&
 !          da*UV(1,nz,elem))*elem_area(elem)*dzbar_inv(nz) !/(zbar(nz)-zbar(nz+1))
 !     UV_rhsAB(2,nz,elem)=UV_rhsAB(2,nz,elem)+(uvert(nz,2)-uvert(nz+1,2)+&
@@ -207,20 +207,20 @@ DO elem=1, myDim_elem2D
   elnodes=elem2D_nodes(:,elem)
   nl1=nlevels(elem)-1
 
-!  w=sum(Wvel(2, elnodes))/3.0_8
-!  w=min(abs(w), 0.0001)*sign(1.0_8, w)
-  uvert(1,1)=w*(UV(1,1,elem)-UV(1,2,elem))*dZ_inv(2)*0.5_8
-  uvert(1,2)=w*(UV(2,1,elem)-UV(2,2,elem))*dZ_inv(2)*0.5_8
+!  w=sum(Wvel(2, elnodes))/3.0_WP
+!  w=min(abs(w), 0.0001)*sign(1.0_WP, w)
+  uvert(1,1)=w*(UV(1,1,elem)-UV(1,2,elem))*dZ_inv(2)*0.5_WP
+  uvert(1,2)=w*(UV(2,1,elem)-UV(2,2,elem))*dZ_inv(2)*0.5_WP
 
-!  w=sum(Wvel(nl1, elnodes))/3.0_8
-!  w=min(abs(w), 0.0001)*sign(1.0_8, w)
-  uvert(nl1,1)=w*(UV(1,nl1-1,elem)-UV(1,nl1,elem))*dZ_inv(nl1)*0.5_8
-  uvert(nl1,2)=w*(UV(2,nl1-1,elem)-UV(2,nl1,elem))*dZ_inv(nl1)*0.5_8
+!  w=sum(Wvel(nl1, elnodes))/3.0_WP
+!  w=min(abs(w), 0.0001)*sign(1.0_WP, w)
+  uvert(nl1,1)=w*(UV(1,nl1-1,elem)-UV(1,nl1,elem))*dZ_inv(nl1)*0.5_WP
+  uvert(nl1,2)=w*(UV(2,nl1-1,elem)-UV(2,nl1,elem))*dZ_inv(nl1)*0.5_WP
 
 
   DO nz=2, nl1-1
-!     w=sum(Wvel(nz,elnodes)+Wvel(nz+1,elnodes))/6.0_8
-!     w=min(abs(w), 0.0001)*sign(1.0_8, w)
+!     w=sum(Wvel(nz,elnodes)+Wvel(nz+1,elnodes))/6.0_WP
+!     w=min(abs(w), 0.0001)*sign(1.0_WP, w)
      if (w >= 0.) then
         uvert(nz,1)=w*(UV(1,nz,elem)-UV(1,nz+1,elem))*dZ_inv(nz+1)
         uvert(nz,2)=w*(UV(2,nz,elem)-UV(2,nz+1,elem))*dZ_inv(nz+1)
@@ -237,7 +237,7 @@ END DO
 ! =======================
 ! Update the rhs   
 ! =======================
-gg=(1.5_8+epsilon)
+gg=(1.5_WP+epsilon)
 if(lfirst.and.(.not.r_restart)) then
    gg=1.0
    lfirst=.false.

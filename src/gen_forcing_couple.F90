@@ -32,10 +32,10 @@ subroutine init_atm_forcing
   character(500)             		:: file
   character(15)             		:: vari, filevari
   character(4)				:: fileyear
-  real(kind=8), dimension(nci,ncj)	:: array_nc, array_nc2
-  real(kind=8), dimension(nod2D)    	:: array_fe
+  real(kind=WP), dimension(nci,ncj)	:: array_nc, array_nc2
+  real(kind=WP), dimension(nod2D)    	:: array_fe
   logical                               :: check_dummy
-  real(kind=8), allocatable             :: aux(:) 
+  real(kind=WP), allocatable             :: aux(:) 
 
   n2=myDim_nod2D+eDim_nod2D       
 
@@ -127,13 +127,13 @@ subroutine update_atm_forcing(istep)
   implicit none
 
   integer		:: i, istep,itime,n2,n,nz,k,elem
-  real(kind=8)		:: i_coef, aux
-  real(kind=8)		:: dux, dvy,tx,ty,tvol
-  real              	:: t1, t2
+  real(kind=WP)		:: i_coef, aux
+  real(kind=WP)		:: dux, dvy,tx,ty,tvol
+  real(kind=WP)       	:: t1, t2
 #ifdef __oasis
-  real(kind=8)        				  :: flux_global(2), flux_local(2), eff_vol(2)
-  real(kind=8), dimension(:), allocatable , save  :: exchange
-  real(kind=8), dimension(:), allocatable , save  :: mask !, weight   
+  real(kind=WP)        				  :: flux_global(2), flux_local(2), eff_vol(2)
+  real(kind=WP), dimension(:), allocatable , save  :: exchange
+  real(kind=WP), dimension(:), allocatable , save  :: mask !, weight   
   logical, save                                   :: firstcall=.true.
   logical                                         :: action  
   logical                                         :: do_rotate_oce_wind=.false.
@@ -144,7 +144,7 @@ subroutine update_atm_forcing(istep)
   character(15)                         :: vari, filevari
   character(4)                          :: fileyear
   integer, parameter                    :: nci=192, ncj=94 ! T62 grid
-  real(kind=8), dimension(nci,ncj)      :: array_nc, array_nc2,array_nc3,x
+  real(kind=WP), dimension(nci,ncj)      :: array_nc, array_nc2,array_nc3,x
   character(500)                        :: file
 
 
@@ -377,10 +377,10 @@ subroutine read_new_atm_forcing
   character(500)            		:: file
   character(15)             		:: vari, filevari
   character(4)				:: fileyear
-  real(kind=8), dimension(nci,ncj)	:: array_nc, array_nc2
-  real(kind=8), dimension(nod2D)    	:: array_fe
+  real(kind=WP), dimension(nci,ncj)	:: array_nc, array_nc2
+  real(kind=WP), dimension(nod2D)    	:: array_fe
   logical                               :: check_dummy
-  real(kind=8), allocatable             :: aux(:)       
+  real(kind=WP), allocatable             :: aux(:)       
 
   n2=myDim_nod2D+eDim_nod2D  
 
@@ -925,7 +925,7 @@ subroutine rotate_T62_wind(xarray, yarray)
 
   integer, parameter 	:: ni=192, nj=94  ! NCEP and CORE are on the same grid.
   integer               :: i, j
-  real(kind=8)      	:: cx(ni), cy(nj), xarray(ni,nj), yarray(ni,nj) 
+  real(kind=WP)      	:: cx(ni), cy(nj), xarray(ni,nj), yarray(ni,nj) 
 
   ! NCEP/CORE latitude
   cy=(/-88.542, -86.6531, -84.7532, -82.8508, -80.9473, -79.0435, &  
@@ -986,19 +986,19 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
   use g_parsup,	         only : myDim_nod2D, eDim_nod2D, mype
   use o_mesh,		 only :	geo_coord_nod2D
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-  use o_PARAM,           only : mstep
+  use o_PARAM,           only : mstep, WP
   IMPLICIT NONE
   
-  real(kind=8), INTENT (INOUT) 	:: field2d(myDim_nod2D+eDim_nod2D)
-  real(kind=8), INTENT (IN)	:: mask(myDim_nod2D+eDim_nod2D)
+  real(kind=WP), INTENT (INOUT) 	:: field2d(myDim_nod2D+eDim_nod2D)
+  real(kind=WP), INTENT (IN)	:: mask(myDim_nod2D+eDim_nod2D)
   INTEGER,      INTENT (IN)	:: n
   INTEGER,      INTENT (IN)	:: h !hemisphere: 0=GL, 1=NH, 2=SH
   logical,      INTENT (IN)	:: do_stats
   
-  real(kind=8)			:: rmask(myDim_nod2D+eDim_nod2D)   
-  real(kind=8)			:: weight(myDim_nod2D+eDim_nod2D)    
-  real(kind=8)			:: flux_global(2), flux_local(2)
-  real(kind=8)			:: eff_vol(2)
+  real(kind=WP)			:: rmask(myDim_nod2D+eDim_nod2D)   
+  real(kind=WP)			:: weight(myDim_nod2D+eDim_nod2D)    
+  real(kind=WP)			:: flux_global(2), flux_local(2)
+  real(kind=WP)			:: eff_vol(2)
 
 #if defined (__oifs)
   return !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping instead
@@ -1057,7 +1057,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
     weight=abs(field2d/sum(flux_global))
   else
     !should rarely happen
-    weight=1.0_8 / sum(eff_vol)
+    weight=1.0_WP / sum(eff_vol)
     write(*,*) 'Warning: Constant redistribution for flux ', trim(cpl_recv(n))
   end if
   
@@ -1097,15 +1097,16 @@ SUBROUTINE compute_residual(field2d, mask, n)
 				flux_correction_north, flux_correction_south,	&
 				flux_correction_total
   use g_parsup, 	only : 	myDim_nod2D, eDim_nod2D
-  
+  use o_PARAM, only : WP 
+ 
   IMPLICIT NONE
   
-  real(kind=8), INTENT(IN)   :: field2d(myDim_nod2D+eDim_nod2D)
-  real(kind=8), INTENT(IN)   :: mask(myDim_nod2D+eDim_nod2D)  
+  real(kind=WP), INTENT(IN)   :: field2d(myDim_nod2D+eDim_nod2D)
+  real(kind=WP), INTENT(IN)   :: mask(myDim_nod2D+eDim_nod2D)  
   INTEGER,      INTENT(IN)   :: n
   
-  real(kind=8)               :: flux_global(2), flux_local(2)
-  real(kind=8)               :: eff_vol(2)
+  real(kind=WP)               :: flux_global(2), flux_local(2)
+  real(kind=WP)               :: eff_vol(2)
   !compute net flux (for flux n) on ocean side
   call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
   oce_net_fluxes_north(n)=flux_global(1)
@@ -1127,15 +1128,16 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
 
   use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
   use o_MESH,	only :	lump2d_north, lump2d_south
-  
+  use o_PARAM, only: WP
+ 
   IMPLICIT NONE
 
-  real(kind=8), INTENT(OUT)  :: flux_global(2), flux_local(2)
-  real(kind=8), INTENT(OUT)  :: eff_vol(2)
-  real(kind=8), INTENT(IN)   :: field2d(myDim_nod2D+eDim_nod2D)
-  real(kind=8), INTENT(IN)   :: mask(myDim_nod2D   +eDim_nod2D) 
+  real(kind=WP), INTENT(OUT)  :: flux_global(2), flux_local(2)
+  real(kind=WP), INTENT(OUT)  :: eff_vol(2)
+  real(kind=WP), INTENT(IN)   :: field2d(myDim_nod2D+eDim_nod2D)
+  real(kind=WP), INTENT(IN)   :: mask(myDim_nod2D   +eDim_nod2D) 
    
-  real(kind=8)               :: eff_vol_local(2)
+  real(kind=WP)               :: eff_vol_local(2)
 
   flux_local(1)=sum(lump2d_north*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   flux_local(2)=sum(lump2d_south*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
@@ -1185,6 +1187,7 @@ SUBROUTINE net_rec_from_atm(action)
   use g_forcing_arrays
   use g_parsup
   use cpl_driver
+  use o_PARAM, only: WP
 
   IMPLICIT NONE
 
@@ -1193,7 +1196,7 @@ SUBROUTINE net_rec_from_atm(action)
   INTEGER                                         :: n  
   INTEGER 					  :: status(MPI_STATUS_SIZE,npes) 
   INTEGER                                         :: request(2)
-  real(kind=8)                 			  :: aux(nrecv)
+  real(kind=WP)                 			  :: aux(nrecv)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif

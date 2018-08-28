@@ -19,8 +19,8 @@ subroutine ice_TG_rhs
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=8)     :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-   integer          :: n, q, row, elem, elnodes(3)
+   real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+   integer         :: n, q, row, elem, elnodes(3)
  ! Taylor-Galerkin (Lax-Wendroff) rhs
   DO row=1, myDim_nod2D
      rhs_m(row)=0.
@@ -164,9 +164,9 @@ subroutine ice_solve_high_order
   use g_comm_auto
   implicit none
   !
-  integer                                 :: n,i,clo,clo2,cn,location(100),row
-  real(kind=8)                            :: rhs_new
-  integer                                 :: num_iter_solve=3
+  integer                              :: n,i,clo,clo2,cn,location(100),row
+  real(kind=WP)                        :: rhs_new
+  integer                              :: num_iter_solve=3
 
   ! Does Taylor-Galerkin solution
   !
@@ -433,7 +433,7 @@ SUBROUTINE ice_mass_matrix_fill
 
   integer                             :: elem, elnodes(3), q, offset, col, ipos 
   integer, allocatable                :: col_pos(:)
-  real(kind=8)                        :: aa
+  real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
   !
   ! a)
@@ -494,9 +494,9 @@ subroutine ice_TG_rhs_div
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=8)     :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+   real(kind=WP)    :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
    integer          :: n, q, row, elem, elnodes(3)
-   real(kind=8)     :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+   real(kind=WP)    :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
  ! In this version I tr to split divergent term off, so that FCT works without it.
@@ -521,24 +521,24 @@ subroutine ice_TG_rhs_div
      vm=sum(v_ice(elnodes))
       ! this is exact computation (no assumption of u=const on elements used 
       ! in the standard version)
-     c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_8 
-     c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_8
-     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_8
+     c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_WP 
+     c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_WP
+     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_WP
      c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
        DO n=1,3
         row=elnodes(n)
 	DO q = 1,3 
-	   entries(q)= vol*ice_dt*((1.0_8-0.5*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
-	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_8 - &
+	   entries(q)= vol*ice_dt*((1.0_WP-0.5*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
+	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
                        0.5*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
                        !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
            entries2(q)=0.5*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
 	                        dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
                                 dy(q)*(vm+v_ice(row)))  
         END DO
-        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_8
-	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_8
-	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_8
+        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
+	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
+	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
         rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
         rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
         rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
@@ -563,7 +563,7 @@ subroutine ice_update_for_div
   implicit none
   !
   integer                                 :: n,i,clo,clo2,cn,location(100),row
-  real(kind=8)                            :: rhs_new
+  real(kind=WP)                           :: rhs_new
   integer                                 :: num_iter_solve=3
  
   ! Does Taylor-Galerkin solution

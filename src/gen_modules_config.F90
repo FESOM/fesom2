@@ -60,7 +60,7 @@ module g_config
   ! ssh change be distributed
   integer                :: lzstar_lev=3
   ! maximal pressure from ice felt by the ocean
-  real(kind=8)           :: max_ice_loading=5.0
+  real(kind=WP)          :: max_ice_loading=5.0
 
   namelist /mesh_def/ grid_type, use_ALE, which_ALE, use_partial_cell, min_hnode, lzstar_lev, max_ice_loading
 
@@ -103,7 +103,7 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean
   
   ! *** others ***
-  real(kind=WP)             	:: dt
+  real(kind=WP)            	:: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
   real(kind=WP)             	:: rtime_ice=0.0, rtime_oce=0.0, rtime_tot=0.0

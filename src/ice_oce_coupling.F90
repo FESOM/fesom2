@@ -55,7 +55,7 @@ subroutine ocean2ice
   implicit none
 
   integer :: n, elem, k
-  real*8 :: uw,vw
+  real(kind=WP) :: uw,vw
   ! the arrays in the ice model are renamed
      
 if (ice_update) then
@@ -70,15 +70,15 @@ if (ice_update) then
   endif
 else
   do n=1, myDim_nod2d+eDim_nod2d    
-     T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1)
-     S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1)
-!NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1)
-!NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1) !PS
+     T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
+     S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
+!NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
+!NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
   end do
   if ( .not. use_ALE ) then
-     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+eta_n(:))/real(ice_steps_since_upd+1)
+     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+eta_n(:))/real(ice_steps_since_upd+1,WP)
   else
-     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1)
+     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
   endif
 endif
      do n=1, myDim_nod2d  
@@ -96,8 +96,8 @@ if (ice_update) then
      u_w(n)=uw
      v_w(n)=vw
 else
-     u_w(n)=(u_w(n)*real(ice_steps_since_upd)+uw)/real(ice_steps_since_upd+1)
-     v_w(n)=(v_w(n)*real(ice_steps_since_upd)+vw)/real(ice_steps_since_upd+1)
+     u_w(n)=(u_w(n)*real(ice_steps_since_upd)+uw)/real(ice_steps_since_upd+1,WP)
+     v_w(n)=(v_w(n)*real(ice_steps_since_upd)+vw)/real(ice_steps_since_upd+1,WP)
 endif
      enddo
      call exchange_nod(u_w, v_w)

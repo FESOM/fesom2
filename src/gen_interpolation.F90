@@ -30,18 +30,19 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   use g_PARSUP, only: par_ex
+  use o_PARAM, only: WP
   implicit none
   integer             		:: n, i, ii, jj, k, nod_find
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_mod
-  real(kind=8) 			:: x, y, diff, d, dmin
-  real(kind=8)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
-  real(kind=8)                  :: data(2,2)
-  real(kind=8)                  :: data_lo, data_up
-  real(kind=8), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
-  real(kind=8), intent(in)	:: data_reg(num_lon_reg, num_lat_reg), missvalue
-  real(kind=8), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod)
-  real(kind=8), intent(out)  	:: data_mod(num_mod)
+  real(kind=WP) 			:: x, y, diff, d, dmin
+  real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
+  real(kind=WP)                  :: data(2,2)
+  real(kind=WP)                  :: data_lo, data_up
+  real(kind=WP), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
+  real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg), missvalue
+  real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod)
+  real(kind=WP), intent(out)  	:: data_mod(num_mod)
   !
   if(lon_reg(1)<0.0 .or. lon_reg(num_lon_reg)>360.) then
      write(*,*) 'Error in 2D interpolation!'
@@ -162,19 +163,20 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   use g_PARSUP, only: par_ex
+  use o_PARAM, only: WP
   implicit none
   integer             		:: n, i
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_mod
   integer, intent(in)          	:: phase_flag
-  real(kind=8) 			:: x, y, diff
-  real(kind=8)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
-  real(kind=8)                  :: data_ll, data_lh, data_hl, data_hh
-  real(kind=8)                  :: data_lo, data_up
-  real(kind=8), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
-  real(kind=8), intent(in)	:: data_reg(num_lon_reg, num_lat_reg)
-  real(kind=8), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod)
-  real(kind=8), intent(out)  	:: data_mod(num_mod)
+  real(kind=WP) 			:: x, y, diff
+  real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
+  real(kind=WP)                  :: data_ll, data_lh, data_hl, data_hh
+  real(kind=WP)                  :: data_lo, data_up
+  real(kind=WP), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
+  real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg)
+  real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod)
+  real(kind=WP), intent(out)  	:: data_mod(num_mod)
   !
   if(lon_reg(1)<0.0 .or. lon_reg(num_lon_reg)>360.) then
      write(*,*) 'Error in 2D interpolation!'
@@ -309,23 +311,24 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   use o_MESH, only: nlevels_nod2D
+  use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer                       :: ind_lay_h, ind_lay_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_lay_reg
   integer, intent(in)          	:: num_mod_z,num_mod
-  real(kind=8) 			:: x, y, z, diff 
-  real(kind=8)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
-  real(kind=8)                  :: rt_lay1, rt_lay2, v_dup, v_dlo
-  real(kind=8)                  :: data_ll, data_lh, data_hl, data_hh
-  real(kind=8)                  :: v_col(4), z_col(4), H, aux1, aux2
-  real(kind=8)                  :: dz, a, b, c, d
-  real(kind=8), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
-  real(kind=8), intent(in)      :: lay_reg(num_lay_reg)
-  real(kind=8), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
-  real(kind=8), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
-  real(kind=8), intent(out)  	:: data_mod(num_mod_z,num_mod)
+  real(kind=WP) 			:: x, y, z, diff 
+  real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
+  real(kind=WP)                  :: rt_lay1, rt_lay2, v_dup, v_dlo
+  real(kind=WP)                  :: data_ll, data_lh, data_hl, data_hh
+  real(kind=WP)                  :: v_col(4), z_col(4), H, aux1, aux2
+  real(kind=WP)                  :: dz, a, b, c, d
+  real(kind=WP), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
+  real(kind=WP), intent(in)      :: lay_reg(num_lay_reg)
+  real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
+  real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
+  real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
   
   do n=1,num_mod
   do nz=1,nlevels_nod2D(n)-1

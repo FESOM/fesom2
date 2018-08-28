@@ -166,7 +166,7 @@ allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))
  
 !if(mom_adv==3) then
 allocate(vorticity(nl-1,node_size))
-vorticity=0.0_8
+vorticity=0.0_WP
 !end if
 
 ! =================
@@ -224,6 +224,11 @@ if (Fer_GM) then
    fer_wvel=0.0_WP
    fer_K=500.
    fer_c=1.
+end if
+
+if (SPP) then
+   allocate(ice_rejected_salt(node_size))
+   ice_rejected_salt=0.
 end if
 
 ! =================
