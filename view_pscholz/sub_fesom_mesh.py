@@ -84,7 +84,11 @@ class fesom_mesh:
 		
 		#_______________________________________________________________________
 		# rotate mesh from rot to geo coordinates
-		self.fesom_grid_rot_r2g('r2g')
+		if (inputarray['mesh_rotate'	 ]==True):
+			self.fesom_grid_rot_r2g('r2g')
+		else:
+			self.nodes_2d_xg = self.nodes_2d_x
+			self.nodes_2d_yg = self.nodes_2d_y
 		
 		#_______________________________________________________________________
 		# change grid focus from -180...180 to e.g. 0...360
@@ -158,7 +162,9 @@ class fesom_mesh:
 		print('     > nlvls.out') 
 		fid				 = open(self.path+'nlvls.out', 'r')
 		self.nodes_2d_iz = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
-		self.nodes_2d_iz = self.nodes_2d_iz.squeeze()
+        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
+        # which starts with zeros --> thats why minus 1
+		self.nodes_2d_iz = self.nodes_2d_iz.squeeze()-1
 		self.nodes_2d_z  = np.float32(self.zlev[self.nodes_2d_iz])
 		fid.close()
 		
@@ -166,7 +172,9 @@ class fesom_mesh:
 		print('     > elvls.out') 
 		fid				 = open(self.path+'elvls.out', 'r')
 		self.elem0_2d_iz  = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
-		self.elem0_2d_iz  = self.elem0_2d_iz.squeeze()
+        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
+        # which starts with zeros --> thats why minus 1
+		self.elem0_2d_iz  = self.elem0_2d_iz.squeeze()-1
 		fid.close()
 	
 	

@@ -48,7 +48,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     if do_onelem==True:
         
         if len(usemeshdiag)==0:
-            mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1
+            mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))
         else:    
             ncfile  = Dataset(os.path.join(usemeshdiag))
             elem0_2d_iz=ncfile.variables['nlevels'][:]-1
@@ -82,7 +82,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
         mat_mean = np.multiply(mat_mean, mat_2d_area[:,np.newaxis])
         del mat_2d_area
     else:
-        mat_2d_iz = mesh.nodes_2d_iz-1
+        mat_2d_iz = mesh.nodes_2d_iz
         
         # keep in mind that node area info is changing over depth--> therefor load from file 
         ncfile  = Dataset(os.path.join(data.path, data.runid+'.mesh.diag.nc'))
@@ -106,7 +106,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     moc     = np.zeros([mesh.nlev,lat.size])
     bottom  = np.zeros([lat.size,])
     numbtri = np.zeros([lat.size,])
-    topo    = np.float32(mesh.zlev[mat_2d_iz+1])
+    topo    = np.float32(mesh.zlev[mat_2d_iz])
     
     # this is more or less requird so bottom patch looks aceptable
     if which_moc=='pmoc':
@@ -117,13 +117,12 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     
     # be sure ocean floor is setted to zero
     for di in range(0,mesh.nlev):
-        mat_idx = np.where(di>mat_2d_iz-1)[0]
+        mat_idx = np.where(di>=mat_2d_iz)[0]
         mat_mean[mat_idx,di]=0.0
         
     # loop over meridional bins
     for bini in range(lat_i.min(), lat_i.max()+1):
         numbtri[bini]= np.sum(lat_i==bini)
-        #print(numbtri[bini])
         moc[:, bini]=mat_mean[lat_i==bini,:].sum(axis=0)
         #bottom[bini] = np.nanmedian(topo[lat_i==bini])
         bottom[bini] = np.nanpercentile(topo[lat_i==bini],25)
