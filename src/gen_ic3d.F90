@@ -1,5 +1,5 @@
 
-MODULE fv_ic
+MODULE g_ic3d
    !!===========================================================================
    !! Initial conditions:
    !!===========================================================================
@@ -8,11 +8,9 @@ MODULE fv_ic
    !! Description:
    !!   read and interpolate initial conditions (T and S) on model grid,
    !!     or use constants from namelist 
-   !!   
-   !!           
    !!       
    !! public: 
-   !!   ic_do   -- provide a sbc (surface boundary conditions) each time step
+   !!   do_ic3d   -- provides an initial 3D boundary conditions
    !!
    USE o_ARRAYS
    USE o_MESH
@@ -20,13 +18,13 @@ MODULE fv_ic
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
-   USE g_config, only: dummy
+   USE g_config, only: dummy, ClimateDataPath
    
    IMPLICIT NONE
 
    include 'netcdf.inc'
 
-   public  ic_do   ! read and apply IC
+   public  do_ic3d   ! read and apply 3D initial conditions
  
    private
 !
@@ -35,36 +33,17 @@ MODULE fv_ic
    ! namelists
    integer, save  :: nm_ic_unit     = 103       ! unit to open namelist file
   !============== namelistatmdata variables ================
-   integer, save  :: nm_ic        = -1        ! data  1= constant, 2=from file, -1=module off
-   character(len=256), save   :: nm_ict_file = 'ic' ! name of file with initial conditions for temperature   
-   character(len=256), save   :: nm_ics_file = 'ic' ! name of file with initial conditions for salinity             
-   
-   character(len=34), save   :: nm_temp_var = 'temp' ! name of variable in file with temperature
-   character(len=34), save   :: nm_salt_var = 'salt' ! name of variable in file with salinity
-
-   
-   real(wp), save :: nm_ict = 15._wp    ! constant temperature 
-   real(wp), save :: nm_ics = 32._wp    ! constant salinity 
-   
-   integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
+   character(256), dimension(10)                 :: filelist
+   character(50),  dimension(10)                 :: varlist
+   character(256)                                :: filename
+   character(50)                                 :: varname
+   integer                                       :: current_tracer_ID
+   integer,save                                  :: warn       ! warning switch node/element coordinate out of forcing bounds
 
    ! ========== interpolation coeficients
    integer,  allocatable, save, dimension(:)     :: bilin_indx_i ! indexs i for interpolation
    integer,  allocatable, save, dimension(:)     :: bilin_indx_j ! indexs j for interpolation
-
-   real(wp), allocatable, save, dimension(:,:,:) :: icdata ! IC data   
 !============== NETCDF ==========================================
-   integer, parameter :: i_totfl = 2 ! total number of fluxes
-   integer, parameter :: i_temp = 1 ! index of tempearature [degC]
-   integer, parameter :: i_salt = 2 ! index of salinity
-   
-   
-   type, public ::   flfi_type    !flux file informations
-      character(len = 256) :: file_name ! file name   
-      character(len = 34)  :: var_name  ! variable name in the NetCDF file
-   end type flfi_type     
- 
-  type(flfi_type),save, dimension(i_totfl) :: ic_flfi  !array for information about flux files
 
   ! arrays of time, lon and lat in INfiles
    real(wp), allocatable, save, dimension(:)  :: nc_lon
@@ -78,11 +57,9 @@ MODULE fv_ic
 
 !============== NETCDF ==========================================   
 CONTAINS
-   SUBROUTINE nc_readTimeGrid(flf)
+   SUBROUTINE nc_readTimeGrid
    ! Read time array and grid from nc file
       IMPLICIT NONE
-
-      type(flfi_type),intent(in) :: flf
 
       integer              :: iost !I/O status     
       integer              :: ncid      ! netcdf file id
@@ -98,66 +75,59 @@ CONTAINS
 !      integer              :: nf_dims(4) ! dimensions (temporal)
       integer              :: nf_start(4)
       integer              :: nf_edges(4)         
-      integer              :: sbc_alloc                   !: allocation status
-      
-
     
       !open file
-      iost = nf_open(flf%file_name,NF_NOWRITE,ncid)
-      call check_nferr(iost,flf%file_name)
+      iost = nf_open(trim(filename),NF_NOWRITE,ncid)
+      call check_nferr(iost,filename)
 
       ! get dimensions
       iost = nf_inq_dimid(ncid, "lat", id_latd)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       iost = nf_inq_dimid(ncid, "lon", id_lond)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       iost = nf_inq_dimid(ncid, "depth", id_depthd)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,filename)  
 
       ! get variable id
 !      iost = nf_inq_varid(ncid, "air", id_data)
-!      call check_nferr(iost,flf%file_name)   
+!      call check_nferr(iost,filename)   
       iost = nf_inq_varid(ncid, "lon", id_lon)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       iost = nf_inq_varid(ncid, "lat", id_lat)
-      call check_nferr(iost,flf%file_name)    
+      call check_nferr(iost,filename)    
       iost = nf_inq_varid(ncid, "depth", id_depth)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       
       !  get dimensions size
       iost = nf_inq_dimlen(ncid, id_latd, nc_Nlat)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       iost = nf_inq_dimlen(ncid, id_lond, nc_Nlon)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,filename)   
       iost = nf_inq_dimlen(ncid, id_depthd, nc_Ndepth)
-      call check_nferr(iost,flf%file_name) 
+      call check_nferr(iost,filename) 
 
       ALLOCATE( nc_lon(nc_Nlon), nc_lat(nc_Nlat),&
-                &       nc_depth(nc_Ndepth), &
-
-                &      STAT=sbc_alloc )  
-      if( sbc_alloc /= 0 )   STOP 'ic:nc_readTimeGrid: failed to allocate arrays'   
-         
+                &       nc_depth(nc_Ndepth))
 
    !read variables from file
    ! coordinates
       nf_start(1)=1
       nf_edges(1)=nc_Nlat
       iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,filename)
       nf_start(1)=1
       nf_edges(1)=nc_Nlon
       iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,filename)
    ! depth
       nf_start(1)=1
       nf_edges(1)=nc_Ndepth
       iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,filename)
 
 
       iost = nf_close(ncid)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,filename)
    END SUBROUTINE nc_readTimeGrid
 
    
@@ -171,31 +141,20 @@ CONTAINS
       IMPLICIT NONE
    
       integer            :: i
-      integer            :: sbc_alloc
-
-      integer            :: elnodes(4) !4 nodes from one element
+      integer            :: elnodes(3) ! 4 nodes from one element
       integer            :: numnodes   ! number of nodes in elem (3 for triangle, 4 for ... )
       real(wp)           :: x, y       ! coordinates of elements
       
       warn = 0
-      ALLOCATE( icdata(i_totfl,nl-1, myDim_nod2d+eDim_nod2D), &
-                   &      STAT=sbc_alloc )  
-      if( sbc_alloc /= 0 )   STOP 'nc_ic_ini: failed to allocate arrays' 
-      ALLOCATE( bilin_indx_i(myDim_nod2d+eDim_nod2D),bilin_indx_j(myDim_nod2d+eDim_nod2D), &
-                   &      STAT=sbc_alloc )  
-                   
-      if( sbc_alloc /= 0 )   STOP 'nc_ic_ini: failed to allocate arrays' 
-      
-      ! we assume that all NetCDF files have identical grid and time variable
-      write(ic_flfi(i_temp)%file_name,*) trim(nm_ict_file),'.nc'
-      ic_flfi(i_temp)%file_name=ADJUSTL(trim(ic_flfi(i_temp)%file_name))
-      ic_flfi(i_temp)%var_name=ADJUSTL(trim(nm_temp_var))
 
-      write(ic_flfi(i_salt)%file_name,*) trim(nm_ics_file),'.nc'
-      ic_flfi(i_salt)%file_name=ADJUSTL(trim(ic_flfi(i_salt)%file_name))
-      ic_flfi(i_salt)%var_name=ADJUSTL(trim(nm_salt_var))
-      
-      call nc_readTimeGrid(ic_flfi(i_temp))
+      filename=trim(ClimateDataPath)//trim(filelist(current_tracer_ID))
+      varname =trim(varlist(current_tracer_ID))
+      if (mype==0) then
+         write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer_ID)
+         write(*,*) 'input file: ', trim(filename)
+         write(*,*) 'variable  : ', trim(varname)
+      end if
+      call nc_readTimeGrid
 
       ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
       do i = 1, myDim_nod2d
@@ -222,23 +181,10 @@ CONTAINS
                bilin_indx_j(i)=0
             end if
          end if
-         if (warn == 0) then
-            if (bilin_indx_i(i) < 1 .or. bilin_indx_j(i) < 1) then
-               WRITE(*,*) '     WARNING:  node/element coordinate out of initial conditions bounds,'
-               WRITE(*,*) '        nearest value will be used'
-               warn = 1
-            end if   
-         end if
-
-         
-         
-         
       end do
                          
    END SUBROUTINE nc_ic_ini
 
-
-   
    SUBROUTINE getcoeffld
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
@@ -274,166 +220,118 @@ CONTAINS
                 data1(nc_Ndepth), &                
                 &      STAT=sbc_alloc )
       if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'   
-      icdata=dummy
-      do fld_idx = 1, i_totfl
-         !open file sbc_flfi      
-         iost = nf_open(ic_flfi(fld_idx)%file_name,NF_NOWRITE,ncid)
-         call check_nferr(iost,ic_flfi(fld_idx)%file_name)
-         ! get variable id
-         iost = nf_inq_varid(ncid, ic_flfi(fld_idx)%var_name, id_data)
-         call check_nferr(iost,ic_flfi(fld_idx)%file_name)   
-         !read data from file
-         nf_start(1)=1
-         nf_edges(1)=nc_Nlon
-         nf_start(2)=1
-         nf_edges(2)=nc_Nlat
-         nf_start(3)=1
-         nf_edges(3)=nc_Ndepth         
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1)
-         call check_nferr(iost,ic_flfi(fld_idx)%file_name)
+      tr_arr(:,:,current_tracer_ID)=dummy
+      !open file sbc_flfi      
+      iost = nf_open(filename,NF_NOWRITE,ncid)
+      call check_nferr(iost,filename)
+      ! get variable id
+      iost = nf_inq_varid(ncid, varname, id_data)
+      call check_nferr(iost,filename)   
+      !read data from file
+      nf_start(1)=1
+      nf_edges(1)=nc_Nlon
+      nf_start(2)=1
+      nf_edges(2)=nc_Nlat
+      nf_start(3)=1
+      nf_edges(3)=nc_Ndepth         
+      iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1)
+      call check_nferr(iost,filename)
 
 
-         ! bilinear space interpolation,  
-         ! data is assumed to be sampled on a regular grid
-         do ii = 1, myDim_nod2d
-            nl1 = nlevels_nod2D(ii)-1
-            i = bilin_indx_i(ii)
-            j = bilin_indx_j(ii)
-            ip1 = i + 1   
-            jp1 = j + 1
-            x  = geo_coord_nod2D(1,ii)/rad
-            y  = geo_coord_nod2D(2,ii)/rad
-            if (x<0.) x=x+360.
-
-            if ( min(i,j)>0 ) then
-            if (any(sbcdata1(i:ip1,j:jp1,1) > dummy*0.99)) cycle
-            x1 = nc_lon(i)
-            x2 = nc_lon(ip1)
-            y1 = nc_lat(j)
-            y2 = nc_lat(jp1)
+      ! bilinear space interpolation,  
+      ! data is assumed to be sampled on a regular grid
+      do ii = 1, myDim_nod2d
+         nl1 = nlevels_nod2D(ii)-1
+         i = bilin_indx_i(ii)
+         j = bilin_indx_j(ii)
+         ip1 = i + 1   
+         jp1 = j + 1
+         x  = geo_coord_nod2D(1,ii)/rad
+         y  = geo_coord_nod2D(2,ii)/rad
+         if (x<0.) x=x+360.
+         if ( min(i,j)>0 ) then
+         if (any(sbcdata1(i:ip1,j:jp1,1) > dummy*0.99)) cycle
+         x1 = nc_lon(i)
+         x2 = nc_lon(ip1)
+         y1 = nc_lat(j)
+         y2 = nc_lat(jp1)
                   
-            ! if point inside forcing domain
-            denom = (x2 - x1)*(y2 - y1)
-            data1(:) = ( sbcdata1(i,j,:)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j,:)    * (x-x1)*(y2-y) + &
-                          sbcdata1(i,jp1,:) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
-            do k= 1, nl1-1
-               call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
-               if ( d_indx < nc_Ndepth ) then
-                  d_indx_p1 = d_indx+1
-                  delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
-                  ! values from OB data for nearest depth           
-                  d1 = data1(d_indx)
-                  d2 = data1(d_indx_p1)
-                  if ((d1<dummy) .and. (d2<dummy)) then
-                  ! line a*z+b coefficients calculation
-                  cf_a  = (d2 - d1)/ delta_d
-                  ! value of interpolated OB data on Z from model
-                  cf_b  = d1 - cf_a * nc_depth(d_indx)
-                  icdata(fld_idx,k,ii) = cf_a * Z_3d_n(k,ii) + cf_b
-                  end if
+         ! if point inside forcing domain
+         denom = (x2 - x1)*(y2 - y1)
+         data1(:) = ( sbcdata1(i,j,:)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j,:)    * (x-x1)*(y2-y) + &
+                       sbcdata1(i,jp1,:) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
+         do k= 1, nl1
+            call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
+            if ( d_indx < nc_Ndepth ) then
+               d_indx_p1 = d_indx+1
+               delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
+               ! values from OB data for nearest depth           
+               d1 = data1(d_indx)
+               d2 = data1(d_indx_p1)
+               if ((d1<0.99*dummy) .and. (d2<0.99*dummy)) then
+               ! line a*z+b coefficients calculation
+               cf_a  = (d2 - d1)/ delta_d
+               ! value of interpolated OB data on Z from model
+               cf_b  = d1 - cf_a * nc_depth(d_indx)
+               tr_arr(k,ii,current_tracer_ID) = -cf_a * Z_3d_n(k,ii) + cf_b
                end if
-            enddo
-            else          
-               icdata(fld_idx,1:nl1,ii) = dummy
             end if
-         end do !ii
-         iost = nf_close(ncid)
-         call check_nferr(iost,ic_flfi(fld_idx)%file_name)
-         
-      end do !fld_idx      
-
+         enddo
+         end if
+      end do !ii
+      iost = nf_close(ncid)
+      call check_nferr(iost,filename)
       DEALLOCATE( sbcdata1, data1 )
-                
-
    END SUBROUTINE getcoeffld  
 
    
    SUBROUTINE ic_ini
-      !!---------------------------------------------------------------------
-      !!                    ***  ROUTINE sbc_ini ***
-      !!              
-      !! ** Purpose : inizialization of initial conditions
-      !! ** Method  : 
-      !! ** Action  : 
-      !!----------------------------------------------------------------------
-      IMPLICIT NONE
-     
+      IMPLICIT NONE     
       integer            :: iost  ! I/O status
-      integer            :: sbc_alloc                   !: allocation status
-      
-
-      
-      namelist/nam_ic/ nm_ic, nm_ict_file, nm_ics_file, nm_temp_var, nm_salt_var, &
-                        nm_ict, nm_ics
-
+      namelist/nam_ic/ filelist, varlist
       
       ! OPEN and read namelist for SBC
       open( unit=nm_ic_unit, file='namelist_bc.nml', form='formatted', access='sequential', status='old', iostat=iost )
-      if( iost == 0 ) then
-         WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
-      else
-         WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost     
-         STOP 'ERROR: --> ic_ini'
-      endif
       READ( nm_ic_unit, nml=nam_ic, iostat=iost )
       close( nm_ic_unit)
-      
+
+      ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
    END SUBROUTINE ic_ini  
    
-   SUBROUTINE ic_do
+   SUBROUTINE do_ic3d
       !!---------------------------------------------------------------------
-      !!                    ***  ROUTINE ic_do ***
+      !!                    ***  ROUTINE do_ic3d ***
       !!              
-      !! ** Purpose : read ICfrom netcdf, interpolate on model grid
-      !! ** Method  : 
-      !! ** Action  : 
+      !! ** Purpose : read IC from netcdf, interpolate on model grid
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-      write(*,*) "Start: Initial conditions."
+      if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
       call ic_ini ! read namelist
-      
-      if( nm_ic == -1 ) then
-         ! IF module not in use
-         write(*,*) "Initial conditions module is OFF."      
-         write(*,*) "DONE:  Initial conditions."      
-         return
-      endif      
-      if( nm_ic == 1 ) then
-         tr_arr(:,:,1) = nm_ict;
-         tr_arr(:,:,2) = nm_ics;
-         write(*,*) "Initial conditions are constants."      
-      endif     
-      if( nm_ic == 2 ) then
-         call nc_ic_ini     
+      DO current_tracer_ID=1, num_tracers
+         ! read initial conditions for nth tracer
+         call nc_ic_ini
          ! get first coeficients for time inerpolation on model grid for all datas
          call getcoeffld
-         tr_arr(:,:,1) = icdata(i_temp,:,:)
-         tr_arr(:,:,2) = icdata(i_salt,:,:)
-         call extrap_nod(tr_arr(:,:,1))
-         call extrap_nod(tr_arr(:,:,2))
-         call ic_end ! deallocate 
-      endif        
-      write(*,*) "DONE:  Initial conditions."      
-   
-   END SUBROUTINE ic_do   
+         call nc_end ! deallocate arrqays associated with netcdf file
+         call extrap_nod(tr_arr(:,:,current_tracer_ID))
+      END DO
+      call ic_end ! deallocate search arrays
 
+      if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
+   
+   END SUBROUTINE do_ic3d
    
    SUBROUTINE err_call(iost,fname)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE  err_call ***
-      !!              
-      !! ** Purpose : call Error
-      !! ** Method  : 
-      !! ** Action  : 
       !!----------------------------------------------------------------------
    IMPLICIT NONE
       integer, intent(in)            :: iost
       character(len=256), intent(in) :: fname
       write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
-      STOP 'ERROR:  stop'
-
-
+      call par_ex
+      stop
    END SUBROUTINE err_call
    
   
@@ -441,22 +339,26 @@ CONTAINS
 
       IMPLICIT NONE
  
-         DEALLOCATE( nc_lon, nc_lat, nc_depth,     &
-                  &  bilin_indx_i, bilin_indx_j,  &
-                  &  icdata )
+         DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
-
-      
    END SUBROUTINE ic_end
-   
+
+   SUBROUTINE nc_end
+
+      IMPLICIT NONE
+ 
+         DEALLOCATE(nc_lon, nc_lat, nc_depth)
+
+   END SUBROUTINE nc_end
+
    SUBROUTINE check_nferr(iost,fname)
    IMPLICIT NONE 
       character(len=256), intent(in) :: fname
       integer, intent(in) :: iost
-   
       if (iost .ne. NF_NOERR) then
-         write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         STOP 'ERROR: stop'
+         write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
+         call par_ex 
+         stop
       endif
    END SUBROUTINE
 
@@ -507,4 +409,4 @@ CONTAINS
 
    END SUBROUTINE binarysearch
    
-END MODULE fv_ic
+END MODULE g_ic3d

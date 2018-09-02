@@ -32,7 +32,7 @@ module g_support
   END INTERFACE
 !
 !--------------------------------------------------------------------------------------------
-! fills NaNs (-1000.) in a scalar field
+! fills dummy values in a scalar field
   INTERFACE extrap_nod
             MODULE PROCEDURE extrap_nod3D
   END INTERFACE
@@ -269,42 +269,53 @@ end subroutine integrate_nod_3D
 subroutine extrap_nod3D(arr)
   IMPLICIT NONE
   real(KIND=WP), intent(inout)   :: arr(:,:)
-  integer                        :: n, nl1, nz, k, j, el, cnt
+  integer                        :: n, nl1, nz, k, j, el, cnt, jj
   real(kind=WP), allocatable     :: work_array(:)
   real(kind=WP)                  :: val
   integer                        :: enodes(3)
   logical                        :: success
+  real(kind=WP), allocatable     :: loc_max, glob_max
+
 
   allocate(work_array(myDim_nod2D+eDim_nod2D))
-  ! extrapolate in horizontal direction
-  DO nz=1, nl
-     work_array=arr(nz,:)
-     success=.true.
-     DO WHILE (success)
-     success=.false.
-     DO n=1, myDim_nod2D   
-        IF (work_array(n)>0.99*dummy) THEN
-           cnt=0
-           val=0.
-           DO k=1, nod_in_elem2D_num(n)
-              el=nod_in_elem2D(k, n)
-              enodes=elem2D_nodes(:, el)
-              DO j=1, 3
-                 if ((work_array(enodes(j))<0.99*dummy) .and. (nlevels_nod2D(enodes(j))>=nz)) then
-                    val=val+work_array(enodes(j))
-                    cnt=cnt+1              
+  call exchange_nod(arr)
+  loc_max=maxval(arr(1,:))
+  glob_max=0.
+  call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+  DO WHILE (glob_max>0.99*dummy)  
+     ! extrapolate in horizontal direction
+     DO nz=1, nl-1
+        work_array=arr(nz,:)
+        success=.true.
+        DO WHILE (success)
+           success=.false.
+           DO n=1, myDim_nod2D
+              IF ((work_array(n)>0.99*dummy) .and. (nlevels_nod2D(n)>nz)) THEN
+                 cnt=0
+                 val=0.
+                 DO k=1, nod_in_elem2D_num(n)
+                    el=nod_in_elem2D(k, n)
+                    enodes=elem2D_nodes(:, el)
+                    DO j=1, 3
+                       if ((work_array(enodes(j))<0.99*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
+                          val=val+work_array(enodes(j))
+                          cnt=cnt+1              
+                       end if
+                    END DO
+                 END DO
+                 if (cnt>0) then
+                    work_array(n)=val/real(cnt)
+                    success=.true.
                  end if
-              END DO
+              END IF
            END DO
-           if (cnt>0) then
-              work_array(n)=val/real(cnt)
-              success=.true.
-           end if
-        END IF
-     END DO
-     END DO
+        END DO
      arr(nz,:)=work_array
-  ENDDO
+     ENDDO
+     call exchange_nod(arr)
+     loc_max=maxval(arr(1,:))
+     call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)         
+  END DO
   ! extrapolate in vertical direction
   DO n=1, myDim_nod2D
      nl1 = nlevels_nod2D(n)-1
@@ -312,12 +323,11 @@ subroutine extrap_nod3D(arr)
         if (arr(nz,n)>0.99*dummy) arr(nz,n)=arr(nz-1,n)
      END DO
   END DO
-  deallocate(work_array)
   call exchange_nod(arr)
+  deallocate(work_array)
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------
 !
-
 end module g_support
 

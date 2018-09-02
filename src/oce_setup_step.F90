@@ -300,8 +300,7 @@ USE o_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
-USE g_input
-USE fv_ic
+USE g_ic3d
   !
   ! reads the initial state or the restart file for the ocean
   !
@@ -315,8 +314,7 @@ USE fv_ic
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
   if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
-! call read_init_ts
-  call ic_do
+  call do_ic3d
   Tclim=tr_arr(:,:,1)
   Sclim=tr_arr(:,:,2)
   Tsurf=tr_arr(1,:,1)
