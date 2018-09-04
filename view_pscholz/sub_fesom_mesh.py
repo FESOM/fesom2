@@ -33,6 +33,7 @@ class fesom_mesh:
     #____mesh euler angles_______________________
     alpha, beta, gamma        = 0, 0, 0
     focus                     = 0
+    rotate_grid               = True
     
     #____mesh vertical info______________________
     nlev, zlev, zmid        = 0, [], []
@@ -79,12 +80,13 @@ class fesom_mesh:
         
         #_______________________________________________________________________
         # define euler angles
-        self.id    = inputarray['mesh_id'   ]
-        self.path  = inputarray['mesh_dir'  ]
-        self.alpha = inputarray['mesh_alpha']
-        self.beta  = inputarray['mesh_beta' ]
-        self.gamma = inputarray['mesh_gamma']
-        self.focus = inputarray['mesh_focus']
+        self.id          = inputarray['mesh_id'   ]
+        self.path        = inputarray['mesh_dir'  ]
+        self.alpha       = inputarray['mesh_alpha']
+        self.beta        = inputarray['mesh_beta' ]
+        self.gamma       = inputarray['mesh_gamma']
+        self.focus       = inputarray['mesh_focus']
+        self.rotate_grid = inputarray['mesh_rotate'	 ]
         
         print('')
         print('___LOAD FESOM MESH {}_________________________________________'.format(self.id))
@@ -200,12 +202,14 @@ class fesom_mesh:
         
         if (str_mode == 'focus'):
             print(' --> change mesh focus');
-            alpha = self.alpha-self.focus
-            beta  = self.beta
-            gamma = self.gamma
-            #alpha = -self.focus
-            #beta  = 0.
-            #gamma = 0.
+            if self.rotate_grid == True:
+                alpha = self.alpha-self.focus
+                beta  = self.beta
+                gamma = self.gamma
+            else:    
+                alpha = -self.focus
+                beta  = 0.
+                gamma = 0.
         else:
             if (str_mode == 'r2g'):
                 print(' --> rotate mesh rot2geo')
