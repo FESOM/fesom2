@@ -145,7 +145,7 @@ class fesom_mesh:
         self.nodes_2d_y  = np.float32(np.array(dum[:,2]).reshape(self.n2dn))
         self.nodes_2d_i  = np.uint16( np.array(dum[:,3]).reshape(self.n2dn))
         del dum
-        print(' : #2dn={:d}'.format(self.n2dn))
+        print('  : #2dn={:d}'.format(self.n2dn))
         
         #____load 2d element matrix_____________________________________________
         print('     > elem2d.out',end='')
@@ -154,7 +154,7 @@ class fesom_mesh:
         ## pandas module fastest option but not everywherre available
         self.elem0_2d_i  = np.matrix(pa.read_table(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
         fid_e2d.close()
-        print(' : #2de={:d}'.format(self.e2d))
+        print(' : #2de={:d}'.format(self.n2de))
         
         #____load 3d nodes alligned under 2d nodes______________________________
         print('     > aux3d.out') 
