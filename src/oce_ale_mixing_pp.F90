@@ -123,7 +123,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 			! Q. Wang FESOM1.4 approach
 			else
 				do nz=2,nlevels_nod2d(node)-1 
-					call Kv0_background(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
+					call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
 					Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+Kv0_b + mo(nz,node)
 				end do
 			end if
@@ -153,7 +153,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 			! Q. Wang FESOM1.4 approach
 			else
 				do nz=2,nlevels_nod2d(node)-1 
-					call Kv0_background(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
+					call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
 					Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+Kv0_b
 				end do
 			end if
@@ -264,14 +264,55 @@ end subroutine pmlktmo
 !_______________________________________________________________________________
 ! calculate non constant background diffusion coefficient as it is also used in 
 ! KPP mixing scheme (see. oce_ale_mxing_kpp.F90-->subroutine ri_iwmix(viscA, diffK))
+! after suggestions from Qiang Wang in FESOM1.4
+subroutine Kv0_background_qiang(Kv0_b,lat,dep)
+	! Kv0_b ... backround mixing coefficient
+	use o_PARAM, only: WP
+	implicit none
+	real(kind=WP), intent(out) :: Kv0_b
+	real(kind=WP), intent(in)  :: lat, dep
+	real(kind=WP)              :: aux, ratio
+	
+	!___________________________________________________________________________
+	! set latitudinal and depth dependent background diffusivity after 
+	! Q. Wang FESOM1.4 approach
+	!_______________________________________________________________________
+	aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.0e-5_WP
+	
+	!_______________________________________________________________________
+	! latitudinal equatorial scaling
+	if (abs(lat) < 5.0_WP) then
+		ratio = 1.0_WP
+	else
+		ratio = MIN( 1.0_WP + 9.0_WP * (abs(lat) - 5.0_WP) / 10.0_WP, 10.0_WP )
+	end if 
+	
+	!_______________________________________________________________________
+	! latitudinal arctic scaling
+	if (lat > 70.0) then
+		if (dep <= 50.0)     then
+			ratio=4.0_WP + 6.0_WP * (50.0_WP - dep) / 50.0_WP
+		else
+			ratio=4.0_WP  
+		endif   
+	end if
+	!_______________________________________________________________________
+	Kv0_b = aux*ratio
+	
+end subroutine Kv0_background_qiang
+!
+!
+!_______________________________________________________________________________
+! calculate non constant background diffusion coefficient as it is also used in 
+! KPP mixing scheme (see. oce_ale_mxing_kpp.F90-->subroutine ri_iwmix(viscA, diffK))
 ! first implemented my Q.Wang in FESOM1.4
 subroutine Kv0_background(Kv0_b,lat,dep)
 	! Kv0_b ... backround mixing coefficient
 	use o_PARAM, only: WP
 	implicit none
-	real(kind=WP) :: Kv0_b
-	real(kind=WP) :: lat, dep
-	real(kind=WP) :: aux, ratio
+	real(kind=WP), intent(out) :: Kv0_b
+	real(kind=WP), intent(in)  :: lat, dep
+	real(kind=WP)              :: aux, ratio
 	
 	!___________________________________________________________________________
 	! set latitudinal and depth dependent background diffusivity after 

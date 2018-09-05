@@ -45,19 +45,19 @@ MODULE o_mixing_KPP_mod
   real(KIND=WP), dimension(:,:), allocatable    :: ghats    ! nonlocal transport (s/m^2)
   real(KIND=WP), dimension(:), allocatable      :: hbl      ! boundary layer depth
 
-  real(KIND=WP), parameter :: epsln   	  	= 1.0e-40_WP ! a small value
+  real(KIND=WP), parameter :: epsln             = 1.0e-40_WP ! a small value
 
-  real(KIND=WP), parameter :: epsilon_kpp 	= 0.1_WP
-  real(KIND=WP), parameter :: vonk    	  	= 0.4_WP
-  real(KIND=WP), parameter :: conc1   	  	= 5.0_WP
+  real(KIND=WP), parameter :: epsilon_kpp     = 0.1_WP
+  real(KIND=WP), parameter :: vonk              = 0.4_WP
+  real(KIND=WP), parameter :: conc1             = 5.0_WP
 
-  real(KIND=WP), parameter :: zmin    		= -4.e-7_WP  ! m3/s3 limit for lookup table of wm and ws
-  real(KIND=WP), parameter :: zmax    		= 0.0_WP     ! m3/s3 limit for lookup table of wm and ws
-  real(KIND=WP), parameter :: umin    		= 0.0_WP     ! m/s limit for lookup table of wm and ws
-  real(KIND=WP), parameter :: umax    		= 0.04_WP    ! m/s limit for lookup table of wm and ws
+  real(KIND=WP), parameter :: zmin            = -4.e-7_WP  ! m3/s3 limit for lookup table of wm and ws
+  real(KIND=WP), parameter :: zmax            = 0.0_WP     ! m3/s3 limit for lookup table of wm and ws
+  real(KIND=WP), parameter :: umin            = 0.0_WP     ! m/s limit for lookup table of wm and ws
+  real(KIND=WP), parameter :: umax            = 0.04_WP    ! m/s limit for lookup table of wm and ws
 
-  real(KIND=WP) :: cg        	    ! non-dimensional coefficient for counter-gradient term
-  real(KIND=WP) :: Vtc      	    ! non-dimensional coefficient for velocity 
+  real(KIND=WP) :: cg                ! non-dimensional coefficient for counter-gradient term
+  real(KIND=WP) :: Vtc              ! non-dimensional coefficient for velocity 
                                     ! scale of turbulant velocity shear        
                                     ! (=function of concv,concs,epsilon_kpp,vonk,Ricr)
 
@@ -88,8 +88,8 @@ contains
 !      *******************************************************************
 !       Call this routine under oce_setup_step.F90 (array_setup subroutine)
 !       Change the size of Kv under oce_modules.F90 (o_ARRAYS module)
-! 	KPP: Kv(nl,node_size,2) for T and S and Av(nl,node_size) 
-! 	PP:  Kv(nl,node_size) and Av(nl,elem_size)
+!     KPP: Kv(nl,node_size,2) for T and S and Av(nl,node_size) 
+!     PP:  Kv(nl,node_size) and Av(nl,elem_size)
 !      *******************************************************************
 
   subroutine oce_mixing_kpp_init
@@ -112,19 +112,19 @@ contains
 
      integer :: i, j
     
-     allocate ( ghats 	( nl-1,	myDim_nod2D+eDim_nod2D 		))   ! nonlocal transport (s/m^2)
-     allocate ( hbl   	(	myDim_nod2D+eDim_nod2D 		))   ! boundary layer depth
+     allocate ( ghats     ( nl-1,    myDim_nod2D+eDim_nod2D         ))   ! nonlocal transport (s/m^2)
+     allocate ( hbl       (    myDim_nod2D+eDim_nod2D         ))   ! boundary layer depth
 
-     allocate (	bfsfc  	 (       myDim_nod2D+eDim_nod2D		))   ! surface buoyancy forcing    (m^2/s^3)
-     allocate (	caseA    (       myDim_nod2D+eDim_nod2D		))   ! = 1 in case A; =0 in case B
-     allocate (	stable   (       myDim_nod2D+eDim_nod2D		))   ! = 1 in stable forcing; =0 in unstable
-     allocate (	dkm1     (       myDim_nod2D+eDim_nod2D,      3	))   ! boundary layer diff at kbl-1 level
-     allocate (	blmc     ( nl,   myDim_nod2D+eDim_nod2D,      3	))   ! boundary layer mixing coefficients
-     allocate (	ustar    (       myDim_nod2D+eDim_nod2D		))   ! surface friction velocity       (m/s)
-     allocate (	Bo       (       myDim_nod2D+eDim_nod2D		))   ! surface turb buoy. forcing  (m^2/s^3)
-     allocate (	dVsq     ( nl,   myDim_nod2D+eDim_nod2D		))   ! (velocity shear re sfc)^2   (m/s)^2
-     allocate (	dbsfc    ( nl,   myDim_nod2D+eDim_nod2D		))   ! buoyancy re sfc
-     allocate (	kbl      (	 myDim_nod2D+eDim_nod2D		))   ! index of first grid level below hbl
+     allocate (    bfsfc       (       myDim_nod2D+eDim_nod2D        ))   ! surface buoyancy forcing    (m^2/s^3)
+     allocate (    caseA    (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in case A; =0 in case B
+     allocate (    stable   (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in stable forcing; =0 in unstable
+     allocate (    dkm1     (       myDim_nod2D+eDim_nod2D,      3    ))   ! boundary layer diff at kbl-1 level
+     allocate (    blmc     ( nl,   myDim_nod2D+eDim_nod2D,      3    ))   ! boundary layer mixing coefficients
+     allocate (    ustar    (       myDim_nod2D+eDim_nod2D        ))   ! surface friction velocity       (m/s)
+     allocate (    Bo       (       myDim_nod2D+eDim_nod2D        ))   ! surface turb buoy. forcing  (m^2/s^3)
+     allocate (    dVsq     ( nl,   myDim_nod2D+eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
+     allocate (    dbsfc    ( nl,   myDim_nod2D+eDim_nod2D        ))   ! buoyancy re sfc
+     allocate (    kbl      (     myDim_nod2D+eDim_nod2D        ))   ! index of first grid level below hbl
      ghats       = 0.0
      hbl         = 0.0
 
@@ -227,8 +227,8 @@ contains
      IMPLICIT NONE
 
 !      *******************************************************************
-! 	Define allocatble arrays under oce_modules.F90
-! 	Allocate arrays under oce_setup_step.F90
+!     Define allocatble arrays under oce_modules.F90
+!     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
 
      integer                    :: node, kn, elem, elnodes(3)
@@ -251,13 +251,13 @@ contains
 !       Eqn. 21
 !       dVsq: Velocity shear referenced to surface (defined @ Z layer)
 !       Compute squared vertical difference of velocity
-! 	(Vr-Vd)**2 
+!     (Vr-Vd)**2 
 !        
 !       dbsfc: Buoyancy difference between surface and grid points below 
 !       i.e., Compute buoyancy difference with respect to "zref",i.e. the 
 !       surface(m/s2) (defined @ zbar layer)
 !       dbsfc = g * [ drho{1,k}/rho{1,k} - drho{k,k}/rho{k,k} ]
-! 	(Br-Bd) 
+!     (Br-Bd) 
 !
 !       Squared buoyancy frequency which is required in this module,
 !       is calculated in a separate routine
@@ -347,7 +347,7 @@ contains
           IF (nz < kbl(node)) then ! within the bounday layer
              viscA(nz,node  ) = MAX(viscA(nz,node  ), blmc(nz,node,1))
              diffK(nz,node,1) = MAX(diffK(nz,node,1), blmc(nz,node,2))
-             diffK(nz,node,2) = MAX(diffK(nz,node,2), blmc(nz,node,3))		  		  
+             diffK(nz,node,2) = MAX(diffK(nz,node,2), blmc(nz,node,3))                    
           ELSE
              ghats(nz,node)=0.0    ! outside the boundary layer set nonlocal terms to zero
           ENDIF
@@ -359,7 +359,7 @@ contains
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      DO nz=1,nlevels(elem)-1
-        viscAE(nz,elem) = SUM(viscA(nz,elnodes))/3.0_WP	! (elementwise)	  		  
+        viscAE(nz,elem) = SUM(viscA(nz,elnodes))/3.0_WP    ! (elementwise)                
      END DO
      viscAE( nlevels(elem), elem ) = viscAE( nlevels(elem)-1, elem )
   END DO    
@@ -367,7 +367,7 @@ contains
 ! Set the mixing coeff. in the first layer above some limiting value
 ! this is very helpful to avoid huge surface velocity when vertical
 ! viscosity is very small derived from the KPP scheme.
-! I strongly recommend this trick, at least in the current FESOM version.	
+! I strongly recommend this trick, at least in the current FESOM version.    
   minmix=3.0e-3
   WHERE(viscAE(1,:) < minmix) 
      viscAE(1,:) = minmix
@@ -662,7 +662,7 @@ contains
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
      real(KIND=WP)               :: Rigg, ratio, frit
-     real(KIND=WP)               :: dz_inv, shear, aux, dep, lat
+     real(KIND=WP)               :: dz_inv, shear, aux, dep, lat, Kv0_b
 
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D             ), intent(inout) :: viscA !for momentum (nodes)
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D ,num_tracers), intent(inout) :: diffK !for T and S
@@ -676,9 +676,9 @@ contains
         DO nz=2,nlevels_nod2d(node)-1
            dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
            shear  = ( Unode(1, nz-1, node) - Unode(1, nz, node) )**2 + &
-	            ( Unode(2, nz-1, node) - Unode(2, nz, node) )**2 
+                ( Unode(2, nz-1, node) - Unode(2, nz, node) )**2 
            shear  = shear * dz_inv * dz_inv
-	   diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)  ! To avoid NaNs at start
+       diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)  ! To avoid NaNs at start
         END DO                                                                  ! minimum Richardson number is 0
 
 !      *******************************************************************
@@ -706,66 +706,49 @@ contains
        call smooth_nod(diffK(:,:,1), 3)
     end if
 
-	!___________________________________________________________________________
-	! compute viscA and diffK
-	do node=1, myDim_nod2D+eDim_nod2D
-		do nz=2,nlevels_nod2d(node)-1
-			!___________________________________________________________________
-			! evaluate function of Ri# for shear instability eqn. (28b&c)
-			Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
-			ratio = AMIN1( Rigg/Riinfty , 1.0_WP )
-			frit  = (1.0_WP - ratio*ratio)
-			frit  = frit*frit*frit
-			!___________________________________________________________________
-			! viscosity
-			viscA(nz,node) =  visc_sh_limit * frit + A_ver  ! A_ver= 1.e-4 Vertical harm. visc.
-			
-			!___________________________________________________________________
-			!  diffusivity
-			! set constant background diffusivity with namelist value K_ver
-			if(Kv0_const) then
-				diffK(nz,node,1) = diff_sh_limit * frit + K_ver
-				
-			! set latitudinal and depth dependent background diffusivity after Qiangs
-			! FESOM1.4 approach
-			else
-				dep = abs(zbar_3d_n(nz,node)) ! Kv is defined on the levels 
-				lat = geo_coord_nod2D(2,node)/ rad
-				! latitudinal equatorial scaling
-				if (abs(lat) < 5.0_WP) then
-					ratio = 1.0_WP
-				else
-					ratio = MIN( 1.0_WP + 9.0_WP * (abs(lat) - 5.0_WP) / 10.0_WP, 10.0_WP )
-				end if 
-				! latitudinal <70 scaling
-				if (lat < 70.0) then
-					aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
-				! latitudinal arctic scaling
-				else
-					aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6
-					ratio=3.0
-					if (dep < 80.0)     then
-						ratio=1.0
-					elseif(dep < 100.0) then
-						ratio=2.0  
-					endif   
-				end if
-				diffK(nz,node,1) =  diff_sh_limit * frit + aux * ratio
-			end if 
-			diffK(nz,node,2) = diffK(nz,node,1)  
-		end do ! --> do nz=2,nlevels_nod2d(node)-1
-		
-		!_______________________________________________________________________
-		!!! No need to set surface and bottom diffusivity. diffK @ zbar      !!!
-		!!! Model do not use these levels !!!!!!!                            !!!
-		viscA( 1, node    ) = viscA(2, node   )
-		diffK( 1, node, 1 ) = diffK(2, node, 1)
-		diffK( 1, node, 2 ) = diffK(2, node, 2)
-		viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
-		diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
-		diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
-		
-	end do !-->do node=1, myDim_nod2D+eDim_nod2D
+    !___________________________________________________________________________
+    ! compute viscA and diffK
+    do node=1, myDim_nod2D+eDim_nod2D
+        do nz=2,nlevels_nod2d(node)-1
+            !___________________________________________________________________
+            ! evaluate function of Ri# for shear instability eqn. (28b&c)
+            Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
+            ratio = AMIN1( Rigg/Riinfty , 1.0_WP )
+            frit  = (1.0_WP - ratio*ratio)
+            frit  = frit*frit*frit
+            !___________________________________________________________________
+            ! viscosity
+            viscA(nz,node) =  visc_sh_limit * frit + A_ver  ! A_ver= 1.e-4 Vertical harm. visc.
+            
+            !___________________________________________________________________
+            ! diffusivity
+            ! set constant background diffusivity with namelist value K_ver
+            if(Kv0_const) then
+                diffK(nz,node,1) = diff_sh_limit * frit + K_ver
+                
+            ! set latitudinal and depth dependent background diffusivity after Qiangs
+            ! FESOM1.4 approach
+            else
+                ! --> see in oce_ale_mixing_pp.F90 --> there are different 
+                ! schemes of the vertical background diffusivity possible strongly
+                ! depending on purpos and tuning especially with arctic focus
+                call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
+                diffK(nz,node,1) =  diff_sh_limit * frit + Kv0_b
+            end if 
+            diffK(nz,node,2) = diffK(nz,node,1)  
+        end do ! --> do nz=2,nlevels_nod2d(node)-1
+        
+        !_______________________________________________________________________
+        !!! No need to set surface and bottom diffusivity. diffK @ zbar      !!!
+        !!! Model do not use these levels !!!!!!!                            !!!
+        viscA( 1, node    ) = viscA(2, node   )
+        diffK( 1, node, 1 ) = diffK(2, node, 1)
+        diffK( 1, node, 2 ) = diffK(2, node, 2)
+        viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
+        diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
+        diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+        
+    end do !-->do node=1, myDim_nod2D+eDim_nod2D
 
   end subroutine ri_iwmix
 
