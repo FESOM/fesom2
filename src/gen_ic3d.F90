@@ -27,14 +27,15 @@ MODULE g_ic3d
    public  do_ic3d   ! read and apply 3D initial conditions
  
    private
-!
 
-   
-   ! namelists
+! namelists
    integer, save  :: nm_ic_unit     = 103       ! unit to open namelist file
-  !============== namelistatmdata variables ================
-   character(256), dimension(10)                 :: filelist
-   character(50),  dimension(10)                 :: varlist
+!============== namelistatmdata variables ================
+   integer, parameter                            :: io_max=10
+   integer                                       :: n_io3d
+   integer,        dimension(io_max)             :: idlist
+   character(256), dimension(io_max)             :: filelist
+   character(50),  dimension(io_max)             :: varlist
    character(256)                                :: filename
    character(50)                                 :: varname
    integer                                       :: current_tracer_ID
@@ -57,7 +58,7 @@ MODULE g_ic3d
 
 !============== NETCDF ==========================================   
 CONTAINS
-   SUBROUTINE nc_readTimeGrid
+   SUBROUTINE nc_readGrid
    ! Read time array and grid from nc file
       IMPLICIT NONE
 
@@ -71,78 +72,120 @@ CONTAINS
       integer              :: id_latd
       integer              :: id_depth
       integer              :: id_depthd      
-      
-!      integer              :: nf_dims(4) ! dimensions (temporal)
       integer              :: nf_start(4)
       integer              :: nf_edges(4)         
+      integer              :: ierror              ! return error code
     
       !open file
-      iost = nf_open(trim(filename),NF_NOWRITE,ncid)
+      if (mype==0) then
+         iost = nf_open(trim(filename),NF_NOWRITE,ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
 
       ! get dimensions
-      iost = nf_inq_dimid(ncid, "lat", id_latd)
-      call check_nferr(iost,filename)   
-      iost = nf_inq_dimid(ncid, "lon", id_lond)
-      call check_nferr(iost,filename)   
-      iost = nf_inq_dimid(ncid, "depth", id_depthd)
+      if (mype==0) then
+         iost = nf_inq_dimid(ncid, "lat", id_latd)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename)  
+      if (mype==0) then 
+         iost = nf_inq_dimid(ncid, "lon", id_lond)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename) 
+      if (mype==0) then   
+         iost = nf_inq_dimid(ncid, "depth", id_depthd)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)  
 
       ! get variable id
-!      iost = nf_inq_varid(ncid, "air", id_data)
-!      call check_nferr(iost,filename)   
-      iost = nf_inq_varid(ncid, "lon", id_lon)
-      call check_nferr(iost,filename)   
-      iost = nf_inq_varid(ncid, "lat", id_lat)
-      call check_nferr(iost,filename)    
-      iost = nf_inq_varid(ncid, "depth", id_depth)
+      if (mype==0) then
+         iost = nf_inq_varid(ncid, "lon", id_lon)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename)
+      if (mype==0) then
+         iost = nf_inq_varid(ncid, "lat", id_lat)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename)  
+      if (mype==0) then   
+         iost = nf_inq_varid(ncid, "depth", id_depth)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)   
       
-      !  get dimensions size
-      iost = nf_inq_dimlen(ncid, id_latd, nc_Nlat)
+      ! get dimensions size
+      if (mype==0) then
+         iost = nf_inq_dimlen(ncid, id_latd, nc_Nlat)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)   
-      iost = nf_inq_dimlen(ncid, id_lond, nc_Nlon)
+      if (mype==0) then      
+         iost = nf_inq_dimlen(ncid, id_lond, nc_Nlon)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)   
-      iost = nf_inq_dimlen(ncid, id_depthd, nc_Ndepth)
+      if (mype==0) then      
+         iost = nf_inq_dimlen(ncid, id_depthd, nc_Ndepth)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename) 
+
+      call MPI_BCast(nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_Ndepth, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
       ALLOCATE( nc_lon(nc_Nlon), nc_lat(nc_Nlat),&
                 &       nc_depth(nc_Ndepth))
 
    !read variables from file
    ! coordinates
-      nf_start(1)=1
-      nf_edges(1)=nc_Nlat
-      iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
+      if (mype==0) then
+         nf_start(1)=1
+         nf_edges(1)=nc_Nlat
+         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
-      nf_start(1)=1
-      nf_edges(1)=nc_Nlon
-      iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon)
+      if (mype==0) then
+         nf_start(1)=1
+         nf_edges(1)=nc_Nlon
+         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename)
    ! depth
-      nf_start(1)=1
-      nf_edges(1)=nc_Ndepth
-      iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
+      if (mype==0) then
+         nf_start(1)=1
+         nf_edges(1)=nc_Ndepth
+         iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename)
 
+      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_depth, nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
-      iost = nf_close(ncid)
+      if (mype==0) then
+         iost = nf_close(ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
-   END SUBROUTINE nc_readTimeGrid
+   END SUBROUTINE nc_readGrid
 
    
-   SUBROUTINE nc_ic_ini
+   SUBROUTINE nc_ic3d_ini
       !!---------------------------------------------------------------------
-      !!                    ***  ROUTINE ascii_ini ***
-      !!              
       !! ** Purpose : inizialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
-
       IMPLICIT NONE
    
       integer            :: i
-      integer            :: elnodes(3) ! 4 nodes from one element
-      integer            :: numnodes   ! number of nodes in elem (3 for triangle, 4 for ... )
+      integer            :: elnodes(3)
       real(wp)           :: x, y       ! coordinates of elements
       
       warn = 0
@@ -154,7 +197,7 @@ CONTAINS
          write(*,*) 'input file: ', trim(filename)
          write(*,*) 'variable  : ', trim(varname)
       end if
-      call nc_readTimeGrid
+      call nc_readGrid
 
       ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
       do i = 1, myDim_nod2d
@@ -183,7 +226,7 @@ CONTAINS
          end if
       end do
                          
-   END SUBROUTINE nc_ic_ini
+   END SUBROUTINE nc_ic3d_ini
 
    SUBROUTINE getcoeffld
       !!---------------------------------------------------------------------
@@ -201,42 +244,43 @@ CONTAINS
       integer              :: id_data
       integer              :: nf_start(4)
       integer              :: nf_edges(4)         
-!      integer              :: zero_year,yyyy,mm,dd
-!      character(len = 256) :: att_string ! attribute              
       integer              :: fld_idx, i,j,ii, ip1, jp1, k
-      integer              :: sbc_alloc
-  
       integer              :: d_indx, d_indx_p1  ! index of neares      
       real(wp)             :: cf_a, cf_b, delta_d, nl1
       real(wp)             :: denom, x1, x2, y1, y2, x, y, d1,d2     
       
-      real(wp), allocatable, dimension(:,:,:)  :: sbcdata1
-      real(wp), allocatable, dimension(:)      :: data1
-      
-      integer              :: elnodes(4) !4 nodes from one element
-      integer              :: numnodes   ! number of nodes in elem (3 for triangle, 4 for ... )
+      real(wp), allocatable, dimension(:,:,:)  :: ncdata
+      real(wp), allocatable, dimension(:)      :: data1d      
+      integer              :: elnodes(3)
+      integer              :: ierror              ! return error code
 
-      ALLOCATE( sbcdata1(nc_Nlon,nc_Nlat,nc_Ndepth), &
-                data1(nc_Ndepth), &                
-                &      STAT=sbc_alloc )
-      if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'   
+      ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       tr_arr(:,:,current_tracer_ID)=dummy
-      !open file sbc_flfi      
-      iost = nf_open(filename,NF_NOWRITE,ncid)
+      !open NETCDF file on 0 core     
+      if (mype==0) then
+         iost = nf_open(filename,NF_NOWRITE,ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
       ! get variable id
-      iost = nf_inq_varid(ncid, varname, id_data)
+      if (mype==0) then
+         iost = nf_inq_varid(ncid, varname, id_data)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)   
       !read data from file
-      nf_start(1)=1
-      nf_edges(1)=nc_Nlon
-      nf_start(2)=1
-      nf_edges(2)=nc_Nlat
-      nf_start(3)=1
-      nf_edges(3)=nc_Ndepth         
-      iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1)
+      if (mype==0) then
+         nf_start(1)=1
+         nf_edges(1)=nc_Nlon
+         nf_start(2)=1
+         nf_edges(2)=nc_Nlat
+         nf_start(3)=1
+         nf_edges(3)=nc_Ndepth         
+         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
-
+      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
@@ -250,7 +294,7 @@ CONTAINS
          y  = geo_coord_nod2D(2,ii)/rad
          if (x<0.) x=x+360.
          if ( min(i,j)>0 ) then
-         if (any(sbcdata1(i:ip1,j:jp1,1) > dummy*0.99)) cycle
+         if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99)) cycle
          x1 = nc_lon(i)
          x2 = nc_lon(ip1)
          y1 = nc_lat(j)
@@ -258,16 +302,16 @@ CONTAINS
                   
          ! if point inside forcing domain
          denom = (x2 - x1)*(y2 - y1)
-         data1(:) = ( sbcdata1(i,j,:)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j,:)    * (x-x1)*(y2-y) + &
-                       sbcdata1(i,jp1,:) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
+         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)    * (x-x1)*(y2-y) + &
+                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
          do k= 1, nl1
             call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
             if ( d_indx < nc_Ndepth ) then
                d_indx_p1 = d_indx+1
                delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
                ! values from OB data for nearest depth           
-               d1 = data1(d_indx)
-               d2 = data1(d_indx_p1)
+               d1 = data1d(d_indx)
+               d2 = data1d(d_indx_p1)
                if ((d1<0.99*dummy) .and. (d2<0.99*dummy)) then
                ! line a*z+b coefficients calculation
                cf_a  = (d2 - d1)/ delta_d
@@ -279,16 +323,17 @@ CONTAINS
          enddo
          end if
       end do !ii
-      iost = nf_close(ncid)
-      call check_nferr(iost,filename)
-      DEALLOCATE( sbcdata1, data1 )
+      if (mype==0) then
+         iost = nf_close(ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
-
    
-   SUBROUTINE ic_ini
+   SUBROUTINE ic3d_ini
       IMPLICIT NONE     
       integer            :: iost  ! I/O status
-      namelist/nam_ic/ filelist, varlist
+      namelist/nam_ic/ n_io3d, idlist, filelist, varlist
       
       ! OPEN and read namelist for SBC
       open( unit=nm_ic_unit, file='namelist_bc.nml', form='formatted', access='sequential', status='old', iostat=iost )
@@ -296,7 +341,7 @@ CONTAINS
       close( nm_ic_unit)
 
       ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
-   END SUBROUTINE ic_ini  
+   END SUBROUTINE ic3d_ini  
    
    SUBROUTINE do_ic3d
       !!---------------------------------------------------------------------
@@ -307,17 +352,17 @@ CONTAINS
       IMPLICIT NONE
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
-      call ic_ini ! read namelist
+      call ic3d_ini ! read namelist
       DO current_tracer_ID=1, num_tracers
          ! read initial conditions for nth tracer
-         call nc_ic_ini
+         call nc_ic3d_ini
          ! get first coeficients for time inerpolation on model grid for all datas
          call getcoeffld
          call nc_end ! deallocate arrqays associated with netcdf file
          call extrap_nod(tr_arr(:,:,current_tracer_ID))
       END DO
       call ic_end ! deallocate search arrays
-
+      call insitu2pot
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    
    END SUBROUTINE do_ic3d
@@ -345,9 +390,9 @@ CONTAINS
 
    SUBROUTINE nc_end
 
-      IMPLICIT NONE
+    IMPLICIT NONE
  
-         DEALLOCATE(nc_lon, nc_lat, nc_depth)
+    DEALLOCATE(nc_lon, nc_lat, nc_depth)
 
    END SUBROUTINE nc_end
 
@@ -373,22 +418,14 @@ CONTAINS
       !org. source from: https://github.com/cfinch/Shocksolution_Examples/blob/master/FORTRAN/BilinearInterpolation/interpolation.f90
 
       IMPLICIT NONE 
-      integer,  intent(in) :: length
+      integer,  intent(in)                    :: length
       real(wp), dimension(length), intent(in) :: array
-      real(wp), intent(in) :: value
-   !   real, intent(in), optional :: delta
+      real(wp), intent(in)                    :: value
+      integer, intent(out)                    :: ind
+      integer                                 :: left, middle, right
+      real(wp)                                :: d
 
-   !   integer :: binarysearch
-      integer, intent(out) :: ind
-
-      integer :: left, middle, right
-      real(wp):: d
-
-   !   if (present(delta) .eqv. .true.) then
-   !      d = delta
-   !   else
       d = 1e-9
-   !   endif
       left = 1
       right = length
       do
@@ -408,5 +445,4 @@ CONTAINS
       ind = right
 
    END SUBROUTINE binarysearch
-   
 END MODULE g_ic3d
