@@ -50,3 +50,10 @@ tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
 num_tracers=2       !number of all tracers
 tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
 /
+
+&nam_ic3d       ! initial conditions for tracers
+n_ic3d   = 2                              ! number of tracers to initialize
+idlist   = 0, 1                           ! their IDs (0 is temperature, 1 is salinity, etc.)
+filelist = 'T_January.nc', 'S_January.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 't0112an1', 's0112an1'         ! variables to read from specified files
+/

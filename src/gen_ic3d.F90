@@ -1,13 +1,12 @@
 
 MODULE g_ic3d
    !!===========================================================================
-   !! Initial conditions:
+   !! Initial conditions for tracers:
    !!===========================================================================
    !! History: 0.1 ! 03/2016 I. Kuznetsov
    
    !! Description:
-   !!   read and interpolate initial conditions (T and S) on model grid,
-   !!     or use constants from namelist 
+   !!   read and interpolate initial conditions for tracers on model grid,
    !!       
    !! public: 
    !!   do_ic3d   -- provides an initial 3D boundary conditions
@@ -24,22 +23,26 @@ MODULE g_ic3d
 
    include 'netcdf.inc'
 
-   public  do_ic3d   ! read and apply 3D initial conditions
- 
+   public  do_ic3d, &                                   ! read and apply 3D initial conditions
+           n_ic3d, idlist, filelist, varlist, nam_ic3d  ! to be read from the namelist
+      
    private
 
 ! namelists
    integer, save  :: nm_ic_unit     = 103       ! unit to open namelist file
 !============== namelistatmdata variables ================
-   integer, parameter                            :: io_max=10
-   integer                                       :: n_io3d
-   integer,        dimension(io_max)             :: idlist
-   character(256), dimension(io_max)             :: filelist
-   character(50),  dimension(io_max)             :: varlist
-   character(256)                                :: filename
-   character(50)                                 :: varname
-   integer                                       :: current_tracer_ID
-   integer,save                                  :: warn       ! warning switch node/element coordinate out of forcing bounds
+   integer, parameter                           :: ic_max=10
+   integer,        save                         :: n_ic3d
+   integer,        save,  dimension(ic_max)     :: idlist
+   character(256), save,  dimension(ic_max)     :: filelist
+   character(50),  save,  dimension(ic_max)     :: varlist
+
+   namelist / nam_ic3d / n_ic3d, idlist, filelist, varlist 
+
+   character(256), save                         :: filename
+   character(50),  save                         :: varname
+   integer,        save                         :: current_tracer
+   integer,        save                         :: warn       ! warning switch node/element coordinate out of forcing bounds
 
    ! ========== interpolation coeficients
    integer,  allocatable, save, dimension(:)     :: bilin_indx_i ! indexs i for interpolation
@@ -190,10 +193,10 @@ CONTAINS
       
       warn = 0
 
-      filename=trim(ClimateDataPath)//trim(filelist(current_tracer_ID))
-      varname =trim(varlist(current_tracer_ID))
+      filename=trim(ClimateDataPath)//trim(filelist(current_tracer))
+      varname =trim(varlist(current_tracer))
       if (mype==0) then
-         write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer_ID)
+         write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer)
          write(*,*) 'input file: ', trim(filename)
          write(*,*) 'variable  : ', trim(varname)
       end if
@@ -255,7 +258,7 @@ CONTAINS
       integer              :: ierror              ! return error code
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
-      tr_arr(:,:,current_tracer_ID)=dummy
+      tr_arr(:,:,current_tracer)=dummy
       !open NETCDF file on 0 core     
       if (mype==0) then
          iost = nf_open(filename,NF_NOWRITE,ncid)
@@ -317,7 +320,7 @@ CONTAINS
                cf_a  = (d2 - d1)/ delta_d
                ! value of interpolated OB data on Z from model
                cf_b  = d1 - cf_a * nc_depth(d_indx)
-               tr_arr(k,ii,current_tracer_ID) = -cf_a * Z_3d_n(k,ii) + cf_b
+               tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
                end if
             end if
          enddo
@@ -330,38 +333,36 @@ CONTAINS
       DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
    
-   SUBROUTINE ic3d_ini
-      IMPLICIT NONE     
-      integer            :: iost  ! I/O status
-      namelist/nam_ic/ n_io3d, idlist, filelist, varlist
-      
-      ! OPEN and read namelist for SBC
-      open( unit=nm_ic_unit, file='namelist_bc.nml', form='formatted', access='sequential', status='old', iostat=iost )
-      READ( nm_ic_unit, nml=nam_ic, iostat=iost )
-      close( nm_ic_unit)
-
-      ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
-   END SUBROUTINE ic3d_ini  
-   
    SUBROUTINE do_ic3d
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE do_ic3d ***
       !!              
-      !! ** Purpose : read IC from netcdf, interpolate on model grid
+      !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
       IMPLICIT NONE
+      integer                       :: n
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
-      call ic3d_ini ! read namelist
-      DO current_tracer_ID=1, num_tracers
-         ! read initial conditions for nth tracer
-         call nc_ic3d_ini
-         ! get first coeficients for time inerpolation on model grid for all datas
-         call getcoeffld
-         call nc_end ! deallocate arrqays associated with netcdf file
-         call extrap_nod(tr_arr(:,:,current_tracer_ID))
+      ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
+      DO n=1, n_ic3d
+      DO current_tracer=1, num_tracers
+         if (tracer_ID(current_tracer)==idlist(n)) then
+            ! read initial conditions for nth tracer
+            call nc_ic3d_ini
+            ! get first coeficients for time inerpolation on model grid for all datas
+            call getcoeffld
+            call nc_end ! deallocate arrqays associated with netcdf file
+            call extrap_nod(tr_arr(:,:,current_tracer))
+            exit
+         elseif (current_tracer==num_tracers) then
+            if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
+            if (mype==0) write(*,*) "check your namelists!"
+            call par_ex
+            stop
+         end if
       END DO
-      call ic_end ! deallocate search arrays
+      END DO
+      DEALLOCATE(bilin_indx_i, bilin_indx_j)
       call insitu2pot
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    
@@ -379,14 +380,6 @@ CONTAINS
       stop
    END SUBROUTINE err_call
    
-  
-   SUBROUTINE ic_end
-
-      IMPLICIT NONE
- 
-         DEALLOCATE(bilin_indx_i, bilin_indx_j)
-
-   END SUBROUTINE ic_end
 
    SUBROUTINE nc_end
 

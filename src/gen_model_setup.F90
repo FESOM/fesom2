@@ -17,6 +17,7 @@ subroutine read_namelist
   use g_parsup
   use g_config
   use g_clock, only: timenew, daynew, yearnew
+  use g_ic3d  
   implicit none
 
   character(len=100)   :: nmlfile
@@ -74,6 +75,7 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=oce_dyn)
   read (20,NML=oce_tra)
+  read (20,NML=nam_ic3d)
   close (20)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
