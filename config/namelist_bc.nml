@@ -2,6 +2,8 @@
 ! nam_ic       -> filenames to read the initial conditions
 !-----------------------------------------------------------------------
 &nam_ic
-   filelist = 'T_January.nc','S_January.nc'
+   n_io3d   = 2
+   idlist   = 0, 1 !0 is temperature, 1 is salinity
+   filelist = 'T_January.nc', 'S_January.nc'
    varlist  = 't0112an1', 's0112an1'
 /
