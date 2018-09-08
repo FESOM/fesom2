@@ -193,8 +193,6 @@ CONTAINS
       
       warn = 0
 
-      filename=trim(ClimateDataPath)//trim(filelist(current_tracer))
-      varname =trim(varlist(current_tracer))
       if (mype==0) then
          write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer)
          write(*,*) 'input file: ', trim(filename)
@@ -345,9 +343,11 @@ CONTAINS
 
       ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
       DO n=1, n_ic3d
+      filename=trim(ClimateDataPath)//trim(filelist(n))
+      varname =trim(varlist(n))
       DO current_tracer=1, num_tracers
          if (tracer_ID(current_tracer)==idlist(n)) then
-            ! read initial conditions for nth tracer
+            ! read initial conditions for current tracer
             call nc_ic3d_ini
             ! get first coeficients for time inerpolation on model grid for all datas
             call getcoeffld
