@@ -1,4 +1,4 @@
-# Patrick, Scholz 26.04.2018
+# Patrick, Scholz 02.09.2018
 import numpy as np
 import time
 import os
@@ -6,64 +6,95 @@ from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 import matplotlib.patches as Polygon
 from colormap_c2c    import *
+import matplotlib.path as mpltPath
+from matplotlib.tri import Triangulation
+from numba import jit, njit, prange
+import xarray
 
-#+___CALCULATE MERIDIONAL OVERTURNING FROM VERTICAL VELOCITIES________________________________________+
-#| Global MOC, Atlantik MOC, Indo-Pacific MOC, Indo MOC                                               |
-#|                                                                                                    |
-#+____________________________________________________________________________________________________+
+#+___CALCULATE MERIDIONAL OVERTURNING FROM VERTICAL VELOCITIES_________________+
+#| Global MOC, Atlantik MOC, Indo-Pacific MOC, Indo MOC                        |
+#|                                                                             |
+#+_____________________________________________________________________________+
 def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
-    
+    #do_onelem=False
     #_________________________________________________________________________________________________
     t1=time.time()
-    if do_output==True: print('     --> calculate '+which_moc.upper()+' from vertical velocities via meridional bins')
+    if do_output==True: print('_____calc. '+which_moc.upper()+' from vertical velocities via meridional bins_____')
         
-    #_________________________________________________________________________________________________
+    #___________________________________________________________________________
     # calculate/use index for basin domain limitation
+    
     if which_moc=='gmoc':
         in_elemidx=[]
     else:    
+        tt1=time.time()
         if len(in_elemidx)==0:
+            #___________________________________________________________________
+            # amoc2 ... calculate amoc without arctic
             if which_moc=='amoc2':
+                # for calculation of amoc mesh focus must be on 0 degree longitude
+                if mesh.focus!=0:
+                    mesh.focus=0
+                    mesh.fesom_grid_rot_r2g(str_mode='focus')
                 box_moc = [-100.0,36.0,-30.0,79.0]
-                in_elemidx=calc_basindomain(mesh,box_moc)
+                in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)
+            #___________________________________________________________________
+            # amoc ... calculate amoc including arctic
             if which_moc=='amoc':
+                # for calculation of amoc mesh focus must be on 0 degree longitude
+                if mesh.focus!=0:
+                    mesh.focus=0
+                    mesh.fesom_grid_rot_r2g(str_mode='focus')
                 box_moc = [[-100.0,36.0,-30.0,79.0],[-180.0,180.0,65.0,90.0]]
-                in_elemidx=calc_basindomain(mesh,box_moc)    
+                in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)   
+            #___________________________________________________________________
+            # pmoc ... calculate indo-pacific moc
             elif which_moc=='pmoc':
-                box_moc = [[30.0,180.0,-30.0,65.0],[-180.0,-65.0,-30.0,65.0]]
-                in_elemidx=calc_basindomain(mesh,box_moc)    
+                # for calculation of pmoc mesh focus must be on 180 degree longitude
+                if mesh.focus!=180:
+                    mesh.focus=180
+                    mesh.fesom_grid_rot_r2g(str_mode='focus')
+                box_moc = [[115.0,240.0,40.0,65.0],[30.0,295.0,-30.0,40.0]]
+                in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)    
+            #___________________________________________________________________
+            # imoc ... calculate indian ocean moc
             elif which_moc=='imoc':
                 box_moc = [48.0,77.0,9.0,32.0]
-                in_elemidx=calc_basindomain(mesh,box_moc)    
-
-            #fig = plt.figure(figsize=[10,5])
-            #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
-            #plt.axis('scaled')
-            #plt.title('Basin limited domain')
-            #plt.show()
-        
-    #_________________________________________________________________________________________________
-    # do moc calculation either on nodes or on elements. In moment local moc calculation is just 
-    # supported on elements
+                in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)    
+            
+            fig = plt.figure(figsize=[10,5])
+            plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
+            plt.axis('scaled')
+            plt.title('Basin limited domain')
+            plt.show()
+            fig.canvas.draw()
+            #STOP
+            
+    #___________________________________________________________________________
+    # do moc calculation either on nodes or on elements. In moment local moc 
+    # calculation is just supported on elements
     if do_onelem==True:
         
         if len(usemeshdiag)==0:
-            mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1
+            mat_2d_iz = np.concatenate(( mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))
+            
         else:    
             ncfile  = Dataset(os.path.join(usemeshdiag))
             elem0_2d_iz=ncfile.variables['nlevels'][:]-1
             mat_2d_iz = np.concatenate((elem0_2d_iz,elem0_2d_iz[mesh.pbndtri_2d_i]))
             
-    
         # calc triangle area if not alredy exist
-        if len(mesh.elem_2d_area)==0: mesh.fesom_calc_triarea()
-        mat_2d_area = mesh.elem_2d_area*1e6
+        if len(mesh.elem0_2d_area)==0: mesh.fesom_calc_triarea()
+        
+        # augment elemental triangle area so it fits periodic augmented mesh
+        mat_2d_area = np.concatenate((mesh.elem0_2d_area,mesh.elem0_2d_area[mesh.pbndtri_2d_i]))
+        mat_2d_area = mat_2d_area*1e6
         
         # mean over elements
-        mat_mean = data.value[mesh.elem_2d_i,:].sum(axis=1)/3.0*1e-6
+        mat_mean = data.value[mesh.elem_2d_i,:].sum(axis=1)/3.0*1e-6        
         
         if len(in_elemidx)>0:
-            mat_mean = mat_mean[in_elemidx]
+            mat_mean = mat_mean[in_elemidx,:]
             # create meridional bins
             triy = mesh.nodes_2d_yg[mesh.elem_2d_i[in_elemidx,:]]
             lat   = np.arange(np.floor(triy.min())+dlat/2, np.ceil(triy.max()), dlat)
@@ -77,12 +108,13 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
             lat   = np.arange(np.floor(triy.min())+dlat/2, np.ceil(triy.max()), dlat)
             lat_i = (( mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0-lat[0])/dlat).astype('int')
         del triy
-     
+        
         # calculate area weighted mean
         mat_mean = np.multiply(mat_mean, mat_2d_area[:,np.newaxis])
+                
         del mat_2d_area
     else:
-        mat_2d_iz = mesh.nodes_2d_iz-1
+        mat_2d_iz = mesh.nodes_2d_iz
         
         # keep in mind that node area info is changing over depth--> therefor load from file 
         ncfile  = Dataset(os.path.join(data.path, data.runid+'.mesh.diag.nc'))
@@ -100,13 +132,13 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
         mat_mean = np.multiply(mat_mean, mat_2d_area)
         del mat_2d_area
         
-    #_________________________________________________________________________________________________
-    # This approach is five time faster than the original from dima at least for COREv2 mesh but
-    # needs probaply a bit more RAM
+    #___________________________________________________________________________
+    # This approach is five time faster than the original from dima at least for
+    # COREv2 mesh but needs probaply a bit more RAM
     moc     = np.zeros([mesh.nlev,lat.size])
     bottom  = np.zeros([lat.size,])
     numbtri = np.zeros([lat.size,])
-    topo    = np.float32(mesh.zlev[mat_2d_iz+1])
+    topo    = np.float16(mesh.zlev[mat_2d_iz])
     
     # this is more or less requird so bottom patch looks aceptable
     if which_moc=='pmoc':
@@ -117,16 +149,15 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     
     # be sure ocean floor is setted to zero
     for di in range(0,mesh.nlev):
-        mat_idx = np.where(di>mat_2d_iz-1)[0]
+        mat_idx = np.where(di>=mat_2d_iz)[0]
         mat_mean[mat_idx,di]=0.0
         
     # loop over meridional bins
     for bini in range(lat_i.min(), lat_i.max()+1):
         numbtri[bini]= np.sum(lat_i==bini)
-        #print(numbtri[bini])
         moc[:, bini]=mat_mean[lat_i==bini,:].sum(axis=0)
         #bottom[bini] = np.nanmedian(topo[lat_i==bini])
-        bottom[bini] = np.nanpercentile(topo[lat_i==bini],25)
+        bottom[bini] = np.nanpercentile(topo[lat_i==bini],15)
         
     # kickout outer bins where eventually no triangles are found
     idx    = numbtri>0
@@ -142,7 +173,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     else:
         moc = moc.cumsum(axis=1)
     
-    #_________________________________________________________________________________________________
+    #___________________________________________________________________________
     # smooth bottom line a bit 
     filt=np.array([1,2,3,2,1])
     #filt=np.array([1,2,1])
@@ -151,11 +182,11 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     aux = np.convolve(aux,filt,mode='same')
     bottom = aux[filt.size:-filt.size]
     
-    #_________________________________________________________________________________________________
+    #___________________________________________________________________________
     t2=time.time()
-    if do_output==True: print('         elpased time:'+str(t2-t1)+'s')
+    if do_output==True: print(' --> total time:{:.3f} s'.format(t2-t1))
         
-    #_________________________________________________________________________________________________
+    #___________________________________________________________________________
     # variable number of output fields if you also want to write out the basin limited domain index
     #if out_elemidx==True and which_moc!='gmoc':    
     if out_elemidx==True:       
@@ -164,9 +195,9 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
         return(moc,lat,bottom)
     
  
-#+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  ________________________________________________________+
-#|                                                                                                    |
-#+____________________________________________________________________________________________________+
+#+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  _________________________________+
+#|                                                                             |
+#+_____________________________________________________________________________+
 def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[]):    
     
     if len(figsize)==0: figsize=[13,6]
@@ -201,10 +232,10 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
         ax1.plot(lat,bottom,color='k')
         ax1.fill_between(lat, bottom, depth[-1],color=cbot,zorder=2)#,alpha=0.95)
 
-    #_______________________________________________________________________________
+    #___________________________________________________________________________
     for im in ax1.get_images():
         im.set_clim(clevel[0],clevel[-1])
-    #_______________________________________________________________________________    
+    #___________________________________________________________________________   
     ax1.text(txtx,txty,str_descript , fontsize=14, fontweight='bold',horizontalalignment='left')
     ax1.grid(color='k', linestyle='-', linewidth=0.25,alpha=1.0)
     ax1.set_xlabel('Latitudes [deg]',fontsize=12)
@@ -241,9 +272,9 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     
 
     
-#+___PLOT MERIDIONAL OVERTRUNING CIRCULATION TIME-SERIES______________________________________________+
-#|                                                                                                    |
-#+____________________________________________________________________________________________________+
+#+___PLOT MERIDIONAL OVERTRUNING CIRCULATION TIME-SERIES_______________________+
+#|                                                                             |
+#+_____________________________________________________________________________+
 def plot_xmoc_tseries(time,moc_t,which_lat=['max'],which_moc='amoc',str_descript='',str_time='',figsize=[]):    
     import matplotlib.patheffects as path_effects
     from matplotlib.ticker import AutoMinorLocator
@@ -288,98 +319,222 @@ def plot_xmoc_tseries(time,moc_t,which_lat=['max'],which_moc='amoc',str_descript
     return(fig,ax)
 
 
-#+___CALCULATE BASIN LIMITED DOMAIN___________________________________________________________________+
-#| to calculate the regional moc (amoc,pmoc,imoc) the domain needs be limited to corresponding basin.
-#| here the elemental index of the triangels in the closed basin is calcualted
-#+____________________________________________________________________________________________________+
+#+___CALCULATE BASIN LIMITED DOMAIN____________________________________________+
+#| to calculate the regional moc (amoc,pmoc,imoc) the domain needs be limited  |
+#| to corresponding basin. here the elemental index of the triangels in the    |
+#| closed basin is calcualted                                                  |
+#+_____________________________________________________________________________+
 def calc_basindomain(mesh,box_moc,do_output=False):
     
-    if do_output==True: print('     --> calculate regional basin limited domain')
+    if do_output==True: print(' --> calculate basin limited domain',end='')
+    t1=time.time()
+    
+    #___________________________________________________________________________
+    # 1st. pre-limit ocean domain by pre defined boxes for atlantic, 
+    # indo-pacific ... basin
     box_moc = np.matrix(box_moc)
+    allbox_idx  =np.zeros((mesh.n2dea,),dtype=bool)
     for bi in range(0,box_moc.shape[0]):
-        #_____________________________________________________________________________________________
+        #_______________________________________________________________________
         box_idx = mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0<box_moc[bi,0]
         box_idx = np.logical_or(box_idx,mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0>box_moc[bi,1])
         box_idx = np.logical_or(box_idx,mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0<box_moc[bi,2])
         box_idx = np.logical_or(box_idx,mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0>box_moc[bi,3])
-        box_idx = np.where(box_idx==False)[0]
-        box_elem2di = mesh.elem_2d_i[box_idx,:]
-
-        #_____________________________________________________________________________________________
-        # calculate edge indices of box limited domain
-        edge_12     = np.sort(np.array(box_elem2di[:,[0,1]]),axis=1)
-        edge_23     = np.sort(np.array(box_elem2di[:,[1,2]]),axis=1)
-        edge_31     = np.sort(np.array(box_elem2di[:,[2,0]]),axis=1)
-        edge_triidx = np.arange(0,box_elem2di.shape[0],1)
-
-        #_____________________________________________________________________________________________
-        # start with seed triangle
-        seed_pts     = [box_moc[bi,0]+(box_moc[bi,1]-box_moc[bi,0])/2.0,box_moc[bi,2]+(box_moc[bi,3]-box_moc[bi,2])/2.0]
-        seed_triidx  = np.argsort((mesh.nodes_2d_xg[box_elem2di].sum(axis=1)/3.0-seed_pts[0])**2 + (mesh.nodes_2d_yg[box_elem2di].sum(axis=1)/3.0-seed_pts[1])**2,axis=-0)[0]
-        seed_elem2di = box_elem2di[seed_triidx,:]
-        seed_edge    = np.concatenate((seed_elem2di[:,[0,1]], seed_elem2di[:,[1,2]], seed_elem2di[:,[2,0]]),axis=0)     
-        seed_edge    = np.sort(seed_edge,axis=1) 
-        
-        # already delete seed triangle and coresbonding edges from box limited domain list
-        edge_triidx = np.delete(edge_triidx,seed_triidx)
-        edge_12     = np.delete(edge_12,seed_triidx,0)
-        edge_23     = np.delete(edge_23,seed_triidx,0)
-        edge_31     = np.delete(edge_31,seed_triidx,0)
-
-        #_____________________________________________________________________________________________
-        # do iterative search of which triangles are connected to each other and form cluster
-        t1 = time.time()
-        tri_merge_idx = np.zeros((box_elem2di.shape[0],),dtype='int')
-        tri_merge_count = 0
-        for ii in range(0,10000): 
-            #print(ii,tri_merge_count,seed_edge.shape[0])
-        
-            # determine which triangles contribute to edge
-            triidx12 = ismember_rows(seed_edge,edge_12)
-            triidx23 = ismember_rows(seed_edge,edge_23)
-            triidx31 = ismember_rows(seed_edge,edge_31)
-        
-            # calculate new seed edges
-            seed_edge = np.concatenate((edge_23[triidx12,:],edge_31[triidx12,:],\
-                                        edge_12[triidx23,:],edge_31[triidx23,:],\
-                                        edge_12[triidx31,:],edge_23[triidx31,:]))
-            
-            # collect all found connected triagles    
-            triidx = np.concatenate((triidx12,triidx23,triidx31))
-            triidx = np.unique(triidx)
-            
-            # break out of iteration loop 
-            if triidx.size==0: break 
-                
-            # add found trinagles to final domain list    
-            tri_merge_idx[tri_merge_count:tri_merge_count+triidx.size]=edge_triidx[triidx]
-            tri_merge_count = tri_merge_count+triidx.size
-            
-            # delete already found trinagles and edges from list
-            edge_triidx = np.delete(edge_triidx,triidx)
-            edge_12     = np.delete(edge_12,triidx,0)
-            edge_23     = np.delete(edge_23,triidx,0)
-            edge_31     = np.delete(edge_31,triidx,0)
+        allbox_idx[np.where(box_idx==False)[0]]=True
     
-            del triidx,triidx12,triidx23,triidx31
+    # kick out all the elements that are not located within predefined box
+    allbox_elem = mesh.elem_2d_i[allbox_idx==True,:]
+    
+    #fig = plt.figure(figsize=[10,5])
+    #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[allbox_idx==True,:],linewidth=0.2)
+    #plt.axis('scaled')
+    #plt.title('Box limited domain')
+    #plt.show()
+    #fig.canvas.draw()
+    
+    #___________________________________________________________________________
+    # 2nd. select main ocean basin cluster for either atlantic or pacific by finding 
+    # the outer coastline of the main basin
+    edge    = np.concatenate((allbox_elem[:,[0,1]], allbox_elem[:,[0,2]], allbox_elem[:,[1,2]]),axis=0)
+    edge    = np.sort(edge,axis=1) 
+    
+    # python  sortrows algorythm --> matlab equivalent
+    # twice as fast as list sorting
+    sortidx = np.lexsort((edge[:,0],edge[:,1]))
+    edge    = edge[sortidx,:].squeeze()
+    edge    = np.array(edge)
+    
+    # list sorting
+    #edge    = edge.tolist()
+    #edge.sort()
+    #edge    = np.array(edge)
         
-        tri_merge_idx = tri_merge_idx[:tri_merge_count-1]
-        t2=time.time()
-        if do_output==True: print('         elpased time:'+str(t2-t1)+'s')
+    idx     = np.diff(edge,axis=0)==0
+    idx     = np.all(idx,axis=1)
+    idx     = np.logical_or(np.concatenate((idx,np.array([False]))),np.concatenate((np.array([False]),idx)))
         
-        #_____________________________________________________________________________________________
-        # calculate final domain limited trinagle cluster element index
-        if bi==0:
-            box_idx_fin = box_idx[tri_merge_idx]
+    # all outer ocean edges that belong to preselected boxes defined domain
+    bnde    = edge[idx==False,:]
+    nbnde    = bnde.shape[0];
+    
+    # find most northern ocean edge and start from there
+    maxi = np.argmax(mesh.nodes_2d_yg[bnde].sum(axis=1)/2)
+    
+    #fig = plt.figure(figsize=[10,5])
+    #plt.plot(mesh.nodes_2d_xg[np.unique(bnde.flatten())],mesh.nodes_2d_yg[np.unique(bnde.flatten())],'*')
+    #plt.plot(mesh.nodes_2d_xg[np.unique(bnde[maxi].flatten())],mesh.nodes_2d_yg[np.unique(bnde[maxi].flatten())],'*',color='red')
+    #plt.axis('scaled')
+    #plt.title('Outer boundary edges')
+    #plt.show()
+    #fig.canvas.draw()
+    
+    #___________________________________________________________________________
+    # start with on outer coastline edge and find the next edge that is 
+    # connected and so forth, like that build entire outer coastline of the main 
+    # basin
+    
+    run_cont        = np.zeros((1,nbnde+1))*np.nan
+    run_cont[0,:2]  = bnde[maxi,:] # initialise the first landmask edge
+    #run_bnde        = bnde[1:,:] # remaining edges that still need to be distributed
+    run_bnde        = np.delete(bnde, (maxi), axis=0)
+    count_init      = 1;
+    init_ind        = run_cont[0,0];
+    ind_lc_s        = 0;
+    
+    ocebasin_polyg = []
+    for ii in range(0,nbnde):
+        #_______________________________________________________________________
+        # search for next edge that contains the last node index from 
+        # run_cont
+        kk_rc = np.column_stack(np.where( run_bnde==np.int(run_cont[0,count_init]) ))
+        kk_r  = kk_rc[:,0]
+        kk_c  = kk_rc[:,1]
+        count_init  = count_init+1
+        if len(kk_c)==0 : break        
+        
+        #_______________________________________________________________________
+        if kk_c[0] == 0 :
+            run_cont[0,count_init] = run_bnde[kk_r[0],1]
         else:
-            box_idx_fin = np.concatenate((box_idx_fin,box_idx[tri_merge_idx]))
-        
-    return(box_idx_fin)
+            run_cont[0,count_init] = run_bnde[kk_r[0],0]
+            
+        #_______________________________________________________________________
+        # if a land sea mask polygon is closed
+        if  np.any(run_bnde[kk_r[0],:] == init_ind):
+            count_init  = count_init+1
+            
+            aux_lx = mesh.nodes_2d_xg[np.int64(run_cont[0,0:count_init])];
+            aux_ly = mesh.nodes_2d_yg[np.int64(run_cont[0,0:count_init])];
+            aux_xy = np.zeros((count_init,2))
+            aux_xy[:,0] = aux_lx
+            aux_xy[:,1] = aux_ly
+            ocebasin_polyg=aux_xy
+            del aux_lx; del aux_ly; del aux_xy
+            
+            ind_lc_s = ind_lc_s+count_init+1;
+            
+            count_init = count_init+1
+            aux_ind  = np.arange(0,run_bnde.shape[0],1)
+            run_bnde = run_bnde[aux_ind!=kk_r[0],:]
+            if np.size(run_bnde)==0:
+                break
+                
+            #___________________________________________________________________
+            run_cont        = np.zeros((1,nbnde))*np.nan
+            run_cont[0,:2]  = run_bnde[0,:]
+            run_bnde        = run_bnde[1:,:]
+            count_init=1;
+        else:
+            aux_ind =np.arange(0,run_bnde.shape[0],1)
+            run_bnde=run_bnde[aux_ind!=kk_r[0],:]
+            
+    #___________________________________________________________________________
+    # check which preselected triangle centroids are within main ocean basin 
+    # polygon 
+    ptsc = list(zip(mesh.nodes_2d_xg[allbox_elem].sum(axis=1)/3,mesh.nodes_2d_yg[allbox_elem].sum(axis=1)/3))
+    
+    #___________________________________________________________________________
+    # Option (1)
+    # python Matplotlib mplPath seems to be faster at least by a factor of 2 when
+    # compared to ray_tracing method
+    #print(' >> use mpltPath ',end='')
+    #path = mpltPath.Path(ocebasin_polyg)
+    #inside_ocebasin = path.contains_points(ptsc)
+    
+    # Option (2)
+    # determine points in polygon by ray tracing method
+    #print(' >> use rtracing ',end='')
+    #inside_ocebasin = [calc_ray_tracing(point[0], point[1], np.array(ocebasin_polyg)) for point in ptsc]
+    #inside_ocebasin = np.array(inside_ocebasin)
+    
+    # Option (3)
+    # determine points in polygon by parallel (numba optimized) ray tracing 
+    # method --> considerable faster for large meshes
+    print(' >> use rtracing parallel ',end='')
+    inside_ocebasin = calc_ray_tracing_parallel(np.array(ptsc),np.array(ocebasin_polyg),np.zeros((len(ptsc),),dtype=bool))
+    
+    #___________________________________________________________________________
+    # write out regional indices with respect to the global elemental array
+    allbox_tidx = np.where(allbox_idx==True)[0]
+    allbox_fin = allbox_tidx[inside_ocebasin==True]
+    
+    #fig = plt.figure(figsize=[10,5])
+    #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[allbox_fin,:],linewidth=0.2)
+    #plt.axis('scaled')
+    #plt.title('Basin limited domain')
+    #plt.show()
+    #fig.canvas.draw()
+    
+    #___________________________________________________________________________
+    t2=time.time()
+    print(" >> time: {:.3f} s".format(t2-t1))   
+    
+    return(allbox_fin)
 
+#+___RAY TRACING METHOD TO CHECK IF POINT IS IN POLYGON________________________+
+#| see...https://stackoverflow.com/questions/36399381/whats-the-fastest-way-of-
+#| checking-if-a-point-is-inside-a-polygon-in-python
+#| 
+#+_____________________________________________________________________________+
+@jit(nopython=True)
+def calc_ray_tracing(x,y,poly):
+    n = len(poly)
+    inside = False
+    p1x,p1y = poly[0]
+    for i in range(n+1):
+        p2x,p2y = poly[i % n]
+        if y > min(p1y,p2y):
+            if y <= max(p1y,p2y):
+                if x <= max(p1x,p2x):
+                    if p1y != p2y:
+                        xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                    if p1x == p2x or x <= xints:
+                        inside = not inside
+        p1x,p1y = p2x,p2y
 
-#+___EQUIVALENT OF MATLAB ISMEMBER FUNCTION___________________________________________________________+
-#|                                                                                                    |
-#+____________________________________________________________________________________________________+
-def ismember_rows(a, b):
-	return np.flatnonzero(np.in1d(b[:,0], a[:,0]) & np.in1d(b[:,1], a[:,1]))
-	
+    return inside
+#+___RAY TRACING METHOD PARALLEL TO CHECK IF POINT IS IN POLYGON_______________+
+#| see...https://stackoverflow.com/questions/36399381/whats-the-fastest-way-of-|
+#| checking-if-a-point-is-inside-a-polygon-in-python                           |
+#|                                                                             |
+#+_____________________________________________________________________________+
+#@njit(parallel=True,nopython=True)
+@njit(parallel=True)
+def calc_ray_tracing_parallel(pts,poly,inside):
+    n = len(poly)
+    npts=len(pts)
+    for j in prange(npts):
+        x,y = pts[j]
+        p1x,p1y = poly[0]
+        for i in range(n+1):
+            p2x,p2y = poly[i % n]
+            if y > min(p1y,p2y):
+                if y <= max(p1y,p2y):
+                    if x <= max(p1x,p2x):
+                        if p1y != p2y:
+                            xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                        if p1x == p2x or x <= xints:
+                            inside[j] = not inside[j]
+            p1x,p1y = p2x,p2y
+
+    return inside

@@ -38,7 +38,7 @@ real(kind=WP) :: mrtime_ice=0.0,mrtime_oce=0.0,mrtime_tot=0.0
 
 
 #if defined (__oasis)
-        call cpl_oasis3mct_init(MPI_COMM_FESOM)
+    call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
 
     call par_init 
@@ -84,7 +84,8 @@ real(kind=WP) :: mrtime_ice=0.0,mrtime_oce=0.0,mrtime_tot=0.0
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
     call restart(0, .false., r_restart) ! istep, l_write, l_read
-        ! store grid information into netcdf file
+    
+    ! store grid information into netcdf file
     if (.not. r_restart) call write_mesh_info
 
     !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
@@ -152,9 +153,9 @@ real(kind=WP) :: mrtime_ice=0.0,mrtime_oce=0.0,mrtime_tot=0.0
     if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
     
     ! average ocean, ice and total runtime over all cpus
-    call MPI_AllREDUCE(rtime_oce  , mrtime_oce  , 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_ice  , mrtime_ice  , 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_tot  , mrtime_tot  , 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_oce  , mrtime_oce  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_ice  , mrtime_ice  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_tot  , mrtime_tot  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     if (mype==0) then
         write(*,*) '___MODEL RUNTIME [seconds]_____________________________'
         write(*,*) '    runtime ocean : ',mrtime_oce/npes, ' sec'
