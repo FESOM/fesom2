@@ -26,7 +26,7 @@ scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby ra
 scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
 scaling_FESOM14    =.true.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
 
-Redi  =.true.
+Redi  =.false.
 visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
 mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
 Ricr   = 0.3               ! critical bulk Richardson Number
@@ -40,7 +40,7 @@ double_diffusion=.false.               ! for KPP,dd switch
 K_ver=1.0e-5
 K_hor=3000.
 surf_relax_T=0.0
-surf_relax_S=1.929e-06       ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
+surf_relax_S=0.0!1.929e-06       ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
 balance_salt_water =.true.   ! balance virtual-salt or freshwater flux or not
 clim_relax=0.0	                    ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
@@ -49,11 +49,4 @@ i_vert_diff=.true.  ! true
 tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
 num_tracers=2       !number of all tracers
 tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
-/
-
-&nam_ic3d                                 ! initial conditions for tracers
-n_ic3d   = 2                              ! number of tracers to initialize
-idlist   = 1, 0                           ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
-filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
-varlist  = 'salt', 'temp'                 ! variables to read from specified files
 /
