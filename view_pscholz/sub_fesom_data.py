@@ -7,6 +7,8 @@ from set_inputarray import *
 from sub_fesom_mesh import *
 import matplotlib.pyplot as plt
 from matplotlib.tri import Triangulation
+import numpy.matlib
+import seawater as sw
 #from sub_fesom_mesh import fesom_vector_rot
 global inputarray
     
@@ -186,6 +188,19 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             if data.var =='pdens': data.lname,data.unit='potential density','[kg/m^3]'
             if data.var.find('tuv')!=-1: data.lname='temperature advection'
             if data.var.find('suv')!=-1: data.lname='salt advection'
+            
+            #___________________________________________________________________
+            # calc 3d depth and latitude for calculation of potential density 
+            # and temperature
+            if data.var =='ptemp' or data.var=='pdens':
+                depth3d = np.zeros(ncid.variables[aux_datavar][:].shape)
+                lat3d   = np.zeros(ncid.variables[aux_datavar][:].shape)
+                for nreci in range(0,nrec):
+                    depth3d[nreci,:,:] = np.matlib.repmat((mesh.zlev[0:-1]+(mesh.zlev[1::]-mesh.zlev[0:-1])/2),nsmple,1)
+                    lat3d[nreci,:,:] = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],ncid.variables[aux_datavar][:].shape[2],1).transpose()
+                press3d = sw.pres(depth3d,lat3d)
+                del depth3d, lat3d
+            
         
         #_______________________________________________________________________
         #ncval = np.array(ncid.variables[aux_datavar][:])
@@ -209,30 +224,16 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             ncid2.close()
             
         elif data.var=='ptemp':    
-            import numpy.matlib
-            import seawater as sw
             #ncval2 = np.array(ncid2.variables[aux_datavar2][:])
             ncval2 = np.copy(ncid2.variables[aux_datavar2][:])
-            depth3d = np.zeros(ncval.shape)
-            press3d = np.zeros(ncval.shape)
-            for nreci in range(0,nrec):
-                depth3d[nreci,:,:] = np.matlib.repmat((mesh.zlev[0:-1]+(mesh.zlev[1::]-mesh.zlev[0:-1])/2),nsmple,1)
-                press3d[nreci,:,:] = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],ncval.shape[2],1).transpose()
-            press3d = sw.pres(depth3d,press3d)
             ncval = sw.ptmp(ncval2,ncval,press3d)
+            del ncval2
             
         elif data.var=='pdens':    
-            import numpy.matlib
-            import seawater as sw
             #ncval2 = np.array(ncid2.variables[aux_datavar2][:])
             ncval2 = np.copy(ncid2.variables[aux_datavar2][:])
-            depth3d = np.zeros(ncval.shape)
-            press3d = np.zeros(ncval.shape)
-            for nreci in range(0,nrec):
-                depth3d[nreci,:,:] = np.matlib.repmat((mesh.zlev[0:-1]+(mesh.zlev[1::]-mesh.zlev[0:-1])/2),nsmple,1)
-                press3d[nreci,:,:] = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],ncval.shape[2],1).transpose()
-            press3d = sw.pres(depth3d,press3d)
             ncval = sw.pden(ncval2,ncval,press3d,0)-1000.025 
+            del ncval2
             
         #_______________________________________________________________________
         # check if a single time slice record is selcted
