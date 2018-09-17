@@ -352,7 +352,7 @@ CONTAINS
             ! get first coeficients for time inerpolation on model grid for all datas
             call getcoeffld
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tr_arr(:,:,current_tracer))
+            call extrap_nod(tr_arr(:,:,current_tracer))            
             exit
          elseif (current_tracer==num_tracers) then
             if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
@@ -363,6 +363,9 @@ CONTAINS
       END DO
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
+      where (tr_arr > 0.9*dummy)
+            tr_arr=0.
+      end where
       call insitu2pot
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    
