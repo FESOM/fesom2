@@ -682,3 +682,27 @@ subroutine compute_neutral_slope
         call exchange_nod(neutral_slope)
         call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope
+!===============================================================================
+!converts insitu temperature to a potential one
+!               tr_arr(:,:,1) will be modified!
+subroutine insitu2pot
+  use o_mesh
+  use o_param
+  use o_arrays
+  use g_config
+  use g_PARSUP
+  implicit none
+  real(kind=WP), external     :: ptheta
+  real(kind=WP)               :: pp, pr, tt, ss
+  integer                     :: n, nz
+  ! Convert in situ temperature into potential temperature
+  pr=0.0_WP
+  do n=1,myDim_nod2d+eDim_nod2D
+     do nz=1, nlevels_nod2D(n)-1    
+        tt=tr_arr(nz,n,1)
+        ss=tr_arr(nz,n,2)
+        pp=abs(Z(nz))
+        tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
+     end do	
+  end do
+end subroutine insitu2pot
