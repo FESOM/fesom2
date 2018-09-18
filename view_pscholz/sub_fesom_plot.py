@@ -71,18 +71,21 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         tickstep = np.array([1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
         idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
+        
         if idx1.size==0 : 
             xticks   = np.arange(-180.+tickstep[-1],180.-tickstep[-1]+1,tickstep[-1])
         else:
-            xticks   = np.arange(180.+tickstep[idx1[0,0]],180.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
-
-        del idx
+            xticks   = np.arange(-180.+tickstep[idx1[0,0]],180.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
+        del idx, idx1
+        
         idx      = (inputarray['which_box'][3]-inputarray['which_box'][2])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
             yticks   = np.arange(-90.+tickstep[-1],90.-tickstep[-1]+1,tickstep[-1])
         else:    
             yticks   = np.arange(-90.+tickstep[idx1[0,0]],90.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
+        del idx, idx1    
+            
     #___________________________________________________________________________
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -99,6 +102,12 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
     idxbox_e = idxbox_e==False # true index for triangles that are within box 
     # case of node data
+    if data.value.size ==mesh.n2dna:
+        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
+    elif data.value.size ==mesh.n2dea:
+        idx_box = np.ones((mesh.n2dea,),dtype='bool')
+        
+        
     if data.value.size ==mesh.n2dna:
         idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
         idxbox_n  = np.array(idxbox_n).squeeze()
@@ -256,9 +265,9 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
                     antialiased=False,
-                    cmap=cmap0,
-                    clim=[clevel[0],clevel[-1]])
-        plt.clim=[clevel[0],clevel[-1]]
+                    cmap=cmap0)#,
+        #           clim=[clevel[0],clevel[-1]])
+        #plt.clim=[clevel[0],clevel[-1]]
         if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
     
     #___________________________________________________________________________
@@ -348,8 +357,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
     #___________________________________________________________________________
     ax.tick_params(axis='both', direction='out')
-    ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
-    ax.get_yaxis().tick_left()
+    #ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
+    #ax.get_yaxis().tick_left()
     plt.sca(ax)
     plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
     #+_________________________________________________________________________+

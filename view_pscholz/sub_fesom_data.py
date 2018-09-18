@@ -6,6 +6,9 @@ from netCDF4 import Dataset
 from set_inputarray import *
 from sub_fesom_mesh import *
 import matplotlib.pyplot as plt
+from matplotlib.tri import Triangulation
+import numpy.matlib
+import seawater as sw
 #from sub_fesom_mesh import fesom_vector_rot
 global inputarray
     
@@ -81,9 +84,9 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
     #____START YEAR LOOP________________________________________________________
     aux_datavar = data.var
     for yi in range(0, nyi):
-        if do_output==True: print('     {:4.0f} |'.format(ayi[yi])),
+        if do_output==True: print('     {:4.0f} |'.format(ayi[yi]),end='')
         tstart = time.time();
-        if data.var.find('norm')!=-1 or data.var.find('vec')!=-1 or data.var=='ptemp':
+        if data.var.find('norm')!=-1 or data.var.find('vec')!=-1 or data.var=='ptemp' or data.var=='pdens':
             if data.var.find('tuv')!=-1 or data.var.find('suv')!=-1:
                 
                 if   data.var.find('tuv')!=-1 : aux_datavar,aux_datavar2,aux_datavar3 = 'u','v','temp'
@@ -104,7 +107,7 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
                 
             else:
                 aux_datavar,aux_datavar2 = 'u','v'
-                if data.var =='ptemp':
+                if data.var =='ptemp' or data.var=='pdens':
                     aux_datavar,aux_datavar2 = 'temp','salt'
                 #_______________________________________________________________________
                 # build filename where data are located
@@ -182,8 +185,22 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
                 elif attrname=='units':
                     data.unit='['+ncvar.getncattr(attrname)+']'
             if data.var =='ptemp': data.lname='potential temperature'
+            if data.var =='pdens': data.lname,data.unit='potential density','[kg/m^3]'
             if data.var.find('tuv')!=-1: data.lname='temperature advection'
             if data.var.find('suv')!=-1: data.lname='salt advection'
+            
+            #___________________________________________________________________
+            # calc 3d depth and latitude for calculation of potential density 
+            # and temperature
+            if data.var =='ptemp' or data.var=='pdens':
+                depth3d = np.zeros(ncid.variables[aux_datavar][:].shape)
+                lat3d   = np.zeros(ncid.variables[aux_datavar][:].shape)
+                for nreci in range(0,nrec):
+                    depth3d[nreci,:,:] = np.matlib.repmat((mesh.zlev[0:-1]+(mesh.zlev[1::]-mesh.zlev[0:-1])/2),nsmple,1)
+                    lat3d[nreci,:,:] = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],ncid.variables[aux_datavar][:].shape[2],1).transpose()
+                press3d = sw.pres(depth3d,lat3d)
+                del depth3d, lat3d
+            
         
         #_______________________________________________________________________
         #ncval = np.array(ncid.variables[aux_datavar][:])
@@ -207,17 +224,16 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             ncid2.close()
             
         elif data.var=='ptemp':    
-            import numpy.matlib
-            import seawater as sw
             #ncval2 = np.array(ncid2.variables[aux_datavar2][:])
             ncval2 = np.copy(ncid2.variables[aux_datavar2][:])
-            depth3d = np.zeros(ncval.shape)
-            press3d = np.zeros(ncval.shape)
-            for nreci in range(0,nrec):
-                depth3d[nreci,:,:] = np.matlib.repmat((mesh.zlev[0:-1]+(mesh.zlev[1::]-mesh.zlev[0:-1])/2),nsmple,1)
-                press3d[nreci,:,:] = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],ncval.shape[2],1).transpose()
-            press3d = sw.pres(depth3d,press3d)
             ncval = sw.ptmp(ncval2,ncval,press3d)
+            del ncval2
+            
+        elif data.var=='pdens':    
+            #ncval2 = np.array(ncid2.variables[aux_datavar2][:])
+            ncval2 = np.copy(ncid2.variables[aux_datavar2][:])
+            ncval = sw.pden(ncval2,ncval,press3d,0)-1000.025 
+            del ncval2
             
         #_______________________________________________________________________
         # check if a single time slice record is selcted
@@ -225,13 +241,13 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
         if len(data.record)==0:
             #___________________________________________________________________
             if nrec==1:
-                if do_output==True: print('annual |'),
+                if do_output==True: print('annual |',end='')
             elif nrec==12:
-                if do_output==True: print('monthly|'),
+                if do_output==True: print('monthly|',end='')
             #elif nrec==73:
                 #print('5daily |'),
             elif nrec==365:
-                if do_output==True: print('daily  |'),
+                if do_output==True: print('daily  |',end='')
             else:    
                 print(' --> error: temporal length of data unclear or not supported!!!|'),
                 break
@@ -239,7 +255,7 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             # select monthly or seasonal subset of data
             if nmi<12 and nrec>=12:
                 if do_output==True: 
-                    for ii in data.month: print('{:d}|'.format(ii)),
+                    for ii in data.month: print('{:d}|'.format(ii),end='')
                 #_______________________________________________________________
                 # select from monthly data
                 if nrec==12 : 
@@ -277,7 +293,7 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             if np.max(data.record)-1>nrec:
                 print(' --> error: this record number doesnt exist in that file')
                 break
-            print('select single record time slice|'),
+            print('select single record time slice|',ebd='')
             for ii in data.record: print('{:d}|'.format(ii)),
             ncval=fesom_time_depth_mean(mesh,ncval,data.record[0]-1,data.depth)
             if data.var.find('vec')!=-1: 
@@ -935,7 +951,7 @@ def fesom_load_data3d_4bm(mesh,data,do_output=True):
 #
 #_______________________________________________________________________________
 def fesom_vinterp(data_in,mesh,levels):
-    
+     
     #___________________________________________________________________________
     # do vertical linear interpolation of certain layer
     dims = data_in.shape
@@ -981,20 +997,20 @@ def fesom_vinterp(data_in,mesh,levels):
             if deltaz_i==0 or idx_dwn==idx_up:
                 if   len(dims)==2:    
                     auxval = data_in[:,idx_dwn]
-                    aux_div[mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]=aux_div[mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]+1.0
+                    aux_div[mesh.nodes_2d_iz>=idx_dwn]=aux_div[mesh.nodes_2d_iz>=idx_dwn]+1.0
                 else : 
                     auxval = data_in[:,:,idx_dwn]
-                    aux_div[:,mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]=aux_div[:,mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]+1.0
+                    aux_div[:,mesh.nodes_2d_iz>=idx_dwn]=aux_div[:,mesh.nodes_2d_iz>=idx_dwn]+1.0
                 
             else:
                 if   len(dims)==2:
                     auxval = data_in[:,idx_dwn]-(data_in[:,idx_dwn]-data_in[:,idx_up])*deltaz_i/deltaz
-                    auxval[mesh.nodes_2d_iz[0:mesh.n2dn]<idx_dwn]=0
-                    aux_div[mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]=aux_div[mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]+1.0
+                    auxval[mesh.nodes_2d_iz<idx_dwn]=0.0
+                    aux_div[mesh.nodes_2d_iz>=idx_dwn]=aux_div[mesh.nodes_2d_iz>=idx_dwn]+1.0
                 else:
                     auxval = data_in[:,:,idx_dwn]-(data_in[:,:,idx_dwn]-data_in[:,:,idx_up])*deltaz_i/deltaz
-                    auxval[:,mesh.nodes_2d_iz[0:mesh.n2dn]<idx_dwn]=0
-                    aux_div[:,mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]=aux_div[:,mesh.nodes_2d_iz[0:mesh.n2dn]>idx_dwn]+1.0
+                    auxval[:,mesh.nodes_2d_iz<idx_dwn]=0.0
+                    aux_div[:,mesh.nodes_2d_iz>=idx_dwn]=aux_div[:,mesh.nodes_2d_iz>=idx_dwn]+1.0
                     
             data_out = data_out + auxval
         #_______________________________________________________________________
@@ -1003,28 +1019,36 @@ def fesom_vinterp(data_in,mesh,levels):
             if deltaz_i==0 or idx_dwn==idx_up:
                 if   len(dims)==2:
                     auxval = data_in[:,idx_dwn]
-                    aux_div[mesh.elem0_2d_iz>idx_dwn]=aux_div[mesh.elem0_2d_iz>idx_dwn]+1.0
+                    aux_div[mesh.elem0_2d_iz>=idx_dwn]=aux_div[mesh.elem0_2d_iz>=idx_dwn]+1.0
                 else:
                     auxval = data_in[:,:,idx_dwn]
-                    aux_div[:,mesh.elem0_2d_iz>idx_dwn]=aux_div[:,mesh.elem0_2d_iz>idx_dwn]+1.0
+                    aux_div[:,mesh.elem0_2d_iz>=idx_dwn]=aux_div[:,mesh.elem0_2d_iz>=idx_dwn]+1.0
                     
             else:
                 if   len(dims)==2:
                     auxval     = data_in[:,idx_dwn]-(data_in[:,idx_dwn]-data_in[:,idx_up])*deltaz_i/deltaz
                     auxval[mesh.elem0_2d_iz<idx_dwn]=0
-                    aux_div[mesh.elem0_2d_iz>idx_dwn]=aux_div[mesh.elem0_2d_iz>idx_dwn]+1.0
+                    aux_div[mesh.elem0_2d_iz>=idx_dwn]=aux_div[mesh.elem0_2d_iz>=idx_dwn]+1.0
                 else:
                     auxval     = data_in[:,:,idx_dwn]-(data_in[:,:,idx_dwn]-data_in[:,:,idx_up])*deltaz_i/deltaz
                     auxval[:,mesh.elem0_2d_iz<idx_dwn]=0
-                    aux_div[:,mesh.elem0_2d_iz>idx_dwn]=aux_div[:,mesh.elem0_2d_iz>idx_dwn]+1.0
+                    aux_div[:,mesh.elem0_2d_iz>=idx_dwn]=aux_div[:,mesh.elem0_2d_iz>=idx_dwn]+1.0
             data_out = data_out + auxval
             
     #___________________________________________________________________________
     # do mean over averaged layers
-    data_out[aux_div!=0] = data_out[aux_div!=0]/aux_div[aux_div!=0]
-    data_out[aux_div==0        ]=np.nan
+    data_out[aux_div!=0.0] = data_out[aux_div!=0.0]/aux_div[aux_div!=0.0]
+    data_out[aux_div==0.0      ]=np.nan
     data_out[np.isinf(data_out)]=np.nan
     
+    #fig=plt.figure()
+    #tri = Triangulation(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i)
+    #data_plot = np.concatenate((data_out,data_out[mesh.pbndn_2d_i]))
+    #plt.tripcolor(tri,data_plot,edgecolors='None')
+    #plt.colorbar()
+    #plt.show
+    #fig.canvas.draw()
+    #STOP
     #___________________________________________________________________________
     return(data_out)
     

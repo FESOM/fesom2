@@ -62,12 +62,12 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
                 box_moc = [48.0,77.0,9.0,32.0]
                 in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)    
             
-            fig = plt.figure(figsize=[10,5])
-            plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
-            plt.axis('scaled')
-            plt.title('Basin limited domain')
-            plt.show()
-            fig.canvas.draw()
+            #fig = plt.figure(figsize=[6,3])
+            #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
+            #plt.axis('scaled')
+            #plt.title('Basin limited domain')
+            #plt.show()
+            #fig.canvas.draw()
             #STOP
             
     #___________________________________________________________________________
@@ -198,7 +198,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
 #+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  _________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[]):    
+def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[],crange=[]):    
     
     if len(figsize)==0: figsize=[13,6]
     fig= plt.figure(figsize=figsize)
@@ -213,7 +213,8 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     #+_________________________________________________________________________+
     cnumb = 20; # minimum number of colors
     #cmin,cmax,cref  = -6,16,0 # [cmin, cmax, cref]  --> MLD2
-    cmin,cmax,cref  = moc[np.where(depth<=-500)[0][0]::,:].min(),moc[np.where(depth<=-500)[0][0]::,:].max(),0 # [cmin, cmax, cref]  --> MLD2
+    cmin,cmax,cref  = moc[np.where(depth<=-500)[0][0]::,:].min(),moc[np.where(depth<=-500)[0][0]::,:].max(),0.0 # [cmin, cmax, cref]  --> MLD2
+    if len(crange)!=0: cmin,cmax,cref = crange[0],crange[1],0.0
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,'blue2red')
     cbot = [0.5,0.5,0.5]
     do_drawedges=True
