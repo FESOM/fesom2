@@ -33,8 +33,8 @@ IMPLICIT NONE
  integer        :: n, nn, k, m, fileID
  integer        :: error_status !0/1=no error/error
  integer        :: vert_nodes(1000)
- integer        :: nchunk, chunk_size, ipos, iofs, mesh_check
- real(kind=WP)  :: x, y, rx, ry
+ integer        :: nchunk, chunk_size, ipos, iofs, mesh_check, flag_checkisrot, flag_checkmustrot
+ real(kind=WP)  :: x, y, rx, ry, xp, yp
  real(kind=WP)  :: t0, t1
  character*10   :: mype_string,npes_string
  character*500  :: file_name
@@ -151,6 +151,13 @@ IMPLICIT NONE
 
   ! 0 proc reads the data in chunks and distributes it between other procs
   mesh_check=0
+  
+  ! new rotation pole usually (-40.0°,75.0°)
+  call r2g(xp, yp, 0.0_WP*rad, 90.0_WP*rad)
+  xp = xp/rad
+  yp = yp/rad
+  flag_checkisrot=0
+  flag_checkmustrot=1
   do nchunk=0, (nod2D-1)/chunk_size
      !create the mapping for the current chunk
      mapping(1:chunk_size)=0
@@ -166,6 +173,19 @@ IMPLICIT NONE
      if (mype==0) then
         do n=1, k
            read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
+            !___________________________________________________________________
+            ! check if input mesh is already rotated --> force_rotation flag == .False.
+            if (force_rotation==.True. .and. & 
+               (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
+                rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
+                flag_checkisrot = 1
+            !___________________________________________________________________
+            ! check if input mesh is already unrotated --> force_rotation flag ==.True.
+            elseif (force_rotation==.False. .and. & 
+               (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
+                rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
+                flag_checkmustrot = 0
+            end if    
         end do
      end if
      call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -175,10 +195,13 @@ IMPLICIT NONE
      do n=1, k
         x=rbuff(n,1)*rad
         y=rbuff(n,2)*rad
+        !_______________________________________________________________________
+        ! rotate grid points if force_rotation flag .True.
         if (force_rotation) then
            rx=x
            ry=y
            call g2r(rx, ry, x, y)
+           
         end if        
         if (mapping(n)>0) then
            mesh_check=mesh_check+1
@@ -188,7 +211,44 @@ IMPLICIT NONE
      end do
   end do
   if (mype==0) close(fileID)
-
+    
+    !___________________________________________________________________________
+    ! check if rotation is applied to an already rotated mesh
+    if ((mype==0) .and. (force_rotation==.True.) .and. (flag_checkisrot==1)) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Your input mesh seems to be rotated and you try to' 
+        write(*,*) '        rotate it again in FESOM (force_rotation=.true. ) !'
+        write(*,*) '        The mesh you loaded suggests that it is already'
+        write(*,*) '        rotate because it has ocean points in a box'
+        write(*,*) '        around lon,lat = (-40.0, 75.0) (new rotation pole).'
+        write(*,*) '        In an unrotated grid should be NO OCEAN points'
+        write(*,*) '        over Greenland !!!. So set in namelist.config '
+        write(*,*) '        force_rotation==.False. If I am wrong go to'
+        write(*,*) '        oce_mesh.F90:line231 and comment this part'
+        write(*,*)
+        write(*,*) '        --> check your namelist.config !!!'
+        write(*,*) '____________________________________________________________________'
+        call par_ex(0)
+    !___________________________________________________________________________
+    ! check if rotation needs to be applied to an unrotated mesh
+    elseif ((mype==0) .and. (force_rotation==.False.) .and. (flag_checkmustrot==1)) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Your input mesh seems to be unrotated this requires'
+        write(*,*) '        that it is rotated in FESOM, but you set force_rotation=.False'
+        write(*,*) '        The mesh you loaded suggests that it needs to'
+        write(*,*) '        be rotated because it has no ocean points in a box'
+        write(*,*) '        around lon,lat = (-40.0, 75.0) (new rotation pole).'
+        write(*,*) '        A rotated grid should have some ocean points around'
+        write(*,*) '        the rotation pole !!!. So set in namelist.config '
+        write(*,*) '        force_rotation=.True. If I am wrong go to'
+        write(*,*) '        oce_mesh.F90:line248 and comment this part'
+        write(*,*)
+        write(*,*) '        --> check your namelist.config !!!'
+        write(*,*) '____________________________________________________________________'
+        call par_ex(0)
+    end if
+  
+  
   if (mesh_check/=myDim_nod2D+eDim_nod2D) then
      write(*,*) 'ERROR while reading nod2d.out on mype=', mype
      write(*,*) mesh_check, ' values have been read in according to partitioning'
