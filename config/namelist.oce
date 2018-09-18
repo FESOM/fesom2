@@ -51,7 +51,7 @@ num_tracers=2       !number of all tracers
 tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
 /
 
-&nam_ic3d                                 ! initial conditions for tracers
+&oce_init3d                               ! initial conditions for tracers
 n_ic3d   = 2                              ! number of tracers to initialize
 idlist   = 1, 0                           ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
 filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist

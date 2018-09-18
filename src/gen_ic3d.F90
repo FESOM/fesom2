@@ -23,8 +23,8 @@ MODULE g_ic3d
 
    include 'netcdf.inc'
 
-   public  do_ic3d, &                                   ! read and apply 3D initial conditions
-           n_ic3d, idlist, filelist, varlist, nam_ic3d  ! to be read from the namelist
+   public  do_ic3d, &                                     ! read and apply 3D initial conditions
+           n_ic3d, idlist, filelist, varlist, oce_init3d  ! to be read from the namelist
       
    private
 
@@ -37,7 +37,7 @@ MODULE g_ic3d
    character(256), save,  dimension(ic_max)     :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / nam_ic3d / n_ic3d, idlist, filelist, varlist 
+   namelist / oce_init3d / n_ic3d, idlist, filelist, varlist 
 
    character(256), save                         :: filename
    character(50),  save                         :: varname
