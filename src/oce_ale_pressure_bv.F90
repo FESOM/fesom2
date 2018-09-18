@@ -186,7 +186,7 @@ subroutine pressure_force
 	real(kind=WP)		:: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
 	real(kind=WP)		:: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
 	
-	if     (trim(which_ale)=='linfs') then
+	if     (trim(which_ale)=='linfs' .and. (use_partial_cell==.false.) ) then
 		!___________________________________________________________________________
 		! loop over triangular elemments
 		do elem=1, myDim_elem2D
@@ -204,123 +204,137 @@ subroutine pressure_force
 				pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
 				pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
 			end do 
-		end do
+		end do !-->do elem=1, myDim_elem2D
 	else 
 		!___________________________________________________________________________
-		! loop over triangular elemments
-		do elem=1, myDim_elem2D
-			!_______________________________________________________________________
-			! number of levels at elem
-! 			nle=nlevels(elem)-1 !PS
-			nle=nlevels(elem)
-			
-			!_______________________________________________________________________
-			! calculate mid depth element level --> Z_e
-			zbar_n=0.0_WP
-			Z_n=0.0_WP
-			zbar_n(nle+1)=zbar_e_bot(elem)
-			Z_n(nle)=zbar_n(nle+1) + helem(nle,elem)/2.0_WP
-			do nlz=nle,2,-1
-				zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-				Z_n(nlz-1) = zbar_n(nlz) + helem(nlz-1,elem)/2.0_WP
-			end do
-			zbar_n(1) = zbar_n(2) + helem(1,elem)
-			
-			!_______________________________________________________________________
-			! node indices of elem 
-			elnodes = elem2D_nodes(:,elem)
-			
-			!_______________________________________________________________________
-			nln=nlevels_nod2D(elnodes)
-			if (any(nln>nle)) nln=nln+1
-			nln(1) = min(nln(1),nle)
-			nln(2) = min(nln(2),nle)
-			nln(3) = min(nln(3),nle)
-			
-			!_______________________________________________________________________
-			! loop over depth levels at element elem
-			p_grad=0.0_WP
-			do nlz=1,nle-1
-				
-				!___________________________________________________________________
-				rho_n = 0.0_WP
-				do ni=1,3
-					node = elnodes(ni)
-					
-					!_______________________________________________________________
-					dens_ind=0
-					do kk=1,nln(ni) 
-						! Z_n ... mid depth level at element
-						! Z_3d_n ... mid depth levels at nodes
-						if (Z_3d_n(kk,node)<=Z_n(nlz)) then
-							dens_ind=kk-1
-							if (kk==1) dens_ind=1
-							exit
-						end if
-					end do
-					
-					!_______________________________________________________________
-					! cubic spline interpolation 
-! 					s_ind=(/nlz-1,nlz,nlz+1,nlz+2/)
-					s_ind=(/dens_ind-1,dens_ind,dens_ind+1,dens_ind+2/)
-					flag=0
-					if (nlz==1) then ! surface layer
-						flag = 1
-						s_ind(1)=nlz
-					elseif (nlz==nln(ni)-1 ) then ! bottom layer
-						flag = -1
-						s_ind(4)=nlz+1
-					end if 
-					s_z    = Z_3d_n(s_ind,node)
-					s_dens = density_m_rho0(s_ind,node)
-					s_H    = s_z(3)-s_z(2)
-					aux1   = (s_dens(3)-s_dens(2))/s_H
-					
-					!_______________________________________________________________
-					! calculate derivatives in a way to get monotonic profile
-					if     (flag==0) then ! subsurface/above bottom case
-						aux2=(s_dens(2)-s_dens(1))/(s_z(2)-s_z(1))
-						s_dup=0.0
-						if(aux1*aux2>0.)  s_dup=2.0*aux1*aux2/(aux1+aux2)
-						aux2=(s_dens(4)-s_dens(3))/(s_z(4)-s_z(3))
-						s_dlo=0.0
-						if(aux1*aux2>0.) s_dlo=2.0*aux1*aux2/(aux1+aux2)
-					elseif (flag==1) then ! surface case
-						aux2=(s_dens(4)-s_dens(3))/(s_z(4)-s_z(3))
-						s_dlo=0.0
-						if(aux1*aux2>0.) s_dlo=2.0*aux1*aux2/(aux1+aux2)
-						s_dup=1.5*aux1-0.5*s_dlo
-					elseif (flag==-1) then! bottom case
-						aux2=(s_dens(2)-s_dens(1))/(s_z(2)-s_z(1))
-						s_dup=0.0
-						if(aux1*aux2>0.)  s_dup=2.0*aux1*aux2/(aux1+aux2)
-						s_dlo=1.5*aux1-0.5*s_dup
-					end if
-					
-					! cubic polynomial coefficients
-					a=s_dens(2)
-					b=s_dup
-					c=-(2.0*s_dup+s_dlo)/s_H + 3.0*(s_dens(3)-s_dens(2))/s_H**2
-					d=(s_dup+s_dlo)/s_H**2 - 2.0*(s_dens(3)-s_dens(2))/s_H**3
-					
-					! interploate
-					dz=Z_n(nlz)-s_z(2)
-					rho_n(ni)=a+b*dz+c*dz**2+d*dz**3
-					
-				end do ! --> do ni=1,3
-				
-				! calculate element wise density gradient
-				rhograd_e(1) = sum(gradient_sca(1:3,elem)*rho_n)
-				rhograd_e(2) = sum(gradient_sca(4:6,elem)*rho_n)
-				
-				! calculate element wise pressure gradient force 
-				aux             = g*helem(nlz,elem)*rhograd_e/density_0
-				pgf_x(nlz,elem) = p_grad(1) + aux(1)*0.5
-				pgf_y(nlz,elem) = p_grad(2) + aux(2)*0.5
-				p_grad          = p_grad    + aux
-			end do ! --> do nlz=1,nle
-		end do ! --> do elem=1, myDim_elem2D
-	endif
+        ! loop over triangular elemments
+        do elem=1, myDim_elem2D
+            !_______________________________________________________________________
+            ! calculate mid depth element level --> Z_e
+            ! nle...number of mid-depth levels at elem
+            nle          = nlevels(elem)-1
+            zbar_n       = 0.0_WP
+            Z_n          = 0.0_WP
+            zbar_n(nle+1)= zbar_e_bot(elem)
+            Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+            do nlz=nle,2,-1
+                zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+                Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+            end do
+            zbar_n(1) = zbar_n(2) + helem(1,elem)
+            
+            !_______________________________________________________________________
+            ! node indices of elem 
+            elnodes = elem2D_nodes(:,elem)
+            
+            !_______________________________________________________________________
+            ! nln...number of mid depth levels at each node that corresponds to 
+            ! element elem
+            nln=nlevels_nod2D(elnodes)-1
+            
+            !_______________________________________________________________________
+            ! loop over mid-depth levels at element elem
+            p_grad=0.0_WP
+            do nlz=1,nle
+                
+                !___________________________________________________________________
+                rho_n = 0.0_WP
+                ! loop over the three node points that span up element elem
+                do ni=1,3
+                    ! node...
+                    node = elnodes(ni)
+                    
+                    !_______________________________________________________________
+                    ! search for center index of cubic spline interpolation 
+                    ! [ center-1, center, center+1, center +2 ] at each node to interpolate 
+                    ! elemental mid-depth level value
+                    dens_ind=nln(ni)
+                    do kk=1,nln(ni) 
+                        ! Z_n ... mid depth level at element
+                        ! Z_3d_n ... mid depth levels at nodes
+                        if (Z_3d_n(kk,node)<=Z_n(nlz)) then
+                            dens_ind=kk-1
+                            if (kk==1) dens_ind=1
+                            exit
+                        end if
+                    end do
+                    
+                    !_______________________________________________________________
+                    ! prepare cubic spline interpolation 
+                    s_ind=(/dens_ind-1,dens_ind,dens_ind+1,dens_ind+2/)
+                    
+                    ! distinguish between bulg (flag=0), surface (flag=1) and
+                    ! bottom (flag=-1) 
+                    flag=0
+                    if (nlz==1) then ! surface layer
+                        flag = 1
+                        s_ind(1)=nlz
+                    elseif (nlz==nln(ni) ) then ! bottom layer
+                        flag = -1
+                        s_ind(4)=nlz+1
+                    end if 
+                    s_z    = Z_3d_n(s_ind,node)
+                    s_dens = density_m_rho0(s_ind,node)
+                    s_H    = s_z(3)-s_z(2)
+                    aux1   = (s_dens(3)-s_dens(2))/s_H
+                    
+                    !_______________________________________________________________
+                    ! calculate derivatives in a way to get monotonic profile
+                    if     (flag==0) then ! subsurface/above bottom case
+                        aux2=(s_dens(2)-s_dens(1))/(s_z(2)-s_z(1))
+                        s_dup=0.0
+                        if(aux1*aux2>0.)  s_dup=2.0*aux1*aux2/(aux1+aux2)
+                        aux2=(s_dens(4)-s_dens(3))/(s_z(4)-s_z(3))
+                        s_dlo=0.0
+                        if(aux1*aux2>0.) s_dlo=2.0*aux1*aux2/(aux1+aux2)
+                    elseif (flag==1) then ! surface case
+                        aux2=(s_dens(4)-s_dens(3))/(s_z(4)-s_z(3))
+                        s_dlo=0.0
+                        if(aux1*aux2>0.) s_dlo=2.0*aux1*aux2/(aux1+aux2)
+                        s_dup=1.5*aux1-0.5*s_dlo
+                    elseif (flag==-1) then! bottom case
+                        aux2=(s_dens(2)-s_dens(1))/(s_z(2)-s_z(1))
+                        s_dup=0.0
+                        if(aux1*aux2>0.)  s_dup=2.0*aux1*aux2/(aux1+aux2)
+                        s_dlo=1.5*aux1-0.5*s_dup
+                    end if
+                    
+                    !_______________________________________________________________
+                    ! cubic polynomial coefficients
+                    a=s_dens(2)
+                    b=s_dup
+                    c=-(2.0*s_dup+s_dlo)/s_H + 3.0*(s_dens(3)-s_dens(2))/s_H**2
+                    d=(s_dup+s_dlo)/s_H**2 - 2.0*(s_dens(3)-s_dens(2))/s_H**3
+                    
+                    !_______________________________________________________________
+                    ! interpolate
+                    dz=Z_n(nlz)-s_z(2)
+                    rho_n(ni)=a+b*dz+c*dz**2+d*dz**3
+                    
+                end do ! --> do ni=1,3
+                
+                !___________________________________________________________________
+                ! calculate element wise density gradient
+                rhograd_e(1) = sum(gradient_sca(1:3,elem)*rho_n)
+                rhograd_e(2) = sum(gradient_sca(4:6,elem)*rho_n)
+                
+                !___________________________________________________________________
+                ! calculate element wise pressure gradient force 
+                ! helem ... here because of vertical integral 
+                aux             = g*helem(nlz,elem)*rhograd_e/density_0
+                
+                ! *0.5 because pgf_xy is calculated at mid depth levels but at 
+                ! this point p_grad is integrated pressure gradient force until
+                ! until full depth  layers of previouse depth layer
+                pgf_x(nlz,elem) = p_grad(1) + aux(1)*0.5
+                pgf_y(nlz,elem) = p_grad(2) + aux(2)*0.5
+                
+                ! integration to full depth levels
+                p_grad          = p_grad    + aux
+                
+            end do ! --> do nlz=1,nle
+        end do ! --> do elem=1, myDim_elem2D
+    endif
 end subroutine pressure_force
 !
 !

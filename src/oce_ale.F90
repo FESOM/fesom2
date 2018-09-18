@@ -100,9 +100,10 @@ subroutine init_bottom_elem_thickness
     use o_ARRAYS
     use g_config,only: use_partial_cell
     use g_comm_auto
+    use g_support
     implicit none
     
-    integer :: elem, elnodes(3), nle, nln, n, k
+    integer :: node, elem, elnodes(3), nle, nln, n, k
     real(kind=WP) :: dd, dd1, hnbot, tvol 
     
     !___________________________________________________________________________
@@ -167,43 +168,168 @@ subroutine init_bottom_elem_thickness
 !                 zbar_e_bot(elem) = zbar(nlevels(elem)) ! partial cells are not allowed to become smaller
                 
             end if        
-            dd1=zbar(nle-1)-zbar_e_bot(elem)
-            bottom_elem_thickness(elem)=dd1
+            bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
             
-        end do
+        end do ! --> do elem=1, myDim_elem2D
+        call exchange_elem(bottom_elem_thickness)
+        call exchange_elem(zbar_e_bot)
+!         !_______________________________________________________________________
+!         !smooth bottom elem thickness
+!         call smooth_elem(bottom_elem_thickness,1)
+!         do elem=1, myDim_elem2D
+!             ! number of full depth levels at elem
+!             nle=nlevels(elem)  
+!             zbar_e_bot(elem) = zbar(nle-1)-bottom_elem_thickness(elem)
+!         end do    
+!         call exchange_elem(bottom_elem_thickness)
+!         call exchange_elem(zbar_e_bot)
         
         !_______________________________________________________________________
         ! calculate bottom node thickness from weighted mean of sorounding elemental
         ! bottom thicknesses
-        call exchange_elem(bottom_elem_thickness)
-        do n=1,myDim_nod2D+eDim_nod2D
+        do node=1,myDim_nod2D+eDim_nod2D
+            nln  = nlevels_nod2D(node)
             hnbot= 0.0_WP
             tvol = 0.0_WP
-            do k=1, nod_in_elem2D_num(n)
-                elem=nod_in_elem2D(k,n)
-                tvol=tvol+elem_area(elem)
+            do k=1, nod_in_elem2D_num(node)
+                elem  = nod_in_elem2D(k,node)
+                tvol  = tvol+elem_area(elem)
                 hnbot = hnbot + bottom_elem_thickness(elem)*elem_area(elem)
             end do
-            bottom_node_thickness(n) = hnbot/tvol
-            zbar_n_bot(n)             = zbar(nlevels_nod2D(n)-1)-bottom_node_thickness(n)
+            bottom_node_thickness(node) = hnbot/tvol
+            zbar_n_bot(node)            = zbar(nln-1)-bottom_node_thickness(node)
         end do 
-        
+!         call exchange_nod(bottom_node_thickness)
+!         call exchange_nod(zbar_n_bot)
+    !___________________________________________________________________________
+    ! use full bottom cells
     else
         do elem=1, myDim_elem2D
             nle=nlevels(elem)
             bottom_elem_thickness(elem)=zbar(nle-1)-zbar(nle)
             zbar_e_bot(elem) = zbar(nle)
         end do
+!         call exchange_elem(bottom_elem_thickness)
+!         call exchange_elem(zbar_e_bot)
         
         do n=1,myDim_nod2D+eDim_nod2D
             nln = nlevels_nod2D(n)
             bottom_node_thickness(n)=zbar(nln-1)-zbar(nln)
             zbar_n_bot(n) = zbar(nln)
         end do
+!         call exchange_nod(bottom_node_thickness)
+!         call exchange_nod(zbar_n_bot)
         
     end if 
     
 END subroutine init_bottom_elem_thickness
+!
+!
+!===============================================================================
+subroutine init_bottom_node_thickness
+    use o_PARAM
+    use o_MESH
+    use g_PARSUP
+    use o_ARRAYS
+    use g_config,only: use_partial_cell
+    use g_comm_auto
+    use g_support
+    implicit none
+    
+    integer :: node, elnodes(3), nle, nln, k
+    real(kind=WP) :: dd, dd1, hnbot, tvol 
+    
+    !___________________________________________________________________________
+    ! If we use partial cells, the thickness of bottom cell is adjusted.
+    ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
+    ! layer, nor -(1/2) of the current layer. 
+    if(use_partial_cell) then 
+        !Adjust the thickness of elemental bottom cells
+        do node=1, myDim_nod2D+eDim_nod2D
+            ! elemental topographic depth
+            dd=depth(node)
+            
+            ! number of full depth levels at elem
+            nln  = nlevels_nod2D(node)
+            !___________________________________________________________________
+            ! if topographic depth dd is deeper than depth of deepest full cell 
+            ! depth level zbar(nle)
+            !       : 
+            !       : 
+            ! ______________ zbar(nle-1)--------->+---->+
+            !                                     |     |
+            !                                     |     |
+            ! -------------- Z(nle-1)             |--case1--> dd1=
+            !                                     |     |
+            !                                     |     |
+            ! ______________ zbar(nle)            |     |--case2--> dd1 = 
+            ! / / / / / / /                       |     |
+            !  / / o dd case1 ------------------->+     |
+            ! -------------- Z(nle)(mid-depth)--------->+
+            !  / / / / / / /
+            ! / /  o dd case2
+            !  / / / / / /
+            if(dd<zbar(nln)) then 
+                if(nln==nl) then
+                    zbar_n_bot(node) = dd
+                    
+                else
+                    ! case 1 : max(Z(nle),dd) = dd
+                    ! case 2 : max(Z(nle),dd) = Z(nle)
+                    zbar_n_bot(node) = max(Z(nln),dd)
+                end if
+            !___________________________________________________________________
+            ! if topographic depth dd is shallower than depth of deepest full cell 
+            ! depth level zbar(nle)
+            !        : 
+            !        : 
+            ! ______________ zbar(nle-1)--------->+---->+
+            !                                     |--dd case1--> dd1=
+            !      o dd case1                     |     |
+            ! -------------- Z(nle-1)(mid-depth)->+     |--dd case 2 --> dd1=
+            !      o dd case2 ------------------------->+
+            ! ______________ zbar(nle) 
+            ! / / / / / / / 
+            !  / / / / / / /
+            ! / / / / / / / 
+            else
+                ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
+                ! case 2 : min(Z(nle-1),dd) = dd
+                zbar_n_bot(node) = min(Z(nln-1),dd)
+!                 zbar_e_bot(elem) = zbar(nlevels(elem)) ! partial cells are not allowed to become smaller
+                
+            end if        
+            bottom_node_thickness(node)=zbar(nln-1)-zbar_n_bot(node)
+        end do ! --> do node=1, myDim_nod2D
+        call exchange_nod(bottom_node_thickness)
+        call exchange_nod(zbar_n_bot)
+        
+!         !_______________________________________________________________________
+!         !smooth bottom node thickness
+!         call smooth_nod(bottom_node_thickness,1)
+!         do node=1, myDim_nod2D+eDim_nod2D
+!             ! number of full depth levels at elem
+!             nln=nlevels(node)  
+!             zbar_n_bot(node) = zbar(nln-1)-bottom_node_thickness(node)
+!         end do    
+!         call exchange_nod(bottom_node_thickness)
+!         call exchange_nod(zbar_n_bot)
+        
+        
+    !___________________________________________________________________________
+    ! use full bottom cells
+    else
+        do node=1,myDim_nod2D+eDim_nod2D
+            nln = nlevels_nod2D(node)
+            bottom_node_thickness(node)=zbar(nln-1)-zbar(nln)
+            zbar_n_bot(node) = zbar(nln)
+        end do
+        call exchange_nod(bottom_node_thickness)
+        call exchange_nod(zbar_n_bot)
+        
+    end if 
+    
+END subroutine init_bottom_node_thickness
 !
 !
 !===============================================================================
