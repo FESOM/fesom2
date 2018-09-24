@@ -219,10 +219,10 @@ IMPLICIT NONE
         write(*,*) ' ERROR: Your input mesh seems to be rotated and you try to' 
         write(*,*) '        rotate it again in FESOM (force_rotation=.true. ) !'
         write(*,*) '        The mesh you loaded suggests that it is already'
-        write(*,*) '        rotate because it has ocean points in a box'
+        write(*,*) '        rotated because it has ocean points in a box'
         write(*,*) '        around lon,lat = (-40.0, 75.0) (new rotation pole).'
         write(*,*) '        In an unrotated grid should be NO OCEAN points'
-        write(*,*) '        over Greenland !!!. So set in namelist.config '
+        write(*,*) '        over Greenland !!!. So set in the namelist.config '
         write(*,*) '        force_rotation==.False. If I am wrong go to'
         write(*,*) '        oce_mesh.F90:line231 and comment this part'
         write(*,*)

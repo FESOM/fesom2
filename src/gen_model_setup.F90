@@ -75,7 +75,7 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=oce_dyn)
   read (20,NML=oce_tra)
-  read (20,NML=nam_ic3d)
+  read (20,NML=oce_init3d)
   close (20)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
