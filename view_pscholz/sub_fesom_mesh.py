@@ -58,20 +58,20 @@ class fesom_mesh:
     pbndn_2d_i                = []
     
     #____mesh elem info__________________________
-    elem0_2d_i, elem_2d_i    = [], []
-    elem0_2d_iz,pbndtri_2d_i= [], []
-    abnormtri_2d_i             = []
+    elem0_2d_i, elem_2d_i     = [], []
+    elem0_2d_iz,pbndtri_2d_i  = [], []
+    abnormtri_2d_i            = []
     
     #____fesom lsmask polygon____________________
     polygon_xy                = []
     
     #____triangle area in km^2___________________
-    elem0_2d_area            = []
+    elem0_2d_area             = []
     elem_2d_resol             = []
     
     #____triangle area in km^2___________________
     nodes_2d_resol            = []
-    nodes_2d_area            = []
+    nodes_2d_area             = []
     
     #+___INIT FESOM2.0 MESH OBJECT_____________________________________________+
     #|                                                                         |
@@ -552,37 +552,53 @@ class fesom_mesh:
                                             #self.elem_2d_area[self.pbndtri_2d_i]))
         del jacobian
         
-        ##_______________________________________________________________________
-        ## calc node cluster area 
-        #self.nodes_2d_area=np.zeros(self.n2dna)
-        #aux_area = np.concatenate((self.elem0_2d_area, self.elem0_2d_area[self.pbndtri_2d_i]))
-        #aux_area = aux_area.reshape(aux_area.size,1)
-        #aux_area = np.concatenate((aux_area,aux_area,aux_area),axis=1).flatten()
-        #count    = 0
-        ## single loop over self.elem0_2d_i.flat is ~4 times faster than douple loop 
-        ## over for i in range(3): ,for j in range(self.n2de):
-        #for idx in self.elem0_2d_i.flat:
-            #self.nodes_2d_area[idx]=self.nodes_2d_area[idx]+aux_area[count]
-            #count=count+1 # count triangle index for aux_area[count] --> aux_area =[n2de*3,]
-        #del aux_area, count
-        #self.nodes_2d_area=self.nodes_2d_area/3.
-        #self.nodes_2d_area[self.n2dn:self.n2dna] = self.nodes_2d_area[self.pbndn_2d_i]
-        
         #_______________________________________________________________________
         t2 = time.time()
         print(' >> time:{:.3f} s'.format(t2-t1))
+        
     
+    #___CALCULATE TRIANGLE AREA("volume")_______________________________________
+    # calculate TRIANGLE AREA IN M^2
+    #
+    #___________________________________________________________________________
+    def fesom_calc_nodearea(self):
+        #_______________________________________________________________________
+        print(' --> calc. triangle area on nodes m^2',end='')
+        t1 = time.time()
+        #_______________________________________________________________________
+        if len(self.elem0_2d_area)==0: self.fesom_calc_triarea()
+        #_______________________________________________________________________
+        # calc node cluster area 
+        self.nodes_2d_area=np.zeros(self.n2dna)
+        aux_area = np.concatenate((self.elem0_2d_area, self.elem0_2d_area[self.pbndtri_2d_i]))
+        aux_area = aux_area.reshape(aux_area.size,1)
+        aux_area = np.concatenate((aux_area,aux_area,aux_area),axis=1).flatten()
+        count    = 0
+        # single loop over self.elem0_2d_i.flat is ~4 times faster than douple loop 
+        # over for i in range(3): ,for j in range(self.n2de):
+        for idx in self.elem0_2d_i.flat:
+            self.nodes_2d_area[idx]=self.nodes_2d_area[idx]+aux_area[count]
+            count=count+1 # count triangle index for aux_area[count] --> aux_area =[n2de*3,]
+        del aux_area, count
+        self.nodes_2d_area=self.nodes_2d_area/3.
+        self.nodes_2d_area[self.n2dn:self.n2dna] = self.nodes_2d_area[self.pbndn_2d_i]
+        #_______________________________________________________________________
+        t2 = time.time()
+        print(' >> time:{:.3f} s'.format(t2-t1))
+        
+        
     #+___CALCULATE INTERPOLATION MATRIX FROM ELEMENTS TO NODE POINTS RESOLUTION+
     #| interpolate from triangle values to node values                         |
     #|                                                                         |
     #+_________________________________________________________________________+
     def fesom_interp_e2n(self,data_e):
-        if len(self.elem_2d_area)==0: self.fesom_calc_triarea()
+        if len(self.elem0_2d_area)==0: self.fesom_calc_triarea()
+        if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
         
         if data_e.size==self.n2de:
-            data_e=data_e*self.elem_2d_area[0:self.n2de]
+            data_e=data_e*self.elem0_2d_area
         elif data_e.size==self.n2dea:
-            data_e=data_e*self.elem_2d_area 
+            data_e=data_e*np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
         
         data_n=np.zeros((self.n2dna,))
         for ii in range(self.n2de):     
