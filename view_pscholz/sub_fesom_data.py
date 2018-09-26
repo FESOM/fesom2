@@ -712,7 +712,7 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
 #_______________________________________________________________________________
-def fesom_load_blowup(mesh,data,do_output=True):
+def fesom_load_blowup(mesh,data,do_output=True,which_file='blowup'):
     
     #___________________________________________________________________________
     # number of years to average 
@@ -726,7 +726,7 @@ def fesom_load_blowup(mesh,data,do_output=True):
     ami = np.array(data.month)
     
     #____START YEAR LOOP________________________________________________________
-    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.blowup.nc'
+    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.'+which_file+'.nc'
     print('     --> '+fname)
     print('     --> '+data.var)
     
