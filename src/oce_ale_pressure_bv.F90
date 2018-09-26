@@ -265,8 +265,10 @@ subroutine pressure_force
                     
                     ! distinguish between bulg (flag=0), surface (flag=1) and
                     ! bottom (flag=-1) 
+                    ! why s_ind(1)==0 ? so compiler doesn't complain of zero index
+                    ! also s(1) is ot used when flag=1
                     flag=0
-                    if (nlz==1) then ! surface layer
+                    if (nlz==1 .or. s_ind(1)==0) then ! surface layer
                         flag = 1
                         s_ind(1)=nlz
                     elseif (nlz==nln(ni) ) then ! bottom layer
