@@ -101,12 +101,12 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2])
     idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
     idxbox_e = idxbox_e==False # true index for triangles that are within box 
+    
     # case of node data
     if data.value.size ==mesh.n2dna:
         idx_box = np.ones((mesh.n2dna,),dtype='bool')   
     elif data.value.size ==mesh.n2dea:
         idx_box = np.ones((mesh.n2dea,),dtype='bool')
-        
         
     if data.value.size ==mesh.n2dna:
         idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
@@ -250,7 +250,9 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 antialiased=False,
                 edgecolors='None',
                 cmap=cmap0,
-                shading='gouraud')
+                shading='flat',
+                clim=[clevel[0],clevel[-1]],
+                vmin=clevel[0],vmax=clevel[-1])
                 #shading='flat')
                 #shading='gouraud')
             if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)        
@@ -265,9 +267,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
                     antialiased=False,
-                    cmap=cmap0)#,
-        #           clim=[clevel[0],clevel[-1]])
-        #plt.clim=[clevel[0],clevel[-1]]
+                    cmap=cmap0,
+                    clim=[clevel[0],clevel[-1]],
+                    vmin=clevel[0],vmax=clevel[-1])
+    
         if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
     
     #___________________________________________________________________________
@@ -379,9 +382,9 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     
     #___________________________________________________________________________
     plt.show(block=False)
-    
+    fig.canvas.draw()
     #___________________________________________________________________________
-    return(fig,ax,map,cbar)
+    return(fig,ax,map,cbar,hp1,tri)
     #return map
     
     

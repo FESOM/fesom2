@@ -171,23 +171,21 @@ subroutine init_bottom_elem_thickness
             bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
             
         end do ! --> do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        !smooth bottom elem thickness
+        call smooth_elem(bottom_elem_thickness,1)
+        do elem=1, myDim_elem2D
+            ! number of full depth levels at elem
+            nle=nlevels(elem)  
+            zbar_e_bot(elem) = zbar(nle-1)-bottom_elem_thickness(elem)
+        end do    
         call exchange_elem(bottom_elem_thickness)
         call exchange_elem(zbar_e_bot)
-!         !_______________________________________________________________________
-!         !smooth bottom elem thickness
-!         call smooth_elem(bottom_elem_thickness,1)
-!         do elem=1, myDim_elem2D
-!             ! number of full depth levels at elem
-!             nle=nlevels(elem)  
-!             zbar_e_bot(elem) = zbar(nle-1)-bottom_elem_thickness(elem)
-!         end do    
-!         call exchange_elem(bottom_elem_thickness)
-!         call exchange_elem(zbar_e_bot)
-        
+          
         !_______________________________________________________________________
         ! calculate bottom node thickness from weighted mean of sorounding elemental
         ! bottom thicknesses
-        do node=1,myDim_nod2D+eDim_nod2D
+        do node=1,myDim_nod2D
             nln  = nlevels_nod2D(node)
             hnbot= 0.0_WP
             tvol = 0.0_WP
@@ -199,8 +197,18 @@ subroutine init_bottom_elem_thickness
             bottom_node_thickness(node) = hnbot/tvol
             zbar_n_bot(node)            = zbar(nln-1)-bottom_node_thickness(node)
         end do 
-!         call exchange_nod(bottom_node_thickness)
-!         call exchange_nod(zbar_n_bot)
+        
+!         !_______________________________________________________________________
+!         call smooth_nod(bottom_node_thickness,1)
+!         do node=1,myDim_nod2D+eDim_nod2D
+!             nln  = nlevels_nod2D(node)
+!             zbar_n_bot(node)= zbar(nln-1)-bottom_node_thickness(node)
+!         end do 
+
+        !_______________________________________________________________________
+        call exchange_nod(bottom_node_thickness)
+        call exchange_nod(zbar_n_bot)
+        
     !___________________________________________________________________________
     ! use full bottom cells
     else
@@ -209,16 +217,12 @@ subroutine init_bottom_elem_thickness
             bottom_elem_thickness(elem)=zbar(nle-1)-zbar(nle)
             zbar_e_bot(elem) = zbar(nle)
         end do
-!         call exchange_elem(bottom_elem_thickness)
-!         call exchange_elem(zbar_e_bot)
         
         do n=1,myDim_nod2D+eDim_nod2D
             nln = nlevels_nod2D(n)
             bottom_node_thickness(n)=zbar(nln-1)-zbar(nln)
             zbar_n_bot(n) = zbar(nln)
         end do
-!         call exchange_nod(bottom_node_thickness)
-!         call exchange_nod(zbar_n_bot)
         
     end if 
     
@@ -301,19 +305,18 @@ subroutine init_bottom_node_thickness
             end if        
             bottom_node_thickness(node)=zbar(nln-1)-zbar_n_bot(node)
         end do ! --> do node=1, myDim_nod2D
+        
+        !_______________________________________________________________________
+        !smooth bottom node thickness
+        call smooth_nod(bottom_node_thickness,1)
+        do node=1, myDim_nod2D+eDim_nod2D
+            ! number of full depth levels at elem
+            nln=nlevels(node)  
+            zbar_n_bot(node) = zbar(nln-1)-bottom_node_thickness(node)
+        end do    
+        !_______________________________________________________________________
         call exchange_nod(bottom_node_thickness)
         call exchange_nod(zbar_n_bot)
-        
-!         !_______________________________________________________________________
-!         !smooth bottom node thickness
-!         call smooth_nod(bottom_node_thickness,1)
-!         do node=1, myDim_nod2D+eDim_nod2D
-!             ! number of full depth levels at elem
-!             nln=nlevels(node)  
-!             zbar_n_bot(node) = zbar(nln-1)-bottom_node_thickness(node)
-!         end do    
-!         call exchange_nod(bottom_node_thickness)
-!         call exchange_nod(zbar_n_bot)
         
         
     !___________________________________________________________________________

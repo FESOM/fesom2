@@ -325,7 +325,7 @@ subroutine pressure_force
                 
                 ! *0.5 because pgf_xy is calculated at mid depth levels but at 
                 ! this point p_grad is integrated pressure gradient force until
-                ! until full depth  layers of previouse depth layer
+                ! full depth  layers of previouse depth layer
                 pgf_x(nlz,elem) = p_grad(1) + aux(1)*0.5
                 pgf_y(nlz,elem) = p_grad(2) + aux(2)*0.5
                 

@@ -164,6 +164,8 @@ subroutine check_blowup(istep)
 	use i_ARRAYS
 	use g_comm_auto
 	use io_BLOWUP
+	use g_forcing_arrays
+	use diagnostics
 	implicit none
 	
 	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
@@ -190,21 +192,30 @@ subroutine check_blowup(istep)
 				write(*,*) 'eta_n(n)    = ',eta_n(n)
 				write(*,*) 'd_eta(n)    = ',d_eta(n)
 				write(*,*)
-				write(*,*) 'hbar        = ',hbar(n)
-				write(*,*) 'hbar_old    = ',hbar_old(n)
-				write(*,*)
 				write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
 				write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
 				write(*,*)
-				write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
-				write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+				write(*,*) 'ssh_rhs = ',ssh_rhs(n),', ssh_rhs_old = ',ssh_rhs_old(n)
 				write(*,*)
-				write(*,*) 'wflux       = ',water_flux(n)
-				write(*,*) 'wflux_old   = ',water_flux_old(n)
+				write(*,*) 'hbar = ',hbar(n),', hbar_old = ',hbar_old(n)
 				write(*,*)
-				write(*,*) 'm_ice       = ',m_ice(n)
-				write(*,*) 'm_ice_old   = ',m_ice_old(n)
+				write(*,*) 'wflux = ',water_flux(n),', wflux_old = ',water_flux_old(n)
 				write(*,*)
+				write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
+				write(*,*)
+				do nz=1,nod_in_elem2D_num(n)
+                    write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
+				end do
+				write(*,*)
+				write(*,*) 'm_ice = ',m_ice(n),', m_ice_old = ',m_ice_old(n)
+				write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
+				write(*,*) 'thdgr = ',thdgr(n),', thdgr_old = ',thdgr_old(n)
+				write(*,*) 'thdgrsn = ',thdgrsn(n)
+				write(*,*)
+				if (lcurt_stress_surf) then
+                    write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
+                    write(*,*)
+				endif 
 ! 				do el=1,nod_in_elem2d_num(n)
 ! 					elidx = nod_in_elem2D(el,n)
 ! 					write(*,*) ' elem#=',el,', elemidx=',elidx

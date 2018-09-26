@@ -293,7 +293,7 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
             if np.max(data.record)-1>nrec:
                 print(' --> error: this record number doesnt exist in that file')
                 break
-            print('select single record time slice|',ebd='')
+            print('select single record time slice|',end='')
             for ii in data.record: print('{:d}|'.format(ii)),
             ncval=fesom_time_depth_mean(mesh,ncval,data.record[0]-1,data.depth)
             if data.var.find('vec')!=-1: 
@@ -712,7 +712,7 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
 #_______________________________________________________________________________
-def fesom_load_blowup(mesh,data,do_output=True):
+def fesom_load_blowup(mesh,data,do_output=True,which_file='blowup'):
     
     #___________________________________________________________________________
     # number of years to average 
@@ -726,7 +726,7 @@ def fesom_load_blowup(mesh,data,do_output=True):
     ami = np.array(data.month)
     
     #____START YEAR LOOP________________________________________________________
-    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.blowup.nc'
+    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.'+which_file+'.nc'
     print('     --> '+fname)
     print('     --> '+data.var)
     
@@ -1084,7 +1084,6 @@ def fesom_time_depth_mean(mesh,ncval,sel_time,levels=[],do_tmean=True,do_zmean=T
         nselt = 0
     else:
         nselt = len(sel_time)
-    
     #___________________________________________________________________________
     # do no time selection
     #if len(sel_time)==0:
@@ -1092,13 +1091,18 @@ def fesom_time_depth_mean(mesh,ncval,sel_time,levels=[],do_tmean=True,do_zmean=T
         if dim_num==2:
             # case 2d variable
             #ncval= ncval[:,:]
-            if np.isscalar(sel_time)==True:ncval= ncval[sel_time,:]
-            if do_tmean==True: ncval=ncval.mean(axis=0)
+            if np.isscalar(sel_time)==True:
+                ncval= ncval[sel_time,:]
+            elif do_tmean==True and np.isscalar(sel_time)==False: 
+                ncval=ncval.mean(axis=0)
+            
         elif dim_num==3:
             # case 3d variable
             #ncval= ncval[:,:,:]
-            if np.isscalar(sel_time)==True:ncval= ncval[sel_time,:,:]
-            if do_tmean==True: ncval=ncval.mean(axis=0)
+            if np.isscalar(sel_time)==True:
+                ncval= ncval[sel_time,:,:]
+            elif do_tmean==True and np.isscalar(sel_time)==False: 
+                ncval=ncval.mean(axis=0)
             # do vertical interpolation of certain layer if data.depth is not empty
             #if len(data.depth)!=0 : ncval=fesom_vinterp(ncval,mesh)
             if do_zmean==True:
