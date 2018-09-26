@@ -350,7 +350,7 @@ subroutine compute_diagnostics(mode)
   if (ldiag_energy)      call diag_energy(mode)
   !5. print integrated temperature 
   if (ldiag_salt3d) then
-     if (mod(mstep,100)==0) then
+     if (mod(mstep,logfile_outfreq)==0) then
         call integrate_nod(tr_arr(:,:,2), val)
         if (mype==0) then
            write(*,*) 'total integral of salinity at timestep :', mstep, val

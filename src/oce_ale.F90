@@ -1957,6 +1957,7 @@ subroutine oce_timestep_ale(n)
     if (trim(mix_scheme)=='KPP') then
         call oce_mixing_KPP(Av, Kv_double)
         Kv=Kv_double(:,:,1)
+        call mo_convect
     else if(trim(mix_scheme)=='PP') then
         call oce_mixing_PP
     else

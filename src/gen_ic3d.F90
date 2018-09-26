@@ -32,6 +32,7 @@ MODULE g_ic3d
    integer, save  :: nm_ic_unit     = 103       ! unit to open namelist file
 !============== namelistatmdata variables ================
    integer, parameter                           :: ic_max=10
+   logical                                      :: ic_cyclic=.true.
    integer,        save                         :: n_ic3d
    integer,        save,  dimension(ic_max)     :: idlist
    character(256), save,  dimension(ic_max)     :: filelist
@@ -136,14 +137,14 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename) 
-
+      nc_Nlon=nc_Nlon+2 !for the halo in case of periodic boundary
       call MPI_BCast(nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(nc_Ndepth, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+         
 
       ALLOCATE( nc_lon(nc_Nlon), nc_lat(nc_Nlat),&
                 &       nc_depth(nc_Ndepth))
-
    !read variables from file
    ! coordinates
       if (mype==0) then
@@ -155,8 +156,10 @@ CONTAINS
       call check_nferr(iost,filename)
       if (mype==0) then
          nf_start(1)=1
-         nf_edges(1)=nc_Nlon
-         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon)
+         nf_edges(1)=nc_Nlon-2
+         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
+         nc_lon(1)        =nc_lon(nc_Nlon-1)
+         nc_lon(nc_Nlon)  =nc_lon(2)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename)
@@ -178,6 +181,11 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
+
+      if (ic_cyclic) then
+         nc_lon(1)      =nc_lon(1)-360.
+         nc_lon(nc_Nlon)=nc_lon(nc_Nlon)+360.
+      end if 
    END SUBROUTINE nc_readGrid
 
    
@@ -205,25 +213,19 @@ CONTAINS
 !         ! get coordinates of elements
          x  = geo_coord_nod2D(1,i)/rad
          y  = geo_coord_nod2D(2,i)/rad
-         if (x<0.) x=x+360.
+         if (x<0.)   x=x+360.
+         if (x>360.) x=x-360.
          ! find nearest
-         if ( x < nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then      
+         if ( x <= nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then               
             call binarysearch(nc_Nlon, nc_lon, x, bilin_indx_i(i))
          else ! NO extrapolation in space
-            if ( x < nc_lon(1) ) then               
-               bilin_indx_i(i)=-1         
-            else
-               bilin_indx_i(i)=0
-            end if
+            bilin_indx_i(i)=-1         
          end if
-         if ( y < nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then      
+
+         if ( y <= nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then      
             call binarysearch(nc_Nlat, nc_lat, y, bilin_indx_j(i))
          else ! NO extrapolation in space
-            if ( y < nc_lat(1) ) then               
                bilin_indx_j(i)=-1         
-            else
-               bilin_indx_j(i)=0
-            end if
          end if
       end do
                          
@@ -272,13 +274,15 @@ CONTAINS
       !read data from file
       if (mype==0) then
          nf_start(1)=1
-         nf_edges(1)=nc_Nlon
+         nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
          nf_edges(2)=nc_Nlat
          nf_start(3)=1
          nf_edges(3)=nc_Ndepth         
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata)
+         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
       end if
+      ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
+      ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
       call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -293,7 +297,8 @@ CONTAINS
          jp1 = j + 1
          x  = geo_coord_nod2D(1,ii)/rad
          y  = geo_coord_nod2D(2,ii)/rad
-         if (x<0.) x=x+360.
+         if (x<0.)   x=x+360.
+         if (x>360.) x=x-360.
          if ( min(i,j)>0 ) then
          if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99)) cycle
          x1 = nc_lon(i)
