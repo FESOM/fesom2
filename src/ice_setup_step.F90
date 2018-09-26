@@ -131,7 +131,6 @@ subroutine ice_timestep(step)
 ! 
 ! Sea ice model step
 !
-use g_config, only: rtime_ice, rtime_tot
 use o_param
 use g_parsup
 use g_CONFIG
