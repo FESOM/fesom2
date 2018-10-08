@@ -49,11 +49,20 @@ def create_indexes_and_distances(mesh, lons, lats, k=1, n_jobs=2,which='node'):
         The locations of the neighbors in data.
 
     '''
-    if which=='node':
-        xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
-    elif which=='elem':
-        xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3, 
-        								mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3)
+    try:
+        mesh.x2
+    except AttributeError:
+        if which=='node':
+            xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+        elif which=='elem':
+            xs, ys, zs = lon_lat_to_cartesian(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3, 
+                                            mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3)
+    else:
+        if which=='node':
+            xs, ys, zs = lon_lat_to_cartesian(mesh.x2, mesh.y2)
+        elif which=='elem':
+            xs, ys, zs = lon_lat_to_cartesian(mesh.x2[mesh.elem].sum(axis=1)/3, 
+                                              mesh.y2[mesh.elem].sum(axis=1)/3)
     
     xt, yt, zt = lon_lat_to_cartesian(lons.flatten(), lats.flatten())
     
@@ -95,8 +104,12 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
         array with data interpolated to the target grid.
     '''
     which='node'
-    if data.shape[0]==mesh.n2dea:
-        which='elem'
+    try:
+        mesh.x2
+    except AttributeError:
+        if data.shape[0]==mesh.n2dea: which='elem'
+    else:
+        if data.shape[0]==mesh.e2d: which='elem'
     
     #print distances
     if (distances is None) or (inds is None):
@@ -116,6 +129,7 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
         
         data_interpolated = data_interpolated.reshape(lons.shape)
         data_interpolated = np.ma.masked_invalid(data_interpolated)
+        data_interpolated = np.ma.filled(data_interpolated,np.nan)
     else:
         distances_ma = np.ma.masked_greater(distances, radius_of_influence)
         #distances_ma = np.ma.masked_greater(distances, np.nan)
@@ -124,6 +138,8 @@ def fesom2regular(data, mesh, lons, lats, distances=None, \
         data_interpolated = np.ma.sum(w * data[inds], axis=1) / np.ma.sum(w, axis=1)
         data_interpolated.shape = lons.shape
         data_interpolated = np.ma.masked_invalid(data_interpolated)
+        data_interpolated = np.ma.filled(data_interpolated,np.nan)
+        
         #data_interpolated[distances[:,1]>=radius_of_influence] = np.nan
         #data_interpolated[np.where(distances.min(axis=1)>=radius_of_influence)[0]] = np.nan
     

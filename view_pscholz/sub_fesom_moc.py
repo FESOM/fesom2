@@ -492,6 +492,103 @@ def calc_basindomain(mesh,box_moc,do_output=False):
     
     return(allbox_fin)
 
+
+#+___CALCULATE BASIN LIMITED DOMAIN___________________________________________________________________+
+#| to calculate the regional moc (amoc,pmoc,imoc) the domain needs be limited to corresponding basin.
+#| here the elemental index of the triangels in the closed basin is calcualted
+#+____________________________________________________________________________________________________+
+def calc_basindomain_slow(mesh,box_moc,do_output=False):
+    
+    if do_output==True: print('     --> calculate regional basin limited domain')
+    box_moc = np.matrix(box_moc)
+    for bi in range(0,box_moc.shape[0]):
+        #_____________________________________________________________________________________________
+        box_idx = mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0<box_moc[bi,0]
+        box_idx = np.logical_or(box_idx,mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0>box_moc[bi,1])
+        box_idx = np.logical_or(box_idx,mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0<box_moc[bi,2])
+        box_idx = np.logical_or(box_idx,mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0>box_moc[bi,3])
+        box_idx = np.where(box_idx==False)[0]
+        box_elem2di = mesh.elem_2d_i[box_idx,:]
+
+        #_____________________________________________________________________________________________
+        # calculate edge indices of box limited domain
+        edge_12     = np.sort(np.array(box_elem2di[:,[0,1]]),axis=1)
+        edge_23     = np.sort(np.array(box_elem2di[:,[1,2]]),axis=1)
+        edge_31     = np.sort(np.array(box_elem2di[:,[2,0]]),axis=1)
+        edge_triidx = np.arange(0,box_elem2di.shape[0],1)
+
+        #_____________________________________________________________________________________________
+        # start with seed triangle
+        seed_pts     = [box_moc[bi,0]+(box_moc[bi,1]-box_moc[bi,0])/2.0,box_moc[bi,2]+(box_moc[bi,3]-box_moc[bi,2])/2.0]
+        seed_triidx  = np.argsort((mesh.nodes_2d_xg[box_elem2di].sum(axis=1)/3.0-seed_pts[0])**2 + (mesh.nodes_2d_yg[box_elem2di].sum(axis=1)/3.0-seed_pts[1])**2,axis=-0)[0]
+        seed_elem2di = box_elem2di[seed_triidx,:]
+        seed_edge    = np.concatenate((seed_elem2di[:,[0,1]], seed_elem2di[:,[1,2]], seed_elem2di[:,[2,0]]),axis=0)     
+        seed_edge    = np.sort(seed_edge,axis=1) 
+        
+        # already delete seed triangle and coresbonding edges from box limited domain list
+        edge_triidx = np.delete(edge_triidx,seed_triidx)
+        edge_12     = np.delete(edge_12,seed_triidx,0)
+        edge_23     = np.delete(edge_23,seed_triidx,0)
+        edge_31     = np.delete(edge_31,seed_triidx,0)
+
+        #_____________________________________________________________________________________________
+        # do iterative search of which triangles are connected to each other and form cluster
+        t1 = time.time()
+        tri_merge_idx = np.zeros((box_elem2di.shape[0],),dtype='int')
+        tri_merge_count = 0
+        for ii in range(0,10000): 
+            #print(ii,tri_merge_count,seed_edge.shape[0])
+        
+            # determine which triangles contribute to edge
+            triidx12 = ismember_rows(seed_edge,edge_12)
+            triidx23 = ismember_rows(seed_edge,edge_23)
+            triidx31 = ismember_rows(seed_edge,edge_31)
+        
+            # calculate new seed edges
+            seed_edge = np.concatenate((edge_23[triidx12,:],edge_31[triidx12,:],\
+                                        edge_12[triidx23,:],edge_31[triidx23,:],\
+                                        edge_12[triidx31,:],edge_23[triidx31,:]))
+            
+            # collect all found connected triagles    
+            triidx = np.concatenate((triidx12,triidx23,triidx31))
+            triidx = np.unique(triidx)
+            
+            # break out of iteration loop 
+            if triidx.size==0: break 
+                
+            # add found trinagles to final domain list    
+            tri_merge_idx[tri_merge_count:tri_merge_count+triidx.size]=edge_triidx[triidx]
+            tri_merge_count = tri_merge_count+triidx.size
+            
+            # delete already found trinagles and edges from list
+            edge_triidx = np.delete(edge_triidx,triidx)
+            edge_12     = np.delete(edge_12,triidx,0)
+            edge_23     = np.delete(edge_23,triidx,0)
+            edge_31     = np.delete(edge_31,triidx,0)
+    
+            del triidx,triidx12,triidx23,triidx31
+        
+        tri_merge_idx = tri_merge_idx[:tri_merge_count-1]
+        t2=time.time()
+        if do_output==True: print('         elpased time:'+str(t2-t1)+'s')
+        
+        #_____________________________________________________________________________________________
+        # calculate final domain limited trinagle cluster element index
+        if bi==0:
+            box_idx_fin = box_idx[tri_merge_idx]
+        else:
+            box_idx_fin = np.concatenate((box_idx_fin,box_idx[tri_merge_idx]))
+        
+    return(box_idx_fin)
+
+
+#+___EQUIVALENT OF MATLAB ISMEMBER FUNCTION___________________________________________________________+
+#|                                                                                                    |
+#+____________________________________________________________________________________________________+
+def ismember_rows(a, b):
+    return np.flatnonzero(np.in1d(b[:,0], a[:,0]) & np.in1d(b[:,1], a[:,1]))
+
+
 #+___RAY TRACING METHOD TO CHECK IF POINT IS IN POLYGON________________________+
 #| see...https://stackoverflow.com/questions/36399381/whats-the-fastest-way-of-
 #| checking-if-a-point-is-inside-a-polygon-in-python
