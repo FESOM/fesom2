@@ -1445,6 +1445,7 @@ subroutine vert_vel_ale
                 cumsum_maxdhbar(1)            =  max_dhbar2distr(1)
                 cumsum_maxdhbar(2:lzstar_lev) = (/(max_dhbar2distr(nz)+max_dhbar2distr(nz-1),nz=2,lzstar_lev,1)/)
                 nz = minval(pack(idx,cumsum_maxdhbar<dhbar_total))
+                nz = min(nz,lzstar_lev)
                 
                 !_______________________________________________________________
                 ! calc array for distribution of ssh change over layers
@@ -1464,13 +1465,19 @@ subroutine vert_vel_ale
                 !_______________________________________________________________
                 if ( abs(sum(distrib_dhbar)-dhbar_total)>1.0e-10 ) then
                     write(*,*) " --> problem <-- with conservation of dhbar distribution over depth"
-                    write(*,*) "                 there are not enough layers to distribute all "
+                    write(*,*) "                 there are not enough layers to distribute "
                     write(*,*) "                 all change in ssh "
                     write(*,*) "                  > mype        =",mype
                     write(*,*) "                  > node        =",n
                     write(*,*) "                  > mstep       =",mstep
                     write(*,*) "                  > dhbar_total =",dhbar_total
                     write(*,*) "                  > dhbar_rest  =",dhbar_rest
+                    write(*,*) "                  > lzstar_lev  =",lzstar_lev
+                    write(*,*) "                  > nzmax       =",nzmax
+                    write(*,*) "                  > max_dhbar2distr=",max_dhbar2distr
+                    write(*,*) "                  > hnode_min=",(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode
+                    write(*,*) "                  > hnode_now=",hnode(1:lzstar_lev,n)
+                    
                 end if 
                 
                 !_______________________________________________________________

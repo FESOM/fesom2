@@ -26,7 +26,7 @@ class fesom_data(object):
     runid, path, descript       = 'fesom', '', ''
     
     #____data time variables_____________________
-    year,  month, record, depth = [], [], [], []
+    year,  month, record, depth,zlev = [], [], [], [],[]
     str_time, str_dep           = '', ''
     
     #____data projection variables_______________
@@ -378,7 +378,15 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
     
     #___________________________________________________________________________
     if len(data.depth)==0:
-        data.depth = mesh.zlev
+        try:
+            mesh.zlevs
+        except AttributeError:
+            data.zlev = mesh.zlev
+        else:     
+            data.zlev = mesh.zlevs
+        #data.depth = mesh.zlev
+    else:
+        data.zlev = data.depth
     
     #___________________________________________________________________________
     # set up descriptiv variable names
@@ -404,11 +412,11 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
     else: 
         data.str_time = 'rec_i: '+str(data.record[0])
     
-    if dim_num==3 and len(data.depth)!=0:
-        if len(data.depth)<=1:
-            data.str_dep=', dep: '+str(data.depth[0])+'m'
+    if dim_num==3 and len(data.zlev)!=0:
+        if len(data.zlev)<=1:
+            data.str_dep=', dep: '+str(data.zlev[0])+'m'
         else:
-            data.str_dep=', dep: '+str(data.depth[0])+'m-'+str(data.depth[-1])+'m'
+            data.str_dep=', dep: '+str(data.zlev[0])+'m-'+str(data.zlev[-1])+'m'
     #___________________________________________________________________________
     return data
     
@@ -679,7 +687,8 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
             data.value[ii] = data.value[ii][0:count_ti,:]
             
     data.time  = data.time[0:count_ti]
-    if len(data.depth)==0: data.depth = mesh.zlev
+    if len(data.zlev)==0: data.zlev = mesh.zlev
+    #if len(data.depth)==0: data.depth = mesh.zlev
     
     #___________________________________________________________________________
     # set up descriptiv variable names

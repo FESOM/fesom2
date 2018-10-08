@@ -255,14 +255,14 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 vmin=clevel[0],vmax=clevel[-1])
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
@@ -374,7 +374,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         str_deps = data.str_dep.replace(' ','').replace(',','').replace(':','')
         sfname = 'plot_'+data.descript+'_'+data.proj+'_'+data.sname+'_'+str_times+'_'+str_deps+'.png'
         sdname = inputarray['save_figpath']
-        if os.path.isdir(sdname)==False: os.mkdir(sdname)
+        if os.path.isdir(sdname)==False: os.makedirs(sdname)
         plt.savefig(sdname+sfname, \
                     format='png', dpi=600, \
                 bbox_inches='tight', pad_inches=0,\
@@ -651,7 +651,7 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
         print(' --> save figure: png')
         #print(fig.dpi)
         sdname = inputarray['save_figpath']
-        if os.path.isdir(sdname)==False: os.mkdir(sdname)
+        if os.path.isdir(sdname)==False: os.makedirs(sdname)
         plt.savefig(sdname+'plot_'+data.proj+'_'+data.sname+'.png', \
                 format='png', dpi=600, \
                 bbox_inches='tight', pad_inches=0,\
@@ -732,6 +732,7 @@ def fesom_plot2d_geomesh(mesh):
         print(' --> save figure')
         #fig.savefig('mesh_resolution.eps',dpi=300)
         sdname = inputarray['save_figpath']
+        if os.path.isdir(sdname)==False: os.makedirs(sdname)
         plt.savefig(sdname+'mesh_geo_coord.png', \
                 format='png', dpi=600, \
                 bbox_inches='tight', pad_inches=0,\
@@ -795,6 +796,7 @@ def fesom_plot2d_rotmesh(mesh):
         print(' --> save figure')
         sdname = inputarray['save_figpath']
         #fig.savefig('mesh_resolution.eps',dpi=300)
+        if os.path.isdir(sdname)==False: os.makedirs(sdname)
         plt.savefig(sdname+'mesh_rot_coord.png', format='png', dpi=600)
     
     #___________________________________________________________________________
