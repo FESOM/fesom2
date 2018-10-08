@@ -10,4 +10,5 @@ cd $MYPATH
 mkdir build || true # make sure not to commit this to svn or git
 cd build
 cmake .. # not required when re-compiling
-#make install -j`nproc --all`
+make
+ln -s fesom_ini ../../bin/fesom_ini.x
