@@ -14,7 +14,7 @@ module diagnostics
   implicit none
 
   private
-  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wzmid, wzmidrho, rho, &
+  public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wzmid, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, &
             taux_nod, tauy_nod, tbotx_nod, tboty_nod, av_nod, u_bott, v_bott
 
@@ -24,7 +24,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: rhs_diag(:)
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
-  real(kind=WP),  save, allocatable, target      :: wzmid(:,:), wzmidrho(:,:), rho(:,:)
+  real(kind=WP),  save, allocatable, target      :: wzmid(:,:), wrhof(:,:), rhof(:,:)
   real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:), av_dudz_sq(:)
@@ -33,7 +33,7 @@ module diagnostics
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
-  logical                                       :: ldiag_energy     =.false.
+  logical                                       :: ldiag_energy     =.true.
   logical                                       :: ldiag_salt3D     =.true.
   contains
 
@@ -167,15 +167,15 @@ subroutine diag_energy(mode)
 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
-     allocate(wzmid(nl-1, myDim_nod2D), wzmidrho(nl-1, myDim_nod2D), rho(nl-1, myDim_nod2D))
+     allocate(wzmid(nl-1, myDim_nod2D), wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
      allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_nod2D), u_x_w(nl-1, myDim_nod2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl-1, myDim_nod2D), dvdz(nl-1, myDim_nod2D))
      allocate(utau_surf(myDim_nod2D), utau_bott(myDim_nod2D), av_dudz_sq(myDim_nod2D))
      allocate(Av_nod(nl-1, myDim_nod2D), u_bott(myDim_nod2D), v_bott(myDim_nod2D))
      allocate(taux_nod(myDim_nod2D), tauy_nod(myDim_nod2D), tbotx_nod(myDim_nod2D), tboty_nod(myDim_nod2D))
      wzmid=0.
-     rho  =0.
-     wzmidrho=0.
+     rhof  =0.
+     wrhof=0.
      u_x_u=0.
      u_x_v=0.
      v_x_v=0.
@@ -204,15 +204,7 @@ subroutine diag_energy(mode)
   end if
   
   !vertical velocity at the mid depths
-  wzmid=0.5*(Wvel(1:nl-1, 1:myDim_nod2D)+Wvel(2:nl, 1:myDim_nod2D))
-  rho  =density_m_rho0(1:nl-1, 1:myDim_nod2D)
-  where(abs(rho)>0.)
-     rho=rho+density_0
-  end where
-
-  !vertical velocity times density
-  wzmidrho=rho(1:nl-1, 1:myDim_nod2D)*wzmid(1:nl-1, 1:myDim_nod2D)
-  
+  wzmid=0.5*(Wvel(1:nl-1, 1:myDim_nod2D)+Wvel(2:nl, 1:myDim_nod2D)) 
   ! etc.
   u_x_u=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(1,1:nl-1,1:myDim_nod2D)
   u_x_v=Unode(1,1:nl-1,1:myDim_nod2D)*Unode(2,1:nl-1,1:myDim_nod2D)
@@ -229,11 +221,29 @@ subroutine diag_energy(mode)
   u_bott   =0.
   v_bott   =0.
   Av_nod   =0.
+
   ! this loop might be very expensive
   DO n=1, myDim_nod2D
      nzmax=nlevels_nod2D(n)
      stress_surf_n=0.
      stress_bott_n=0.
+
+     ! compute Z_n which is the mid depth of prisms (ALE supports changing layer thicknesses)
+     zbar_n=0.0_WP
+     Z_n   =0.0_WP
+     zbar_n(nzmax) =zbar_n_bot(n)
+     rhof(nzmax,n) =density_m_rho0(nzmax-1, n)
+     rhof(1,n)     =density_m_rho0(1, n)
+
+     Z_n(nzmax-1) =zbar_n(nzmax)  + hnode_new(nzmax-1,n)/2.0_WP
+     do nz=nzmax-1,2,-1
+        zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
+        Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+        rhof(nz,n) = (hnode_new(nz,n)*density_m_rho0(nz, n)+hnode_new(nz-1,n)*density_m_rho0(nz-1, n))/(hnode_new(nz,n)+hnode_new(nz-1,n))
+     end do
+     zbar_n(1)         = zbar_n(2) + hnode_new(1,n)
+     wrhof(1:nzmax, n) = rhof(1:nzmax, n)*Wvel(1:nzmax, n)
+
      DO nz=1, nzmax-1
         tvol=0.0_WP
         ux  =0.0_WP
@@ -309,17 +319,6 @@ subroutine diag_energy(mode)
         call vector_r2g(tbotx_nod(n), tboty_nod(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
         call vector_r2g(u_bott(n), v_bott(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
      end if
-         
-     ! compute Z_n which is the mid depth of prisms (ALE supports changing layer thicknesses)
-     zbar_n=0.0_WP
-     Z_n=0.0_WP
-     zbar_n(nzmax)=zbar_n_bot(n)
-     Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-     do nz=nzmax-1,2,-1
-        zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-        Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
-     end do
-     zbar_n(1) = zbar_n(2) + hnode_new(1,n)
 
      !compute du/dz & dv/dz
      dudz(2:nzmax-2, n)=(Unode(1, 1:nzmax-3, n)-Unode(1, 3:nzmax-1, n))/(Z_n(1:nzmax-3)-Z_n(3:nzmax-1)) !central differences in vertical

@@ -80,9 +80,9 @@ subroutine ini_mean_io
 
 !3D
   if (ldiag_energy) then
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'rho',      'in-situ density',             'kg/m3',     rho(:,:),      1, 'm', i_real4)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmidrho', 'vertical velocity x density', 'kg/(s*m2)', wzmidrho(:,:), 1, 'm', i_real4)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:),    1, 'm', i_real4)
+     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'rhof',     'in-situ density at faces',    'kg/m3',     rhof(:,:),  1, 'm', i_real4)
+     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'wrhof',    'vertical velocity x density', 'kg/(s*m2)', wrhof(:,:), 1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl,     myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:), 1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',   'u times u', 'm2/s2', u_x_u(:,:), 1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',   'u times v', 'm2/s2', u_x_v(:,:), 1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vv',   'v times v', 'm2/s2', v_x_v(:,:), 1, 'm', i_real4)
@@ -100,7 +100,7 @@ subroutine ini_mean_io
 
     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y', i_real4)
     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'y', i_real4)
-    call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'y', i_real4)
+    call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real4)
 
     call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm', i_real4)
     call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm', i_real4)
