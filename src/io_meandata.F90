@@ -200,7 +200,9 @@ subroutine ini_mean_io
      call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 'm', i_real4)
   end if
   if (ldiag_curl_vel3) then
-     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u', 'relative vorticity',         '1/s',   vorticity, 1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4)
+ !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u100',  'relative vorticity at 100m',  '1/s',   vorticity(12,1:myDim_nod2D), 1, 'd', i_real4)
+ !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u280',  'relative vorticity at 280m',  '1/s',   vorticity(16,1:myDim_nod2D), 1, 'd', i_real4)
   end if
 
   if (whichEVP==2) then
