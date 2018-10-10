@@ -11,4 +11,6 @@ mkdir build || true # make sure not to commit this to svn or git
 cd build
 cmake .. # not required when re-compiling
 make
-ln -s fesom_ini ../../bin/fesom_ini.x
+ln -s ../mesh_part/build/fesom_ini ../../bin/fesom_ini.x
+
+
