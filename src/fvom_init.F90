@@ -906,6 +906,7 @@ subroutine check_partitioning
   ! trying not to spoil the load balance.
 
   use o_MESH
+  use g_PARSUP
   integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
   integer :: nod_per_partition(2,0:npes-1)
   integer :: max_nod_per_part(2), min_nod_per_part(2)

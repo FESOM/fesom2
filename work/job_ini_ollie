@@ -15,7 +15,7 @@ module load intel.compiler
 module load intel.mpi
 module load netcdf/4.4.0_intel
 
-ln -s ../bin/fvom_ini.x          .           # cp -n ../bin/fvom_ini.x
+ln -s ../bin/fesom_ini.x         .           # cp -n ../bin/fvom_ini.x
 cp -n ../config/namelist.config  .
 cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
@@ -26,6 +26,6 @@ cp -n ../config/namelist.ice     .
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 date
-srun --mpi=pmi2 --ntasks=1 ./fvom_ini.x > "fvom_ini.out"
+srun --mpi=pmi2 --ntasks=1 ./fesom_ini.x > "fvom_ini.out"
 date
 
