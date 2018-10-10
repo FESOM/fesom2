@@ -25,8 +25,8 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
   real(kind=WP),  save, allocatable, target      :: wzmid(:,:), wrhof(:,:), rhof(:,:)
   real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
-  real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:)
-  real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:), av_dudz_sq(:)
+  real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
+  real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: taux_nod(:), tauy_nod(:), tbotx_nod(:), tboty_nod(:), av_nod(:,:), u_bott(:), v_bott(:)
 
   logical                                       :: ldiag_solver     =.false.
@@ -169,7 +169,7 @@ subroutine diag_energy(mode)
      allocate(wzmid(nl-1, myDim_nod2D), wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
      allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_nod2D), u_x_w(nl-1, myDim_nod2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl-1, myDim_nod2D), dvdz(nl-1, myDim_nod2D))
-     allocate(utau_surf(myDim_nod2D), utau_bott(myDim_nod2D), av_dudz_sq(myDim_nod2D), av_dudz(nl-1, myDim_nod2D), av_dvdz(nl-1, myDim_nod2D))
+     allocate(utau_surf(myDim_nod2D), utau_bott(myDim_nod2D), av_dudz_sq(nl-1, myDim_nod2D), av_dudz(nl-1, myDim_nod2D), av_dvdz(nl-1, myDim_nod2D))
      allocate(Av_nod(nl-1, myDim_nod2D), u_bott(myDim_nod2D), v_bott(myDim_nod2D))
      allocate(taux_nod(myDim_nod2D), tauy_nod(myDim_nod2D), tbotx_nod(myDim_nod2D), tboty_nod(myDim_nod2D))
      wzmid=0.
@@ -331,9 +331,9 @@ subroutine diag_energy(mode)
      dvdz(nl-1, n)    =stress_bott_n(2)
 
      !compute int(Av * (du/dz)^2)
-     av_dudz_sq(n)=sum((dudz(1:nzmax-1, n)**2+dvdz(1:nzmax-1, n)**2)*Av_nod(1:nzmax-1, n)*hnode_new(1:nzmax-1,n))
-     av_dudz(1:nl-1, n)   =dudz(1:nl-1, n)*Av_nod(1:nl-1, n)
-     av_dvdz(1:nl-1, n)   =dvdz(1:nl-1, n)*Av_nod(1:nl-1, n)
+     av_dudz_sq(1:nl-1, n)=(dudz(1:nl-1, n)**2+dvdz(1:nl-1, n)**2)*Av_nod(1:nl-1, n)
+     av_dudz   (1:nl-1, n)= dudz(1:nl-1, n)*Av_nod(1:nl-1, n)
+     av_dvdz   (1:nl-1, n)= dvdz(1:nl-1, n)*Av_nod(1:nl-1, n)
   END DO  
 end subroutine diag_energy
 ! ==============================================================

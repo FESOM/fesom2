@@ -80,8 +80,8 @@ subroutine ini_mean_io
 
 !3D
   if (ldiag_energy) then
-     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'rhof',     'in-situ density at faces',    'kg/m3',     rhof(:,:),  1, 'm', i_real4)
-     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'wrhof',    'vertical velocity x density', 'kg/(s*m2)', wrhof(:,:), 1, 'm', i_real4)
+     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'rhof',     'in-situ density at faces',    'kg/m3',     rhof(:,:),  1, 'm', i_real8)
+     call def_stream((/nl,   nod2D/),  (/nl,     myDim_nod2D/), 'wrhof',    'vertical velocity x density', 'kg/(s*m2)', wrhof(:,:), 1, 'm', i_real8)
      call def_stream((/nl-1, nod2D/),  (/nl,     myDim_nod2D/), 'wzmid',    'vertical velocity',           'm/s',       wzmid(:,:), 1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uu',   'u times u', 'm2/s2', u_x_u(:,:), 1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'uv',   'u times v', 'm2/s2', u_x_v(:,:), 1, 'm', i_real4)
@@ -94,20 +94,19 @@ subroutine ini_mean_io
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdy', 'dv/dy',     '1/s',   dvdy(:,:),  1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dudz', 'du/dz',     '1/s',   dudz(:,:),  1, 'm', i_real4)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'dvdz', 'dv/dz',     '1/s',   dvdz(:,:),  1, 'm', i_real4)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'unod',  'horizontal velocity at nodes', 'm/s', Unode(1,:,:), 1, 'm', i_real4)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vnod',  'meridional velocity at nodes', 'm/s', Unode(2,:,:), 1, 'm', i_real4)
-     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'av_nod',  'Av at nodes',                  'm2/s', av_nod(:,:),  1, 'm',    i_real4)
-     call def_stream((/nl-1, nod2D/), (/nl-1,   myDim_nod2D/),  'av_dudz', 'int(Av * du/dz)',              'm3/s2',av_dudz(:,:), 1, 'm',    i_real4)
-     call def_stream((/nl-1, nod2D/), (/nl-1,   myDim_nod2D/),  'av_dvdz', 'int(Av * dv/dz)',              'm3/s2',av_dvdz(:,:), 1, 'm',    i_real4)
-
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'unod',  'horizontal velocity at nodes', 'm/s', Unode(1,:,:),    1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'vnod',  'meridional velocity at nodes', 'm/s', Unode(2,:,:),    1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/), 'av_nod',  'Av at nodes',            'm2/s',    av_nod(:,:),     1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/), (/nl-1,   myDim_nod2D/),  'av_dudz', 'int(Av * du/dz)',        'm3/s2',   av_dudz(:,:),    1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/), (/nl-1,   myDim_nod2D/),  'av_dvdz', 'int(Av * dv/dz)',        'm3/s2',   av_dvdz(:,:),    1, 'm', i_real4)
+     call def_stream((/nl-1, nod2D/), (/nl-1,   myDim_nod2D/),  'av_dudz_sq',  'Av * (du/dz)^2',     'm^2/s^3', av_dudz_sq(:,:), 1, 'm', i_real4)
 
     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'u',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'y', i_real4)
     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'v',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'y', i_real4)
-    call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real4)
+    call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),    'w',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real8)
 
     call def_stream(nod2D, myDim_nod2D, 'utau_surf',   '(u, tau) at the surface', 'N/(m s)',  utau_surf(1:myDim_nod2D), 1, 'm', i_real4)
     call def_stream(nod2D, myDim_nod2D, 'utau_bott',   '(u, tau) at the bottom',  'N/(m s)',  utau_bott(1:myDim_nod2D), 1, 'm', i_real4)
-    call def_stream(nod2D, myDim_nod2D, 'av_dudz_sq',  'int(Av * (du/dz)^2)',     'm^3/s^3', av_dudz_sq(1:myDim_nod2D), 1, 'm', i_real4)
 !   call def_stream(nod2D, myDim_nod2D, 'av_dudz',     'int(Av * du/dz)',         'm3/s2',   av_dudz(1:myDim_nod2D),    1, 'm', i_real4)
 !   call def_stream(nod2D, myDim_nod2D, 'av_dvdz',     'int(Av * dv/dz)',         'm3/s2',   av_dvdz(1:myDim_nod2D),    1, 'm', i_real4)
 
