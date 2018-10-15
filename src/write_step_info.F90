@@ -12,7 +12,7 @@ subroutine write_step_info(istep,outfreq)
 	
 	integer								:: n, istep,outfreq
 	real(kind=WP)						:: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
-	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2,max_cfl_z
+	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2,max_cfl_z, max_pgfx, max_pgfy
 	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, max_wvel,max_hnode,max_deta,max_wvel2,max_hnode2
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
@@ -116,6 +116,10 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_hnode2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(CFL_z(:,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_cfl_z , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(abs(pgf_x(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_pgfx , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(abs(pgf_y(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		
 		!_______________________________________________________________________
 		if (mype==0) then
@@ -148,6 +152,8 @@ subroutine write_step_info(istep,outfreq)
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then

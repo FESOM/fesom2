@@ -215,6 +215,7 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     #cmin,cmax,cref  = -6,16,0 # [cmin, cmax, cref]  --> MLD2
     cmin,cmax,cref  = moc[np.where(depth<=-500)[0][0]::,:].min(),moc[np.where(depth<=-500)[0][0]::,:].max(),0.0 # [cmin, cmax, cref]  --> MLD2
     if len(crange)!=0: cmin,cmax,cref = crange[0],crange[1],0.0
+    print(cmin,cmax,cref)
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,'blue2red')
     cbot = [0.5,0.5,0.5]
     do_drawedges=True

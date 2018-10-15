@@ -1927,7 +1927,7 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n)
-    use g_config, only: logfile_outfreq, rtime_oce, rtime_tot
+    use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn,rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi
     use o_MESH
     use o_ARRAYS
     use o_PARAM
@@ -1938,10 +1938,10 @@ subroutine oce_timestep_ale(n)
     use o_mixing_KPP_mod
     
     IMPLICIT NONE
-    real(kind=8)      :: t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
+    real(kind=8)      :: t0,t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
     integer           :: n
     
-    t1=MPI_Wtime()
+    t0=MPI_Wtime()
     !___________________________________________________________________________
     call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
     call pressure_force
@@ -1973,7 +1973,7 @@ subroutine oce_timestep_ale(n)
     end if
     Av(1,:)=Av(2,:)
     Kv(1,:)=Kv(2,:)
-
+    t1=MPI_Wtime()
     !___________________________________________________________________________
     if(mom_adv/=3) then
         call compute_vel_rhs
@@ -2010,7 +2010,6 @@ subroutine oce_timestep_ale(n)
     
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     call compute_hbar_ale
-    t5=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2019,6 +2018,7 @@ subroutine oce_timestep_ale(n)
     eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
+    t5=MPI_Wtime() 
     
     if (Fer_GM .or. Redi) then
         call init_Redi_GM
@@ -2060,10 +2060,15 @@ subroutine oce_timestep_ale(n)
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
     t10=MPI_Wtime()
-    rtime_oce = rtime_oce + (t10-t1)-(t10-t9)
-    rtime_tot = rtime_tot + (t10-t1)-(t10-t9)
+    rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
+    rtime_oce_dyn      = rtime_oce_dyn + (t2-t1)+(t7-t6)+(t4-t3)
+    rtime_oce_solvessh = rtime_oce_solvessh + (t3-t2)
+    rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
+    rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
+    rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
+        write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
         write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
         write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
         write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
@@ -2076,7 +2081,7 @@ subroutine oce_timestep_ale(n)
         write(*,*) '    _______________________________'
         write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t1
+        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
         write(*,*)
         write(*,*)
     end if
