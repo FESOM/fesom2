@@ -1970,9 +1970,10 @@ subroutine oce_timestep_ale(n)
     else
         stop "!not existing mixing scheme!"
         call par_ex
-    end if  
+    end if
+    Av(1,:)=Av(2,:)
+    Kv(1,:)=Kv(2,:)
     t1=MPI_Wtime()
-    
     !___________________________________________________________________________
     if(mom_adv/=3) then
         call compute_vel_rhs
