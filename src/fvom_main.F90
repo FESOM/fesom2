@@ -156,20 +156,20 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0
     if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
     
     ! average ocean, ice and total runtime over all cpus
-    call MPI_AllREDUCE(rtime_oce  , mrtime_oce  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_oce         , mrtime_oce         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_dyn     , mrtime_oce_dyn     , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_solvessh, mrtime_oce_solvessh, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_GMRedi  , mrtime_oce_GMRedi  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_solvetra, mrtime_oce_solvetra, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_ice  , mrtime_ice  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_tot  , mrtime_tot  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_ice         , mrtime_ice         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_tot         , mrtime_tot         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     if (mype==0) then
         write(*,*) '___MODEL RUNTIME [seconds]_____________________________'
         write(*,*) '    runtime ocean : ',mrtime_oce/npes, ' sec'
         write(*,*) '      > runtime oce. dyn        : ',mrtime_oce_dyn/npes, ' sec'
         write(*,*) '      > runtime oce. solve ssh  : ',mrtime_oce_solvessh/npes, ' sec'
-        write(*,*) '      > runtime oce. GM/Redi    : ',rtime_oce_GMRedi/npes, ' sec'
-        write(*,*) '      > runtime oce. solve tacer: ',rtime_oce_solvetra/npes, ' sec'
+        write(*,*) '      > runtime oce. GM/Redi    : ',mrtime_oce_GMRedi/npes, ' sec'
+        write(*,*) '      > runtime oce. solve tacer: ',mrtime_oce_solvetra/npes, ' sec'
         write(*,*) '    runtime ice   : ',mrtime_ice/npes, ' sec'
         write(*,*) '    runtime total : ',mrtime_tot/npes, ' sec'
     end if     

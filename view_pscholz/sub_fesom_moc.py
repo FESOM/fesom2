@@ -198,7 +198,7 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
 #+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  _________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[],crange=[]):    
+def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[],crange=[],cnumb=20):    
     
     if len(figsize)==0: figsize=[13,6]
     fig= plt.figure(figsize=figsize)
@@ -211,7 +211,7 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     #| set minimum, maximum and reference values for the creation of the       |
     #| adjustable colormap                                                     |
     #+_________________________________________________________________________+
-    cnumb = 20; # minimum number of colors
+    #cnumb = 20; # minimum number of colors
     #cmin,cmax,cref  = -6,16,0 # [cmin, cmax, cref]  --> MLD2
     cmin,cmax,cref  = moc[np.where(depth<=-500)[0][0]::,:].min(),moc[np.where(depth<=-500)[0][0]::,:].max(),0.0 # [cmin, cmax, cref]  --> MLD2
     if len(crange)!=0: cmin,cmax,cref = crange[0],crange[1],0.0
