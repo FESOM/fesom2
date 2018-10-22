@@ -1927,7 +1927,7 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n)
-    use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn,rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi,rtime_oce_mixpres
+    use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn,rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi,rtime_oce_mixpres,rtime_oce_dynssh
     use o_MESH
     use o_ARRAYS
     use o_PARAM
@@ -1938,7 +1938,7 @@ subroutine oce_timestep_ale(n)
     use o_mixing_KPP_mod
     
     IMPLICIT NONE
-    real(kind=8)      :: t0,t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
+    real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
     integer           :: n
     
     t0=MPI_Wtime()
@@ -1970,10 +1970,9 @@ subroutine oce_timestep_ale(n)
     else
         stop "!not existing mixing scheme!"
         call par_ex
-    end if
-    Av(1,:)=Av(2,:)
-    Kv(1,:)=Kv(2,:)
+    end if  
     t1=MPI_Wtime()
+    
     !___________________________________________________________________________
     if(mom_adv/=3) then
         call compute_vel_rhs
@@ -1999,6 +1998,7 @@ subroutine oce_timestep_ale(n)
     call compute_ssh_rhs_ale
     
     ! Take updated ssh matrix and solve --> new ssh!
+    t30=MPI_Wtime() 
     call solve_ssh_ale
     t3=MPI_Wtime() 
     
@@ -2063,7 +2063,8 @@ subroutine oce_timestep_ale(n)
     rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
     rtime_oce_mixpres  = rtime_oce_mixpres + (t1-t0)
     rtime_oce_dyn      = rtime_oce_dyn + (t2-t1)+(t7-t6)+(t4-t3)
-    rtime_oce_solvessh = rtime_oce_solvessh + (t3-t2)
+    rtime_oce_dynssh   = rtime_oce_dynssh + (t3-t2)+(t5-t4)
+    rtime_oce_solvessh = rtime_oce_solvessh + (t3-t30)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)

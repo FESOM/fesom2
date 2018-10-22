@@ -29,7 +29,7 @@ IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
 real(kind=WP) :: mrtime_ice=0.0,mrtime_oce=0.0,mrtime_tot=0.0
-real(kind=WP) :: mrtime_oce_dyn=0.0, mrtime_oce_solvessh=0.0 
+real(kind=WP) :: mrtime_oce_dyn=0.0, mrtime_oce_dynssh=0.0, mrtime_oce_solvessh=0.0 
 real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixpres=0.0
   
 
@@ -159,6 +159,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     call MPI_AllREDUCE(rtime_oce         , mrtime_oce         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_mixpres , mrtime_oce_mixpres , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_dyn     , mrtime_oce_dyn     , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(rtime_oce_dynssh  , mrtime_oce_dynssh  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_solvessh, mrtime_oce_solvessh, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_GMRedi  , mrtime_oce_GMRedi  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     call MPI_AllREDUCE(rtime_oce_solvetra, mrtime_oce_solvetra, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
@@ -168,8 +169,9 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
         write(*,*) '___MODEL RUNTIME [seconds]_____________________________'
         write(*,*) '    runtime ocean : ',mrtime_oce/npes, ' sec'
         write(*,*) '      > runtime oce. mix,pres...: ',mrtime_oce_mixpres/npes, ' sec'
-        write(*,*) '      > runtime oce. dyn        : ',mrtime_oce_dyn/npes, ' sec'
-        write(*,*) '      > runtime oce. solve ssh  : ',mrtime_oce_solvessh/npes, ' sec'
+        write(*,*) '      > runtime oce. dyn. u,v,w : ',mrtime_oce_dyn/npes, ' sec'
+        write(*,*) '      > runtime oce. dyn. ssh   : ',mrtime_oce_dynssh/npes, ' sec'
+        write(*,*) '          > runtime oce. solve ssh  : ',mrtime_oce_solvessh/npes, ' sec'
         write(*,*) '      > runtime oce. GM/Redi    : ',mrtime_oce_GMRedi/npes, ' sec'
         write(*,*) '      > runtime oce. solve tacer: ',mrtime_oce_solvetra/npes, ' sec'
         write(*,*) '    runtime ice   : ',mrtime_ice/npes, ' sec'
