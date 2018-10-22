@@ -2056,9 +2056,11 @@ subroutine oce_timestep_ale(n)
     ! togeather around 2.5% of model runtime
     call check_blowup(n)
     t10=MPI_Wtime()
+    
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
     rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
+    rtime_oce_mixpres  = rtime_oce_mixpres + (t1-t0)
     rtime_oce_dyn      = rtime_oce_dyn + (t2-t1)+(t7-t6)+(t4-t3)
     rtime_oce_solvessh = rtime_oce_solvessh + (t3-t2)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
