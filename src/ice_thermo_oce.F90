@@ -47,6 +47,7 @@ subroutine thermodynamics
   use g_forcing_arrays
   use g_parsup
   use g_comm_auto
+  use g_sbf, only: l_snow
   implicit none
   real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
   real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
@@ -84,8 +85,8 @@ subroutine thermodynamics
      flo     = longwave(i)
      Ta      = Tair(i)
      qa      = shum(i)  
-     if(precip_data_source=='NCEP') then
-        if(Ta>=0.0_WP) then
+     if (.not. l_snow) then
+        if (Ta>=0.0_WP) then
            rain=prec_rain(i)
            snow=0.0_WP
         else
