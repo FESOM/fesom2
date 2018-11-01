@@ -132,7 +132,7 @@ MODULE g_sbf
 
    integer, save  :: nm_calc_flux = 0 ! calculate atm. flux =1 (based on GOTM subroutins), =0 use precalculated I0,... (based in NEMO subroutins)
    ! ========== netCDF time param
-   integer, save :: nm_nc_iyear = 1948    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
+   integer, save :: nm_nc_iyear = 1900    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
    integer, save :: nm_nc_imm = 1         ! initial month of time axis in netCDF
    integer, save :: nm_nc_idd = 1         ! initial day of time axis in netCDF
    real, save :: nm_nc_secstep = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
@@ -203,34 +203,40 @@ CONTAINS
 
       ! get dimensions
       if (mype==0) then
-         iost = nf_inq_dimid(ncid, "LAT", id_latd)
+!        iost = nf_inq_dimid(ncid, "LAT", id_latd)
+         iost = nf_inq_dimid(ncid, "latitude", id_latd)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
       if (mype==0) then 
-         iost = nf_inq_dimid(ncid, "LON", id_lond)
+!        iost = nf_inq_dimid(ncid, "LON", id_lond)
+         iost = nf_inq_dimid(ncid, "longitude", id_lond)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
       if (mype==0) then   
-         iost = nf_inq_dimid(ncid, "TIME", id_timed)
+!        iost = nf_inq_dimid(ncid, "TIME", id_timed)
+         iost = nf_inq_dimid(ncid, "time", id_timed)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
 
       ! get variable id
       if (mype==0) then
-         iost = nf_inq_varid(ncid, "LON", id_lon)
+!        iost = nf_inq_varid(ncid, "LON", id_lon)
+         iost = nf_inq_varid(ncid, "longitude", id_lon)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
       if (mype==0) then
-         iost = nf_inq_varid(ncid, "LAT", id_lat)
+!        iost = nf_inq_varid(ncid, "LAT", id_lat)
+         iost = nf_inq_varid(ncid, "latitude", id_lat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
-      if (mype==0) then   
-         iost = nf_inq_varid(ncid, "TIME", id_time)
+      if (mype==0) then
+!        iost = nf_inq_varid(ncid, "TIME", id_time)
+         iost = nf_inq_varid(ncid, "time", id_time)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
@@ -287,16 +293,13 @@ CONTAINS
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-
       nc_time = nc_time / nm_nc_secstep + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
-
       if (nc_Ntime > 1) then
          do i = 1, nc_Ntime-1
             nc_time(i) = (nc_time(i+1) + nc_time(i))/2.0
          end do
          nc_time(nc_Ntime) = nc_time(nc_Ntime) + (nc_time(nc_Ntime) - nc_time(nc_Ntime-1))/2.0
       end if
-
       call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
@@ -516,7 +519,6 @@ CONTAINS
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
       end if
-
       do fld_idx = 1, i_totfl
          !open file sbc_flfi
          if (mype==0) then
@@ -703,9 +705,9 @@ CONTAINS
                         nm_nc_secstep, nm_nc_iyear, nm_nc_imm, nm_nc_idd, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 
-       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
-
-      rdate = real(julday(yearnew,1,1))
+      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
+write (*,*) 'nm_nc_iyear=', nm_nc_iyear
+      rdate = 42368.+real(julday(nm_nc_iyear,1,1))
       rdate = rdate+real(daynew-1)+timenew/86400.
       idate = int(rdate)
 
@@ -838,8 +840,8 @@ CONTAINS
 
       real(wp)     :: rdate ! date
 
-      rdate = julday(yearnew,1,1)
-      rdate = rdate+(daynew-1)+timenew/86400.-dt/86400./2.
+      rdate = 42368.+real(julday(nm_nc_iyear,1,1))
+      rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
       if ( .not. one_field ) then
          ! IF more field available
          if ( rdate > nc_time(t_indx_p1) ) then

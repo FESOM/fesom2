@@ -91,12 +91,12 @@ subroutine update_atm_forcing(istep)
   use g_config
   use g_forcing_interp
   use g_comm_auto
+  use g_rotate_grid
   use g_sbf, only: sbc_do
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
                                      l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 #if defined (__oasis)
   use cpl_driver
-  use g_rotate_grid
 #endif
   use gen_bulk
 
@@ -277,12 +277,15 @@ subroutine update_atm_forcing(istep)
   call sbc_do
   u_wind   =atmdata(i_xwind, :)
   v_wind   =atmdata(i_ywind, :)
+  do i=1, myDim_nod2D+eDim_nod2D
+     call vector_g2r(u_wind(i), v_wind(i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+  end do
   shum     =atmdata(i_humi, :)
   longwave =atmdata(i_qlw, :)
   shortwave=atmdata(i_qsr, :)
   Tair     =atmdata(i_tair, :)-273.15
-  prec_rain=atmdata(i_prec, :)
-  prec_snow=atmdata(i_snow, :)
+  prec_rain=atmdata(i_prec, :)/1000.
+  prec_snow=atmdata(i_snow, :)/1000.
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
