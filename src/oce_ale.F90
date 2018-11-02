@@ -1776,9 +1776,10 @@ end if
 ! new_values>0 requires reuse=1 in psolver_init!
 
 if (lfirst) then
-   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
+   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-   ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
+   !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
+   !               Should scale better than SOLBICGS, but be careful, it is still experimental.
    call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
