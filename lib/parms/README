@@ -50,3 +50,14 @@ data->issetup for reusing of the LU-Facorization
 
 changed convergence criterion in fgmres.c, gmres.c (ro <= tol) instead of (ro
 <= eps1)
+
+///////////////////////////////////////////////////////////////////////////////
+
+additional routine implemented by Natalja Rakowsky, natalja.rakowsky@awi.de
+
+Solver: PBICGS (pbicgstab.c)
+
+ Pipelined BiCGstab, overlapping global sums with computation. See:
+  Siegfried Cools, Wim Vanroose
+  The communication-hiding pipelined BiCGStab method for the parallel solution of large unsymmetric linear systems
+  Parallel Computing 65, pp. 1-20, July 2017
