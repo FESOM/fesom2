@@ -1780,7 +1780,9 @@ if (lfirst) then
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
    !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
    !               Should scale better than SOLBICGS, but be careful, it is still experimental.
-   call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
+   !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
+   !                   for even better scalability       
+    call psolver_init(ident, SOLPBICGS_RAS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)
