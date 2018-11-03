@@ -61,3 +61,8 @@ Solver: PBICGS (pbicgstab.c)
   Siegfried Cools, Wim Vanroose
   The communication-hiding pipelined BiCGStab method for the parallel solution of large unsymmetric linear systems
   Parallel Computing 65, pp. 1-20, July 2017
+
+Solver: PBICGS_RAS (pbicgstab_ras.c)
+
+ Pipelined BiCGstab with hard-coded RAS preconditioner. This allows to overlap the
+ halo communication for RAS with some computations in bicgstab.
