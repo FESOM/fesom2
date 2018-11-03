@@ -276,7 +276,7 @@ static int pbicgstab_view(parms_Solver self, parms_Viewer v)
   fprintf(fp,"	Solver Parameters	\n");
   fprintf(fp,"=============================\n");
   
-  fprintf(fp, "Solver type = BiConjugate Gradient Stabilized Method (PBICGS) \n");
+  fprintf(fp, "Solver type = Pipelined BiConjugate Gradient Stabilized Method (PBICGS) \n");
   
   fprintf(fp, "maxits = %d \n", self->maxits);
   fprintf(fp, "Relative tolerance = %-8.2e \n", self->tol);
