@@ -186,7 +186,7 @@ subroutine pressure_force
 	real(kind=WP)		:: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
 	real(kind=WP)		:: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
 	
-	if     (trim(which_ale)=='linfs' .and. (use_partial_cell==.false.) ) then
+	if     (trim(which_ale)=='linfs' .and. (.not. use_partial_cell) ) then
 		!___________________________________________________________________________
 		! loop over triangular elemments
 		do elem=1, myDim_elem2D
