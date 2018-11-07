@@ -39,6 +39,7 @@ MODULE g_sbf
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
+   USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
    IMPLICIT NONE
@@ -83,7 +84,7 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
-
+   real(wp), allocatable, dimension(:,:),     public     :: sbcdata1,sbcdata2
 !   real(wp), allocatable, save, dimension(:), public     :: qns_2   ! downward non solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: qsr_2   ! downward solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: emp_2   ! evaporation minus precipitation        [kg/m2/s]
@@ -113,7 +114,7 @@ MODULE g_sbf
    character(len=256), save   :: nm_prec_file  = 'prec.dat'  ! name of file with total precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_snow_file  = 'snow.dat'  ! name of file with snow  precipitation, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_mslp_file  = 'mslp.dat'  ! name of file with mean sea level pressure, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
-   character(len=256), save   :: nm_cloud_file  = 'cloud.dat'  ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
+   character(len=256), save   :: nm_cloud_file = 'cloud.dat'  ! name of file with clouds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
 
    character(len=34), save   :: nm_xwind_var = 'uwnd' ! name of variable in file with wind
    character(len=34), save   :: nm_ywind_var = 'vwnd' ! name of variable in file with wind
@@ -126,22 +127,13 @@ MODULE g_sbf
    character(len=34), save   :: nm_mslp_var  = 'mslp' ! name of variable in file with mean sea level pressure
    character(len=34), save   :: nm_cloud_var = 'cloud'! name of variable in file with clouds
 
-   real(wp),public, save :: depth_swr = 5._wp    ! depth of swr penetration
-   real(wp), save :: nm_prec_coef = 1._wp ! precipitation will be devide by this constant (3600 for CoastDat, 1 for NCEP) (3600 - total precipitation per hour)
-   integer , save :: nm_net_flux  = 0     ! constant for downward longwave heat over the ocean: 0 - downward, 1 - Net downward
-
-   integer, save  :: nm_calc_flux = 0 ! calculate atm. flux =1 (based on GOTM subroutins), =0 use precalculated I0,... (based in NEMO subroutins)
    ! ========== netCDF time param
-   integer, save :: nm_nc_iyear = 1900    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
+   integer, save :: nm_nc_iyear = 1948    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
    integer, save :: nm_nc_imm = 1         ! initial month of time axis in netCDF
    integer, save :: nm_nc_idd = 1         ! initial day of time axis in netCDF
-   real, save :: nm_nc_secstep = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
+   real, save    :: nm_nc_secstep = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
-
-   ! ========== interpolation coeficients
-   integer,  allocatable, save, dimension(:)     :: bilin_indx_i ! indexs i for interpolation
-   integer,  allocatable, save, dimension(:)     :: bilin_indx_j ! indexs j for interpolation
 
    real(wp), allocatable, save, dimension(:,:)   :: coef_b ! time inerp coef. b (x=a*t+b)
    real(wp), allocatable, save, dimension(:,:)   :: coef_a ! time inerp coef. a (x=a*t+b)
@@ -151,26 +143,22 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
    type, public ::   flfi_type    !flux file informations
-      character(len = 256) :: file_name ! file name
-      character(len = 34)  :: var_name  ! variable name in the NetCDF file
+      character(len = 256)                 :: file_name ! file name
+      character(len = 34)                  :: var_name  ! variable name in the NetCDF file
+      integer                              :: nc_Nlon
+      integer                              :: nc_Nlat
+      integer                              :: nc_Ntime
+      real(wp), allocatable, dimension(:)  :: nc_lon, nc_lat, nc_time
+      ! time index for NC time array
+      integer                              :: t_indx    ! now time index in nc_time array
+      integer                              :: t_indx_p1 ! now time index +1 in nc_time array
+      ! ========== interpolation coeficients
    end type flfi_type
-
-  type(flfi_type), allocatable, save, dimension(:) :: sbc_flfi  !array for information about flux files
-
-  ! arrays of time, lon and lat in INfiles
-   real(wp), allocatable, save, dimension(:)  :: nc_lon
-   real(wp), allocatable, save, dimension(:)  :: nc_lat
-   real(wp), allocatable, save, dimension(:)  :: nc_time
-  ! lenght of arrays in INfiles
-   integer,save              :: nc_Nlon
-   integer,save              :: nc_Nlat
-   integer,save              :: nc_Ntime
-   ! time index for NC time array
-   integer,save              :: t_indx    ! now time index in nc_time array
-   integer,save              :: t_indx_p1 ! now time index +1 in nc_time array
-
-  ! flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
-  integer, save              :: flip_lat ! 1 if we need to flip
+   type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
+   integer,  allocatable, dimension(:,:)     :: bilin_indx_i ! indexs i for interpolation
+   integer,  allocatable, dimension(:,:)     :: bilin_indx_j ! indexs j for interpolation
+   !flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
+   integer, save              :: flip_lat ! 1 if we need to flip
 !============== NETCDF ==========================================
 
 
@@ -179,137 +167,158 @@ CONTAINS
    ! Read time array and grid from nc file
       IMPLICIT NONE
  
-     type(flfi_type),intent(in) :: flf
-      integer                   :: iost !I/O status     
-      integer                   :: ncid      ! netcdf file id
-      integer                   :: i
+     type(flfi_type),intent(inout) :: flf
+      integer                      :: iost !I/O status     
+      integer                      :: ncid      ! netcdf file id
+      integer                      :: i
       ! ID dimensions and variables:
-      integer                   :: id_lon
-      integer                   :: id_lat
-      integer                   :: id_lond
-      integer                   :: id_latd
-      integer                   :: id_time
-      integer                   :: id_timed      
-      integer                   :: nf_start(4)
-      integer                   :: nf_edges(4)         
-      integer                   :: ierror              ! return error code
+      integer                      :: id_lon
+      integer                      :: id_lat
+      integer                      :: id_lond
+      integer                      :: id_latd
+      integer                      :: id_time
+      integer                      :: id_timed      
+      integer                      :: nf_start(4)
+      integer                      :: nf_edges(4)         
+      integer                      :: ierror              ! return error code
 
       !open file
       if (mype==0) then
          iost = nf_open(trim(flf%file_name),NF_NOWRITE,ncid)
       end if
+
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
 
       ! get dimensions
       if (mype==0) then
-!        iost = nf_inq_dimid(ncid, "LAT", id_latd)
-         iost = nf_inq_dimid(ncid, "latitude", id_latd)
+         iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
+         if     (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lat",      id_latd)
+         elseif (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "latitude", id_latd)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
       if (mype==0) then 
-!        iost = nf_inq_dimid(ncid, "LON", id_lond)
-         iost = nf_inq_dimid(ncid, "longitude", id_lond)
+         iost = nf_inq_dimid(ncid,    "LON",       id_lond)
+         if      (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "longitude", id_lond)
+         elseif (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
       if (mype==0) then   
-!        iost = nf_inq_dimid(ncid, "TIME", id_timed)
-         iost = nf_inq_dimid(ncid, "time", id_timed)
+         iost = nf_inq_dimid(ncid, "TIME", id_timed)
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_dimid(ncid, "time", id_timed)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
 
       ! get variable id
       if (mype==0) then
-!        iost = nf_inq_varid(ncid, "LON", id_lon)
-         iost = nf_inq_varid(ncid, "longitude", id_lon)
+         iost = nf_inq_varid(ncid,    "LON",       id_lon)
+         if      (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "longitude", id_lon)
+         elseif (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lon",       id_lon)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
       if (mype==0) then
-!        iost = nf_inq_varid(ncid, "LAT", id_lat)
-         iost = nf_inq_varid(ncid, "latitude", id_lat)
+         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
+         if     (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lat",      id_lat)
+         elseif (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "latitude", id_lat)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
       if (mype==0) then
-!        iost = nf_inq_varid(ncid, "TIME", id_time)
-         iost = nf_inq_varid(ncid, "time", id_time)
+         iost = nf_inq_varid(ncid, "TIME", id_time)
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_varid(ncid, "time", id_time)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
       
       ! get dimensions size
       if (mype==0) then
-         iost = nf_inq_dimlen(ncid, id_latd, nc_Nlat)
+         iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
       if (mype==0) then      
-         iost = nf_inq_dimlen(ncid, id_lond, nc_Nlon)
+         iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
       if (mype==0) then      
-         iost = nf_inq_dimlen(ncid, id_timed, nc_Ntime)
+         iost = nf_inq_dimlen(ncid, id_timed,flf%nc_Ntime)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
-      nc_Nlon=nc_Nlon+2 !for the halo in case of periodic boundary
-      call MPI_BCast(nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_Ntime,  1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      flf%nc_Nlon=flf%nc_Nlon+2 !for the halo in case of periodic boundary
+      call MPI_BCast(flf%nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_Ntime,  1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
          
 
-      ALLOCATE( nc_lon(nc_Nlon), nc_lat(nc_Nlat),&
-                &       nc_time(nc_Ntime))
+      ALLOCATE( flf%nc_lon(flf%nc_Nlon), flf%nc_lat(flf%nc_Nlat),&
+                &       flf%nc_time(flf%nc_Ntime))
    !read variables from file
    ! coordinates
       if (mype==0) then
          nf_start(1)=1
-         nf_edges(1)=nc_Nlat
-         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
+         nf_edges(1)=flf%nc_Nlat
+         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, flf%nc_lat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
       if (mype==0) then
          nf_start(1)=1
-         nf_edges(1)=nc_Nlon-2
-         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
-         nc_lon(1)        =nc_lon(nc_Nlon-1)
-         nc_lon(nc_Nlon)  =nc_lon(2)
+         nf_edges(1)=flf%nc_Nlon-2
+         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, flf%nc_lon(2:flf%nc_Nlon-1))
+         flf%nc_lon(1)        =flf%nc_lon(flf%nc_Nlon-1)
+         flf%nc_lon(flf%nc_Nlon)  =flf%nc_lon(2)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
    ! time
       if (mype==0) then
          nf_start(1)=1
-         nf_edges(1)=nc_Ntime
-         iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, nc_time)
+         nf_edges(1)=flf%nc_Ntime
+         iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
       end if
-      call MPI_BCast(nc_time, nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-      nc_time = nc_time / nm_nc_secstep + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
-      if (nc_Ntime > 1) then
-         do i = 1, nc_Ntime-1
-            nc_time(i) = (nc_time(i+1) + nc_time(i))/2.0
+      flf%nc_time = flf%nc_time / nm_nc_secstep + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
+      if (flf%nc_Ntime > 1) then
+         do i = 1, flf%nc_Ntime-1
+            flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
          end do
-         nc_time(nc_Ntime) = nc_time(nc_Ntime) + (nc_time(nc_Ntime) - nc_time(nc_Ntime-1))/2.0
+         flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
       end if
-      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
       !flip lat and data in case of lat from -90 to 90
       !!!! WARNING this is temporal solution, needs some more checks
       flip_lat = 0
-      if ( nc_Nlat > 1 ) then
-         if ( nc_lat(1) > nc_lat(nc_Nlat) ) then
+      if ( flf%nc_Nlat > 1 ) then
+         if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
             flip_lat = 1
-            nc_lat=nc_lat(nc_Nlat:1:-1)
+            flf%nc_lat=flf%nc_lat(flf%nc_Nlat:1:-1)
             if (mype==0) write(*,*) "fv_sbc: nc_readTimeGrid: FLIP lat and data while lat from -90 to 90"
          endif
       endif
@@ -321,56 +330,52 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
 
       if (ic_cyclic) then
-         nc_lon(1)      =nc_lon(1)-360.
-         nc_lon(nc_Nlon)=nc_lon(nc_Nlon)+360.
+         flf%nc_lon(1)      =flf%nc_lon(1)-360.
+         flf%nc_lon(flf%nc_Nlon)=flf%nc_lon(flf%nc_Nlon)+360.
       end if 
    END SUBROUTINE nc_readTimeGrid
 
-   SUBROUTINE nc_sbc_ini_fillnames(yyear)
-      character(len=4),intent(in)   :: yyear
+   SUBROUTINE nc_sbc_ini_fillnames(yyyy)
+      integer, intent(in)         :: yyyy
+      character(len=4)            :: yyear
+
+      write(yyear,"(I4)") yyyy
 
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      write(sbc_flfi(i_xwind)%file_name,*) trim(nm_xwind_file),yyear,'.nc'
-      write(sbc_flfi(i_ywind)%file_name,*) trim(nm_ywind_file),yyear,'.nc'
-      write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file),yyear,'.nc'
-      write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file),yyear,'.nc'
-      write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file),yyear,'.nc'
-      write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file),yyear,'.nc'
-      write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file),yyear,'.nc'
-      write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file),yyear,'.nc'
-      write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file),yyear,'.nc'
-      if (nm_calc_flux==1) then
-         write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),yyear,'.nc'
-      end if
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name,*) trim(nm_xwind_file),yyear,'.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name,*) trim(nm_ywind_file),yyear,'.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file),yyear,'.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file),yyear,'.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file),yyear,'.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file),yyear,'.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file),yyear,'.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file),yyear,'.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file),yyear,'.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),yyear,'.nc'
 
-      sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
-      sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
-      sbc_flfi(i_humi)%file_name=ADJUSTL(trim(sbc_flfi(i_humi)%file_name))
-      sbc_flfi(i_qsr)%file_name=ADJUSTL(trim(sbc_flfi(i_qsr)%file_name))
-      sbc_flfi(i_qlw)%file_name=ADJUSTL(trim(sbc_flfi(i_qlw)%file_name))
-      sbc_flfi(i_tair)%file_name=ADJUSTL(trim(sbc_flfi(i_tair)%file_name))
-      sbc_flfi(i_prec)%file_name=ADJUSTL(trim(sbc_flfi(i_prec)%file_name))
-      sbc_flfi(i_snow)%file_name=ADJUSTL(trim(sbc_flfi(i_snow)%file_name))
-      sbc_flfi(i_mslp)%file_name=ADJUSTL(trim(sbc_flfi(i_mslp)%file_name))
-      if (nm_calc_flux==1) then
-         sbc_flfi(i_cloud)%file_name=ADJUSTL(trim(sbc_flfi(i_cloud)%file_name))
-      end if
+      if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
+      if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
+      if (l_humi)  sbc_flfi(i_humi)%file_name=ADJUSTL(trim(sbc_flfi(i_humi)%file_name))
+      if (l_qsr)   sbc_flfi(i_qsr)%file_name=ADJUSTL(trim(sbc_flfi(i_qsr)%file_name))
+      if (l_qlw)   sbc_flfi(i_qlw)%file_name=ADJUSTL(trim(sbc_flfi(i_qlw)%file_name))
+      if (l_tair)  sbc_flfi(i_tair)%file_name=ADJUSTL(trim(sbc_flfi(i_tair)%file_name))
+      if (l_prec)  sbc_flfi(i_prec)%file_name=ADJUSTL(trim(sbc_flfi(i_prec)%file_name))
+      if (l_snow)  sbc_flfi(i_snow)%file_name=ADJUSTL(trim(sbc_flfi(i_snow)%file_name))
+      if (l_mslp)  sbc_flfi(i_mslp)%file_name=ADJUSTL(trim(sbc_flfi(i_mslp)%file_name))
+      if (l_cloud) sbc_flfi(i_cloud)%file_name=ADJUSTL(trim(sbc_flfi(i_cloud)%file_name))
 
-      sbc_flfi(i_xwind)%var_name=ADJUSTL(trim(nm_xwind_var))
-      sbc_flfi(i_ywind)%var_name=ADJUSTL(trim(nm_ywind_var))
-      sbc_flfi(i_humi)%var_name=ADJUSTL(trim(nm_humi_var))
-      sbc_flfi(i_qsr)%var_name=ADJUSTL(trim(nm_qsr_var))
-      sbc_flfi(i_qlw)%var_name=ADJUSTL(trim(nm_qlw_var))
-      sbc_flfi(i_tair)%var_name=ADJUSTL(trim(nm_tair_var))
-      sbc_flfi(i_prec)%var_name=ADJUSTL(trim(nm_prec_var))
-      sbc_flfi(i_snow)%var_name=ADJUSTL(trim(nm_snow_var))
-      sbc_flfi(i_mslp)%var_name=ADJUSTL(trim(nm_mslp_var))
-      if (nm_calc_flux==1) then
-         sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
-      end if
-
+      if (l_xwind) sbc_flfi(i_xwind)%var_name=ADJUSTL(trim(nm_xwind_var))
+      if (l_ywind) sbc_flfi(i_ywind)%var_name=ADJUSTL(trim(nm_ywind_var))
+      if (l_humi)  sbc_flfi(i_humi)%var_name=ADJUSTL(trim(nm_humi_var))
+      if (l_qsr)   sbc_flfi(i_qsr)%var_name=ADJUSTL(trim(nm_qsr_var))
+      if (l_qlw)   sbc_flfi(i_qlw)%var_name=ADJUSTL(trim(nm_qlw_var))
+      if (l_tair)  sbc_flfi(i_tair)%var_name=ADJUSTL(trim(nm_tair_var))
+      if (l_prec)  sbc_flfi(i_prec)%var_name=ADJUSTL(trim(nm_prec_var))
+      if (l_snow)  sbc_flfi(i_snow)%var_name=ADJUSTL(trim(nm_snow_var))
+      if (l_mslp)  sbc_flfi(i_mslp)%var_name=ADJUSTL(trim(nm_mslp_var))
+      if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
    SUBROUTINE nc_sbc_ini(rdate)
@@ -381,15 +386,16 @@ CONTAINS
       IMPLICIT NONE
       real(wp),intent(in) :: rdate ! initialization date
       integer             :: idate
-      character(len=4)    :: yyear
       integer             :: yyyy,mm,dd
 
-      integer             :: i
-      integer             :: sbc_alloc
-
-      integer             :: elnodes(4) !4 nodes from one element
-      integer             :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
-      real(wp)            :: x, y       ! coordinates of elements
+      integer                  :: i
+      integer                  :: sbc_alloc
+      logical, save            :: lfirst=.true.
+      integer                  :: elnodes(4) !4 nodes from one element
+      integer                  :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
+      real(wp)                 :: x, y       ! coordinates of elements
+      integer                  :: fld_idx
+      type(flfi_type), pointer :: flf
 
 
 ! used for interpolate on elements
@@ -402,55 +408,60 @@ CONTAINS
 
       ! get ini year; Fill names of sbc_flfi
       idate=int(rdate)
-      call calendar_date(idate,yyyy,dd,mm)
-
-      write(yyear,"(I4)") yyyy
-      call nc_sbc_ini_fillnames(yyear)
+      call calendar_date(idate,yyyy,mm,dd)
+      call nc_sbc_ini_fillnames(yyyy)
       ! we assume that all NetCDF files have identical grid and time variable
-      call nc_readTimeGrid(sbc_flfi(i_xwind))
-
-
-      ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
-      do i = 1, myDim_nod2D+eDim_nod2D
-         x  = geo_coord_nod2D(1,i)/rad
-         if (x < 0) x=x+360.
-         y  = geo_coord_nod2D(2,i)/rad
-
-         ! find nearest
-         if ( x < nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then
-            call binarysearch(nc_Nlon, nc_lon, x, bilin_indx_i(i))
-         else ! NO extrapolation in space
-            if ( x < nc_lon(1) ) then
-               bilin_indx_i(i)=-1
-            else
-               bilin_indx_i(i)=0
-            end if
-         end if
-         if ( y < nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then
-            call binarysearch(nc_Nlat, nc_lat, y, bilin_indx_j(i))
-         else ! NO extrapolation in space
-            if ( y < nc_lat(1) ) then
-               bilin_indx_j(i)=-1
-            else
-               bilin_indx_j(i)=0
-            end if
-         end if
-         if (warn == 0) then
-            if (bilin_indx_i(i) < 1 .or. bilin_indx_j(i) < 1) then
-!               WRITE(*,*) '     WARNING:  node/element coordinate out of forcing bounds,'
-!               WRITE(*,*) '        nearest value will be used as a constant field'
-               warn = 1
-            end if
-         end if
+      do fld_idx = 1, i_totfl
+         call nc_readTimeGrid(sbc_flfi(fld_idx))
       end do
-      ! get first coefficients for time interpolation on model grid for all data
-      call getcoeffld(rdate)
-      ! interpolate in time
-      call data_timeinterp(rdate)
+      if (lfirst) then
+      do fld_idx = 1, i_totfl
+         flf=>sbc_flfi(fld_idx)
+         ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
+         do i = 1, myDim_nod2D+eDim_nod2D
+            x  = geo_coord_nod2D(1,i)/rad
+            if (x < 0) x=x+360.
+            y  = geo_coord_nod2D(2,i)/rad
 
+            ! find nearest
+            if ( x < flf%nc_lon(flf%nc_Nlon) .and. x >= flf%nc_lon(1) ) then
+               call binarysearch(flf%nc_Nlon, flf%nc_lon, x, bilin_indx_i(fld_idx, i))
+            else ! NO extrapolation in space
+               if ( x < flf%nc_lon(1) ) then
+                  bilin_indx_i(fld_idx, i)=-1
+               else
+                  bilin_indx_i(fld_idx, i)=0
+               end if
+            end if
+            if ( y < flf%nc_lat(flf%nc_Nlat) .and. y >= flf%nc_lat(1) ) then
+               call binarysearch(flf%nc_Nlat, flf%nc_lat, y, bilin_indx_j(fld_idx, i))
+            else ! NO extrapolation in space
+               if ( y < flf%nc_lat(1) ) then
+                  bilin_indx_j(fld_idx, i)=-1
+               else
+                  bilin_indx_j(fld_idx, i)=0
+               end if
+            end if
+            if (warn == 0) then
+               if (bilin_indx_i(fld_idx, i) < 1 .or. bilin_indx_j(fld_idx, i) < 1) then
+!                 WRITE(*,*) '     WARNING:  node/element coordinate out of forcing bounds,'
+!                 WRITE(*,*) '        nearest value will be used as a constant field'
+                  warn = 1
+               end if
+            end if
+         end do
+      end do
+      lfirst=.false.
+      end if
+      do fld_idx = 1, i_totfl
+         ! get first coefficients for time interpolation on model grid for all data
+         call getcoeffld(fld_idx, rdate)
+      end do
+         ! interpolate in time
+      call data_timeinterp(rdate)
    END SUBROUTINE nc_sbc_ini
 
-   SUBROUTINE getcoeffld(rdate)
+   SUBROUTINE getcoeffld(fld_idx, rdate)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -459,11 +470,9 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-!      integer,intent(in)   :: idate ! initialization date
-!      integer,intent(in)   :: isec ! initialization seconds
-      real(wp),intent(in)   :: rdate ! initialization date
-
-      integer              :: iost !I/O status
+      integer, intent(in)  :: fld_idx
+      real(wp),intent(in)  :: rdate ! initialization date
+      integer              :: iost  !I/O status
       integer              :: ncid      ! netcdf file id
       ! ID dimensions and variables:
       integer              :: id_data
@@ -471,13 +480,13 @@ CONTAINS
       integer              :: nf_edges(4)
 !      integer              :: zero_year,yyyy,mm,dd
 !      character(len = 256) :: att_string ! attribute
-      integer              :: fld_idx, i,j,ii, ip1, jp1, extrp
+      integer              :: i,j,ii, ip1, jp1, extrp
       integer              :: sbc_alloc, itot
 
       real(wp)             :: denom, x1, x2, y1, y2, x, y
       real(wp)             :: now_date
 
-      real(wp), allocatable, dimension(:,:)  :: sbcdata1,sbcdata2
+!     real(wp), allocatable, dimension(:,:)  :: sbcdata1,sbcdata2
       real(wp)             :: data1,data2
       real(wp)             :: delta_t   ! time(t_indx) - time(t_indx+1)
 
@@ -485,162 +494,161 @@ CONTAINS
       integer              :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
       integer              :: yyyy,mm,dd
       integer              :: ierror              ! return error code
+      integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
+      character(len=256), pointer   :: file_name
+      character(len=34) , pointer   :: var_name
+      real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
 
+      nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
+      nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
+      nc_Nlat  =>sbc_flfi(fld_idx)%nc_Nlat
+      t_indx   =>sbc_flfi(fld_idx)%t_indx
+      t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
+      file_name=>sbc_flfi(fld_idx)%file_name
+      var_name =>sbc_flfi(fld_idx)%var_name
+      nc_time  =>sbc_flfi(fld_idx)%nc_time
+      nc_lon   =>sbc_flfi(fld_idx)%nc_lon
+      nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
-      ALLOCATE( sbcdata1(nc_Nlon,nc_Nlat), sbcdata2(nc_Nlon,nc_Nlat),&
-                &      STAT=sbc_alloc )
-!                data1(elem2D),data2(elem2D), &
+      ALLOCATE (sbcdata1(nc_Nlon,nc_Nlat), &
+                sbcdata2(nc_Nlon,nc_Nlat), STAT=sbc_alloc )
       if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'
 
-!if (mype==0) then
-!write(*,*) 'getcoeffld statistics:'
-!call calendar_date(int(rdate),yyyy,mm,dd)
-!write(*,*) 'input yyyy/mm/dd=', yyyy, mm, dd
-!call calendar_date(int(nc_time(1)),yyyy,mm,dd)
-!write(*,*) 'lower time bound yyyy/mm/dd=', yyyy, mm, dd
-!call calendar_date(int(nc_time(nc_Ntime)),yyyy,mm,dd)
-!write(*,*) 'upper time bound yyyy/mm/dd=', yyyy, mm, dd
-!end if
-!call par_ex
-!stop
       ! find time index in files
       now_date = rdate
       call binarysearch(nc_Ntime,nc_time,now_date,t_indx)
-
       if ( (t_indx < nc_Ntime) .and. (t_indx > 0) ) then
          t_indx_p1 = t_indx + 1
-         delta_t = nc_time(t_indx_p1) - nc_time(t_indx)
+         delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
       elseif (t_indx > 0) then ! NO extrapolation to future
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
          one_field = .true.
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used) for ', var_name, ' !'
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used) for ', var_name, ' !'
       end if
-      do fld_idx = 1, i_totfl
-         !open file sbc_flfi
-         if (mype==0) then
-            !write(*,*) 'check: ', trim(sbc_flfi(fld_idx)%file_name)
-            iost = nf_open(trim(sbc_flfi(fld_idx)%file_name),NF_NOWRITE,ncid)
-         end if
-         call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-         call check_nferr(iost,sbc_flfi(fld_idx)%file_name)
-         ! get variable id
-         if (mype==0) then
-            iost = nf_inq_varid(ncid, sbc_flfi(fld_idx)%var_name, id_data)
-         end if
-         call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-         call check_nferr(iost,sbc_flfi(fld_idx)%file_name)
-         !read data from file
-         if (mype==0) then
-            nf_start(1)=1
-            nf_edges(1)=nc_Nlon-2
-            nf_start(2)=1
-            nf_edges(2)=nc_Nlat
-            nf_start(3)=t_indx
-            nf_edges(3)=1
-            iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1(2:nc_Nlon-1,:))
-         end if
-         call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-         call check_nferr(iost,sbc_flfi(fld_idx)%file_name)
-         sbcdata1(1,:)       =sbcdata1(nc_Nlon-1,:)
-         sbcdata1(nc_Nlon,:) =sbcdata1(2,:)
-         call MPI_BCast(sbcdata1, nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-         ! read next time step in file (check for +1 done before)
-         if (mype==0) then
-            nf_start(3)=t_indx_p1
-            nf_edges(3)=1
-            iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata2(2:nc_Nlon-1,:))
-         end if
-         call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-         call check_nferr(iost,sbc_flfi(fld_idx)%file_name)
-         sbcdata2(1,:)       =sbcdata2(nc_Nlon-1,:)
-         sbcdata2(nc_Nlon,:) =sbcdata2(2,:)
-         call MPI_BCast(sbcdata2, nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-         !flip data in case of lat from -90 to 90
-         !!!! WARNING
-         if ( flip_lat == 1 ) then
-             sbcdata1=sbcdata1(:,nc_Nlat:1:-1)
-             sbcdata2=sbcdata2(:,nc_Nlat:1:-1)
-         end if
-         ! bilinear space interpolation, and time interpolation ,
-         ! data is assumed to be sampled on a regular grid
+      !open file sbc_flfi
+      if (mype==0) then
+         !write(*,*) 'check: ', trim(file_name)
+         iost = nf_open(trim(file_name),NF_NOWRITE,ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,file_name)
+      ! get variable id
+      if (mype==0) then
+          iost = nf_inq_varid(ncid, var_name, id_data)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,file_name)
+      !read data from file
+      if (mype==0) then
+         nf_start(1)=1
+         nf_edges(1)=nc_Nlon-2
+         nf_start(2)=1
+         nf_edges(2)=nc_Nlat
+         nf_start(3)=t_indx
+         nf_edges(3)=1
+         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,file_name)
+      if (mype==0) then
+         sbcdata1(1,1:nc_Nlat)       =sbcdata1(nc_Nlon-1,1:nc_Nlat)
+         sbcdata1(nc_Nlon,1:nc_Nlat) =sbcdata1(2,1:nc_Nlat)
+      end if
+      call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+       ! read next time step in file (check for +1 done before)
+      if (mype==0) then
+         nf_start(3)=t_indx_p1
+         nf_edges(3)=1
+         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost, file_name)
+      if (mype==0) then
+         sbcdata2(1, 1:nc_Nlat)       =sbcdata2(nc_Nlon-1,1:nc_Nlat)
+         sbcdata2(nc_Nlon, 1:nc_Nlat) =sbcdata2(2,1:nc_Nlat)
+      end if
+      call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+!      !flip data in case of lat from -90 to 90
+!      !!!! WARNING
+!      if ( flip_lat == 1 ) then
+!         sbcdata1=sbcdata1(1:nc_Nlon,nc_Nlat:1:-1)
+!         sbcdata2=sbcdata2(1:nc_Nlon,nc_Nlat:1:-1)
+!      end if
+      ! bilinear space interpolation, and time interpolation ,
+      ! data is assumed to be sampled on a regular grid
 !!$OMP PARALLEL
 !!$OMP DO
-         do ii = 1, myDim_nod2D+eDim_nod2D
-            i = bilin_indx_i(ii)
-            j = bilin_indx_j(ii)
-            ip1 = i + 1
-            jp1 = j + 1
-            x  = geo_coord_nod2D(1,ii)/rad
-            if (x < 0) x=x+360.
-            y  = geo_coord_nod2D(2,ii)/rad
-            extrp = 0
-            if ( i == 0 ) then
-               i   = nc_Nlon
-               ip1 = i
-               extrp = extrp + 1
-            end if
-            if ( i == -1 ) then
-               i   = 1
-               ip1 = i
-               extrp = extrp + 1
-            end if
-            if ( j == 0 ) then
-               j   = nc_Nlat
-               jp1 = j
-               extrp = extrp + 2
-            end if
-            if ( j == -1 ) then
-               j   = 1
-               jp1 = j
-               extrp = extrp + 2
-            end if
+      do ii = 1, myDim_nod2D+eDim_nod2D
+         i = bilin_indx_i(fld_idx, ii)
+         j = bilin_indx_j(fld_idx, ii)
+         ip1 = i + 1
+         jp1 = j + 1
+         x  = geo_coord_nod2D(1,ii)/rad
+         if (x < 0) x=x+360.
+         y  = geo_coord_nod2D(2,ii)/rad
+         extrp = 0
+         if ( i == 0 ) then
+            i   = nc_Nlon
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( i == -1 ) then
+            i   = 1
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( j == 0 ) then
+            j   = nc_Nlat
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         if ( j == -1 ) then
+            j   = 1
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         x1 = nc_lon(i)
+         x2 = nc_lon(ip1)
+         y1 = nc_lat(j)
+         y2 = nc_lat(jp1)
+         if ( extrp == 0 ) then
+         ! if point inside forcing domain
+            denom = (x2 - x1)*(y2 - y1)
+            data1 = ( sbcdata1(i,j)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j)    * (x-x1)*(y2-y) + &
+                    sbcdata1(i,jp1) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
+            data2 = ( sbcdata2(i,j)   * (x2-x)*(y2-y)   + sbcdata2(ip1,j)    * (x-x1)*(y2-y) + &
+                    sbcdata2(i,jp1) * (x2-x)*(y-y1)   + sbcdata2(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
+         else if ( extrp == 1 ) then !  "extrapolation" in x direction
+            denom = (y2 - y1)
+            data1 = ( sbcdata1(i,j)   * (y2-y)   + sbcdata1(ip1, jp1) * (y-y1) ) / denom
+            data2 = ( sbcdata2(i,j)   * (y2-y)   + sbcdata2(ip1, jp1) * (y-y1) ) / denom
+         else if ( extrp == 2 ) then !  "extrapolation" in y direction
+            denom = (x2 - x1)
+            data1 = ( sbcdata1(i,j)   * (x2-x)   + sbcdata1(ip1, jp1) * (x-x1) ) / denom
+            data2 = ( sbcdata2(i,j)   * (x2-x)   + sbcdata2(ip1, jp1) * (x-x1) ) / denom
+         else if ( extrp == 3 ) then !  "extrapolation" in x and y direction
+            data1 = sbcdata1(i,j)
+            data2 = sbcdata2(i,j)
+         end if
+         ! calculate new coefficients for interpolations
+         coef_a(fld_idx, ii) = ( data2 - data1 ) / delta_t !( nc_time(t_indx+1) - nc_time(t_indx) )
+         coef_b(fld_idx, ii) = data1 - coef_a(fld_idx, ii) * nc_time(t_indx)
 
-            x1 = nc_lon(i)
-            x2 = nc_lon(ip1)
-            y1 = nc_lat(j)
-            y2 = nc_lat(jp1)
-
-            if ( extrp == 0 ) then
-            ! if point inside forcing domain
-               denom = (x2 - x1)*(y2 - y1)
-               data1 = ( sbcdata1(i,j)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j)    * (x-x1)*(y2-y) + &
-                     sbcdata1(i,jp1) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
-               data2 = ( sbcdata2(i,j)   * (x2-x)*(y2-y)   + sbcdata2(ip1,j)    * (x-x1)*(y2-y) + &
-                     sbcdata2(i,jp1) * (x2-x)*(y-y1)   + sbcdata2(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
-            else if ( extrp == 1 ) then !  "extrapolation" in x direction
-               denom = (y2 - y1)
-               data1 = ( sbcdata1(i,j)   * (y2-y)   + sbcdata1(ip1, jp1) * (y-y1) ) / denom
-               data2 = ( sbcdata2(i,j)   * (y2-y)   + sbcdata2(ip1, jp1) * (y-y1) ) / denom
-            else if ( extrp == 2 ) then !  "extrapolation" in y direction
-               denom = (x2 - x1)
-               data1 = ( sbcdata1(i,j)   * (x2-x)   + sbcdata1(ip1, jp1) * (x-x1) ) / denom
-               data2 = ( sbcdata2(i,j)   * (x2-x)   + sbcdata2(ip1, jp1) * (x-x1) ) / denom
-            else if ( extrp == 3 ) then !  "extrapolation" in x and y direction
-               data1 = sbcdata1(i,j)
-               data2 = sbcdata2(i,j)
-            end if
-            ! calculate new coefficients for interpolations
-            coef_a(fld_idx, ii) = ( data2 - data1 ) / delta_t !( nc_time(t_indx+1) - nc_time(t_indx) )
-            coef_b(fld_idx, ii) = data1 - coef_a(fld_idx, ii) * nc_time(t_indx)
-
-         end do !ii
+      end do !ii
 !!$OMP END DO
 !!$OMP END PARALLEL
-         if (mype==0) then
-            iost = nf_close(ncid)
-         end if
-         call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-         call check_nferr(iost, sbc_flfi(fld_idx)%file_name)
-      end do !fld_idx
-
-      DEALLOCATE( sbcdata1, sbcdata2 )
-
+      if (mype==0) then
+         iost = nf_close(ncid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call check_nferr(iost, file_name)
+      DEALLOCATE( sbcdata2, sbcdata1 )
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
@@ -652,29 +660,20 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-!      integer,intent(in) :: ndate ! date
-!      integer,intent(in) :: nsec  ! seconds
       real(wp),intent(in)    :: rdate  ! seconds
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
-      real(wp)           :: now_date
 
-!      now_date = ndate+nsec/86400.0_wp
-      now_date = rdate
-!write(*,*) 'rdate2', rdate
 !!$OMP PARALLEL
 !!$OMP DO
-      do i = 1, myDim_nod2D+eDim_nod2D
-         do fld_idx = 1, i_totfl
-
-            atmdata(fld_idx,i) = now_date * coef_a(fld_idx,i) + coef_b(fld_idx,i)
-            
-         end do !fld_idx
-      end do !elem2D
+      do fld_idx = 1, i_totfl
+         do i = 1, myDim_nod2D+eDim_nod2D
+            atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
+         end do !nod2D
+      end do !fld_idx
 !!$OMP END DO
 !!$OMP END PARALLEL
-!write(*,*) 'coeff', maxval(coef_a), minval(coef_a), maxval(coef_b), minval(coef_b)
 
    END SUBROUTINE data_timeinterp
 
@@ -695,22 +694,12 @@ CONTAINS
 
       real(wp)           :: tx, ty
 
-      namelist/nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
+      namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
-                        nm_xwind_var,nm_ywind_var,nm_humi_var, &
+                        nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_mslp_file, &
-                        nm_cloud_var, nm_cloud_file, &
-                        depth_swr, nm_prec_coef, nm_net_flux, nm_calc_flux, &
-                        nm_nc_secstep, nm_nc_iyear, nm_nc_imm, nm_nc_idd, &
+                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_secstep, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-
-      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
-write (*,*) 'nm_nc_iyear=', nm_nc_iyear
-      rdate = 42368.+real(julday(nm_nc_iyear,1,1))
-      rdate = rdate+real(daynew-1)+timenew/86400.
-      idate = int(rdate)
-
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist_bc.nml', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -722,6 +711,10 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+      if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
+      rdate = real(julday(nm_nc_iyear,1,1))
+      rdate = rdate+real(daynew-1)+timenew/86400.
+      idate = int(rdate)
 
       if (mype==0) then
          write(*,*) "Start: Ocean forcing inizialization."
@@ -735,7 +728,7 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
             write(*,*) "      nm_xwind_var  = ", trim(nm_xwind_var)  ," ! name of variable in file with wind "
          end if
          i_totfl=i_totfl+1
-         l_xwind=i_totfl
+         i_xwind=i_totfl
       end if
 
       if (l_ywind) then
@@ -744,7 +737,7 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
             write(*,*) "      nm_ywind_var  = ", trim(nm_ywind_var)  ," ! name of variable in file with wind "
          end if
          i_totfl=i_totfl+1
-         l_ywind=i_totfl
+         i_ywind=i_totfl
       end if
 
       if (l_humi) then
@@ -818,7 +811,7 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
               & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), &
                    &      STAT=sbc_alloc )
 
-      ALLOCATE( bilin_indx_i(myDim_nod2D+eDim_nod2D),bilin_indx_j(myDim_nod2D+eDim_nod2D), &
+      ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
               & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
                    &      STAT=sbc_alloc )
 
@@ -839,16 +832,38 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
       IMPLICIT NONE
 
       real(wp)     :: rdate ! date
+      integer      :: fld_idx, i
+      logical      :: do_rotation
+      integer      :: yyyy, dd, mm
 
-      rdate = 42368.+real(julday(nm_nc_iyear,1,1))
+      rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
-      if ( .not. one_field ) then
-         ! IF more field available
-         if ( rdate > nc_time(t_indx_p1) ) then
+      do_rotation=.false.
+
+      if (yearnew/=yearold) then
+         call calendar_date(int(rdate),yyyy,dd,mm)
+         call nc_sbc_ini_fillnames(yyyy)
+         ! we assume that all NetCDF files have identical grid and time variable
+         do fld_idx = 1, i_totfl
+            call nc_readTimeGrid(sbc_flfi(fld_idx))
+         end do      
+      end if
+
+      do fld_idx = 1, i_totfl
+         if ( (rdate > sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx_p1)) .and. &
+              (rdate < sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
             ! get new coefficients for time interpolation on model grid for all data
-            call getcoeffld(rdate)
+            call getcoeffld(fld_idx, rdate)
+            if (fld_idx==i_xwind) do_rotation=.true.
          endif
-      endif
+      end do
+
+      if (do_rotation) then
+         do i=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         end do
+      end if
       ! interpolate in time
       call data_timeinterp(rdate)
    END SUBROUTINE sbc_do
@@ -876,28 +891,31 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
    IMPLICIT NONE
       integer, INTENT(IN) :: mm, dd, yyyy
       integer             :: julday
-! In this routine julday returns the Julian Day Number that begins at noon of the calendar
-!    date specified by month mm , day dd , and year yyyy , all integer variables. Positive year
-!    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
+      ! In this routine julday returns the Julian Day Number that begins at noon of the calendar     
+      !    date specified by month mm , day dd , and year yyyy , all integer variables. Positive year
+      !    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
       integer, PARAMETER  :: IGREG=15+31*(10+12*1582)
-! Gregorian Calendar adopted Oct. 15, 1582.
+      ! Gregorian Calendar adopted Oct. 15, 1582.
       integer             :: ja,jm,jy
-
-      jy = yyyy
-      if (jy == 0) STOP 'julday: there is no year zero'
-      if (jy < 0) jy=jy+1
-      if (mm > 2) then
-         jm=mm+1
-      else
-         jy=jy-1
-         jm=mm+13
-      endif
-      julday=int(365.25_wp*jy)+int(30.6001_wp*jm)+dd+1720995
-!Test whether to change to Gregorian Calendar.
-      if (dd+31*(mm+12*yyyy) >= IGREG) then
-         ja=int(0.01*jy)
-         julday=julday+2-ja+int(0.25_wp*ja)
-      end if
+      if (include_fleapyear) then
+         jy = yyyy
+         if (jy == 0) STOP 'julday: there is no year zero'
+         if (jy < 0) jy=jy+1
+         if (mm > 2) then
+            jm=mm+1
+         else
+            jy=jy-1
+            jm=mm+13
+         endif
+         julday=int(365.25_wp*jy)+int(30.6001_wp*jm)+dd+1720995
+         !Test whether to change to Gregorian Calendar.
+         if (dd+31*(mm+12*yyyy) >= IGREG) then
+            ja=int(0.01*jy)
+            julday=julday+2-ja+int(0.25_wp*ja)
+         end if
+       else
+         julday=365*yyyy
+       end if
    END FUNCTION julday
 
 
@@ -906,45 +924,52 @@ write (*,*) 'nm_nc_iyear=', nm_nc_iyear
 !  Converts a Julian day to a calendar date (year, month and day). Numerical Recipes
    IMPLICIT NONE
 !
-      integer,intent(in) :: julian
-      integer            :: yyyy,mm,dd
+      integer,intent(in)  :: julian
+      integer,intent(out) :: yyyy,mm,dd
 
       integer, parameter :: IGREG=2299161
       integer            :: ja,jb,jc,jd,je
       real(wp)           :: x
-!
-!-----------------------------------------------------------------------
-      if (julian >= IGREG ) then
-         x = ((julian-1867216)-0.25)/36524.25
-         ja = julian+1+int(x)-int(0.25*x)
+      !
+      !-----------------------------------------------------------------------
+      if (include_fleapyear) then
+         if (julian >= IGREG ) then
+            x = ((julian-1867216)-0.25)/36524.25
+            ja = julian+1+int(x)-int(0.25*x)
+         else
+            ja = julian
+         end if
+
+         jb = ja+1524
+         jc = int(6680 + ((jb-2439870)-122.1)/365.25)
+         jd = int(365*jc+(0.25*jc))
+         je = int((jb-jd)/30.6001)
+
+         dd = jb-jd-int(30.6001*je)
+         mm = je-1
+         if (mm > 12) mm = mm-12
+         yyyy = jc - 4715
+         if (mm > 2) yyyy = yyyy-1
+         if (yyyy <= 0) yyyy = yyyy-1
       else
-         ja = julian
+         yyyy=int((real(julian)+1.e-12)/365.)
+         mm=-1 !not supported (no need so far)
+         dd=-1 !not supported (no need so far)
       end if
-
-      jb = ja+1524
-      jc = int(6680 + ((jb-2439870)-122.1)/365.25)
-      jd = int(365*jc+(0.25*jc))
-      je = int((jb-jd)/30.6001)
-
-      dd = jb-jd-int(30.6001*je)
-      mm = je-1
-      if (mm > 12) mm = mm-12
-      yyyy = jc - 4715
-      if (mm > 2) yyyy = yyyy-1
-      if (yyyy <= 0) yyyy = yyyy-1
-
       return
    END SUBROUTINE calendar_date
 
    SUBROUTINE sbc_end
 
       IMPLICIT NONE
-
-      DEALLOCATE( nc_lon, nc_lat, nc_time)
+      integer      :: fld_idx      
+      do fld_idx = 1, i_totfl     
+         DEALLOCATE( sbc_flfi(fld_idx)%nc_lon, sbc_flfi(fld_idx)%nc_lat, sbc_flfi(fld_idx)%nc_time)
+      end do
+      DEALLOCATE( sbc_flfi )
       DEALLOCATE( coef_a, coef_b, atmdata, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
-
 
 
 

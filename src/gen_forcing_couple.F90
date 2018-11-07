@@ -277,9 +277,6 @@ subroutine update_atm_forcing(istep)
   call sbc_do
   u_wind   =atmdata(i_xwind, :)
   v_wind   =atmdata(i_ywind, :)
-  do i=1, myDim_nod2D+eDim_nod2D
-     call vector_g2r(u_wind(i), v_wind(i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
-  end do
   shum     =atmdata(i_humi, :)
   longwave =atmdata(i_qlw, :)
   shortwave=atmdata(i_qsr, :)
