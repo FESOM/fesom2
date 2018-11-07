@@ -309,12 +309,12 @@ CONTAINS
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
       flf%nc_time = flf%nc_time / nm_nc_secstep + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
-      if (flf%nc_Ntime > 1) then
-         do i = 1, flf%nc_Ntime-1
-            flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
-         end do
-         flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
-      end if
+!      if (flf%nc_Ntime > 1) then
+!         do i = 1, flf%nc_Ntime-1
+!            flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
+!         end do
+!         flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
+!      end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
