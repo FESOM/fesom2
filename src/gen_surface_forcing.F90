@@ -139,8 +139,6 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:,:)   :: coef_b ! time inerp coef. b (x=a*t+b)
    real(wp), allocatable, save, dimension(:,:)   :: coef_a ! time inerp coef. a (x=a*t+b)
 
-   logical, save :: one_field = .false.! only one field used for forcing
-
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
    type, public ::   flfi_type    !flux file informations
@@ -527,15 +525,15 @@ CONTAINS
          t_indx_p1 = t_indx + 1
          delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
       elseif (t_indx > 0) then ! NO extrapolation to future
+         t_indx    =nc_Ntime
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         one_field = .true.
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used) for ', var_name, ' !'
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', var_name, ' !'
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used) for ', var_name, ' !'
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', var_name, ' !'
       end if
       !open file sbc_flfi
       if (mype==0) then
@@ -871,7 +869,8 @@ CONTAINS
 
       do fld_idx = 1, i_totfl
          if ( (rdate > sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx_p1)) .and. &
-              (rdate < sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
+              (sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx)<sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
+!             (rdate < sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
             ! get new coefficients for time interpolation on model grid for all data
             call getcoeffld(fld_idx, rdate)
             if (fld_idx==i_xwind) do_rotation=.true.
