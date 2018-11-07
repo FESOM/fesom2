@@ -165,6 +165,8 @@ int parms_pbicgstabras(parms_Solver self, double *rhs, double *xin)
       for (i=0; i<nloc; i++) qt[i] = rt[i] - alpha*st[i];
       for (i=0; i<nloc; i++)  y[i] =  w_ext[i] - alpha* z_ext[i];
       if (nodv) parms_CommDataEnd(pc_handler);
+      if (pc_data->n - pc_data->nloc) 
+	PARMS_MEMCPY(&z_ext[nloc], pc_data->rbuf, pc_data->n - pc_data->nloc);
 
       tmp[0] = 0.; tmp[1] = 0.;
       for (i=0; i<nloc; i++) {
@@ -179,8 +181,6 @@ int parms_pbicgstabras(parms_Solver self, double *rhs, double *xin)
             
       /* copy received external interface variables to the extended
 	 vector */
-      if (pc_data->n - pc_data->nloc) 
-	PARMS_MEMCPY(&z_ext[nloc], pc_data->rbuf, pc_data->n - pc_data->nloc);
       
       /* solve the extended linear system */
       parms_OperatorApply(pc_data->op, z_ext, zt_ext);
@@ -202,6 +202,9 @@ int parms_pbicgstabras(parms_Solver self, double *rhs, double *xin)
       for (i=0; i<nloc; i++)  r[i]  =  q[i] - omega*y[i];
       for (i=0; i<nloc; i++) rt[i]  = qt[i] - omega*(wt_ext[i] - alpha*zt_ext[i]);
 
+      if (nodv) parms_CommDataEnd(pc_handler);
+      if (pc_data->n - pc_data->nloc) 
+	PARMS_MEMCPY(&w_ext[nloc], pc_data->rbuf, pc_data->n - pc_data->nloc);
 
       tmp[0] = 0.; tmp[1] = 0.; tmp[2] = 0.; tmp[3] = 0.; tmp[4] = 0.;
       for (i=0; i<nloc; i++) {
@@ -211,15 +214,12 @@ int parms_pbicgstabras(parms_Solver self, double *rhs, double *xin)
 	tmp[3] += r0[i]*z_ext[i];
 	tmp[4] +=  r[i]*r[i]; // residuum
       }
-      if (nodv) parms_CommDataEnd(pc_handler);
 
       if(is->isserial == false)
 	MPI_Iallreduce(MPI_IN_PLACE, tmp, 5, MPI_DOUBLE, MPI_SUM, comm, &req2);
       
       /*  === Preconditioner RAS: parms_PCApply(pc, w, wt); === */
-            
-      if (pc_data->n - pc_data->nloc) 
-	PARMS_MEMCPY(&w_ext[nloc], pc_data->rbuf, pc_data->n - pc_data->nloc);
+        
       
       parms_OperatorApply(pc_data->op, w_ext, wt_ext);
       
