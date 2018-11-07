@@ -3,20 +3,16 @@
 ! S.D 05.04.12
 ! ==========================================================
 subroutine forcing_setup
-! forcing: arrays, initialization, interpolation preparation  
-use g_forcing_index
 use g_parsup
 use g_CONFIG
-use g_forcing_interp
+use g_sbf, only: sbc_ini
 implicit none
 
   if (mype==0) write(*,*) '****************************************************'
-  call forcing_index
   if (use_ice) then
      call forcing_array_setup
 #ifndef __oasis
-     call init_forcing_interp      ! calculates the forcing interpolation weights
-     call init_atm_forcing         ! initialize forcing fields
+     call sbc_ini         ! initialize forcing fields
 #endif
   endif 
 end subroutine forcing_setup
@@ -30,6 +26,7 @@ subroutine forcing_array_setup
   use g_forcing_param
   use g_parsup
   use g_config
+  use g_sbf, only: l_mslp, l_cloud
 #if defined (__oasis)
   use cpl_driver, only : nrecv
 #endif   
@@ -78,20 +75,22 @@ subroutine forcing_array_setup
   Tair=0.
   shum=0.
   runoff=0.
-  if(rad_data_source=='NCEP') then
-    allocate(cloudiness(n2), Pair(n2))
-    cloudiness=0.
-    Pair=0.
-  end if
 
-  if(wind_ttp_ind==1) then
-    allocate(u_wind_t(2,n2),v_wind_t(2,n2))
-    allocate(Tair_t(2,n2), shum_t(2,n2))
-    u_wind_t=0.
-    v_wind_t=0.
-    Tair_t=0.
-    shum_t=0.
+  if (l_cloud) then
+     allocate(cloudiness(n2))
+     cloudiness=0.
   end if
+  if (l_mslp) then
+     allocate(Pair(n2))
+     Pair=0.
+  end if
+ 
+  allocate(u_wind_t(2,n2),v_wind_t(2,n2))
+  allocate(Tair_t(2,n2), shum_t(2,n2))
+  u_wind_t=0.
+  v_wind_t=0.
+  Tair_t=0.
+  shum_t=0.
 
   if(use_landice_water) then
     allocate(runoff_landice(n2))

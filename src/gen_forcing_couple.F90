@@ -1,81 +1,5 @@
-! Routines for initializing and updating ocean surface forcing fields
+! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-
-subroutine init_atm_forcing
-  ! read in forcing data that are constant in time
-  ! the time varying forcing fields will be read in by read_new_atm_forcing
-  ! assume atmosphere forcing data on T62 NCEP/NCAR grid
-  !
-  ! Coded by Qiang Wang
-  ! Reviewed by ??
-
-  use o_PARAM
-  use o_MESH
-  use o_arrays
-  use i_therm_param
-  use i_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_forcing_index
-  use g_forcing_interp
-  use g_read_other_NetCDF
-  use g_clock
-  use g_parsup
-  use g_config
-  use g_sbf, only: sbc_ini
-  implicit none
-  !
-  integer, parameter        		:: nci=192, ncj=94 ! T62 grid
-  integer                   		:: itime, i, k, n2, year_first_rec
-  integer                               :: readtype
-  character(500)             		:: file
-  character(15)             		:: vari, filevari
-  character(4)				:: fileyear
-  real(kind=WP), dimension(nci,ncj)	:: array_nc, array_nc2
-  real(kind=WP), allocatable            :: aux(:) 
-  logical                               :: check_dummy
-
-  call sbc_ini
-
-  !==========================================================================
-  ! runoff    
-  if(runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-     ! runoff in CORE is constant in time
-     ! Warning: For a global mesh, conservative scheme is to be updated!!
-     file=trim(ForcingDataPath)//trim(runoff_data_source)//'/runoff.nc'
-     vari='Foxx_o_roff'
-     check_dummy=.false.
-     itime=1
-     call read_other_NetCDF(file, vari, itime, runoff, check_dummy) 
-     runoff=runoff/1000.0  ! Kg/s/m2 --> m/s
-  end if
-  !
-  !==========================================================================
-  ! sss restoring
-  if(surf_relax_S > 0.) then
-     if(sss_data_source=='AAOMIP' .OR. sss_data_source=='ECHAM5') then
-        ! taking the annual mean of PHC2 SSS
-        file=trim(ForcingDataPath)//'CORE2'//'/PHC2_salx.nc'
-        vari='SALT'
-        check_dummy=.true.
-
-        Ssurf=0.0
-
-        allocate(aux(n2))
-        do itime=1,12
-           call read_other_NetCDF(file, vari, itime, aux, check_dummy) 
-           Ssurf=Ssurf+aux
-        end do
-        Ssurf=Ssurf/12.0
-        deallocate(aux)
-     endif
-  end if
-  if(mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
-
-end subroutine init_atm_forcing
-!
-!------------------------------------------------------------------------------------------
-!
 subroutine update_atm_forcing(istep)
   use o_PARAM
   use o_MESH
@@ -85,11 +9,9 @@ subroutine update_atm_forcing(istep)
   use i_therm_param
   use g_forcing_param
   use g_forcing_arrays
-  use g_forcing_index
   use g_parsup
   use g_clock
   use g_config
-  use g_forcing_interp
   use g_comm_auto
   use g_rotate_grid
   use g_sbf, only: sbc_do

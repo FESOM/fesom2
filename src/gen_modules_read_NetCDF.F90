@@ -32,8 +32,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
   real(real64)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
-  character(15)              :: vari
-  character(300)             :: file
+  character(*)               :: vari
+  character(*)               :: file
   logical                    :: check_dummy
   integer                    :: ierror           ! return error code
 

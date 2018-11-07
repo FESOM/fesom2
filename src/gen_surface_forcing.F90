@@ -79,7 +79,8 @@ MODULE g_sbf
    logical :: l_cloud = .false.
    logical :: l_snow  = .false.
 
-
+   character(10),      save   :: runoff_data_source='CORE2'
+   character(len=256), save   :: nm_runoff_file    ='runoff.nc'
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -271,9 +272,14 @@ CONTAINS
       call MPI_BCast(flf%nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_Ntime,  1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
          
-
-      ALLOCATE( flf%nc_lon(flf%nc_Nlon), flf%nc_lat(flf%nc_Nlat),&
+      if (.not. allocated(flf%nc_time)) then
+         allocate( flf%nc_lon(flf%nc_Nlon), flf%nc_lat(flf%nc_Nlat),&
                 &       flf%nc_time(flf%nc_Ntime))
+      else
+      ! only the temporal axis is allowed to vary between the files
+         deallocate(flf%nc_time)
+           allocate(flf%nc_time(flf%nc_Ntime))
+      end if
    !read variables from file
    ! coordinates
       if (mype==0) then
@@ -685,6 +691,8 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
+      use g_forcing_arrays,    only: runoff
+      use g_read_other_NetCDF, only: read_other_NetCDF
       IMPLICIT NONE
 
       integer            :: idate ! initialization date
@@ -699,9 +707,10 @@ CONTAINS
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_secstep, &
-                        l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+                        l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
+                        nm_runoff_file, runoff_data_source
       ! OPEN and read namelist for SBC
-      open( unit=nm_sbc_unit, file='namelist_bc.nml', form='formatted', access='sequential', status='old', iostat=iost )
+      open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
       else
@@ -818,7 +827,17 @@ CONTAINS
       ALLOCATE(sbc_flfi(i_totfl))
 
       call nc_sbc_ini(rdate)
+      !==========================================================================
+      ! runoff    
+      if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+         ! runoff in CORE is constant in time
+         ! Warning: For a global mesh, conservative scheme is to be updated!!
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false.) 
+         runoff=runoff/1000.0  ! Kg/s/m2 --> m/s
+      end if
+
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
+      if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
 
    SUBROUTINE sbc_do
@@ -836,11 +855,8 @@ CONTAINS
       logical      :: do_rotation
       integer      :: yyyy, dd, mm
 
-      rdate = real(julday(yearnew,1,1))
-      rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
-      do_rotation=.false.
-
       if (yearnew/=yearold) then
+         rdate = real(julday(yearnew,1,1))
          call calendar_date(int(rdate),yyyy,dd,mm)
          call nc_sbc_ini_fillnames(yyyy)
          ! we assume that all NetCDF files have identical grid and time variable
@@ -848,6 +864,10 @@ CONTAINS
             call nc_readTimeGrid(sbc_flfi(fld_idx))
          end do      
       end if
+
+      rdate = real(julday(yearnew,1,1))
+      rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
+      do_rotation=.false.
 
       do fld_idx = 1, i_totfl
          if ( (rdate > sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx_p1)) .and. &
@@ -982,7 +1002,8 @@ CONTAINS
 
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         STOP 'ERROR: stop'
+         call par_ex
+         stop
       endif
    END SUBROUTINE
 

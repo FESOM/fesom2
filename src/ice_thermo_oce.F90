@@ -194,7 +194,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
 
   use i_therm_param
-  use g_forcing_param,  only: precip_data_source, use_virt_salt
+  use g_forcing_param,  only: use_virt_salt
   
   use o_param
   use g_parsup
@@ -267,14 +267,8 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   hsn=hsn+snow*ice_dt*A*rhowat*inv_rhosno	! Add snow fall to temporary snow thickness    !!!
   dhsngrowth=hsn   		        ! Store snow thickness after snow fall 
 
-  ! evaporation/sublimation
-  if(precip_data_source=='NCEP') then
-     evap=evap_in*(1.0-A)
-     subli=evap_in*A
-  else
-     evap=evap*(1.0-A)    		! m water/s
-     subli=subli*A
-  end if
+  evap=evap*(1.0-A)    		! m water/s
+  subli=subli*A
 
   ! If there is atmospheric melting, first melt any snow that is present.
   ! Atmospheric heat flux available for melting

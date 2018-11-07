@@ -83,7 +83,6 @@ subroutine read_namelist
   nmlfile ='namelist.forcing'    ! name of forcing namelist file
   open (20,file=nmlfile)
   read (20,NML=forcing_exchange_coeff)
-  read (20,NML=forcing_source)
   read (20,NML=forcing_bulk)
   read (20,NML=land_ice)
   close (20)

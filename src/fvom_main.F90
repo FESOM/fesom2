@@ -15,7 +15,6 @@ USE i_PARAM
 use i_ARRAYS
 use g_clock
 use g_config
-use g_forcing_index
 use g_comm_auto
 use g_forcing_arrays
 use io_RESTART
@@ -118,7 +117,6 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock
-        call forcing_index
         call compute_vel_nodes 
         !___model sea-ice step__________________________________________________
         if(use_ice) then
