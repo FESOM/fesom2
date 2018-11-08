@@ -850,27 +850,41 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation
+      logical      :: do_rotation, force_newcoeff
       integer      :: yyyy, dd, mm
+      integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
+      real(wp),  pointer   :: nc_time(:)
 
+      nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
+      t_indx   =>sbc_flfi(fld_idx)%t_indx
+      t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
+      nc_time  =>sbc_flfi(fld_idx)%nc_time
+
+
+
+      force_newcoeff=.false.
       if (yearnew/=yearold) then
          rdate = real(julday(yearnew,1,1))
          call calendar_date(int(rdate),yyyy,dd,mm)
          call nc_sbc_ini_fillnames(yyyy)
          ! we assume that all NetCDF files have identical grid and time variable
          do fld_idx = 1, i_totfl
-            call nc_readTimeGrid(sbc_flfi(fld_idx))
-         end do      
+            call nc_readTimeGrid(sbc_flfi(fld_idx))            
+         end do
+         force_newcoeff=.true.
       end if
+      
 
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
       do_rotation=.false.
 
       do fld_idx = 1, i_totfl
-         if ( (rdate > sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx_p1)) .and. &
-              (sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%t_indx)<sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
-!             (rdate < sbc_flfi(fld_idx)%nc_time(sbc_flfi(fld_idx)%nc_Ntime))) then
+         nc_time  =>sbc_flfi(fld_idx)%nc_time
+         t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
+         t_indx   =>sbc_flfi(fld_idx)%t_indx
+         nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
+         if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
             call getcoeffld(fld_idx, rdate)
             if (fld_idx==i_xwind) do_rotation=.true.
