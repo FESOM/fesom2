@@ -42,6 +42,8 @@ MODULE g_sbf
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
+   USE g_forcing_arrays,    only: runoff
+   USE g_read_other_NetCDF, only: read_other_NetCDF
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -81,6 +83,9 @@ MODULE g_sbf
 
    character(10),      save   :: runoff_data_source='CORE2'
    character(len=256), save   :: nm_runoff_file    ='runoff.nc'
+
+   character(10),      save   :: sss_data_source   ='CORE2'
+   character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -528,12 +533,12 @@ CONTAINS
          t_indx    =nc_Ntime
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', var_name, ' !'
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', var_name, ' !'
+         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
       end if
       !open file sbc_flfi
       if (mype==0) then
@@ -689,8 +694,6 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
-      use g_forcing_arrays,    only: runoff
-      use g_read_other_NetCDF, only: read_other_NetCDF
       IMPLICIT NONE
 
       integer            :: idate ! initialization date
@@ -706,7 +709,7 @@ CONTAINS
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_secstep, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source
+                        nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -846,6 +849,7 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
+      use g_clock
       IMPLICIT NONE
 
       real(wp)     :: rdate ! date
@@ -897,6 +901,18 @@ CONTAINS
             call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
          end do
       end if
+      
+      if (surf_relax_S > 0.) then
+         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+            if ((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400.)) then
+               i=month+1
+               if (i > 12) i=1
+               if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true.) 
+            end if
+         end if
+      end if
+
       ! interpolate in time
       call data_timeinterp(rdate)
    END SUBROUTINE sbc_do
