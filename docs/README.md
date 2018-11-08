@@ -209,10 +209,19 @@ By changing the clock file into
 ```
 the model will then restart from the last year of the first cycle, but using CORE2 forcing from 1948 onwards.
 
+Model spinup / Cold start at higher resolutions
+----------------
 
-Todo
-----
-
-#### recomendations on model spin up
+Cold starting the model at high mesh resolutions with standard values for timestep and viscosity will lead to instabilities that cause the model to crash. If no restart files are available and a spinup has to be performed, the following changes should be made for the first month long simulation and then taken back gradually over the next 6-8 months:
+In config.namelist set:
+```
+step_per_day=720 
+```
+In namelist.oce set:
+```
+Div_c=5
+Leith_c=.5
+```
+After one month change one of the parameters to more standard values. Increase the timestep gradually. Very highly resolved meshes may require an inital timestep of one instead of two minutes.
 
 

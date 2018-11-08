@@ -1776,10 +1776,16 @@ end if
 ! new_values>0 requires reuse=1 in psolver_init!
 
 if (lfirst) then
-   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
+   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only, no precond available!!)
    !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-   ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
-   call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
+   !     SOLBICGS_RAS for BiCGstab solver (arbitrary matrices) with integrated RAS - the global 
+   !                  preconditioner setting is ignored! It saves a 4 vector copies per iteration
+   !                  compared to SOLBICGS + PCRAS.
+   !     SOLPBICGS for pipelined BiCGstab solver (arbitrary matrices)
+   !               Should scale better than SOLBICGS, but be careful, it is still experimental.
+   !     SOLPBICGS_RAS is SOLPBICGS with integrated RAS (global preconditioner setting is ignored!)
+   !                   for even better scalability, well, in the end, it does not matter much.     
+    call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ssh_stiff%values, reuse, MPI_COMM_FESOM)

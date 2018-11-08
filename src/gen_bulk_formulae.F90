@@ -56,7 +56,7 @@ subroutine ncar_ocean_fluxes_mode
      cd_n10 = (2.7/u10+0.142+0.0764*u10)*1.0e-3                ! L-Y eqn. 6a
      cd_n10_rt = sqrt(cd_n10) 
      ce_n10 = 34.6 *cd_n10_rt*1.0e-3       		      ! L-Y eqn. 6b
-     stab = 0.5 + sign(0.5,t-ts)
+     stab = 0.5 + sign(0.5_WP,t-ts)
      ch_n10 = (18.0*stab+32.7*(1.0-stab))*cd_n10_rt*1.e-3      ! L-Y eqn. 6c
 
      cd = cd_n10                                 	      ! first guess for exchange coeff's at z
@@ -69,7 +69,7 @@ subroutine ncar_ocean_fluxes_mode
         qstar    = (ce/cd_rt)*(q-qs)              	      ! L-Y eqn. 7c
         bstar    = grav*(tstar/tv+qstar/(q+1.0/0.608))
         zeta     = vonkarm*bstar*zz/(ustar*ustar) 	      ! L-Y eqn. 8a
-        zeta     = sign( min(abs(zeta),10.0), zeta )          ! undocumented NCAR
+        zeta     = sign( min(abs(zeta),10.0_WP), zeta )          ! undocumented NCAR
         x2 = sqrt(abs(1.-16.*zeta))                           ! L-Y eqn. 8b
         x2 = max(x2, 1.0)                                     ! undocumented NCAR
         x = sqrt(x2)
@@ -86,7 +86,7 @@ subroutine ncar_ocean_fluxes_mode
         cd_n10 = (2.7/u10+0.142+0.0764*u10)*1.e-3                  ! L-Y eqn. 6a again
         cd_n10_rt = sqrt(cd_n10) 
         ce_n10 = 34.6*cd_n10_rt*1.e-3                              ! L-Y eqn. 6b again
-        stab = 0.5 + sign(0.5,zeta)
+        stab = 0.5 + sign(0.5_WP,zeta)
         ch_n10 = (18.0*stab+32.7*(1.0-stab))*cd_n10_rt*1.e-3       ! L-Y eqn. 6c again
         !z0 = 10*exp(-vonkarm/cd_n10_rt)                          ! diagnostic
 

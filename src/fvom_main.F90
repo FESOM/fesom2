@@ -163,12 +163,12 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     if (mype==0) then
         write(*,*) '___MODEL RUNTIME [seconds]_____________________________'
         write(*,*) '    runtime ocean : ',mrtime_oce/npes, ' sec'
-        write(*,*) '      > runtime oce. mix,pres...: ',mrtime_oce_mixpres/npes, ' sec'
-        write(*,*) '      > runtime oce. dyn. u,v,w : ',mrtime_oce_dyn/npes, ' sec'
-        write(*,*) '      > runtime oce. dyn. ssh   : ',mrtime_oce_dynssh/npes, ' sec'
+        write(*,*) '      > runtime oce. mix,pres... : ',mrtime_oce_mixpres/npes, ' sec'
+        write(*,*) '      > runtime oce. dyn. u,v,w  : ',mrtime_oce_dyn/npes, ' sec'
+        write(*,*) '      > runtime oce. dyn. ssh    : ',mrtime_oce_dynssh/npes, ' sec'
         write(*,*) '          > runtime oce. solve ssh  : ',mrtime_oce_solvessh/npes, ' sec'
-        write(*,*) '      > runtime oce. GM/Redi    : ',mrtime_oce_GMRedi/npes, ' sec'
-        write(*,*) '      > runtime oce. solve tacer: ',mrtime_oce_solvetra/npes, ' sec'
+        write(*,*) '      > runtime oce. GM/Redi     : ',mrtime_oce_GMRedi/npes, ' sec'
+        write(*,*) '      > runtime oce. solve tracer: ',mrtime_oce_solvetra/npes, ' sec'
         write(*,*) '    runtime ice   : ',mrtime_ice/npes, ' sec'
         write(*,*) '    runtime total : ',mrtime_tot/npes, ' sec'
     end if     
