@@ -622,8 +622,7 @@ subroutine fct_ale(ttf, iter_yn)
 	end do 
 	
 	! fct_minus and fct_plus must be known to neighbouring PE
-	call exchange_nod(fct_plus)
-	call exchange_nod(fct_minus)	   
+	call exchange_nod(fct_plus, fct_minus)	   
 	
 	!___________________________________________________________________________
 	! b3. Limiting   
@@ -655,6 +654,8 @@ subroutine fct_ale(ttf, iter_yn)
 		end do
 	! the bottom flux is always zero 
 	end do
+
+        call exchange_nod_end  ! fct_plus, fct_minus
 	
 	!Horizontal
 	do edge=1, myDim_edge2D
