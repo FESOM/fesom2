@@ -880,7 +880,7 @@ subroutine set_par_support_ini
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-!!$  call check_partitioning
+  call check_partitioning
 
   write(*,*) 'Partitioning is done.'
 
@@ -938,118 +938,102 @@ subroutine check_partitioning
   allocate(ne_part(max_adjacent_nodes), ne_part_num(max_adjacent_nodes), &
        ne_part_load(2,max_adjacent_nodes))
 
-  isolated_nodes_check: do n_iter = 1, 10
-     print *,' '
-     print *,'Check for isolated nodes, new iteration ========'
-     n_iso = 0
-     do n=1,nod2D
-        is = ssh_stiff%rowptr(n)
-        ie = ssh_stiff%rowptr(n+1) -1
+  print *,' '
+  print *,'Check for isolated nodes ========'
+  n_iso = 0
+  checkloop: do n=1,nod2D
+     is = ssh_stiff%rowptr(n)
+     ie = ssh_stiff%rowptr(n+1) -1
 
-        node_neighb_part(1:ie-is) = part(ssh_stiff%colind(is:ie))
-        if (count(node_neighb_part(1:ie-is) == part(n)) <= 1) then
+     node_neighb_part(1:ie-is) = part(ssh_stiff%colind(is:ie))
+     if (count(node_neighb_part(1:ie-is) == part(n)) <= 1) then
 
-           n_iso = n_iso+1
-           print *,'Isolated node',n, 'in partition', part(n)
-           print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
+        n_iso = n_iso+1
+        print *,'Isolated node',n, 'in partition', part(n)
+        print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
 
-           ! count the adjacent nodes of the other PEs
+        ! count the adjacent nodes of the other PEs
 
-           np=1
-           ne_part(1) = node_neighb_part(1)
-           ne_part_num(1) = 1
-           ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
-           ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
+        np=1
+        ne_part(1) = node_neighb_part(1)
+        ne_part_num(1) = 1
+        ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
+        ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
 
-           do i=1,ie-is
-              if (node_neighb_part(i)==part(n)) cycle
-              already_counted = .false.
-              do k=1,np
-                 if (node_neighb_part(i) == ne_part(k)) then
-                    ne_part_num(k) = ne_part_num(k) + 1
-                    already_counted = .true.
-                    exit
-                 endif
-              enddo
-              if (.not. already_counted) then
-                 np = np+1
-                 ne_part(np) = node_neighb_part(i)
-                 ne_part_num(np) = 1
-                 ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
-                 ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+        do i=1,ie-is
+           if (node_neighb_part(i)==part(n)) cycle
+           already_counted = .false.
+           do k=1,np
+              if (node_neighb_part(i) == ne_part(k)) then
+                 ne_part_num(k) = ne_part_num(k) + 1
+                 already_counted = .true.
+                 exit
+              endif
+           enddo
+           if (.not. already_counted) then
+              np = np+1
+              ne_part(np) = node_neighb_part(i)
+              ne_part_num(np) = 1
+              ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
+              ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
+           endif
+        enddo
+
+        ! Now, check for two things: The load balance, and if 
+        ! there is more than one node of that partition.
+        ! Otherwise, it would become isolated again.
+
+        ! Best choice would be the partition with most adjacent nodes (edgecut!)
+        ! Choose, if it does not decrease the load balance. 
+        !        (There might be two partitions with the same number of adjacent
+        !         nodes. Don't care about this here)
+
+        kmax = maxloc(ne_part_num(1:np),1)
+
+        if (ne_part_num(kmax) <= 1) then
+           ! No chance - this is probably a boundary
+           ! node that has only two neighbors.
+           cycle checkloop
+        endif
+
+        if  (ne_part_load(1,kmax) <= max_nod_per_part(1) .and. &
+             ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
+           k = kmax
+        else
+           ! Don't make it too compicated. Reject partitions that have only one
+           ! adjacent node. Take the next not violating the load balance.
+           found_part = .false.
+           do k=1,np
+              if (ne_part_num(k)==1 .or. k==kmax) cycle
+
+              if  (ne_part_load(1,k) <= max_nod_per_part(1) .and. &
+                   ne_part_load(2,k) <= max_nod_per_part(2) ) then
+
+                 found_part = .true.
+                 exit
               endif
            enddo
 
-           ! Now, check for two things: The load balance, and if 
-           ! there is more than one node of that partition.
-           ! Otherwise, it would become isolated again.
-
-           ! Best choice would be the partition with most adjacent nodes (edgecut!)
-           ! Choose, if it does not decrease the load balance. 
-           !        (There might be two partitions with the same number of adjacent
-           !         nodes. Don't care about this here)
-
-           kmax = maxloc(ne_part_num(1:np),1)
-
-           if (ne_part_num(kmax) <= 1) then
-              print *,'Sorry, no chance to solve an isolated node problem'
-              exit isolated_nodes_check
-           endif
-
-           if  (ne_part_load(1,kmax) <= max_nod_per_part(1) .and. &
-                ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
+           if (.not. found_part) then
+              ! Ok, don't think to much. Simply go for minimized edge cut.
               k = kmax
-           else
-              ! Don't make it too compicated. Reject partitions that have only one
-              ! adjacent node. Take the next not violating the load balance.
-              found_part = .false.
-              do k=1,np
-                 if (ne_part_num(k)==1 .or. k==kmax) cycle
-
-                 if  (ne_part_load(1,k) <= max_nod_per_part(1) .and. &
-                      ne_part_load(2,k) <= max_nod_per_part(2) ) then
-
-                    found_part = .true.
-                    exit
-                 endif
-              enddo
-
-              if (.not. found_part) then
-                 ! Ok, don't think to much. Simply go for minimized edge cut.
-                 k = kmax
-              endif
            endif
-
-           ! Adjust the load balancing
-
-           nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
-           nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
-           nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
-           nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
-
-           ! And, finally, move nod n to other partition        
-           part(n) = ne_part(k)
-           print *,'Node',n,'is moved to part',part(n)
         endif
-     enddo
 
-     if (n_iso==0) then
-        print *,'No isolated nodes found'
-        exit isolated_nodes_check 
+        ! Adjust the load balancing
+
+        nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
+        nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
+        nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
+        nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
+
+        ! And, finally, move nod n to other partition        
+        part(n) = ne_part(k)
+        print *,'Node',n,'is moved to part',part(n)
      endif
-     ! Check for isolated nodes again
-  end do isolated_nodes_check
+  enddo checkloop
 
   deallocate(ne_part, ne_part_num, ne_part_load)
-
-  if (n_iso > 0) then
-     print *,'++++++++++++++++++++++++++++++++++++++++++++'
-     print *,'+  WARNING: PARTITIONING LOOKS REALLY BAD  +'
-     print *,'+  It was not possible to remove all       +'
-     print *,'+  isolated nodes. Consider to rerun with  +'
-     print *,'+  new metis random seed (see Makefile.in) +'
-     print *,'++++++++++++++++++++++++++++++++++++++++++++'
-  endif
 
   print *,'=== LOAD BALANCING ==='
   print *,'2D nodes: min, aver, max per part',min_nod_per_part(1), &

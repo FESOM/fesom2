@@ -42,4 +42,14 @@ extern int parms_gmres(parms_Solver self, FLOAT *y, FLOAT *x);
 extern int bicgstab_create(parms_Solver self);
 extern int parms_bicgstab(parms_Solver self, FLOAT *y, FLOAT *x);
 
+/* additional Solver Type (NR) */
+extern int cg_create(parms_Solver self);
+extern int parms_cg(parms_Solver self, FLOAT *y, FLOAT *x);
+extern int pbicgstab_create(parms_Solver self);
+extern int parms_pbicgstab(parms_Solver self, FLOAT *y, FLOAT *x);
+extern int pbicgstabras_create(parms_Solver self);
+extern int parms_pbicgstabras(parms_Solver self, FLOAT *y, FLOAT *x);
+extern int bicgstabras_create(parms_Solver self);
+extern int parms_bicgstabras(parms_Solver self, FLOAT *y, FLOAT *x);
+
 #endif 
