@@ -177,10 +177,6 @@ int parms_pbicgstabras(parms_Solver self, double *rhs, double *xin)
 	MPI_Iallreduce(MPI_IN_PLACE, tmp, 2, MPI_DOUBLE, MPI_SUM, comm, &req1); 
       
       /*  === Preconditioner RAS parms_PCApply(pc, z, zt); === */
-
-            
-      /* copy received external interface variables to the extended
-	 vector */
       
       /* solve the extended linear system */
       parms_OperatorApply(pc_data->op, z_ext, zt_ext);
