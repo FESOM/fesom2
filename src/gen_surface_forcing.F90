@@ -135,9 +135,10 @@ MODULE g_sbf
 
    ! ========== netCDF time param
    integer, save :: nm_nc_iyear = 1948    ! initial year of time axis in netCDF (1948 like CoastDat,1800 NCEP)
-   integer, save :: nm_nc_imm = 1         ! initial month of time axis in netCDF
-   integer, save :: nm_nc_idd = 1         ! initial day of time axis in netCDF
-   real, save    :: nm_nc_secstep = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
+   integer, save :: nm_nc_imm   = 1       ! initial month of time axis in netCDF
+   integer, save :: nm_nc_idd   = 1       ! initial day of time axis in netCDF
+   real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
+   integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
@@ -311,13 +312,15 @@ CONTAINS
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-      flf%nc_time = flf%nc_time / nm_nc_secstep + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
-!      if (flf%nc_Ntime > 1) then
-!         do i = 1, flf%nc_Ntime-1
-!            flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
-!         end do
-!         flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
-!      end if
+      flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
+      if (nm_nc_tmid/=1) then
+         if (flf%nc_Ntime > 1) then
+            do i = 1, flf%nc_Ntime-1
+               flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
+            end do
+           flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
+         end if
+      end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
@@ -707,7 +710,7 @@ CONTAINS
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_secstep, &
+                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
