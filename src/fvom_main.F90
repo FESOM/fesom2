@@ -15,7 +15,6 @@ USE i_PARAM
 use i_ARRAYS
 use g_clock
 use g_config
-use g_forcing_index
 use g_comm_auto
 use g_forcing_arrays
 use io_RESTART
@@ -104,11 +103,9 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     if (mype==0) write(*,*) 'FESOM start interation before the barrier...'
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
     if (mype==0) write(*,*) 'FESOM start interation after the barrier...'
-    
-    
+   
     !___MODEL TIME STEPPING LOOP________________________________________________
-    do n=1, nsteps
-        
+    do n=1, nsteps        
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='
@@ -120,9 +117,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock
-        call forcing_index
         call compute_vel_nodes 
-        
         !___model sea-ice step__________________________________________________
         if(use_ice) then
             call ocean2ice
@@ -177,7 +172,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
         write(*,*) '    runtime ice   : ',mrtime_ice/npes, ' sec'
         write(*,*) '    runtime total : ',mrtime_tot/npes, ' sec'
     end if     
-    call clock_finish  
+!   call clock_finish  
     call par_ex
 end program main
     
