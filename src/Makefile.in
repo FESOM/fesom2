@@ -1,11 +1,13 @@
 # Compiler and Linker
-CC = mpiicc 
-FC = mpiifort 
+# CC = mpiicc 
+# FC = mpiifort 
+CC=mpiicc
+FC=mpiifort
 LD = $(FC)
 
 # Optimization specs for compiler
-OPT  = -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -implicitnone -traceback -fopenmp #-fpe:0 #-g -debug -check all
-COPT = -O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude -xHost -traceback
+OPT  =  -r8 -i4 -O3 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -implicitnone -traceback -g -fopenmp # -tcollect -trace ## -fpe0 -debug -check all -check noarg_temp_created #-fpe:0 #-g -debug -check all
+COPT =  -r8 -i4 -O3 -xHost  # -g -fbounds-check  -fopenmp -fbacktrace -ffree-line-length-none #-O3 -DLINUX -DUNDER_ -DMPI2 -Iinclude -xHost -traceback
 ######################################################
 # Include path for MPI header file
 MPIROOT            = 
@@ -15,7 +17,7 @@ MPI_INCLUDE        =
 # NetCDF library and include definitions
 #    (use 'module load netcdf')
 NCDIR   = # /opt/cray/netcdf/4.3.0/INTEL/130
-NCLIB   = -L$(NETCDF_DIR)/lib -lnetcdff -lnetcdf 
+NCLIB   = -L$(NETCDF_DIR)/lib -Wl,-rpath,$(NETCDF_DIR)/lib -lnetcdff -lnetcdf 
 NCINC   = -I$(NETCDF_DIR)/include
 
 # Definition of LAPACK include and library (if not provided by FoSSI)
