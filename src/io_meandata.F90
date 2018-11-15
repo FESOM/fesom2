@@ -462,9 +462,11 @@ subroutine update_means
 !_____________ compute in 8 byte accuracy _________________________
      if (entry%accuracy == i_real8) then
         if (entry%ndim==1) then 
-           entry%local_values_r8(:,1) = entry%local_values_r8(:,1) + entry%ptr2(:)
+           entry%local_values_r8(1:entry%lcsize(1),1) = &
+           entry%local_values_r8(1:entry%lcsize(1),1) + entry%ptr2(1:entry%lcsize(1))
         elseif (entry%ndim==2) then 
-           entry%local_values_r8(:,:) = entry%local_values_r8(:,:) + entry%ptr3(:,:)
+           entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) = &
+           entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
         else
            if (mype==0) write(*,*) 'not supported size in update_means'
            call par_ex
@@ -474,9 +476,12 @@ subroutine update_means
 !_____________ compute in 4 byte accuracy _________________________
      elseif (entry%accuracy == i_real4 .or. entry%accuracy == i_int2) then
         if (entry%ndim==1) then 
-           entry%local_values_r4(:,1) = entry%local_values_r4(:,1) + real(entry%ptr2(:),real32)
+           entry%local_values_r4(1:entry%lcsize(1),1) = &
+           entry%local_values_r4(1:entry%lcsize(1),1) + real(entry%ptr2(1:entry%lcsize(1)),real32)
         elseif (entry%ndim==2) then 
-           entry%local_values_r4(:,:) = entry%local_values_r4(:,:) + real(entry%ptr3(:,:),real32)
+           entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) = &
+           entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) + &
+                 real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
         else
            if (mype==0) write(*,*) 'not supported size in update_means'
            call par_ex
