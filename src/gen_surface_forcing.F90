@@ -862,12 +862,7 @@ CONTAINS
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
 
-      nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
-      t_indx   =>sbc_flfi(fld_idx)%t_indx
-      t_indx_p1=>sbc_flfi(fld_idx)%t_indx_p1
-      nc_time  =>sbc_flfi(fld_idx)%nc_time
-
-
+     
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
