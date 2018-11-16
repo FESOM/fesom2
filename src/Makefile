@@ -37,7 +37,8 @@ MODULES = oce_modules.o \
           io_restart.o \
           io_blowup.o \
           io_mesh_info.o \
-          gen_ic3d.o
+          gen_ic3d.o \
+	  gen_surface_forcing.o 
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\

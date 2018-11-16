@@ -73,15 +73,11 @@ int parms_VecScale(FLOAT *self, FLOAT scalar, parms_Map map)
   int lsize, i;
 
   lsize = parms_MapGetLocalSize(map);
-#ifdef HAS_BLAS
-  i = 1;
-  GSCAL(lsize, scalar, self, i);
-#else
   for (i = 0; i < lsize; i++) 
   {
     self[i] *= scalar;
   }
-#endif 
+
   return 0;
 }
 
@@ -101,15 +97,12 @@ int parms_VecAXPY(FLOAT *self, FLOAT *x, FLOAT scalar, parms_Map map)
 
   lsize = parms_MapGetLocalSize(map);
 
-#ifdef HAS_BLAS
-  i = 1;
-  GAXPY(lsize, scalar, x, i, self, i);
-#else
+
   for (i = 0; i < lsize; i++) 
  {
     self[i] += scalar * x[i];
   }
-#endif 
+
 
   return 0;
 }
@@ -128,18 +121,10 @@ int parms_VecAYPX(FLOAT *self, FLOAT *x, FLOAT scalar, parms_Map map)
   int lsize, i;
   lsize = parms_MapGetLocalSize(map);
 
-#ifdef HAS_BLAS
-  FLOAT  t;
-  i = 1;
-  t = 1.0;
-  GSCAL(lsize, scalar, self, i);
-  GAXPY(lsize, t, x, i, self, i);
-#else
-
   for (i = 0; i < lsize; i++) {
     self[i] = scalar * self[i] + x[i];
   }
-#endif 
+
   return 0;
 }
 
@@ -151,17 +136,6 @@ static int vec_LDot(FLOAT *self, FLOAT *x, FLOAT *value, parms_Map map)
   int lsize, i;
 
   lsize = parms_MapGetLocalSize(map);
-#ifdef HAS_BLAS
-
-#if defined(DBL_CMPLX)
-  i = 1;
-  *value = GDOTU(lsize, self, i, x, i);
-#else
-  i = 1;
-  *value = GDOT(lsize, self, i, x, i);
-#endif
-
-#else 
 
 #if defined(DBL_CMPLX)
   FLOAT dot = 0.0 + 0.0*I;
@@ -175,7 +149,7 @@ static int vec_LDot(FLOAT *self, FLOAT *x, FLOAT *value, parms_Map map)
 #endif
 
   *value = dot;
-#endif 
+
 
   return 0;
 }
@@ -187,18 +161,6 @@ static int vec_LDotc(FLOAT *self, FLOAT *x, FLOAT *value, parms_Map map)
   int lsize, i;
 
   lsize = parms_MapGetLocalSize(map);
-
-#ifdef HAS_BLAS
-
-#if defined(DBL_CMPLX)
-  i = 1;
-  *value = GDOTC(lsize, self, i, x, i);
-#else
-  i = 1;
-  *value = GDOT(lsize, self, i, x, i);
-#endif
-
-#else 
 
 #if defined(DBL_CMPLX)
   FLOAT dot = 0.0 + 0.0*I;
@@ -212,7 +174,6 @@ static int vec_LDotc(FLOAT *self, FLOAT *x, FLOAT *value, parms_Map map)
 #endif
 
   *value = dot;
-#endif 
 
   return 0;
 }
@@ -309,16 +270,12 @@ int parms_VecGetNorm2(FLOAT *self, REAL *value, parms_Map is)
 { 
 
   if (is->isserial) {
-#ifdef HAS_BLAS
-    int lsize = parms_MapGetLocalSize(is);
-    int incr = 1;
-    *value = GNRM2(lsize, self, incr);
-#else
+
     FLOAT dot;
     vec_LDotc(self, self, &dot, is);
     *value = ABS_VALUE(dot);
     *value = sqrt(*value);
-#endif 
+
   }
   else {
     REAL dot;
