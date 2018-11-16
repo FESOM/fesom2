@@ -31,7 +31,7 @@ OBJ1	=    ./src/parms_comm.o  \
              ./src/parms_table.o ./src/parms_timer.o  \
              ./src/parms_vec.o ./src/parms_viewer.o \
 	     ./src/fgmres.o ./src/bicgstab.o ./src/cg.o ./src/pbicgstab.o \
-             ./src/pbicgstab_ras.o ./src/bicgstab_ras.o\
+	     ./src/pbicgstab_ras.o ./src/bicgstab_ras.o\
              ./src/gmres.o ./src/parms_complex.o 
 #$(HYPRE_OBJ) \
 
@@ -52,7 +52,7 @@ $(LIB): $(OBJ)
 	if [ ! -d lib ]; then \
 	  mkdir lib; \
 	fi
-	$(AR) $(ARFLAGS) $(LIB) $(OBJ) 
+	$(AR) $(LIB) $(OBJ) 
 
 .c.o:
 	${CC} ${ICFLAGS} ${ISRCINC} $(COPT) \
