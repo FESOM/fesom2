@@ -31,7 +31,6 @@ end program main
 
 subroutine main_initialize(nsteps)
   ! Split main into three major parts
-  ! Coded by Thomas Rackow, 2018
   !----------------------------------
   USE g_PARSUP, only: mype, par_init
   USE i_PARAM,  only: ice_ave_steps, whichEVP
