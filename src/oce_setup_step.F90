@@ -120,6 +120,7 @@ allocate(Visc(nl-1, elem_size))
 ! elevation and its rhs
 ! ================
 allocate(eta_n(node_size), d_eta(node_size))
+d_eta(:)=0.0
 allocate(ssh_rhs(node_size))
 ! ================
 ! Monin-Obukhov

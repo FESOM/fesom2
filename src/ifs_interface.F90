@@ -36,6 +36,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! FESOM might perform substeps
    INTEGER :: itend_fesom
    INTEGER :: substeps !per IFS timestep
+   INTEGER :: i
 
    ! TODO hard-coded here, put in namelist
    substeps=2
@@ -163,7 +164,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    
    ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
    omask(:)= 1			! all points are ocean points
-   ogloind = myList_nod2D	! global index for local point number
+   ogloind(1:myDim_nod2d)= myList_nod2D(1:myDim_nod2d)	! global index for local point number
 
    ! Could be helpful later:
    ! Replace global numbering with a local one
@@ -238,7 +239,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ALLOCATE(omask(MAX(nopoints,1)),ogloind(MAX(nopoints,1)))
 
    omask(:)= 1			! all elements are in the ocean 	
-   ogloind = myList_elem2D	! global index for local element number
+   ogloind(1:myDim_elem2D) = myList_elem2D(1:myDim_elem2D) ! global index for local element number
 
    ! Read the interpolation weights and setup the parallel interpolation
    ! from atmosphere Gaussian grid to ocean UV-grid
@@ -338,7 +339,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    REAL(wp)			     :: rlon, rlat	
 
    ! Loop variables
-   INTEGER :: n, elem
+   INTEGER :: n, elem, ierr
 
 
    ! =================================================================== !
@@ -421,6 +422,11 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    end do
 
+#ifdef FESOM_TODO
+
+   ! We need to sort out the non-unique global index before we
+   ! can couple currents
+
    ! Interpolate: 'pgucur' and 'pgvcur' on Gaussian grid.
    CALL parinter_fld( mype, npes, icomm, UVtogauss, &
       &               myDim_elem2D, zsendU, &
@@ -429,6 +435,13 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    CALL parinter_fld( mype, npes, icomm, UVtogauss, &
       &               myDim_elem2D, zsendV, &
       &               nopoints, pgvcur )
+
+#else
+
+   pgucur(:) = 0.0
+   pgvcur(:) = 0.0
+
+#endif
 
 #ifndef FESOM_TODO
 
