@@ -50,18 +50,14 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    READ(9,namfesomstep)
    CLOSE(9)
 
+   MPI_COMM_FESOM=icomm
+   itini = 1
+   CALL main_initialize(itend_fesom) !also sets mype and npes 
+   itend=itend_fesom/substeps
    if(mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! FESOM is initialized from within IFS.'
-
    WRITE(0,*)'! get MPI_COMM_FESOM. ================='
-   endif
-   MPI_COMM_FESOM=icomm
-
-   itini = 1
-   CALL main_initialize(itend_fesom) !also sets mype and npes
-   itend=itend_fesom/substeps
-   if(mype==0) then
    WRITE(0,*)'! main_initialize done. ==============='
    endif
 
@@ -1458,11 +1454,15 @@ END SUBROUTINE nemogcmcoup_step
 
 SUBROUTINE nemogcmcoup_final
 
+   USE g_PARSUP, only: mype
+
    ! Finalize the FESOM model
 
    IMPLICIT NONE
 
+   if(mype==0) then
    WRITE(*,*)'Finalization of FESOM from IFS.'
+   endif
    CALL main_finalize
 
 END SUBROUTINE nemogcmcoup_final
