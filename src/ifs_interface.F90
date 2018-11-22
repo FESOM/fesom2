@@ -6,15 +6,21 @@
 ! -Adapted to FESOM2 by Thomas Rackow, AWI, 2018.
 !-----------------------------------------------------
 
+MODULE nemogcmcoup_steps
+   INTEGER :: substeps !per IFS timestep
+END MODULE nemogcmcoup_steps
+
 SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    & lwaveonly, iatmunit, lwrite )
 
    ! Initialize the FESOM model for single executable coupling 
 
    USE par_kind !in ifs_modules.F90
-   USE g_PARSUP, only: MPI_COMM_FESOM
+   USE g_PARSUP, only: MPI_COMM_FESOM, mype
    USE g_config, only: dt
    USE g_clock, only: timenew, daynew, yearnew, month, day_in_month
+   USE nemogcmcoup_steps, ONLY : substeps
+
    IMPLICIT NONE
 
    ! Input arguments
@@ -35,34 +41,46 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    LOGICAL :: lwrite
    ! FESOM might perform substeps
    INTEGER :: itend_fesom
-   INTEGER :: substeps !per IFS timestep
    INTEGER :: i
+   NAMELIST/namfesomstep/substeps
 
    ! TODO hard-coded here, put in namelist
    substeps=2
+   OPEN(9,file='namfesomstep.in')
+   READ(9,namfesomstep)
+   CLOSE(9)
 
+   if(mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! FESOM is initialized from within IFS.'
 
    WRITE(0,*)'! get MPI_COMM_FESOM. ================='
+   endif
    MPI_COMM_FESOM=icomm
 
    itini = 1
    CALL main_initialize(itend_fesom) !also sets mype and npes
    itend=itend_fesom/substeps
+   if(mype==0) then
    WRITE(0,*)'! main_initialize done. ==============='
+   endif
 
    ! Set more information for the caller
    
    ! initial date and time (time is not used)
    inidate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
    initime = 0
+   if(mype==0) then
    WRITE(0,*)'! FESOM initial date is ', inidate ,' ======'
-   
+   WRITE(0,*)'! FESOM substeps are ', substeps ,' ======'
+   endif
+
    ! fesom timestep (as seen by IFS)
-   zstp = real(substeps,wp)*dt
+   zstp = REAL(substeps,wp)*dt
+   if(mype==0) then
    WRITE(0,*)'! FESOM timestep as seen by IFS is ', real(zstp,4), 'sec (',substeps,'xdt)'
    WRITE(0,*)'!======================================'
+   endif
 
 END SUBROUTINE nemogcmcoup_init
 
@@ -153,10 +171,13 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
       &                mpi_integer, mpi_sum, icomm, ierr)
 
 
+   if(mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! SCALARS ============================='
 
    WRITE(0,*)'Update FESOM global scalar points'
+   endif
+
    noglopoints=nod2D
    nopoints=myDim_nod2d
 
@@ -227,10 +248,12 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    DEALLOCATE(omask,ogloind)
 
 
+   if(mype==0) then
    WRITE(0,*)'!======================================'
    WRITE(0,*)'! VECTORS ============================='
 
    WRITE(0,*)'Update FESOM global vector points'
+   endif
    noglopoints=elem2D
    nopoints=myDim_elem2D
 
@@ -445,7 +468,9 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
 #ifndef FESOM_TODO
 
+   if(mype==0) then
    WRITE(0,*)'Everything implemented except ice level temperatures (licelvls).'
+   endif
 
 #else
 
@@ -1391,6 +1416,8 @@ END SUBROUTINE nemogcmcoup_lim2_update
 SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
 
    USE g_clock, only: yearnew, month, day_in_month
+   USE g_PARSUP, only: mype
+   USE nemogcmcoup_steps, ONLY : substeps
    IMPLICIT NONE
 
    ! Arguments
@@ -1401,13 +1428,9 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    ! Data and time from NEMO
    INTEGER, INTENT(OUT) :: icdate, ictime
 
-   ! Local variables
-   INTEGER		:: substeps
-
-   ! Advance the FESOM model 2 time steps here, still hard-coded
-   substeps=2
-
+   if(mype==0) then
    WRITE(0,*)'! IFS at timestep ', istp, '. Do ', substeps , 'FESOM timesteps...'
+   endif
    CALL main_timestepping(substeps)
 
    ! Compute date and time at the end of the time step
@@ -1415,7 +1438,9 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    icdate = yearnew*10000 + month*100 + day_in_month ! e.g. 20170906
    ictime = 0 ! (time is not used)
 
+   if(mype==0) then
    WRITE(0,*)'! FESOM date at end of timestep is ', icdate ,' ======'
+   endif
 
 #ifdef FESOM_TODO
    iye = ndastp / 10000
