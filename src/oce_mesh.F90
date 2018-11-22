@@ -175,13 +175,13 @@ IMPLICIT NONE
            read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
             !___________________________________________________________________
             ! check if input mesh is already rotated --> force_rotation flag == .False.
-            if (force_rotation==.True. .and. & 
+            if (force_rotation .and. & 
                (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
                 rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
                 flag_checkisrot = 1
             !___________________________________________________________________
             ! check if input mesh is already unrotated --> force_rotation flag ==.True.
-            elseif (force_rotation==.False. .and. & 
+            elseif ((.not. force_rotation) .and. & 
                (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
                 rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
                 flag_checkmustrot = 0
@@ -214,7 +214,7 @@ IMPLICIT NONE
     
     !___________________________________________________________________________
     ! check if rotation is applied to an already rotated mesh
-    if ((mype==0) .and. (force_rotation==.True.) .and. (flag_checkisrot==1)) then
+    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1)) then
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: Your input mesh seems to be rotated and you try to' 
         write(*,*) '        rotate it again in FESOM (force_rotation=.true. ) !'
@@ -231,7 +231,7 @@ IMPLICIT NONE
         call par_ex(0)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
-    elseif ((mype==0) .and. (force_rotation==.False.) .and. (flag_checkmustrot==1)) then
+    elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1)) then
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: Your input mesh seems to be unrotated this requires'
         write(*,*) '        that it is rotated in FESOM, but you set force_rotation=.False'

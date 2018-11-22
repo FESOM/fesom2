@@ -33,11 +33,12 @@ MODULES = oce_modules.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
 	  fort_part.o \
-          gen_input.o \
           io_meandata.o \
           io_restart.o \
           io_blowup.o \
-          io_mesh_info.o
+          io_mesh_info.o \
+          gen_ic3d.o \
+	  gen_surface_forcing.o 
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\
@@ -54,6 +55,8 @@ OBJECTS=  fvom_main.o 		\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\
           oce_ale_tracer.o 	\
+          oce_mo_conv.o         \
+          oce_spp.o             \
           ice_EVP.o             \
           ice_maEVP.o 		\
           ice_setup_step.o 	\

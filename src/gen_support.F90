@@ -274,7 +274,7 @@ subroutine extrap_nod3D(arr)
   real(kind=WP)                  :: val
   integer                        :: enodes(3)
   logical                        :: success
-  real(kind=WP), allocatable     :: loc_max, glob_max
+  real(kind=WP)                  :: loc_max, glob_max
 
 
   allocate(work_array(myDim_nod2D+eDim_nod2D))
