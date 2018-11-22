@@ -655,7 +655,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
       &               myDim_nod2D, zrecv )
    
    ! Unpack total evaporation, without halo
-   evap_no_ifrac(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   evap_no_ifrac(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(evap_no_ifrac)
@@ -666,7 +666,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
       &               myDim_nod2D, zrecv )
    
    ! Unpack sublimation (evaporation over ice), without halo
-   sublimation(1:myDim_nod2D)=zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s
+   sublimation(1:myDim_nod2D)=-zrecv(1:myDim_nod2D)/rhofwt	! kg m^(-2) s^(-1) -> m/s; change sign
 
    ! Do the halo exchange
    call exchange_nod(sublimation)
