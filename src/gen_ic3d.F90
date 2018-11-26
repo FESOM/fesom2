@@ -23,9 +23,9 @@ MODULE g_ic3d
 
    include 'netcdf.inc'
 
-   public  do_ic3d, &                                     ! read and apply 3D initial conditions
-           n_ic3d, idlist, filelist, varlist, oce_init3d  ! to be read from the namelist
-      
+   public  do_ic3d, &                                       ! read and apply 3D initial conditions
+           n_ic3d, idlist, filelist, varlist, oce_init3d, & ! to be read from the namelist
+           t_insitu
    private
 
 ! namelists
@@ -33,12 +33,13 @@ MODULE g_ic3d
 !============== namelistatmdata variables ================
    integer, parameter                           :: ic_max=10
    logical                                      :: ic_cyclic=.true.
+   logical                                      :: t_insitu =.true.
    integer,        save                         :: n_ic3d
    integer,        save,  dimension(ic_max)     :: idlist
    character(256), save,  dimension(ic_max)     :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / oce_init3d / n_ic3d, idlist, filelist, varlist 
+   namelist / oce_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
 
    character(256), save                         :: filename
    character(50),  save                         :: varname
@@ -168,6 +169,7 @@ CONTAINS
          nf_start(1)=1
          nf_edges(1)=nc_Ndepth
          iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
+         if (nc_depth(2) < 0.) nc_depth=-nc_depth
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename)
@@ -280,9 +282,12 @@ CONTAINS
          nf_start(3)=1
          nf_edges(3)=nc_Ndepth         
          iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
+         ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
+         ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
+         where (ncdata < -0.99*dummy ) ! dummy values are only positive
+                ncdata = dummy
+         end where
       end if
-      ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
-      ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
       call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
@@ -312,7 +317,7 @@ CONTAINS
                        ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
          do k= 1, nl1
             call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
-            if ( d_indx < nc_Ndepth ) then
+            if ( d_indx < nc_Ndepth .and. d_indx > 0) then
                d_indx_p1 = d_indx+1
                delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
                ! values from OB data for nearest depth           
@@ -325,6 +330,8 @@ CONTAINS
                cf_b  = d1 - cf_a * nc_depth(d_indx)
                tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
                end if
+            elseif (d_indx==0) then
+               tr_arr(k,ii,current_tracer)=data1d(1)
             end if
          enddo
          end if
@@ -368,10 +375,19 @@ CONTAINS
       END DO
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
+
       where (tr_arr > 0.9*dummy)
             tr_arr=0.
       end where
-      call insitu2pot
+
+      where (tr_arr(:,:,1) > 100.)
+         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15
+      end where
+
+      if (t_insitu) then
+         if (mype==0) write(*,*) "converting insitu temperature to potential..."
+         call insitu2pot
+      end if
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    
    END SUBROUTINE do_ic3d

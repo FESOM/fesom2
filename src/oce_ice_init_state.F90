@@ -450,7 +450,6 @@ subroutine init_fields_na_test
   ! Fix for too low salinity
   where (tr_arr(:,:,2)<20.4)
      tr_arr(:,:,2)=20.4
-     
   end where
 end subroutine init_fields_na_test  
 ! ================================================================  
