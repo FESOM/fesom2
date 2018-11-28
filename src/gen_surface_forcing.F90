@@ -200,7 +200,8 @@ CONTAINS
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
          if     (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
-         elseif (iost .ne. NF_NOERR) then
+         end if
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
       end if
@@ -210,7 +211,8 @@ CONTAINS
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
          if      (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
-         elseif (iost .ne. NF_NOERR) then
+         end if
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lon",       id_lond)
          end if
       end if
@@ -227,21 +229,23 @@ CONTAINS
 
       ! get variable id
       if (mype==0) then
-         iost = nf_inq_varid(ncid,    "LON",       id_lon)
-         if      (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "longitude", id_lon)
-         elseif (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lon",       id_lon)
+         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
+         if     (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lat",      id_lat)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "latitude", id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
       if (mype==0) then
-         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
-         if     (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lat",      id_lat)
-         elseif (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "latitude", id_lat)
+         iost = nf_inq_varid(ncid,    "LON",       id_lon)
+         if      (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "longitude", id_lon)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lon",       id_lon)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
