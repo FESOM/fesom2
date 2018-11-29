@@ -337,8 +337,12 @@ CONTAINS
                   
          ! if point inside forcing domain
          denom = (x2 - x1)*(y2 - y1)
-         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)    * (x-x1)*(y2-y) + &
-                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
+         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
+                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
+         where (ncdata(i,j,:)   > 0.99*dummy .OR. ncdata(ip1,j,:)   > 0.99*dummy .OR. &
+                ncdata(i,jp1,:) > 0.99*dummy .OR. ncdata(ip1,jp1,:) > 0.99*dummy)
+            data1d(:)=dummy
+         end where          
          do k= 1, nl1
             call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
             if ( d_indx < nc_Ndepth .and. d_indx > 0) then
