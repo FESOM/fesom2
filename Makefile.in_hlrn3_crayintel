@@ -1,8 +1,9 @@
 
 # Compiler and Linker
 CC = cc 
-FC = ftn 
-LD = $(FC)
+MPICC = cc 
+MPIFC = ftn
+LD = $(MPIFC)
 
 # Optimization specs for compiler - used for FESOM an parms.
 # Metis falls back to conservative and non-compiler specific -O2, as

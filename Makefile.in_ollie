@@ -1,8 +1,9 @@
 
 # Compiler and Linker
-CC = mpiicc 
-FC = mpiifort 
-LD = $(FC)
+CC = icc
+MPICC = mpiicc 
+MPIFC = mpiifort 
+LD = $(MPIFC)
 
 # Optimization specs for compiler - used for FESOM an parms.
 # Metis falls back to conservative and non-compiler specific -O2, as
