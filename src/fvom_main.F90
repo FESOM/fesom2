@@ -219,9 +219,9 @@ real(kind=real32) :: runtime_alltimesteps
     mean_rtime(8)  = rtime_ice         
     mean_rtime(9)  = rtime_tot  
     mean_rtime(10) = rtime_fullice 
-    mean_rtime(10) = rtime_compute_diag
-    mean_rtime(10) = rtime_write_means
-    mean_rtime(10) = rtime_write_restart
+    mean_rtime(11) = rtime_compute_diag
+    mean_rtime(12) = rtime_write_means
+    mean_rtime(13) = rtime_write_restart
     
 
     max_rtime(1:13) = mean_rtime(1:13)
