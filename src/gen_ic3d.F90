@@ -90,12 +90,24 @@ CONTAINS
 
       ! get dimensions
       if (mype==0) then
-         iost = nf_inq_dimid(ncid, "lat", id_latd)
+         iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lat",      id_latd)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "latitude", id_latd)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)  
+      call check_nferr(iost,filename)
       if (mype==0) then 
-         iost = nf_inq_dimid(ncid, "lon", id_lond)
+         iost = nf_inq_dimid(ncid,    "LON",       id_lond)
+         if      (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "longitude", id_lond)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename) 
@@ -106,13 +118,25 @@ CONTAINS
       call check_nferr(iost,filename)  
 
       ! get variable id
-      if (mype==0) then
-         iost = nf_inq_varid(ncid, "lon", id_lon)
-      end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
       if (mype==0) then
-         iost = nf_inq_varid(ncid, "lat", id_lat)
+         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
+         if     (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lat",      id_lat)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "latitude", id_lat)
+         end if
+      end if
+      if (mype==0) then
+         iost = nf_inq_varid(ncid,    "LON",       id_lon)
+         if      (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "longitude", id_lon)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "lon",       id_lon)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)  
@@ -313,8 +337,12 @@ CONTAINS
                   
          ! if point inside forcing domain
          denom = (x2 - x1)*(y2 - y1)
-         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)    * (x-x1)*(y2-y) + &
-                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom          
+         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
+                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
+         where (ncdata(i,j,:)   > 0.99*dummy .OR. ncdata(ip1,j,:)   > 0.99*dummy .OR. &
+                ncdata(i,jp1,:) > 0.99*dummy .OR. ncdata(ip1,jp1,:) > 0.99*dummy)
+            data1d(:)=dummy
+         end where          
          do k= 1, nl1
             call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
             if ( d_indx < nc_Ndepth .and. d_indx > 0) then

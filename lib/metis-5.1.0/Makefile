@@ -1,3 +1,5 @@
+
+include ../../Makefile.in
 include Makefile.in
 
 libmetis.a:

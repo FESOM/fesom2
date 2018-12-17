@@ -3,7 +3,7 @@
 # this makefile will make the library -- for testing PARARMS -- go to
 # examples/grid or examples/general and see README files..
 
-include Makefile.in
+include ../../Makefile.in
 
 # path of the header files of pARMS
 ICFLAGS			=	-I./include $(MPI_INC)
@@ -55,7 +55,7 @@ $(LIB): $(OBJ)
 	$(AR) $(LIB) $(OBJ) 
 
 .c.o:
-	${CC} ${ICFLAGS} ${ISRCINC} $(COPT) \
+	${MPICC} ${ICFLAGS} ${ISRCINC} $(COPT) \
 	${PARMS_DEFS} $< -c -o $@
 
 cleanall: 
