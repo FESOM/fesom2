@@ -310,7 +310,7 @@ CONTAINS
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
       if (nm_nc_tmid/=1) then
@@ -533,15 +533,23 @@ CONTAINS
          t_indx_p1 = t_indx + 1
          delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
       elseif (t_indx > 0) then ! NO extrapolation to future
-         t_indx    =nc_Ntime
+         t_indx    = nc_Ntime
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
+         if (mype==0) then
+            write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
+            write(*,*) file_name
+            write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
+         end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
-         if (mype==0) write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
+         if (mype==0) then 
+            write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
+            write(*,*) file_name
+            write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
+         end if
       end if
       !open file sbc_flfi
       if (mype==0) then
@@ -725,7 +733,7 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
-      rdate = real(julday(nm_nc_iyear,1,1))
+      rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1)+timenew/86400.
       idate = int(rdate)
 
