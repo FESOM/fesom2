@@ -27,10 +27,15 @@ use cpl_driver
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
-real(kind=WP) :: mrtime_ice=0.0,mrtime_oce=0.0,mrtime_tot=0.0
-real(kind=WP) :: mrtime_oce_dyn=0.0, mrtime_oce_dynssh=0.0, mrtime_oce_solvessh=0.0 
-real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixpres=0.0
+real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice
+real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag
+real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
+real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
+real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
+real(kind=real32) :: runtime_alltimesteps
   
+
+
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -38,6 +43,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     call MPI_INIT(i) 
 #endif
 
+    t1 = MPI_Wtime()
 
 #if defined (__oasis)
     call cpl_oasis3mct_init(MPI_COMM_FESOM)
@@ -61,23 +67,29 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     ! fancy advection etc.  
     !=====================
     call check_mesh_consistency
+    if (mype==0) t2=MPI_Wtime()
     call ocean_setup
-    if (mype==0) write(*,*) 'FESOM ocean_setup... complete'
+    if (mype==0) then
+       write(*,*) 'FESOM ocean_setup... complete'
+       t3=MPI_Wtime()
+    endif
     call forcing_setup
+    if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
         call ice_setup
         ice_steps_since_upd = ice_ave_steps-1
         ice_update=.true.
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
     endif
+    if (mype==0) t5=MPI_Wtime()
     call compute_diagnostics(0) ! allocate arrays for diagnostic
 #if defined (__oasis)
     call cpl_oasis3mct_define_unstr
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
     
-
     call clock_newyear                        ! check if it is a new year
+    if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
     ! The interface to the restart module is made via call restart !
     ! The inputs are: istep, l_write, l_create
@@ -86,6 +98,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
     call restart(0, .false., r_restart) ! istep, l_write, l_read
+    if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
     if (.not. r_restart) call write_mesh_info
@@ -95,14 +108,46 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
     if (r_restart .and. use_ALE) then
         call restart_thickness_ale
     end if
+
+    if (mype==0) then
+       t8=MPI_Wtime()
     
-    
+       rtime_setup_mesh    = real( t2 - t1              ,real32)
+       rtime_setup_ocean   = real( t3 - t2              ,real32)
+       rtime_setup_forcing = real( t4 - t3              ,real32)
+       rtime_setup_ice     = real( t5 - t4              ,real32)
+       rtime_setup_restart = real( t7 - t6              ,real32)
+       rtime_setup_other   = real((t8 - t7) + (t6 - t5) ,real32)
+
+       write(*,*) '=========================================='
+       write(*,*) 'MODEL SETUP took on mype=0 [seconds]      '
+       write(*,*) 'runtime setup total      ',real(t8-t1,real32)      
+       write(*,*) ' > runtime setup mesh    ',rtime_setup_mesh   
+       write(*,*) ' > runtime setup ocean   ',rtime_setup_ocean  
+       write(*,*) ' > runtime setup forcing ',rtime_setup_forcing
+       write(*,*) ' > runtime setup ice     ',rtime_setup_ice    
+       write(*,*) ' > runtime setup restart ',rtime_setup_restart
+       write(*,*) ' > runtime setup other   ',rtime_setup_other 
+        write(*,*) '============================================' 
+    endif
+
     !=====================
     ! Time stepping
     !=====================
-    if (mype==0) write(*,*) 'FESOM start interation before the barrier...'
+
+! Initialize timers
+    rtime_fullice       = 0._WP
+    rtime_write_restart = 0._WP
+    rtime_write_means   = 0._WP
+    rtime_compute_diag  = 0._WP
+
+    if (mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
-    if (mype==0) write(*,*) 'FESOM start interation after the barrier...'
+    
+    if (mype==0) then
+       write(*,*) 'FESOM start iteration after the barrier...'
+       t0 = MPI_Wtime()
+    endif
    
     !___MODEL TIME STEPPING LOOP________________________________________________
     do n=1, nsteps        
@@ -119,6 +164,7 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
         call clock
         call compute_vel_nodes 
         !___model sea-ice step__________________________________________________
+        t1 = MPI_Wtime()
         if(use_ice) then
             call ocean2ice
             call update_atm_forcing(n)
@@ -136,42 +182,79 @@ real(kind=WP) :: mrtime_oce_solvetra=0.0, mrtime_oce_GMRedi=0.0, mrtime_oce_mixp
             call oce_fluxes_mom ! momentum only
             call oce_fluxes
         end if  
+        t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
         call oce_timestep_ale(n)
+        t3 = MPI_Wtime()
         call compute_diagnostics(1)
-        
+        t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         call output (n)
+        t5 = MPI_Wtime()
         call restart(n, .false., .false.)
-        
+        t6 = MPI_Wtime()
+        rtime_fullice       = rtime_fullice       + t2 - t1
+        rtime_compute_diag  = rtime_compute_diag  + t4 - t3
+        rtime_write_means   = rtime_write_means   + t5 - t4   
+        rtime_write_restart = rtime_write_restart + t6 - t5
     end do
     
     !___FINISH MODEL RUN________________________________________________________
-    if (mype==0) write(*,*) 'FESOM Run is finished, updating clock'
-    
-    ! average ocean, ice and total runtime over all cpus
-    call MPI_AllREDUCE(rtime_oce         , mrtime_oce         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_mixpres , mrtime_oce_mixpres , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_dyn     , mrtime_oce_dyn     , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_dynssh  , mrtime_oce_dynssh  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_solvessh, mrtime_oce_solvessh, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_GMRedi  , mrtime_oce_GMRedi  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_oce_solvetra, mrtime_oce_solvetra, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_ice         , mrtime_ice         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(rtime_tot         , mrtime_tot         , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+    call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
     if (mype==0) then
-        write(*,*) '___MODEL RUNTIME [seconds]_____________________________'
-        write(*,*) '    runtime ocean : ',mrtime_oce/npes, ' sec'
-        write(*,*) '      > runtime oce. mix,pres... : ',mrtime_oce_mixpres/npes, ' sec'
-        write(*,*) '      > runtime oce. dyn. u,v,w  : ',mrtime_oce_dyn/npes, ' sec'
-        write(*,*) '      > runtime oce. dyn. ssh    : ',mrtime_oce_dynssh/npes, ' sec'
-        write(*,*) '          > runtime oce. solve ssh  : ',mrtime_oce_solvessh/npes, ' sec'
-        write(*,*) '      > runtime oce. GM/Redi     : ',mrtime_oce_GMRedi/npes, ' sec'
-        write(*,*) '      > runtime oce. solve tracer: ',mrtime_oce_solvetra/npes, ' sec'
-        write(*,*) '    runtime ice   : ',mrtime_ice/npes, ' sec'
-        write(*,*) '    runtime total : ',mrtime_tot/npes, ' sec'
-    end if     
+       t1 = MPI_Wtime()
+       runtime_alltimesteps = real(t1-t0,real32)
+       write(*,*) 'FESOM Run is finished, updating clock'
+    endif
+    
+    mean_rtime(1)  = rtime_oce         
+    mean_rtime(2)  = rtime_oce_mixpres 
+    mean_rtime(3)  = rtime_oce_dyn     
+    mean_rtime(4)  = rtime_oce_dynssh  
+    mean_rtime(5)  = rtime_oce_solvessh
+    mean_rtime(6)  = rtime_oce_GMRedi  
+    mean_rtime(7)  = rtime_oce_solvetra
+    mean_rtime(8)  = rtime_ice         
+    mean_rtime(9)  = rtime_tot  
+    mean_rtime(10) = rtime_fullice 
+    mean_rtime(11) = rtime_compute_diag
+    mean_rtime(12) = rtime_write_means
+    mean_rtime(13) = rtime_write_restart
+    
+
+    max_rtime(1:13) = mean_rtime(1:13)
+    min_rtime(1:13) = mean_rtime(1:13)
+
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 13, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    mean_rtime(1:13) = mean_rtime(1:13) / real(npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  13, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  13, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+
+    if (mype==0) then
+        write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
+        write(*,*) '  runtime ocean:',mean_rtime(1), min_rtime(1), max_rtime(1)
+        write(*,*) '    > runtime oce. mix,pres. :',mean_rtime(2), min_rtime(2), max_rtime(2)
+        write(*,*) '    > runtime oce. dyn. u,v,w:',mean_rtime(3), min_rtime(3), max_rtime(3)
+        write(*,*) '    > runtime oce. dyn. ssh  :',mean_rtime(4), min_rtime(4), max_rtime(4)
+        write(*,*) '        > runtime oce. solve ssh:',mean_rtime(5), min_rtime(5), max_rtime(5)
+        write(*,*) '    > runtime oce. GM/Redi   :',mean_rtime(6), min_rtime(6), max_rtime(6)
+        write(*,*) '    > runtime oce. tracer    :',mean_rtime(7), min_rtime(7), max_rtime(7)
+        write(*,*) '  runtime ice  :',mean_rtime(10), min_rtime(10), max_rtime(10)
+        write(*,*) '    > runtime ice step :',mean_rtime(8), min_rtime(8), max_rtime(8)
+        write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
+        write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
+        write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
+        write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
+        write(*,*)
+        write(*,*) '============================================'
+        write(*,*) '=========== BENCHMARK RUNTIME =============='
+        write(*,*) '    Number of cores : ',npes
+        write(*,*) '    Runtime for all timesteps : ',runtime_alltimesteps,' sec'
+        write(*,*) '============================================'
+        write(*,*)
+    end if    
 !   call clock_finish  
     call par_ex
 end program main

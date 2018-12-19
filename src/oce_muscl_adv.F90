@@ -82,7 +82,7 @@ USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
-integer                    :: n, k, ednodes(2), elem
+integer                    :: n, k, ednodes(2), elem, el
 real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax
 real(kind=WP), allocatable :: coord_elem(:, :,:), temp(:)
 integer, allocatable       :: temp_i(:), e_nodes(:,:)
@@ -98,7 +98,9 @@ allocate(coord_elem(2,3,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 allocate(temp(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
    DO n=1,3
         DO k=1,2
-           temp(1:myDim_elem2D)=coord_nod2D(k,elem2D_nodes(n,:))
+           do el=1,myDim_elem2D
+              temp(el)=coord_nod2D(k,elem2D_nodes(n,el))
+           end do
 	   call exchange_elem(temp)
 	   coord_elem(k,n,:)=temp(:)
 	END DO
@@ -108,7 +110,9 @@ deallocate(temp)
 allocate(e_nodes(3,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 allocate(temp_i(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
     DO n=1,3
-       temp_i(1:myDim_elem2D)=myList_nod2D(elem2D_nodes(n,:))
+       do el=1,myDim_elem2D
+          temp_i(el)=myList_nod2D(elem2D_nodes(n,el))
+       end do
        call exchange_elem(temp_i)
        e_nodes(n,:)=temp_i(:)
     END DO   
