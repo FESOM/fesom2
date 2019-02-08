@@ -56,7 +56,7 @@ real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff du
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
- character(5)                 :: mix_scheme='KPP'	   !'KPP','PP'
+character(5)                  :: mix_scheme='KPP'	   !'KPP','PP'
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 
@@ -106,10 +106,20 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! *** others ***
  real(kind=WP)                        :: time_sum=0.0 ! for runtime estimate
 
+!___________________________________________
+! Pressure Gradient Force  calculation (pgf) 
+! calculation of pgf either: 
+! > 'nemo'         ... like NEMO (interpolate to elemental depth, inter-/extrapolation)
+! > 'nemomin'      ... like NEMO (interpolate to shallowest nodal depth, only interp.)
+! > 'adcroft'      ... MITGCM like
+! > 'shchepetkin'  ... based on density jacobian
+! > 'cubic-spline' ... like in FESOM1.4
+character(20)                  :: which_pgf='cubic-spline' 
+
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
-                    Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv
+                    Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
 END MODULE o_PARAM  
@@ -322,7 +332,14 @@ real(kind=WP)                               :: is_nonlinfs
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+
+!_______________________________________________________________________________
+!!PS ! dummy arrays
+!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+!!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
+
 !_______________________________________________________________________________
 !Monin-Obukhov correction
 real(kind=WP),allocatable :: mo(:,:),mixlength(:)

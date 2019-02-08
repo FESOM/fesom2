@@ -1,5 +1,6 @@
 # Patrick Scholz, 23.01.2018
 import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -19,6 +20,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         print('')
         print('___PLOT 2D DATA____________________________________________')
     from set_inputarray import inputarray
+    if (data.value.min() == data.value.max()):
+        print(' --> can\'t plot data are everywhere ', data.value.min())
+        sys.exit(' --> STOP HERE!')
+        
     
     if len(figsize)==0 : figsize=[13,13]
     #___________________________________________________________________________
@@ -31,6 +36,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         ax =do_subplot[1]
     resolution = 'c'
     fsize = 14
+    
     
     #+_________________________________________________________________________+
     #| SET PROJECTION PARAMETERS                                               |
@@ -363,7 +369,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
     #ax.get_yaxis().tick_left()
     plt.sca(ax)
-    plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
+    #plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
+    plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     #+_________________________________________________________________________+
     #| SAVE FIGURE                                                             |
     #+_________________________________________________________________________+
@@ -1339,3 +1346,42 @@ def plot_3d_lmaskline(mlab,mesh):
     mlab.pipeline.surface(lines, color=(0,0,0), line_width=1, opacity=.5)
     
     return mlab
+
+
+#_______________________________________________________________________________
+#
+#_______________________________________________________________________________
+def fesom_idxinbox(mesh,data1,inputarray):
+    #___________________________________________________________________________
+    # calculate index of which data points are within boi
+    idxbox_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1])
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2])
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
+    idxbox_e = idxbox_e==False # true index for triangles that are within box 
+    
+    # case of node data
+    if data1.value.size ==mesh.n2dna:
+        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
+    elif data1.value.size ==mesh.n2dea:
+        idx_box = np.ones((mesh.n2dea,),dtype='bool')
+        
+    if data1.value.size ==mesh.n2dna:
+        idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
+        idxbox_n  = np.array(idxbox_n).squeeze()
+        idxbox_n  = np.unique(idxbox_n)
+        idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
+        idx_box[idxbox_n]=True
+        del idxbox_n 
+        del idxbox_e
+    # case of element data
+    elif data1.value.size ==mesh.n2dea:
+        idx_box   = idxbox_e
+        del idxbox_e
+    
+    #___________________________________________________________________________
+    # make triangle mask arrays from flat triangles and nan trinagles
+    if np.any(np.isnan(data1.value)):
+        idx_box = np.logical_and(idx_box,np.isnan(data1.value)==False)
+        
+    return(idx_box)
