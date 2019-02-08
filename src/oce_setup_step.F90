@@ -286,11 +286,21 @@ end if
     
     ! init field for pressure force 
     allocate(density_m_rho0(nl-1, node_size))
+    allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
-	density_m_rho0=0.0_WP
-	pgf_x = 0.0_WP
-	pgf_y = 0.0_WP
-	
+    density_m_rho0=0.0_WP
+    density_m_rho0_slev=0.0_WP !!PS
+    pgf_x = 0.0_WP
+    pgf_y = 0.0_WP
+    
+!!PS     ! init dummy arrays
+!!PS     allocate(dum_2d_n(node_size), dum_3d_n(nl-1,node_size))
+!!PS     allocate(dum_2d_e(elem_size), dum_3d_e(nl-1,elem_size)) 
+!!PS     dum_2d_n = 0.0_WP
+!!PS     dum_3d_n = 0.0_WP
+!!PS     dum_2d_e = 0.0_WP
+!!PS     dum_3d_e = 0.0_WP
+    
 END SUBROUTINE array_setup
 !==========================================================================
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.

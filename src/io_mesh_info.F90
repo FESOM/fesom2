@@ -47,6 +47,7 @@ implicit none
   integer                    :: nlevels_nod2D_id, nlevels_id
   integer                    :: nod_in_elem2D_num_id, nod_in_elem2D_id
   integer                    :: gradient_sca_x_id, gradient_sca_y_id
+  integer                    :: zbar_e_bot_id,zbar_n_bot_id
   integer                    :: elem_id
   integer                    :: nod_id
   character(100)             :: longname
@@ -84,6 +85,8 @@ implicit none
   call my_def_var(ncid, 'nod_in_elem2D_num', NF_INT,    1, (/nod_n_id/),  nod_in_elem2D_num_id, 'number of elements containing the node')
   call my_def_var(ncid, 'nod_part',          NF_INT,    1, (/nod_n_id/),  nod_part_id,          'nodal partitioning at the cold start'  )
   call my_def_var(ncid, 'elem_part',         NF_INT,    1, (/elem_n_id/), elem_part_id,         'element partitioning at the cold start')
+  call my_def_var(ncid, 'zbar_e_bottom',     NF_DOUBLE, 1, (/elem_n_id/), zbar_e_bot_id,        'element bottom depth')
+  call my_def_var(ncid, 'zbar_n_bottom',     NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_bot_id,        'nodal bottom depth')
   ! 2D
   call my_def_var(ncid, 'nod_area',        NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
   call my_def_var(ncid, 'elem',            NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
@@ -236,7 +239,22 @@ implicit none
      call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
+  
+  ! nodal bottom depth (take into account partial cells if used)
+  allocate(rbuffer(nod2D))
+  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer)
+  call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer)
+  deallocate(rbuffer)
+
+  ! element bottom depth (take into account partial cells if used)
+  allocate(rbuffer(elem2D))
+  call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer)
+  call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer)
+  deallocate(rbuffer)
+  
   call my_close(ncid)
+  
+  
 end subroutine write_mesh_info
 !
 !============================================================================

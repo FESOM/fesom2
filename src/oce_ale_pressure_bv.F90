@@ -5,163 +5,194 @@ subroutine pressure_bv
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency 
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
-	USE o_PARAM
-	USE o_MESH
-	USE o_ARRAYS
-	USE g_PARSUP
-	USE g_config
-	use i_arrays
-	USE o_mixing_KPP_mod, only: dbsfc
-	IMPLICIT NONE
-	
-	real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
-	integer               :: node, nz, nl1, nzmax
-	real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
-	real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
-	real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
-	logical               :: flag1, flag2, mixing_kpp
-
-	smallvalue=1.0e-20
-	buoyancy_crit=0.0003
-	mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
-	!___________________________________________________________________________
-	! Screen salinity
-	a=0.0_WP
-	do node=1, myDim_nod2D+eDim_nod2D
-		do nz=1,nlevels_nod2d(node)-1
-			a=min(a,tr_arr(nz,node,2))
-		enddo
-	enddo
-	
-	!___________________________________________________________________________
-	if(a<0.) then
-		write (*,*)' --> pressure_bv: s<0 happens!', a
-		pe_status=1
-		do node=1, myDim_nod2D+eDim_nod2D
-			do nz=1, nlevels_nod2d(node)-1
-				if (tr_arr(nz, node, 2) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
-			end do
-		end do
-	endif
-	
-	!___________________________________________________________________________
-	if(use_ALE) then
-		!_______________________________________________________________________
-		do node=1, myDim_nod2D+eDim_nod2D
-			nl1= nlevels_nod2d(node)-1
-			! also compute the maximum buoyancy gradient between the surface and any depth
-			! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
-			db_max=0.0
-			!___________________________________________________________________
-			do nz=1, nl1
-				t=tr_arr(nz, node,1)
-				s=tr_arr(nz, node,2)
-				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-			enddo
-			!NR split the loop here. The Intel compiler could not resolve that there is no dependency 
-			!NR and did not vectorize the full loop. 
-			do nz=1, nl1
-				rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
-				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
-				density_m_rho0(nz,node) = rho(nz) 
-				! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
-				rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
-				rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-				dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
-				db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
-			end do
-			dbsfc1(nl)=dbsfc1(nl1)
-			if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
-				dbsfc(1:nl, node )=dbsfc1(1:nl)
-			end if
-			!___________________________________________________________________
-			! Pressure
-			hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
-			DO nz=2, nl1
-				a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
-				hpressure(nz, node)=hpressure(nz-1, node)+a
-			END DO
-			
-			!___________________________________________________________________
-			! BV frequency:  bvfreq(nl,:), squared value is stored   
-			MLD1(node)=Z_3d_n(2,node)
-			MLD2(node)=Z_3d_n(2,node)
-			MLD1_ind(node)=2
-			MLD2_ind(node)=2
-			flag1=.true.
-			flag2=.true.
-			DO nz=2,nl1
-				bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
-				bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
-				rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_3d_n(nz,node))  
-				rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
-				dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
-				bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-				! Define MLD following FESOM 1.4 implementation (after Large et al. 1997) 
-				! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
-				! between the surface and any discrete depth within the water column.
-				if (bvfreq(nz, node) > db_max .and. flag1) then
-					MLD1(node)    =Z_3d_n(nz, node)
-					MLD1_ind(node)=nz
-					flag1=.false.
-				end if
-				! another definition of MLD after Levitus
-				if ((rhopot(nz)-rhopot(1) > sigma_theta_crit) .and. flag2) then
-					MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
-					MLD2_ind(node)=nz
-					flag2=.false.
-				elseif (flag2) then
-					MLD2(node)=Z_3d_n(nz,node)
-				end if
-			END DO
-			if (flag2) MLD2_ind(node)=nl1
-			bvfreq(1,node)=bvfreq(2,node)
-			bvfreq(nl1+1,node)=bvfreq(nl1,node) 
-			!___________________________________________________________________
-			! The mixed layer depth 
-			! mixlay_depth    
-			! bv_ref
-		end do
-		!_______________________________________________________________________
-	else
-		do node=1, myDim_nod2D+eDim_nod2D
-			nl1= nlevels_nod2d(node)-1
-			!___________________________________________________________________
-			do nz=1, nl1
-				t=tr_arr(nz, node,1)
-				s=tr_arr(nz, node,2)
-				call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-				rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz))
-				rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0
-			end do
-			
-			!___________________________________________________________________
-			! Pressure
-			hpressure(1, node)=-Z(1)*rho(1)*g
-			DO nz=2, nl1
-				a=0.5_WP*g*(rho(nz-1)*(zbar(nz-1)-zbar(nz))+rho(nz)*(zbar(nz)-zbar(nz+1)))
-				hpressure(nz, node)=hpressure(nz-1, node)+a
-			END DO
-			
-			!___________________________________________________________________
-			! BV frequency:  bvfreq(nl,:), squared value is stored   
-			DO nz=2,nl1
-				bulk_up = bulk_0(nz-1) + zbar(nz)*(bulk_pz(nz-1) + zbar(nz)*bulk_pz2(nz-1)) 
-				bulk_dn = bulk_0(nz)   + zbar(nz)*(bulk_pz(nz)   + zbar(nz)*bulk_pz2(nz))
-				rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar(nz))  
-				rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar(nz))  
-				dz_inv=1.0_WP/(Z(nz-1)-Z(nz))  
-				bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-			END DO
-			bvfreq(1,node)=bvfreq(2,node)
-			bvfreq(nl1+1,node)=bvfreq(nl1,node) 
-			!___________________________________________________________________
-			! The mixed layer depth 
-			! mixlay_depth    
-			! bv_ref
-		end do
-	end if
-	! BV is defined on full levels except for the first and the last ones.
+    use g_config
+    USE o_PARAM
+    USE o_MESH
+    USE o_ARRAYS
+    USE g_PARSUP
+    use i_arrays
+    USE o_mixing_KPP_mod, only: dbsfc
+    IMPLICIT NONE
+    
+    real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    integer               :: node, nz, nl1, nzmax
+    real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
+    real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
+    real(kind=WP)         :: sigma_theta_crit=0.125   !kg/m3, Levitus threshold for computing MLD2
+    logical               :: flag1, flag2, mixing_kpp
+    
+    smallvalue=1.0e-20
+    buoyancy_crit=0.0003
+    mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
+    !___________________________________________________________________________
+    ! Screen salinity
+    a=0.0_WP
+    do node=1, myDim_nod2D+eDim_nod2D
+        do nz=1,nlevels_nod2d(node)-1
+            a=min(a,tr_arr(nz,node,2))
+        enddo
+    enddo
+    
+    !___________________________________________________________________________
+    if(a<0.) then
+        write (*,*)' --> pressure_bv: s<0 happens!', a
+        pe_status=1
+        do node=1, myDim_nod2D+eDim_nod2D
+            do nz=1, nlevels_nod2d(node)-1
+                if (tr_arr(nz, node, 2) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+            end do
+        end do
+    endif
+    
+    !___________________________________________________________________________
+    if(use_ALE) then
+        !_______________________________________________________________________
+        do node=1, myDim_nod2D+eDim_nod2D
+            nl1= nlevels_nod2d(node)-1
+            rho      = 0.0_WP
+            bulk_0   = 0.0_WP 
+            bulk_pz  = 0.0_WP
+            bulk_pz2 = 0.0_WP
+            rhopot   = 0.0_WP
+            ! also compute the maximum buoyancy gradient between the surface and any depth
+            ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+            db_max=0.0
+            
+            !___________________________________________________________________
+            ! apply equation of state
+            do nz=1, nl1
+                t=tr_arr(nz, node,1)
+                s=tr_arr(nz, node,2)
+                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+            enddo
+            
+            !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
+            !NR and did not vectorize the full loop. 
+            !___________________________________________________________________
+            ! calculate density
+            do nz=1, nl1
+            
+                rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
+                density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
+                
+                rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
+                density_m_rho0(nz,node) = rho(nz)
+                
+                ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+                rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
+                rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+                dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
+                db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
+            end do
+            dbsfc1(nl)=dbsfc1(nl1)
+            if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
+                dbsfc(1:nl, node )=dbsfc1(1:nl)
+            end if
+            
+            !___________________________________________________________________
+            ! calculate pressure 
+            if (trim(which_ale)=='linfs') then
+!!PS                 hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
+                hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
+                DO nz=2, nl1
+                    ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
+                    ! thickness of previouse layer and half layer thickness of actual 
+                    ! layer to integrate pressure on mid depth level of actual layer
+                    a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
+                    hpressure(nz, node)=hpressure(nz-1, node)+a
+                END DO
+            end if    
+            
+            !___________________________________________________________________
+            ! calculate mixed layer depth after Monterey and Levitus, (1997) who 
+            ! compute MLD as the depth at which the density over depth differs 
+            ! by 0.125 sigma units from the surface density (Griffies et al., 2009). 
+            ! This MLD definition was also supported in FESOM1.4 (-->MLD2) and after 
+            ! the definition of Large et al. (1997), who suggest to compute MLD 
+            ! as the shallowest depth where the vertical derivative of buoyancy 
+            ! is equal to a local critical buoyancy gradient (Griffies et al., 
+            ! 2009) (-->MLD1). 
+            ! BV frequency:  bvfreq(nl,:), squared value is stored   
+            MLD1(node)=Z_3d_n(2,node)
+            MLD2(node)=Z_3d_n(2,node)
+            MLD1_ind(node)=2
+            MLD2_ind(node)=2
+            flag1=.true.
+            flag2=.true.
+            DO nz=2,nl1
+                bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
+                bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
+                rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_3d_n(nz,node))  
+                rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
+                dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
+                bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+                ! Define MLD following FESOM 1.4 implementation (after Large et al. 1997) 
+                ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
+                ! between the surface and any discrete depth within the water column.
+                if (bvfreq(nz, node) > db_max .and. flag1) then
+                    MLD1(node)    =Z_3d_n(nz, node)
+                    MLD1_ind(node)=nz
+                    flag1=.false.
+                end if
+                ! another definition of MLD after Levitus
+                if ((rhopot(nz)-rhopot(1) > sigma_theta_crit) .and. flag2) then
+                    MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+                    MLD2_ind(node)=nz
+                    flag2=.false.
+                elseif (flag2) then
+                    MLD2(node)=Z_3d_n(nz,node)
+                end if
+            END DO
+            if (flag2) MLD2_ind(node)=nl1
+            bvfreq(1,node)=bvfreq(2,node)
+            bvfreq(nl1+1,node)=bvfreq(nl1,node) 
+            !___________________________________________________________________
+            ! The mixed layer depth 
+            ! mixlay_depth    
+            ! bv_ref
+        end do
+        !_______________________________________________________________________
+    else
+        do node=1, myDim_nod2D+eDim_nod2D
+            nl1= nlevels_nod2d(node)-1
+            !___________________________________________________________________
+            do nz=1, nl1
+                t=tr_arr(nz, node,1)
+                s=tr_arr(nz, node,2)
+                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz))
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0
+            end do
+            
+            !___________________________________________________________________
+            ! Pressure
+            hpressure(1, node)=-Z(1)*rho(1)*g
+            DO nz=2, nl1
+                a=0.5_WP*g*(rho(nz-1)*(zbar(nz-1)-zbar(nz))+rho(nz)*(zbar(nz)-zbar(nz+1)))
+                hpressure(nz, node)=hpressure(nz-1, node)+a
+            END DO
+            
+            !___________________________________________________________________
+            ! BV frequency:  bvfreq(nl,:), squared value is stored   
+            DO nz=2,nl1
+                bulk_up = bulk_0(nz-1) + zbar(nz)*(bulk_pz(nz-1) + zbar(nz)*bulk_pz2(nz-1)) 
+                bulk_dn = bulk_0(nz)   + zbar(nz)*(bulk_pz(nz)   + zbar(nz)*bulk_pz2(nz))
+                rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar(nz))  
+                rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar(nz))  
+                dz_inv=1.0_WP/(Z(nz-1)-Z(nz))  
+                bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+            END DO
+            bvfreq(1,node)=bvfreq(2,node)
+            bvfreq(nl1+1,node)=bvfreq(nl1,node) 
+            !___________________________________________________________________
+            ! The mixed layer depth 
+            ! mixlay_depth    
+            ! bv_ref
+        end do
+    end if
+    ! BV is defined on full levels except for the first and the last ones.
 end subroutine pressure_bv
 !
 !
@@ -171,42 +202,42 @@ end subroutine pressure_bv
 ! interpolation.
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
-subroutine pressure_force
-	use o_PARAM
-	use o_MESH
-	use o_ARRAYS
-	use g_PARSUP
-	use g_config
-	implicit none
-	
-	integer 			:: elem, elnodes(3), nle, nln(3), nlz, flag
-	integer 			:: ni, node, dens_ind,kk
-	real(kind=WP)		:: ze
-	integer				:: s_ind(4)
-	real(kind=WP)		:: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
-	real(kind=WP)		:: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
-	
-	if     (trim(which_ale)=='linfs' .and. (.not. use_partial_cell) ) then
-		!___________________________________________________________________________
-		! loop over triangular elemments
-		do elem=1, myDim_elem2D
-			!_______________________________________________________________________
-			! number of levels at elem
-			nle=nlevels(elem)-1
-			
-			!_______________________________________________________________________
-			! node indices of elem 
-			elnodes = elem2D_nodes(:,elem)
-			
-			!_______________________________________________________________________
-			! loop over depth levels at element elem
-			do nlz=1,nle
-				pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-				pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
-			end do 
-		end do !-->do elem=1, myDim_elem2D
-	else 
-		!___________________________________________________________________________
+subroutine pressure_force_cubic_spline
+    use o_PARAM
+    use o_MESH
+    use o_ARRAYS
+    use g_PARSUP
+    use g_config
+    implicit none
+    
+    integer             :: elem, elnodes(3), nle, nln(3), nlz, flag
+    integer             :: ni, node, dens_ind,kk
+    real(kind=WP)       :: ze
+    integer             :: s_ind(4)
+    real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
+    real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
+    
+    if     (trim(which_ale)=='linfs' .and. (.not. use_partial_cell) ) then
+        !___________________________________________________________________________
+        ! loop over triangular elemments
+        do elem=1, myDim_elem2D
+            !_______________________________________________________________________
+            ! number of levels at elem
+            nle=nlevels(elem)-1
+            
+            !_______________________________________________________________________
+            ! node indices of elem 
+            elnodes = elem2D_nodes(:,elem)
+            
+            !_______________________________________________________________________
+            ! loop over depth levels at element elem
+            do nlz=1,nle
+                pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+                pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            end do 
+        end do !-->do elem=1, myDim_elem2D
+    else 
+        !___________________________________________________________________________
         ! loop over triangular elemments
         do elem=1, myDim_elem2D
             !_______________________________________________________________________
@@ -337,8 +368,484 @@ subroutine pressure_force
             end do ! --> do nlz=1,nle
         end do ! --> do elem=1, myDim_elem2D
     endif
-end subroutine pressure_force
+end subroutine pressure_force_cubic_spline
 !
+!
+!
+!===============================================================================
+! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine
+! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
+! November 2015, – version 3.6 stable –
+!
+! Calculate pressure gradient force (PGF) based on "Shchepetkin 
+! and McWilliams," A method for computing horizontal pressure-gradient
+! force in an oceanic model with a nonaligned vertical coordinate",
+! Journal of geophysical research, vol 108, no C3, 3090
+! --> based on density jacobian method ...
+!
+! calculate PGF for linfs with partiell cell on/off
+! First coded by P. Scholz for FESOM2.0, 08.02.2019
+subroutine pressure_force_4_linfs
+    use o_PARAM
+    use o_MESH
+    use o_ARRAYS
+    use g_PARSUP
+    use g_config
+    implicit none
+    
+    logical             :: do_interpTS=.true.
+    integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
+    real(kind=WP)       :: hpress_n_bottom(3), hpress_e_bottom(3)
+    real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
+                           dZn, dZn_i, dh, dval, dZn_rho_grad(2),mean_e_rho
+    real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
+    real(kind=WP)       :: int_z_eta(2), drho_dx, dz_dx, drho_dz, aux_sum
+    
+    !___________________________________________________________________________
+    ! calculate pressure gradient force (PGF) for linfs without partiall cells
+    if ( .not. use_partial_cell ) then
+        
+        !_______________________________________________________________________
+        ! loop over triangular elemments
+        do elem=1, myDim_elem2D
+            !___________________________________________________________________
+            ! number of levels at elem
+            nle=nlevels(elem)-1
+            
+            !___________________________________________________________________
+            ! node indices of elem 
+            elnodes = elem2D_nodes(:,elem)
+            
+            !___________________________________________________________________
+            ! loop over mid-depth levels to calculate the pressure gradient 
+            ! force (pgf) --> from top to bottom
+            do nlz=1,nle
+                pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+                pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+            end do 
+        end do !-->do elem=1, myDim_elem2D
+        
+    !___________________________________________________________________________
+    ! calculate pressure gradient force (PGF) for linfs with partiall cells
+    else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
+        
+        !_______________________________________________________________________
+        ! loop over triangular elemments
+        do elem=1, myDim_elem2D
+            !___________________________________________________________________
+            ! nle...number of mid-depth levels at elem
+            nle          = nlevels(elem)-1
+            
+            !___________________________________________________________________
+            ! node indices of elem 
+            elnodes = elem2D_nodes(:,elem)
+            
+            !___________________________________________________________________
+            if(trim(which_pgf)=='nemo'       .or. &
+               trim(which_pgf)=='nemomin'    .or. &
+               trim(which_pgf)=='adcroft'    .or. &
+               trim(which_pgf)=='pacanowski') then
+               
+                !_______________________________________________________________
+                ! 1) loop over mid-depth levels to calculate the pressure gradient 
+                !    force (pgf) --> goes until one layer above the bottom 
+                !        
+                !     :             :      --> nle-2
+                !     :             :
+                ! ----------   ----------
+                ! 
+                !     o            o       --> nle-1
+                ! T,S,rho(nle-1)
+                ! ----------   ----------
+                ! 
+                !     x <--- nle --o linear interpolate densities to shallowest mid depth level
+                !     o
+                !              ----------
+                ! T,S,rho(nle) //////////
+                ! ----------   //////////
+                ! //////////   //////////
+                ! //////////   //////////
+                ! //////////   //////////
+                do nlz=1,nle-1 
+                    pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+                    pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+                end do
+                
+                !_______________________________________________________________
+                ! 2) interpolate/extrapolate nodal density linearly to elemental 
+                !    bottom depth
+                if (trim(which_pgf)=='nemo' .or. trim(which_pgf)=='nemomin') then
+                    !___________________________________________________________
+                    ! nln...number of mid-depth levels at node
+                    nln     = nlevels_nod2d(elnodes)-1
+                    
+                    !___________________________________________________________
+                    ! calculate mid depth element level --> Z_e
+                    zbar_n       = 0.0_WP
+                    Z_n          = 0.0_WP
+                    zbar_n(nle+1)= zbar_e_bot(elem)
+                    Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+                    do nlz=nle,2,-1
+                        zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+                        Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+                    end do
+                    zbar_n(1)    = zbar_n(2) + helem(1,elem)
+                    ! --> zbar_n    ... depth of level at elements
+                    ! --> Z_n       ... depth of mid-depth level at elements
+                    ! --> zbar_n_3d ... depth of level at nodes
+                    ! --> Z_n_3d    ... depth of mid-depth level at nodes
+                    
+                    !___________________________________________________________
+                    ! loop over nodal indices of element
+                    do ni=1,3
+                        !_______________________________________________________
+                        ! Calculate pressure gradient force (PGF) like in NEMO 
+                        ! based on NEMO ocean engine Gurvan Madec, and the NEMO team 
+                        ! gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
+                        ! ! --> interpolate all three densites to mid depth of element
+                        if     (trim(which_pgf)=='nemo') then
+                            !___________________________________________________
+                            ! calculate vertical center index for linear 
+                            ! interpolation/extrapolation, densities are interpolate 
+                            ! to the mid-depth of the element --> extrapolation
+                            ! possible 
+                            nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-Z_n(nle),1,& 
+                                            Z_3d_n(1:nln(ni),elnodes(ni))-Z_n(nle)>0.0_WP &  ! mask for index selection
+                                          )+1
+                            ! center index can not be deeper than nodal bottom 
+                            ! layer index --> will do extrapolation
+                            nlc   = min(nlc,nln(ni)) 
+                            dZn   = Z_3d_n(nlc,elnodes(ni))-Z_3d_n(nlc-1,elnodes(ni))
+                            dZn_i = Z_n(nle)               -Z_3d_n(nlc-1,elnodes(ni))
+                            dh    = helem(nle  ,elem)
+                            
+                        elseif (trim(which_pgf)=='nemomin') then    
+                            !___________________________________________________
+                            ! calculate vertical center index for linear 
+                            ! interpolation, densities are interpolated
+                            ! to shallowest nodal mid depth level that contribute
+                            ! to element --> advantage no extrapolation neccessary
+                            nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,& 
+                                            Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
+                                          )+1
+                            nlc   = min(nlc,nln(ni)) 
+                            dZn   = Z_3d_n(nlc,elnodes(ni))    -Z_3d_n(nlc-1,elnodes(ni))
+                            dZn_i = maxval(Z_3d_n(nle,elnodes))-Z_3d_n(nlc-1,elnodes(ni))
+                            dh    = minval(hnode(nle  ,elnodes)) 
+                        end if             
+                        
+                        !_______________________________________________________
+                        ! Option (A): interpolate density directly ...
+                        if (.not. do_interpTS ) then 
+                            dval              = density_m_rho0(nlc  ,elnodes(ni))-density_m_rho0(nlc-1,elnodes(ni))
+                            interp_n_dens(ni) = density_m_rho0(nlc-1,elnodes(ni)) + (dval/dZn*dZn_i)
+                            
+                        ! Option (B): NEMO ocean engine Gurvan Madec, and the NEMO team suggest 
+                        ! not to linearly interpolate the density towards the bottom rather to 
+                        ! interpolate temperature and salinity and calculate from them the 
+                        ! bottom density to account for the non linearities in the equation of 
+                        ! state ...
+                        else
+                            ! ... interpolate temperature and saltinity ...
+                            dval          = tr_arr(nlc,  elnodes(ni),1) - tr_arr(nlc-1,elnodes(ni),1)
+                            interp_n_temp = tr_arr(nlc-1,elnodes(ni),1) + (dval/dZn*dZn_i)
+                            dval          = tr_arr(nlc  ,elnodes(ni),2) - tr_arr(nlc-1,elnodes(ni),2)
+                            interp_n_salt = tr_arr(nlc-1,elnodes(ni),2) + (dval/dZn*dZn_i)
+                            
+                            ! calculate density at element mid-depth bottom depth via 
+                            ! equation of state from linear interpolated temperature and 
+                            ! salinity
+                            call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
+                            interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
+                            interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))-density_0
+                            
+                        end if 
+                            
+                        ! calculate proper starting level for extrapolation of 
+                        ! bottom pressure
+                        nlce = min(nlc,nle)
+                            
+                        !_______________________________________________________
+                        ! integrate nodal density until mid-depth level of bottom 
+                        ! element using linearly interpolated nodal bottom density 
+                        ! (interp_n_dens) to obtain bottom pressure value
+                        hpress_n_bottom(ni) = hpressure(nlce-1, elnodes(ni))        &
+                                                + 0.5_WP*g*                         & 
+                                                (density_m_rho0(nlce-1,elnodes(ni))*&
+                                                          hnode(nlce-1,elnodes(ni)) & 
+                                                +                                   &  
+                                                interp_n_dens(ni)*dh                &
+                                                )                             
+                    end do ! --> do ni=1,3
+                    !___________________________________________________________
+                    pgf_x(nle,elem) = sum(gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
+                    pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
+                    
+                !_______________________________________________________________
+                ! Calculate pressure gradient force (PGF) like proposed by adcroft 
+                ! (and Sergey: "...in terms of PGF simpler and stable is better... !!!")
+                ! and used in MITGCM... to calculate pressure gradient forcec 
+                ! over the standard depth levels
+                ! --> works on moment only with nasty trick when densities are also
+                !     calculated in the equation of state (call pressure_bv) are also 
+                !     calcualted with the standard levels !!!
+                elseif (trim(which_pgf)=='adcroft') then    
+                    nlce=nle
+                    !___________________________________________________________
+                    ! here in moment use density calculate with equation of on 
+                    ! the standard depth levels
+                    hpress_n_bottom = hpressure(nlce-1, elnodes)                    &
+                                      + 0.5_WP*g*                                   & 
+                                      (density_m_rho0_slev(nlce-1,elnodes)*         &
+                                       (zbar(nlce-1)-zbar(nlce))                    & 
+                                       +                                            &  
+                                       density_m_rho0_slev(nlce  ,elnodes)*         &
+                                       (zbar(nlce)-zbar(nlce+1))                    &
+                                      )   
+                    !___________________________________________________________
+                    pgf_x(nle,elem) = sum(gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
+                    pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
+                                      
+                !_______________________________________________________________
+                ! Calculate pressure gradient force (PGF) based on "Pacanowski and 
+                ! Gnanadesikan, Transient Response in a Z -Level Ocean Model That 
+                ! Resolves Topography with Partial Cells, 1998, Monthly Weather Review"
+                !
+                ! dp/dx|_(z=const) = dp/dx|_z(x,y) + [ dp/dz|_z=const * dz(x,y)/dx ] eq.30
+                !  --> with hydrostatic assumption: p(z) = int_z->0(rho*g*dz')
+                !  dp/dx|_(z=const)= g/rho_0 * [ d/dx* int_z(x,y)->0(rho*dz') - rho|z=const * dz(x,y)/dx] eq.32
+                !
+                ! --> in moment doesnt work et al, the correction term dZn_rho_grad
+                !     is not able to compensate the pressure error and noise in the 
+                !     bottom pressure 
+                ! --> leads to unrealistic deep overturning cells (>100Sv) along 
+                !     the equator 
+                ! --> better use shchepetkin (based on density jacobian method) 
+                elseif (trim(which_pgf)=='pacanowski') then
+                    nlce=nle
+                    !___________________________________________________________
+                    hpress_n_bottom = hpressure(nlce-1, elnodes)                    &
+                                        + 0.5_WP*g*                                 & 
+                                        (density_m_rho0(nlce-1, elnodes)*           &
+                                                  hnode(nlce-1, elnodes)            &
+                                            +                                       &
+                                         density_m_rho0(nlce  , elnodes)*           &
+                                                  hnode(nlce  , elnodes)            &
+                                        )
+                    mean_e_rho      = sum(density_m_rho0(nlce , elnodes))/3.0_WP
+                    !___________________________________________________________
+                    ! calculate vertical pressure correction from Pacanowski et 
+                    ! al 1998 only for bottom layer calculate gradient of 
+                    ! Z_3d_n at nodal bottom 
+                    dZn_rho_grad(1) = sum(gradient_sca(1:3  ,elem)*Z_3d_n(nlce,elnodes))
+                    dZn_rho_grad(2) = sum(gradient_sca(4:6  ,elem)*Z_3d_n(nlce,elnodes))
+                    dZn_rho_grad    = g*dZn_rho_grad*mean_e_rho
+                    
+                    !___________________________________________________________
+                    pgf_x(nle,elem) = (sum(gradient_sca(1:3,elem)*hpress_n_bottom)+dZn_rho_grad(1))/density_0
+                    pgf_y(nle,elem) = (sum(gradient_sca(4:6,elem)*hpress_n_bottom)+dZn_rho_grad(2))/density_0
+                    
+                end if !-->if (trim(which_pgf)=='nemo' .or. trim(which_pgf)=='nemomin') then
+                
+            !___________________________________________________________________
+            ! Calculate pressure gradient force (PGF) based on "Shchepetkin 
+            ! and McWilliams," A method for computing horizontal pressure-gradient
+            ! force in an oceanic model with a nonaligned vertical coordinate",
+            ! Journal of geophysical research, vol 108, no C3, 3090
+            ! --> based on density jacobian method ...
+            ! --> equation 1.7
+            ! 
+            ! -1/rho_0* dP/dx|_z = -1/rho_0*dP/dx|_z=eta - g/rho_0*int_z^eta( drho/dx|_z)*dz'
+            !
+            !                    = g*rho(eta)/rho_0*deta/dx
+            !                      - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            !
+            ! --> eta...free surface elevation for linfs start at zero
+            elseif (trim(which_pgf)=='shchepetkin') then
+                int_z_eta     = 0.0_WP
+                !_______________________________________________________________
+                ! calcualte surface zonal pressure gradient
+                drho_dx       = sum(gradient_sca(1:3,elem)*density_m_rho0(1,elnodes))
+                aux_sum       = drho_dx*helem(1,elem)               
+                pgf_x(1,elem) = (int_z_eta(1) + aux_sum*0.5_WP)*g/density_0
+                int_z_eta(1)  =  int_z_eta(1) + aux_sum
+                
+                !_______________________________________________________________
+                ! calcualte surface meridional pressure gradient
+                drho_dx       = sum(gradient_sca(4:6,elem)*density_m_rho0(1,elnodes))
+                aux_sum       = drho_dx*helem(1,elem)               
+                pgf_y(1,elem) = (int_z_eta(2) + aux_sum*0.5_WP)*g/density_0
+                int_z_eta(2)  =  int_z_eta(2) + aux_sum
+                
+                !_______________________________________________________________
+                ! calculate pressure gradient for subsurface layer until bottom 
+                do nlz=2,nle 
+                    !___________________________________________________________
+                    ! vertical gradient --> with average density and average 
+                    ! mid-depth level on element
+                    drho_dz         = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-&
+                                       sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)/&
+                                      (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-&
+                                       sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
+                    
+                    !___________________________________________________________
+                    ! zonal gradients
+                    drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+                    dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)               
+                    pgf_x(nlz,elem) = (int_z_eta(1) + aux_sum*0.5_WP)*g/density_0
+                    int_z_eta(1)    =  int_z_eta(1) + aux_sum
+                    
+                    !___________________________________________________________
+                    ! meridional gradients
+                    drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+                    dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)               
+                    pgf_y(nlz,elem) = (int_z_eta(2) + aux_sum*0.5_WP)*g/density_0
+                    int_z_eta(2)    =  int_z_eta(2) + aux_sum
+                    
+                end do
+            end if 
+        end do ! --> do elem=1, myDim_elem2D
+    end if ! --> if (trim(which_ale)=='linfs' .and. (.not. use_partial_cell) ) then
+end subroutine pressure_force_4_linfs
+!
+!
+!
+!===============================================================================
+! Calculate pressure gradient force (PGF) based on "Pacanowski and Gnanadesikan, 
+! Transient Response in a Z -Level Ocean Model That Resolves Topography with 
+! Partial Cells, 1998, Monthly Weather Review"
+!
+!   dp/dx|_z=const  =  dp/dx|_z(x,y) + [ dp/dz|_z=const * dz(x,y)/dx ] eq.30
+!   
+!   +++> hydrostatic assumption: p(z) = int_z->0(rho*g*dz')
+!
+!                   = g/rho_0 * [ d/dx* int_z(x,y)->0(rho*dz') - rho|z=const * dz(x,y)/dx] eq.32
+!
+!
+! calculate PGF for linfs with partiell cell on/off
+! First coded by P. Scholz for FESOM2.0, 23.01.2019
+subroutine pressure_force_4_zxxxx_pacanowski_1998
+    use o_PARAM
+    use o_MESH
+    use o_ARRAYS
+    use g_PARSUP
+    use g_config
+    implicit none
+    
+    logical             :: do_interpTS=.true.
+    integer             :: elem, elnodes(3), nle, nlz, ni, nln(3)
+    real(kind=WP)       :: interp_n_dens(3), interp_n_temp(3), interp_n_salt(3), &
+                           dZn(3), dZn_i(3), dval(3)
+    real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)       :: int_n_rho_dh(3), int_n_rho_dh_grad(2), dZn_rho_grad(2) 
+    
+    !_______________________________________________________________________
+    ! loop over triangular elemments
+    do elem=1, myDim_elem2D
+        !___________________________________________________________________
+        ! nle...number of mid-depth levels at elem
+        nle          = nlevels(elem)-1
+        
+        !___________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+        do nlz=nle,2,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+        end do
+        zbar_n(1) = zbar_n(2) + helem(1,elem)
+        
+        ! --> zbar_n    ... depth of level at elements
+        ! --> Z_n       ... depth of mid-depth level at elements
+        ! --> zbar_n_3d ... depth of level at nodes
+        ! --> Z_n_3d    ... depth of mid-depth level at nodes
+        
+        !___________________________________________________________________
+        ! node indices of elem 
+        elnodes = elem2D_nodes(:,elem) 
+        nln     = nlevels_nod2d(elnodes)
+        
+        !___________________________________________________________________
+        int_n_rho_dh     = 0.0_WP
+        do nlz=1,nle 
+            !_______________________________________________________________
+            ! calculate: rho|z=const
+            ! case of partial cells --> bottom density interpolation/extrapolation
+            if ( any(Z_3d_n(nlz,elnodes)/=Z_n(nlz)) ) then
+                dZn           = Z_3d_n(nlz,elnodes)-Z_3d_n(nlz-1,elnodes)
+                dZn_i         = Z_n(nlz)           -Z_3d_n(nlz-1,elnodes)
+                
+                ! Option (A): interpolate density directly ...
+                if (.not. do_interpTS )then 
+                    dval          = density_m_rho0(nlz,elnodes)-density_m_rho0(nlz-1,elnodes)
+                    interp_n_dens = density_m_rho0(nlz-1,elnodes) + (dval/dZn*dZn_i)
+                ! Option (B): NEMO ocean engine Gurvan Madec, and the NEMO team suggest 
+                ! not to linearly interpolate the density towards the bottom rather to 
+                ! interpolate temperature and salinity and calculate from them the 
+                ! bottom density to account for the non linearities in the equation of 
+                ! state ...
+                else
+                    dval          = tr_arr(nlz,elnodes,1)-tr_arr(nlz-1,elnodes,1)
+                    interp_n_temp = tr_arr(nlz-1,elnodes,1) + (dval/dZn*dZn_i)
+                    dval          = tr_arr(nlz,elnodes,2)-tr_arr(nlz-1,elnodes,2)
+                    interp_n_salt = tr_arr(nlz-1,elnodes,2) + (dval/dZn*dZn_i)
+                    ! calculate density via equation of state from linear 
+                    ! interpolated temperature and salinity
+                    do ni=1,3
+                        call densityJM_components(interp_n_temp(ni), interp_n_salt(ni), &
+                                                bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
+                            interp_n_dens(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
+                            interp_n_dens(ni) = interp_n_dens(ni)*rhopot(ni)/(interp_n_dens(ni)+0.1_WP*Z_n(nlz))-density_0
+                    end do
+                end if   
+                
+            ! case of full cells 
+            else
+                interp_n_dens = density_m_rho0(nlz,elnodes)
+            end if
+            
+            !_______________________________________________________________
+            ! calculate:  d/dx* int_Zn(x,y)->0(rho*dz')
+            ! vertical integrate densities*hnode at vertices --> calculate 
+            ! pressure at vertices
+            if (nlz==1) then
+                int_n_rho_dh  = int_n_rho_dh + 0.5_WP*density_m_rho0(nlz,elnodes)*hnode(nlz,elnodes)
+            else
+                int_n_rho_dh  = int_n_rho_dh +                                           &
+                                0.5_WP*(                                                 &
+                                    density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes) + &
+                                    density_m_rho0(nlz  ,elnodes)*hnode(nlz  ,elnodes)   &
+                                        )                                            
+            end if
+            
+            ! calcualte gradient of pressure
+            int_n_rho_dh_grad(1) = sum( gradient_sca(1:3,elem)*int_n_rho_dh )
+            int_n_rho_dh_grad(2) = sum( gradient_sca(4:6,elem)*int_n_rho_dh )
+            
+            !_______________________________________________________________
+            ! calculate: rho|z=const*dZn(x,y)/dx
+            ! gradient of vertice mid depth vertical coordinate minus 
+            ! elemental mid depth vertical coordinate --> calculate vertical
+            ! pressure correction
+            dZn             = ( Z_3d_n(nlz,elnodes) - Z_n(nlz) ) 
+            dZn_rho_grad(1) = sum( gradient_sca(1:3,elem)*(dZn*interp_n_dens) )
+            dZn_rho_grad(2) = sum( gradient_sca(4:6,elem)*(dZn*interp_n_dens) )
+            
+            !_______________________________________________________________
+            ! calculate element wise pressure gradient force 
+            ! --> eq. 32 in Pacanowski et al 1998
+            ! --> different sign because here Zn is negative downward
+            pgf_x(nlz,elem) = g/density_0*( int_n_rho_dh_grad(1) + dZn_rho_grad(1))
+            pgf_y(nlz,elem) = g/density_0*( int_n_rho_dh_grad(2) + dZn_rho_grad(2))
+            
+        end do ! --> do nlz=1,nle-1            
+    end do ! --> do elem=1, myDim_elem2D
+end subroutine pressure_force_4_zxxxx_pacanowski_1998
 !
 !
 ! ===========================================================================
@@ -722,3 +1229,5 @@ subroutine insitu2pot
      end do	
   end do
 end subroutine insitu2pot
+
+

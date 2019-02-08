@@ -1228,7 +1228,7 @@ USE g_ROTATE_grid
 use g_comm_auto
 IMPLICIT NONE
 
-integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3)
+integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3),node
 real(kind=WP)	     :: a(2), b(2), ax, ay, dfactor, lon, lat
 real(kind=WP)	     :: deltaX31, deltaX21, deltaY31, deltaY21
 real(kind=WP)        :: x(3), y(3), cxx, cxy, cyy, d
@@ -1242,7 +1242,7 @@ t0=MPI_Wtime()
  
  allocate(edge_dxdy(2,myDim_edge2D+eDim_edge2D))
  allocate(edge_cross_dxdy(4,myDim_edge2D+eDim_edge2D))
- allocate(gradient_sca(6,myDim_elem2D))	 
+ allocate(gradient_sca(6,myDim_elem2D))
  allocate(gradient_vec(6,myDim_elem2D))
  allocate(metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
@@ -1416,47 +1416,107 @@ DO elem=1, myDim_elem2D
    gradient_sca(6,elem)=deltaX21*dfactor
 END DO
 
- ! ==========================
- ! Derivatives of vector quantities
- ! Least squares interpolation is used
- ! ==========================
-
-   DO elem=1,myDim_elem2D
-             !elnodes=elem2D_nodes(:,elem)
-      a(1)=center_x(elem)
-      a(2)=center_y(elem)
-      DO j=1,3
-      el(1)=elem_neighbors(j,elem)
-      if (el(1)>0) then
-             !elnodes_=elem2D_nodes(:,el(1))
-      b(1)=center_x(el(1))
-      b(2)=center_y(el(1))
-      x(j)=b(1)-a(1)
-      if(x(j)>cyclic_length/2) x(j)=x(j)-cyclic_length
-      if(x(j)<-cyclic_length/2) x(j)=x(j)+cyclic_length
-      y(j)=b(2)-a(2)
-      else
-      ! Virtual element center is taken
-      ed=edges(:,elem_edges(j,elem))
-      call edge_center(ed(1), ed(2), b(1), b(2))
-      x(j)=(b(1)-a(1))
-      if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
-      if(x(j)<-cyclic_length/2)  x(j)=x(j)+cyclic_length
-      x(j)=2*x(j)
-      y(j)=2*(b(2)-a(2))
-      end if
-      END DO
-      x=x*elem_cos(elem)*r_earth
-      y=y*r_earth
-      cxx=sum(x**2)
-      cxy=sum(x*y)
-      cyy=sum(y**2)
-      d=cxy*cxy-cxx*cyy
-	  ! coefficients to compute gradients of velocity
-      gradient_vec(1:3,elem)=(cxy*y-cyy*x)/d
-      gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
+! ==========================
+! Derivatives of vector quantities
+! Least squares interpolation is used
+! ==========================
+!_______________________________________________________________________________ 
+! Least square method for gradient reconstruction of elemental velocities
+!     o___________o___________o
+!      \   P_3   / \   P_1   /          dx_10 = x_1-x_0 ; dy_10 = y_1-y_0
+!       \   x   /   \   x   /           dx_20 = x_2-x_0 ; dy_20 = y_2-y_0
+!        \     / P_0 \     /            dx_30 = x_3-x_0 ; dy_30 = y_3-y_0   
+!         \   /   x   \   /
+!          \ /         \ /
+!           o-----------o      P_1 = P_0 + dx_10*(dP/dx)_0 + dy_10*(dP_dy)_0
+!            \         /
+!             \   x   /        P_2 = P_0 + dx_20*(dP/dx)_0 + dy_20*(dP_dy)_0
+!              \ P_2 / 
+!               \   /          P_3 = P_0 + dx_30*(dP/dx)_0 + dy_30*(dP_dy)_0
+!                \ /
+!                 o            --> How to calculate dP/dx and dP/dy from P0, P1, 
+!                                  P2, P3 ... ?
+!
+!
+! 1st. write as linear equation system ... A*x=f
+!
+!        x = | dP/dx | ;  f = | P_1 - P_0 | ;  A = | dx_10 dy_10 | 
+!            | dP/dy |        | P_2 - P_0 |        | dx_20 dy_20 |
+!                             | P_3 - P_0 |        | dx_30 dy_30 |
+!   ---> there are 3 equations but only 2 unknowns (dP/dx,dP/dy), no solution to
+!        an overestimated problem
+!   ---> Least Square Method can be used
+!
+! 2nd.             A * x =       f  | A^T* , A^T transpose of A
+!              A^T*A * x = A^T * f
+!                      x = (A^T*A)^-1 * A^T *f 
+!
+!               
+!                A^T = | dx_10 dx_20 dx_30 | 
+!                      | dy_10 dy_20 dy_30 |
+!
+!              A^T*A = | dx_10^2+dx_20^2+dx_30^2            ; dx_10*dy_10+dx_20*dy_20+dx_30*dy_30 |
+!                      | dx_10*dy_10+dx_20*dy_20+dx_30*dy_30; dx_10^2+dx_20^2+dx_30^2             |
+!
+!                    = | sum(dx^2)  ; sum(dx*dy) |
+!                      | sum(dx*dy) ; sum(dy^2)  |                    
+! 
+!          (A^T*A)⁻1 = 1/(sum(dx^2)*sum(dy^2)-sum(dx*dy)^2)* |  sum(dy^2)  -sum(dx*dy) |
+!                                      |                     | -sum(dx*dy)  sum(dx^2)  |
+!                                      V
+!                                     DET
+!
+!    (A^T*A)⁻1 * A^T = 1/DET * |  sum(dy^2)  -sum(dx*dy) | * | dx_10 dx_20 dx_30 |
+!                              | -sum(dx*dy)  sum(dx^2)  |   | dy_10 dy_20 dy_30 |
+!
+!  dP/dx =  1/DET *(sum(dy^2)*dx_10 - sum(dx*dy)*dy_10) * (P_1-P_0) 
+!         + 1/DET *(sum(dy^2)*dx_20 - sum(dx*dy)*dy_20) * (P_2-P_0) 
+!         + 1/DET *(sum(dy^2)*dx_30 - sum(dx*dy)*dy_30) * (P_3-P_0) 
+!
+!  dP/dy =  1/DET *(sum(dx^2)*dy_10 - sum(dx*dy)*dx_10) * (P_1-P_0) 
+!         + 1/DET *(sum(dx^2)*dy_20 - sum(dx*dy)*dx_20) * (P_2-P_0) 
+!         + 1/DET *(sum(dx^2)*dy_30 - sum(dx*dy)*dx_30) * (P_3-P_0) 
+!
+DO elem=1,myDim_elem2D
+    !elnodes=elem2D_nodes(:,elem)
+    a(1)=center_x(elem)
+    a(2)=center_y(elem)
+    DO j=1,3
+        el(1)=elem_neighbors(j,elem)
+        if (el(1)>0) then
+                !elnodes_=elem2D_nodes(:,el(1))
+            b(1)=center_x(el(1))
+            b(2)=center_y(el(1))
+            x(j)=b(1)-a(1)
+            if(x(j)>cyclic_length/2) x(j)=x(j)-cyclic_length
+            if(x(j)<-cyclic_length/2) x(j)=x(j)+cyclic_length
+            y(j)=b(2)-a(2)
+        else
+            ! Virtual element center is taken
+            ed=edges(:,elem_edges(j,elem))
+            call edge_center(ed(1), ed(2), b(1), b(2))
+            x(j)=(b(1)-a(1))
+            if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
+            if(x(j)<-cyclic_length/2)  x(j)=x(j)+cyclic_length
+            x(j)=2*x(j)
+            y(j)=2*(b(2)-a(2))
+        end if
     END DO
-    deallocate(center_y, center_x)
+    x=x*elem_cos(elem)*r_earth
+    y=y*r_earth
+    cxx=sum(x**2)
+    cxy=sum(x*y)
+    cyy=sum(y**2)
+    d=cxy*cxy-cxx*cyy
+    ! coefficients to compute gradients of velocity
+    gradient_vec(1:3,elem)=(cxy*y-cyy*x)/d
+    gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
+END DO
+deallocate(center_y, center_x)
+
+
+
+
 
     !array of 2D boundary conditions is used in ice_maEVP
     if (whichEVP > 0) then
