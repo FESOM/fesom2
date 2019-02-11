@@ -830,10 +830,9 @@ subroutine stiff_mat_ale
             ! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
             ! at element el(i)
             ! Attention: here corrected with bottom depth of partial cells !!!
-!!PS             fy(1:3) = (zbar(nlevels(el(i))-1)-bottom_elem_thickness(el(i)))* &
             fy(1:3) = (zbar_e_bot(el(i)))* &
-                      (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
-                     - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
+                      ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
+                       -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
             
             if(i==2) fy=-fy
             
@@ -966,6 +965,18 @@ end subroutine stiff_mat_ale
 !
 !_______________________________________________________________________________
 ! Update ssh stiffness matrix for a new elevation
+! --> update second term on lhs of equation 18 in Danilov et al 2017
+!
+! 1/tau*(eta^(n+1)-eta^n) - alpha*theta*g*tau*grad*(int_H^hbar (grad*(eta^(n+1)-eta^n))*dz) = ...
+!
+!   1/tau*(eta^(n+1)-eta^n)                                          |
+!                                                                    |--> this part is done in using the unpertubed bottom depth 
+!   - alpha*theta*g*tau*grad*(int_H^0(grad*(eta^(n+1)-eta^n))*dz)    |    in the initialisation of the stiff matrix
+!
+!   - alpha*theta*g*tau*grad*(int_0^hbar(grad*(eta^(n+1)-eta^n))*dz) |--> the update from pertubations in the bottom depth
+!                                                                         due to changes in ssh is done here 
+!   = ssh_rhs                                                             in the update of the stiff matrix
+!
 subroutine stiff_mat_ale_update
     use g_config,only: dt
     use o_PARAM
@@ -1012,33 +1023,38 @@ subroutine stiff_mat_ale_update
             end do
             
             !___________________________________________________________________
-            dO i=1,2  ! Two elements related to the edge
+            do i=1,2  ! Two elements related to the edge
                         ! It should be just grad on elements 
                 ! elem ... local element index to calc grad on that element
                 elem=el(i)
+                
                 if(elem<1) cycle
                 
                 ! elnodes ... local node indices of nodes that form element elem
                 elnodes=elem2D_nodes(:,elem)
                 
-                ! calc gradient on elem
-                fx=dhe(elem)*gradient_sca(1:3,elem)
-                fy=dhe(elem)*gradient_sca(4:6,elem)
-                
-                ! fx, fy are contribution to -velocity from elem   (-h\nabla\eta)
-                fy=fy*(edge_cross_dxdy(2*i-1,ed))- fx*(edge_cross_dxdy(2*i,ed))
-                
+                ! here update of second term on lhs of eq. 18 in Danilov etal 2017
+                ! --> in the initialisation of the stiff matrix the integration went 
+                !     over the unperturbed ocean depth using -zbar_e_bot 
+                ! --> here this therm is now updated with the actual change in ssh 
+                !     interpolated to the element dhe
+                ! calculate: - alpha*theta*g*tau*grad*(int_0^hbar(grad*(eta^(n+1)-eta^n))*dz)
+                fy(1:3) = -dhe(elem)* &
+                         ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
+                          -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
+                          
                 if(i==2) fy=-fy
                 if(j==2) fy=-fy
-                 
+                
                 ! In the computation above, I've used rules from ssh_rhs (where it is 
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
                 npos=n_num(elnodes)
-                SSH_stiff%values(npos)=SSH_stiff%values(npos)- fy*factor
-            end do
-        end do
-    end do 
+                SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
+                
+            end do ! --> do i=1,2
+        end do ! --> do j=1,2 
+    end do ! --> do ed=1,myDim_edge2D 
     deallocate(n_num)
 !DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
 !if (mype==0) then
@@ -1063,6 +1079,7 @@ subroutine compute_ssh_rhs_ale
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
+    use g_comm_auto
     implicit none
     
     ! In the semiimplicit method: 
@@ -1132,6 +1149,7 @@ subroutine compute_ssh_rhs_ale
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     end if
+    call exchange_nod(ssh_rhs)
     
 end subroutine compute_ssh_rhs_ale
 !
@@ -1194,14 +1212,14 @@ subroutine compute_hbar_ale
     ! take into account water flux
     if (.not. trim(which_ALE)=='linfs') then
         ssh_rhs_old(1:myDim_nod2D)=ssh_rhs_old(1:myDim_nod2D)-water_flux(1:myDim_nod2D)*area(1,1:myDim_nod2D)
+        call exchange_nod(ssh_rhs_old) 
     end if 
     
     !___________________________________________________________________________
     ! update the thickness
     hbar_old=hbar
     hbar(1:myDim_nod2D)=hbar_old(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
-    
-    call exchange_nod(hbar)
+    call exchange_nod(hbar)  
         
     !___________________________________________________________________________
     ! fill the array for updating the stiffness matrix
@@ -1921,8 +1939,8 @@ subroutine oce_timestep_ale(n)
             trim(which_pgf)=='nemomin'        .or. & 
             trim(which_pgf)=='pacanowski'     .or. &
             trim(which_pgf)=='adcroft'        .or. &
-            trim(which_pgf)=='shchepetkin'         &
-            ) then    
+            trim(which_pgf)=='adcroft2'       .or. &
+            trim(which_pgf)=='shchepetkin' ) then    
             call pressure_force_4_linfs
         elseif (trim(which_pgf)=='cubic-spline') then    
             call pressure_force_cubic_spline
@@ -1936,10 +1954,16 @@ subroutine oce_timestep_ale(n)
             call par_ex(1)
         endif     
     else    
-        call pressure_force_cubic_spline
+!!PS         call pressure_force_cubic_spline
 !!PS         water_flux = 0.0_WP
 !!PS         heat_flux  = 0.0_WP
-!!PS         call pressure_force_4_zxxxx_pacanowski_1998
+        if (trim(which_pgf)=='nemo'           .or. &
+            trim(which_pgf)=='nemomin'        .or. & 
+            trim(which_pgf)=='shchepetkin') then    
+            call pressure_force_4_zxxxx
+        elseif (trim(which_pgf)=='cubic-spline') then    
+            call pressure_force_cubic_spline
+        end if
     end if
         
     !___________________________________________________________________________
@@ -1988,7 +2012,7 @@ subroutine oce_timestep_ale(n)
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements
-    call stiff_mat_ale_update 
+    if (.not. trim(which_ale)=='linfs') call stiff_mat_ale_update 
     
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (12) rhs
@@ -2013,6 +2037,7 @@ subroutine oce_timestep_ale(n)
     ! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
     ! ...if we do it here we don't need to write hbar_old into a restart file...
     eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
     t5=MPI_Wtime() 
