@@ -73,8 +73,6 @@ subroutine update_atm_forcing(istep)
             exchange(:) = m_snow(:)                                 ! snow thickness
 #if defined (__oifs)
             elseif (i.eq.5) then
-            exchange(:) = ice_temp(:)                               ! ice temperature
-            elseif (i.eq.6) then
             exchange(:) = ice_alb(:)                                ! ice albedo
 #endif
             else	    
@@ -172,12 +170,9 @@ subroutine update_atm_forcing(istep)
 	     call force_flux_consv(shortwave, mask, i, 0,action)
          elseif (i.eq.12) then
              if (action) then
-#if defined (__oifs)
-	        exchange=0	
-#endif
-	        runoff(:)                   =  exchange(:)        ! runoff + calving
-    	        mask=1.
-		call force_flux_consv(runoff, mask, i, 0,action)
+	     runoff(:)                   =  exchange(:)        ! runoff + calving
+    	     mask=1.
+	     call force_flux_consv(runoff, mask, i, 0,action)
              end if
 	  end if  	  
 #ifdef VERBOSE

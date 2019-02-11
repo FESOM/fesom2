@@ -23,7 +23,7 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 6
+  integer, parameter         :: nsend = 5
 #else
   integer, parameter         :: nsend = 4
 #endif
@@ -366,8 +366,7 @@ contains
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
 #if defined (__oifs)
-    cpl_send( 5)='ste_feom' ! 5. sea ice temperature [K]           ->
-    cpl_send( 6)='sia_feom' ! 6. sea ice albedo [%-100]            ->
+    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
 #endif
 
 
