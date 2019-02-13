@@ -32,8 +32,8 @@ IMPLICIT NONE
 				write(*,*) ' --> call ale_init'
 				write(*,*)
 		end if	
-		call ale_init
-		call stiff_mat_ale
+		call init_ale
+		call init_stiff_mat_ale !!PS test
 	else
 		call stiff_mat
 	end if    
@@ -44,41 +44,41 @@ IMPLICIT NONE
 	!if(open_boundary) call set_open_boundary   !TODO
 	
 	call fct_init
-        call muscl_adv_init
+    call muscl_adv_init !!PS test
 	!=====================
 	! Initialize fields
 	! A user-defined routine has to be called here!
 	!=====================
-	if(toy_ocean) then  
+    if(toy_ocean) then  
 #ifdef NA_TEST
-	 call init_fields_na_test
+        call init_fields_na_test
 #else
-	 call initial_state_test
+        call initial_state_test
 #endif
-	 !call initial_state_channel_test 
-	 !call initial_state_channel_narrow_test
-	 !call init_fields_na_test  
- 	 !call init_fields_global_test
-        else
+        !call initial_state_channel_test 
+        !call initial_state_channel_narrow_test
+        !call init_fields_na_test  
+        !call init_fields_global_test
+    else
 #ifdef NA_TEST
-	 call init_fields_na_test
+        call init_fields_na_test
 #else
-         call oce_initial_state   ! Use it if not running tests
+        call oce_initial_state   ! Use it if not running tests
 #endif
-        end if
+    end if
 
-         if (.not.r_restart) tr_arr_old=tr_arr
+    if (.not.r_restart) tr_arr_old=tr_arr
          
     !___________________________________________________________________________
-	! first time fill up array for hnode & helem
-	if(use_ALE) then
-		if(mype==0) then
-				write(*,*) '____________________________________________________________'
-				write(*,*) ' --> call init_thickness_ale'
-				write(*,*)
-		end if	
-		call init_thickness_ale
-	end if     
+    ! first time fill up array for hnode & helem
+    if(use_ALE) then
+        if(mype==0) then
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' --> call init_thickness_ale'
+                write(*,*)
+        end if
+        call init_thickness_ale
+    end if     
 
 	 if(mype==0) write(*,*) 'Initial state'
 if (w_split .and. mype==0) then
