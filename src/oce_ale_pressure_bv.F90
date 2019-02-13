@@ -395,9 +395,9 @@ subroutine pressure_force_4_linfs
     
     logical             :: do_interpTS=.true.
     integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
-    real(kind=WP)       :: hpress_n_bottom(3), hpress_e_bottom(3)
+    real(kind=WP)       :: hpress_n_bottom(3)
     real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
-                           dZn, dZn_i, dh, dval, dZn_rho_grad(2),mean_e_rho
+                           dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
     real(kind=WP)       :: int_z_eta(2), drho_dx, dz_dx, drho_dz, aux_sum
     
@@ -443,8 +443,7 @@ subroutine pressure_force_4_linfs
             !___________________________________________________________________
             if(trim(which_pgf)=='nemo'       .or. &
                trim(which_pgf)=='nemomin'    .or. &
-               trim(which_pgf)=='adcroft'    .or. &
-               trim(which_pgf)=='pacanowski') then
+               trim(which_pgf)=='adcroft'    ) then
                
                 !_______________________________________________________________
                 ! 1) loop over mid-depth levels to calculate the pressure gradient 
@@ -601,50 +600,11 @@ subroutine pressure_force_4_linfs
                                        +                                            &  
                                        density_m_rho0_slev(nlce  ,elnodes)*         &
                                        (zbar(nlce)-zbar(nlce+1))                    &
-                                      )   
+                                      )
                     !___________________________________________________________
                     pgf_x(nle,elem) = sum(gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
                     pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
                                       
-                !_______________________________________________________________
-                ! Calculate pressure gradient force (PGF) based on "Pacanowski and 
-                ! Gnanadesikan, Transient Response in a Z -Level Ocean Model That 
-                ! Resolves Topography with Partial Cells, 1998, Monthly Weather Review"
-                !
-                ! dp/dx|_(z=const) = dp/dx|_z(x,y) + [ dp/dz|_z=const * dz(x,y)/dx ] eq.30
-                !  --> with hydrostatic assumption: p(z) = int_z->0(rho*g*dz')
-                !  dp/dx|_(z=const)= g/rho_0 * [ d/dx* int_z(x,y)->0(rho*dz') - rho|z=const * dz(x,y)/dx] eq.32
-                !
-                ! --> in moment doesnt work et al, the correction term dZn_rho_grad
-                !     is not able to compensate the pressure error and noise in the 
-                !     bottom pressure 
-                ! --> leads to unrealistic deep overturning cells (>100Sv) along 
-                !     the equator 
-                ! --> better use shchepetkin (based on density jacobian method) 
-                elseif (trim(which_pgf)=='pacanowski') then
-                    nlce=nle
-                    !___________________________________________________________
-                    hpress_n_bottom = hpressure(nlce-1, elnodes)                    &
-                                        + 0.5_WP*g*                                 & 
-                                        (density_m_rho0(nlce-1, elnodes)*           &
-                                                  hnode(nlce-1, elnodes)            &
-                                            +                                       &
-                                         density_m_rho0(nlce  , elnodes)*           &
-                                                  hnode(nlce  , elnodes)            &
-                                        )
-                    mean_e_rho      = sum(density_m_rho0(nlce , elnodes))/3.0_WP
-                    !___________________________________________________________
-                    ! calculate vertical pressure correction from Pacanowski et 
-                    ! al 1998 only for bottom layer calculate gradient of 
-                    ! Z_3d_n at nodal bottom 
-                    dZn_rho_grad(1) = sum(gradient_sca(1:3  ,elem)*Z_3d_n(nlce,elnodes))
-                    dZn_rho_grad(2) = sum(gradient_sca(4:6  ,elem)*Z_3d_n(nlce,elnodes))
-                    dZn_rho_grad    = g*dZn_rho_grad*mean_e_rho
-                    
-                    !___________________________________________________________
-                    pgf_x(nle,elem) = (sum(gradient_sca(1:3,elem)*hpress_n_bottom)+dZn_rho_grad(1))/density_0
-                    pgf_y(nle,elem) = (sum(gradient_sca(4:6,elem)*hpress_n_bottom)+dZn_rho_grad(2))/density_0
-                    
                 end if !-->if (trim(which_pgf)=='nemo' .or. trim(which_pgf)=='nemomin') then
                 
             !___________________________________________________________________
@@ -666,16 +626,16 @@ subroutine pressure_force_4_linfs
                 !_______________________________________________________________
                 ! calcualte surface zonal pressure gradient
                 drho_dx       = sum(gradient_sca(1:3,elem)*density_m_rho0(1,elnodes))
-                aux_sum       = drho_dx*helem(1,elem)               
-                pgf_x(1,elem) = (int_z_eta(1) + aux_sum*0.5_WP)*g/density_0
-                int_z_eta(1)  =  int_z_eta(1) + aux_sum
+                aux_sum       = drho_dx*helem(1,elem)*g/density_0     
+                pgf_x(1,elem) = int_z_eta(1) + aux_sum*0.5_WP
+                int_z_eta(1)  = int_z_eta(1) + aux_sum
                 
                 !_______________________________________________________________
                 ! calcualte surface meridional pressure gradient
                 drho_dx       = sum(gradient_sca(4:6,elem)*density_m_rho0(1,elnodes))
-                aux_sum       = drho_dx*helem(1,elem)               
-                pgf_y(1,elem) = (int_z_eta(2) + aux_sum*0.5_WP)*g/density_0
-                int_z_eta(2)  =  int_z_eta(2) + aux_sum
+                aux_sum       = drho_dx*helem(1,elem)*g/density_0       
+                pgf_y(1,elem) = int_z_eta(2) + aux_sum*0.5_WP
+                int_z_eta(2)  = int_z_eta(2) + aux_sum
                 
                 !_______________________________________________________________
                 ! calculate pressure gradient for subsurface layer until bottom 
@@ -689,22 +649,47 @@ subroutine pressure_force_4_linfs
                                        sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
                     
                     !___________________________________________________________
+                    ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
                     ! zonal gradients
                     drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
                     dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)               
-                    pgf_x(nlz,elem) = (int_z_eta(1) + aux_sum*0.5_WP)*g/density_0
-                    int_z_eta(1)    =  int_z_eta(1) + aux_sum
+                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
+                    pgf_x(nlz,elem) = int_z_eta(1) + aux_sum*0.5_WP
+                    int_z_eta(1)    = int_z_eta(1) + aux_sum
                     
-                    !___________________________________________________________
                     ! meridional gradients
                     drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
                     dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)               
-                    pgf_y(nlz,elem) = (int_z_eta(2) + aux_sum*0.5_WP)*g/density_0
-                    int_z_eta(2)    =  int_z_eta(2) + aux_sum
+                    aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
+                    pgf_y(nlz,elem) = int_z_eta(2) + aux_sum*0.5_WP
+                    int_z_eta(2)    = int_z_eta(2) + aux_sum
                     
                 end do
+                
+!!PS             !___________________________________________________________________
+!!PS             ! Calculate pressure gradient force (PGF) like proposed by adcroft 
+!!PS             ! (and Sergey: "...in terms of PGF simpler and stable is better... !!!")
+!!PS             ! --> supposedly used in MITGCM... 
+!!PS             ! --> to calculate pressure gradient force always over the standard depth levels
+!!PS             !     dont care if there are partial cells or not although density points 
+!!PS             !     sits on partial mid depth level
+!!PS             elseif (trim(which_pgf)=='adcroft2') then
+!!PS                 int_z_eta = 0.0_WP
+!!PS                 do nlz=1,nle 
+!!PS                     !___________________________________________________________
+!!PS                     ! zonal gradients
+!!PS                     drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+!!PS                     aux_sum         = drho_dx*(zbar(nlz)-zbar(nlz+1))*g/density_0
+!!PS                     pgf_x(nlz,elem) = int_z_eta(1) + aux_sum*0.5_WP
+!!PS                     int_z_eta(1)    = int_z_eta(1) + aux_sum
+!!PS                     
+!!PS                     ! meridional gradients
+!!PS                     drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+!!PS                     aux_sum         = drho_dx*(zbar(nlz)-zbar(nlz+1))*g/density_0
+!!PS                     pgf_y(nlz,elem) = int_z_eta(2) + aux_sum*0.5_WP
+!!PS                     int_z_eta(2)    = int_z_eta(2) + aux_sum
+!!PS                 end do ! --> do nlz=1,nle 
+            
             end if 
         end do ! --> do elem=1, myDim_elem2D
     end if ! --> if (trim(which_ale)=='linfs' .and. (.not. use_partial_cell) ) then
@@ -726,7 +711,7 @@ end subroutine pressure_force_4_linfs
 !
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 23.01.2019
-subroutine pressure_force_4_zxxxx_pacanowski_1998
+subroutine pressure_force_4_zxxxx
     use o_PARAM
     use o_MESH
     use o_ARRAYS
@@ -735,11 +720,12 @@ subroutine pressure_force_4_zxxxx_pacanowski_1998
     implicit none
     
     logical             :: do_interpTS=.true.
-    integer             :: elem, elnodes(3), nle, nlz, ni, nln(3)
-    real(kind=WP)       :: interp_n_dens(3), interp_n_temp(3), interp_n_salt(3), &
-                           dZn(3), dZn_i(3), dval(3)
-    real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
-    real(kind=WP)       :: int_n_rho_dh(3), int_n_rho_dh_grad(2), dZn_rho_grad(2) 
+    integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
+    real(kind=WP)       :: hpress_n_bottom(3)
+    real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
+                           dZn, dZn_i, dh, dval 
+    real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
+    real(kind=WP)       :: int_z_eta(2), drho_dx, dz_dx, drho_dz, aux_sum, deta_dx
     
     !_______________________________________________________________________
     ! loop over triangular elemments
@@ -749,103 +735,194 @@ subroutine pressure_force_4_zxxxx_pacanowski_1998
         nle          = nlevels(elem)-1
         
         !___________________________________________________________________
-        ! calculate mid depth element level --> Z_e
-        zbar_n       = 0.0_WP
-        Z_n          = 0.0_WP
-        zbar_n(nle+1)= zbar_e_bot(elem)
-        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
-        do nlz=nle,2,-1
-            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
-            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
-        end do
-        zbar_n(1) = zbar_n(2) + helem(1,elem)
-        
-        ! --> zbar_n    ... depth of level at elements
-        ! --> Z_n       ... depth of mid-depth level at elements
-        ! --> zbar_n_3d ... depth of level at nodes
-        ! --> Z_n_3d    ... depth of mid-depth level at nodes
-        
-        !___________________________________________________________________
         ! node indices of elem 
-        elnodes = elem2D_nodes(:,elem) 
-        nln     = nlevels_nod2d(elnodes)
+        elnodes      = elem2D_nodes(:,elem) 
         
-        !___________________________________________________________________
-        int_n_rho_dh     = 0.0_WP
-        do nlz=1,nle 
-            !_______________________________________________________________
-            ! calculate: rho|z=const
-            ! case of partial cells --> bottom density interpolation/extrapolation
-            if ( any(Z_3d_n(nlz,elnodes)/=Z_n(nlz)) ) then
-                dZn           = Z_3d_n(nlz,elnodes)-Z_3d_n(nlz-1,elnodes)
-                dZn_i         = Z_n(nlz)           -Z_3d_n(nlz-1,elnodes)
+        !_______________________________________________________________________
+        ! Calculate pressure gradient force (PGF) like in NEMO 
+        ! based on NEMO ocean engine Gurvan Madec, and the NEMO team 
+        ! gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
+        ! --> interpolate all three densites to mid depth of element
+        if (trim(which_pgf)=='nemo' .or. trim(which_pgf)=='nemomin') then
+            !___________________________________________________________________
+            ! calculate mid depth element level --> Z_e
+            zbar_n       = 0.0_WP
+            Z_n          = 0.0_WP
+            zbar_n(nle+1)= zbar_e_bot(elem)
+            Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)/2.0_WP
+            do nlz=nle,2,-1
+                zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+                Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)/2.0_WP
+            end do
+            zbar_n(1) = zbar_n(2) + helem(1,elem)
+            
+            ! --> zbar_n    ... depth of level at elements
+            ! --> Z_n       ... depth of mid-depth level at elements
+            ! --> zbar_n_3d ... depth of level at nodes
+            ! --> Z_n_3d    ... depth of mid-depth level at nodes
+            
+            !___________________________________________________________________
+            ! nln...number of mid-depth levels at node
+            nln         = nlevels_nod2d(elnodes)
+        
+            !___________________________________________________________________
+            ! loop from surface to bottom 
+            do nlz=1,nle 
+                !_______________________________________________________________
+                ! loop over nodal indices of element
+                do ni=1,3
+                    !___________________________________________________________
+                    ! Calculate pressure gradient force (PGF) like in NEMO 
+                    ! based on NEMO ocean engine Gurvan Madec, and the NEMO team 
+                    ! gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
+                    ! ! --> interpolate all three densites to mid depth of element
+                    if     (trim(which_pgf)=='nemo') then
+                        !_______________________________________________________
+                        ! calculate vertical center index for linear 
+                        ! interpolation/extrapolation, densities are interpolate 
+                        ! to the mid-depth of the element --> extrapolation
+                        ! possible 
+                        nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-Z_n(nlz),1,& 
+                                        Z_3d_n(1:nln(ni),elnodes(ni))-Z_n(nlz)>0.0_WP &  ! mask for index selection
+                                        )+1
+                        ! center index can not be deeper than nodal bottom 
+                        ! layer index --> will do extrapolation
+                        nlc   = min(nlc,nln(ni)) 
+                        dZn   = Z_3d_n(nlc,elnodes(ni))-Z_3d_n(nlc-1,elnodes(ni))
+                        dZn_i = Z_n(nlz)               -Z_3d_n(nlc-1,elnodes(ni))
+                        dh    = helem(nlz  ,elem)
+                        
+                    elseif (trim(which_pgf)=='nemomin') then    
+                        !_______________________________________________________
+                        ! calculate vertical center index for linear 
+                        ! interpolation, densities are interpolated
+                        ! to shallowest nodal mid depth level that contribute
+                        ! to element --> advantage no extrapolation neccessary
+                        nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nlz,elnodes)),1,& 
+                                        Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nlz,elnodes))>0.0_WP &  ! mask for index selection
+                                        )+1
+                        nlc   = min(nlc,nln(ni)) 
+                        dZn   = Z_3d_n(nlc,elnodes(ni))    -Z_3d_n(nlc-1,elnodes(ni))
+                        dZn_i = maxval(Z_3d_n(nlz,elnodes))-Z_3d_n(nlc-1,elnodes(ni))
+                        dh    = minval(hnode(nlz  ,elnodes)) 
+                    end if             
+                    
+                    !___________________________________________________________
+                    ! Option (A): interpolate density directly ...
+                    if (.not. do_interpTS ) then 
+                        dval              = density_m_rho0(nlc  ,elnodes(ni))-density_m_rho0(nlc-1,elnodes(ni))
+                        interp_n_dens(ni) = density_m_rho0(nlc-1,elnodes(ni)) + (dval/dZn*dZn_i)
+                        
+                    ! Option (B): NEMO ocean engine Gurvan Madec, and the NEMO team suggest 
+                    ! not to linearly interpolate the density towards the bottom rather to 
+                    ! interpolate temperature and salinity and calculate from them the 
+                    ! bottom density to account for the non linearities in the equation of 
+                    ! state ...
+                    else
+                        ! ... interpolate temperature and saltinity ...
+                        dval          = tr_arr(nlc,  elnodes(ni),1) - tr_arr(nlc-1,elnodes(ni),1)
+                        interp_n_temp = tr_arr(nlc-1,elnodes(ni),1) + (dval/dZn*dZn_i)
+                        dval          = tr_arr(nlc  ,elnodes(ni),2) - tr_arr(nlc-1,elnodes(ni),2)
+                        interp_n_salt = tr_arr(nlc-1,elnodes(ni),2) + (dval/dZn*dZn_i)
+                        
+                        ! calculate density at element mid-depth bottom depth via 
+                        ! equation of state from linear interpolated temperature and 
+                        ! salinity
+                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
+                        interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
+                        interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))-density_0
+                        
+                    end if 
+                    
+                    ! calculate proper starting level for extrapolation of 
+                    ! bottom pressure
+                    nlce = min(nlc,nlz)
+                    
+                    !___________________________________________________________
+                    ! integrate nodal density until mid-depth level of bottom 
+                    ! element using linearly interpolated nodal bottom density 
+                    ! (interp_n_dens) to obtain bottom pressure value
+                    hpress_n_bottom(ni) = hpressure(nlce-1, elnodes(ni))        &
+                                            + 0.5_WP*g*                         & 
+                                            (density_m_rho0(nlce-1,elnodes(ni))*&
+                                                      hnode(nlce-1,elnodes(ni)) & 
+                                            +                                   &  
+                                            interp_n_dens(ni)*dh                &
+                                            )                             
+                end do ! --> do ni=1,3
+                !_______________________________________________________________
+                pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpress_n_bottom)/density_0
+                pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
+                    
+            end do ! --> do nlz=1,nle         
+                    
+        !_______________________________________________________________________
+        ! Calculate pressure gradient force (PGF) based on "Shchepetkin 
+        ! and McWilliams," A method for computing horizontal pressure-gradient
+        ! force in an oceanic model with a nonaligned vertical coordinate",
+        ! Journal of geophysical research, vol 108, no C3, 3090
+        ! --> based on density jacobian method ...
+        ! --> equation 1.7
+        ! 
+        ! -1/rho_0* dP/dx|_z = -1/rho_0*dP/dx|_z=eta - g/rho_0*int_z^eta( drho/dx|_z)*dz'
+        !
+        !                    = g*rho(eta)/rho_0*deta/dx
+        !                      - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+        !
+        elseif (trim(which_pgf)=='shchepetkin') then
+            
+            !___________________________________________________________________
+            ! --> g*rho(eta)/rho_0*deta/dx
+            deta_dx       = sum(gradient_sca(1:3,elem)*eta_n(elnodes))
+            int_z_eta(1)  = deta_dx*sum(density_m_rho0(1,elnodes))/3.0_WP*g/density_0
+            deta_dx       = sum(gradient_sca(4:6,elem)*eta_n(elnodes))
+            int_z_eta(2)  = deta_dx*sum(density_m_rho0(1,elnodes))/3.0_WP*g/density_0
+            
+            !___________________________________________________________________
+            ! --> ...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! calcualte surface zonal pressure gradient
+            drho_dx       = sum(gradient_sca(1:3,elem)*density_m_rho0(1,elnodes))
+            aux_sum       = drho_dx*helem(1,elem)*g/density_0
+            pgf_x(1,elem) = int_z_eta(1) + aux_sum*0.5_WP
+            int_z_eta(1)  = int_z_eta(1) + aux_sum
+            
+            ! calcualte surface meridional pressure gradient
+            drho_dx       = sum(gradient_sca(4:6,elem)*density_m_rho0(1,elnodes))
+            aux_sum       = drho_dx*helem(1,elem)*g/density_0
+            pgf_y(1,elem) = int_z_eta(2) + aux_sum*0.5_WP
+            int_z_eta(2)  = int_z_eta(2) + aux_sum
+            
+            !___________________________________________________________________
+            ! calculate pressure gradient for subsurface layer until bottom 
+            do nlz=2,nle 
+                !_______________________________________________________________
+                ! vertical gradient --> with average density and average 
+                ! mid-depth level on element
+                drho_dz         = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-&
+                                   sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)/&
+                                  (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-&
+                                   sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
+                    
+                !_______________________________________________________________
+                ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+                ! zonal gradients
+                drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+                dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+                aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0               
+                pgf_x(nlz,elem) = int_z_eta(1) + aux_sum*0.5_WP
+                int_z_eta(1)    = int_z_eta(1) + aux_sum
                 
-                ! Option (A): interpolate density directly ...
-                if (.not. do_interpTS )then 
-                    dval          = density_m_rho0(nlz,elnodes)-density_m_rho0(nlz-1,elnodes)
-                    interp_n_dens = density_m_rho0(nlz-1,elnodes) + (dval/dZn*dZn_i)
-                ! Option (B): NEMO ocean engine Gurvan Madec, and the NEMO team suggest 
-                ! not to linearly interpolate the density towards the bottom rather to 
-                ! interpolate temperature and salinity and calculate from them the 
-                ! bottom density to account for the non linearities in the equation of 
-                ! state ...
-                else
-                    dval          = tr_arr(nlz,elnodes,1)-tr_arr(nlz-1,elnodes,1)
-                    interp_n_temp = tr_arr(nlz-1,elnodes,1) + (dval/dZn*dZn_i)
-                    dval          = tr_arr(nlz,elnodes,2)-tr_arr(nlz-1,elnodes,2)
-                    interp_n_salt = tr_arr(nlz-1,elnodes,2) + (dval/dZn*dZn_i)
-                    ! calculate density via equation of state from linear 
-                    ! interpolated temperature and salinity
-                    do ni=1,3
-                        call densityJM_components(interp_n_temp(ni), interp_n_salt(ni), &
-                                                bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni))
-                            interp_n_dens(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
-                            interp_n_dens(ni) = interp_n_dens(ni)*rhopot(ni)/(interp_n_dens(ni)+0.1_WP*Z_n(nlz))-density_0
-                    end do
-                end if   
+                ! meridional gradients
+                drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+                dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+                aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0             
+                pgf_y(nlz,elem) = int_z_eta(2) + aux_sum*0.5_WP
+                int_z_eta(2)    = int_z_eta(2) + aux_sum
                 
-            ! case of full cells 
-            else
-                interp_n_dens = density_m_rho0(nlz,elnodes)
-            end if
-            
-            !_______________________________________________________________
-            ! calculate:  d/dx* int_Zn(x,y)->0(rho*dz')
-            ! vertical integrate densities*hnode at vertices --> calculate 
-            ! pressure at vertices
-            if (nlz==1) then
-                int_n_rho_dh  = int_n_rho_dh + 0.5_WP*density_m_rho0(nlz,elnodes)*hnode(nlz,elnodes)
-            else
-                int_n_rho_dh  = int_n_rho_dh +                                           &
-                                0.5_WP*(                                                 &
-                                    density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes) + &
-                                    density_m_rho0(nlz  ,elnodes)*hnode(nlz  ,elnodes)   &
-                                        )                                            
-            end if
-            
-            ! calcualte gradient of pressure
-            int_n_rho_dh_grad(1) = sum( gradient_sca(1:3,elem)*int_n_rho_dh )
-            int_n_rho_dh_grad(2) = sum( gradient_sca(4:6,elem)*int_n_rho_dh )
-            
-            !_______________________________________________________________
-            ! calculate: rho|z=const*dZn(x,y)/dx
-            ! gradient of vertice mid depth vertical coordinate minus 
-            ! elemental mid depth vertical coordinate --> calculate vertical
-            ! pressure correction
-            dZn             = ( Z_3d_n(nlz,elnodes) - Z_n(nlz) ) 
-            dZn_rho_grad(1) = sum( gradient_sca(1:3,elem)*(dZn*interp_n_dens) )
-            dZn_rho_grad(2) = sum( gradient_sca(4:6,elem)*(dZn*interp_n_dens) )
-            
-            !_______________________________________________________________
-            ! calculate element wise pressure gradient force 
-            ! --> eq. 32 in Pacanowski et al 1998
-            ! --> different sign because here Zn is negative downward
-            pgf_x(nlz,elem) = g/density_0*( int_n_rho_dh_grad(1) + dZn_rho_grad(1))
-            pgf_y(nlz,elem) = g/density_0*( int_n_rho_dh_grad(2) + dZn_rho_grad(2))
-            
-        end do ! --> do nlz=1,nle-1            
+            end do
+        end if ! --> if (trim(which_pgf)=='nemo' .or. trim(which_pgf)=='nemomin') then
     end do ! --> do elem=1, myDim_elem2D
-end subroutine pressure_force_4_zxxxx_pacanowski_1998
+end subroutine pressure_force_4_zxxxx
 !
 !
 ! ===========================================================================
