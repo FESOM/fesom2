@@ -124,10 +124,13 @@ contains
     end do
 
     if(mype==0) then
-       write(*,*)'clock initialized at time ', timenew, daynew, yearnew
-       if(r_restart) then
-          write(*,*) 'this is a restart run'
-       end if
+        write(*,*)'clock initialized at time ', timenew, daynew, yearnew
+        if(r_restart) then
+            write(*,*)
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' --> THIS IS A RESTART RUN !!!'
+            write(*,*)
+        end if
     end if
   
   end subroutine clock_init

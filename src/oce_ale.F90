@@ -14,7 +14,7 @@
 !    
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
-subroutine ale_init
+subroutine init_ale
     USE o_PARAM
     USE o_MESH
     USE g_PARSUP
@@ -24,7 +24,6 @@ subroutine ale_init
     Implicit NONE
     
     integer             :: n, nzmax
-
     
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
@@ -54,8 +53,8 @@ subroutine ale_init
     allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
-    allocate(bottom_elem_thickness(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-    allocate(zbar_e_bot(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
+    allocate(bottom_elem_thickness(myDim_elem2D))
+    allocate(zbar_e_bot(myDim_elem2D)) 
     
     ! also change bottom thickness at nodes due to partial cell --> bottom 
     ! thickness at nodes is the volume weighted mean of sorounding elemental 
@@ -90,7 +89,7 @@ subroutine ale_init
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
-end subroutine ale_init
+end subroutine init_ale
 !
 !
 !===============================================================================
@@ -305,7 +304,7 @@ subroutine init_thickness_ale
     ! Fill in ssh_rhs_old
     ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
     
-    ! -->see equation (8) FESOM2:from finite elements to finie volume
+    ! -->see equation (14) FESOM2:from finite elements to finie volume
     eta_n=alpha*hbar_old+(1.0_WP-alpha)*hbar   
     
     if     (trim(which_ale)=='linfs') then
@@ -315,7 +314,6 @@ subroutine init_thickness_ale
         ! no layer thickness variation in any layer
         do n=1,myDim_nod2D+eDim_nod2D
             hnode(1,n)=(zbar(1)-zbar(2))
-!             do nz=2,nlevels_nod2D(n)-1
             do nz=2,nlevels_nod2D(n)-2
                 hnode(nz,n)=(zbar(nz)-zbar(nz+1))
             end do      
@@ -450,6 +448,7 @@ subroutine init_thickness_ale
     
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
+    
 end subroutine init_thickness_ale
 !
 !
@@ -646,7 +645,12 @@ subroutine restart_thickness_ale
             end if
             
             !___________________________________________________________________
-            dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+            ! for the first time steps of a restart or  initialisation dhe must 
+            ! be the absolute value of the elemental sea surface height, afterwards
+            ! when the stiffness matrix is update dhe becomes the anomaly between 
+            ! old and new elemental sea surface height (dhe(elem)=sum(hbar(elnodes)
+            ! -hbar_old(elnodes))/3.0_WP in subroutine compute_hbar_ale)
+            dhe(elem)=sum(hbar(elnodes))/3.0_WP
             
         end do ! --> do elem=1,myDim_elem2D
         
@@ -680,12 +684,16 @@ subroutine restart_thickness_ale
             end do
             
             !___________________________________________________________________
-            dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
+            ! for the first time steps of a restart or  initialisation dhe must 
+            ! be the absolute value of the elemental sea surface height, afterwards
+            ! when the stiffness matrix is update dhe becomes the anomaly between 
+            ! old and new elemental sea surface height (dhe(elem)=sum(hbar(elnodes)
+            ! -hbar_old(elnodes))/3.0_WP in subroutine compute_hbar_ale)
+            dhe(elem)=sum(hbar(elnodes))/3.0_WP
             
         end do
     endif
 end subroutine restart_thickness_ale
-!
 !
 !
 !===============================================================================
@@ -703,28 +711,31 @@ end subroutine restart_thickness_ale
 ! 
 ! To achive it we should use global arrays n_num and n_pos.
 ! Reserved for future. 
-subroutine stiff_mat_ale
+subroutine init_stiff_mat_ale
     use o_PARAM
     use o_MESH
     use g_PARSUP
-    use o_ARRAYS, only:zbar_e_bot,bottom_elem_thickness
+    use o_ARRAYS, only:zbar_e_bot
     use g_CONFIG
     implicit none
     
     integer                             :: n, n1, n2, i, j, row, ed, fileID
     integer                             :: elnodes(3), el(2)
     integer                             :: npos(3), offset, nini, nend
-    real(kind=WP)                       :: dmean, ff, factor, a 
-    real(kind=WP)                       :: fx(3), fy(3), ax, ay
+    real(kind=WP)                       :: factor, fy(3)
     integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
     integer, allocatable                :: mapping(:)
-    logical                             :: flag
-    character*10                        :: mype_string,npes_string
+    character*10                        :: npes_string
     character*1000                      :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
     
     t0=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '____________________________________________________________'
+        write(*,*) ' --> initialise ssh operator using unperturbed ocean depth'
+    endif
+    
     !___________________________________________________________________________
     ! a) pre allocate stiff_mat: dimenssion,  reduced row vector ... and number 
     ! of neighbors and idices of neighbors
@@ -807,7 +818,7 @@ subroutine stiff_mat_ale
     ! global node indices
     n_num=0 
     
-    ! 1st do secod term of lhs od equation (12) of "FESOM2 from finite element to finite volumes"
+    ! 1st do secod term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! stiffness part
     factor = g*dt*alpha*theta
     
@@ -830,6 +841,7 @@ subroutine stiff_mat_ale
             ! calc value for stiffness matrix something like H*div --> zbar is maximum depth(m)
             ! at element el(i)
             ! Attention: here corrected with bottom depth of partial cells !!!
+            
             fy(1:3) = (zbar_e_bot(el(i)))* &
                       ( gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)   &
                        -gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed) )
@@ -868,7 +880,7 @@ subroutine stiff_mat_ale
         end do
     end do
     
-    ! 2nd do first term of lhs od equation (12) of "FESOM2 from finite element to finite volumes"
+    ! 2nd do first term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! Mass matrix part
     do row=1, myDim_nod2D
         offset = ssh_stiff%rowptr(row)
@@ -877,13 +889,9 @@ subroutine stiff_mat_ale
     deallocate(n_pos,n_num)
     
     !___________________________________________________________________________
-    ! g)
-    ! =================================
-    ! Global contiguous numbers:
-    ! =================================
+    ! g) Global contiguous numbers:
     ! Now we need to exchange between PE to know their 
     ! numbers of non-zero entries (nza):
-    ! ================================= 
     allocate(pnza(npes), rpnza(npes))    
     pnza(1:npes)=0
     rpnza=0
@@ -907,15 +915,13 @@ subroutine stiff_mat_ale
     !    offset
     ssh_stiff%rowptr=ssh_stiff%rowptr+offset   ! pointers are global
     
-    ! =================================
+    !___________________________________________________________________________
     ! replace local nza with a global one
-    ! =================================
     ssh_stiff%nza=sum(rpnza(1:npes))
     deallocate(rpnza, pnza)
-    ! ==================================
-    ! colindices are now local to PE. We need to make them local
-    ! contiguous
-    ! ==================================
+    
+    !___________________________________________________________________________
+    ! colindices are now local to PE. We need to make them local contiguous
     ! (i) global natural: 
     do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
         ! myList_nod2D ... contains global node index of every meshpoit that belongs 
@@ -925,6 +931,7 @@ subroutine stiff_mat_ale
         ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
     end do
     
+    !___________________________________________________________________________
     allocate(mapping(nod2d))
     ! 0 proc reads the data in chunks and distributes it between other procs
     write(npes_string,"(I10)") npes
@@ -932,7 +939,7 @@ subroutine stiff_mat_ale
     file_name=trim(dist_mesh_dir)//'rpart.out'
     fileID=10
     if (mype==0) then
-        write(*,*) 'in stiff_mat_ale, reading ', trim(file_name)
+        write(*,*) '     > in stiff_mat_ale, reading ', trim(file_name)
         open(fileID, file=trim(file_name))
         ! n ... how many cpus
         read(fileID, *) n      
@@ -946,6 +953,7 @@ subroutine stiff_mat_ale
     end if
     call MPI_BCast(mapping, nod2D, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
     
+    !___________________________________________________________________________
     ! (ii) global PE contiguous: 
     do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
         ! convert global mesh node point numbering to global numbering of how the single 
@@ -957,13 +965,13 @@ subroutine stiff_mat_ale
     deallocate(mapping)
     t1=MPI_Wtime()
     if (mype==0) then
-        write(*,*) 'Building SSH operator took ', t1-t0, ' seconds'
-        write(*,*) '========================='
+        write(*,*) '     took: ',t1-t0, ' sec'
+        write(*,*) 
     endif
-end subroutine stiff_mat_ale
+end subroutine init_stiff_mat_ale
 !
 !
-!_______________________________________________________________________________
+!===============================================================================
 ! Update ssh stiffness matrix for a new elevation
 ! --> update second term on lhs of equation 18 in Danilov et al 2017
 !
@@ -977,7 +985,7 @@ end subroutine stiff_mat_ale
 !                                                                         due to changes in ssh is done here 
 !   = ssh_rhs                                                             in the update of the stiff matrix
 !
-subroutine stiff_mat_ale_update
+subroutine update_stiff_mat_ale
     use g_config,only: dt
     use o_PARAM
     use o_MESH
@@ -992,11 +1000,13 @@ subroutine stiff_mat_ale_update
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
     
+    !___________________________________________________________________________
+    ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
+    ! to finite volumes" --> stiff matrix part
+    ! loop over lcal edges
     allocate(n_num(myDim_nod2D+eDim_nod2D))
     n_num=0
     factor=g*dt*alpha*theta
-    !___________________________________________________________________________
-    ! loop over lcal edges
     do ed=1,myDim_edge2D   !! Attention
         ! enodes ... local node indices of nodes that edge ed
         enodes=edges(:,ed)
@@ -1056,6 +1066,7 @@ subroutine stiff_mat_ale_update
         end do ! --> do j=1,2 
     end do ! --> do ed=1,myDim_edge2D 
     deallocate(n_num)
+
 !DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
 !if (mype==0) then
 !do row=1, myDim_nod2D
@@ -1068,8 +1079,7 @@ subroutine stiff_mat_ale_update
 !end do
 !end if
 !DS
-
-end subroutine stiff_mat_ale_update
+end subroutine update_stiff_mat_ale
 !
 !
 !===============================================================================
@@ -1583,9 +1593,11 @@ subroutine vert_vel_ale
         write(*,*) ' --> fatal problem <--: layerthickness of a layer became smaller zero'    
         do n=1, myDim_nod2D+eDim_nod2D
             if (any( hnode_new(:,n)<0.0_WP)) then
-                write(*,*) "mype = ", mype
-                write(*,*) "node = ", n
+                write(*,*) "          mype = ", mype
+                write(*,*) "         mstep = ", mstep
+                write(*,*) "          node = ", n
                 write(*,*) "hnode_new(:,n) = ", hnode_new(:,n)
+                write(*,*) "hnode(:,n)     = ", hnode(:,n)
                 write(*,*) "zbar_3d_n(:,n) = ", zbar_3d_n(:,n)
                 write(*,*) "Z_3d_n(:,n)    = ", Z_3d_n(:,n)
                 write(*,*) "zbar_n_bot(n)  = ", zbar_n_bot(n)
@@ -1593,7 +1605,7 @@ subroutine vert_vel_ale
                 write(*,*)
             end if 
         end do
-!!PS         call par_ex(1)
+        call par_ex(1)
     endif
     
     !___________________________________________________________________________
@@ -1634,7 +1646,6 @@ subroutine vert_vel_ale
     ! Split implicit vertical velocity onto implicit and explicit components
     if (w_split) then
         do n=1, myDim_nod2D+eDim_nod2D
-!             do nz=1,nlevels_nod2D(n)-1
             do nz=1,nlevels_nod2D(n)
                 Wvel_e(nz,n)=min(max(Wvel(nz,n), -w_exp_max), w_exp_max)
             end do
@@ -1927,7 +1938,7 @@ subroutine oce_timestep_ale(n)
     t0=MPI_Wtime()
     
     !___________________________________________________________________________
-    ! calculate equation of state, density, pressure and mimxed layer depths
+    ! calculate equation of state, density, pressure and mixed layer depths
     call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
     
     !___________________________________________________________________________
@@ -1937,7 +1948,6 @@ subroutine oce_timestep_ale(n)
         ! cells the bottom cell is treated slightly differently
         if (trim(which_pgf)=='nemo'           .or. &
             trim(which_pgf)=='nemomin'        .or. & 
-            trim(which_pgf)=='pacanowski'     .or. &
             trim(which_pgf)=='adcroft'        .or. &
             trim(which_pgf)=='adcroft2'       .or. &
             trim(which_pgf)=='shchepetkin' ) then    
@@ -1954,15 +1964,21 @@ subroutine oce_timestep_ale(n)
             call par_ex(1)
         endif     
     else    
-!!PS         call pressure_force_cubic_spline
-!!PS         water_flux = 0.0_WP
-!!PS         heat_flux  = 0.0_WP
         if (trim(which_pgf)=='nemo'           .or. &
             trim(which_pgf)=='nemomin'        .or. & 
             trim(which_pgf)=='shchepetkin') then    
             call pressure_force_4_zxxxx
         elseif (trim(which_pgf)=='cubic-spline') then    
             call pressure_force_cubic_spline
+        else
+            write(*,*) '________________________________________________________'
+            write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
+            write(*,*) '            calculation (PGF) is not supported for      '
+            write(*,*) '            zlevel/zstar !!!'
+            write(*,*) '            see in namelist.oce --> which_pgf = nemo,   '
+            write(*,*) '            nemomin, shchepetkin, cubic-spline          '
+            write(*,*) '________________________________________________________'
+            call par_ex(1)
         end if
     end if
         
@@ -2011,11 +2027,12 @@ subroutine oce_timestep_ale(n)
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
-    ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements
-    if (.not. trim(which_ale)=='linfs') call stiff_mat_ale_update 
+    ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
+    ! needed for zlevel and zstar
+    if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale
     
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
-    ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (12) rhs
+    ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
     call compute_ssh_rhs_ale
     
     ! Take updated ssh matrix and solve --> new ssh!
@@ -2034,7 +2051,7 @@ subroutine oce_timestep_ale(n)
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
-    ! equation (7) Danlov et.al "the finite volume sea ice ocean model FESOM2
+    ! equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
     ! ...if we do it here we don't need to write hbar_old into a restart file...
     eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 
@@ -2056,7 +2073,7 @@ subroutine oce_timestep_ale(n)
     t6=MPI_Wtime() 
     
     !___________________________________________________________________________
-    !The main step of ALE procedure --> this is were the magic happens --> here 
+    ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     call vert_vel_ale 
     t7=MPI_Wtime() 

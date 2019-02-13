@@ -538,8 +538,13 @@ allocate(nlevels_nod2D(nod2D))
    DO n=1, elem2D
       nodes=elem2D_nodes(1:3,n)
       
+      ! depth of element is  shallowest depth of sorounding vertices
       !dmean=maxval(depth(nodes))
+      
+      ! depth of element is deepest depth of sorounding vertices
       !dmean=minval(depth(nodes))
+      
+      ! depth of element is  mean depth of sorounding vertices
       dmean=sum(depth(nodes))/3.0
       exit_flag=0
           DO nz=1,nl-1

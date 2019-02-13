@@ -98,16 +98,16 @@ subroutine ini_ocean_io(year)
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call def_variable(oid, 'ssh',         (/nod2D/),  'sea surface elevation', 'm', eta_n);
+  call def_variable(oid, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n);
   !___ALE related fields______________________________________________________
-  call def_variable(oid, 'hbar',        (/nod2D/), 'ALE surface elevation hbar_n+0.5', 'm', hbar);
-  call def_variable(oid, 'hbar_old',    (/nod2D/), 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
-  call def_variable(oid, 'ssh_rhs',     (/nod2D/), 'RHS for the elevation', '?', ssh_rhs);
-  call def_variable(oid, 'ssh_rhs_old', (/nod2D/), 'RHS for the elevation', '?', ssh_rhs_old);
+  call def_variable(oid, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar);
+!!PS   call def_variable(oid, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs);
+  call def_variable(oid, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old);
+  call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
+  
   !___Define the netCDF variables for 3D fields_______________________________
-  call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'ALE stuff', '?', hnode);
-  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity', 'm/s', UV(1,:,:));
-  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity', 'm/s', UV(2,:,:));
+  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:));
+  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
   call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
   call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
 
@@ -160,21 +160,12 @@ subroutine ini_ice_io(year)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  !___SSH_____________________________________________________________________
-  call def_variable(iid, 'area',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice);
-  call def_variable(iid, 'hice',         (/nod2D/),  'effective ice thickness',    'm', m_ice);
-  call def_variable(iid, 'hsnow',        (/nod2D/),  'effective snow thickness',   'm', m_snow);
-  call def_variable(iid, 'uice',         (/nod2D/),  'zonal velocity',    'm/s', u_ice);
-  call def_variable(iid, 'vice',         (/nod2D/),  'meridional velocity', 'm', v_ice);
-  call def_variable(iid, 'area_old',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice_old); !PS
-  call def_variable(iid, 'hice_old',         (/nod2D/),  'effective ice thickness',    'm', m_ice_old); !PS
-  call def_variable(iid, 'hsnow_old',        (/nod2D/),  'effective snow thickness',   'm', m_snow_old); !PS
-  call def_variable(iid, 'uice_old',         (/nod2D/),  'zonal velocity',    'm/s', u_ice_old);
-  call def_variable(iid, 'vice_old',         (/nod2D/),  'meridional velocity', 'm', v_ice_old);
-  call def_variable(iid, 'heat_flux',         (/nod2D/),  'heat flux ',    '?', heat_flux); !PS
-  call def_variable(iid, 'heat_flux_old',         (/nod2D/),  'heat flux old',    '?', heat_flux_old); !PS
-  call def_variable(iid, 'water_flux',         (/nod2D/),  'water flux ',    '?', water_flux); !PS
-  call def_variable(iid, 'water_flux_old',         (/nod2D/),  'water flux old',    '?', water_flux_old); !PS
+  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
+  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
+  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
+  call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
+  call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
