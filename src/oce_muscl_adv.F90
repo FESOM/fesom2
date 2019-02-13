@@ -15,63 +15,88 @@
 !	find_up_downwind_triangles
 !	fill_up_dn_grad
 !	adv_tracer_muscl
-SUBROUTINE muscl_adv_init
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-use g_comm_auto
-use g_config
-IMPLICIT NONE
-integer     :: n, k, n1, n2, n_num
-integer     :: nz
-call find_up_downwind_triangles
-n_num=0
-  DO n=1, myDim_nod2D
-  k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
-  if(k>n_num) n_num=k
-  END DO
-  allocate(nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
-  allocate(nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer nboundary_lay(n)
-  allocate(nn_num(myDim_nod2D), nn_pos(n_num,myDim_nod2D))
-                    !! These are the same arrays that we also use in quadratic
-		    !! reconstruction
-  !MOVE IT TO SOMEWHERE ELSE
-  DO n=1,myDim_nod2d
-     nn_num(n)=1
-     nn_pos(1,n)=n
-  end do   
-
-	nboundary_lay=nl-1
-	Do n=1, myDim_edge2D
-		n1=edges(1,n)
-		n2=edges(2,n)
-		if(n1<=myDim_nod2D) then
-			nn_pos(nn_num(n1)+1,n1)=n2
-			nn_num(n1)=nn_num(n1)+1
-		end if
-		if(n2<=myDim_nod2D) then
-			nn_pos(nn_num(n2)+1,n2)=n1
-			nn_num(n2)=nn_num(n2)+1
-		end if
-		if (any(edge_tri(:,n)<=0)) then
-			! this edge nodes is already at the surface at the boundary ...
-			! later here ...sign(1, nboundary_lay(enodes(1))-nz) for nz=1 must be negativ
-			! thats why here nboundary_lay(edges(:,n))=0
-			nboundary_lay(edges(:,n))=0
-		else
-			! this edge nodes become boundary edge with increasing depth due to bottom topography
-			! at the depth nboundary_lay the edge (edgepoints) still has two valid ocean triangles
-			! below that depth, edge becomes boundary edge
-			nboundary_lay(edges(1,n))=min(nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
-			nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
-		end if
-	END DO  
-	DO n=1, myDim_nod2d
-		k=nod_in_elem2D_num(n)
-		nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
-	END DO
-	call exchange_nod(nlevels_nod2D_min)
+subroutine muscl_adv_init
+    use o_MESH
+    use o_ARRAYS
+    use o_PARAM
+    use g_PARSUP
+    use g_comm_auto
+    use g_config
+    IMPLICIT NONE
+    integer     :: n, k, n1, n2, n_num
+    integer     :: nz
+    !___________________________________________________________________________
+    ! find upwind and downwind triangle for each local edge 
+    call find_up_downwind_triangles
+    
+    !___________________________________________________________________________
+    n_num=0
+    do n=1, myDim_nod2D
+        ! get number of  neighbouring nodes from sparse stiffness matrix
+        ! stiffnes matrix filled up in subroutine init_stiff_mat_ale
+        ! --> SSH_stiff%rowptr... compressed row index of sparse matrix
+        ! --> SSH_stiff%values... array with values at row column location, has legth nod2d+1
+        ! --> SSH_stiff%rowptr(n) ... gives index location in SSH_stiff%values where the 
+        !                             next value switches to a new row
+        ! --> SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n) gives maximum number of 
+        !     neighbouring nodes within a single row of the sparse matrix
+        k=SSH_stiff%rowptr(n+1)-SSH_stiff%rowptr(n)
+        if(k>n_num) n_num=k ! nnum maximum number of neighbouring nodes
+    end do
+    
+    !___________________________________________________________________________
+    allocate(nn_num(myDim_nod2D), nn_pos(n_num,myDim_nod2D))
+    ! These are the same arrays that we also use in quadratic reconstruction
+    !MOVE IT TO SOMEWHERE ELSE
+    do n=1,myDim_nod2d
+        ! number of neigbouring nodes to node n
+        nn_num(n)=1
+        ! local position of neigbouring nodes
+        nn_pos(1,n)=n
+    end do   
+    
+    !___________________________________________________________________________
+    allocate(nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+    allocate(nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer nboundary_lay(n)
+    nboundary_lay=nl-1
+    do n=1, myDim_edge2D
+        ! n1 and n2 are local indices 
+        n1=edges(1,n)
+        n2=edges(2,n)
+        ! ... if(n1<=myDim_nod2D) --> because dont use extended nodes
+        if(n1<=myDim_nod2D) then
+            nn_pos(nn_num(n1)+1,n1)=n2
+            nn_num(n1)=nn_num(n1)+1
+        end if
+        
+        ! ... if(n2<=myDim_nod2D) --> because dont use extended nodes
+        if(n2<=myDim_nod2D) then
+            nn_pos(nn_num(n2)+1,n2)=n1
+            nn_num(n2)=nn_num(n2)+1
+        end if
+        
+        if (any(edge_tri(:,n)<=0)) then
+            ! this edge nodes is already at the surface at the boundary ...
+            ! later here ...sign(1, nboundary_lay(enodes(1))-nz) for nz=1 must be negativ
+            ! thats why here nboundary_lay(edges(:,n))=0
+            nboundary_lay(edges(:,n))=0
+        else
+            ! this edge nodes become boundary edge with increasing depth due to bottom topography
+            ! at the depth nboundary_lay the edge (edgepoints) still has two valid ocean triangles
+            ! below that depth, edge becomes boundary edge
+            nboundary_lay(edges(1,n))=min(nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
+            nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
+        end if
+    end do
+    
+    !___________________________________________________________________________
+    do n=1, myDim_nod2d
+        k=nod_in_elem2D_num(n)
+        ! minimum depth in neigbouring nodes around node n
+        nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
+    end do
+    call exchange_nod(nlevels_nod2D_min)
+    
 end SUBROUTINE muscl_adv_init
 !=======================================================================
 SUBROUTINE find_up_downwind_triangles
