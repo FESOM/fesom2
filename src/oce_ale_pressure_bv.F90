@@ -726,7 +726,7 @@ end subroutine pressure_force_4_linfs
 !
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 23.01.2019
-subroutine pressure_force_4_zxxxx_pacanowski_1998
+subroutine pressure_force_4_zxxxx
     use o_PARAM
     use o_MESH
     use o_ARRAYS
@@ -845,7 +845,7 @@ subroutine pressure_force_4_zxxxx_pacanowski_1998
             
         end do ! --> do nlz=1,nle-1            
     end do ! --> do elem=1, myDim_elem2D
-end subroutine pressure_force_4_zxxxx_pacanowski_1998
+end subroutine pressure_force_4_zxxxx
 !
 !
 ! ===========================================================================
