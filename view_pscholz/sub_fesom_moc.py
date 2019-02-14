@@ -15,7 +15,8 @@ import xarray
 #| Global MOC, Atlantik MOC, Indo-Pacific MOC, Indo MOC                        |
 #|                                                                             |
 #+_____________________________________________________________________________+
-def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
+def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',\
+              in_elemidx=[], out_elemidx=False, usemeshdiag=[]):
     #do_onelem=False
     #_________________________________________________________________________________________________
     t1=time.time()
@@ -198,10 +199,21 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
 #+___PLOT MERIDIONAL OVERTRUNING CIRCULATION  _________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time='',figsize=[],crange=[],cnumb=20):    
+def plot_xmoc(lat, depth, moc, bottom=[], which_moc='gmoc',
+              str_descript='', str_time='', figsize=[], crange=[], cnumb=20,
+              do_clabel=True, do_subplot=[]):    
     
+    #___________________________________________________________________________
     if len(figsize)==0: figsize=[13,6]
-    fig= plt.figure(figsize=figsize)
+    
+    #___________________________________________________________________________
+    # plot is not part of subplot
+    if len(do_subplot)==0:
+        fig = plt.figure(figsize=figsize)
+        ax1 = plt.gca()
+    else:
+        fig = do_subplot[0]
+        ax1 = do_subplot[1]
     
     resolution = 'c'
     fsize = 10
@@ -224,12 +236,13 @@ def plot_xmoc(lat,depth,moc,bottom=[],which_moc='gmoc',str_descript='',str_time=
     #+_________________________________________________________________________+
     #| plot AXES1                                                              |
     #+_________________________________________________________________________+
-    ax1 = plt.gca()    
+    plt.sca(ax1)
     data_plot = moc
     data_plot[data_plot<clevel[ 0]]  = clevel[ 0]+np.finfo(np.float32).eps
     data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
     hp1=plt.contourf(lat,depth,data_plot,levels=clevel,extend='both',cmap=cmap0)
-    plt.contour(lat,depth,data_plot,levels=clevel,colors='k',linewidths=[0.5,0.25],antialised=True)
+    CS=plt.contour(lat,depth,data_plot,levels=clevel,colors='k',linewidths=[0.5,0.25],antialised=True)
+    if do_clabel: ax1.clabel(CS,CS.levels[np.where(CS.levels!=cref)],inline=1,inline_spacing=1, fontsize=6,fmt='%1.1f Sv')
     if len(bottom)>0:
         ax1.plot(lat,bottom,color='k')
         ax1.fill_between(lat, bottom, depth[-1],color=cbot,zorder=2)#,alpha=0.95)
