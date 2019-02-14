@@ -2,15 +2,21 @@
 ! ------------
 !    subroutine ale_init
 !    subroutine init_bottom_elem_thickness
+!    subroutine init_bottom_elem_thickness
 !    subroutine init_thickness_ale
 !    subroutine update_thickness_ale
-!    subroutine stiff_mat_update
+!    subroutine restart_thickness_ale
+!    subroutine init_stiff_mat_ale
+!    subroutine update_stiff_mat_ale
 !    subroutine compute_ssh_rhs_ale
 !    subroutine compute_hbar_ale
 !    subroutine vert_vel_ale
 !    subroutine solve_ssh_ale
+!    subroutine impl_vert_visc_ale
 !    subroutine oce_timestep_ale
-!    
+!
+! initially written by Sergey Danilov, adapted and expanded by Patrick Scholz and
+! Dmitry Sidorenko, 14.02.2019
 !    
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
@@ -1083,6 +1089,10 @@ end subroutine update_stiff_mat_ale
 !
 !
 !===============================================================================
+! compute new ssh_rhs which is first term on rhs of eq.18 in S. Danilov et al.: 
+!"FESOM2: from finite elements to finite volumes"
+!
+! ssh_rhs = alpha * grad[  int_hbot^hbar(n+0.5)( u^n+deltau)dz + W(n+0.5) ]
 subroutine compute_ssh_rhs_ale
     use g_config,only: which_ALE,dt
     use o_MESH
@@ -1165,6 +1175,15 @@ end subroutine compute_ssh_rhs_ale
 !
 !
 !===============================================================================
+! compute old ssh_rhs which is second term on rhs of eq.18...
+!
+! ssh_rhs_old = grad[  int_hbot^hbar(n-0.5)(u^n)dz + W(n-0.5) ]
+!
+! as well as new ale surface elevation hbar from eq. 13
+!
+! hbar(n+0.5) = hbar(n-0.5) - tau*ssh_rhs_old
+!
+! in S. Danilov et al.: "FESOM2: from finite elements to finite volumes"
 subroutine compute_hbar_ale
     use g_config,only: dt, which_ALE
     use o_MESH
@@ -1242,6 +1261,18 @@ end subroutine compute_hbar_ale
 !
 !
 !===============================================================================
+! calculate vertical velocity from eq.3 in S. Danilov et al. : FESOM2: from 
+! finite elements to finite volumes. 
+!
+!   dh_k/dt + grad(u*h)_k + (w^t - w^b) + water_flux_k=1 = 0
+!
+!   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
+!   --> do cumulativ summation from bottom to top
+!
+! > for linfs : dh_k/dt = 0
+! > for zlevel: dh_k/dt_k=1 != 0
+! > for zstar : dh_k/dt_k=1...kbot-1 != 0
+!
 subroutine vert_vel_ale
     use g_config,only: dt, which_ALE,min_hnode,lzstar_lev
     use o_MESH
@@ -1658,6 +1689,8 @@ end subroutine vert_vel_ale
 !
 !
 !===============================================================================
+! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
+! for (eta^(n+1)-eta^n) = d_eta
 subroutine solve_ssh_ale
 use o_PARAM
 use o_MESH
