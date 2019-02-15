@@ -428,18 +428,10 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished.
-  if (t<0.0) then	        ! freezing condition    
-     if (hsn.gt.0.0) then	!   snow cover present  
-        alb=albsn         	
-     else              		!   no snow cover       
-        alb=albi       	
-     endif
-  else			        ! melting condition     
-     if (hsn.gt.0.0) then	!   snow cover present  
-        alb=albsnm	    	
-     else			!   no snow cover       
-        alb=albim		
-     endif
+  if (hsn.gt.0.0) then	!   snow cover present  
+     alb=albsn         	
+  else              		!   no snow cover       
+     alb=albi       	
   endif
  end subroutine ice_albedo
 
