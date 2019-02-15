@@ -166,7 +166,7 @@ contains
 #endif
     use o_mesh
     use g_rotate_grid
-    
+    use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
 
@@ -212,8 +212,8 @@ contains
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=WP)               :: this_x_coord     ! longitude coordinates
-    real(kind=WP)               :: this_y_coord     ! latitude coordinates
+    real(kind=WP)              :: this_x_coord          ! longitude coordinates
+    real(kind=WP)              :: this_y_coord          ! latitude coordinates
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
@@ -222,6 +222,7 @@ contains
 
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_elem_area(:,:)    
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -301,10 +302,11 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-
+      ALLOCATE(all_elem_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
+      ALLOCATE(all_elem_area(1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -318,18 +320,24 @@ contains
     CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
     CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
-      print *, 'FESOM after 2nd GatherV'
+    if (mype .eq. 0) then 
+      print *, 'FESOM before 3rd GatherV'
+    endif
+    CALL MPI_GATHERV(elem_area, my_number_of_points, MPI_DOUBLE_PRECISION, all_elem_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    if (mype .eq. 0) then 
+      print *, 'FESOM after 3rd GatherV'
     endif
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
 
@@ -337,13 +345,19 @@ contains
       print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
-       print *, 'FESOM before write grid'
+
+          print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
-       print *, 'FESOM before write mask'
+          print *, 'FESOM before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
+
+          print *, 'FESOM before write area'
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_elem_area)
+
        end if
       print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
