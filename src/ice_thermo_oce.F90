@@ -51,7 +51,7 @@ subroutine thermodynamics
   implicit none
   real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
   real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
-  real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout
+  real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
   real(kind=WP)  :: lat
   integer        :: i, j, elem
   real(kind=WP), allocatable  :: ustar_aux(:)
@@ -118,14 +118,14 @@ subroutine thermodynamics
      ehf     = 0.0_WP
      lid_Clo=h0
      if (coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
-       lid_clo=0.5
+       lid_clo=0.5_WP
      else
-       lid_clo=0.5
+       lid_clo=0.5_WP
      endif
 
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
           ug,ustar,T_oc,S_oc,h_ml,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-          rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
+          rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
 
      m_ice_old(i)         = m_ice(i) !PS
      m_snow_old(i)        = m_snow(i) !PS
@@ -139,6 +139,7 @@ subroutine thermodynamics
      fresh_wa_flux(i) = fw      !positive down
      net_heat_flux(i) = ehf     !positive down
      evaporation(i)   = evap    !negative up
+     ice_sublimation(i)= subli 
 
      thdgr(i)         = ithdgr
      thdgrsn(i)       = ithdgrsn
@@ -158,7 +159,7 @@ end subroutine thermodynamics
 !
 subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
      ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-     rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo)
+     rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
   ! Ice Thermodynamic growth model     
   !
   ! Input parameters:
@@ -224,9 +225,9 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   rhow=0.0
   evap=0.0
   call obudget(qa,fsh,flo,T_oc,ug,ta,ch,ce,rhow,evap,hflatow,hfsenow,hflwrdout) 
-  hflatow=hflatow*(1.0-A)
-  hfsenow=hfsenow*(1.0-A)
-  hflwrdout=hflwrdout*(1.0-A)
+  hflatow=hflatow*(1.0_WP-A)
+  hfsenow=hfsenow*(1.0_WP-A)
+  hflwrdout=hflwrdout*(1.0_WP-A)
 
   ! add heat loss at open ocean due to melting snow fall
   !rhow=rhow+snow*1000.0/rhoice !qiang
@@ -253,7 +254,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
 
   ! Multiply ice growth of open water and ice
   ! with the corresponding areal fractions of grid cell
-  show =rhow*(1.0-A)
+  show =rhow*(1.0_WP-A)
   shice=rhice*A
   sh   =show+shice
 
@@ -261,13 +262,13 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ahf=-cl*sh/ice_dt   
 
   ! precipitation (into the ocean)
-  prec=rain+runo+snow*(1.0-A)  	        ! m water/s
+  prec=rain+runo+snow*(1.0_WP-A)  	        ! m water/s
 
   ! snow fall above ice
   hsn=hsn+snow*ice_dt*A*rhowat*inv_rhosno	! Add snow fall to temporary snow thickness    !!!
   dhsngrowth=hsn   		        ! Store snow thickness after snow fall 
 
-  evap=evap*(1.0-A)    		! m water/s
+  evap=evap*(1.0_WP-A)    		! m water/s
   subli=subli*A
 
   ! If there is atmospheric melting, first melt any snow that is present.
@@ -291,7 +292,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   !
   ! Total heat content is the sum of
   !	h	ice thickness after calculation of dynamic effects
-  !	rh	change in ice thickness due to atmospheric forcing
+  !	178418rh	change in ice thickness due to atmospheric forcing
   ! and heat available in mixed layer, with
   !	T_oc	temperature of ocean surface layer
   !	Tfrez	freezing point of sea water
@@ -377,7 +378,9 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   else
      fw=fw+iflice*rhoice*inv_rhowat*Sice/rsss
   end if
-evap=evap+subli
+  
+  evap=evap+subli
+  
 end subroutine therm_ice
 !
 !=====================================================================================

@@ -115,6 +115,7 @@ subroutine oce_fluxes
   use g_forcing_arrays
   use g_PARSUP
   use g_support
+  use i_therm_param
 
   implicit none
   integer                    :: n, elem, elnodes(3),n1
@@ -161,10 +162,28 @@ subroutine oce_fluxes
   ! enforce the total freshwater/salt flux be zero
   ! 1. water flux ! if (.not. use_virt_salt) can be used!
   ! we conserve only the fluxes from the database plus evaporation.
-  ! the rest (ocean/ice transformation etc. will follow from the conservation of volume)
-  flux=evaporation+prec_rain+prec_snow+runoff
+  flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+        +prec_rain                       &
+        +prec_snow*(1.0_WP-a_ice_old)    &
+        +runoff    
+        
+  ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
+  ! on top of the ocean without displacement of water, there the thermodynamic 
+  ! growth rates of sea ice have to be taken into account to preserve the fresh water 
+  ! flux. In the case of floating sea ice, water is displaced by 
+  ! sea ice and flux conservation from ocean sea ice transformation follows from 
+  ! the conservation of volume
+  ! --> In case of linfs ocean sea ice transformation is balanced by the virtual 
+  ! salinity flux
+  if ( .not. use_floatice .and. .not. use_virt_salt) then
+       flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
+  end if     
+  
   call integrate_nod(flux, net)
-  water_flux=water_flux+net/ocean_area ! the + sign should be used here
+  ! here the + sign must be used because we switched up the sign of the 
+  ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
+  ! have there original sign
+  water_flux=water_flux+net/ocean_area 
 
   ! 2. virtual salt flux
   if (use_virt_salt) then ! is already zero otherwise

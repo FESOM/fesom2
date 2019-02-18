@@ -33,9 +33,9 @@ subroutine write_step_info(istep,outfreq)
 		loc_deta  =0.
 		loc_dhbar =0.
 		loc_wflux =0.
-		loc_hflux =0.
-		loc_temp  =0.
-		loc_salt  =0.
+!!PS 		loc_hflux =0.
+!!PS 		loc_temp  =0.
+!!PS 		loc_salt  =0.
 		loc       =0.
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D
@@ -44,9 +44,9 @@ subroutine write_step_info(istep,outfreq)
 			loc_deta  = loc_deta  + area(1, n)*d_eta(n)
 			loc_dhbar = loc_dhbar + area(1, n)*(hbar(n)-hbar_old(n))
 			loc_wflux = loc_wflux + area(1, n)*water_flux(n)
-			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
-			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
-			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
+!!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
+!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
+!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
 		end do
 		
 		!_______________________________________________________________________
@@ -55,17 +55,17 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc_deta , int_deta , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		int_eta  = int_eta  /ocean_area
 		int_hbar = int_hbar /ocean_area
 		int_deta = int_deta /ocean_area
 		int_dhbar= int_dhbar/ocean_area
 		int_wflux= int_wflux/ocean_area
-		int_hflux= int_hflux/ocean_area
-		int_temp = int_temp /ocean_area
-		int_salt = int_salt /ocean_area
+!!PS 		int_hflux= int_hflux/ocean_area
+!!PS 		int_temp = int_temp /ocean_area
+!!PS 		int_salt = int_salt /ocean_area
 		
 		!_______________________________________________________________________
 		loc = minval(eta_n(1:myDim_nod2D))
