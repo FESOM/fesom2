@@ -1977,25 +1977,7 @@ subroutine oce_timestep_ale(n)
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
     if (trim(which_ale)=='linfs') then
-        ! without partiell cells all three schemes are identical, with partial 
-        ! cells the bottom cell is treated slightly differently
-        if (trim(which_pgf)=='nemo'           .or. &
-            trim(which_pgf)=='nemomin'        .or. & 
-            trim(which_pgf)=='adcroft'        .or. &
-            trim(which_pgf)=='adcroft2'       .or. &
-            trim(which_pgf)=='shchepetkin' ) then    
-            call pressure_force_4_linfs
-        elseif (trim(which_pgf)=='cubic-spline') then    
-            call pressure_force_cubic_spline
-        else
-            write(*,*) '________________________________________________________'
-            write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
-            write(*,*) '            calculation (PGF) is not supported for linfs !!!'
-            write(*,*) '            see in namelist.oce --> which_pgf = nemo, '
-            write(*,*) '            nemomin, shchepetkin, adcroft, cubic-spline'
-            write(*,*) '________________________________________________________'
-            call par_ex(1)
-        endif     
+        call pressure_force_4_linfs  
     else    
         if (trim(which_pgf)=='nemo'           .or. &
             trim(which_pgf)=='nemomin'        .or. & 
