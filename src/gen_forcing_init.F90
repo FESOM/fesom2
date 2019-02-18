@@ -40,7 +40,7 @@ subroutine forcing_array_setup
   allocate(prec_rain(n2), prec_snow(n2))
   allocate(u_wind(n2), v_wind(n2))
   allocate(Tair(n2), shum(n2))
-  allocate(runoff(n2), evaporation(n2))
+  allocate(runoff(n2), evaporation(n2),ice_sublimation(n2))
 
 #if defined (__oasis)
   allocate(sublimation(n2), evap_no_ifrac(n2))

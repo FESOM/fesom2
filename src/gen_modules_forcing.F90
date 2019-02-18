@@ -52,7 +52,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
-  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation
+  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
 
 #if defined (__oasis)
