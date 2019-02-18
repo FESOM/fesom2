@@ -369,8 +369,11 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
     #ax.get_yaxis().tick_left()
     plt.sca(ax)
-    #plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
-    plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
+    
+    if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
+        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='baseline')
+    else:    
+        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     #ax.set_xlabel(' ',fontsize=20,verticalalignment='top')
     #ax.set_ylabel(' ',fontsize=30,verticalalignment='bottom')
     #+_________________________________________________________________________+
