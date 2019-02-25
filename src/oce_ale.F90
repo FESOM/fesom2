@@ -1978,23 +1978,8 @@ subroutine oce_timestep_ale(n)
     ! calculate calculate pressure gradient force
     if (trim(which_ale)=='linfs') then
         call pressure_force_4_linfs  
-    else    
-        if (trim(which_pgf)=='nemo'           .or. &
-            trim(which_pgf)=='nemomin'        .or. & 
-            trim(which_pgf)=='shchepetkin') then    
-            call pressure_force_4_zxxxx
-        elseif (trim(which_pgf)=='cubic-spline') then    
-            call pressure_force_cubic_spline
-        else
-            write(*,*) '________________________________________________________'
-            write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
-            write(*,*) '            calculation (PGF) is not supported for      '
-            write(*,*) '            zlevel/zstar !!!'
-            write(*,*) '            see in namelist.oce --> which_pgf = nemo,   '
-            write(*,*) '            nemomin, shchepetkin, cubic-spline          '
-            write(*,*) '________________________________________________________'
-            call par_ex(1)
-        end if
+    else  
+        call pressure_force_4_zxxxx
     end if
         
     !___________________________________________________________________________
