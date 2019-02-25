@@ -109,12 +109,12 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 !___________________________________________
 ! Pressure Gradient Force  calculation (pgf) 
 ! calculation of pgf either: 
+! only linfs:
 ! > 'nemo'         ... like NEMO (interpolate to elemental depth, inter-/extrapolation)
-! > 'nemomin'      ... like NEMO (interpolate to shallowest nodal depth, only interp.)
-! > 'adcroft'      ... MITGCM like
+! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
-! > 'cubic-spline' ... like in FESOM1.4
-character(20)                  :: which_pgf='cubic-spline' 
+! > 'cubicspline'  ... like in FESOM1.4
+character(20)                  :: which_pgf='shchepetkin' 
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
