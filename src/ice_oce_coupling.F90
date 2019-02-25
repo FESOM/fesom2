@@ -175,7 +175,8 @@ subroutine oce_fluxes
   ! the conservation of volume
   ! --> In case of linfs ocean sea ice transformation is balanced by the virtual 
   ! salinity flux
-  if ( .not. use_floatice .and. .not. use_virt_salt) then
+!!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
+  if (.not. use_virt_salt) then
        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
   end if     
   
