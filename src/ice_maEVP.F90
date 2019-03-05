@@ -87,13 +87,13 @@ subroutine ssh2rhs
   use g_config
   use i_arrays
   use g_parsup
+  use i_therm_param
   implicit none
   
-  integer        :: row, elem, elnodes(3)
+  integer        :: row, elem, elnodes(3), n
   real(kind=WP)  :: dx(3), dy(3), vol
   real(kind=WP)  :: val3, meancos, aa, bb
-  real(kind=WP)  :: elevation_elem(3)
-
+  
   val3=1.0_WP/3.0_WP
   
   ! use rhs_m and rhs_a for storing the contribution from elevation:
@@ -101,19 +101,44 @@ subroutine ssh2rhs
      rhs_a(row)=0.0
      rhs_m(row)=0.0
   end do
-
-  do elem=1,myDim_elem2d         
-     elnodes=elem2D_nodes(:,elem)
-     vol=elem_area(elem)
-     dx=gradient_sca(1:3,elem)
-     dy=gradient_sca(4:6,elem)     
-     elevation_elem=elevation(elnodes)
-     bb=g*val3*vol
-     aa=bb*sum(dx*elevation_elem)
-     bb=bb*sum(dy*elevation_elem)
-        rhs_a(elnodes)=rhs_a(elnodes)-aa	    
+  
+  !_____________________________________________________________________________
+  ! use floating sea ice for zlevel and zstar
+  if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+    do elem=1,myDim_elem2d         
+        elnodes=elem2D_nodes(:,elem)
+        !_______________________________________________________________________
+        vol=elem_area(elem)
+        dx=gradient_sca(1:3,elem)
+        dy=gradient_sca(4:6,elem)     
+        
+        !_______________________________________________________________________
+        ! add pressure gradient from sea ice --> in case of floating sea ice
+        p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+        do n=1,3
+            p_ice(n)=min(p_ice(n),max_ice_loading)
+        end do
+        
+        !_______________________________________________________________________
+        bb=g*val3*vol
+        aa=bb*sum(dx*(elevation(elnodes)+p_ice))
+        bb=bb*sum(dy*(elevation(elnodes)+p_ice))
+        rhs_a(elnodes)=rhs_a(elnodes)-aa    
         rhs_m(elnodes)=rhs_m(elnodes)-bb
-  end do
+    end do
+  else
+    do elem=1,myDim_elem2d         
+        elnodes=elem2D_nodes(:,elem)
+        vol=elem_area(elem)
+        dx=gradient_sca(1:3,elem)
+        dy=gradient_sca(4:6,elem)     
+        bb=g*val3*vol
+        aa=bb*sum(dx*elevation(elnodes))
+        bb=bb*sum(dy*elevation(elnodes))
+        rhs_a(elnodes)=rhs_a(elnodes)-aa   
+        rhs_m(elnodes)=rhs_m(elnodes)-bb
+    end do
+  end if 
   
   
   
@@ -195,7 +220,7 @@ subroutine EVPdynamics_m
   use g_comm_auto
 
   implicit none
-  integer          :: steps, shortstep, i, ed
+  integer          :: steps, shortstep, i, ed,n
   real(kind=WP)    :: rdt, drag, det
   real(kind=WP)    :: inv_thickness(myDim_nod2D), umod, rhsu, rhsv
   logical          :: ice_el(myDim_elem2D), ice_nod(myDim_nod2D)
@@ -210,7 +235,7 @@ subroutine EVPdynamics_m
 !NR for stress2rhs_m  
   integer        :: k, row
   real(kind=WP)  :: vol
-  real(kind=WP)  :: mf,aa, bb
+  real(kind=WP)  :: mf,aa, bb,p_ice(3)
   real(kind=WP)  :: mass(myDim_nod2D)
 
 
@@ -234,18 +259,46 @@ subroutine EVPdynamics_m
      rhs_a(row)=0.0
      rhs_m(row)=0.0
   end do
-
-  do el=1,myDim_elem2d         
-     elnodes=elem2D_nodes(:,el)
-     vol=elem_area(el)
-     dx=gradient_sca(1:3,el)
-     dy=gradient_sca(4:6,el)
-     bb=g*val3*vol
-     aa=bb*sum(dx*elevation(elnodes))
-     bb=bb*sum(dy*elevation(elnodes))
-     rhs_a(elnodes)=rhs_a(elnodes)-aa	    
-     rhs_m(elnodes)=rhs_m(elnodes)-bb
-  end do
+  
+  !_____________________________________________________________________________
+  ! use floating sea ice for zlevel and zstar
+  if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+    do el=1,myDim_elem2d         
+        elnodes=elem2D_nodes(:,el)
+        !_______________________________________________________________________
+        vol=elem_area(el)
+        dx=gradient_sca(1:3,el)
+        dy=gradient_sca(4:6,el)     
+        
+        !_______________________________________________________________________
+        ! add pressure gradient from sea ice --> in case of floating sea ice
+        p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+        do n=1,3
+            p_ice(n)=min(p_ice(n),max_ice_loading)
+        end do
+        
+        !_______________________________________________________________________
+        bb=g*val3*vol
+        aa=bb*sum(dx*(elevation(elnodes)+p_ice))
+        bb=bb*sum(dy*(elevation(elnodes)+p_ice))
+        rhs_a(elnodes)=rhs_a(elnodes)-aa    
+        rhs_m(elnodes)=rhs_m(elnodes)-bb
+    end do
+  !_____________________________________________________________________________
+  ! use levitating sea ice for linfs, zlevel and zstar  
+  else
+    do el=1,myDim_elem2d         
+        elnodes=elem2D_nodes(:,el)
+        vol=elem_area(el)
+        dx=gradient_sca(1:3,el)
+        dy=gradient_sca(4:6,el)
+        bb=g*val3*vol
+        aa=bb*sum(dx*elevation(elnodes))
+        bb=bb*sum(dy*elevation(elnodes))
+        rhs_a(elnodes)=rhs_a(elnodes)-aa    
+        rhs_m(elnodes)=rhs_m(elnodes)-bb
+    end do
+  end if
 
 ! precompute thickness (the inverse is needed) and mass (scaled by area)
   do i=1,myDim_nod2D

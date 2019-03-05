@@ -140,7 +140,8 @@ class fesom_mesh:
         print('     > nod2d.out',end='')
         fid_n2d          = open(self.path+'nod2d.out', 'r')
         self.n2dn        = np.uint32(fid_n2d.readline().strip())
-        dum              = np.matrix(pa.read_table(fid_n2d, header=-1,delim_whitespace=True))
+        #dum              = np.matrix(pa.read_table(fid_n2d, header=-1,delim_whitespace=True))
+        dum              = np.matrix(pa.read_csv(fid_n2d, header=-1,delim_whitespace=True))
         fid_n2d.close()
         del fid_n2d
         self.nodes_2d_x  = np.float32(np.array(dum[:,1]).reshape(self.n2dn))
@@ -154,7 +155,8 @@ class fesom_mesh:
         fid_e2d          = open(self.path+'elem2d.out', 'r')
         self.n2de           = np.int64(fid_e2d.readline().strip())
         ## pandas module fastest option but not everywherre available
-        self.elem0_2d_i  = np.matrix(pa.read_table(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
+        #self.elem0_2d_i  = np.matrix(pa.read_table(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
+        self.elem0_2d_i  = np.matrix(pa.read_csv(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
         fid_e2d.close()
         print(' : #2de={:d}'.format(self.n2de))
         
@@ -162,7 +164,7 @@ class fesom_mesh:
         print('     > aux3d.out') 
         fid_aux3d        = open(self.path+'aux3d.out', 'r')
         self.nlev        = np.uint16(fid_aux3d.readline().strip())
-        dum                 = np.array(pa.read_table(fid_aux3d, 
+        dum                 = np.array(pa.read_csv(fid_aux3d, 
                                                     header=-1,
                                                     delim_whitespace=True),
                                         dtype='int16')
@@ -176,7 +178,8 @@ class fesom_mesh:
         #____load number of levels at each node_________________________________
         print('     > nlvls.out') 
         fid                 = open(self.path+'nlvls.out', 'r')
-        self.nodes_2d_iz = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        #self.nodes_2d_iz = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        self.nodes_2d_iz = np.array(pa.read_csv(fid, header=-1,delim_whitespace=True))
         # go from fesom vertical indexing which starts with 1 to python vertical indexing 
         # which starts with zeros --> thats why minus 1
         self.nodes_2d_iz = self.nodes_2d_iz.squeeze()-1
@@ -186,7 +189,8 @@ class fesom_mesh:
         #____load number of levels at each elem_________________________________
         print('     > elvls.out') 
         fid                 = open(self.path+'elvls.out', 'r')
-        self.elem0_2d_iz  = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        #self.elem0_2d_iz  = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        self.elem0_2d_iz  = np.array(pa.read_csv(fid, header=-1,delim_whitespace=True))
         # go from fesom vertical indexing which starts with 1 to python vertical indexing 
         # which starts with zeros --> thats why minus 1
         self.elem0_2d_iz  = self.elem0_2d_iz.squeeze()-1
@@ -884,7 +888,8 @@ def fesom_vector_rot(mesh,u,v):
     gamma = mesh.gamma
     
     #___________________________________________________________________________
-    #mesh = fesom_grid_rot_g2r()
+    if len(mesh.nodes_2d_yr)==0:
+        mesh.fesom_grid_rot_g2r()
     
     #___________________________________________________________________________
     # build euler rotation matrix
@@ -947,15 +952,15 @@ def fesom_vector_rot(mesh,u,v):
         lat  = np.radians(mesh.nodes_2d_yg[0:mesh.n2dn])
         lon  = np.radians(mesh.nodes_2d_xg[0:mesh.n2dn])
     elif u.shape[0]==mesh.n2dea:
-        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem_2d_i],axis=1)/3)
-        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem_2d_i],axis=1)/3)
-        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3)
-        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3)
+        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem_2d_i],axis=1)/3.0)
+        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem_2d_i],axis=1)/3.0)
+        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3.0)
+        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3.0)
     elif u.shape[0]==mesh.n2de:
-        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem0_2d_i],axis=1)/3)
-        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem0_2d_i],axis=1)/3)
-        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem0_2d_i],axis=1)/3)
-        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem0_2d_i],axis=1)/3)
+        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem0_2d_i],axis=1)/3.0)
+        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem0_2d_i],axis=1)/3.0)
+        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem0_2d_i],axis=1)/3.0)
+        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem0_2d_i],axis=1)/3.0)
         
     ndims = u.shape
     if len(ndims)==1:

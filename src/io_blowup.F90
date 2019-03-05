@@ -89,8 +89,8 @@ MODULE io_BLOWUP
 		!===========================================================================
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
-		call def_variable(bid, 'ssh'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
-		call def_variable(bid, 'deta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
+		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
+		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
@@ -139,16 +139,16 @@ MODULE io_BLOWUP
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
-		call def_variable(bid, 'area'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
-		call def_variable(bid, 'hice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
-		call def_variable(bid, 'hsnow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
-		call def_variable(bid, 'uice'		, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice);
-		call def_variable(bid, 'vice'		, (/nod2D/)			, 'meridional velocity', 'm', v_ice);
- 		call def_variable(bid, 'area_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
- 		call def_variable(bid, 'hice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
- 		call def_variable(bid, 'hsnow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
-		call def_variable(bid, 'uice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
- 		call def_variable(bid, 'vice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
+		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
+		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
+		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
+		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice);
+		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', v_ice);
+ 		call def_variable(bid, 'a_ice_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
+ 		call def_variable(bid, 'm_ice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
+ 		call def_variable(bid, 'm_snow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
+		call def_variable(bid, 'u_ice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
+ 		call def_variable(bid, 'v_ice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
  		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',    '?', heat_flux); !PS
  		call def_variable(bid, 'heat_flux_old', (/nod2D/)		, 'heat flux old',    '?', heat_flux_old); !PS
 		call def_variable(bid, 'water_flux'	, (/nod2D/)			, 'water flux ',    '?', water_flux); !PS
