@@ -34,6 +34,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     else:
         fig=do_subplot[0]
         ax =do_subplot[1]
+        fig.sca(ax)
     resolution = 'c'
     fsize = 14
     
@@ -155,8 +156,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         cmax,cmin,cref = 100.0, 0.0, 50.0
         data.cmap='wbgyr'
     elif data.sname=='m_ice':
-            cmax = np.max(data.value[idx_box])
-            cmin = np.min(data.value[idx_box])
+            cmax = np.nanmax(data.value[idx_box])
+            cmin = np.nanmin(data.value[idx_box])
             cref = cmin + (cmax-cmin)/2
             cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
             data.cmap='wbgyr'    
@@ -346,7 +347,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     for im in ax.get_images():
         im.set_clim(clevel[0],clevel[-1])
     
-    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,extend='neither',extendrect=True,extendfrac='auto')
+    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,extend='neither',extendrect=False,extendfrac=None)
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
     plt.setp(cl, fontsize=fsize)
@@ -404,17 +405,23 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2dvec_data(mesh,data,figsize=[]):
-    print('')
-    print('___PLOT 2D VECTOR DATA____________________________________________')
+def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_fac=1.0):
+    if do_output==True: 
+        print('')
+        print('___PLOT 2D VECTOR DATA____________________________________________')
     from set_inputarray import inputarray
     
     if len(figsize)==0 : figsize=[13,13]
     #___________________________________________________________________________
-    fig = plt.figure(figsize=figsize)
-    #fig.patch.set_alpha(0.0)
-    ax  = plt.gca()
-    resolution = 'c'
+    # plot is not part of subplot
+    if len(do_subplot)==0:
+        fig = plt.figure(figsize=figsize)
+        ax  = plt.gca()
+    else:
+        fig=do_subplot[0]
+        ax =do_subplot[1]
+        plt.sca(ax)
+    resolution = 'l'
     fsize = 14
     
     #+_________________________________________________________________________+
@@ -480,56 +487,98 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
     tri = Triangulation(mx,my,mesh.elem_2d_i)
-    plt.tricontourf(tri,mesh.nodes_2d_z,levels=np.array([-6000,-5500,-5000,-4500,-4000,-3500,-3000,-2500,-2000,-1500,-1000,-750,-500,-250,-150,-80,-40,-20]),\
-                    cmap=cm.gray,alpha=0.75,antialiased=True,extend='both',edgealpha=.75)
+    
+    #___________________________________________________________________________
+    # calculate index of which data points are within boi
+    idxbox_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1])
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2])
+    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
+    idxbox_e = idxbox_e==False # true  index for triangles that are within box 
+    
+    # case of node data
+    if data.value.size ==mesh.n2dna:
+        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
+    elif data.value.size ==mesh.n2dea:
+        idx_box = np.ones((mesh.n2dea,),dtype='bool')
+        
+    if data.value.size ==mesh.n2dna:
+        idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
+        idxbox_n  = np.array(idxbox_n).squeeze()
+        idxbox_n  = np.unique(idxbox_n)
+        idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
+        idx_box[idxbox_n]=True
+        del idxbox_n 
+        del idxbox_e
+    # case of element data
+    elif data.value.size ==mesh.n2dea:
+        idx_box   = idxbox_e
+        del idxbox_e
+    
+    #___________________________________________________________________________
+    # make triangle mask arrays from flat triangles and nan trinagles
+    mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
+    if np.any(np.isnan(data.value)):
+        if data.value.size ==mesh.n2dna:
+            mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
+        elif data.value.size ==mesh.n2dea:    
+            mask_tri = np.logical_or(mask_tri,np.isnan(data.value))
+        idx_box = np.logical_and(idx_box,np.isnan(data.value)==False)
+    
+    if data.proj=='npstere':
+        mask_tri = np.logical_or(mask_tri,np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3<setbndlat)
+    elif data.proj=='spstere':    
+        mask_tri = np.logical_or(mask_tri,np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3>setbndlat)
+    tri.set_mask(mask_tri)
+    
+    #___________________________________________________________________________
+    plt.sca(ax)
+    #ax.tricontourf(tri,mesh.nodes_2d_zg,levels=np.array([-6000,-5500,-5000,-4500,-4000,-3500,-3000,-2500,-2000,-1500,-1000,-750,-500,-250,-150,-80,-40,-20]),\
+                    #cmap=cm.gray,alpha=0.75,antialiased=False,extend='both',edgealpha=.75)
     data_plotu = np.copy(data.value)
     data_plotv = np.copy(data.value2)
     
     #___________________________________________________________________________
-    # limit value range to plotable box
-    mask_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]-1.5
-    mask_e = np.logical_or(mask_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1]+1.5)
-    mask_e = np.logical_or(mask_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2]-0.5)
-    mask_e = np.logical_or(mask_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3]+0.5)
-    if data.value.size ==mesh.n2dna:
-        idx_e  = mesh.elem_2d_i[mask_e,:].flatten().transpose()
-        idx_e  = np.array(idx_e).squeeze()
-        idx_e  = np.unique(idx_e)
-        data_plotu[idx_e]=np.nan
-        data_plotv[idx_e]=np.nan
-    elif data.value.size ==mesh.n2dea:
-        data_plotu[mask_e]=np.nan
-        data_plotv[mask_e]=np.nan
+    if data_plotu.size==mesh.n2dea:
+        mx_in = np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3
+        my_in = np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3
+    else:
+        mx_in = mesh.nodes_2d_xg
+        my_in = mesh.nodes_2d_yg
+    mx_in = mx_in[idx_box]    
+    my_in = my_in[idx_box]
+    data_plotu = data_plotu[idx_box]    
+    data_plotv = data_plotv[idx_box]
     
     #___________________________________________________________________________
-    # calc triangle mid points in case of data on elements
-    if data_plotu.size==mesh.n2dea:
-        mx = np.sum(mx[mesh.elem_2d_i],axis=1)/3
-        my = np.sum(my[mesh.elem_2d_i],axis=1)/3
+    data_plotu,data_plotv,mx,my = map.rotate_vector(data_plotu,data_plotv, mx_in, my_in, returnxy=True)
+    if data.proj=='spstere': data_plotu,data_plotv = -data_plotu, -data_plotv
     
     #___________________________________________________________________________
     # limit all arrays to plotable box 
-    idx     = ~np.isnan(data_plotu)
+    idx      = ~np.isnan(data_plotu)
     mx         = mx[idx]
     my         = my[idx]
     data_plotu  = data_plotu[idx]
     data_plotv  = data_plotv[idx]
-    norm        = np.sqrt(data_plotu**2.0+data_plotv**2.0)
     
-    #idx = np.arange(0,norm.size,2)
-    #mx         = mx[idx]
-    #my         = my[idx]
-    #data_plotu  = data_plotu[idx]
-    #data_plotv  = data_plotv[idx]
-    #norm        = norm[idx]
+    idx      = np.where(data_plotu!=0.0)
+    mx         = mx[idx]
+    my         = my[idx]
+    data_plotu  = data_plotu[idx]
+    data_plotv  = data_plotv[idx]
+    
+    norm        = np.sqrt(data_plotu**2.0+data_plotv**2.0)
+    norm_orig   = np.copy(norm)
+    
     #___________________________________________________________________________
-    cnumb    = 20; #minimum number of colors
+    cnumb    = 10; #minimum number of colors
+    data.cmap = 'wbgyr'
     cmin     = 0 ; 
     cmax     = np.max(norm)
     #cmax     = 0.25
     cref     = cmin + (cmax-cmin)/2
     cref     = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
-    data.cmap = 'wbgyr'
     
     #___________________________________________________________________________
     # if predefined color range --> data.crange
@@ -545,10 +594,10 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
         else:
             print(' this colorrange definition is not supported !!!')
             print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
-    
-    print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+    cnumb = data.cnumb    
+    if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
-    print('clevel = ',clevel)
+    if do_output==True: print('clevel = ',clevel)
     
     #___________________________________________________________________________
     # limit minimum and maximum of vector norm
@@ -556,41 +605,90 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
     norm[norm>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
     
     #___________________________________________________________________________
+    # shrink all vectors that are originaly longer than norm to the norm length
+    data_plotu = data_plotu*norm/norm_orig
+    data_plotv = data_plotv*norm/norm_orig
+    
+    #___________________________________________________________________________
     # eliminate all vectors that are close to 0
-    idx     = norm>=clevel[-1]*0.01
-    mx         = mx[idx]
-    my         = my[idx]
-    data_plotu  = data_plotu[idx]
-    data_plotv  = data_plotv[idx]
-    norm        = norm[idx]
-    del idx 
+    #idx     = norm>=clevel[-1]*0.01
+    #idx     = norm>=clevel[1]*0.5
+    #mx         = mx[idx]
+    #my         = my[idx]
+    #data_plotu  = data_plotu[idx]
+    #data_plotv  = data_plotv[idx]
+    #norm        = norm[idx]
+    #del idx 
     
     # normalize vector components
-    data_plotu  = data_plotu/clevel[-1]
-    data_plotv  = data_plotv/clevel[-1]
+    #data_plotu  = data_plotu/clevel[-1]
+    #data_plotv  = data_plotv/clevel[-1]
     
     # limit smalles size of vectors
+    
     #limit = cmax/5
     #limit = cmax/10
-    limit = cmax*0.75
+    limit = clevel[-1]*0.15
     aux = (data_plotu**2.0+data_plotv**2.0)**0.5
     data_plotu[aux<limit]=data_plotu[aux<limit]/aux[aux<limit]*limit
     data_plotv[aux<limit]=data_plotv[aux<limit]/aux[aux<limit]*limit
     del aux
     
     #___________________________________________________________________________
-    hp1=plt.quiver(mx,my,data_plotu,data_plotv,norm,#    
-                    scale_units='xy',scale=cmax*3, #25,#scale_units='xy'/'width',scale=clevel[-1],
+    #hp1=ax.quiver(mx,my,data_plotu,data_plotv,norm,#  
+    #hp1=map.quiver(mx,my,data_plotu,data_plotv,norm,#    
+                    #scale_units='xy',scale=None, #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
+                    #edgecolor='k',
+                    #linewidth=0.1,
+                    #cmap = cmap0,#alpha=0.9,
+                    #pivot='middle', #'middle',
+                    #antialiased=True,
+                    #minlength=0.0,
+                    #width=0.005,
+                    #headlength=3,
+                    #headaxislength=3,
+                    #headwidth=2.5)
+    
+    aux = np.sqrt((mx.max()-mx.min())**2 + (my.max()-my.min())**2)
+    print(norm.max())
+    
+    
+    
+    #hp1=ax.quiver(mx,my,data_plotu,data_plotv,norm,#  
+                    #scale_units='inches',scale=0.6, #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
+                    #edgecolor='k',
+                    #linewidth=0.1,
+                    #cmap = cmap0,#alpha=0.9,
+                    #pivot='middle', #'middle',
+                    #antialiased=True,
+                    #minlength=0.0,
+                    #width=0.005,
+                    #headlength=2.5,
+                    #headaxislength=2.5,
+                    #headwidth=1.5)
+    
+    hp1=map.quiver(mx,my,data_plotu,data_plotv,norm,#  
+                    scale_units='xy',scale=1/aux*80*scal_fac*clevel[-1], #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
                     edgecolor='k',
                     linewidth=0.1,
                     cmap = cmap0,#alpha=0.9,
-                    pivot='middle',
+                    pivot='middle', #'middle',
                     antialiased=True,
-                    minlength=0.0)
+                    minlength=0.0,
+                    width=0.005,
+                    headlength=3,
+                    headaxislength=3,
+                    headwidth=2.0)
     
+    hp1.set_clim([clevel[0],clevel[-1]])
     # draw reference vector in corner
-    hpref = plt.quiverkey(hp1, 0.90, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
-            coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
+    #hpref = plt.quiverkey(hp1, 0.85, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
+            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
+    #hpref = plt.quiverkey(hp1, 0.1, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
+            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
+    
+    #hpref = ax.quiverkey(hp1, 0.05, 0.05,clevel[-1],'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
+            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
@@ -633,9 +731,16 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
     else:
         divider = make_axes_locatable(ax)
         cax     = divider.append_axes("right", size="2.5%", pad=0.1)
-    plt.clim(clevel[0],clevel[-1])
+    # give each subplot its own colorrange
+    #plt.clim(clevel[0],clevel[-1])
+  
     cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=True,
-            extend='both')
+            extend='neither',extendrect=True,extendfrac='auto')
+    
+    him = ax.get_images()
+    for im in ax.get_images():
+        im.set_clim(clevel[0],clevel[-1])
+    
     
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
@@ -658,6 +763,12 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
     ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
     ax.get_yaxis().tick_left()
     
+    plt.sca(ax)
+    #plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
+    if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
+        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='baseline')
+    else:    
+        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     #___________________________________________________________________________
     if inputarray['save_fig']==True:
         print(' --> save figure: png')
@@ -673,7 +784,7 @@ def fesom_plot2dvec_data(mesh,data,figsize=[]):
     plt.show(block=False)
     
     #___________________________________________________________________________
-    return(fig,ax,cbar)
+    return(fig,ax,cbar,hp1)
     
     
 #___PLOT 2D FESOM MESH IN GEO COORDINATES_______________________________________
@@ -1378,15 +1489,16 @@ def fesom_idxinbox(mesh,data1,inputarray):
         idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
         idx_box[idxbox_n]=True
         del idxbox_n 
-        del idxbox_e
+        #del idxbox_e
     # case of element data
     elif data1.value.size ==mesh.n2dea:
         idx_box   = idxbox_e
-        del idxbox_e
+        #del idxbox_e
     
     #___________________________________________________________________________
     # make triangle mask arrays from flat triangles and nan trinagles
     if np.any(np.isnan(data1.value)):
         idx_box = np.logical_and(idx_box,np.isnan(data1.value)==False)
-        
+    
     return(idx_box)
+

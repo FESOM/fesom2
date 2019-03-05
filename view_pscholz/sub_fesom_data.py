@@ -105,6 +105,19 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
                 ncid2 = Dataset(fname2, 'r') 
                 ncid3 = Dataset(fname3, 'r')
                 
+            elif data.var.find('uice')!=-1 or data.var.find('vice')!=-1:    
+                aux_datavar,aux_datavar2 = 'uice','vice'
+                #_______________________________________________________________________
+                # build filename where data are located
+                fname  =   data.path+'/'\
+                            + aux_datavar + '.' + data.runid + '.' + str(ayi[yi]) + '.nc'
+                fname2 =   data.path+'/'\
+                            + aux_datavar2 + '.' + data.runid + '.' + str(ayi[yi]) + '.nc'
+                #_______________________________________________________________________
+                # open netcdf file --> read NETCDF4
+                ncid  = Dataset(fname, 'r') 
+                ncid2 = Dataset(fname2, 'r') 
+                
             else:
                 aux_datavar,aux_datavar2 = 'u','v'
                 if data.var =='ptemp' or data.var=='pdens':
@@ -721,7 +734,7 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
 #_______________________________________________________________________________
-def fesom_load_blowup(mesh,data,do_output=True,which_file='blowup'):
+def fesom_load_blowup(mesh,data,do_output=True,which_file=['blowup','oce']):
     
     #___________________________________________________________________________
     # number of years to average 
@@ -735,7 +748,7 @@ def fesom_load_blowup(mesh,data,do_output=True,which_file='blowup'):
     ami = np.array(data.month)
     
     #____START YEAR LOOP________________________________________________________
-    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.oce.'+which_file+'.nc'
+    fname = data.path+'/'+'fesom.'+str(ayi[0])+'.'+which_file[1]+'.'+which_file[0]+'.nc'
     print('     --> '+fname)
     print('     --> '+data.var)
     
