@@ -7,13 +7,17 @@ subroutine write_step_info(istep,outfreq)
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
+	use i_ARRAYS
 	use g_comm_auto
 	implicit none
 	
 	integer								:: n, istep,outfreq
 	real(kind=WP)						:: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
-	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2,max_cfl_z, max_pgfx, max_pgfy
-	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, max_wvel,max_hnode,max_deta,max_wvel2,max_hnode2
+	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, &
+                                           min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2
+	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
+                                           max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
+                                           max_cfl_z, max_pgfx, max_pgfy 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
 	
@@ -120,7 +124,8 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_pgfx , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(abs(pgf_y(:,1:myDim_nod2D)))
 		call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		
+		loc = maxval(m_ice(1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		!_______________________________________________________________________
 		if (mype==0) then
 			write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
@@ -154,6 +159,7 @@ subroutine write_step_info(istep,outfreq)
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then
@@ -222,13 +228,15 @@ subroutine check_blowup(istep)
                     write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
                     write(*,*)
 				endif 
-! 				do el=1,nod_in_elem2d_num(n)
-! 					elidx = nod_in_elem2D(el,n)
-! 					write(*,*) ' elem#=',el,', elemidx=',elidx
-! 					write(*,*) ' 	 helem =',helem(:,elidx)
+ 				do el=1,nod_in_elem2d_num(n)
+ 					elidx = nod_in_elem2D(el,n)
+ 					write(*,*) ' elem#=',el,', elemidx=',elidx
+ 					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
+ 					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
 ! 					write(*,*) ' 	     U =',UV(1,:,elidx)
 ! 					write(*,*) ' 	     V =',UV(2,:,elidx)
-! 				enddo
+                    write(*,*)
+ 				enddo
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
 				write(*,*)
@@ -310,6 +318,8 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'm_ice       = ',m_ice(n)
 					write(*,*) 'm_ice_old   = ',m_ice_old(n)
+					write(*,*) 'm_snow      = ',m_snow(n)
+					write(*,*) 'm_snow_old  = ',m_snow_old(n)
 					write(*,*)
 					write(*,*) 'hnode       = ',hnode(:,n)
 					write(*,*) 'hnode_new   = ',hnode_new(:,n)

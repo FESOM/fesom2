@@ -280,42 +280,42 @@ if ( .not. trim(which_ALE)=='linfs') then
 		
 		elnodes = elem2D_nodes(:,el)
 		
-		!_______________________________________________________________________ !!PS
+		!_______________________________________________________________________
 		if (any(m_ice(elnodes)<=0.) .or. &
 			any(a_ice(elnodes)<=0.)) then
 			
 			! There is no ice in elem
 			ice_strength(el) = 0.
 			
-		!_______________________________________________________________________ !!PS
+		!_______________________________________________________________________
 		else
 			msum = sum(m_ice(elnodes))/3.0_WP
 			asum = sum(a_ice(elnodes))/3.0_WP
 			
-			!___________________________________________________________________ !!PS
+			!___________________________________________________________________
 			! Hunke and Dukowicz c*h*p*
 			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
-			!___________________________________________________________________ !!PS
+			!___________________________________________________________________
 			! use rhs_m and rhs_a for storing the contribution from elevation:
-			aa = 9.81*elem_area(el)/3.0_WP
+			aa = 9.81_WP*elem_area(el)/3.0_WP
 			
-			!___________________________________________________________________ !!PS
+			!___________________________________________________________________
 			! add and limit pressure from ice weight in case of floating ice
 			! like in FESOM 1.4
 			p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
 			do n=1,3
 				p_ice(n)=min(p_ice(n),max_ice_loading)
 			end do
-! 			p_ice= 0.0_WP
+!!PS  			p_ice= 0.0_WP
 			
-			!___________________________________________________________________ !!PS
+			!___________________________________________________________________
 			elevation_elem = elevation(elnodes)
 			elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))   
 			elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
 			
-			!___________________________________________________________________ !!PS
+			!___________________________________________________________________
 			rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
 			rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
 		end if
