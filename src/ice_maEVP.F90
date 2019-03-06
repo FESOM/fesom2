@@ -92,7 +92,7 @@ subroutine ssh2rhs
   
   integer        :: row, elem, elnodes(3), n
   real(kind=WP)  :: dx(3), dy(3), vol
-  real(kind=WP)  :: val3, meancos, aa, bb
+  real(kind=WP)  :: val3, meancos, aa, bb, p_ice(3)
   
   val3=1.0_WP/3.0_WP
   
