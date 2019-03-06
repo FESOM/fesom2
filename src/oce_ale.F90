@@ -583,7 +583,7 @@ subroutine restart_thickness_ale
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
-    integer :: n, nz, elem, elnodes(3),nzmax
+    integer :: n, nz, elem, elnodes(3), nzmax, lcl_lzstar_lev
     integer      , dimension(:), allocatable :: idx
     
     if(mype==0) then
@@ -591,82 +591,11 @@ subroutine restart_thickness_ale
         write(*,*) ' --> restart ALE layerthicknesses, depth levels and middepth levels'
         write(*,*)
     end if
-    !___________________________________________________________________________
-    ! >->->->->->->->->->->->->->->       z-level      <-<-<-<-<-<-<-<-<-<-<-<-<
-    !___________________________________________________________________________
-    if     (trim(which_ale)=='zlevel') then
-        !_______________________________________________________________________
-        ! idx is only needed for local star case to estimate over how much 
-        ! depth layers hnode, depthlevel and mid-depthlevel need to be updated
-        allocate(idx(lzstar_lev))
-        idx = (/(nz,nz=1,lzstar_lev,1)/)
-        
-        ! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
-        do n=1,myDim_nod2D+eDim_nod2D
-            if (any(hnode(2:lzstar_lev,n) /=  &
-                    (zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) ) then
-                ! --> case local zstar 
-                ! the change in ssh, so that the next loops run only over the 
-                ! nesseccary levels and not over all lzstar_lev levels
-                nz  = max(1,maxval(pack(idx,hnode(1:lzstar_lev,n)/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
-                
-                ! nlevels_nod2D_min(n)-1 ...would be hnode of partial bottom cell but this
-                ! one is not allowed to change so go until nlevels_nod2D_min(n)-2
-                nzmax = min(nz,nlevels_nod2D_min(n)-2)
-                do nz=nzmax,1,-1
-                    zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n)+hnode(nz,n)
-                    Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n)+hnode(nz,n)/2.0_WP
-                end do
-            else
-                ! --> case normal zlevel
-                zbar_3d_n(1,n)= zbar_3d_n(2,n)+hnode(1,n)
-                Z_3d_n(1,n)   = zbar_3d_n(2,n)+hnode(1,n)/2.0_WP
-            end if
-        end do ! --> do n=1,myDim_nod2D+eDim_nod2D
-        
-        !_______________________________________________________________________
-        ! restart element layer thinkness (helem) and The increment of total 
-        ! fluid depth on elements (dhe)
-        do elem=1,myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            !___________________________________________________________________
-            if (any(hnode(2:lzstar_lev,elnodes(1))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))     .or. &
-                any(hnode(2:lzstar_lev,elnodes(2))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1))) .or. &
-                any(hnode(2:lzstar_lev,elnodes(3))/=(zbar(2:lzstar_lev)-zbar(3:lzstar_lev+1)))      &
-                ) then
-                ! --> case local zstar 
-                ! try to limitate over how much layers i realy need to distribute
-                ! the change in ssh, so that the next loops run only over the 
-                ! nesseccary levels and not over all lzstar_lev levels
-                nz    = max(1 ,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(1))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
-                nz    = max(nz,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(2))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
-                nz    = max(nz,maxval(pack(idx,hnode(1:lzstar_lev,elnodes(3))/=(zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1)))))
-                nzmax = min(nz,nlevels_nod2D_min(n)-2)
-                do nz=1,nzmax
-                    helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
-                end do
-            else
-                ! --> case normal zlevel
-                helem(1,elem)=sum(hnode(1,elnodes))/3.0_WP
-            end if
-            
-            !___________________________________________________________________
-            ! for the first time steps of a restart or  initialisation dhe must 
-            ! be the absolute value of the elemental sea surface height, afterwards
-            ! when the stiffness matrix is update dhe becomes the anomaly between 
-            ! old and new elemental sea surface height (dhe(elem)=sum(hbar(elnodes)
-            ! -hbar_old(elnodes))/3.0_WP in subroutine compute_hbar_ale)
-            dhe(elem)=sum(hbar(elnodes))/3.0_WP
-            
-        end do ! --> do elem=1,myDim_elem2D
-        
-        !_______________________________________________________________________
-        deallocate(idx)
         
     !___________________________________________________________________________
-    ! >->->->->->->->->->->->->->->       z-star       <-<-<-<-<-<-<-<-<-<-<-<-<
+    ! >->->->->->->->->->->->->       z-star/zlevel       <-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
-    elseif (trim(which_ale)=='zstar' ) then
+    if (trim(which_ale)=='zstar' .or. trim(which_ale)=='zlevel' ) then
         ! restart depthlevels (zbar_3d_n) and mitdpethlevels (Z_3d_n)
         ! dont forget also at restart zbar_3d_n and Z_3d_n are first initialised 
         ! and filled up in ale_init there bottom depth zbar_3d_n(nlevels_nod2d) 
@@ -690,7 +619,7 @@ subroutine restart_thickness_ale
             end do
             
             !___________________________________________________________________
-            ! for the first time steps of a restart or  initialisation dhe must 
+            ! for the first time steps of a restart or initialisation dhe must 
             ! be the absolute value of the elemental sea surface height, afterwards
             ! when the stiffness matrix is update dhe becomes the anomaly between 
             ! old and new elemental sea surface height (dhe(elem)=sum(hbar(elnodes)
