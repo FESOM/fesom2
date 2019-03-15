@@ -1110,7 +1110,7 @@ real(real64) ::  arr2Dglobal(:)
 
 integer                                  ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf
+real(real64), ALLOCATABLE, DIMENSION(:)  ::  sendbuf
 integer       :: node_size
 
 node_size=myDim_nod2D+eDim_nod2D
