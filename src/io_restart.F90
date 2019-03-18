@@ -421,6 +421,8 @@ subroutine write_restart(id, istep)
      id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
+  call was_error(id); c=1
+
   do i=1, id%nvar
      shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
@@ -457,6 +459,7 @@ subroutine write_restart(id, istep)
            call par_ex
            stop
      end if
+     call was_error(id); c=1
   end do
 
   if (mype==0) id%error_count=c-1
