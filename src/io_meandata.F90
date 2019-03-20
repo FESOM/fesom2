@@ -125,8 +125,8 @@ subroutine ini_mean_io
 
   end if
 
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'y', i_real4)
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'y', i_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp', 'temperature',         'C',   tr_arr(:,:,1), 1, 'm', i_real4)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt', 'salinity',            'psu', tr_arr(:,:,2), 1, 'm', i_real4)
   
   do i=3, num_tracers
      write (id_string, "(I3.3)") tracer_id(i)
@@ -346,12 +346,12 @@ end subroutine assoc_ids
 subroutine write_mean(entry)
   implicit none
   type(Meandata), intent(inout) :: entry
-  real(real64), allocatable     :: aux1_r8(:), aux2_r8(:,:) 
-  real(real32), allocatable     :: aux1_r4(:), aux2_r4(:,:) 
-  integer(int16), allocatable   :: aux1_i2(:), aux2_i2(:,:) 
+  real(real64)  , allocatable   :: aux_r8(:)
+  real(real32),   allocatable   :: aux_r4(:)
+  integer(int16), allocatable   :: aux_i2(:)
   
   integer                       :: i, size1, size2
-  integer                       :: c
+  integer                       :: c, lev
   ! Serial output implemented so far
   if (mype==0) then
      c=1
@@ -364,33 +364,33 @@ subroutine write_mean(entry)
         size1=entry%glsize(1)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==0) allocate(aux1_r8(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1), aux1_r8)
-           if (size1==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1), aux1_r8)
+           if (mype==0) allocate(aux_r8(size1))
+           if (size1==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
+           if (size1==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
            if (mype==0) then
-              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1_r8, 1); c=c+1
+              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1); c=c+1
            end if
-           if (mype==0) deallocate(aux1_r8)
+           if (mype==0) deallocate(aux_r8)
         
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
-           if (mype==0) allocate(aux1_r4(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux1_r4)
-           if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux1_r4)
+           if (mype==0) allocate(aux_r4(size1))
+           if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
+           if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
            if (mype==0) then
-              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1_r4, 1); c=c+1
+              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1); c=c+1
            end if
-           if (mype==0) deallocate(aux1_r4)
+           if (mype==0) deallocate(aux_r4)
 
 !___________writing real as 2 byte integer _________________________________________ 
         elseif (entry%accuracy == i_int2) then
-           if (mype==0) allocate(aux1_i2(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_i2(1:entry%lcsize(1),1), aux1_i2)
-           if (size1==elem2D) call gather_elem(entry%local_values_i2(1:entry%lcsize(1),1), aux1_i2)
+           if (mype==0) allocate(aux_i2(size1))
+           if (size1==nod2D)  call gather_nod (entry%local_values_i2(1:entry%lcsize(1),1), aux_i2)
+           if (size1==elem2D) call gather_elem(entry%local_values_i2(1:entry%lcsize(1),1), aux_i2)
            if (mype==0) then
-              entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux1_i2, 1); c=c+1
+              entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_i2, 1); c=c+1
            end if
-           if (mype==0) deallocate(aux1_i2)
+           if (mype==0) deallocate(aux_i2)
         else
            if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
            call par_ex
@@ -404,33 +404,37 @@ subroutine write_mean(entry)
         size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==0) allocate(aux2_r8(size1, size2))
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r8)
-           if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r8)
-           if (mype==0) then
-              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2_r8, 2); c=c+1
-           end if
-           if (mype==0) deallocate(aux2_r8)
- 
+           if (mype==0) allocate(aux_r8(size2))
+           do lev=1, size1
+              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              if (mype==0) then
+                 entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1); c=c+1
+              end if
+           end do
+           if (mype==0) deallocate(aux_r8)
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
-           if (mype==0) allocate(aux2_r4(size1, size2))
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r4)
-           if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_r4)
-           if (mype==0) then
-              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2_r4, 2); c=c+1
-           end if
-           if (mype==0) deallocate(aux2_r4)
-
+           if (mype==0) allocate(aux_r4(size2))
+           do lev=1, size1
+              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+              if (mype==0) then
+                 entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1); c=c+1
+              end if
+           end do
+           if (mype==0) deallocate(aux_r4)
 !___________writing real as 2 byte integer _________________________________________ 
         elseif (entry%accuracy == i_int2) then
-           if (mype==0) allocate(aux2_i2(size1, size2))
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_i2(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_i2)
-           if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_i2(1:entry%lcsize(1),1:entry%lcsize(2)), aux2_i2)
-           if (mype==0) then
-              entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/1, 1, entry%rec_count/), (/size1, size2, 1/), aux2_i2, 2); c=c+1
-           end if
-           if (mype==0) deallocate(aux2_i2)
+           if (mype==0) allocate(aux_i2(size2))
+           do lev=1, size1           
+              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
+              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
+              if (mype==0) then
+                 entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_i2, 1); c=c+1
+              end if
+           end do
+           if (mype==0) deallocate(aux_i2)
         else
            if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
            call par_ex
