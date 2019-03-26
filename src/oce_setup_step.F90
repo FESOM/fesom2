@@ -5,41 +5,69 @@ USE g_PARSUP
 USE o_ARRAYS
 USE g_config
 USE g_forcing_param, only: use_virt_salt
+use g_cvmix_tke
+use g_cvmix_idemix
 IMPLICIT NONE
 
-       if (use_ALE) then
-	  !___setup virt_salt_flux____________________________________________________
-          ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
-          ! salinity flux need to be used
-          ! otherwise we set the reference salinity to zero
-          if ( .not. trim(which_ALE)=='linfs') then
- 	     use_virt_salt=.false.
-             ! this will force the virtual saltinity flux to be zero
-             ref_sss_local=.false.
-             ref_sss=0._WP
-             is_nonlinfs = 1.0_WP
-          else
-             use_virt_salt=.true.
-             is_nonlinfs = 0.0_WP
-          end if
+    if (use_ALE) then
+    !___setup virt_salt_flux____________________________________________________
+    ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
+    ! salinity flux need to be used
+    ! otherwise we set the reference salinity to zero
+        if ( .not. trim(which_ALE)=='linfs') then
+            use_virt_salt=.false.
+            ! this will force the virtual saltinity flux to be zero
+            ref_sss_local=.false.
+            ref_sss=0._WP
+            is_nonlinfs = 1.0_WP
+        else
+            use_virt_salt=.true.
+            is_nonlinfs = 0.0_WP
         end if
-        call array_setup
+    end if
+    call array_setup
+    
     !___________________________________________________________________________
-	! initialize arrays for ALE
-	if(use_ALE) then
-		if(mype==0) then
-				write(*,*) '____________________________________________________________'
-				write(*,*) ' --> call ale_init'
-				write(*,*)
-		end if	
-		call init_ale
-		call init_stiff_mat_ale !!PS test
-	else
-		call stiff_mat
-	end if    
+    ! initialize arrays for ALE
+    if(use_ALE) then
+        if(mype==0) then
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
+            write(*,*)
+        end if
+        call init_ale
+        call init_stiff_mat_ale !!PS test
+    else
+        call stiff_mat
+    end if    
         
-	
-	if(mype==0) write(*,*) 'Arrays are set'
+    !___________________________________________________________________________
+    ! initialize arrays from cvmix library for CVMIX_TKE and  CVMIX_IDEMIX
+    if(trim(mix_scheme)=='cvmix_TKE'        .or. &
+       trim(mix_scheme)=='cvmix_TKE+IDEMIX' .or. &
+       trim(mix_scheme)=='cvmix_IDEMIX'     ) then    
+        !_______________________________________________________________________
+        if (trim(mix_scheme)=='cvmix_TKE+IDEMIX' .or. trim(mix_scheme)=='cvmix_IDEMIX') then 
+            if(mype==0) then
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' --> initialise IDEMIX'
+                write(*,*)
+            end if
+            call init_cvmix_idemix
+        endif
+        !_______________________________________________________________________
+        if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+            if(mype==0) then
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' --> initialise CVMIX_TKE'
+                write(*,*)
+            end if
+            call init_cvmix_tke
+        endif
+    endif 
+
+    !___________________________________________________________________________
+    if(mype==0) write(*,*) 'Arrays are set'
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
