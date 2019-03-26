@@ -240,7 +240,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			!                         |                                                                          |
 			!    enodes(1) o----------O---------o enodes(2)                                                      |-> calculate volume flux out of/in
 			!          vflux_________/|                                                                          |   the volume of enode1(enode2) through
-			!                         |---> vec_n2 (dy2,-dx2)--> project vec_u2 onto vec_n2 --> -v2*dx2+u2*dy2 -->   sections of dx1,dy1 and dx2,dy2
+			!                     <---| vec_n2 (dy2,-dx2)--> project vec_u2 onto vec_n2 --> -v2*dx2+u2*dy2     -->   sections of dx1,dy1 and dx2,dy2
 			!               (dx2,dy2) |                                                                              --> vflux 
 			!                         v
 			!                         x
@@ -250,6 +250,9 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 			vflux=(-UV(2,nz,el(1))*deltaX1 + UV(1,nz,el(1))*deltaY1)*helem(nz,el(1)) &
 				  +(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
 			
+			! WHY vflux = (...vflux(el1)...) !!!-!!! (vflux(...el(2))...) ???
+			! --> Right-Hand-Rule: vectors vec_n1 and vec_n2 face in oppostite
+			!     direction, the minus sign switches the direction of vec_n2
 			!___________________________________________________________________
 			! tracer flux upwind
 			! if vflux (+) --> c1 = 2*vflux*Tmean1
@@ -1137,7 +1140,7 @@ subroutine diff_part_hor_redi
 		!_______________________________________________________________________
 		n2=min(nl1,nl2)
 		do nz=1,n2
-                        Kh=sum(Ki(nz, enodes))/2.0_WP
+            Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=sum(helem(nz, el))/2.0_WP
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
@@ -1153,7 +1156,7 @@ subroutine diff_part_hor_redi
 		
 		!_______________________________________________________________________
 		do nz=n2+1,nl1
-                        Kh=sum(Ki(nz, enodes))/2.0_WP
+            Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=helem(nz, el(1))
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
@@ -1167,7 +1170,7 @@ subroutine diff_part_hor_redi
 			rhs2(nz) = rhs2(nz) - c
 		end do
 		do nz=n2+1,nl2
-                        Kh=sum(Ki(nz, enodes))/2.0_WP
+            Kh=sum(Ki(nz, enodes))/2.0_WP
 			dz=helem(nz, el(2))
 			Tz=0.5_WP*(tr_z(nz,enodes)+tr_z(nz+1,enodes))
 			SxTz=sum(Tz*slope_tapered(1,nz,enodes))/2.0_WP
