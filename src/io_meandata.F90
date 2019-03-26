@@ -9,6 +9,8 @@ module io_MEANDATA
   use g_forcing_arrays
   use i_ARRAYS
   use o_mixing_KPP_mod
+  use g_cvmix_tke
+  use g_cvmix_idemix
   use diagnostics
   use i_PARAM, only: whichEVP
 
@@ -157,6 +159,8 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'thdgr', 'growth rate ice',              'm/s',      thdgr(1:myDim_nod2D),          1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'thdgrsn', 'growth rate ice',              'm/s',      thdgrsn(1:myDim_nod2D),          1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'MLD1',   'Mixed Layer Depth',      'm',      MLD1(1:myDim_nod2D),           1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm', i_real4)
@@ -170,22 +174,54 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm', i_real4)
 #if defined (__oifs)
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', i_real4)
 #endif
 
-  if (trim(mix_scheme)=='KPP') then
-     call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm', i_real4)
-     call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm', i_real4)
-  end if
-
+    !___________________________________________________________________________________________________________________________________
+    ! output vertical mixing schemes
+    if (trim(mix_scheme)=='KPP') then
+        call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm', i_real4)
+        call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm', i_real4)
+    else if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        ! TKE diagnostic 
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke'     , 'turbulent kinetic energy'                    , 'm^2/s^2', tke(:,:)     , 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Ttot', 'total production of turbulent kinetic energy', 'm^2/s^3', tke_Ttot(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbpr', 'TKE production by buoyancy'                  , 'm^2/s^3', tke_Tbpr(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tspr', 'TKE production by shear'                     , 'm^2/s^3', tke_Tspr(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tdif', 'TKE production by vertical diffusion'        , 'm^2/s^3', tke_Tdif(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tdis', 'TKE production by dissipation'               , 'm^2/s^3', tke_Tdis(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Twin', 'TKE production by wind'                      , 'm^2/s^3', tke_Twin(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbck', 'background forcing for TKE'                  , 'm^2/s^3', tke_Tbck(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Lmix', 'mixing length scale of TKE'                  , 'm'      , tke_Lmix(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Pr'  , 'Prantl number'                               , ''       , tke_Pr(:,:)  , 1, 'm', i_real4)
+        if (trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+            ! IDEMIX diagnostic 
+            call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tiwf', 'TKE production by internal waves (IDEMIX)', 'm^2/s^3', tke_Tiwf(:,:), 1, 'm', i_real4)
+        end if 
+    else if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        ! IDEMIX Internal-Wave-Energy diagnostics
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe'     , 'internal wave energy'                    , 'm^2/s^2', iwe(:,:)     , 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Ttot', 'total production of internal wave energy', 'm^2/s^2', iwe_Ttot(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tdif', 'IWE production by vertical diffusion'    , 'm^2/s^3', iwe_Tdif(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tdis', 'IWE production by dissipation'           , 'm^2/s^3', iwe_Tdis(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tsur', 'IWE production from surface forcing'     , 'm^2/s^2', iwe_Tsur(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tbot', 'IWE production from bottom forcing'      , 'm^2/s^2', iwe_Tbot(:,:), 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_c0'  , 'IWE vertical group velocity'             , 'm/s'    , iwe_c0(:,:)  , 1, 'm', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_v0'  , 'IWE horizontal group velocity'           , 'm/s'    , iwe_c0(:,:)  , 1, 'm', i_real4)
+    end if
+  
+  !___________________________________________________________________________________________________________________________________
+  ! output Redi parameterisation
   if (Redi) then
      call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'm', i_real4)
   end if
 
+  !___________________________________________________________________________________________________________________________________
+  ! output Ferrari/GM parameterisation
   if (Fer_GM) then
      call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U',      'm/s',  fer_uv(1,:,:), 1, 'y', i_real4)
      call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V',      'm/s',  fer_uv(2,:,:), 1, 'y', i_real4)
@@ -193,25 +229,47 @@ subroutine ini_mean_io
      call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diffusivity', 'm2/s', fer_k(:,:),    1, 'm', i_real4)
 
      call def_stream(nod2D, myDim_nod2D, 'fer_C', 'GM,   depth independent speed',  'm/s' ,  fer_c(1:myDim_nod2D),           1, 'm', i_real4)
-     call def_stream(nod2D, myDim_nod2D, 'reso',  'mesh resolution',                'm',     mesh_resolution(1:myDim_nod2D), 1, 'm', i_real4)
+!!PS      call def_stream(nod2D, myDim_nod2D, 'reso',  'mesh resolution',                'm',     mesh_resolution(1:myDim_nod2D), 1, 'm', i_real4)
   end if
+  
+  !___________________________________________________________________________________________________________________________________
   if (ldiag_solver) then
-     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     10, 's', i_real4)
-     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     10, 's', i_real4)
+     call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     1, 's', i_real4)
+     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     1, 's', i_real4)
+     call def_stream(nod2D, myDim_nod2D, 'ssh_rhs_old',   'ssh_rhs_old',         'none',      ssh_rhs_old(1:myDim_nod2D),     1, 's', i_real4)
+     call def_stream(nod2D, myDim_nod2D, 'd_eta',   'd_eta',         'm',      d_eta (1:myDim_nod2D),     1, 's', i_real4)
   end if
+  
+  !___________________________________________________________________________________________________________________________________
   if (lcurt_stress_surf) then
-     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  10, 'm', i_real4)
+     call def_stream(nod2D, myDim_nod2D, 'curl_stress_surf',  'vorticity of the surface stress', 'none', curl_stress_surf(1:myDim_nod2D),  1, 'm', i_real4)
   end if
+  
+  !___________________________________________________________________________________________________________________________________
   if (ldiag_curl_vel3) then
      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4)
  !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u100',  'relative vorticity at 100m',  '1/s',   vorticity(12,1:myDim_nod2D), 1, 'd', i_real4)
  !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u280',  'relative vorticity at 280m',  '1/s',   vorticity(16,1:myDim_nod2D), 1, 'd', i_real4)
   end if
 
+  !___________________________________________________________________________________________________________________________________
   if (whichEVP==2) then
      call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4)
      call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4)
   end if
+  
+!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'helem', 'elemental layer thickness', 'm', helem(:,:), 1, 'm', i_real4)
+!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'hnode', 'nodal layer thickness'    , 'm', hnode(:,:), 1, 'm', i_real4)
+  
+!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_x', 'zonal pressure gradient force', 'm', pgf_x(:,:), 1, 'y', i_real4)
+!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm', pgf_y(:,:), 1, 'y', i_real4)
+  
+!!PS   call def_stream(nod2D,        myDim_nod2D,        'dum_2d_n', '????????????????', '?', dum_2d_n(:), 1  , 's', i_real4)
+!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'dum_3d_e', '????????????????', '?', dum_3d_e(:,:), 1, 's', i_real4)
+!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'press', 'pressure'    , 'm', hpressure(:,:), 1, 's', i_real4)
+!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'density_m_rho0', 'density'    , 'm', density_m_rho0(:,:), 1, 's', i_real4)
+  
+     
 end subroutine ini_mean_io
 !
 !--------------------------------------------------------------------------------------------

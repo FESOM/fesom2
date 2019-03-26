@@ -6,6 +6,8 @@ MODULE io_RESTART
   use o_mesh
   use o_arrays
   use i_arrays
+  use g_cvmix_tke
+  use g_cvmix_idemix
   implicit none
 #include "netcdf.inc"
 !
@@ -110,6 +112,14 @@ subroutine ini_ocean_io(year)
   call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
   call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
   call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+  
+  !___Save restart variables for TKE and IDEMIX_________________________________
+  if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        call def_variable(oid, 'tke',  (/nl, nod2d/), 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:));
+  endif
+  if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        call def_variable(oid, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
+  endif 
 
   do j=1,num_tracers
      SELECT CASE (j) 

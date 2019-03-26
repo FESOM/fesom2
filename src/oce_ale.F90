@@ -1892,6 +1892,8 @@ subroutine oce_timestep_ale(n)
     use io_RESTART !PS
     use i_ARRAYS !PS
     use o_mixing_KPP_mod
+    use g_cvmix_tke
+    use g_cvmix_idemix
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
@@ -1927,12 +1929,34 @@ subroutine oce_timestep_ale(n)
     call status_check
     
     !___________________________________________________________________________
+    ! calculate vertical mixing coefficients for tracer (Kv) and momentum (Av)
+    
+    ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (trim(mix_scheme)=='KPP') then
         call oce_mixing_KPP(Av, Kv_double)
         Kv=Kv_double(:,:,1)
         call mo_convect
+        
+    ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
+    ! mixing     
     else if(trim(mix_scheme)=='PP') then
         call oce_mixing_PP
+        
+    ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
+    ! vertical mixing with or without the IDEMIX (dissipation of energy by 
+    ! internal gravity waves) extension from Olbers and Eden, 2013, "A global 
+    ! Model for the diapycnal diffusivity induced by internal gravity waves" 
+    else if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then    
+        if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') call calc_cvmix_idemix
+        call calc_cvmix_tke
+        
+    ! use only CVMIX IDEMIX (internal wave energy) parameterisation for 
+    ! vertical mixing (dissipation of energy by internal gravity waves) 
+    ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal 
+    ! diffusivity induced by internal gravity waves"     
+    else if(trim(mix_scheme)=='cvmix_IDEMIX') then
+        call calc_cvmix_idemix
+        
     else
         stop "!not existing mixing scheme!"
         call par_ex
