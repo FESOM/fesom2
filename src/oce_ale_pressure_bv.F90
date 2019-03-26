@@ -487,8 +487,7 @@ subroutine pressure_force_4_linfs_shchepetkin
         ! calculate pressure gradient for bottom layer
         nlz = nle 
         
-        ! vertical gradient --> with average density and average id-depth level 
-        ! on element
+        ! vertical gradient --> with average density on element
         !       x0        x1               x2
         !  -----o---------o----------------o-------
         !       f0        f1               f2
