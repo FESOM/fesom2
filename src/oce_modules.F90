@@ -46,7 +46,7 @@ real(kind=WP)                 :: ref_sss=34.7
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
 real(kind=WP)                 :: K_GM=1000.
 logical			      :: scaling_Ferreira   =.true.
-logical			      :: scaling_Rossby     =.false.
+logical			      :: scaling_Rossby     =.false. 
 logical			      :: scaling_resolution =.true.
 logical			      :: scaling_FESOM14    =.false.
 logical			      :: Redi               =.false.  !flag for Redi scheme
@@ -56,7 +56,7 @@ real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff du
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
-character(5)                  :: mix_scheme='KPP'	   !'KPP','PP'
+character(20)                  :: mix_scheme='KPP'	   !'KPP','PP'
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 
