@@ -17,7 +17,7 @@ subroutine write_step_info(istep,outfreq)
                                            min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2
 	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
                                            max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
-                                           max_cfl_z, max_pgfx, max_pgfy 
+                                           max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
 	
@@ -126,6 +126,10 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(m_ice(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(abs(Av(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_av , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(abs(Kv(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_kv , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		!_______________________________________________________________________
 		if (mype==0) then
 			write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
@@ -159,6 +163,8 @@ subroutine write_step_info(istep,outfreq)
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Av= ',' N.A.     ',' | ',max_av    ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Kv= ',' N.A.     ',' | ',max_kv    ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
 			write(*,*)
 		endif
@@ -379,13 +385,14 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,n)
 					write(*,*)
-! 					do el=1,nod_in_elem2d_num(n)
-! 						elidx = nod_in_elem2D(el,n)
-! 						write(*,*) ' elem#=',el,', elemidx=',elidx
+ 					do el=1,nod_in_elem2d_num(n)
+ 						elidx = nod_in_elem2D(el,n)
+ 						write(*,*) ' elem#=',el,', elemidx=',elidx
+ 						write(*,*) ' 	 Av =',Av(:,elidx)
 ! 						write(*,*) ' 	 helem =',helem(:,elidx)
 ! 						write(*,*) ' 	     U =',UV(1,:,elidx)
 ! 						write(*,*) ' 	     V =',UV(2,:,elidx)
-! 					enddo
+ 					enddo
 					write(*,*) 'Wvel        = ',Wvel(:,n)
 					write(*,*)
 					write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)

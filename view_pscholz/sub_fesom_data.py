@@ -336,8 +336,9 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
     # in case of ice data set no ice to nan
     if (data.var=='a_ice'):
         mean_data=mean_data*100.0
-    #if (data.var=='a_ice' or data.var=='m_ice'):
+    if (data.var=='a_ice' or data.var=='m_ice'):
         #mean_data[mean_data==0.0]=np.nan
+        mean_data[mean_data<=0.0]=np.nan
     
     #____ROTATE VECTORES FROM ROT TO GEO________________________________________
     # in future check if rotation is s till neccessary -> we want to/should write out 

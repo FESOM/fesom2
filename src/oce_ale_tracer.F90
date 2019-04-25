@@ -133,6 +133,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
 		! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
 		deltaX1=edge_cross_dxdy(1,ed)
 		deltaY1=edge_cross_dxdy(2,ed)
+		a=r_earth*elem_cos(el(1))
 		
 		! same parameter but for other element el(2) that contributes to edge ed
 		! if el(2)==0 than edge is boundary edge

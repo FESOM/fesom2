@@ -638,7 +638,10 @@ subroutine integrate_tke( &
   !---------------------------------------------------------------------------------
   ! Part 2: calculate diffusivities
   !---------------------------------------------------------------------------------
+  ! see. Blanke and Delecluse 1993, eq. 2.25
   KappaM_out = min(KappaM_max,c_k*mxl*sqrttke)
+  
+  ! Richardson number --> see. Blanke and Delecluse 1993, eq. 2.18
   Rinum = Nsqr/max(Ssqr,1d-12)
  
   ! FIXME: nils: Check this later if IDEMIX is coupled.
@@ -647,8 +650,13 @@ subroutine integrate_tke( &
   if (.not.only_tke) then  !IDEMIX is on
     Rinum = min(Rinum,KappaM_out*Nsqr/max(1d-12,alpha_c*E_iw**2))
   end if
-    
+  
+  ! Richardson number dependent expression is used for the P_rt (Osborn 1980, 
+  ! Crawford 1982) --> see. Blanke and Delecluse 1993, eq. 2.33 & 2.34
+  ! Why 6.6*... ???
   prandtl=max(1d0,min(10d0,6.6*Rinum))
+  
+  ! see. Blanke and Delecluse 1993, eq. 2.26
   KappaH_out=KappaM_out/prandtl
 
   !---------------------------------------------------------------------------------

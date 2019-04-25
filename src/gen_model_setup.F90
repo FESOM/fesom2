@@ -59,8 +59,8 @@ subroutine read_namelist
 		write(*,*) '        800, 864, 900, 960, 1080, 1152, 1200, 1350, 1440(1min), ...'
 		write(*,*)
 		write(*,*) '        --> check your namelist.config !!!'
-		call par_ex(0)
 		write(*,*) '____________________________________________________________________'
+		call par_ex(0)
 	endif	
   endif
   ! ==========
