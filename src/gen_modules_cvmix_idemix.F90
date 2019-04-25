@@ -58,6 +58,7 @@ module g_cvmix_idemix
     use g_parsup
     use o_arrays
     use g_comm_auto 
+    use g_read_other_NetCDF
     implicit none
     public
     
@@ -80,13 +81,23 @@ module g_cvmix_idemix
     
     integer       :: n_hor_iwe_prop_iter = 1
     
-    namelist /param_idemix/ tau_v, tau_h, gamma, jstar, mu0, n_hor_iwe_prop_iter
+    ! filelocation for idemix surface forcing 
+    character(200):: nm_idemixsur_file = '/work/ollie/pscholz/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+    
+    ! filelocation for idemix bottom forcing 
+    character(200):: nm_idemixbot_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+    
+    namelist /param_idemix/ tau_v, tau_h, gamma, jstar, mu0, n_hor_iwe_prop_iter, & 
+                            nm_idemixsur_file, nm_idemixbot_file
+                            
+                            
     
     !___________________________________________________________________________
     ! CVMIX-IDEMIX variables
     
     ! diagnostic fields
     real(kind=WP), allocatable, dimension(:,:) :: iwe
+    real(kind=WP), allocatable, dimension(:)   :: iwe_old
     real(kind=WP), allocatable, dimension(:,:) :: iwe_diss
     real(kind=WP), allocatable, dimension(:,:) :: iwe_alpha_c
     real(kind=WP), allocatable, dimension(:,:) :: iwe_c0
@@ -106,12 +117,8 @@ module g_cvmix_idemix
     ! forcing square of Brunt Väisälä frequency
     real(kind=WP), allocatable, dimension(:,:) :: in3d_bvfreq2
     
-    real(kind=WP), allocatable, dimension(:,:) :: weto_w
-    real(kind=WP), allocatable, dimension(:,:) :: vol_wcell
     real(kind=WP), allocatable, dimension(:,:) :: vol_wcelli
-    real(kind=WP), allocatable, dimension(:,:) :: Fx
-    real(kind=WP), allocatable, dimension(:,:) :: Fy
-
+    
     real(kind=WP), allocatable, dimension(:)   :: forc_iw_bottom_2D
     real(kind=WP), allocatable, dimension(:)   :: forc_iw_surface_2D
 
@@ -134,7 +141,7 @@ module g_cvmix_idemix
     subroutine init_cvmix_idemix
         
         character(len=100) :: nmlfile
-        logical            :: nmlfile_exist=.False.
+        logical            :: file_exist=.False.
         integer            :: node_size
         
         !_______________________________________________________________________
@@ -143,8 +150,10 @@ module g_cvmix_idemix
         
         ! initialise 3D  IDEMIX fields
         allocate(iwe(nl,node_size))
+        allocate(iwe_old(nl))
         allocate(iwe_diss(nl,node_size))
         iwe(:,:)         = 0.0_WP
+        iwe_old(:)       = 0.0_WP
         iwe_diss(:,:)    = 0.0_WP
         
         allocate(cvmix_dummy_1(nl,node_size))
@@ -181,17 +190,8 @@ module g_cvmix_idemix
         iwe_v0(:,:)      = 0.0_WP
         iwe_alpha_c(:,:) = 0.0_WP
         
-        allocate(weto_w(nl,node_size))
-        allocate(vol_wcell(nl,node_size))
         allocate(vol_wcelli(nl,node_size))
-        weto_w(:,:)      = 0.0_WP
-        vol_wcell(:,:)   = 0.0_WP
         vol_wcelli(:,:)  = 0.0_WP
-        
-        allocate(Fx(nl,node_size))
-        allocate(Fy(nl,node_size))
-        Fx(:,:)          = 0.0_WP
-        Fy(:,:)          = 0.0_WP
         
         ! 2D
         allocate(forc_iw_bottom_2D(node_size))
@@ -206,12 +206,59 @@ module g_cvmix_idemix
         ! read cvmix namelist file 
         nmlfile ='namelist.cvmix'    ! name of ocean namelist file
         ! check if cvmix namelist file exists if not use default values 
-        inquire(file=trim(nmlfile),exist=nmlfile_exist) 
-        if (nmlfile_exist) then
+        file_exist=.False.
+        inquire(file=trim(nmlfile),exist=file_exist) 
+        if (file_exist) then
             open(20,file=trim(nmlfile))
                 read(20,nml=param_idemix)
             close(20)
         end if    
+        
+        !_______________________________________________________________________
+        ! read idemix surface near inertial wave forcing from cfsr data --> file 
+        ! from N. Brüggemann interpoalted to regular grid
+        file_exist=.False.
+        inquire(file=trim(nm_idemixsur_file),exist=file_exist) 
+        if (file_exist) then
+            if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
+            call read_other_NetCDF(nm_idemixsur_file, 'var706', 1, forc_iw_surface_2D, .true.) 
+            ! only 20% of the niw-input are available to penetrate into the deeper ocean
+            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
+            
+        else
+            if (mype==0) then
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: IDEMIX surface forcing file not found! Cant apply IDEMIX'
+                write(*,*) '        vertical mixing parameterisation! '
+                write(*,*) '        --> check your namelist.cvmix, nm_idemixsur_file &  '
+                write(*,*) '            nm_idemixbot_file'
+                write(*,*) '____________________________________________________________________'
+            end if
+            call par_ex(0)
+        end if 
+        
+        !_______________________________________________________________________
+        ! read idemix bottom near tidal forcing from cesm data set --> file 
+        ! from N. Brüggemann interpoalted to regular grid
+        file_exist=.False.
+        inquire(file=trim(nm_idemixsur_file),exist=file_exist) 
+        if (file_exist) then
+            if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
+            call read_other_NetCDF(nm_idemixbot_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true.) 
+            ! convert from W/m^2 to m^3/s^3
+            forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
+            
+        else
+            if (mype==0) then
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: IDEMIX bottom forcing file not found! Cant apply IDEMIX'
+                write(*,*) '        vertical mixing parameterisation! '
+                write(*,*) '        --> check your namelist.cvmix, nm_idemixsur_file &  '
+                write(*,*) '            nm_idemixbot_file'
+                write(*,*) '____________________________________________________________________'
+            end if 
+            call par_ex(0)
+        end if 
         
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
@@ -228,82 +275,76 @@ module g_cvmix_idemix
         integer       :: node, elem, edge
         integer       :: nz, nln, nl1, nl2, nl12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
-        real(kind=WP) :: dz_trr(nl), bvfreq2(nl), vflux, dz_el, aux, cflfac
+        real(kind=WP) :: dz_trr(nl), dz_trr2(nl), bvfreq2(nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         logical       :: debug=.false.
         
         ! nils
         tstep_count = tstep_count + 1
-        
-        !_______________________________________________________________________
-        ! Bottom and surface forcing
-        if (tstep_count==1) then
-            ! convert from W/m^2 to m^3/s^3
-            forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
-            ! only 20% of the niw-input are available to penetrate into the deeper ocean
-            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
-        end if
-        
+          
         !_______________________________________________________________________
         do node = 1,myDim_nod2D
             nln = nlevels_nod2D(node)-1
             
             !___________________________________________________________________
-            ! calculate for TKE square of Brünt-Väisälä frequency
-            bvfreq2          = 0.0_WP
-            bvfreq2(1:nln+1) = bvfreq(1:nln+1,node)**2
+            ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
+            ! bvfreq contains already the squared brünt Väisälä frequency ...
+            bvfreq2        = 0.0_WP
+            bvfreq2(2:nln) = bvfreq(2:nln,node)
             
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
             dz_trr         = 0.0_WP
-            dz_trr(2:nln)  = Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node)
+            dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
             dz_trr(1)      = hnode(1,node)/2.0_WP
             dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
             ! main call to calculate idemix
+            iwe_old = iwe(:,node)
+            
             call cvmix_coeffs_idemix(&
                 ! parameter
-                dzw             = hnode(1:nln,node),          &
-                dzt             = dz_trr(1:nln+1),            &
-                nlev            = nln,                        &
-                max_nlev        = nl,                         & 
-                dtime           = dt,                         &
-                coriolis        = coriolis_node(node),        &
+                dzw             = hnode(:,node),                &
+                dzt             = dz_trr(:),                    &
+                nlev            = nln,                          &
+                max_nlev        = nl-1,                         &  
+                dtime           = dt,                           &
+                coriolis        = coriolis_node(node),          &
                 ! essentials 
-                iwe_old         = iwe(1:nln+1,node),          & ! in
-                iwe_new         = iwe(1:nln+1,node),          & ! out
-                forc_iw_surface = forc_iw_surface_2D(node),   & ! in
-                forc_iw_bottom  = forc_iw_bottom_2D(node),    & ! in
+                iwe_new         = iwe(:,node),                  & ! out
+                iwe_old         = iwe_old(:),                   & ! in
+                forc_iw_surface = forc_iw_surface_2D(node),     & ! in
+                forc_iw_bottom  = forc_iw_bottom_2D(node),      & ! in
                 ! FIXME: nils: better output IDEMIX Ri directly
-                alpha_c         = iwe_alpha_c(1:nln+1,node),  & ! out (for Ri IMIX)
+                alpha_c         = iwe_alpha_c(:,node),          & ! out (for Ri IMIX)
                 ! only for Osborn shortcut 
                 ! FIXME: nils: put this to cvmix_tke
-                KappaM_out      = iwe_Av(1:nln+1,node),      & ! out
-                KappaH_out      = iwe_Kv(1:nln+1,node),      & ! out
-                Nsqr            = bvfreq2(1:nln+1),           & ! in
+                KappaM_out      = iwe_Av(:,node),               & ! out
+                KappaH_out      = iwe_Kv(:,node),               & ! out
+                Nsqr            = bvfreq2(:),                   & ! in
                 ! diagnostics
-                iwe_Ttot        = iwe_Ttot(1:nln+1,node),     &
-                iwe_Tdif        = iwe_Tdif(1:nln+1,node),     &
-                iwe_Thdi        = iwe_Thdi(1:nln+1,node),     &
-                iwe_Tdis        = iwe_Tdis(1:nln+1,node),     &
-                iwe_Tsur        = iwe_Tsur(1:nln+1,node),     &
-                iwe_Tbot        = iwe_Tbot(1:nln+1,node),     &
-                c0              = iwe_c0(1:nln+1,node),       &
-                v0              = iwe_v0(1:nln+1,node),       &
+                iwe_Ttot        = iwe_Ttot(:,node),             &
+                iwe_Tdif        = iwe_Tdif(:,node),             &
+                iwe_Thdi        = iwe_Thdi(:,node),             &
+                iwe_Tdis        = iwe_Tdis(:,node),             &
+                iwe_Tsur        = iwe_Tsur(:,node),             &
+                iwe_Tbot        = iwe_Tbot(:,node),             &
+                c0              = iwe_c0(:,node),               &
+                v0              = iwe_v0(:,node),               &
                 ! debugging
-                debug           = debug,                      &
+                debug           = debug,                        &
                 !i = i,                                        &
                 !j = j,                                        &
                 !tstep_count = tstep_count,                    &
-                cvmix_int_1     = cvmix_dummy_1(1:nln+1,node),&
-                cvmix_int_2     = cvmix_dummy_2(1:nln+1,node),&
-                cvmix_int_3     = cvmix_dummy_3(1:nln+1,node) &
+                cvmix_int_1     = cvmix_dummy_1(:,node),        &
+                cvmix_int_2     = cvmix_dummy_2(:,node),        &
+                cvmix_int_3     = cvmix_dummy_3(:,node)         &
                 )
             
         end do !-->do node = 1,myDim_nod2D
-        
+            
         !_______________________________________________________________________
         ! --> add contribution from horizontal wave propagation
         ! Since IDEMIX is used in a global model configuration the vertical 
@@ -332,7 +373,7 @@ module g_cvmix_idemix
             ! --> limit v0 to CFL=0.2
             ! --> v0 = sqrt(CFL * dx^2 / dt)
             cflfac = 0.2_WP
-            ! |--> FROM NILS: fac=0.2 ist geschätzt. Würde ich erstmal so 
+            ! |--> FROM NILS: "fac=0.2 ist geschätzt. Würde ich erstmal so 
             !      probieren. Der kommt aus dem stabilitätskriterium für Diffusion 
             !      (ähnlich berechnet wie das CFL Kriterium nur halt für den 
             !      Diffusions anstatt für den Advektionsterm). Normalerweise 
@@ -342,23 +383,39 @@ module g_cvmix_idemix
             !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
             !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
-            !      machen, aber nahe der ML kann der schon Probleme machen.
+            !      machen, aber nahe der ML kann der schon Probleme machen".
             do node = 1,myDim_nod2D
+                ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
+                
+                ! thickness of mid-level to mid-level interface at node
                 dz_trr         = 0.0_WP
                 dz_trr(2:nln)  = Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node)
                 dz_trr(1)      = hnode(1,node)/2.0_WP
                 dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
-                do nz=1,nln+1
+                
+                ! surface cell 
+                vol_wcelli(1,node) = 1/(area(1,node)*dz_trr(1))
+                aux = sqrt(cflfac*(area(1,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                iwe_v0(1,node) = min(iwe_v0(1,node),aux)
+                
+                ! bulk cells
+                do nz=2,nln
                     ! inverse volumne 
-                    vol_wcelli(nz,node) = area_inv(nz,node)/dz_trr(nz)
+                    vol_wcelli(nz,node) = 1/(area(nz-1,node)*dz_trr(nz))
                     
                     ! restrict iwe_v0
-                    aux = sqrt(cflfac*(area(nz,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
                     !                  `--------+-------------´
                     !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
-                    iwe(nz,node) = min(iwe(nz,node),aux)
+                    iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
                 end do 
+                
+                ! bottom cell 
+                vol_wcelli(nln+1,node) = 1/(area(nln,node)*dz_trr(nln+1))
+                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
+                
             end do !-->do node = 1,myDim_nod2D
             call exchange_nod(vol_wcelli)
             call exchange_nod(iwe_v0)
@@ -393,19 +450,35 @@ module g_cvmix_idemix
                 ! nl1 ... number of layers at element el(1)
                 nl1      = nlevels(el(1))
                 
+                ! thickness of mid-level to mid-level interface of element el(1)
+                dz_trr         = 0.0_WP
+                dz_trr(1)      = helem(1,el(1))/2.0_WP
+                do nz=2,nl1-1
+                    dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
+                end do
+                dz_trr(nl1)    = helem(nl1-1,el(1))/2.0_WP
+                
                 !_______________________________________________________________
                 ! the same as above but for el(2)--> if el(2)==0 than this edge 
-                ! is a boundary edge
+                ! is a boundary edge and el(2) does not exist
                 nl2=0
                 if (el(2)>0) then 
-                    deltaX2=edge_cross_dxdy(3,edge)
-                    deltaY2=edge_cross_dxdy(4,edge)
-                    elnodes1= elem2d_nodes(:,el(2))
-                    nl2=nlevels(el(2))
+                    deltaX2  = edge_cross_dxdy(3,edge)
+                    deltaY2  = edge_cross_dxdy(4,edge)
+                    elnodes2 = elem2d_nodes(:,el(2))
+                    nl2      = nlevels(el(2))
+                    
+                    ! thickness of mid-level to mid-level interface of element el(2)
+                    dz_trr2         = 0.0_WP
+                    dz_trr2(1)      = helem(1,el(2))/2.0_WP
+                    do nz=2,nl2-1
+                        dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP
+                    end do
+                    dz_trr2(nl2)    = helem(nl2-1,el(2))/2.0_WP
                 endif
                 
                 !_______________________________________________________________
-                ! goes only into this loop when the edge as two facing elements
+                ! goes only into this loop when the edge has two facing elements
                 ! --> so the edge is not a boundary edge
                 nl12=min(nl1,nl2)
                 do nz=1,nl12
@@ -419,7 +492,9 @@ module g_cvmix_idemix
                     ! and el(2)
                     grad_v0Eiw(1) = (grad_v0Eiw(1) + sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2)))*0.5_WP
                     grad_v0Eiw(2) = (grad_v0Eiw(2) + sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2)))*0.5_WP
-                    dz_el         = sum(helem(nz, el))*0.5_WP
+                    
+                    ! mean mid level to midlevel tickness between el(1) and el(2)
+                    dz_el         = (dz_trr(nz)+dz_trr2(nz))*0.5_WP
                     
                     ! calculate flux 
                     vflux = ((deltaX2-deltaX1)*grad_v0Eiw(2)-(deltaY2-deltaY1)*grad_v0Eiw(1))*dz_el
@@ -447,7 +522,7 @@ module g_cvmix_idemix
                     ! point
                     grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
                     grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
-                    dz_el         = helem(nz, el(1))
+                    dz_el         = dz_trr(nz)
                     
                     ! calculate flux 
                     vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
@@ -475,7 +550,7 @@ module g_cvmix_idemix
                     ! point
                     grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
                     grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
-                    dz_el         = helem(nz, el(2))
+                    dz_el         = dz_trr2(nz)
                     
                     ! calculate flux 
                     vflux = -(grad_v0Eiw(1)*deltaY2-grad_v0Eiw(2)*deltaX2)*dz_el
@@ -494,9 +569,11 @@ module g_cvmix_idemix
                     ! sum fluxes over the surface --> gaussian integral satz
                     iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
                     iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    
                 end do !-->do nz=nl12+1,nl1
             end do !-->do edge=1,myDim_edge2D
             
+            !___________________________________________________________________
             ! diagnostic: add horizontal propgation to the total production rate
             ! of internal wave energy iwe_Tot
             iwe_Thdi = (iwe - iwe_Thdi)/dt
@@ -509,6 +586,7 @@ module g_cvmix_idemix
         if(trim(mix_scheme)=='cvmix_IDEMIX') then 
             !___________________________________________________________________
             ! write out diffusivity
+            call exchange_nod(iwe_Kv)
             Kv = iwe_Kv
             
             !___________________________________________________________________
@@ -519,8 +597,9 @@ module g_cvmix_idemix
                 do nz=1,nlevels(elem)-1
                     Av(nz,elem) = sum(iwe_Av(nz,elnodes1))/3.0_WP    ! (elementwise)                
                 end do
-                Av(nlevels(elem),elem ) = Av(nlevels(elem)-1,elem )
             end do
+            call exchange_elem(Av)
         end if 
+        
     end subroutine calc_cvmix_idemix
 end module g_cvmix_idemix
