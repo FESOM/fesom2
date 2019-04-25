@@ -228,14 +228,16 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     do_drawedges=True
     if clevel.size>50: do_drawedges=False
     
-    if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
+    #if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
+    if data.sname.find('MLD')==0:
         if data.anom==False:
             # make no sea ice transparent
             from matplotlib.colors import ListedColormap
             auxcmap = cmap0(np.arange(cmap0.N))
-            if data.sname=='a_ice' or data.sname=='m_ice' :
-                auxcmap[0,-1]=0.0
-            elif data.sname.find('MLD')==0 :
+            #if data.sname=='a_ice' or data.sname=='m_ice' :
+                ##auxcmap[0,-1]=0.0
+            #elif data.sname.find('MLD')==0 :
+            if data.sname.find('MLD')==0 :    
                 #auxcmap[-1,-1]=0.0
                 auxcmap[0,-1]=0.0
             cmap0 = ListedColormap(auxcmap)
@@ -246,6 +248,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     data_plot = np.copy(data.value)
     data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
     data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
+    
     data.levels = clevel
     #+_________________________________________________________________________+
     #| plot data on triangluar grid                                            |
