@@ -162,7 +162,7 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
             scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
          end if
          fer_k(1,n)=min(K_GM*scaling, 2000.0_WP) !put to repo
-         fer_k(1,n)=max(K_GM*scaling, 2.0_WP)    !put to repo
+         fer_k(1,n)=max(fer_k(1,n), 2.0_WP)      !put to repo
          fer_c(n)=c1*c1                          !put to repo
       end if
       !note, Redi can be used without GM and vise versa!
