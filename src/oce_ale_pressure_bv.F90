@@ -128,7 +128,7 @@ subroutine pressure_bv
                 rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
                 dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
                 bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-                ! Define MLD following FESOM 1.4 implementation (after Large et al. 1997) 
+                ! define MLD following Large et al. 1997
                 ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
                 ! between the surface and any discrete depth within the water column.
                 if (bvfreq(nz, node) > db_max .and. flag1) then
