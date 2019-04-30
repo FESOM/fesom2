@@ -300,7 +300,7 @@ deallocate(aux1)
 ! (b) Find edges and elements containing them.
 !     Write information to auxiliary file
 ! ====================
- open(10, file='edges.out')
+! open(10, file='edges.out')
 
  ! Count edges: 
  ! ==================== 
@@ -341,11 +341,11 @@ deallocate(aux1)
           edges(1,counter_in)=n
           edges(2,counter_in)=node
           edge_tri(:,counter_in)=elems
-          write(10,'(4I10)') n, node, elems
-       else if (flag==1) then
-          write(10,'(4I10)') n, node, elems(1), -999
-       else
-          write(*,*) 'flag'
+!          write(10,'(4I10)') n, node, elems
+!       else if (flag==1) then
+!          write(10,'(4I10)') n, node, elems(1), -999
+!       else
+!          write(*,*) 'flag'
        end if
     END DO
  END DO
@@ -382,7 +382,7 @@ deallocate(aux1)
        end if
     END DO
  END DO
- close(10)
+ !close(10)
  ! Edges from edge2D_in+1 to edge2D lie on the horizontal boundary
  ! The rest (1:edge2D_in) are internal edges
 

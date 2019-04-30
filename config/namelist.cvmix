@@ -6,8 +6,8 @@ alpha_tke    = 30.0
 mxl_min      = 1.0e-8            
 kappaM_min   = 0.0                
 kappaM_max   = 100.0              
-!cd         = 3.75 ! for Dirichlet boundary conditions
-cd           = 1.0  ! for Neumann boundary conditions 
+!tke_cd       = 3.75 ! for Dirichlet boundary conditions
+tke_cd       = 1.0  ! for Neumann boundary conditions 
 tke_surf_min = 1.0e-4             
 tke_min      = 1.0e-6
 ! tke_mxl_choice ... Can only be 1 or 2, choice of calculation of mixing 
@@ -28,7 +28,7 @@ tau_h = 1296000.0	! time scale for horizontal symmetrisation
 gamma = 1.570           ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
 jstar = 10.0		! spectral bandwidth in modes (dimensionless)
 mu0   = 1.33333333	! dissipation parameter (dimensionless)
-hor_iwe_prop_iter = 1   ! iterations for contribution from horiz. wave propagation 
+n_hor_iwe_prop_iter = 1   ! iterations for contribution from horiz. wave propagation 
 /
 
 

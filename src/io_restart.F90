@@ -417,9 +417,10 @@ subroutine write_restart(id, istep)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
-  real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
-  integer                       :: i, size1, size2, shape
+  real(kind=WP), allocatable    :: aux(:), laux(:)
+  integer                       :: i, lev, size1, size2, shape
   integer                       :: c
+
   ! Serial output implemented so far
   if (mype==0) then
      c=1
@@ -430,34 +431,45 @@ subroutine write_restart(id, istep)
      id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
+  call was_error(id); c=1
+
   do i=1, id%nvar
      shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
      if (shape==1) then
         size1=id%var(i)%dims(1)
-        if (mype==0) allocate(aux1(size1))
-        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1)
-        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1)
+        if (mype==0) allocate(aux(size1))
+        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
+        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
         if (mype==0) then
-           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
-        if (mype==0) deallocate(aux1)
+        if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0) allocate(aux2(size1, size2))
-        if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2)
-        if (mype==0) then
-           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
-        end if
-        if (mype==0) deallocate(aux2)
+        if (mype==0)       allocate(aux (size2))
+        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        do lev=1, size1
+           laux=id%var(i)%pt2(lev,:)
+!          if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2(lev,:), aux)
+!          if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2(lev,:), aux)
+           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (laux, aux)
+           if (size1==elem2D .or. size2==elem2D) call gather_elem(laux, aux)
+           if (mype==0) then
+              id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
+           end if
+        end do
+        deallocate(laux)
+        if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file'
            call par_ex
            stop
      end if
+     call was_error(id); c=1
   end do
 
   if (mype==0) id%error_count=c-1
@@ -473,10 +485,13 @@ subroutine read_restart(id, arg)
   implicit none
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
-  real(kind=WP), allocatable        :: aux1(:), aux2(:,:) 
-  integer                          :: i, size1, size2, shape
+  real(kind=WP), allocatable       :: aux(:), laux(:)
+  integer                          :: i, lev, size1, size2, shape
   integer                          :: rec2read, c
   real(kind=WP)                    :: rtime !timestamp of the record
+
+
+  laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then
@@ -509,32 +524,47 @@ subroutine read_restart(id, arg)
      if (shape==1) then
         size1=id%var(i)%dims(1)
         if (mype==0) then
-           allocate(aux1(size1))
-           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           allocate(aux(size1))
+           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
+!          write(*,*) 'min/max 2D =', minval(aux), maxval(aux)
         end if
-        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux1)
-        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux1)
-        if (mype==0) deallocate(aux1)
+        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux)
+        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux)
+        if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0) then
-           allocate(aux2(size1, size2))
-           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
-        end if
-        if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2, aux2)
-        if (mype==0) deallocate(aux2)
+        if (mype==0)       allocate(aux (size2))
+        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))        
+        do lev=1, size1
+           if (mype==0) then
+              id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
+!             write(*,*) 'min/max 3D ', lev,'=', minval(aux), maxval(aux)
+           end if
+           id%var(i)%pt2(lev,:)=0.
+!          if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2(lev,:), aux)
+!          if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2(lev,:), aux)
+           if (size2==nod2D)  then
+              call broadcast_nod (laux, aux)
+              id%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
+           end if
+           if (size2==elem2D) then
+              call broadcast_elem(laux, aux)
+              id%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
+           end if
+        end do
+        deallocate(laux)
+        if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
            call par_ex
            stop
      end if
+     call was_error(id); c=1
   end do
 
-  id%error_count=c-1
-  call was_error(id)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
   call was_error(id)
