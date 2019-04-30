@@ -123,136 +123,136 @@ DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('sst       ')
-     call def_stream(nod2D, myDim_nod2D, 'sst',     'sea surface temperature',         'C',    tr_arr(1,1:myDim_nod2D,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C',      tr_arr(1,1:myDim_nod2D,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('sss       ')
-     call def_stream(nod2D, myDim_nod2D, 'sss',     'sea surface salinity',            'psu',  tr_arr(1,1:myDim_nod2D,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu',    tr_arr(1,1:myDim_nod2D,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('ssh       ')
-     call def_stream(nod2D, myDim_nod2D, 'ssh',     'sea surface elevation',           'm',    eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('vve_5     ')
-     call def_stream(nod2D, myDim_nod2D, 'vve_5',   'vertical velocity at 5th level', 'm/s',   Wvel(5,:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'vve_5',    'vertical velocity at 5th level', 'm/s',    Wvel(5,:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('uice      ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'uice',    'ice velocity x',                 'm/s',   u_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    u_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('vice      ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'vice',    'ice velocity y',                 'm/s',   v_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'vice',     'ice velocity y',                 'm/s',    v_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('a_ice     ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'a_ice',   'ice concentration',                '%',   a_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'a_ice',    'ice concentration',              '%',      a_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('m_ice     ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'm_ice',   'ice height',                       'm',   m_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'm_ice',    'ice height',                     'm',      m_ice(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('thdgr     ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'thdgr',   'growth rate ice',                'm/s',   thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'thdgr',    'growth rate ice',                 'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('thdgrsn   ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'thdgrsn', 'growth rate ice',                'm/s',   thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'growth rate ice',                 'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('m_snow    ')
      if (use_ice) then
-     call def_stream(nod2D, myDim_nod2D, 'm_snow',  'snow height',                      'm',   m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
      end if
 CASE ('MLD1      ')
-     call def_stream(nod2D, myDim_nod2D, 'MLD1',    'Mixed Layer Depth',                'm',   MLD1(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'MLD1',     'Mixed Layer Depth',               'm',      MLD1(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('MLD2      ')
-     call def_stream(nod2D, myDim_nod2D, 'MLD2',    'Mixed Layer Depth',                'm',   MLD2(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'MLD2',     'Mixed Layer Depth',               'm',      MLD2(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('fh        ')
-     call def_stream(nod2D, myDim_nod2D, 'fh',      'heat flux',                        'W',   heat_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('fw        ')
-     call def_stream(nod2D, myDim_nod2D, 'fw',      'fresh water flux',               'm/s',   water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('atmice_x  ')
-     call def_stream(nod2D, myDim_nod2D, 'atmice_x','stress atmice x',               'N/m2',   stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('atmice_y  ')
-     call def_stream(nod2D, myDim_nod2D, 'atmice_y','stress atmice y',               'N/m2',   stress_atmice_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',                 'N/m2',   stress_atmice_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('atmoce_x  ')
-     call def_stream(nod2D, myDim_nod2D, 'atmoce_x','stress atmoce x',               'N/m2',   stress_atmoce_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',                 'N/m2',   stress_atmoce_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('atmoce_y  ')
-     call def_stream(nod2D, myDim_nod2D,  'atmoce_y','stress atmoce y',              'N/m2',   stress_atmoce_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',                 'N/m2',   stress_atmoce_y(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('alpha     ')
-     call def_stream(nod2D, myDim_nod2D,  'alpha',   'thermal expansion',            'none',   sw_alpha(1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'alpha',    'thermal expansion',               'none',   sw_alpha(1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('beta      ')
-     call def_stream(nod2D, myDim_nod2D,  'beta',    'saline contraction',           'none',   sw_beta (1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'beta',     'saline contraction',              'none',   sw_beta (1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('runoff    ')
-     call def_stream(nod2D, myDim_nod2D,  'runoff',  'river runoff',                 'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('evap      ')
-     call def_stream(nod2D, myDim_nod2D,  'evap',    'evaporation',                   'm/s',   evaporation(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'evap',     'evaporation',                     'm/s',    evaporation(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('prec      ')
-     call def_stream(nod2D, myDim_nod2D,  'prec',    'precicipation rain',            'm/s',   prec_rain(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+     call def_stream(nod2D, myDim_nod2D, 'prec',     'precicipation rain',              'm/s',    prec_rain(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 !___________________________________________________________________________________________________________________________________
 ! output vertical mixing schemes
 CASE ('hbl       ')
   if (trim(mix_scheme)=='KPP') then
-  call def_stream(nod2D, myDim_nod2D,      'hbl',    'HBL KPP',                      'none',   hbl(:),                    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(nod2D, myDim_nod2D,    'hbl',       'HBL KPP',                        'none',   hbl(:),                    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('Bo        ')
   if (trim(mix_scheme)=='KPP') then
-  call def_stream(nod2D, myDim_nod2D,       'Bo',    'surface boyancy flux',        'm2/s3',   Bo(:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(nod2D, myDim_nod2D,    'Bo',        'surface boyancy flux',           'm2/s3',  Bo(:),                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('tx_sur    ')
-  call def_stream(elem2D, myDim_elem2D, 'tx_sur',    'zonal wind str. to ocean',     'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('ty_sur    ')
-  call def_stream(elem2D, myDim_elem2D, 'ty_sur',    'meridional wind str. to ocean','m/s2',   stress_surf(2, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(elem2D, myDim_elem2D,  'ty_sur',    'meridional wind str. to ocean',  'm/s2',   stress_surf(2, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('curl_surf ')
   if (lcurt_stress_surf) then
-  call def_stream(nod2D, myDim_nod2D,'curl_surf',  'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('fer_C     ')
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation
   if (Fer_GM) then
-  call def_stream(nod2D,  myDim_nod2D,   'fer_C',    'GM,   depth independent speed','m/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream(nod2D,  myDim_nod2D,   'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!3D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('temp      ')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',   tr_arr(:,:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tr_arr(:,:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('salt      ')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',  'psu',   tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('otracers  ')
 do j=3, num_tracers
   write (id_string, "(I3.3)") tracer_id(j)
   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 end do
 CASE ('slope_x   ')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X', 'none', slope_tapered(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X',    'none', slope_tapered(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('slope_y   ')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y',   'neutral slope Y', 'none', slope_tapered(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_y',   'neutral slope Y',    'none', slope_tapered(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('slope_z   ')
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z', 'none', slope_tapered(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none', slope_tapered(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('N2        ')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),       'N2',     'brunt väisälä', '1/s2',          bvfreq(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('Kv        ')
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),       'Kv', 'Vertical mixing K', 'm2/s',              Kv(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'Vertical mixing K',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('u         ')
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),       'u', 'horizontal velocity','m/s',           uv(1,:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('v         ')
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),       'v', 'meridional velocity','m/s',           uv(2,:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('w         ')
-  call def_stream((/nl, nod2D/),    (/nl,   myDim_nod2D/),        'w', 'vertical velocity',  'm/s',           Wvel(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('Av        ')
-  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/),      'Av', 'Vertical mixing A', 'm2/s',             Av(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical mixing A',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation
 CASE ('bolus_u   ')
   if (Fer_GM) then
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u', 'GM bolus velocity U','m/s',  fer_uv(1,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u',   'GM bolus velocity U','m/s',  fer_uv(1,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('bolus_v   ')
   if (Fer_GM) then  
-  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v', 'GM bolus velocity V','m/s',  fer_uv(2,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v',   'GM bolus velocity V','m/s',  fer_uv(2,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('bolus_w   ')
   if (Fer_GM) then
-  call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w', 'GM bolus velocity W','m/s',  fer_Wvel(:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'bolus_w',   'GM bolus velocity W','m/s',  fer_Wvel(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE ('fer_K     ')
   if (Fer_GM) then
-  call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',   'GM, stirring diff.','m2/s',  fer_k(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+  call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',     'GM, stirring diff.','m2/s',  fer_k(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
   end if
 CASE DEFAULT
      if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
@@ -280,20 +280,20 @@ END DO
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'unod',  'horizontal velocity at nodes', 'm/s', Unode(1,:,:), 1, 'm', i_real8)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'vnod',  'meridional velocity at nodes', 'm/s', Unode(2,:,:), 1, 'm', i_real8)
     
-    call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm', i_real4)
-    call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm', i_real4)
-    call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real8)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm', i_real4)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm', i_real4)
+     call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real8)
 
-    call def_stream(elem2D, myDim_elem2D,   'utau_surf',  '(u, tau) at the surface',      'N/(m s)', utau_surf(1:myDim_elem2D),     1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'utau_bott',  '(u, tau) at the bottom',       'N/(m s)', utau_bott(1:myDim_elem2D),     1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'u_bott',     'bottom velocity',                  'm/s', u_bott(1:myDim_elem2D),        1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'v_bott',     'bottom velocity',                  'm/s', v_bott(1:myDim_elem2D),        1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'u_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'v_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'tx_bot',     'bottom stress x',                 'N/m2', stress_bott(1, 1:myDim_elem2D),1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'ty_bot',     'bottom stress y',                 'N/m2', stress_bott(2, 1:myDim_elem2D),1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'tx_surm',     'zonal wind stress to ocean',      'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4)
-    call def_stream(elem2D, myDim_elem2D,   'ty_surm',     'meridional wind stress to ocean', 'm/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'utau_surf',  '(u, tau) at the surface',      'N/(m s)', utau_surf(1:myDim_elem2D),     1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'utau_bott',  '(u, tau) at the bottom',       'N/(m s)', utau_bott(1:myDim_elem2D),     1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'u_bott',     'bottom velocity',                  'm/s', u_bott(1:myDim_elem2D),        1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'v_bott',     'bottom velocity',                  'm/s', v_bott(1:myDim_elem2D),        1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'u_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'v_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'tx_bot',     'bottom stress x',                 'N/m2', stress_bott(1, 1:myDim_elem2D),1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'ty_bot',     'bottom stress y',                 'N/m2', stress_bott(2, 1:myDim_elem2D),1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'tx_surm',     'zonal wind stress to ocean',     'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4)
+     call def_stream(elem2D, myDim_elem2D,   'ty_surm',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4)
   end if
 
 #if defined (__oifs)
