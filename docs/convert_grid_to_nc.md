@@ -27,7 +27,7 @@ R>install.packages("ncdf4")
 Load libraries:
 ```R
 R>library(spheRlab)
-R>ibrary(ncdf4)
+R>library(ncdf4)
 ```
 You can get help (for any function) by typing, e.g.:
 ```R
@@ -49,7 +49,7 @@ R>grid = sl.grid.readFESOM(griddir=meshpath,rot=FALSE,rot.invert=FALSE,rot.abg=c
 ```
 Define path to the output file:
 ```R
-R>ofile = paste0(meshpath, "sl.grid.CDO", , sep = "")
+R>ofile = paste0(meshpath, "sl.grid.CDO", sep = "")
 ```
 Directrly write netCDF file with mesh description:
 ```R
