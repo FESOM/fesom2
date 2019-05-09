@@ -21,23 +21,23 @@
 !!PS     !___________________________________________________________________________
 !!PS     ! OCECTL/CVMIX_IDEMIX_PARAM namelist parameters
 !!PS     ! time scale for vertical symmetrisation (sec)
-!!PS     real(kind=WP) :: tau_v = 86400.0
+!!PS     real(kind=WP) :: idemix_tau_v = 86400.0
 !!PS     
 !!PS     ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
-!!PS     real(kind=WP) :: tau_h = 1296000.0
+!!PS     real(kind=WP) :: idemix_tau_h = 1296000.0
 !!PS     
 !!PS     ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-!!PS     real(kind=WP) :: gamma = 1.570
+!!PS     real(kind=WP) :: idemix_gamma = 1.570
 !!PS     
 !!PS     ! spectral bandwidth in modes (dimensionless)
-!!PS     real(kind=WP) :: jstar = 10.0
+!!PS     real(kind=WP) :: idemix_jstar = 10.0
 !!PS     
 !!PS     ! dissipation parameter (dimensionless)
-!!PS     real(kind=WP) :: mu0   = 1.33333333
+!!PS     real(kind=WP) :: idemix_mu0   = 1.33333333
 !!PS     
-!!PS     integer       :: n_hor_iwe_prop_iter = 1
+!!PS     integer       :: idemix_n_hor_iwe_prop_iter = 1
 !!PS     
-!!PS     namelist /cvmix_idemix/ tau_v, tau_h, gamma, jstar, mu0, n_hor_iwe_prop_iter
+!!PS     namelist /cvmix_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter
 !!PS end module g_cvmix_idemix_param    
 !
 !
@@ -65,30 +65,30 @@ module g_cvmix_idemix
     !___________________________________________________________________________
     ! OCECTL/CVMIX_IDEMIX_PARAM namelist parameters
     ! time scale for vertical symmetrisation (sec)
-    real(kind=WP) :: tau_v = 86400.0
+    real(kind=WP) :: idemix_tau_v = 86400.0
     
     ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
-    real(kind=WP) :: tau_h = 1296000.0
+    real(kind=WP) :: idemix_tau_h = 1296000.0
     
     ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-    real(kind=WP) :: gamma = 1.570
+    real(kind=WP) :: idemix_gamma = 1.570
     
     ! spectral bandwidth in modes (dimensionless)
-    real(kind=WP) :: jstar = 10.0
+    real(kind=WP) :: idemix_jstar = 10.0
     
     ! dissipation parameter (dimensionless)
-    real(kind=WP) :: mu0   = 1.33333333
+    real(kind=WP) :: idemix_mu0   = 1.33333333
     
-    integer       :: n_hor_iwe_prop_iter = 1
+    integer       :: idemix_n_hor_iwe_prop_iter = 1
     
     ! filelocation for idemix surface forcing 
-    character(200):: nm_idemixsur_file = '/work/ollie/pscholz/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+    character(200):: idemix_surforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
     
     ! filelocation for idemix bottom forcing 
-    character(200):: nm_idemixbot_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
+    character(200):: idemix_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
     
-    namelist /param_idemix/ tau_v, tau_h, gamma, jstar, mu0, n_hor_iwe_prop_iter, & 
-                            nm_idemixsur_file, nm_idemixbot_file
+    namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, & 
+                            idemix_surforc_file, idemix_botforc_file
                             
                             
     
@@ -215,13 +215,26 @@ module g_cvmix_idemix
         end if    
         
         !_______________________________________________________________________
+        if (mype==0) then
+            write(*,*) "     idemix_tau_v        = ", idemix_tau_v
+            write(*,*) "     idemix_tau_h        = ", idemix_tau_h
+            write(*,*) "     idemix_gamma        = ", idemix_gamma
+            write(*,*) "     idemix_jstar        = ", idemix_jstar
+            write(*,*) "     idemix_mu0          = ", idemix_mu0
+            write(*,*) "     idemix_n_hor_iwe_...= ", idemix_n_hor_iwe_prop_iter
+            write(*,*) "     idemix_surforc_file = ", idemix_surforc_file
+            write(*,*) "     idemix_botforc_file = ", idemix_botforc_file
+            write(*,*)
+        end if
+        
+        !_______________________________________________________________________
         ! read idemix surface near inertial wave forcing from cfsr data --> file 
         ! from N. Brüggemann interpoalted to regular grid
         file_exist=.False.
-        inquire(file=trim(nm_idemixsur_file),exist=file_exist) 
+        inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(nm_idemixsur_file, 'var706', 1, forc_iw_surface_2D, .true.) 
+            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true.) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
             
@@ -230,8 +243,8 @@ module g_cvmix_idemix
                 write(*,*) '____________________________________________________________________'
                 write(*,*) ' ERROR: IDEMIX surface forcing file not found! Cant apply IDEMIX'
                 write(*,*) '        vertical mixing parameterisation! '
-                write(*,*) '        --> check your namelist.cvmix, nm_idemixsur_file &  '
-                write(*,*) '            nm_idemixbot_file'
+                write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
+                write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if
             call par_ex(0)
@@ -241,10 +254,10 @@ module g_cvmix_idemix
         ! read idemix bottom near tidal forcing from cesm data set --> file 
         ! from N. Brüggemann interpoalted to regular grid
         file_exist=.False.
-        inquire(file=trim(nm_idemixsur_file),exist=file_exist) 
+        inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(nm_idemixbot_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true.) 
+            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true.) 
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
             
@@ -253,8 +266,8 @@ module g_cvmix_idemix
                 write(*,*) '____________________________________________________________________'
                 write(*,*) ' ERROR: IDEMIX bottom forcing file not found! Cant apply IDEMIX'
                 write(*,*) '        vertical mixing parameterisation! '
-                write(*,*) '        --> check your namelist.cvmix, nm_idemixsur_file &  '
-                write(*,*) '            nm_idemixbot_file'
+                write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
+                write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if 
             call par_ex(0)
@@ -262,7 +275,7 @@ module g_cvmix_idemix
         
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
-        call init_idemix(tau_v,tau_h,gamma,jstar,mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
+        call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
         
     end subroutine init_cvmix_idemix
     !
@@ -352,12 +365,12 @@ module g_cvmix_idemix
         ! a lateral diffusion term (see. Olbers D., Eden C., 2013, A Global Model 
         ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
         !
-        ! diffusion term = div_h( v_0 * tau_h * grad_h(v_0*E_iw) )
+        ! diffusion term = div_h( v_0 * idemix_tau_h * grad_h(v_0*E_iw) )
         ! 
         ! use Gaussian integral satz ... int(div vec_A)dV = ringint(A*vec_n)dA
         !                                    div vec_A    = 1/V * sum_i=1...nface( A_i*vec_n_i)*A_i
         !
-        if (n_hor_iwe_prop_iter>0) then
+        if (idemix_n_hor_iwe_prop_iter>0) then
         
             ! make boundary exchange for iwe, and iwe_v0 --> for propagation need
             ! to calculate edge contribution that crosses the halo
@@ -379,7 +392,7 @@ module g_cvmix_idemix
             !      Diffusions anstatt für den Advektionsterm). Normalerweise 
             !      sollte der Grenzwert aber nicht zu oft auftreten. Ich hatte 
             !      mal damit rum-experimentiert, aber letztendlich war die Lösung 
-            !      das Iterativ zu machen und ggf. n_hor_iwe_prop_iter zu erhöhen. 
+            !      das Iterativ zu machen und ggf. idemix_n_hor_iwe_prop_iter zu erhöhen. 
             !      Du kannst IDEMIX erstmal ohne den Term ausprobieren und sehen, 
             !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
@@ -396,7 +409,7 @@ module g_cvmix_idemix
                 
                 ! surface cell 
                 vol_wcelli(1,node) = 1/(area(1,node)*dz_trr(1))
-                aux = sqrt(cflfac*(area(1,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                aux = sqrt(cflfac*(area(1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                 iwe_v0(1,node) = min(iwe_v0(1,node),aux)
                 
                 ! bulk cells
@@ -405,7 +418,7 @@ module g_cvmix_idemix
                     vol_wcelli(nz,node) = 1/(area(nz-1,node)*dz_trr(nz))
                     
                     ! restrict iwe_v0
-                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                    aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                     !                  `--------+-------------´
                     !                           |-> comes from mesh_resolution=sqrt(area(1, :)/pi)*2._WP
                     iwe_v0(nz,node) = min(iwe_v0(nz,node),aux)
@@ -413,7 +426,7 @@ module g_cvmix_idemix
                 
                 ! bottom cell 
                 vol_wcelli(nln+1,node) = 1/(area(nln,node)*dz_trr(nln+1))
-                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(tau_h*dt/n_hor_iwe_prop_iter))
+                aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
             end do !-->do node = 1,myDim_nod2D
@@ -500,16 +513,16 @@ module g_cvmix_idemix
                     vflux = ((deltaX2-deltaX1)*grad_v0Eiw(2)-(deltaY2-deltaY1)*grad_v0Eiw(1))*dz_el
                     
                     !___________________________________________________________
-                    ! --> calc: v_0*tau_h* grad_h(v_0*E_iw)
+                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
                     ! multiply vflux with iwe_v0 interpolate to the edge-
                     ! mid point 
                     vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
                     
                     !___________________________________________________________
-                    ! --> calc: div(v_0*tau_h* grad_h(v_0*E_iw))
+                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
                     ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
                 end do !-->do nz=1,n2
                 
                 !_______________________________________________________________
@@ -528,16 +541,16 @@ module g_cvmix_idemix
                     vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
                     
                     !___________________________________________________________
-                    ! --> calc: v_0*tau_h* grad_h(v_0*E_iw)
+                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
                     ! multiply vflux with iwe_v0 interpolate to the edge-
                     ! mid point 
                     vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
                     
                     !___________________________________________________________
-                    ! --> calc: div(v_0*tau_h* grad_h(v_0*E_iw))
+                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
                     ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
                 end do !-->do nz=nl12+1,nl1
                 
                 !_______________________________________________________________
@@ -559,16 +572,16 @@ module g_cvmix_idemix
                     !            in opposite direction (Right-Hand-Rule)
                     
                     !___________________________________________________________
-                    ! --> calc: v_0*tau_h* grad_h(v_0*E_iw)
+                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
                     ! multiply vflux with iwe_v0 interpolate to the edge-
                     ! mid point 
                     vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
                     
                     !___________________________________________________________
-                    ! --> calc: div(v_0*tau_h* grad_h(v_0*E_iw))
+                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
                     ! sum fluxes over the surface --> gaussian integral satz
-                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
-                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*tau_h/n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
                     
                 end do !-->do nz=nl12+1,nl1
             end do !-->do edge=1,myDim_edge2D
@@ -578,7 +591,7 @@ module g_cvmix_idemix
             ! of internal wave energy iwe_Tot
             iwe_Thdi = (iwe - iwe_Thdi)/dt
             iwe_Ttot = iwe_Ttot + iwe_Thdi
-        end if !-->if (n_hor_iwe_prop_iter>0) then
+        end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         
         !_______________________________________________________________________
         ! write IDEMIX diffusivities and viscositie to FESOM only when IDEMIX is 
