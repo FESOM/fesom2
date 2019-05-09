@@ -32,23 +32,22 @@ module g_cvmix_tke
     
     !___________________________________________________________________________
     ! CVMIX-TKE namelist parameters
-    real(kind=WP) :: c_k          = 0.1              
-    real(kind=WP) :: c_eps        = 0.7               
-    real(kind=WP) :: alpha_tke    = 30.0              
-    real(kind=WP) :: mxl_min      = 1.0e-8            
-    real(kind=WP) :: kappaM_min   = 0.0                
-    real(kind=WP) :: kappaM_max   = 100.0              
-    ! real(kind=WP) :: cd         = 3.75 ! for Dirichlet boundary conditions
-    real(kind=WP) :: tke_cd       = 1.0  ! for Neumann boundary conditions 
-    real(kind=WP) :: tke_surf_min = 1.0e-4             
-    real(kind=WP) :: tke_min      = 1.0e-6
+    real(kind=WP) :: tke_c_k        = 0.1              
+    real(kind=WP) :: tke_c_eps      = 0.7               
+    real(kind=WP) :: tke_alpha      = 30.0              
+    real(kind=WP) :: tke_mxl_min    = 1.0e-8            
+    real(kind=WP) :: tke_kappaM_min = 0.0                
+    real(kind=WP) :: tke_kappaM_max = 100.0              
+    ! real(kind=WP) :: cd             = 3.75 ! for Dirichlet boundary conditions
+    real(kind=WP) :: tke_cd         = 1.0  ! for Neumann boundary conditions 
+    real(kind=WP) :: tke_surf_min   = 1.0e-4             
+    real(kind=WP) :: tke_min        = 1.0e-6
     
     ! tke_mxl_choice ... Can only be 1 or 2, choice of calculation of mixing 
     ! length; currently only Blanke, B., P. Delecluse option is implemented
     integer       :: tke_mxl_choice = 2 
     
-    logical       :: l_tke_active         = .true.             
-    logical       :: only_tke             = .true.             
+    logical       :: tke_only             = .true.             
     logical       :: use_ubound_dirichlet = .false.           
     logical       :: use_lbound_dirichlet = .false.
     
@@ -59,7 +58,7 @@ module g_cvmix_tke
     real(kind=WP) :: relne=0.4       ! percentage of new value
     real(kind=WP) :: relax=0.6       ! percentage of old value 1-relne
     
-    namelist /param_tke/ c_k, c_eps, alpha_tke, mxl_min, kappaM_min, kappaM_max, &
+    namelist /param_tke/ tke_c_k, tke_c_eps, tke_alpha, tke_mxl_min, tke_kappaM_min, tke_kappaM_max, &
                          tke_cd, tke_surf_min, tke_min, tke_mxl_choice, &
                          use_ubound_dirichlet, use_lbound_dirichlet, & 
                          timerelax_tke, relne, relax
@@ -194,29 +193,36 @@ module g_cvmix_tke
             close(20)
         end if  
         !_______________________________________________________________________
-        if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') only_tke=.False.
+        if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') tke_only=.False.
         
         if (mype==0) then
-            write(*,*) "     alpha_tke = ", alpha_tke
-            write(*,*) "    kappaM_min = ", kappaM_min
-            write(*,*) "    kappaM_max = ", kappaM_max
-            write(*,*) "      only_tke = ", only_tke
+            write(*,*) "     tke_only       = ", tke_only
+            write(*,*) "     tke_c_k        = ", tke_c_k
+            write(*,*) "     tke_c_eps      = ", tke_c_eps
+            write(*,*) "     tke_alpha      = ", tke_alpha
+            write(*,*) "     tke_cd         = ", tke_cd
+            write(*,*) "     tke_surf_min   = ", tke_surf_min
+            write(*,*) "     tke_min        = ", tke_min
+            write(*,*) "     tke_kappaM_min = ", tke_kappaM_min
+            write(*,*) "     tke_kappaM_max = ", tke_kappaM_max
+            write(*,*) "     tke_mxl_choice = ", tke_mxl_choice
+            write(*,*)
         end if
         
         !_______________________________________________________________________
         ! call tke initialisation routine from cvmix library
-        call init_tke(c_k            = c_k,            &
-                      c_eps          = c_eps,          &
-                      cd             = tke_cd,         &
-                      alpha_tke      = alpha_tke,      &
-                      mxl_min        = mxl_min,        &
-                      kappaM_min     = kappaM_min,     &
-                      kappaM_max     = kappaM_max,     &
-                      tke_mxl_choice = tke_mxl_choice, &
+        call init_tke(c_k            = tke_c_k,            &
+                      c_eps          = tke_c_eps,          &
+                      cd             = tke_cd,             &
+                      alpha_tke      = tke_alpha,          &
+                      mxl_min        = tke_mxl_min,        &
+                      kappaM_min     = tke_kappaM_min,     &
+                      kappaM_max     = tke_kappaM_max,     &
+                      tke_mxl_choice = tke_mxl_choice,     &
                       use_ubound_dirichlet = use_ubound_dirichlet, &
                       use_lbound_dirichlet = use_lbound_dirichlet, &
-                      only_tke       = only_tke,       &
-                      tke_min        = tke_min,        &
+                      only_tke       = tke_only,           &
+                      tke_min        = tke_min,            &
                       tke_surf_min   = tke_surf_min    )
             
     end subroutine init_cvmix_tke
@@ -239,7 +245,7 @@ module g_cvmix_tke
         tke_forc2d_rhosurf    = 0.0_WP
         
         ! load things from idemix when selected
-        if (.not. only_tke) then
+        if (.not. tke_only) then
             tke_in3d_iwe       = iwe
             tke_in3d_iwdis     = -iwe_Tdis
             tke_in3d_iwealphac = iwe_alpha_c

@@ -36,13 +36,12 @@ real(kind=real32) :: runtime_alltimesteps
   
 
 
-
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
     call MPI_INIT(i) 
 #endif
-
+    
     t1 = MPI_Wtime()
 
 #if defined (__oasis)
@@ -50,6 +49,11 @@ real(kind=real32) :: runtime_alltimesteps
 #endif
 
     call par_init 
+    if(mype==0) then
+        write(*,*)
+        print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
+    end if
     !=====================
     ! Read configuration data,  
     ! load the mesh and fill in 
@@ -148,7 +152,11 @@ real(kind=real32) :: runtime_alltimesteps
        write(*,*) 'FESOM start iteration after the barrier...'
        t0 = MPI_Wtime()
     endif
-   
+    if(mype==0) then
+        write(*,*)
+        print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
+    end if
     !___MODEL TIME STEPPING LOOP________________________________________________
     do n=1, nsteps        
         mstep = n
