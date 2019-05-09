@@ -1590,13 +1590,16 @@ subroutine vert_vel_ale
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)-1
                 if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
-                    write(*,*) '***********************************************************'
-                    write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
-                    write(*,*) 'mstep      = ', mstep
-                    write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
-                    write(*,*) '2D node    = ', myList_nod2D(n)
-                    write(*,*) 'nz         = ', nz
-                    write(*,*) '***********************************************************'
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
+                          ',nz=',nz
+                    !!PS write(*,*) '***********************************************************'
+                    !!PS write(*,*) 'max. CFL_z = ', cflmax, ' mype = ', mype
+                    !!PS write(*,*) 'mstep      = ', mstep
+                    !!PS write(*,*) 'glon, glat = ', geo_coord_nod2D(:,n)/rad
+                    !!PS write(*,*) '2D node    = ', myList_nod2D(n)
+                    !!PS write(*,*) 'nz         = ', nz
+                    !!PS write(*,*) '***********************************************************'
                 end if
             end do
         end do
@@ -1894,6 +1897,7 @@ subroutine oce_timestep_ale(n)
     use o_mixing_KPP_mod
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_pp
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
@@ -1929,8 +1933,13 @@ subroutine oce_timestep_ale(n)
     call status_check
     
     !___________________________________________________________________________
-    ! calculate vertical mixing coefficients for tracer (Kv) and momentum (Av)
-    
+    ! >>>>>>                                                             <<<<<<
+    ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<
+    ! >>>>>>    and momentum (Av) using using FESOM implementations      <<<<<<
+    ! >>>>>>    for PP and KPP as well as mixing schemes provided by     <<<<<<
+    ! >>>>>>    by the CVMIX library                                     <<<<<< 
+    ! >>>>>>                                                             <<<<<<
+    !___________________________________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (trim(mix_scheme)=='KPP') then
         call oce_mixing_KPP(Av, Kv_double)
@@ -1956,6 +1965,12 @@ subroutine oce_timestep_ale(n)
     ! diffusivity induced by internal gravity waves"     
     else if(trim(mix_scheme)=='cvmix_IDEMIX') then
         call calc_cvmix_idemix
+        
+    ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
+    ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
+    ! N^2 and vertical horizontal velocity shear dui/dz
+    else if(trim(mix_scheme)=='cvmix_PP') then
+        call calc_cvmix_pp
         
     else
         stop "!not existing mixing scheme!"
