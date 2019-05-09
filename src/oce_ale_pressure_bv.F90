@@ -127,8 +127,17 @@ subroutine pressure_bv
                 rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_3d_n(nz,node))  
                 rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar_3d_n(nz,node))  
                 dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
+                
+                !_______________________________________________________________
+                ! squared brunt väisälä frequence N^2 --> N^2>0 stratification is 
+                ! stable, vertical elongated parcel is accelaratedtowards 
+                ! initial point --> does oscillation with frequency N. 
+                ! N^2<0 stratification is unstable vertical elongated parcel is 
+                ! accelerated away from initial point 
                 bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-                ! Define MLD following FESOM 1.4 implementation (after Large et al. 1997) 
+                
+                !_______________________________________________________________
+                ! define MLD following Large et al. 1997
                 ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
                 ! between the surface and any discrete depth within the water column.
                 if (bvfreq(nz, node) > db_max .and. flag1) then
@@ -146,6 +155,8 @@ subroutine pressure_bv
                 end if
             END DO
             if (flag2) MLD2_ind(node)=nl1
+            
+            
             bvfreq(1,node)=bvfreq(2,node)
             bvfreq(nl1+1,node)=bvfreq(nl1,node) 
             !___________________________________________________________________

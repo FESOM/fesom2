@@ -7,6 +7,7 @@ USE g_config
 USE g_forcing_param, only: use_virt_salt
 use g_cvmix_tke
 use g_cvmix_idemix
+use g_cvmix_pp
 IMPLICIT NONE
 
     if (use_ALE) then
@@ -64,6 +65,14 @@ IMPLICIT NONE
             end if
             call init_cvmix_tke
         endif
+    !_______________________________________________________________________
+    elseif(trim(mix_scheme)=='cvmix_PP') then
+        if(mype==0) then
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' --> initialise CVMIX_PP'
+            write(*,*)
+        end if
+        call init_cvmix_pp
     endif 
 
     !___________________________________________________________________________
