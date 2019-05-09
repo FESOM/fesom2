@@ -40,7 +40,10 @@ subroutine solve_tracers_ale
 		call relax_to_clim(tr_num)
 		
 		call exchange_nod(tr_arr(:,:,tr_num))
-	end do
+        end do
+        do tr_num=1, ptracers_restore_total           
+           tr_arr(:,ptracers_restore(tr_num)%ind2,ptracers_restore(tr_num)%locid)=1.
+        end do
 	
 	! subtract the the bolus velocities back from 3D velocities:
 	if (Fer_GM) then
@@ -1218,7 +1221,8 @@ FUNCTION bc_surface(n, id)
 				+ relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
     CASE (101) ! apply boundary conditions to tracer ID=101
     bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
-
+    CASE (301)
+    bc_surface=0.
     CASE DEFAULT
       if (mype==0) then
          write (id_string, "(I3)") id

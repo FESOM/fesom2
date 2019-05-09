@@ -343,7 +343,7 @@ USE g_ic3d
   ! reads the initial state or the restart file for the ocean
   !
   implicit none
-  integer           :: i, id
+  integer           :: i, k, counter, rcounter3, id
   character(len=10) :: i_string, id_string
 
   if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
@@ -359,6 +359,18 @@ USE g_ic3d
   Ssurf=tr_arr(1,:,2)
   relax2clim=0.0
 
+  ! count the passive tracers which require 3D source (ptracers_restore_total)
+  ptracers_restore_total=0
+  DO i=3, num_tracers
+     id=tracer_ID(i)
+     SELECT CASE (id)
+     CASE (301)
+          ptracers_restore_total=ptracers_restore_total+1
+     END SELECT
+  END DO
+  allocate(ptracers_restore(ptracers_restore_total))
+  
+  rcounter3=0         ! counter for tracers with 3D source
   DO i=3, num_tracers
      id=tracer_ID(i)
      SELECT CASE (id)
@@ -369,7 +381,28 @@ USE g_ic3d
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (3)
+       CASE (301) !Fram Strait 3d restored passive tracer
+         tr_arr(:,:,i)=0.
+         rcounter3    =rcounter3+1
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+               counter=counter+1
+            end if
+         end do
+         allocate(ptracers_restore(rcounter3)%ind2(counter))
+         ptracers_restore(rcounter3)%id   =301
+         ptracers_restore(rcounter3)%locid=i
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+               counter=counter+1
+               ptracers_restore(rcounter3)%ind2(counter)=k
+            end if
+         end do
+         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
