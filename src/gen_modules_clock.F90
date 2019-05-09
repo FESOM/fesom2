@@ -124,11 +124,17 @@ contains
     end do
 
     if(mype==0) then
-        write(*,*)'clock initialized at time ', timenew, daynew, yearnew
         if(r_restart) then
             write(*,*)
-            write(*,*) '____________________________________________________________'
-            write(*,*) ' --> THIS IS A RESTART RUN !!!'
+            print *, achar(27)//'[31m'    //'____________________________________________________________'//achar(27)//'[0m'
+            print *, achar(27)//'[5;7;31m'//' --> THIS IS A RESTART RUN !!!                              '//achar(27)//'[0m'
+            write(*,"(A, F5.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
+            write(*,*)
+        else
+            write(*,*)
+            print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
+            print *, achar(27)//'[7;32m'//' --> THIS IS A INITIALISATION RUN !!!                       '//achar(27)//'[0m'
+            write(*,"(A, F5.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
             write(*,*)
         end if
     end if
