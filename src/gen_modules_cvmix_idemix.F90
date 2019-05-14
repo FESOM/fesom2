@@ -13,35 +13,7 @@
 ! @see Eden C., Czeschel L., Olbers D.:
 !       Towards Energetically Consistent Ocean Models. 
 !       J. Phys. Oceanogr., 44, 3160-3184, doi: 10.1175/JPO-D-13-0260.1, 2014.
-!!PS !
-!!PS !
-!!PS !===============================================================================
-!!PS module g_cvmix_idemix_param  
-!!PS     use o_param, only: WP
-!!PS     !___________________________________________________________________________
-!!PS     ! OCECTL/CVMIX_IDEMIX_PARAM namelist parameters
-!!PS     ! time scale for vertical symmetrisation (sec)
-!!PS     real(kind=WP) :: idemix_tau_v = 86400.0
-!!PS     
-!!PS     ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
-!!PS     real(kind=WP) :: idemix_tau_h = 1296000.0
-!!PS     
-!!PS     ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-!!PS     real(kind=WP) :: idemix_gamma = 1.570
-!!PS     
-!!PS     ! spectral bandwidth in modes (dimensionless)
-!!PS     real(kind=WP) :: idemix_jstar = 10.0
-!!PS     
-!!PS     ! dissipation parameter (dimensionless)
-!!PS     real(kind=WP) :: idemix_mu0   = 1.33333333
-!!PS     
-!!PS     integer       :: idemix_n_hor_iwe_prop_iter = 1
-!!PS     
-!!PS     namelist /cvmix_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter
-!!PS end module g_cvmix_idemix_param    
-!
-!
-!===============================================================================
+! written by Patrick Scholz, 10.05.2019
 module g_cvmix_idemix
     
     !___________________________________________________________________________
@@ -145,6 +117,13 @@ module g_cvmix_idemix
         integer            :: node_size
         
         !_______________________________________________________________________
+        if(mype==0) then
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' --> initialise IDEMIX'
+            write(*,*)
+        end if
+            
+        !_______________________________________________________________________
         ! allocate + initialse all idemix arrays
         node_size=myDim_nod2D+eDim_nod2D
         
@@ -212,6 +191,8 @@ module g_cvmix_idemix
             open(20,file=trim(nmlfile))
                 read(20,nml=param_idemix)
             close(20)
+        else
+            write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if    
         
         !_______________________________________________________________________
