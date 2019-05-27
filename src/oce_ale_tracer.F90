@@ -1223,6 +1223,10 @@ FUNCTION bc_surface(n, id)
     bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)
     bc_surface=0.
+    CASE (302)
+    bc_surface=0.
+    CASE (303)
+    bc_surface=0.
     CASE DEFAULT
       if (mype==0) then
          write (id_string, "(I3)") id
