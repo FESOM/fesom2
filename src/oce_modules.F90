@@ -77,11 +77,19 @@ real(kind=WP)                 :: w_exp_max=1.e-5_WP
 
 logical                       :: SPP=.false.
 
-				! 1 MUSCL
-				! 2 MUSCL-FCT
+TYPE tracer_source3d_type
+    integer                             :: locID
+    integer                             :: ID
+    integer, allocatable, dimension(:)  :: ind2
+END TYPE tracer_source3d_type
+
 integer	                       :: num_tracers=2
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
+type(tracer_source3d_type), &
+    allocatable, dimension(:)  :: ptracers_restore
+integer                        :: ptracers_restore_total=0
+
 
 ! Momentum
 logical                       :: free_slip=.false.
