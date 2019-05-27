@@ -49,29 +49,14 @@ IMPLICIT NONE
        trim(mix_scheme)=='cvmix_IDEMIX'     ) then    
         !_______________________________________________________________________
         if (trim(mix_scheme)=='cvmix_TKE+IDEMIX' .or. trim(mix_scheme)=='cvmix_IDEMIX') then 
-            if(mype==0) then
-                write(*,*) '____________________________________________________________'
-                write(*,*) ' --> initialise IDEMIX'
-                write(*,*)
-            end if
             call init_cvmix_idemix
         endif
         !_______________________________________________________________________
         if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-            if(mype==0) then
-                write(*,*) '____________________________________________________________'
-                write(*,*) ' --> initialise CVMIX_TKE'
-                write(*,*)
-            end if
             call init_cvmix_tke
         endif
     !_______________________________________________________________________
     elseif(trim(mix_scheme)=='cvmix_PP') then
-        if(mype==0) then
-            write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise CVMIX_PP'
-            write(*,*)
-        end if
         call init_cvmix_pp
     endif 
 

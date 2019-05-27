@@ -5,7 +5,9 @@
 #SBATCH --time=00:05:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
+module load intel.compiler intel.mpi netcdf/4.4.0_intel
 module load centoslibs
+
 set -x
 
 ulimit -s unlimited

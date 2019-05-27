@@ -12,6 +12,7 @@
 ! @see  Blanke, B., P. Delecluse
 !       J. Phys. Oceanogr., 23, 1363–1388. doi:10.1175/1520-0485(1993)023<1363:VOTTAO>2.0.CO;2
 !
+! written by Patrick Scholz, 10.05.2019
 module g_cvmix_tke
     !___________________________________________________________________________
     ! module calls from cvmix library
@@ -121,6 +122,13 @@ module g_cvmix_tke
         integer            :: node_size
         
         !_______________________________________________________________________
+        if(mype==0) then
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' --> initialise CVMIX_TKE'
+            write(*,*)
+        end if
+        
+        !_______________________________________________________________________
         ! allocate + initialse all tke arrays
         node_size=myDim_nod2D+eDim_nod2D
         
@@ -191,7 +199,10 @@ module g_cvmix_tke
             open(20,file=trim(nmlfile))
                 read(20,nml=param_tke)
             close(20)
-        end if  
+        else
+            write(*,*) '     could not find namelist.cvmix, will use default values !'    
+        end if
+        
         !_______________________________________________________________________
         if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') tke_only=.False.
         
