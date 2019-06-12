@@ -42,9 +42,12 @@ subroutine cal_shortwave_rad
      c3=c2*c
      c4=c3*c
      c5=c4*c
+     ! --> coefficients come from Sweeney et al. 2005, "Impacts of shortwave
+     ! penetration depthon large scale ocean circulation and heat transport" see 
+     ! Appendix A
      v1=0.008*c+0.132*c2+0.038*c3-0.017*c4-0.007*c5
      v2=0.679-v1
-     v1=v1+0.321
+     v1=0.321+v1
      sc1=1.54-0.197*c+0.166*c2-0.252*c3-0.055*c4+0.042*c5
      sc2=7.925-6.644*c+3.662*c2-1.815*c3-0.218*c4+0.502*c5
 
@@ -61,6 +64,11 @@ subroutine cal_shortwave_rad
            exit
         end if
      end do
+     
+     ! sw_3d --> TEMPERATURE FLUX through full depth level interfaces into/out off 
+     ! the tracer volume 
+     ! sum(sw_3d(1:nlevels(n2)-1,n2)-sw_3d(2:nlevels(n2),n2)) = swsurf !!!
+     
 !for testing the subroutine
 !if (mype==30 .and. n2==100) then
 !write(*,*) 'heat_flux=', heat_flux(n2)
