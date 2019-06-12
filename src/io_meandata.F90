@@ -11,6 +11,7 @@ module io_MEANDATA
   use o_mixing_KPP_mod
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_cvmix_kpp
   use diagnostics
   use i_PARAM, only: whichEVP
 
@@ -348,6 +349,23 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tbot', 'IWE production from bottom forcing'      , 'm^2/s^2', iwe_Tbot(:,:), 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_c0'  , 'IWE vertical group velocity'             , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_v0'  , 'IWE horizontal group velocity'           , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
+    end if
+    
+    if (trim(mix_scheme)=='cvmix_KPP') then
+        ! KPP diagnostics
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Av'         , 'KPP viscosity'          , '', kpp_Av            , 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Kv'         , 'KPP diffusivty'         , '', kpp_Kv            , 1, 'm', i_real4)
+        call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_obldepth'   , 'KPP OBL depth'          , '', kpp_obldepth      , 1, 'm', i_real4)
+        call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_surfbuoyflx', 'KPP surf. bouyancy flx.', '', kpp_surfbuoyflx   , 1, 'm', i_real4)
+        !!PS call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp_ustar         , 1, 'm', i_real4)
+        !!PS call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_nzobldepth' , 'KPP Index OBL depth    ', '', kpp_nzobldepth    , 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp_bulkRi        , 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_shearRi'    , 'KPP Shear Richardson Nr.','', kpp_shearRi       , 1, 'm', i_real4)
+        call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_dbsurf'  , 'KPP bouyancy difference', '', dbsfc             , 1, 'y', i_real4)
+        !!PS call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_ws_cntr' , 'KPP ws cntr'            , '', kpp_ws_cntr       , 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc1'   , 'KPP OBLMIX1'            , '', kpp_oblmixc(:,:,1), 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc2'   , 'KPP OBLMIX2'            , '', kpp_oblmixc(:,:,2), 1, 'm', i_real4)
+        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc3'   , 'KPP OBLMIX3'            , '', kpp_oblmixc(:,:,3), 1, 'm', i_real4)
     end if
   
   !___________________________________________________________________________________________________________________________________
