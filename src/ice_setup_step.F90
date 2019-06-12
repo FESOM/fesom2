@@ -140,6 +140,7 @@ integer       :: step
 REAL(kind=WP) :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
+if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
 SELECT CASE (whichEVP)
    CASE (0)
       call EVPdynamics
@@ -160,13 +161,18 @@ END SELECT
 ! call ice_fct_solve
 ! call cut_off
 ! new FCT routines from Sergey Danilov 08.05.2018
+ if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
  call ice_TG_rhs_div   
+ if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
  call ice_fct_solve
+ if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
  call ice_update_for_div
+ if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
  call cut_off
 
  t2=MPI_Wtime()
  ! ===== Thermodynamic part
+ if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
  call thermodynamics
  t3=MPI_Wtime()
  rtime_ice = rtime_ice + (t3-t0)

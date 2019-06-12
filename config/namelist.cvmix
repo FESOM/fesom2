@@ -1,42 +1,64 @@
 ! namelist for Turbulent Kinetic Energy (TKE) 
 &param_tke
-tke_c_k        = 0.1              
-tke_c_eps      = 0.7               
-tke_alpha      = 30.0              
-tke_mxl_min    = 1.0e-8            
-tke_kappaM_min = 0.0                
-tke_kappaM_max = 100.0              
-!tke_cd        = 3.75 ! for Dirichlet boundary conditions
-tke_cd         = 1.0  ! for Neumann boundary conditions 
-tke_surf_min   = 1.0e-4             
-tke_min        = 1.0e-6
+tke_c_k            = 0.1              
+tke_c_eps          = 0.7               
+tke_alpha          = 30.0              
+tke_mxl_min        = 1.0e-8            
+tke_kappaM_min     = 0.0                
+tke_kappaM_max     = 100.0              
+!tke_cd            = 3.75 ! for Dirichlet boundary conditions
+tke_cd             = 1.0  ! for Neumann boundary conditions 
+tke_surf_min       = 1.0e-4             
+tke_min            = 1.0e-6
 ! tke_mxl_choice ... Can only be 1 or 2, choice of calculation of mixing 
 ! length; currently only Blanke, B., P. Delecluse option is implemented
-tke_mxl_choice = 2     
+tke_mxl_choice     = 2     
 /
 
 ! namelist for IDEMIX
 &param_idemix
-idemix_tau_v = 86400.0     ! time scale for vertical symmetrisation (sec)
-idemix_tau_h = 1296000.0   ! time scale for horizontal symmetrisation
-idemix_gamma = 1.570       ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-idemix_jstar = 10.0        ! spectral bandwidth in modes (dimensionless)
-idemix_mu0   = 1.33333333  ! dissipation parameter (dimensionless)
-idemix_n_hor_iwe_prop_iter = 1   ! iterations for contribution from horiz. wave propagation 
+idemix_tau_v       = 86400.0    ! time scale for vertical symmetrisation (sec)
+idemix_tau_h       = 1296000.0  ! time scale for horizontal symmetrisation
+idemix_gamma       = 1.570      ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
+idemix_jstar       = 10.0       ! spectral bandwidth in modes (dimensionless)
+idemix_mu0         = 1.33333333 ! dissipation parameter (dimensionless)
+idemix_n_hor_iwe_prop_iter = 1  ! iterations for contribution from horiz. wave propagation 
 /
 
 ! namelist for PP
 &param_pp
-pp_Av0             = 0.01    ! mixing coeff. for PP
-pp_alpha           = 5.0     ! alpha param eq. (1) in Pacanowski and Philander 1981
-pp_exp             = 2.0     ! n param eq. (1) in Pacanowski and Philander 1981
-pp_Avbckg          = 1.0e-4  ! const. pp background viscosity
-pp_Kvbckg          = 1.0e-5  ! const. pp background diffusivity
-pp_use_monob       = .true.  ! use additional mixing with monin-obukov length
-pp_monob_Kv        = 0.01    ! strength of monin obukov mixing
-pp_use_nonconstKvb = .true.  ! use lat and depth dependent background diffusivity
-pp_use_windmix     = .true.  ! enhance mixing in upper to layers
-pp_use_instabmix   = .true.  ! enhance mixing when instable  stratification
+pp_Av0             = 0.01       ! mixing coeff. for PP
+pp_alpha           = 5.0        ! alpha param eq. (1) in Pacanowski and Philander 1981
+pp_exp             = 2.0        ! n param eq. (1) in Pacanowski and Philander 1981
+pp_Avbckg          = 1.0e-4     ! const. pp background viscosity
+pp_Kvbckg          = 1.0e-5     ! const. pp background diffusivity
+pp_use_monob       = .true.     ! use additional mixing with monin-obukov length
+pp_monob_Kv        = 0.01       ! strength of monin obukov mixing
+pp_use_nonconstKvb = .true.     ! use lat and depth dependent background diffusivity
+pp_use_windmix     = .true.     ! enhance mixing in upper to layers
+pp_use_instabmix   = .true.     ! enhance mixing when instable  stratification
 /
 
-
+! namelist for KPP
+&param_kpp
+kpp_Rib_crit       = 0.3        ! Critical bulk Richardson number (defines OBL depth)
+kpp_vonKarman      = 0.40       ! von Karman constant (dimensionless)
+kpp_minOBLdepth    = 0.0        ! If non-zero, set the minimum depth for the OBL (m)
+kpp_minVtsqr       = 1.0e-10    ! Min for the squared unresolved velocity used in bulk Richardson CVMix calculation (m2/s2)
+kpp_surf_layer_ext = 0.10       ! Fraction of OBL depth considered in the surface layer (nondim) (epsilon=0.1)
+kpp_use_enhanceKv  = .true.     ! If true, add enhanced diffusivity at base of boundary layer
+kpp_use_compEkman  = .true.     ! If true, compute Ekman depth limit for OBLdepth 
+kpp_use_monob      = .true.     ! If true, compute Monin-Obukhov limit for OBLdepth
+kpp_interptype_ri  = "cubic"    ! Type of interpolation in determining OBL depth: linear,quadratic,cubic
+kpp_interptype_atobl= "LMD94"   ! Type of interpolation of visc and diff at obl depth: linear,quadratic,cubic,LMD94
+kpp_matchtechc     = "ParabolicNonLocal" ! Setting diffusivity and NLT profile functions:SimpleShapes, MatchGradient, MatchBoth, ParabolicNonLocal
+kpp_internalmix    = "KPP"      ! Ri-number dependet mixing scheme below the OBL: 'PP' or 'KPP'
+kpp_reduce_tauuice = .false.    ! If True, reduce the wind stress (ustar) under sea ice.
+kpp_Av0            = 5.0e-3     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
+kpp_Kv0            = 5.0e-2 
+kpp_Ri0            = 0.8        ! critical Richardson number value, units: unitless (0.7 in LMD94)
+kpp_pp_Av0         = 0.01       ! Parameter in case of PP mixing below the OBL
+kpp_use_nonconstKvb= .true.     ! If True use non constant background diffusivity of Qiang from FESOM1.4
+kpp_Avbckg         = 1.0e-4     ! Values for const. background viscosity and diffusivity
+kpp_Kvbckg         = 1.0e-5
+/

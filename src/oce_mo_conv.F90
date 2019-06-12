@@ -48,7 +48,7 @@ DO elem=1, myDim_elem2D
 !      Av(nz,elem)=min(Av(nz,elem), av_conv)
     END DO
 END DO
-call exchange_elem(Av)
+!!PS call exchange_elem(Av)
 
 end subroutine mo_convect
 
