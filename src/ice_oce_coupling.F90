@@ -128,7 +128,15 @@ subroutine oce_fluxes
   ! ==================
   heat_flux_old  = heat_flux !PS
   water_flux_old = water_flux !PS
-     
+  
+  
+  !___________________________________________________________________
+  ! from here on: 
+  !    (-)  (+)
+  !     |    ^
+  ! ~~~~|~~~~|~~~~
+  !     V    |
+  !     
   heat_flux   = -net_heat_flux 
   water_flux  = -fresh_wa_flux
 
