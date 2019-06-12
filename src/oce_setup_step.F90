@@ -8,6 +8,7 @@ USE g_forcing_param, only: use_virt_salt
 use g_cvmix_tke
 use g_cvmix_idemix
 use g_cvmix_pp
+use g_cvmix_kpp
 IMPLICIT NONE
 
     if (use_ALE) then
@@ -58,6 +59,9 @@ IMPLICIT NONE
     !_______________________________________________________________________
     elseif(trim(mix_scheme)=='cvmix_PP') then
         call init_cvmix_pp
+    !_______________________________________________________________________
+    elseif(trim(mix_scheme)=='cvmix_KPP') then
+        call init_cvmix_kpp    
     endif 
 
     !___________________________________________________________________________

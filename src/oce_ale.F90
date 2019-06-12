@@ -1589,8 +1589,13 @@ subroutine vert_vel_ale
     if (cflmax>1.0) then
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)-1
-                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
+                !!PS if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.0_WP .and. CFL_z(nz,n)<=2.0_WP ) then
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                          'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
+                          ',nz=',nz
+                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.0_WP) then          
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
                     !!PS write(*,*) '***********************************************************'
@@ -1898,6 +1903,7 @@ subroutine oce_timestep_ale(n)
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_pp
+    use g_cvmix_kpp
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
@@ -1907,10 +1913,12 @@ subroutine oce_timestep_ale(n)
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
     call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
     
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_force_4_...'//achar(27)//'[0m'
     if (trim(which_ale)=='linfs') then
         call pressure_force_4_linfs  
     else  
@@ -1942,6 +1950,7 @@ subroutine oce_timestep_ale(n)
     !___________________________________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (trim(mix_scheme)=='KPP') then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
         call oce_mixing_KPP(Av, Kv_double)
         Kv=Kv_double(:,:,1)
         call mo_convect
@@ -1949,6 +1958,7 @@ subroutine oce_timestep_ale(n)
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
     else if(trim(mix_scheme)=='PP') then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
@@ -1957,6 +1967,7 @@ subroutine oce_timestep_ale(n)
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
     else if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then    
         if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') call calc_cvmix_idemix
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke
         
     ! use only CVMIX IDEMIX (internal wave energy) parameterisation for 
@@ -1964,13 +1975,20 @@ subroutine oce_timestep_ale(n)
     ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal 
     ! diffusivity induced by internal gravity waves"     
     else if(trim(mix_scheme)=='cvmix_IDEMIX') then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
     ! N^2 and vertical horizontal velocity shear dui/dz
     else if(trim(mix_scheme)=='cvmix_PP') then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp
+        
+    ! use CVMIX KPP (Large at al. 1994) 
+    else if(trim(mix_scheme)=='cvmix_KPP') then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
+        call calc_cvmix_kpp
         
     else
         stop "!not existing mixing scheme!"
@@ -1979,6 +1997,7 @@ subroutine oce_timestep_ale(n)
     t1=MPI_Wtime()
     
     !___________________________________________________________________________
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     if(mom_adv/=3) then
         call compute_vel_rhs
     else
@@ -1989,6 +2008,7 @@ subroutine oce_timestep_ale(n)
     call viscosity_filter(2)
     
     !___________________________________________________________________________
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale
     t2=MPI_Wtime()
     
@@ -1998,7 +2018,7 @@ subroutine oce_timestep_ale(n)
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
     if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale
-    
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
     call compute_ssh_rhs_ale
@@ -2010,11 +2030,13 @@ subroutine oce_timestep_ale(n)
     
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
     call update_vel
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
     
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale
     
     !___________________________________________________________________________
@@ -2035,6 +2057,7 @@ subroutine oce_timestep_ale(n)
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
     if (Fer_GM) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
         call fer_solve_Gamma
         call fer_gamma2vel
     end if
@@ -2043,16 +2066,19 @@ subroutine oce_timestep_ale(n)
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale 
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! solve tracer equation
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale  
     t9=MPI_Wtime() 
     
