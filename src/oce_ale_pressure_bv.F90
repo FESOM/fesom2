@@ -23,7 +23,7 @@ subroutine pressure_bv
     
     smallvalue=1.0e-20
     buoyancy_crit=0.0003
-    mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
+    mixing_kpp = (trim(mix_scheme)=='KPP' .or. trim(mix_scheme)=='cvmix_KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
     !___________________________________________________________________________
     ! Screen salinity
     a=0.0_WP
@@ -81,6 +81,9 @@ subroutine pressure_bv
                 density_m_rho0(nz,node) = rho(nz)
                 
                 ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+                ! --> bring density of surface point adiabatically to the same 
+                !     depth level as the deep point --> than calculate bouyancy 
+                !     difference
                 rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
                 rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
                 dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
@@ -122,6 +125,19 @@ subroutine pressure_bv
             flag1=.true.
             flag2=.true.
             DO nz=2,nl1
+                !_______________________________________________________________
+                ! prepare to calculate bvfreq at full depth levels zbar_3d_n(nz,node)
+                !
+                !  ~~~~~~~~~~~~~~~> zbar1
+                !
+                !         -+-rho1   Z1        
+                !          |
+                !  ~~~~~~~^v~~~~~~> zbar2,  --> bring rho1 and rho2 adiabatic to 
+                !         |                     level of zbar2, then calculate
+                !        -+-rho2    Z2          bouyancy difference !!!
+                !
+                !  ~~~~~~~~~~~~~~~> zbar3
+                !
                 bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
                 bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
                 rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar_3d_n(nz,node))  
