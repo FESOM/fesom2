@@ -129,8 +129,12 @@ module g_cvmix_tke
         end if
         
         !_______________________________________________________________________
-        ! allocate + initialse all tke arrays
+        ! allocate + initialse tke arrays --> with size myDim_nod2D+eDim_nod2D
         node_size=myDim_nod2D+eDim_nod2D
+        ! initialise TKE viscosities and diffusivities
+        allocate(tke_Av(nl,node_size),tke_Kv(nl,node_size))
+        tke_Av        = 0.0_WP
+        tke_Kv        = 0.0_WP
         
         ! initialize 2D TKE input fields 
         allocate(tke_forc2d_normstress(node_size))
@@ -182,11 +186,6 @@ module g_cvmix_tke
         tke_Tbck       = 0.0_WP
         tke_Ttot       = 0.0_WP
         
-        ! initialise TKE viscosities and diffusivities
-        allocate(tke_Av(nl,node_size),tke_Kv(nl,node_size))
-        tke_Av        = 0.0_WP
-        tke_Kv        = 0.0_WP
-            
         ! nils (for debugging)
         tstep_count = 0
         
@@ -244,11 +243,12 @@ module g_cvmix_tke
     ! calculate TKE vertrical mixing coefficients from CVMIX library
     subroutine calc_cvmix_tke
         
-        integer       :: node, elem, nelem, nz, nln, elnodes(3)
+        integer       :: node, elem, nelem, nz, nln, elnodes(3), node_size
         real(kind=WP) :: tvol
         real(kind=WP) :: dz_trr(nl), bvfreq2(nl), vshear2(nl)
         real(kind=WP) :: tke_Av_old(nl), tke_Kv_old(nl), tke_old(nl)
-            
+        
+        node_size = myDim_nod2D
         !_______________________________________________________________________
         ! calculate all neccessary forcing for TKE 
         tke_forc2d_normstress = 0.0_WP
@@ -263,7 +263,7 @@ module g_cvmix_tke
         endif
         
         !_______________________________________________________________________
-        do node = 1,myDim_nod2D
+        do node = 1,node_size
             !___________________________________________________________________
             ! number of above bottom levels at node
             nln = nlevels_nod2D(node)-1
@@ -367,46 +367,24 @@ module g_cvmix_tke
             tke_Av(1,node)=0.0_WP
             tke_Kv(1,node)=0.0_WP
             
-        end do !--> do node = 1,myDim_nod2D
+        end do !--> do node = 1,node_size
         
         !_______________________________________________________________________
-        ! Time relaxation of avo/dvo
-        ! FIXME: nils: Why should we want to do this???
-        !if ( timerelax_tke) THEN
-        !  
-        !    !___________________________________________________________________
-        !    ! write out diffusivity
-        !    Kv = relax*tke_Kv_old + relne*tke_Kv
-        !    
-        !    !___________________________________________________________________
-        !    ! write out viscosity -->interpolate therefor from nodes to elements
-        !    call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
-        !    do elem=1, myDim_elem2D
-        !        elnodes=elem2D_nodes(:,elem)
-        !        do nz=1,nlevels(elem)-1
-        !            Av(nz,elem) = sum(relax*tke_Av_old(nz,elnodes)+relne*tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
-        !        end do
-        !        Av(nlevels(elem),elem ) = Av(nlevels(elem)-1,elem )
-        !    end do
-        !    
-        !else
-            !___________________________________________________________________
-            ! write out diffusivity
-            call exchange_nod(tke_Kv)
-            Kv = tke_Kv
-             
-            !___________________________________________________________________
-            ! write out viscosity -->interpolate therefor from nodes to elements
-            call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
-            Av = 0.0_WP
-            do elem=1, myDim_elem2D
-                elnodes=elem2D_nodes(:,elem)
-                do nz=2,nlevels(elem)-1
-                    Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
-                end do
+        ! write out diffusivity
+        call exchange_nod(tke_Kv)
+        Kv = tke_Kv
+            
+        !_______________________________________________________________________
+        ! write out viscosity -->interpolate therefor from nodes to elements
+        call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
+        Av = 0.0_WP
+        do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            do nz=2,nlevels(elem)-1
+                Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
-            call exchange_elem(Av)
-        !end
+        end do
+!!PS         call exchange_elem(Av)
         
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

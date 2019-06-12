@@ -124,14 +124,23 @@ module g_cvmix_idemix
         end if
             
         !_______________________________________________________________________
-        ! allocate + initialse all idemix arrays
+        ! allocate + initialse idemix arrays --> with size myDim_nod2D+eDim_nod2D
         node_size=myDim_nod2D+eDim_nod2D
-        
-        ! initialise 3D  IDEMIX fields
         allocate(iwe(nl,node_size))
+        iwe(:,:)         = 0.0_WP
+        allocate(iwe_v0(nl,node_size))
+        iwe_v0(:,:)      = 0.0_WP
+        allocate(vol_wcelli(nl,node_size))
+        vol_wcelli(:,:)  = 0.0_WP
+        
+        ! internal wave related vertical viscosity and diffusivity
+        allocate(iwe_Av(nl,node_size))
+        allocate(iwe_Kv(nl,node_size))
+        iwe_Av(:,:)     = 0.0_WP
+        iwe_Kv(:,:)     = 0.0_WP
+        
         allocate(iwe_old(nl))
         allocate(iwe_diss(nl,node_size))
-        iwe(:,:)         = 0.0_WP
         iwe_old(:)       = 0.0_WP
         iwe_diss(:,:)    = 0.0_WP
         
@@ -156,21 +165,10 @@ module g_cvmix_idemix
         iwe_Tsur(:,:)    = 0.0_WP
         iwe_Tbot(:,:)    = 0.0_WP
         
-        ! internal wave related vertical viscosity and diffusivity
-        allocate(iwe_Av(nl,node_size))
-        allocate(iwe_Kv(nl,node_size))
-        iwe_Av(:,:)     = 0.0_WP
-        iwe_Kv(:,:)     = 0.0_WP
-        
         allocate(iwe_c0(nl,node_size))
-        allocate(iwe_v0(nl,node_size))
         allocate(iwe_alpha_c(nl,node_size))
         iwe_c0(:,:)      = 0.0_WP
-        iwe_v0(:,:)      = 0.0_WP
         iwe_alpha_c(:,:) = 0.0_WP
-        
-        allocate(vol_wcelli(nl,node_size))
-        vol_wcelli(:,:)  = 0.0_WP
         
         ! 2D
         allocate(forc_iw_bottom_2D(node_size))
@@ -266,7 +264,7 @@ module g_cvmix_idemix
     ! calculate IDEMIX internal wave energy and its dissipation
     subroutine calc_cvmix_idemix
     
-        integer       :: node, elem, edge
+        integer       :: node, elem, edge, node_size
         integer       :: nz, nln, nl1, nl2, nl12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(nl), dz_trr2(nl), bvfreq2(nl), vflux, dz_el, aux, cflfac
@@ -277,7 +275,8 @@ module g_cvmix_idemix
         tstep_count = tstep_count + 1
           
         !_______________________________________________________________________
-        do node = 1,myDim_nod2D
+        node_size = myDim_nod2D
+        do node = 1,node_size
             nln = nlevels_nod2D(node)-1
             
             !___________________________________________________________________
@@ -337,7 +336,7 @@ module g_cvmix_idemix
                 cvmix_int_3     = cvmix_dummy_3(:,node)         &
                 )
             
-        end do !-->do node = 1,myDim_nod2D
+        end do !-->do node = 1,node_size
             
         !_______________________________________________________________________
         ! --> add contribution from horizontal wave propagation
@@ -358,7 +357,7 @@ module g_cvmix_idemix
             call exchange_nod(iwe)
             
             ! temporarily store old iwe values for diag
-            iwe_Thdi = iwe
+            iwe_Thdi = iwe(:,1:myDim_nod2D)
             
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
@@ -378,7 +377,7 @@ module g_cvmix_idemix
             !      ob es läuft, dann kannst du den dazuschalten und hoffen, dass 
             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
             !      machen, aber nahe der ML kann der schon Probleme machen".
-            do node = 1,myDim_nod2D
+            do node = 1,node_size
                 ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
                 
@@ -410,7 +409,7 @@ module g_cvmix_idemix
                 aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
-            end do !-->do node = 1,myDim_nod2D
+            end do !-->do node = 1,node_size
             call exchange_nod(vol_wcelli)
             call exchange_nod(iwe_v0)
             
@@ -570,7 +569,7 @@ module g_cvmix_idemix
             !___________________________________________________________________
             ! diagnostic: add horizontal propgation to the total production rate
             ! of internal wave energy iwe_Tot
-            iwe_Thdi = (iwe - iwe_Thdi)/dt
+            iwe_Thdi = (iwe(:,1:myDim_nod2D) - iwe_Thdi)/dt
             iwe_Ttot = iwe_Ttot + iwe_Thdi
         end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         
@@ -592,7 +591,7 @@ module g_cvmix_idemix
                     Av(nz,elem) = sum(iwe_Av(nz,elnodes1))/3.0_WP    ! (elementwise)                
                 end do
             end do
-            call exchange_elem(Av)
+!!PS             call exchange_elem(Av)
         end if 
         
     end subroutine calc_cvmix_idemix

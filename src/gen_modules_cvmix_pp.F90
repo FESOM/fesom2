@@ -86,10 +86,10 @@ module g_cvmix_pp
         !_______________________________________________________________________
         ! allocate + initialse all pp arrays
         node_size=myDim_nod2D+eDim_nod2D
-        
         allocate(pp_Av(nl,node_size),pp_Kv(nl,node_size))
         pp_Av         = 0.0_WP
         pp_Kv         = 0.0_WP
+        
         allocate(pp_richardnmb(nl,node_size))
         pp_richardnmb = 0.0_WP
         allocate(pp_monob_mixl(node_size))
@@ -167,11 +167,12 @@ module g_cvmix_pp
     ! calculate PP vertrical mixing coefficients from CVMIX library
     subroutine calc_cvmix_pp
         
-        integer       :: node, elem, nz, nln, elnodes(3), windnl=2
+        integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
         
+        node_size = myDim_nod2D
         !_______________________________________________________________________
-        do node = 1,myDim_nod2D
+        do node = 1,node_size
             !___________________________________________________________________
             ! number of above bottom levels at node
             nln = nlevels_nod2D(node)-1
@@ -242,7 +243,7 @@ module g_cvmix_pp
         ! Computes the mixing length derived from the Monin-Obukhov length
         ! --> in FESOM1.4 refered as TB04 mixing scheme
         if (pp_use_fesompp .and. pp_use_monob) then
-            do node = 1,myDim_nod2D
+            do node = 1,node_size
                 !_______________________________________________________________
                 ! calcualte monin obukov length
                 call mo_length(water_flux(node),heat_flux(node), &         
@@ -268,7 +269,7 @@ module g_cvmix_pp
         ! calculate and add latitudinal and depth dependend background 
         ! diffusivity of Q. Wang from FESOM1.4
         if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
-            do node = 1,myDim_nod2D
+            do node = 1,node_size
                 do nz = 2,nlevels_nod2D(node)-1
                     call Kv0_background_qiang(Kvb,                         &
                                               geo_coord_nod2D(2,node)/rad, &
@@ -283,7 +284,7 @@ module g_cvmix_pp
         ! enhance mixing in case of instable stratification  --> (N^2<0)
         ! pp_instabmix_Kv=0.1_WP, pp_instabmix_Av=0.1_WP
         if (pp_use_fesompp .and. pp_use_instabmix) then
-            do node = 1,myDim_nod2D
+            do node = 1,node_size
                 do nz = 2,nlevels_nod2D(node)-1
                     if (bvfreq(nz,node) < 0.0_WP) then 
                         pp_Kv(nz,node)=max(pp_Kv(nz,node), pp_instabmix_Kv)
@@ -295,11 +296,11 @@ module g_cvmix_pp
         
         !_______________________________________________________________________
         ! add additional wind mixing for upper two layers --> otherwise PP mixing 
-        ! works insufficient --> but job might be partly done already by the mixing 
-        ! with monin-obukov
+        ! works insufficient --> solution here might be a bit nasty --> potential 
+        ! to improve
         ! pp_windmix=1.e-3
         if (pp_use_fesompp .and. pp_use_windmix) then
-            do node = 1,myDim_nod2D
+            do node = 1,node_size
                 do nz = 2,nlevels_nod2D(node)-1
                     if (nz <= windnl+1) then
                         pp_Kv(nz,node)=max(pp_Kv(nz,node), pp_windmix)
@@ -312,7 +313,7 @@ module g_cvmix_pp
         end if
         
         !_______________________________________________________________________
-        ! write out diffusivities to FESOM2.0 --> diffusivites remain on nodes
+        ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
         call exchange_nod(pp_Kv)
         Kv = pp_Kv
            
@@ -327,7 +328,7 @@ module g_cvmix_pp
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        call exchange_elem(Av)
+!!PS         call exchange_elem(Av)
         
     end subroutine calc_cvmix_pp
 end module g_cvmix_pp
