@@ -110,5 +110,7 @@ module g_config
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
   real(kind=WP)             	:: dummy=1.e10
+  
+  logical                       :: flag_debug=.false.
 end module g_config
 

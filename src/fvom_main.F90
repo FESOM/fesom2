@@ -170,13 +170,22 @@ real(kind=real32) :: runtime_alltimesteps
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock
+        
+        !___compute horizontal velocity on nodes (originaly on elements)________
         call compute_vel_nodes 
+        
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
+            !___compute fluxes from ocean to ice________________________________
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
             call ocean2ice
+            
+            !___compute update of atmospheric forcing____________________________
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             call update_atm_forcing(n)
             
+            !___compute ice step________________________________________________
             if (ice_steps_since_upd>=ice_ave_steps-1) then
                 ice_update=.true.
                 ice_steps_since_upd = 0
@@ -184,24 +193,33 @@ real(kind=real32) :: runtime_alltimesteps
                 ice_update=.false.
                 ice_steps_since_upd=ice_steps_since_upd+1
             endif
-            
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
             if (ice_update) call ice_timestep(n)
             
+            !___compute fluxes to the ocean: heat, freshwater, momentum_________
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom ! momentum only
             call oce_fluxes
         end if  
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
         call oce_timestep_ale(n)
         t3 = MPI_Wtime()
+        
+        !___compute energy diagnostics..._______________________________________
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
         call compute_diagnostics(1)
         t4 = MPI_Wtime()
+        
         !___prepare output______________________________________________________
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n)
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
         t6 = MPI_Wtime()
+        
         rtime_fullice       = rtime_fullice       + t2 - t1
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
         rtime_write_means   = rtime_write_means   + t5 - t4   
