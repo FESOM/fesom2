@@ -245,7 +245,7 @@ contains
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
   ViscA=0.0_WP
-  DO node=1, myDim_nod2D+eDim_nod2D
+  DO node=1, myDim_nod2D !+eDim_nod2D
 
 !      *******************************************************************
 !       Eqn. 21
@@ -308,7 +308,7 @@ contains
 !       bo =  -g * ( Talpha*heat_flux/vcpw + Sbeta * salinity*water_flux ) (m^2/s^3)
 !      *******************************************************************
 
-  DO node=1, myDim_nod2D+eDim_nod2D
+  DO node=1, myDim_nod2D !+eDim_nod2D
      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
 
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
@@ -335,7 +335,13 @@ contains
     CALL enhance(viscA, diffK) 
 
     if (smooth_blmc) then
+       call exchange_nod(blmc(:,:,1)) 
+       call exchange_nod(blmc(:,:,2))
+       call exchange_nod(blmc(:,:,3))
        do j=1, 3
+          !_____________________________________________________________________  
+          ! all loops go over myDim_nod2D so no halo information --> for smoothing 
+          ! haloinfo is required --> therefor exchange_nod
           call smooth_nod(blmc(:,:,j), 3)
        end do
     end if
@@ -353,6 +359,12 @@ contains
           ENDIF
      END DO
   END DO    
+  
+  !_____________________________________________________________________________
+  ! do all node loops only over myDim_nod2D --> therefore do an halo exchange 
+  ! only at the end should save some time
+  call exchange_nod(diffK(:,:,1))
+  call exchange_nod(diffK(:,:,2))
 
 ! OVER ELEMENTS 
   call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
@@ -432,14 +444,14 @@ contains
      real(KIND=WP), parameter :: cmonob = 1.0_WP  ! constant for Monin-Obukhov depth
 
 ! Initialize hbl and kbl to bottomed out values
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
 ! Index of first grid level below hbl
         kbl(node) = nlevels_nod2D(node)      
 ! Boundary layer depth
         hbl(node) = ABS( zbar_3d_n( nlevels_nod2d(node),node ) )
      END DO
 
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
 
         IF (use_sw_pene)  THEN                
            coeff_sw = g * sw_alpha(1,node)  ! @ the surface @ Z (m/s2/K)
@@ -534,7 +546,7 @@ contains
 
   if (smooth_hbl) call smooth_nod(hbl, 3)
 
-  DO node=1, myDim_nod2D+eDim_nod2D
+  DO node=1, myDim_nod2D !+eDim_nod2D
        nk = nlevels_nod2D(node)
        !-----------------------------------------------------------------------
        !     find new kbl 
@@ -672,7 +684,7 @@ contains
      integer                     :: num_smoothings = 1              ! for vertical smoothing of Richardson number
 
 ! Compute Richardson number and store it as diffK to save memory
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D! +eDim_nod2D
         DO nz=2,nlevels_nod2d(node)-1
            dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
            shear  = ( Unode(1, nz-1, node) - Unode(1, nz, node) )**2 + &
@@ -708,7 +720,7 @@ contains
 
     !___________________________________________________________________________
     ! compute viscA and diffK
-    do node=1, myDim_nod2D+eDim_nod2D
+    do node=1, myDim_nod2D !+eDim_nod2D
         do nz=2,nlevels_nod2d(node)-1
             !___________________________________________________________________
             ! evaluate function of Ri# for shear instability eqn. (28b&c)
@@ -777,7 +789,7 @@ contains
 
      real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
 
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D!+eDim_nod2D
         DO nz=2,nlevels_nod2d(node)-1
 
        ! alphaDT and betaDS @Z 
@@ -876,7 +888,7 @@ contains
 !      *******************************************************************
 !       Kv over the NODE 
 !      *******************************************************************
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
         nl1=nlevels_nod2d(node)
 
         if(nl1<3) cycle  ! a temporary solution
@@ -1041,7 +1053,7 @@ contains
      integer           :: nz, node, k
      real(kind=WP)     :: delta, dkmp5, dstar
 
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
 
         k     = kbl(node) - 1
         delta = (hbl(node) + zbar_3d_n(k,node)) / (zbar_3d_n(k,node) - zbar_3d_n(k+1,node))
