@@ -277,10 +277,21 @@ def plot_xmoc(lat, depth, moc, bottom=[], which_moc='gmoc',
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0: nstep=1
-    plt.setp(cbar1.ax.get_yticklabels()[:], visible=False)
-    plt.setp(cbar1.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-    plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
-    plt.show(block=False)    
+    
+    #plt.setp(cbar1.ax.get_yticklabels()[:], visible=False)
+    #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+    #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+    #plt.show(block=False)    
+    
+    tickl = cbar1.ax.get_yticklabels()
+    idx = np.arange(0,len(tickl),1)
+    idxb = np.ones((len(tickl),), dtype=bool)                
+    idxb[idx_cref::nstep]  = False
+    idxb[idx_cref::-nstep] = False
+    idx = idx[idxb==True]
+    for ii in list(idx):
+        tickl[ii]=''
+    cbar1.ax.set_yticklabels(tickl)
     
     fig.canvas.draw()
     return(fig,ax1)

@@ -20,8 +20,11 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         print('')
         print('___PLOT 2D DATA____________________________________________')
     from set_inputarray import inputarray
-    if (data.value.min() == data.value.max()):
+    if (data.value.min() == data.value.max() ):
         print(' --> can\'t plot data are everywhere ', data.value.min())
+        sys.exit(' --> STOP HERE!')
+    elif (len(np.unique(data.value[~np.isnan(data.value)]))==1 ) :   
+        print(' --> can\'t plot data are everywhere ', np.unique(data.value[~np.isnan(data.value)]) )
         sys.exit(' --> STOP HERE!')
         
     
@@ -37,7 +40,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         fig.sca(ax)
     resolution = 'c'
     fsize = 14
-    
     
     #+_________________________________________________________________________+
     #| SET PROJECTION PARAMETERS                                               |
@@ -67,7 +69,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         xlabels=[1,1,1,1]
         xticks = np.arange(0.,360.,20.)
         yticks = np.arange(-90.,90.+1,10.)
-    else:    
+    else:   
         map = Basemap(projection = data.proj,resolution = resolution,
                 llcrnrlon  = inputarray['which_box'][0], urcrnrlon  = inputarray['which_box'][1],
                 llcrnrlat  = inputarray['which_box'][2], urcrnrlat  = inputarray['which_box'][3],
@@ -78,13 +80,11 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         tickstep = np.array([1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
         idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
-        
         if idx1.size==0 : 
             xticks   = np.arange(-180.+tickstep[-1],180.-tickstep[-1]+1,tickstep[-1])
         else:
             xticks   = np.arange(-180.+tickstep[idx1[0,0]],180.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
         del idx, idx1
-        
         idx      = (inputarray['which_box'][3]-inputarray['which_box'][2])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
@@ -92,7 +92,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         else:    
             yticks   = np.arange(-90.+tickstep[idx1[0,0]],90.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
         del idx, idx1    
-            
     #___________________________________________________________________________
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -114,7 +113,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         idx_box = np.ones((mesh.n2dna,),dtype='bool')   
     elif data.value.size ==mesh.n2dea:
         idx_box = np.ones((mesh.n2dea,),dtype='bool')
-        
+    
     if data.value.size ==mesh.n2dna:
         idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
         idxbox_n  = np.array(idxbox_n).squeeze()
@@ -131,6 +130,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #___________________________________________________________________________
     # make triangle mask arrays from flat triangles and nan trinagles
     mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
+    
     if np.any(np.isnan(data.value)):
         if data.value.size ==mesh.n2dna:
             mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
@@ -241,7 +241,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 #auxcmap[-1,-1]=0.0
                 auxcmap[0,-1]=0.0
             cmap0 = ListedColormap(auxcmap)
-
+    
     #___________________________________________________________________________
     # limit minimum and maximum of data vector to setted colorrange avoid holes 
     # in the plot
@@ -280,7 +280,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     cmap=cmap0,
                     clim=[clevel[0],clevel[-1]],
                     vmin=clevel[0],vmax=clevel[-1])
-    
+        
         if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
     
     #___________________________________________________________________________
@@ -364,10 +364,22 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
-    plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-    #plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
-    plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-    plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+    
+    if cbar.orientation=='vertical':
+        tickl = cbar.ax.get_yticklabels()
+    else:
+        tickl = cbar.ax.get_xticklabels()
+    idx = np.arange(0,len(tickl),1)
+    idxb = np.ones((len(tickl),), dtype=bool)                
+    idxb[idx_cref::nstep]  = False
+    idxb[idx_cref::-nstep] = False
+    idx = idx[idxb==True]
+    for ii in list(idx):
+        tickl[ii]=''
+    if cbar.orientation=='vertical':    
+        cbar.ax.set_yticklabels(tickl)
+    else:    
+        cbar.ax.set_xticklabels(tickl)
     #___________________________________________________________________________
     ax.tick_params(axis='both', direction='out')
     #ax.get_xaxis().tick_bottom()   # remove unneeded ticks 

@@ -26,7 +26,7 @@ class fesom_box:
 	runid, path, descript       = 'fesom', '', ''
 	
 	#____data time variables_____________________
-	year,  month, record, depth = [], [], [], []
+	year,  month, record, depth,zlev = [], [], [], [],[]
 	str_time, str_dep           = '', ''
 	
 	#____data projection variables_______________
@@ -480,7 +480,7 @@ class fesom_box:
 			# duplicate x-axes
 			
 			#___________________________________________________________________
-			cnumb= 25
+			cnumb= 30
 			cmin = np.nanmin(self.value[ii])
 			cmax = np.nanmax(self.value[ii])
 			cref = cmin + (cmax-cmin)/2
@@ -508,6 +508,7 @@ class fesom_box:
 					print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
 			
 			print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+			print('[cnum]=',cnumb)
 			cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,self.cmap)
 			print('clevel = ',clevel)
 			
@@ -520,8 +521,9 @@ class fesom_box:
 			
 			#___________________________________________________________________
 			# make pcolor or contour plot 
-			depth = self.depth[:-1] + (self.depth[1:]-self.depth[:-1])/2.0
-			depth = -depth
+			#depth = self.depth[:-1] + (self.depth[1:]-self.depth[:-1])/2.0
+			#depth = self.zlev[:-1] + (self.zlev[1:]-self.zlev[:-1])/2.0
+			depth = -self.zlev
 			depthlim = np.sum(~np.isnan(self.value[ii][0,:])).max()
 			if depthlim==depth.shape: depthlim=depthlim-1
 			yy,xx = np.meshgrid(depth,self.time)
@@ -557,7 +559,7 @@ class fesom_box:
 			ax1.set_xlim(self.time.min(),self.time.max())
 			ax1.set_ylim(0,depth[depthlim-1])
 			ax1.invert_yaxis()
-			ax1.set_axis_bgcolor([0.25,0.25,0.25])
+			#ax1.set_axis_bgcolor([0.25,0.25,0.25])
 			ax1.tick_params(axis='both',which='major',direction='out',length=8,labelsize=fsize)
 			ax1.minorticks_on()
 			ax1.tick_params(axis='both',which='minor',direction='out',length=4,labelsize=fsize)
@@ -584,9 +586,19 @@ class fesom_box:
 			nmax_cbar_l = 10
 			nstep = ncbar_l/nmax_cbar_l
 			nstep = np.int(np.floor(nstep))
-			plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-			plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-			plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+			#plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+			#plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+			#plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+			if nstep==0:nstep=1
+			tickl = cbar.ax.get_yticklabels()
+			idx = np.arange(0,len(tickl),1)
+			idxb = np.ones((len(tickl),), dtype=bool)                
+			idxb[idx_cref::nstep]  = False
+			idxb[idx_cref::-nstep] = False
+			idx = idx[idxb==True]
+			for ii in list(idx):
+				tickl[ii]=''
+			cbar.ax.set_yticklabels(tickl)
 			
 			#___________________________________________________________________
 			# save figure
@@ -632,16 +644,27 @@ class fesom_box:
 			figp, ax = plt.figure(figsize=(13, 13)), plt.gca()
 			map 	= Basemap(projection = 'cyl',resolution = 'c',
 						llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
+            
 			mx,my 	= map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
-			map.drawmapboundary(fill_color='0.9',linewidth=1.0)
+			
+			
+			map.bluemarble()
+			fesom_plot_lmask(map,mesh,ax,'0.6')
 			
 			xlabels,ylabels=[0,0,0,1],[1,0,0,0]
 			xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
 			map.drawparallels(yticks,labels=ylabels,fontsize=fsize)
 			map.drawmeridians(xticks,labels=xlabels,fontsize=fsize)
-			#map.bluemarble()
-			fesom_plot_lmask(map,mesh,ax,'none','r')
-			ax.grid(color='k', linestyle='-', linewidth=0.5)
+			map.drawmapboundary(linewidth=1.0)
+			
+			
+			
+			
+			
+			
+			#plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[allbox_idx==True,:],linewidth=0.2)
+			
+			#ax.grid(color='k', linestyle='-', linewidth=0.5)
 			
 			#___________________________________________________________________
 			patch=[]
@@ -666,7 +689,7 @@ class fesom_box:
 			# plot selected mesh points
 			#ax.plot(mesh.nodes_2d_xg[self.box_idx[ii]],mesh.nodes_2d_yg[self.box_idx[ii]],color='r',linestyle='None',marker='.')
 			plt.title(self.box_define[ii][2],fontdict= dict(fontsize=fsize*2),verticalalignment='bottom')
-		
+			
 			#___________________________________________________________________
 			# save figure
 			if inputarray['save_fig']==True:
@@ -680,5 +703,5 @@ class fesom_box:
 							transparent=True,frameon=True)
 			
 			#___________________________________________________________________
-			plt.show(block=False)
-
+			plt.show()
+			figp.canvas.draw()
