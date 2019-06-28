@@ -1366,7 +1366,7 @@ contains
     ! Since depth gets more negative as you go deeper, that translates into
     ! OBL_depth = max(abs(computed depth), abs(Ekman depth), abs(M-O depth))
     if (CVmix_kpp_params_in%lEkman) then
-      if (Coriolis.eq.cvmix_zero) then
+      if (Coriolis.eq.cvmix_zero .or. surf_buoy.le.cvmix_zero) then
         ! Rather than divide by zero, set Ekman depth to ocean bottom
         Ekman = abs(zt_cntr(nlev))
       else
