@@ -11,7 +11,6 @@ module io_MEANDATA
   use o_mixing_KPP_mod
   use g_cvmix_tke
   use g_cvmix_idemix
-  use g_cvmix_kpp
   use diagnostics
   use i_PARAM, only: whichEVP
 
@@ -53,7 +52,7 @@ module io_MEANDATA
     integer                                            :: dimID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
-    integer                                            :: error_status(1000), error_count
+    integer                                            :: error_status(10000), error_count
     logical                                            :: is_in_use=.false.
   end type
 !
@@ -270,10 +269,18 @@ CASE ('fer_K     ')
     if (Fer_GM) then
     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',     'GM, stirring diff.','m2/s',  fer_k(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
+CASE ('dMOC      ')
+    if (ldiag_dMOC) then
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'U_rho_x_DZ',     'fluxes for density MOC', 'fluxes', std_dens_UVDZ(1,:,:),   1, 'm', i_real4)
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'V_rho_x_DZ',     'fluxes for density MOC', 'fluxes', std_dens_UVDZ(2,:,:),   1, 'm', i_real4)
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'RHO_Z',          'drho/dz',                'kg/m4' , std_dens_RHOZ(:,:),     1, 'm', i_real4)
+       call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      1, 'm', i_real4)
+    end if
 CASE DEFAULT
     if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
 END SELECT
 END DO
+
 
 !3D
   if (ldiag_energy) then
@@ -349,23 +356,6 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tbot', 'IWE production from bottom forcing'      , 'm^2/s^2', iwe_Tbot(:,:), 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_c0'  , 'IWE vertical group velocity'             , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_v0'  , 'IWE horizontal group velocity'           , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
-    end if
-    
-    if (trim(mix_scheme)=='cvmix_KPP') then
-        ! KPP diagnostics
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Av'         , 'KPP viscosity'          , '', kpp_Av            , 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Kv'         , 'KPP diffusivty'         , '', kpp_Kv            , 1, 'm', i_real4)
-        call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_obldepth'   , 'KPP OBL depth'          , '', kpp_obldepth      , 1, 'm', i_real4)
-        call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_surfbuoyflx', 'KPP surf. bouyancy flx.', '', kpp_surfbuoyflx   , 1, 'm', i_real4)
-        !!PS call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp_ustar         , 1, 'm', i_real4)
-        !!PS call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_nzobldepth' , 'KPP Index OBL depth    ', '', kpp_nzobldepth    , 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp_bulkRi        , 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_shearRi'    , 'KPP Shear Richardson Nr.','', kpp_shearRi       , 1, 'm', i_real4)
-        call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_dbsurf'  , 'KPP bouyancy difference', '', dbsfc             , 1, 'y', i_real4)
-        !!PS call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_ws_cntr' , 'KPP ws cntr'            , '', kpp_ws_cntr       , 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc1'   , 'KPP OBLMIX1'            , '', kpp_oblmixc(:,:,1), 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc2'   , 'KPP OBLMIX2'            , '', kpp_oblmixc(:,:,2), 1, 'm', i_real4)
-        !!PS call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc3'   , 'KPP OBLMIX3'            , '', kpp_oblmixc(:,:,3), 1, 'm', i_real4)
     end if
   
   !___________________________________________________________________________________________________________________________________

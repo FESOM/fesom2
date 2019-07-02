@@ -127,6 +127,7 @@ use g_config
 use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
+use diagnostics,     only: ldiag_dMOC
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -313,9 +314,15 @@ end if
     ! init field for pressure force 
     allocate(density_m_rho0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
+    if (ldiag_dMOC) then
+       allocate(density_dMOC       (nl-1, node_size))
+    end if
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
     density_m_rho0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
+    if (ldiag_dMOC) then
+       density_dMOC       =0.0_WP
+    end if
     pgf_x = 0.0_WP
     pgf_y = 0.0_WP
     

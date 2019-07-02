@@ -52,7 +52,7 @@ implicit none
   integer                    :: nod_id
   character(100)             :: longname
   character(2000)            :: filename
-  real(kind=WP), allocatable :: rbuffer(:)
+  real(kind=WP), allocatable :: rbuffer(:), lrbuffer(:)
   integer, allocatable       :: ibuffer(:), lbuffer(:)
   character(2000)            :: att_text, short_name
   integer                    :: vtype
@@ -192,7 +192,7 @@ implicit none
   allocate(lbuffer(myDim_edge2D))
   do i=1, 2
      do k=1, myDim_edge2D
-        lbuffer(k)=myList_edge2D(edges(i, k))
+        lbuffer(k)=myList_nod2D(edges(i, k))
      end do
      call gather_edge(lbuffer, ibuffer)
      call my_put_vara(ncid, edges_id, (/1, i/), (/edge2D, 1/), ibuffer)
@@ -217,11 +217,13 @@ implicit none
 
   ! edge cross distances
   allocate(rbuffer(edge2D))
+  allocate(lrbuffer(myDim_edge2D))
   do i=1, 4
-     call gather_edge(edge_cross_dxdy(i, :), rbuffer)
+     lrbuffer=edge_cross_dxdy(i, 1:myDim_edge2D)
+     call gather_edge(lrbuffer, rbuffer)
      call my_put_vara(ncid, edge_cross_dxdy_id, (/1, i/), (/edge2D, 1/), rbuffer)
   end do
-  deallocate(rbuffer)
+  deallocate(rbuffer, lrbuffer)
 
 
   ! X component of gadient at elements
