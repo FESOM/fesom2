@@ -127,6 +127,7 @@ use g_config
 use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
+use diagnostics,     only: ldiag_dMOC
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -313,9 +314,15 @@ end if
     ! init field for pressure force 
     allocate(density_m_rho0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
+    if (ldiag_dMOC) then
+       allocate(density_dMOC       (nl-1, node_size))
+    end if
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
     density_m_rho0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
+    if (ldiag_dMOC) then
+       density_dMOC       =0.0_WP
+    end if
     pgf_x = 0.0_WP
     pgf_y = 0.0_WP
     
@@ -341,7 +348,7 @@ USE g_ic3d
   ! reads the initial state or the restart file for the ocean
   !
   implicit none
-  integer           :: i, id
+  integer           :: i, k, counter, rcounter3, id
   character(len=10) :: i_string, id_string
 
   if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
@@ -357,6 +364,23 @@ USE g_ic3d
   Ssurf=tr_arr(1,:,2)
   relax2clim=0.0
 
+  ! count the passive tracers which require 3D source (ptracers_restore_total)
+  ptracers_restore_total=0
+  DO i=3, num_tracers
+     id=tracer_ID(i)
+     SELECT CASE (id)
+     CASE (301)
+          ptracers_restore_total=ptracers_restore_total+1
+     CASE (302)
+          ptracers_restore_total=ptracers_restore_total+1
+     CASE (303)
+          ptracers_restore_total=ptracers_restore_total+1
+
+     END SELECT
+  END DO
+  allocate(ptracers_restore(ptracers_restore_total))
+  
+  rcounter3=0         ! counter for tracers with 3D source
   DO i=3, num_tracers
      id=tracer_ID(i)
      SELECT CASE (id)
@@ -367,7 +391,84 @@ USE g_ic3d
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
-       CASE (3)
+       CASE (301) !Fram Strait 3d restored passive tracer
+         tr_arr(:,:,i)=0.
+         rcounter3    =rcounter3+1
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+               counter=counter+1
+            end if
+         end do
+         allocate(ptracers_restore(rcounter3)%ind2(counter))
+         ptracers_restore(rcounter3)%id   =301
+         ptracers_restore(rcounter3)%locid=i
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
+               .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+               counter=counter+1
+               ptracers_restore(rcounter3)%ind2(counter)=k
+            end if
+         end do
+         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+
+       CASE (302) !Bering Strait 3d restored passive tracer
+         tr_arr(:,:,i)=0.
+         rcounter3    =rcounter3+1
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
+               .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+               counter=counter+1
+            end if
+         end do
+         allocate(ptracers_restore(rcounter3)%ind2(counter))
+         ptracers_restore(rcounter3)%id   =302
+         ptracers_restore(rcounter3)%locid=i
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
+               .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+               counter=counter+1
+               ptracers_restore(rcounter3)%ind2(counter)=k
+            end if
+         end do
+         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       
+      CASE (303) !BSO 3d restored passive tracer
+         tr_arr(:,:,i)=0.
+         rcounter3    =rcounter3+1
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
+               .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+               counter=counter+1
+            end if
+         end do
+         allocate(ptracers_restore(rcounter3)%ind2(counter))
+         ptracers_restore(rcounter3)%id   =303
+         ptracers_restore(rcounter3)%locid=i
+         counter=0
+         do k=1, myDim_nod2D+eDim_nod2D
+            if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
+               .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+               counter=counter+1
+               ptracers_restore(rcounter3)%ind2(counter)=k
+            end if
+         end do
+         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id

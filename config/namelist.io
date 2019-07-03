@@ -47,4 +47,6 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_v   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
            'bolus_w   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
            'fer_K     ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
+           'fer_K     ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
+           'dMOC      ',1, 'y', 4, !ldiag_dMOC must be .true. otherwise no output
 /
