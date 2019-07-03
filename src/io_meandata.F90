@@ -66,7 +66,7 @@ module io_MEANDATA
 !
   integer, save                  :: io_listsize=0
   type io_entry
-        CHARACTER(len=10)        :: id        ='unknown   '
+        CHARACTER(len=15)        :: id        ='unknown   '
         INTEGER                  :: freq      =0
         CHARACTER                :: unit      =''
         INTEGER                  :: precision =0
@@ -202,11 +202,11 @@ CASE ('kpp_obldepth   ')
     elseif (trim(mix_scheme)=='cvmix_KPP') then
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',       'KPP ocean bounhdary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
-CASE ('kpp_surfbuoyflx')
+CASE ('kpp_sbuoyflx')
     if (trim(mix_scheme)=='KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_surfbuoyflx',    'surface boyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface boyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     elseif (trim(mix_scheme)=='cvmix_KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_surfbuoyflx',     'surface boyancy flux',   'm2/s3',  kpp_surfbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',     'surface boyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
 CASE ('tx_sur    ')
     call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
