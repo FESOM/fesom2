@@ -200,7 +200,7 @@ module g_cvmix_kpp
     ! depth of oceananic boundary layer (OBL)
     real(kind=WP), allocatable, dimension(:)    :: kpp_obldepth,kpp_nzobldepth
     ! surface buoyancy flux
-    real(kind=WP), allocatable, dimension(:)    :: kpp_surfbuoyflx
+    real(kind=WP), allocatable, dimension(:)    :: kpp_sbuoyflx
     
     ! 3d arrays
     !-----------
@@ -249,11 +249,11 @@ module g_cvmix_kpp
         
         ! allocate 2D variable 
         allocate(kpp_obldepth(node_size),kpp_nzobldepth(node_size))
-        allocate(kpp_surfbuoyflx(node_size))
+        allocate(kpp_sbuoyflx(node_size))
         kpp_obldepth       = 0.0_WP
         kpp_nzobldepth     = 0.0_WP
         
-        kpp_surfbuoyflx    = 0.0_WP
+        kpp_sbuoyflx    = 0.0_WP
         
         ! allocate 3D variable 
         allocate(kpp_Av(nl,node_size),kpp_Kv(nl,node_size))
@@ -470,7 +470,7 @@ module g_cvmix_kpp
             !___2D Quantities___________________________________________________
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
-            kpp_surfbuoyflx(node) = -g*density_0_r * &
+            kpp_sbuoyflx(node) = -g*density_0_r * &
                                     (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
                                      sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
                                      
@@ -553,7 +553,7 @@ module g_cvmix_kpp
             ! eq. A2c & A2d & A3b & A3d in Large et al. 1994
             ! --> avoid if condition in depth loop --> should be a tiny bit faster 
             aux_surfbuoyflx_nl = 0.0_WP
-            aux_surfbuoyflx_nl(1:nln) = kpp_surfbuoyflx(node)
+            aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! coeffcient to transfer SW temp flux into buoyancy flux
                 aux_coeff       = g*density_0_r*sw_alpha(1,node) 
@@ -563,7 +563,7 @@ module g_cvmix_kpp
                     ! out off the tacervolume 
                     ! --> (sw_3d(1,node)-sw_3d(nz,node)) contains all the penetrated 
                     ! heatflux until level nz
-                    aux_surfbuoyflx_nl(nz) = kpp_surfbuoyflx(node)+aux_coeff*(sw_3d(1,node)-sw_3d(nz+1,node))
+                    aux_surfbuoyflx_nl(nz) = kpp_sbuoyflx(node)+aux_coeff*(sw_3d(1,node)-sw_3d(nz+1,node))
                                                    ! look in oce_shortwave_pene.F90<--|
                                                    ! substract swsurf from surface 
                                                    ! heat flux 
@@ -578,7 +578,7 @@ module g_cvmix_kpp
             !    sigma_loc(:) = min(surf_layer_ext, sigma_coord(:))
             ! end if
             if (kpp_use_LMDws .and. kpp_use_fesomkpp) then
-                stable = 0.5_WP + SIGN( 0.5_WP, kpp_surfbuoyflx(node) )
+                stable = 0.5_WP + SIGN( 0.5_WP, kpp_sbuoyflx(node) )
                 sigma  = stable + ( 1.0_WP - stable ) * kpp_surf_layer_ext
             else
                 sigma = kpp_surf_layer_ext
@@ -622,13 +622,13 @@ module g_cvmix_kpp
             ! +-> if kpp_use_compEkman=.True. ... kpp_obldepth can not be deeper than 
             ! !   ekmann layer depth (h_ekmann = 0.7 * ustar/coriolis)
             ! +-> if kpp_use_monob=.True. ... kpp_obldepth can not be deeper than monin
-            !     obukov length (h_monob = ustar^3/( kpp_surfbuoyflx*kpp_vonKarman )
+            !     obukov length (h_monob = ustar^3/( kpp_sbuoyflx*kpp_vonKarman )
             !
             ! Attention !!!: in case of kpp_use_compEkman=.True. cvmix DOES NOT 
             ! check if surface buoyancy forcing is stable, it limits to ekman depth
             ! everywhere and eradicates possible obldepths from bulkRi number 
             ! --> thats why kpp_use_compEkman = .False.
-            aux_surfbuoyflx_nl(1) = kpp_surfbuoyflx(node)
+            aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! take total heatflux from shortwave radiation into account --> 
                 ! here only needed to calculate monin-obukov mixing length
@@ -680,7 +680,7 @@ module g_cvmix_kpp
             ! parameterisation of FESOM1.4 & FESOM2.0
             ! --> interpolate contribution that comes from shortwave penetration
             ! to the depth of the obldepth
-            aux_surfbuoyflx_nl(1) = kpp_surfbuoyflx(node)
+            aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
             if (use_sw_pene .and. kpp_use_fesomkpp==.True.) then
                 aux_nz = int(kpp_nzobldepth(node))
                 ! take only penetrated shortwave radiation heatflux into account 
@@ -746,7 +746,7 @@ module g_cvmix_kpp
                 old_Tdiff = kpp_oblmixc(:,node,2),     & ! (in)    Tdiff_iface: Original heat diffusivity (m2/s)
                 old_Sdiff = kpp_oblmixc(:,node,3),     & ! (in)    Sdiff_iface: Original salt diffusivity (m2/s)
                 OBL_depth = kpp_obldepth(node),        & ! (in)    BoundaryLayerDepth: OBL depth (m)
-                kOBL_depth= kpp_nzobldepth(node),            & ! (in)    kOBL_depth: level (+fraction) of OBL extent
+                kOBL_depth= kpp_nzobldepth(node),      & ! (in)    kOBL_depth: level (+fraction) of OBL extent
                 Tnonlocal = kpp_nonlcltranspT(:,node), & ! (out)   kpp_Tnonlocal_iface: Non-local heat transport (non-dimensional)
                 Snonlocal = kpp_nonlcltranspS(:,node), & ! (out)   kkp_Snonlocal_iface: Non-local salt transport (non-dimensional)
                 surf_fric = aux_ustar,                 & ! (in)    SurfaceFriction:Turbulent friction velocity at surface (m/s)
