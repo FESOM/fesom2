@@ -15,7 +15,8 @@ module diagnostics
 
   private
   public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wrhof, rhof, &
-            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott
+            u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
+	    ldiag_dMOC, std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -28,11 +29,35 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
   real(kind=WP),  save, allocatable, target      :: stress_bott(:,:), u_bott(:), v_bott(:), u_surf(:), v_surf(:)
 
+! defining a set of standard density bins which will be used for computing densMOC
+! integer,        parameter                      :: std_dens_N  = 100
+! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
+  integer,        parameter                      :: std_dens_N  =72
+  real(kind=WP),  save, target                   :: std_dens(std_dens_N)=(/ &
+                                                            0.0000,   30.00000, 30.55556, 31.11111, 31.66667, 32.22222, &
+                                                            32.77778, 33.33333, 33.88889, 34.44444, 35.00000, 35.10622, &
+                                                            35.20319, 35.29239, 35.37498, 35.45187, 35.52380, 35.59136, &
+                                                            35.65506, 35.71531, 35.77247, 35.82685, 35.87869, 35.92823, &
+                                                            35.97566, 36.02115, 36.06487, 36.10692, 36.14746, 36.18656, &
+                                                            36.22434, 36.26089, 36.29626, 36.33056, 36.36383, 36.39613, &
+                                                            36.42753, 36.45806, 36.48778, 36.51674, 36.54495, 36.57246, &
+                                                            36.59932, 36.62555, 36.65117, 36.67621, 36.70071, 36.72467, &
+                                                            36.74813, 36.77111, 36.79363, 36.81570, 36.83733, 36.85857, &
+                                                            36.87940, 36.89985, 36.91993, 36.93965, 36.95904, 36.97808, &
+                                                            36.99682, 37.01524, 37.03336, 37.05119, 37.06874, 37.08602, &
+                                                            37.10303, 37.11979, 37.13630, 37.15257, 37.16861, 37.18441/)
+  real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
+  real(kind=WP),  save, target                   :: std_dens_min=1012., std_dens_max=1039.
+  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_RHOZ(:,:)
+
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
   logical                                       :: ldiag_curl_vel3  =.false.
   logical                                       :: ldiag_energy     =.false.
-  logical                                       :: ldiag_salt3D     =.true.
+  logical                                       :: ldiag_salt3D     =.false.
+  ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
+  ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
+  logical                                       :: ldiag_dMOC       =.false.
   contains
 
 ! ==============================================================
@@ -298,11 +323,97 @@ subroutine diag_energy(mode)
   END DO
 end subroutine diag_energy
 ! ==============================================================
+subroutine diag_densMOC(mode)
+  implicit none
+  integer, intent(in)                 :: mode
+  integer                             :: nz, snz, elem, nzmax, elnodes(3), is, ie, pos
+  real(kind=WP), save                 :: dd
+  real(kind=WP)                       :: uvdz_el(2), rhoz_el, dz, weight, dmin, dmax, ddiff, test, test1, test2, test3
+  real(kind=WP), save, allocatable    :: dens(:), aux(:)
+  real(kind=WP), save, allocatable    :: std_dens_w(:,:)
+  logical, save                       :: firstcall=.true.
+!=====================
+
+
+  if (firstcall) then !allocate the stuff at the first call
+     allocate(std_dens_UVDZ(2,std_dens_N, myDim_elem2D))
+     allocate(std_dens_RHOZ(  std_dens_N, myDim_elem2D))
+     allocate(std_dens_w   (  std_dens_N, myDim_elem2D))
+     allocate(aux(nl-1))
+     allocate(dens(nl))
+!
+!std_dens(1)=27.5
+!do nz=2, std_dens_N
+!std_dens(nz)=std_dens(nz-1)+10.5/real(std_dens_N)
+!end do
+!
+     std_dd(:)=std_dens(2:)-std_dens(:std_dens_N-1)
+     dens         =0.
+     std_dens_UVDZ=0.
+     std_dens_RHOZ=0.
+     firstcall=.false.
+     if (mode==0) return
+  end if
+
+  std_dens_UVDZ=0.
+  std_dens_RHOZ=0.
+  std_dens_w   =0.
+  do elem=1, myDim_elem2D
+     elnodes=elem2D_nodes(:,elem)    
+     nzmax =nlevels(elem)
+     do nz=1, nzmax-1
+       aux(nz)=sum(density_dmoc(nz, elnodes))/3.-1000.
+     end do
+     do nz=nzmax-1,2,-1
+        dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
+                      aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+     end do
+     dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
+     dens(1)    =dens(2)      +(dens(2)-dens(3))            *helem(1, elem)/helem(2,elem)
+
+     do nz=nzmax-1,1,-1
+        dmin=minval(dens(nz:nz+1))
+        dmax=maxval(dens(nz:nz+1))
+        is=findloc(std_dens > dmin, value=.true., dim=1)
+        ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+        if (std_dens(is)>=dmax) is=ie
+        if (std_dens(ie)<=dmin) ie=is
+        uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
+        rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
+        ddiff=abs(dens(nz)-dens(nz+1))
+        if (ie-is > 0) then
+           weight=(std_dens(is)-dmin)+std_dd(is)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+weight*uvdz_el
+           std_dens_RHOZ(   is, elem)=std_dens_RHOZ(   is, elem)+weight*rhoz_el
+           std_dens_w(   is, elem)   =std_dens_w(   is, elem)   +weight
+           do snz=is+1, ie-1
+              weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+              std_dens_UVDZ(:, snz, elem)=std_dens_UVDZ(:, snz, elem)+weight*uvdz_el
+              std_dens_RHOZ(   snz, elem)=std_dens_RHOZ(   snz, elem)+weight*rhoz_el
+              std_dens_w   (   snz, elem)=std_dens_w   (   snz, elem)+weight
+           end do
+           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_UVDZ(:, ie, elem)=std_dens_UVDZ(:, ie, elem)+weight*uvdz_el
+           std_dens_RHOZ(   ie, elem)=std_dens_RHOZ(   ie, elem)+weight*rhoz_el
+           std_dens_w   (   ie, elem)=std_dens_w   (   ie, elem)+weight
+        else
+           std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+uvdz_el
+           std_dens_RHOZ(   is, elem)=std_dens_RHOZ(   is, elem)+rhoz_el
+           std_dens_w   (   is, elem)=std_dens_w   (   is, elem)+1._wp
+        end if
+     end do
+  end do
+  where (std_dens_w > 0.)
+        std_dens_RHOZ=std_dens_RHOZ/std_dens_w
+  end where
+end subroutine diag_densMOC
+! ==============================================================
 subroutine compute_diagnostics(mode)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                 :: val  
-
   !1. solver diagnostic
   if (ldiag_solver)      call diag_solver(mode)
   !2. compute curl(stress_surf)
@@ -320,5 +431,8 @@ subroutine compute_diagnostics(mode)
         end if
      end if
   end if
+  !6. MOC in density coordinate
+  if (ldiag_dMOC)        call diag_densMOC(mode)
+
 end subroutine compute_diagnostics
 end module diagnostics

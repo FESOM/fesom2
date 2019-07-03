@@ -47,6 +47,10 @@ ref_sss_local=.true.
 ref_sss=34.
 i_vert_diff=.true.  ! true
 tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
+! Implemented trassers (3d restoring):
+! 301 - Fram strait.
+! 302 - Bering Strait
+! 303 - BSO 
 num_tracers=2       !number of all tracers
 tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
 /
