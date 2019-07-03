@@ -11,6 +11,7 @@ module io_MEANDATA
   use o_mixing_KPP_mod
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_cvmix_kpp
   use diagnostics
   use i_PARAM, only: whichEVP
 
