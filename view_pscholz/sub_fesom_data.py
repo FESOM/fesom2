@@ -450,11 +450,11 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
     # array with month
     ami = np.array(data.month)
     
-    #___________________________________________________________________________
-    # 3d lsmask
-    lsmask3d = np.zeros((mesh.n2dn,mesh.nlev-1))
-    for ii in range(0,mesh.n2dn):
-        lsmask3d[ii,0:mesh.nodes_2d_iz[ii]-1]=1
+    ##___________________________________________________________________________
+    ## 3d lsmask
+    #lsmask3d = np.zeros((mesh.n2dn,mesh.nlev-1))
+    #for ii in range(0,mesh.n2dn):
+        #lsmask3d[ii,0:mesh.nodes_2d_iz[ii]-1]=1
     
     if do_output==True:
         print('     -----+-----------------------------------+------------')
@@ -466,7 +466,8 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
     aux_datavar = data.var
     count_ti=0
     for yi in range(0, nyi):
-        if do_output==True: print('     {:4.0f} |'.format(ayi[yi])),
+        if do_output==True: print('     {:4.0f} |'.format(ayi[yi]),end=''),
+        
         tstart = time.time();
         if data.var.find('norm')!=-1 or data.var=='ptemp':
             aux_datavar,aux_datavar2 = 'u','v'
@@ -511,7 +512,6 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
         
         # read dimension of variable 
         ncdims=ncid.variables[aux_datavar].shape
-        #print(ncdims)
         
         # number of dimension is 2d or 3d
         dim_num = len(ncdims)
@@ -519,11 +519,25 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
         # check time dimension of loaded data aka number of records
         nrec  = ncdims[0]
         nsmple= ncdims[1]
+        nlev  = 0
+        if dim_num == 3: nlev=ncdims[2]
+        
         
         #_______________________________________________________________________
         # at first loaded year allocate matrices to calc means
         if yi==0:
             nti = np.min([nmi,nrec])*nyi
+            
+            #___________________________________________________________________
+            # 3d lsmask
+            if dim_num == 3:
+                lsmask3d = np.zeros((mesh.n2dn,nlev))
+                if mesh.nlev==nlev:
+                    for ii in range(0,mesh.n2dn):
+                        lsmask3d[ii,0:mesh.nodes_2d_iz[ii]]=1
+                else:    
+                    for ii in range(0,mesh.n2dn):
+                        lsmask3d[ii,0:mesh.nodes_2d_iz[ii]-1]=1
             
             #___________________________________________________________________
             # if data are 3d and no loadable depth layers are given load all fesom 
@@ -602,13 +616,13 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
         if len(data.record)==0:
             #___________________________________________________________________
             if nrec==1:
-                if do_output==True: print('annual |'),
+                if do_output==True and yi==0 : print('annual |',end=''),
             elif nrec==12:
-                if do_output==True: print('monthly|'),
+                if do_output==True and yi==0 : print('monthly|',end=''),
             #elif nrec==73:
                 #print('5daily |'),
             elif nrec==365:
-                if do_output==True: print('daily  |'),
+                if do_output==True and yi==0 : print('daily  |',end=''),
             else:    
                 print(' --> error: temporal length of data unclear or not supported!!!|'),
                 break
@@ -693,7 +707,6 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
         #_______________________________________________________________________
         tend = time.time();        
         if do_output==True: print(' --> t={:2.2f}s'.format(tend-tstart))
-        
     #___________________________________________________________________________
     # cut of time_data
     if data.which_obj=='box':
@@ -701,7 +714,11 @@ def fesom_load_data_overtime(mesh,data,do_output=True):
             data.value[ii] = data.value[ii][0:count_ti,:]
             
     data.time  = data.time[0:count_ti]
-    if len(data.zlev)==0: data.zlev = mesh.zlev
+    if len(data.zlev)==0:
+        if nlev==mesh.nlev:
+            data.zlev = mesh.zlev
+        elif nlev==mesh.nlev-1:    
+            data.zlev = mesh.zmid
     #if len(data.depth)==0: data.depth = mesh.zlev
     
     #___________________________________________________________________________

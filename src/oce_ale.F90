@@ -1989,7 +1989,7 @@ subroutine oce_timestep_ale(n)
     else if(trim(mix_scheme)=='cvmix_KPP') then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
         call calc_cvmix_kpp
-        
+        call mo_convect
     else
         stop "!not existing mixing scheme!"
         call par_ex

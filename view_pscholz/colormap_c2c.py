@@ -34,19 +34,36 @@ def colormap_c2c(cmin,cmax,cref,cnumb,cname):
     # calculate optimal color step size
     cdelta   = (cmax-cmin)/cnumb
     cstep_all= np.array([0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 2.5, 5.0, 10.0, 20.0, 25.0, 50.0])
-    cstep_all=cstep_all*(10**np.floor(np.log10( cdelta )))
+    cstep_all=cstep_all*(10**np.floor(np.log10( np.abs(cdelta) )))
     cstep_i  = np.squeeze(np.where(cstep_all<=cdelta))
     cstep_i  = cstep_i[-1] 
     cstep    = cstep_all[cstep_i]
+    #print('[cmin,cmax,cref]=',cmin,cmax,cref)
+    #print('cstep  = ',cstep)
+    #print('cdelta = ',cdelta)
     
     #___________________________________________________________________________
     # calculate colormap levels
+    #print(np.arange(cref-cstep,cmin-cstep,-cstep))
+    
     clevel   = np.concatenate((np.sort(np.arange(cref-cstep,cmin-cstep,-cstep)),np.arange(cref,cmax+cstep,cstep)))
+    #print(clevel)
+    if np.abs(clevel.min())>1.0e-15:
+        #clevel   = np.around(clevel, -np.int32(np.floor(np.log10(np.abs( clevel.min() ))-2) ) )
+        clevel   = np.around(clevel, -np.int32(np.floor(np.log10(np.abs( cstep ))-2) ) )
+    
+    clevel   = np.unique(clevel)
+    #print(clevel)
+    #print(clevel[:-1]-clevel[1:])
+    #print(clevel)
     cdelta2  = clevel[-1]-clevel[0]
     if cmin==0.0 and clevel[0]<cmin:
         #clevel = clevel[1:]
         clevel[0]=0.0
+        clevel   = np.unique(clevel)
         cdelta2  = clevel[-1]-clevel[0]
+    
+        
     #___________________________________________________________________________
     # different colormap definitions
     cmap_def = []

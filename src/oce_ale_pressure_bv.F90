@@ -25,6 +25,7 @@ subroutine pressure_bv
     smallvalue=1.0e-20
     buoyancy_crit=0.0003
     mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
+!!PS     mixing_kpp = (trim(mix_scheme)=='KPP' .or. trim(mix_scheme)=='cvmix_KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
     !___________________________________________________________________________
     ! Screen salinity
     a=0.0_WP
@@ -88,10 +89,14 @@ subroutine pressure_bv
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
                 density_m_rho0(nz,node) = rho(nz)
                 
-                ! squared buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+                ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+                ! --> bring density of surface point adiabatically to the same 
+                !     depth level as the deep point --> than calculate bouyancy 
+                !     difference
                 rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
                 rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
                 dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
+!!PS                 dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
                 db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
             end do
             dbsfc1(nl)=dbsfc1(nl1)
