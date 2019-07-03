@@ -25,8 +25,6 @@ io_list =  'sst       ',1, 'm', 4,
            'runoff    ',1, 'm', 4,
            'evap      ',1, 'm', 4,
            'prec      ',1, 'm', 4,
-           'hbl       ',1, 'm', 4, !KPP must be .true. otherwise no output
-           'Bo        ',1, 'm', 4, !KPP must be .true. otherwise no output
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
            'curl_surf ',1, 'm', 4, !lcurt_stress_surf must be .true. otherwise no output
@@ -47,4 +45,6 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_v   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
            'bolus_w   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
            'fer_K     ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
+	   'kpp_obldepth',1, 'm', 4, !KPP must be used otherwise no output
+           'kpp_sbuoyflx',1, 'm', 4, !KPP must be used otherwise no output
 /
