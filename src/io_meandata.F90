@@ -414,6 +414,8 @@ function get_dimname(n) result(s)
      s='nz'
   elseif (n==nl-1) then
      s='nz1'
+  elseif (n==std_dens_N) then
+     s='ndens'
   else
      s='unknown'
      if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with zise of ', n
