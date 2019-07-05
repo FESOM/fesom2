@@ -211,7 +211,6 @@ module g_cvmix_kpp
     ! obl mixing coefficient for momentum, temp/salt diffusivity
     real(kind=WP), allocatable, dimension(:,:,:):: kpp_oblmixc
     
-
     contains
     !
     !
@@ -235,36 +234,35 @@ module g_cvmix_kpp
         ! allocate + initialse kpp arrays --> with size myDim_nod2D+eDim_nod2D
         node_size=myDim_nod2D+eDim_nod2D
         
-        ! allocate 1D variable 
+        ! allocate 1D depth variable 
         allocate(kpp_bulkRi(nl))
         allocate(kpp_shearRi(nl))
         allocate(kpp_dvsurf2(nl-1))
         allocate(kpp_dbsurf(nl-1))
         allocate(kpp_ws_cntr(nl-1))
-        kpp_bulkRi         = 0.0_WP
-        kpp_shearRi        = 0.0_WP
-        kpp_dvsurf2        = 0.0_WP
-        kpp_dbsurf         = 0.0_WP
-        kpp_ws_cntr        = 0.0_WP
+        kpp_bulkRi        = 0.0_WP
+        kpp_shearRi       = 0.0_WP
+        kpp_dvsurf2       = 0.0_WP
+        kpp_dbsurf        = 0.0_WP
+        kpp_ws_cntr       = 0.0_WP
         
-        ! allocate 2D variable 
+        ! allocate horizontal 2D variable 
         allocate(kpp_obldepth(node_size),kpp_nzobldepth(node_size))
         allocate(kpp_sbuoyflx(node_size))
-        kpp_obldepth       = 0.0_WP
-        kpp_nzobldepth     = 0.0_WP
-        
-        kpp_sbuoyflx    = 0.0_WP
+        kpp_obldepth      = 0.0_WP
+        kpp_nzobldepth    = 0.0_WP
+        kpp_sbuoyflx      = 0.0_WP
         
         ! allocate 3D variable 
         allocate(kpp_Av(nl,node_size),kpp_Kv(nl,node_size))
         allocate(kpp_nonlcltranspT(nl,node_size),kpp_nonlcltranspS(nl,node_size))
-        kpp_Av             = 0.0_WP
-        kpp_Kv             = 0.0_WP
-        kpp_nonlcltranspT  = 0.0_WP
-        kpp_nonlcltranspS  = 0.0_WP
+        kpp_Av            = 0.0_WP
+        kpp_Kv            = 0.0_WP
+        kpp_nonlcltranspT = 0.0_WP
+        kpp_nonlcltranspS = 0.0_WP
         
         allocate(kpp_oblmixc(nl,node_size,3))
-        kpp_oblmixc        = 0.0_WP
+        kpp_oblmixc       = 0.0_WP
         
         !_______________________________________________________________________
         ! read cvmix namelist file 
@@ -386,7 +384,7 @@ module g_cvmix_kpp
                     ! calculate squared velocity shear referenced to the surface
                     ! --> cvmix wants to have it with  respect to the midlevel rather than full levels
                     kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,1,node) )**2 + &
-                                     ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
+                                      ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
                     
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2
@@ -577,9 +575,11 @@ module g_cvmix_kpp
             ! else
             !    sigma_loc(:) = min(surf_layer_ext, sigma_coord(:))
             ! end if
+            ! --> FESOM1.4/MOM5 approach
             if (kpp_use_LMDws .and. kpp_use_fesomkpp) then
                 stable = 0.5_WP + SIGN( 0.5_WP, kpp_sbuoyflx(node) )
                 sigma  = stable + ( 1.0_WP - stable ) * kpp_surf_layer_ext
+            ! --> MOM6 approach
             else
                 sigma = kpp_surf_layer_ext
             end if 
@@ -720,19 +720,19 @@ module g_cvmix_kpp
             ! mixing + background mixing into KdiffT, KdiffS, Kvisc --> are only 
             ! required for  kpp_matchtechc= 'MatchGradient' or 'MatchBoth'  as
             ! well as for the diffusive enhancement at the last OBL layer
-!!PS             if ( .not. trim(kpp_matchtechc)=='MatchBoth') then 
+            !!PS if ( .not. trim(kpp_matchtechc)=='MatchBoth') then 
                 kpp_oblmixc(:,node,1) = kpp_Av(:,node)
                 kpp_oblmixc(:,node,2) = kpp_Kv(:,node)
                 kpp_oblmixc(:,node,3) = kpp_Kv(:,node)
-!!PS             else
-!!PS                 ! --> this part is done in MOM6 and MPIOM but i dont realy see 
-!!PS                 ! the reason for doing this --> need to test this !!! -->
-!!PS                 ! this leads to slightly lower and slightly less deeper
-!!PS                 ! diffusivity values --> i would not use it !      
-!!PS                 kpp_oblmixc(:,node,1) = 0.0_WP
-!!PS                 kpp_oblmixc(:,node,2) = 0.0_WP
-!!PS                 kpp_oblmixc(:,node,3) = 0.0_WP
-!!PS             end if 
+            !!PS else
+            !!PS     ! --> this part is done in MOM6 and MPIOM but i dont realy see 
+            !!PS     ! the reason for doing this --> need to test this !!! -->
+            !!PS     ! this leads to slightly lower and slightly less deeper
+            !!PS     ! diffusivity values --> i would not use it !      
+            !!PS     kpp_oblmixc(:,node,1) = 0.0_WP
+            !!PS     kpp_oblmixc(:,node,2) = 0.0_WP
+            !!PS     kpp_oblmixc(:,node,3) = 0.0_WP
+            !!PS end if 
             
             !___________________________________________________________________
             !  compute the turbulent diffusion coefficients
@@ -767,15 +767,20 @@ module g_cvmix_kpp
             !     oscillation, see Appendix D and eq. D6 
             
             !___________________________________________________________________
-            ! Over-write CVMix NLT shape function with one of the following choices.
-            ! The CVMix code has yet to update for these options, so we compute it here.
-            ! Note that nonLocalTrans = Cs * G(sigma) (LMD94 notation), with Cs =
-            ! 6.32739901508.
-            ! Start do-loop at k=2, since k=1 is ocean surface (sigma=0)
-            ! and we do not wish to double-count the surface forcing.
-            ! Only compute nonlocal transport for 0 <= sigma <= 1.
-            ! MOM6 recommended shape is the parabolic; it gives deeper boundary layer
-            ! and no spurious extrema.
+            ! MOM6: Over-write CVMix NLT shape function with one of the 
+            !       following choices. The CVMix code has yet to update for 
+            !       these options, so we compute it here. Note that 
+            !       nonLocalTrans = Cs * G(sigma) (LMD94 notation), with Cs =
+            !       6.32739901508.
+            !       Start do-loop at k=2, since k=1 is ocean surface (sigma=0)
+            !       and we do not wish to double-count the surface forcing.
+            !       Only compute nonlocal transport for 0 <= sigma <= 1.
+            !       MOM6 recommended shape is the parabolic; it gives deeper 
+            !       boundary layer and no spurious extrema.
+            ! --> I dont think this part is neccessary either since the treatment 
+            !     of parabolic non-local transport seems to be already included 
+            !     in the cvmix used heren, kept only for comparability reasons 
+            !     between FESOM2 and MOM6/MPIOM --> keep kpp_nlt_shape='cvmix'
             if (aux_surfbuoyflx_nl(1) < 0.0_WP) then
                 if (kpp_nlt_shape == "cubic") then
                     do nz = 2,nln+1
@@ -835,9 +840,9 @@ module g_cvmix_kpp
                     kpp_Av(nz,node) = max(kpp_Av(nz,node),kpp_oblmixc(nz,node,1))
                     kpp_Kv(nz,node) = max(kpp_Kv(nz,node),kpp_oblmixc(nz,node,2))
                 end do
+            ! MOM6/MPIOM approach
             else
-                ! MOM6/MPIOM approach
-                do nz = 2,nln
+                do nz = 2,nlevels_nod2D(node)-1
                     kpp_Av(nz,node) = kpp_oblmixc(nz,node,1)
                     kpp_Kv(nz,node) = min(kpp_oblmixc(nz,node,2),kpp_oblmixc(nz,node,3))
                 end do
@@ -860,7 +865,6 @@ module g_cvmix_kpp
                 Av(nz,elem) = sum(kpp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-!!PS         call exchange_elem(Av)
         
     end subroutine calc_cvmix_kpp    
 end module g_cvmix_kpp
