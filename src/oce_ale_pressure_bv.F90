@@ -72,19 +72,19 @@ subroutine pressure_bv
             !NR and did not vectorize the full loop. 
             !___________________________________________________________________
             ! calculate density
-	    if (ldiag_dMOC) then 	
-		do nz=1, nl1
-    	            rho(nz)                      = bulk_0(nz) - 2000.*(bulk_pz(nz)   -2000.*bulk_pz2(nz))
-                    density_dmoc(nz,node)   = rho(nz)*rhopot(nz)/(rho(nz)-200.)
-                    !           density_dmoc(nz,node)   = rhopot(nz)
-		end do
-	    end if 
-
+            if (ldiag_dMOC) then
+                do nz=1, nl1
+                    rho(nz)              = bulk_0(nz) - 2000.*(bulk_pz(nz)   -2000.*bulk_pz2(nz))
+                    density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200.)
+                            !           density_dmoc(nz,node)   = rhopot(nz)
+                end do
+            end if 
+            
             do nz=1, nl1
                 rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
                 density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
-
+                
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
                 density_m_rho0(nz,node) = rho(nz)

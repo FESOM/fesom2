@@ -199,15 +199,15 @@ CASE ('prec      ')
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
     if (trim(mix_scheme)=='KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',       'KPP ocean bounhdary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     elseif (trim(mix_scheme)=='cvmix_KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',       'KPP ocean bounhdary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
 CASE ('kpp_sbuoyflx')
     if (trim(mix_scheme)=='KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface boyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     elseif (trim(mix_scheme)=='cvmix_KPP') then
-        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',     'surface boyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+        call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
 CASE ('tx_sur    ')
     call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
@@ -367,17 +367,14 @@ END DO
 !!PS         ! KPP diagnostics
 !!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Av'         , 'KPP viscosity'          , '', kpp_Av            , 1, 'm', i_real4)
 !!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Kv'         , 'KPP diffusivty'         , '', kpp_Kv            , 1, 'm', i_real4)
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_obldepth'   , 'KPP OBL depth'          , '', kpp_obldepth      , 1, 'm', i_real4)
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_surfbuoyflx', 'KPP surf. bouyancy flx.', '', kpp_surfbuoyflx   , 1, 'm', i_real4)
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp_ustar         , 1, 'm', i_real4)
-!!PS !!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_nzobldepth' , 'KPP Index OBL depth    ', '', kpp_nzobldepth    , 1, 'm', i_real4)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp_bulkRi        , 1, 'm', i_real4)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_shearRi'    , 'KPP Shear Richardson Nr.','', kpp_shearRi       , 1, 'm', i_real4)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_dbsurf'  , 'KPP bouyancy difference', '', dbsfc             , 1, 'y', i_real4)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_dbsurf2'  , 'KPP bouyancy difference', '', kpp_dbsurf             , 1, 'y', i_real4)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_ws_cntr' , 'KPP ws cntr'            , '', kpp_ws_cntr       , 1, 'm', i_real4)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_dvsurf2' , 'KPP kpp_dvsurf2'        , '', kpp_dvsurf2       , 1, 'm', i_real4)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_surfbuoyflx3d' , 'KPP kpp_surfbuoyflx3d'        , '', kpp_surfbuoyflx3d       , 1, 'm', i_real4)
+!!PS         call def_stream(       nod2D  ,        myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp_ustar         , 1, 'm', i_real4)
+!!PS         call def_stream(       nod2D  ,        myDim_nod2D  , 'kpp_nzobldepth' , 'KPP Index OBL depth    ', '', kpp_nzobldepth    , 1, 'm', i_real4)
+!!PS         call def_stream((/nl  ,nod2D/), (/nl  ,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp_bulkRi        , 1, 'm', i_real4)
+!!PS         call def_stream((/nl  ,nod2D/), (/nl  ,myDim_nod2D/), 'kpp_shearRi'    , 'KPP Shear Richardson Nr.','', kpp_shearRi       , 1, 'm', i_real4)
+!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_dbsurf2'    , 'KPP bouyancy difference', '', kpp_dbsurf             , 1, 'y', i_real4)
+!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_ws_cntr'    , 'KPP ws cntr'            , '', kpp_ws_cntr       , 1, 'm', i_real4)
+!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_dvsurf2'    , 'KPP kpp_dvsurf2'        , '', kpp_dvsurf2       , 1, 'm', i_real4)
+!!PS !!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_surfbuoyflx3d' , 'KPP kpp_surfbuoyflx3d'        , '', kpp_surfbuoyflx3d       , 1, 'm', i_real4)
 !!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc1'   , 'KPP OBLMIX1'            , '', kpp_oblmixc(:,:,1), 1, 'm', i_real4)
 !!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc2'   , 'KPP OBLMIX2'            , '', kpp_oblmixc(:,:,2), 1, 'm', i_real4)
 !!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc3'   , 'KPP OBLMIX3'            , '', kpp_oblmixc(:,:,3), 1, 'm', i_real4)
