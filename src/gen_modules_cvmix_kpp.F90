@@ -393,12 +393,19 @@ module g_cvmix_kpp
                               (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
                     kpp_shearRi(nz) = max(bvfreq(nz,node),0.0_WP)/(vshear2+kpp_epsln)
+                    
+                    !_______________________________________________________________
+                    ! buoyancy difference with respect to the surface --> computed in
+                    ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
+                    ! --> dbsfc(nz,node)
+                    call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
+                    rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
+                    rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
+                    rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
+                    rho_sfc = rho_sfc*sfc_rhopot/(rho_sfc+0.1_WP*Z_3d_n(nz,node))-density_0
+                    kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do 
-                !_______________________________________________________________
-                ! buoyancy difference with respect to the surface --> computed in
-                ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
-                ! --> dbsfc(nz,node)
-                kpp_dbsurf = dbsfc(:,node)
             else
                 do nz=1, nln
                     !___________________________________________________________
@@ -468,7 +475,8 @@ module g_cvmix_kpp
             !___2D Quantities___________________________________________________
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
-            kpp_sbuoyflx(node) = -g*density_0_r * &
+!!PS             kpp_sbuoyflx(node) = -g*density_0_r * &
+            kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
                                      sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
                                      
@@ -554,7 +562,8 @@ module g_cvmix_kpp
             aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! coeffcient to transfer SW temp flux into buoyancy flux
-                aux_coeff       = g*density_0_r*sw_alpha(1,node) 
+                aux_coeff       = g*density_0_r*sw_alpha(1,node)
+!!PS                 aux_coeff       = g*density_0_r*sw_alpha(1,node) 
                 
                 do nz = 1, nln
                     ! sw_3d is the temperature through the full depth levels into/

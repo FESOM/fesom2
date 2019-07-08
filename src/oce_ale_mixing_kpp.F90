@@ -312,7 +312,7 @@ contains
      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
 
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
-     Bo(node)  = -g*density_0_r * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
+     Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
                       + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2)) 
   END DO
 
@@ -454,7 +454,7 @@ contains
      DO node=1, myDim_nod2D !+eDim_nod2D
 
         IF (use_sw_pene)  THEN                
-           coeff_sw = g*density_0_r * sw_alpha(1,node)  ! @ the surface @ Z (m/s2/K)
+           coeff_sw = g * sw_alpha(1,node)  ! @ the surface @ Z (m/s2/K)
         END IF
  
         Rib_km1 = 0.0_WP
