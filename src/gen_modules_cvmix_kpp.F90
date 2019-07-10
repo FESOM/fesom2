@@ -78,7 +78,7 @@ module g_cvmix_kpp
     
     ! If true use horizontal smoothing on boundary layer mixing coefficient as 
     ! its done in the original kpp of fesom2.0
-    logical           :: kpp_use_smoothblmc= .false.
+    logical           :: kpp_use_smoothblmc= .true.
     
     ! how offen should smoothing be applied
     integer           :: kpp_smoothblmc_nmb= 3
@@ -475,7 +475,6 @@ module g_cvmix_kpp
             !___2D Quantities___________________________________________________
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
-!!PS             kpp_sbuoyflx(node) = -g*density_0_r * &
             kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
                                      sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
@@ -562,9 +561,7 @@ module g_cvmix_kpp
             aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! coeffcient to transfer SW temp flux into buoyancy flux
-                aux_coeff       = g*density_0_r*sw_alpha(1,node)
-!!PS                 aux_coeff       = g*density_0_r*sw_alpha(1,node) 
-                
+                aux_coeff       = g*sw_alpha(1,node)
                 do nz = 1, nln
                     ! sw_3d is the temperature through the full depth levels into/
                     ! out off the tacervolume 
