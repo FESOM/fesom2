@@ -749,10 +749,11 @@ END DO
 
 end subroutine viscosity_filt2x
 !===========================================================================
-subroutine viscosity_filter(option)
+subroutine viscosity_filter(argument)
 use o_PARAM
 use g_PARSUP
 IMPLICIT NONE 
+integer      ::  argument
 integer      ::  option
 
 ! Driving routine 
@@ -763,8 +764,8 @@ integer      ::  option
 ! h_viscosity_leiht needs vorticity, so vorticity array should be 
 ! allocated. At present, there are two rounds of smoothing in 
 ! h_viscosity. 
- 
-if(option>4) then
+option=argument
+if(option>5) then
 option=2    ! default
 if(mype==0) write(*,*) 'Default horizontal viscosity option is used'  
 endif
