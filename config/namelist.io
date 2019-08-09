@@ -4,6 +4,7 @@ io_listsize=100 !number of streams to allocate. shallbe large or equal to the nu
 &nml_list
 io_list =  'sst       ',1, 'm', 4, 
            'sss       ',1, 'm', 4,
+	   'ssh       ',1, 'm', 4, 	
            'vve_5     ',1, 'm', 4,
            'uice      ',1, 'm', 4, !use_ice must be .true. otherwise no output
            'vice      ',1, 'm', 4, !use_ice must be .true. otherwise no output
