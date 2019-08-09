@@ -299,7 +299,7 @@ module g_cvmix_kpp
             write(*,*) "     kpp_interptype_ri   = ", kpp_interptype_ri
             write(*,*) "     kpp_matchtechc      = ", kpp_matchtechc
             write(*,*) "     kpp_internalmix     = ", kpp_internalmix
-            write(*,*) "     kpp_reduce_tauuice= ", kpp_reduce_tauuice
+            write(*,*) "     kpp_reduce_tauuice  = ", kpp_reduce_tauuice
             if (kpp_internalmix .eq. 'KPP') then 
                 write(*,*) "     kpp_Av0             = ", kpp_Av0
                 write(*,*) "     kpp_Kv0             = ", kpp_Kv0

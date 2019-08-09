@@ -203,7 +203,7 @@ module g_cvmix_tke
         end if
         
         !_______________________________________________________________________
-        if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') tke_only=.False.
+        if(mix_scheme_nmb==56) tke_only=.False.
         
         if (mype==0) then
             write(*,*) "     tke_only       = ", tke_only
@@ -384,7 +384,6 @@ module g_cvmix_tke
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-!!PS         call exchange_elem(Av)
         
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

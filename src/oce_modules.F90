@@ -56,7 +56,8 @@ real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff du
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
-character(20)                  :: mix_scheme='KPP'	   !'KPP','PP'
+character(25)                 :: mix_scheme     ='KPP'	   !'KPP','PP'
+integer                       :: mix_scheme_nmb = 1       ! choosen in oce_setup_step --> replace string by int comparison
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 

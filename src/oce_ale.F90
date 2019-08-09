@@ -1904,6 +1904,7 @@ subroutine oce_timestep_ale(n)
     use g_cvmix_idemix
     use g_cvmix_pp
     use g_cvmix_kpp
+    use g_cvmix_tidal
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
@@ -1948,8 +1949,24 @@ subroutine oce_timestep_ale(n)
     ! >>>>>>    by the CVMIX library                                     <<<<<< 
     ! >>>>>>                                                             <<<<<<
     !___________________________________________________________________________
+    
+    !___EXTENSION OF MIXING SCHEMES_____________________________________________
+    ! add CVMIX IDEMIX (internal wave energy) parameterisation for 
+    ! vertical mixing (dissipation of energy by internal gravity waves) 
+    ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal 
+    ! diffusivity induced by internal gravity waves" --> use together with 
+    ! cvmix_TKE (mix_scheme='cvmix_TKE+cvmix_IDEMIX') or standalone for debbuging 
+    ! (mix_scheme='cvmix_IDEMIX') --> If idemix is used together with tke it needs 
+    ! to be called prior to tke
+    ! for debugging
+    if  (mod(mix_scheme_nmb,10)==6) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
+        call calc_cvmix_idemix
+    end if 
+    
+    !___MAIN MIXING SCHEMES_____________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
-    if (trim(mix_scheme)=='KPP') then
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
         call oce_mixing_KPP(Av, Kv_double)
         Kv=Kv_double(:,:,1)
@@ -1957,44 +1974,44 @@ subroutine oce_timestep_ale(n)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
-    else if(trim(mix_scheme)=='PP') then
+    else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP
+        
+    ! use CVMIX KPP (Large at al. 1994) 
+    else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
+        call calc_cvmix_kpp
+        call mo_convect
+        
+    ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
+    ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
+    ! N^2 and vertical horizontal velocity shear dui/dz
+    else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
+        call calc_cvmix_pp
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
     ! internal gravity waves) extension from Olbers and Eden, 2013, "A global 
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
-    else if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then    
-        if(trim(mix_scheme)=='cvmix_TKE+IDEMIX') call calc_cvmix_idemix
+    else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke
         
-    ! use only CVMIX IDEMIX (internal wave energy) parameterisation for 
-    ! vertical mixing (dissipation of energy by internal gravity waves) 
-    ! extension from Olbers and Eden, 2013, "A global Model for the diapycnal 
-    ! diffusivity induced by internal gravity waves"     
-    else if(trim(mix_scheme)=='cvmix_IDEMIX') then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
-        call calc_cvmix_idemix
+    end if     
+    
+    !___EXTENSION OF MIXING SCHEMES_____________________________________________
+    ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
+    ! in a numerical model of the ocean general circulation", ocean modelling to 
+    ! the already computed viscosities/diffusivities of KPP, PP, cvmix_KPP or 
+    ! cvmix_PP --> use standalone for debugging --> needs to be called after main
+    ! mixing schemes
+    if ( mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tidal'//achar(27)//'[0m'
+        call calc_cvmix_tidal
         
-    ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
-    ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
-    ! N^2 and vertical horizontal velocity shear dui/dz
-    else if(trim(mix_scheme)=='cvmix_PP') then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
-        call calc_cvmix_pp
-        
-    ! use CVMIX KPP (Large at al. 1994) 
-    else if(trim(mix_scheme)=='cvmix_KPP') then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp
-        call mo_convect
-    else
-        stop "!not existing mixing scheme!"
-        call par_ex
     end if  
-    t1=MPI_Wtime()
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'

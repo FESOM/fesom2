@@ -57,7 +57,8 @@ module g_cvmix_pp
     
     
     namelist /param_pp/ pp_Av0, pp_alpha, pp_exp, pp_Avbckg, pp_Kvbckg, pp_use_monob, &
-                        pp_monob_Kv, pp_use_nonconstKvb, pp_use_windmix, pp_use_instabmix
+                        pp_monob_Kv, pp_use_nonconstKvb, pp_use_windmix, pp_use_instabmix, &
+                        pp_use_fesompp
     
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:,:) :: pp_Av, pp_Kv
@@ -328,7 +329,6 @@ module g_cvmix_pp
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-!!PS         call exchange_elem(Av)
         
     end subroutine calc_cvmix_pp
 end module g_cvmix_pp
