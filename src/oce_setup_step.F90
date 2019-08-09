@@ -9,6 +9,7 @@ use g_cvmix_tke
 use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
+use g_cvmix_tidal
 IMPLICIT NONE
 
     if (use_ALE) then
@@ -44,25 +45,59 @@ IMPLICIT NONE
     end if    
         
     !___________________________________________________________________________
-    ! initialize arrays from cvmix library for CVMIX_TKE and  CVMIX_IDEMIX
-    if(trim(mix_scheme)=='cvmix_TKE'        .or. &
-       trim(mix_scheme)=='cvmix_TKE+IDEMIX' .or. &
-       trim(mix_scheme)=='cvmix_IDEMIX'     ) then    
-        !_______________________________________________________________________
-        if (trim(mix_scheme)=='cvmix_TKE+IDEMIX' .or. trim(mix_scheme)=='cvmix_IDEMIX') then 
-            call init_cvmix_idemix
-        endif
-        !_______________________________________________________________________
-        if(trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-            call init_cvmix_tke
-        endif
-    !_______________________________________________________________________
-    elseif(trim(mix_scheme)=='cvmix_PP') then
-        call init_cvmix_pp
-    !_______________________________________________________________________
-    elseif(trim(mix_scheme)=='cvmix_KPP') then
+    ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
+    ! CVMIX_IDEMIX and CVMIX_TIDAL
+    ! here translate mix_scheme string into integer --> for later usage only 
+    ! integer comparison is required
+    select case (trim(mix_scheme))
+        case ('KPP'                   ) ; mix_scheme_nmb = 1
+        case ('PP'                    ) ; mix_scheme_nmb = 2
+        case ('cvmix_KPP'             ) ; mix_scheme_nmb = 3
+        case ('cvmix_PP'              ) ; mix_scheme_nmb = 4
+        case ('cvmix_TKE'             ) ; mix_scheme_nmb = 5
+        case ('cvmix_IDEMIX'          ) ; mix_scheme_nmb = 6
+        case ('cvmix_TIDAL'           ) ; mix_scheme_nmb = 7 
+        case ('KPP+cvmix_TIDAL'       ) ; mix_scheme_nmb = 17
+        case ('PP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 27
+        case ('cvmix_KPP+cvmix_TIDAL' ) ; mix_scheme_nmb = 37
+        case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
+        case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
+        case default 
+            stop "!not existing mixing scheme!"
+            call par_ex
+    end select
+    
+    ! initialise fesom1.4 like KPP
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+        call oce_mixing_kpp_init
+    ! initialise fesom1.4 like PP
+    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
+    
+    ! initialise cvmix_KPP
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         call init_cvmix_kpp    
-    endif 
+        
+    ! initialise cvmix_PP    
+    elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+        call init_cvmix_pp
+        
+    ! initialise cvmix_TKE    
+    elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+        call init_cvmix_tke
+        
+    endif
+    
+    ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
+    ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
+    if     (mod(mix_scheme_nmb,10)==6) then
+        call init_cvmix_idemix
+        
+    ! initialise additional mixing cvmix_TIDAL --> only in combination with 
+    ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
+    ! or stand alone for debbuging as cvmix_TIDAL   
+    elseif (mod(mix_scheme_nmb,10)==7) then
+        call init_cvmix_tidal    
+    end if         
 
     !___________________________________________________________________________
     if(mype==0) write(*,*) 'Arrays are set'
@@ -204,10 +239,10 @@ allocate(Av(nl,elem_size), Kv(nl,node_size))
 
 Av=0.0_WP
 Kv=0.0_WP
-if (trim(mix_scheme)=='KPP') then
+if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    allocate(Kv_double(nl,node_size,num_tracers))
    Kv_double=0.0_WP
-   call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+   !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 end if
 
 !Velocities at nodes

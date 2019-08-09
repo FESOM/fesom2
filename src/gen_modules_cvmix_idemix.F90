@@ -576,7 +576,7 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         ! write IDEMIX diffusivities and viscositie to FESOM only when IDEMIX is 
         ! used alone --> mostly for debuging --> otherwise TKE Av and Kv are use
-        if(trim(mix_scheme)=='cvmix_IDEMIX') then 
+        if(mix_scheme_nmb==6) then 
             !___________________________________________________________________
             ! write out diffusivity
             call exchange_nod(iwe_Kv)
@@ -591,7 +591,6 @@ module g_cvmix_idemix
                     Av(nz,elem) = sum(iwe_Av(nz,elnodes1))/3.0_WP    ! (elementwise)                
                 end do
             end do
-!!PS             call exchange_elem(Av)
         end if 
         
     end subroutine calc_cvmix_idemix

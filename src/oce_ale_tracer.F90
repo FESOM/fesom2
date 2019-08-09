@@ -955,7 +955,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
             ! nonlocal transport to the rhs (only T and S currently) _GO_
             ! *******************************************************************
 !leads to non conservation in 8th digit. needs to be checked!
-!            if (trim(mix_scheme)=='KPP') then
+!            if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
 !                if (tr_num==1) then ! T
 !                    tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
 !                elseif (tr_num==2) then ! S

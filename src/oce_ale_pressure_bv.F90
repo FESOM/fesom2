@@ -24,7 +24,7 @@ subroutine pressure_bv
     
     smallvalue=1.0e-20
     buoyancy_crit=0.0003
-    mixing_kpp = (trim(mix_scheme)=='KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
 !!PS     mixing_kpp = (trim(mix_scheme)=='KPP' .or. trim(mix_scheme)=='cvmix_KPP')  ! NR Evaluate string comparison outside the loop. It is expensive.
     !___________________________________________________________________________
     ! Screen salinity

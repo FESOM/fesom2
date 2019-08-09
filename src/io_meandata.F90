@@ -12,6 +12,7 @@ module io_MEANDATA
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
+  use g_cvmix_tidal
   use diagnostics
   use i_PARAM, only: whichEVP
 
@@ -198,15 +199,15 @@ CASE ('prec      ')
 !___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
-    if (trim(mix_scheme)=='KPP') then
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
-    elseif (trim(mix_scheme)=='cvmix_KPP') then
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
 CASE ('kpp_sbuoyflx')
-    if (trim(mix_scheme)=='KPP') then
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then ! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
-    elseif (trim(mix_scheme)=='cvmix_KPP') then
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
 CASE ('tx_sur    ')
@@ -246,7 +247,7 @@ CASE ('slope_z   ')
 CASE ('N2        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('Kv        ')
-    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'Vertical mixing K',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('u         ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('v         ')
@@ -254,7 +255,7 @@ CASE ('v         ')
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
 CASE ('Av        ')
-    call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical mixing A',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+    call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation
@@ -329,7 +330,7 @@ END DO
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', i_real4)
 #endif
     
-    if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+    if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         ! TKE diagnostic 
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke'     , 'turbulent kinetic energy'                    , 'm^2/s^2', tke(:,:)     , 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Ttot', 'total production of turbulent kinetic energy', 'm^2/s^3', tke_Ttot(:,:), 1, 'y', i_real4)
@@ -341,17 +342,13 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbck', 'background forcing for TKE'                  , 'm^2/s^3', tke_Tbck(:,:), 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Lmix', 'mixing length scale of TKE'                  , 'm'      , tke_Lmix(:,:), 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Pr'  , 'Prantl number'                               , ''       , tke_Pr(:,:)  , 1, 'y', i_real4)
-!!PS         call def_stream(nod2D, myDim_nod2D,              'tke_stress2' , 'TKE surface wind stress forcing'          , ''       , tke_forc2d_normstress(:) , 1, 'y', i_real4)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_vshear2' , 'squared vertical velocity shear'          , ''       , tke_in3d_vshear2(:,:)    , 1, 'y', i_real4)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'tke_bvfreq2' , 'squared brunt väisälä frequency'          , ''       , tke_in3d_bvfreq2(:,:)    , 1, 'y', i_real4)
-        
-        if (trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-            ! IDEMIX diagnostic 
+        if (mix_scheme_nmb==56) then
+            ! TKE-IDEMIX diagnostic 
             call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tiwf', 'TKE production by internal waves (IDEMIX)', 'm^2/s^3', tke_Tiwf(:,:), 1, 'y', i_real4)
         end if 
     end if 
     
-    if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+    if (mod(mix_scheme_nmb,10)==6) then
         ! IDEMIX Internal-Wave-Energy diagnostics
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe'     , 'internal wave energy'                    , 'm^2/s^2', iwe(:,:)     , 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Ttot', 'total production of internal wave energy', 'm^2/s^2', iwe_Ttot(:,:), 1, 'y', i_real4)
@@ -361,6 +358,13 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_Tbot', 'IWE production from bottom forcing'      , 'm^2/s^2', iwe_Tbot(:,:), 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_c0'  , 'IWE vertical group velocity'             , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_v0'  , 'IWE horizontal group velocity'           , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4)
+    end if
+    
+    if (mod(mix_scheme_nmb,10)==7) then
+        ! cvmix_TIDAL diagnostics
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tidal_Kv'  , 'tidal diffusivity'           , 'm^2/s'    , tidal_Kv(:,:)  , 1, 'y', i_real4)
+        call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tidal_Av'  , 'tidal viscosity'             , 'm^2/s'    , tidal_Av(:,:)  , 1, 'y', i_real4)
+        call def_stream(     nod2D  ,      myDim_nod2D  , 'tidal_forcbot', 'near tidal bottom forcing', 'W/m^2'    , tidal_forc_bottom_2D  , 100, 'y', i_real4)
     end if
     
 !!PS     if (trim(mix_scheme)=='cvmix_KPP') then
