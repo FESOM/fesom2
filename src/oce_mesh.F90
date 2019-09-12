@@ -39,6 +39,7 @@ IMPLICIT NONE
  character*10   :: mype_string,npes_string
  character*500  :: file_name
  character*500  :: dist_mesh_dir
+ integer        :: flag_wrongaux3d=0
  integer       :: ierror              ! return error code
  integer, allocatable, dimension(:)        :: mapping
  integer, allocatable, dimension(:,:)      :: ibuff
@@ -214,7 +215,7 @@ IMPLICIT NONE
     
     !___________________________________________________________________________
     ! check if rotation is applied to an already rotated mesh
-    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1)) then
+    if ((mype==0) .and. (force_rotation) .and. (i==1)) then
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: Your input mesh seems to be rotated and you try to' 
         write(*,*) '        rotate it again in FESOM (force_rotation=.true. ) !'
@@ -365,6 +366,10 @@ IMPLICIT NONE
        do n=1, k
           read(fileID,*) rbuff(n,1)
        end do
+       ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
+       ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
+       ! the maximum depth on earth in marianen trench
+       if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0) ) flag_wrongaux3d=1
     end if
     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
@@ -385,6 +390,23 @@ IMPLICIT NONE
     write(*,*) mesh_check, ' values have been read in according to partitioning'
     write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
  end if
+!_______________________________________________________________________________
+! check if the mesh structure of FESOM2.0 and of FESOM1.4 is loaded
+if ((mype==0) .and. (flag_wrongaux3d==1)) then
+    write(*,*) '____________________________________________________________________'
+    write(*,*) ' ERROR: It looks like the mesh you want to use is prepared for ' 
+    write(*,*) '        FESOM1.4. Please be aware that the input mesh structure'
+    write(*,*) '        between FESOM1.4 and FESOM2.0 is different! The input'
+    write(*,*) '        mesh structure of FESOM2.0 contains only the files nod2d.out'
+    write(*,*) '        elem2d.out, nlvls.out, elvls.out and aux3d.out, where'
+    write(*,*) '        aux3d.out contains the number of depth layers, the depth'
+    write(*,*) '        layers and the bottom depth of your mesh vertices.'
+    write(*,*) '        So please check your meshpath in namelist.config or your '
+    write(*,*) '        mesh directory itself so you use the proper mesh structure'
+    write(*,*)
+    write(*,*) '____________________________________________________________________'
+    call par_ex(0)
+end if 
 
  ! ==============================
  ! Communication information
