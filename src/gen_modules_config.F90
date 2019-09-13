@@ -26,7 +26,7 @@ module g_config
   character(100)         :: ClimateDataPath='./hydrography/'
   character(100)         :: ForcingDataPath='./forcing/'
   character(100)         :: TideForcingPath='./tide_forcing/'
-  character(100)         :: ResultPath='./result/'
+  character(1000)         :: ResultPath='./result/'
   namelist /paths/  MeshPath, OpbndPath, ClimateDataPath, ForcingDataPath, &
        TideForcingPath, ResultPath
 
