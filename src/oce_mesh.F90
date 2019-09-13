@@ -215,7 +215,7 @@ IMPLICIT NONE
     
     !___________________________________________________________________________
     ! check if rotation is applied to an already rotated mesh
-    if ((mype==0) .and. (force_rotation) .and. (i==1)) then
+    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1)) then
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: Your input mesh seems to be rotated and you try to' 
         write(*,*) '        rotate it again in FESOM (force_rotation=.true. ) !'
