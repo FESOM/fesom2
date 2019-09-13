@@ -6,7 +6,7 @@
 ! This module calls subroutines from the CVMix library for the
 ! calculation of vertical mixing: TKE scheme 
 !
-! @see  Gaspar, P., Y. Grégoris, and J.-M. Lefevre
+! @see  Gaspar, P., Y. Grégoris, and J.-M. Lefevre, 1990
 !       J. Geophys. Res., 95(C9), 16179–16193, doi:10.1029/JC095iC09p16179.
 !
 ! @see  Blanke, B., P. Delecluse
@@ -240,7 +240,7 @@ module g_cvmix_tke
     !
     !
     !===========================================================================
-    ! calculate TKE vertrical mixing coefficients from CVMIX library
+    ! calculate TKE vertical mixing coefficients from CVMIX library
     subroutine calc_cvmix_tke
         
         integer       :: node, elem, nelem, nz, nln, elnodes(3), node_size
