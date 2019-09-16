@@ -184,14 +184,19 @@ def clim_vinterp(data_in,levels):
 #___DO VERTICAL INTERPOLATE AVERAGE OVER CERTAIN LAYERS_________________________
 #
 #_______________________________________________________________________________
-def clim_plot_anom(clim,figsize=[]):
+def clim_plot_anom(clim,figsize=[],do_subplot=[]):
     from set_inputarray import inputarray
     
     if len(figsize)==0 : figsize=[12,8]
     #___________________________________________________________________________
-    fig = plt.figure(figsize=figsize)
-    #fig.patch.set_alpha(0.0)
-    ax  = plt.gca()
+    # plot is not part of subplot
+    if len(do_subplot)==0:
+        fig = plt.figure(figsize=figsize)
+        ax  = plt.gca()
+    else:
+        fig=do_subplot[0]
+        ax =do_subplot[1]
+        fig.sca(ax)
     resolution = 'c'
     fsize = 12
     #+_________________________________________________________________________+
@@ -360,11 +365,28 @@ def clim_plot_anom(clim,figsize=[]):
     nstep = np.int(np.floor(nstep))
     if nstep==0: nstep=1
    
-    plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-    #plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
-    plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-    plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+    #plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+    ##plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
+    #plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+    #plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+    fig.canvas.draw() # this is need so cbar.ax.get_yticklabels() always finds the labels
+    if cbar.orientation=='vertical':
+        tickl = cbar.ax.get_yticklabels()
+    else:
+        tickl = cbar.ax.get_xticklabels()
     
+    idx = np.arange(0,len(tickl),1)
+    idxb = np.ones((len(tickl),), dtype=bool)                
+    idxb[idx_cref::nstep]  = False
+    idxb[idx_cref::-nstep] = False
+    idx = idx[idxb==True]
+    for ii in list(idx):
+        tickl[ii]=''
+    if cbar.orientation=='vertical':    
+        cbar.ax.set_yticklabels(tickl)
+    else:    
+        cbar.ax.set_xticklabels(tickl)
+        
     #______________________________________________________________________________+
     ax.tick_params(axis='both', direction='out')
     ax.get_xaxis().tick_bottom()   # remove unneeded ticks 

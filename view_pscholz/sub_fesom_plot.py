@@ -15,7 +15,7 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False ):
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False, which_orient='vertical' ):
     if do_output==True:
         print('')
         print('___PLOT 2D DATA____________________________________________')
@@ -350,7 +350,9 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     for im in ax.get_images():
         im.set_clim(clevel[0],clevel[-1])
     
-    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,extend='neither',extendrect=False,extendfrac=None)
+    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges, \
+                        extend='neither',extendrect=False,extendfrac=None,\
+                        orientation=which_orient)
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
     plt.setp(cl, fontsize=fsize)
@@ -365,10 +367,12 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
     
+    fig.canvas.draw() # this is need so cbar.ax.get_yticklabels() always finds the labels
     if cbar.orientation=='vertical':
         tickl = cbar.ax.get_yticklabels()
     else:
         tickl = cbar.ax.get_xticklabels()
+    
     idx = np.arange(0,len(tickl),1)
     idxb = np.ones((len(tickl),), dtype=bool)                
     idxb[idx_cref::nstep]  = False
