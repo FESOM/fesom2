@@ -117,7 +117,7 @@ subroutine thermodynamics
      fw      = 0.0_WP
      ehf     = 0.0_WP
      lid_Clo=h0
-     if (coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
+     if (geo_coord_nod2D(2,i)>0) then !TODO 2 separate pars for each hemisphere
        lid_clo=0.5_WP
      else
        lid_clo=0.5_WP
