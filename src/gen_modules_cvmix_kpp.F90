@@ -311,7 +311,7 @@ module g_cvmix_kpp
                 write(*,*) "     kpp_pp_loc_exp      = ", kpp_pp_loc_exp
             end if
             write(*,*) "     kpp_use_nonconstKvb = ", kpp_use_nonconstKvb
-            if (kpp_use_nonconstKvb ==.false.) then 
+            if (kpp_use_nonconstKvb .eqv. .false.) then 
                 write(*,*) "     kpp_Avbckg         = ", kpp_Avbckg
                 write(*,*) "     kpp_Kvbckg         = ", kpp_Kvbckg
             end if
@@ -687,7 +687,7 @@ module g_cvmix_kpp
             ! --> interpolate contribution that comes from shortwave penetration
             ! to the depth of the obldepth
             aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
-            if (use_sw_pene .and. kpp_use_fesomkpp==.True.) then
+            if (use_sw_pene .and. kpp_use_fesomkpp .eqv. .true.) then
                 aux_nz = int(kpp_nzobldepth(node))
                 ! take only penetrated shortwave radiation heatflux into account 
                 ! that reached until the obldepth --> do linear interpolation 
@@ -702,7 +702,7 @@ module g_cvmix_kpp
             ! MOM6 provides different option how buoyancy flux is influenced by 
             ! short wave penetration flux
             ! --> mxl comes closest to what FESOM1.4 was doing 
-            elseif (use_sw_pene .and. kpp_use_fesomkpp==.False.) then
+            elseif (use_sw_pene .and. kpp_use_fesomkpp .eqv. .false.) then
                 if     (trim(kpp_sw_method) == 'all')  then
                     aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node) 
                 elseif (trim(kpp_sw_method) == 'mxl')  then

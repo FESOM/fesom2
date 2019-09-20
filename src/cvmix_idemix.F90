@@ -110,7 +110,7 @@ if (present(tau_v)) then
   end if
   call idemix_put('tau_v', tau_v, idemix_userdef_constants)
 else
-  call idemix_put('tau_v',1.d0*86400.0 , idemix_userdef_constants)
+  call idemix_put('tau_v',1._cvmix_r8*86400.0 , idemix_userdef_constants)
 end if
 
 if (present(tau_h)) then
@@ -120,7 +120,7 @@ if (present(tau_h)) then
   end if
   call idemix_put('tau_h', tau_h, idemix_userdef_constants)
 else
-  call idemix_put('tau_h', 15.d0*86400.0, idemix_userdef_constants)
+  call idemix_put('tau_h', 15._cvmix_r8*86400.0, idemix_userdef_constants)
 end if
 
 if (present(gamma)) then
@@ -130,7 +130,7 @@ if (present(gamma)) then
   end if
   call idemix_put('gamma', gamma, idemix_userdef_constants)
 else
-  call idemix_put('gamma', 1.57d0, idemix_userdef_constants)
+  call idemix_put('gamma', 1.57_cvmix_r8, idemix_userdef_constants)
 end if
 
 if (present(jstar)) then
@@ -140,7 +140,7 @@ if (present(jstar)) then
   end if
   call idemix_put('jstar', jstar, idemix_userdef_constants)
 else
-  call idemix_put('jstar', 10.d0 , idemix_userdef_constants)
+  call idemix_put('jstar', 10._cvmix_r8 , idemix_userdef_constants)
 end if
 
 if (present(mu0)) then
@@ -150,7 +150,7 @@ if (present(mu0)) then
   end if
   call idemix_put('mu0', mu0, idemix_userdef_constants)
 else
-  call idemix_put('mu0', 4.d0/3.0 , idemix_userdef_constants)
+  call idemix_put('mu0', 4._cvmix_r8/3.0 , idemix_userdef_constants)
 end if
 
 if (present(handle_old_vals)) then
