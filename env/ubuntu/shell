@@ -1,0 +1,3 @@
+export FC=mpifort CC=mpicc CXX=mpicxx
+
+
