@@ -1,3 +1,4 @@
 export FC=mpifort CC=mpicc CXX=mpicxx
+export UBUNTU_BLAS_LIBRARY="libblas.a"
 
 

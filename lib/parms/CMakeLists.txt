@@ -15,7 +15,7 @@ target_include_directories(${PROJECT_NAME}
 	PRIVATE ${src_home}/src/../include ${src_home}/src/include
 	INTERFACE ${src_home}/src/../include
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE ${BLAS_C_LIBRARIES} libblas.a)
+target_link_libraries(${PROJECT_NAME} INTERFACE ${BLAS_C_LIBRARIES} $ENV{UBUNTU_BLAS_LIBRARY})
 if(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 	target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-div -no-prec-sqrt -fast-transcendentals -fp-model precise)
 endif()
