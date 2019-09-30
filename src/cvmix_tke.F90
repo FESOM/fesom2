@@ -134,7 +134,7 @@ if (present(c_k)) then
   end if
   call put_tke('c_k', c_k, tke_userdef_constants)
 else
-  call put_tke('c_k',0.1d0 , tke_userdef_constants)
+  call put_tke('c_k',0.1_cvmix_r8 , tke_userdef_constants)
 end if
 
 if (present(c_eps)) then
@@ -144,7 +144,7 @@ if (present(c_eps)) then
   end if
   call put_tke('c_eps', c_eps, tke_userdef_constants)
 else
-  call put_tke('c_eps', 0.7d0, tke_userdef_constants)
+  call put_tke('c_eps', 0.7_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(cd)) then
@@ -154,7 +154,7 @@ if (present(cd)) then
   end if
   call put_tke('cd', cd, tke_userdef_constants)
 else
-  call put_tke('cd', 3.75d0, tke_userdef_constants)
+  call put_tke('cd', 3.75_cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(alpha_tke)) then
@@ -164,7 +164,7 @@ if (present(alpha_tke)) then
   end if
   call put_tke('alpha_tke', alpha_tke, tke_userdef_constants)
 else
-  call put_tke('alpha_tke', 30.d0, tke_userdef_constants)
+  call put_tke('alpha_tke', 30._cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(mxl_min)) then
@@ -174,7 +174,7 @@ if (present(mxl_min)) then
   end if
   call put_tke('mxl_min', mxl_min, tke_userdef_constants)
 else
-  call put_tke('mxl_min', 1.d-8, tke_userdef_constants)
+  call put_tke('mxl_min', 1._cvmix_r8-8, tke_userdef_constants)
 end if
 
 if (present(KappaM_min)) then
@@ -184,7 +184,7 @@ if (present(KappaM_min)) then
   end if
   call put_tke('kappaM_min', KappaM_min, tke_userdef_constants)
 else
-  call put_tke('kappaM_min', 0.d0, tke_userdef_constants)
+  call put_tke('kappaM_min', 0._cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(KappaM_max)) then
@@ -194,7 +194,7 @@ if (present(KappaM_max)) then
   end if
   call put_tke('kappaM_max', KappaM_max, tke_userdef_constants)
 else
-  call put_tke('kappaM_max', 100.d0, tke_userdef_constants)
+  call put_tke('kappaM_max', 100._cvmix_r8, tke_userdef_constants)
 end if
 
 if (present(tke_mxl_choice)) then
@@ -224,7 +224,7 @@ if (present(tke_min)) then
   end if
   call put_tke('tke_min', tke_min, tke_userdef_constants)
 else
-  call put_tke('tke_min', 1.d-6, tke_userdef_constants)
+  call put_tke('tke_min', 1._cvmix_r8-6, tke_userdef_constants)
 end if
 
 if (present(tke_surf_min)) then
@@ -234,7 +234,7 @@ if (present(tke_surf_min)) then
   end if
   call put_tke('tke_surf_min', tke_surf_min, tke_userdef_constants)
 else
-  call put_tke('tke_surf_min', 1.d-4, tke_userdef_constants)
+  call put_tke('tke_surf_min', 1._cvmix_r8-4, tke_userdef_constants)
 end if
 
 if (present(use_ubound_dirichlet)) then

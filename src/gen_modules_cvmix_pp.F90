@@ -141,7 +141,7 @@ module g_cvmix_pp
         !                = PP_nu_zero/(1+PP_alpha*Ri)^(PP_exp+1) + 
         !                  PP_nu_b/(1+PP_alpha*Ri) +
         !                  PP_kappa_b
-        if (pp_use_fesompp .and. pp_use_AvbinKv==.false.) then
+        if (pp_use_fesompp .and. pp_use_AvbinKv .eqv. .false.) then
             ! ommit the term PP_nu_b/(1+PP_alpha*Ri) in kappa this can make an
             ! already diffusive model even more diffusive --> it was done in 
             ! FESOM1.4 like this. In this case set pp_Avbckg and pp_Kvbckg by
@@ -220,7 +220,7 @@ module g_cvmix_pp
             !                      -----------
             ! This can make an already diffusive model even more diffusive --> it 
             ! needs to be tested if this is an advantage for FESOM2.0 or not 
-            if (pp_use_fesompp .and. pp_use_AvbinKv==.false.) then
+            if (pp_use_fesompp .and. pp_use_AvbinKv .eqv. .false.) then
                  pp_Av(2:nln,node) = pp_Av(2:nln,node) + pp_Avbckg
                  pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
             end if  

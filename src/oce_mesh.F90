@@ -176,14 +176,14 @@ IMPLICIT NONE
             !___________________________________________________________________
             ! check if input mesh is already rotated --> force_rotation flag == .False.
             if (force_rotation .and. & 
-               (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
-                rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
+               (rbuff(n,1)>=xp-14.5 .and. rbuff(n,1)<=xp+14.5 .and. & 
+                rbuff(n,2)>=yp-14.5 .and. rbuff(n,2)<=yp+14.5)) then
                 flag_checkisrot = 1
             !___________________________________________________________________
             ! check if input mesh is already unrotated --> force_rotation flag ==.True.
             elseif ((.not. force_rotation) .and. & 
-               (rbuff(n,1)>=xp-2.5 .and. rbuff(n,1)<=xp+2.5 .and. & 
-                rbuff(n,2)>=yp-2.5 .and. rbuff(n,2)<=yp+2.5)) then
+               (rbuff(n,1)>=xp-14.5 .and. rbuff(n,1)<=xp+14.5 .and. & 
+                rbuff(n,2)>=yp-14.5 .and. rbuff(n,2)<=yp+14.5)) then
                 flag_checkmustrot = 0
             end if    
         end do
