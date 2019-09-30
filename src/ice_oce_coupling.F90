@@ -63,11 +63,7 @@ if (ice_update) then
      T_oc_array(n)=tr_arr(1,n,1)
      S_oc_array(n)=tr_arr(1,n,2)  
   end do
-  if ( .not. use_ALE ) then
-     elevation(:)= eta_n(:)
-  else
-     elevation(:)= hbar(:)
-  endif
+  elevation(:)= hbar(:)
 else
   do n=1, myDim_nod2d+eDim_nod2d    
      T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
@@ -75,11 +71,7 @@ else
 !NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
 !NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
   end do
-  if ( .not. use_ALE ) then
-     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+eta_n(:))/real(ice_steps_since_upd+1,WP)
-  else
-     elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
-  endif
+  elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
 endif
      do n=1, myDim_nod2d  
        uw=0.0_WP

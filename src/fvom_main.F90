@@ -109,7 +109,7 @@ real(kind=real32) :: runtime_alltimesteps
 
     !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
     !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
-    if (r_restart .and. use_ALE) then
+    if (r_restart) then
         call restart_thickness_ale
     end if
 

@@ -86,8 +86,6 @@ IMPLICIT NONE
 real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
 real(kind=WP)     :: dz
 integer           :: n, nz, nlev
-
-if (use_ALE) then
 DO n=1, myDim_nod2D+eDim_nod2D
    nlev=nlevels_nod2D(n)
    DO nz=2,  nlev-1
@@ -97,16 +95,4 @@ DO n=1, myDim_nod2D+eDim_nod2D
    tr_z(1,    n)=0.0_WP
    tr_z(nlev, n)=0.0_WP
 END DO
-else
-DO n=1, myDim_nod2D+eDim_nod2D
-     nlev=nlevels_nod2D(n)
-     DO nz=2, nlev-1
-        dz=0.5_WP*(Z(nz-1)-Z(nz))
-        tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
-     END DO
-     tr_z(1,    n)=0.0_WP
-     tr_z(nlev, n)=0.0_WP
-END DO
-end if
-
 END SUBROUTINE tracer_gradient_z

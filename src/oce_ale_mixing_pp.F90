@@ -30,33 +30,17 @@ real(kind=WP)         :: bulk_up, bulk_dn
 real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 
 	!___________________________________________________________________________
-	if(use_ALE) then
-		do node=1, myDim_nod2D+eDim_nod2D
-			!___________________________________________________________________
-			! implement changing ALE zlevel at every node in PP mxing 
-			do nz=2,nlevels_nod2d(node)-1
-				dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
-				shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
-						(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
-				shear = shear*dz_inv*dz_inv
+	do node=1, myDim_nod2D+eDim_nod2D
+		!___________________________________________________________________
+		! implement changing ALE zlevel at every node in PP mxing 
+		do nz=2,nlevels_nod2d(node)-1
+			dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
+			shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
+					(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
+			shear = shear*dz_inv*dz_inv
 				Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_WP)+1.0e-14)  ! To avoid NaNs at start
-			end do
 		end do
-		!_______________________________________________________________________
-		! PP mixing withour ALE
-	else
-		do node=1, myDim_nod2D+eDim_nod2D
-			!___________________________________________________________________
-			do nz=2,nlevels_nod2d(node)-1
-				dz_inv=1.0_WP/(Z(nz-1)-Z(nz))
-				shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
-						(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
-				shear = shear*dz_inv*dz_inv
-				Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_WP)+1.0e-14)  ! To avoid NaNs at start
-			end do
-		enddo
-	endif
-	
+	end do	
 	!___________________________________________________________________________
 	! add vertical mixing scheme of Timmermann and Beckmann, 2004,"Parameterization 
 	! of vertical mixing in the Weddell Sea!
@@ -64,42 +48,22 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 	! --> in FESOM1.4 refered as TB04 mixing scheme
 	if (use_ice .and. mo_on) then !stress is only partial!!
 		!_______________________________________________________________________
-		if(use_ALE) then
-			do node=1, myDim_nod2D+eDim_nod2D
-				!_______________________________________________________________
-				! calcualte monin obukov length
-				call mo_length(water_flux(node),heat_flux(node), &         
-								stress_atmoce_x(node),stress_atmoce_y(node), &    
-								u_ice(node),v_ice(node),a_ice(node), &                             
-								dt, mixlength(node))
-				!_______________________________________________________________
-				! increase vertical diffusion within monin obukov length to namelist
-				! parameter modiff. modiff in moment set to 0.01 --> that means 
+		do node=1, myDim_nod2D+eDim_nod2D
+			!_______________________________________________________________
+			! calcualte monin obukov length
+			call mo_length(water_flux(node),heat_flux(node), &         
+							stress_atmoce_x(node),stress_atmoce_y(node), &    
+							u_ice(node),v_ice(node),a_ice(node), &                             
+							dt, mixlength(node))
+			!_______________________________________________________________
+			! increase vertical diffusion within monin obukov length to namelist
+			! parameter modiff. modiff in moment set to 0.01 --> that means 
 				! very strong vertical mixing within mixlength
-				do nz = 2,nlevels_nod2d(node)-1
-					mo(nz,node) = 0._WP
-					if(abs(zbar_3d_n(nz,node)) <= mixlength(node)) mo(nz,node)=modiff    ! Potentialy bad place 
-				end do 
-			end do
-		!_______________________________________________________________________
-		else
-			do node=1, myDim_nod2D+eDim_nod2D
-				!_______________________________________________________________
-				! calcualte monin obukov length
-				call mo_length(water_flux(node),heat_flux(node), &         
-								stress_atmoce_x(node),stress_atmoce_y(node), &    
-								u_ice(node),v_ice(node),a_ice(node), &                             
-								dt, mixlength(node))
-				!_______________________________________________________________
-				! increase vertical diffusion within monin obukov length to namelist
-				! parameter modiff
-				do nz = 2,nlevels_nod2d(node)-1
-					mo(nz,node) = 0._WP
-					if(abs(zbar(nz)) <= mixlength(node)) mo(nz,node)=modiff    ! Potentialy bad place 
-				end do                                                        ! IF inside the internal cycle
-			end do
-		endif
-		
+			do nz = 2,nlevels_nod2d(node)-1
+				mo(nz,node) = 0._WP
+				if(abs(zbar_3d_n(nz,node)) <= mixlength(node)) mo(nz,node)=modiff    ! Potentialy bad place 
+			end do 
+		end do	
 		!_______________________________________________________________________
 		! viscosity
 		DO elem=1, myDim_elem2D
