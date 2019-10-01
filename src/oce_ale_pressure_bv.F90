@@ -49,68 +49,71 @@ subroutine pressure_bv
     !___________________________________________________________________________
     !_______________________________________________________________________
     do node=1, myDim_nod2D+eDim_nod2D
-        nl1= nlevels_nod2d(node)-1
-        rho      = 0.0_WP
-        bulk_0   = 0.0_WP 
-        bulk_pz  = 0.0_WP
-        bulk_pz2 = 0.0_WP
-        rhopot   = 0.0_WP
-        ! also compute the maximum buoyancy gradient between the surface and any depth
-        ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
-        db_max=0.0
-        
-        !___________________________________________________________________
-        ! apply equation of state
-        do nz=1, nl1
-            t=tr_arr(nz, node,1)
-            s=tr_arr(nz, node,2)
-            call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-        enddo
-        !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
-        !NR and did not vectorize the full loop. 
-        !___________________________________________________________________
-        ! calculate density
-        if (ldiag_dMOC) then
-            do nz=1, nl1
-                rho(nz)              = bulk_0(nz) - 2000.*(bulk_pz(nz)   -2000.*bulk_pz2(nz))
-                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200.)
-                        !           density_dmoc(nz,node)   = rhopot(nz)
-            end do
-        end if 
-        do nz=1, nl1
-           rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
-           rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
-           density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
-           rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
-           rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
-           density_m_rho0(nz,node) = rho(nz)
-           ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
-           ! --> bring density of surface point adiabatically to the same 
-           !     depth level as the deep point --> than calculate bouyancy 
-           !     difference
-           rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
-           rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-           dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
-!!PS       dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
-           db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
-        end do
-        dbsfc1(nl)=dbsfc1(nl1)
-        if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
-            dbsfc(1:nl, node )=dbsfc1(1:nl)
-        end if
-        !___________________________________________________________________
-        ! calculate pressure 
-        if (trim(which_ale)=='linfs') then
-!!PS    hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
-            hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
-            DO nz=2, nl1
-               ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
-               ! thickness of previouse layer and half layer thickness of actual 
-               ! layer to integrate pressure on mid depth level of actual layer
-               a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
-               hpressure(nz, node)=hpressure(nz-1, node)+a
-            END DO
+       nl1= nlevels_nod2d(node)-1
+       rho      = 0.0_WP
+       bulk_0   = 0.0_WP 
+       bulk_pz  = 0.0_WP
+       bulk_pz2 = 0.0_WP
+       rhopot   = 0.0_WP
+       ! also compute the maximum buoyancy gradient between the surface and any depth
+       ! it will be used for computing MLD according to FESOM 1.4 implementation (after Large et al. 1997)
+       db_max=0.0
+       !___________________________________________________________________
+       ! apply equation of state
+       do nz=1, nl1
+          t=tr_arr(nz, node,1)
+          s=tr_arr(nz, node,2)
+          call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+       enddo
+       !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
+       !NR and did not vectorize the full loop. 
+       !___________________________________________________________________
+       ! calculate density
+       if (ldiag_dMOC) then
+          do nz=1, nl1
+             rho(nz)              = bulk_0(nz) - 2000.*(bulk_pz(nz)   -2000.*bulk_pz2(nz))
+             density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200.)
+!            density_dmoc(nz,node)   = rhopot(nz)
+          end do
+       end if 
+       do nz=1, nl1
+          rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
+          rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
+          density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
+               
+          rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+          rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
+          density_m_rho0(nz,node) = rho(nz)
+                
+          ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
+          ! --> bring density of surface point adiabatically to the same 
+          !     depth level as the deep point --> than calculate bouyancy 
+          !     difference
+          rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
+          rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+          dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
+!!PS      dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
+          db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
+       end do
+       dbsfc1(nl)=dbsfc1(nl1)
+       if (mixing_kpp) then ! in case KPP is ON store the buoyancy difference with respect to the surface (m/s2)
+          dbsfc(1:nl, node )=dbsfc1(1:nl)
+       end if
+            
+       !___________________________________________________________________
+       ! calculate pressure 
+       if (trim(which_ale)=='linfs') then
+!!PS      hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
+          hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
+          DO nz=2, nl1
+             ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
+             ! thickness of previouse layer and half layer thickness of actual 
+             ! layer to integrate pressure on mid depth level of actual layer
+             a=0.5_WP*g*(rho(nz-1)*hnode(nz-1,node)+rho(nz)*hnode(nz,node))
+             hpressure(nz, node)=hpressure(nz-1, node)+a
+          END DO
         end if    
+            
         !___________________________________________________________________
         ! calculate mixed layer depth after Monterey and Levitus, (1997) who 
         ! compute MLD as the depth at which the density over depth differs 
@@ -145,26 +148,26 @@ subroutine pressure_bv
            ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 
            ! between the surface and any discrete depth within the water column.
            if (bvfreq(nz, node) > db_max .and. flag1) then
-               MLD1(node)    =Z_3d_n(nz, node)
-               MLD1_ind(node)=nz
-               flag1=.false.
+              MLD1(node)    =Z_3d_n(nz, node)
+              MLD1_ind(node)=nz
+              flag1=.false.
            end if
            ! another definition of MLD after Levitus
            if ((rhopot(nz)-rhopot(1) > sigma_theta_crit) .and. flag2) then
-                MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
-                MLD2_ind(node)=nz
-                flag2=.false.
+              MLD2(node)=MLD2(node)+(Z_3d_n(nz,node)-MLD2(node))/(rhopot(nz)-rhopot(nz-1)+1.e-20)*(rhopot(1)+sigma_theta_crit-rhopot(nz-1))
+              MLD2_ind(node)=nz
+              flag2=.false.
            elseif (flag2) then
-                   MLD2(node)=Z_3d_n(nz,node)
+              MLD2(node)=Z_3d_n(nz,node)
            end if
-        END DO
-        if (flag2) MLD2_ind(node)=nl1
-        bvfreq(1,node)=bvfreq(2,node)
-        bvfreq(nl1+1,node)=bvfreq(nl1,node) 
-        !___________________________________________________________________
-        ! The mixed layer depth 
-        ! mixlay_depth    
-        ! bv_ref
+       END DO
+       if (flag2) MLD2_ind(node)=nl1
+       bvfreq(1,node)=bvfreq(2,node)
+       bvfreq(nl1+1,node)=bvfreq(nl1,node) 
+       !___________________________________________________________________
+       ! The mixed layer depth 
+       ! mixlay_depth    
+       ! bv_ref
     end do
     !_______________________________________________________________________
     ! BV is defined on full levels except for the first and the last ones.
