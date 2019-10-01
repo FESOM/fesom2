@@ -2005,7 +2005,7 @@ subroutine oce_timestep_ale(n)
     end if
     
     !___________________________________________________________________________
-    call viscosity_filter(5)
+    call viscosity_filter(2)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
