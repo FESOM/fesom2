@@ -164,10 +164,11 @@ END DO
 
 end subroutine viscosity_filt2x
 !===========================================================================
-subroutine viscosity_filter(option)
+subroutine viscosity_filter(argument)
 use o_PARAM
 use g_PARSUP
 IMPLICIT NONE 
+integer      ::  argument
 integer      ::  option
 
 ! Driving routine 
@@ -178,8 +179,8 @@ integer      ::  option
 ! h_viscosity_leiht needs vorticity, so vorticity array should be 
 ! allocated. At present, there are two rounds of smoothing in 
 ! h_viscosity. 
- 
-if(option>4) then
+option=argument
+if(option>5) then
 option=2    ! default
 if(mype==0) write(*,*) 'Default horizontal viscosity option is used'  
 endif
@@ -210,6 +211,10 @@ if(option==4) then
 ! Biharmonic+upwind-type+ background 
 ! ===
 call viscosity_filt2xx(1)
+end if
+
+if(option==5) then
+call viscosity_filt_h_backscatter
 end if
 
 end subroutine viscosity_filter  
@@ -505,3 +510,260 @@ real(kind=WP), allocatable :: aux(:,:)
 	deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
+!A collection of viscosity routines
+!(i)          visc_filt_bh == biharmonic
+!(ii)         visc_filt_bh2== biharmonic, with less scale selective viscosity
+!(iii)        visc_filt_h  == harmonic 
+!(iv)         visc_filt_h_backscatter == harmonic, with backscatter (the least dissipative)
+!In qualitative terms, viscosity in (i) is as the Leith, and in the rest it is as 
+!the Smagorinsky. 
+!(a) In all cases except (iii) auxliary arrays are allocated/deallocated inside. 
+!May be they should be made static instead.  
+!(b) There are tuning parameters inside. They should go to namelist.
+!Poor-man-Backscatter does not bring a lot if added to the biharmonic operator,
+!presumably because we need more filtering.
+!
+!In test cases, using viscosity_h_backscatter I am able to return back with a factor 1.5,
+!but in the real world we have to start from 1.0 and see what we get.
+!
+!Important:  We do not need to call routines computing the Leith viscosity and velocity gradient.
+!This makes code faster. Do not forget this!
+! ===================================================================
+SUBROUTINE viscosity_filt_bh
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity Laplacian, i.e., on an analog of
+! the Leith viscosity (Lapl==second derivatives)
+! \nu=|3u_c-u_n1-u_n2-u_n3|*sqrt(S_c)/100. There is an additional term
+! in viscosity that is proportional to the velocity amplitude squared.
+! The coefficient has to be selected experimentally.
+real(kind=8)  :: u1, v1, vi, len
+integer       :: ed, el(2), nz
+real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+!
+!
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+ U_c=0.0_8
+ V_c=0.0_8
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     U_c(nz,el(1))=U_c(nz,el(1))-u1
+     U_c(nz,el(2))=U_c(nz,el(2))+u1
+     V_c(nz,el(1))=V_c(nz,el(1))-v1
+     V_c(nz,el(2))=V_c(nz,el(2))+v1
+    END DO 
+ END DO
+ 
+ Do ed=1,myDim_elem2D
+    len=sqrt(elem_area(ed))                     
+    len=len/100.0_8
+    Do nz=1,nlevels(ed)-1
+     ! vi has the sense of harmonic viscosity coef. because of 
+     ! division by area in the end 
+     vi=dt*max(sqrt(U_c(nz,ed)**2+V_c(nz,ed)**2), 5*(U_c(nz,ed)**2+V_c(nz,ed)**2))*len   
+     U_c(nz,ed)=-U_c(nz,ed)*vi                             
+     V_c(nz,ed)=-V_c(nz,ed)*vi
+    END DO
+ end do
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+     el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+     
+ deallocate(V_c,U_c)
+   
+end subroutine viscosity_filt_bh
+! ===================================================================
+SUBROUTINE viscosity_filt_bh2
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity differences, and is introduced symmetrically 
+! into both stages of biharmonic operator
+! On each edge, \nu=sqrt(|u_c1-u_c2|*sqrt(S_c1+S_c2)/100)
+! The effect is \nu^2
+! Quadratic in velocity term can be introduced if needed.
+real(kind=8)  :: u1, v1, vi, len
+integer       :: ed, el(2), nz
+real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+!
+!
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+ U_c=0.0_8
+ V_c=0.0_8
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    len=sqrt(sum(elem_area(el)))/100.0_8
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     vi=sqrt(len*sqrt(u1*u1+v1*v1))
+     u1=u1*vi
+     v1=v1*vi    
+     U_c(nz,el(1))=U_c(nz,el(1))-u1
+     U_c(nz,el(2))=U_c(nz,el(2))+u1
+     V_c(nz,el(1))=V_c(nz,el(1))-v1
+     V_c(nz,el(2))=V_c(nz,el(2))+v1
+    END DO 
+ END DO
+ 
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+     el=edge_tri(:,ed)
+     len=sqrt(sum(elem_area(el)))/100.0_8
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     vi=-dt*sqrt(len*sqrt(u1*u1+v1*v1))
+     u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+     
+ deallocate(V_c,U_c)
+   
+end subroutine viscosity_filt_bh2
+! ===================================================================
+SUBROUTINE viscosity_filt_h
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+
+real(kind=8)  :: u1, v1, le, vi 
+integer       :: nz, ed, el(2)
+ ! An analog of harmonic viscosity operator.  
+ ! The contribution from boundary edges is neglected (free slip).
+ !
+ ! The  viscosity coefficient \nu=|u_c1-u_c2|*le/30
+ !
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    le=sqrt(sum(elem_area(el)))/30.0_8
+    DO  nz=1,minval(nlevels(el))-1
+      u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+      v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+      vi=dt*sqrt(u1*u1+v1*v1)*le
+      u1=u1*vi
+      v1=v1*vi
+     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+end subroutine viscosity_filt_h
+! ===================================================================
+SUBROUTINE viscosity_filt_h_backscatter
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+
+real(kind=8)  :: u1, v1, le, vi 
+integer       :: nz, ed, el(2), nelem(3),k, elem
+real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
+ ! An analog of harmonic viscosity operator.
+ ! Same as visc_filt_h, but with the backscatter. 
+ ! Here the contribution from squared velocities is added to the viscosity.    
+ ! The contribution from boundary edges is neglected (free slip). 
+
+ ed=myDim_elem2D+eDim_elem2D
+ allocate(U_b(nl-1,ed), V_b(nl-1, ed))
+ ed=myDim_nod2D+eDim_nod2D
+ allocate(U_c(nl-1,ed), V_c(nl-1,ed))
+ U_b=0.0_8
+ V_b=0.0_8 
+ U_c=0.0_8
+ V_c=0.0_8
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    le=sqrt(sum(elem_area(el)))/35.0_8
+    DO  nz=1,minval(nlevels(el))-1
+      u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+      v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+      vi=dt*max(sqrt(u1*u1+v1*v1),10*(u1*u1+v1*v1))*le
+      u1=u1*vi
+      v1=v1*vi
+     U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
+     U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
+     V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+     V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+ call exchange_elem(U_b)
+ call exchange_elem(V_b)
+ ! ===========
+ ! Compute smoothed viscous term: 
+ ! ===========
+   DO ed=1, myDim_nod2D 
+    DO nz=1, nlevels_nod2D(ed)-1
+       vi=0.0_WP
+       u1=0.0_8
+       v1=0.0_WP
+       DO k=1, nod_in_elem2D_num(ed)
+           elem=nod_in_elem2D(k,ed)
+           vi=vi+elem_area(elem)
+           u1=u1+U_b(nz,elem)*elem_area(elem)
+           v1=v1+V_b(nz,elem)*elem_area(elem)
+        END DO
+	U_c(nz,ed)=u1/vi
+        V_c(nz,ed)=v1/vi
+    END DO
+    END DO
+  call exchange_nod(U_c)
+  call exchange_nod(V_c)
+  do ed=1, myDim_elem2D
+         nelem=elem2D_nodes(:,ed)
+         Do nz=1, nlevels(ed)-1
+         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -1.5_8*sum(U_c(nz,nelem))/3.0_8
+         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -1.5_8*sum(V_c(nz,nelem))/3.0_8 
+         END DO
+  end do
+ deallocate(V_c,U_c,V_b,U_b)
+end subroutine viscosity_filt_h_backscatter
+
+! ===================================================================
+
