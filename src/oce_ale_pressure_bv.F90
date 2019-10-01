@@ -47,7 +47,6 @@ subroutine pressure_bv
     endif
     
     !___________________________________________________________________________
-    if(use_ALE) then
         !_______________________________________________________________________
         do node=1, myDim_nod2D+eDim_nod2D
             nl1= nlevels_nod2d(node)-1
@@ -178,44 +177,6 @@ subroutine pressure_bv
             ! bv_ref
         end do
         !_______________________________________________________________________
-    else
-        do node=1, myDim_nod2D+eDim_nod2D
-            nl1= nlevels_nod2d(node)-1
-            !___________________________________________________________________
-            do nz=1, nl1
-                t=tr_arr(nz, node,1)
-                s=tr_arr(nz, node,2)
-                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
-                rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz))
-                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0
-            end do
-            
-            !___________________________________________________________________
-            ! Pressure
-            hpressure(1, node)=-Z(1)*rho(1)*g
-            DO nz=2, nl1
-                a=0.5_WP*g*(rho(nz-1)*(zbar(nz-1)-zbar(nz))+rho(nz)*(zbar(nz)-zbar(nz+1)))
-                hpressure(nz, node)=hpressure(nz-1, node)+a
-            END DO
-            
-            !___________________________________________________________________
-            ! BV frequency:  bvfreq(nl,:), squared value is stored   
-            DO nz=2,nl1
-                bulk_up = bulk_0(nz-1) + zbar(nz)*(bulk_pz(nz-1) + zbar(nz)*bulk_pz2(nz-1)) 
-                bulk_dn = bulk_0(nz)   + zbar(nz)*(bulk_pz(nz)   + zbar(nz)*bulk_pz2(nz))
-                rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1*zbar(nz))  
-                rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1*zbar(nz))  
-                dz_inv=1.0_WP/(Z(nz-1)-Z(nz))  
-                bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-            END DO
-            bvfreq(1,node)=bvfreq(2,node)
-            bvfreq(nl1+1,node)=bvfreq(nl1,node) 
-            !___________________________________________________________________
-            ! The mixed layer depth 
-            ! mixlay_depth    
-            ! bv_ref
-        end do
-    end if
     ! BV is defined on full levels except for the first and the last ones.
 end subroutine pressure_bv
 !
