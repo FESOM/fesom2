@@ -164,13 +164,11 @@ END DO
 
 end subroutine viscosity_filt2x
 !===========================================================================
-subroutine viscosity_filter(argument)
+subroutine viscosity_filter(option)
 use o_PARAM
 use g_PARSUP
 IMPLICIT NONE 
-integer      ::  argument
 integer      ::  option
-
 ! Driving routine 
 ! Background viscosity is selected in terms of Vl, where V is 
 ! background velocity scale and l is the resolution. V is 0.005 
@@ -179,44 +177,38 @@ integer      ::  option
 ! h_viscosity_leiht needs vorticity, so vorticity array should be 
 ! allocated. At present, there are two rounds of smoothing in 
 ! h_viscosity. 
-option=argument
-if(option>5) then
-option=2    ! default
-if(mype==0) write(*,*) 'Default horizontal viscosity option is used'  
-endif
 
-if(option==1) then 
-! ====
-! Laplacian+Leith parameterization + harmonic background
-! ====
-call h_viscosity_leith
-call viscosity_filtxx
-end if
-if(option==2) then
-! ===
-! Laplacian+Leith+biharmonic background
-! ===
-call h_viscosity_leith
-call viscosity_filtxxx
-end if
-if(option==3) then
-! ===
-! Biharmonic+Leith+ background 
-! ===
-call h_viscosity_leith
-call viscosity_filt2xx(2)
-end if
-if(option==4) then
-! ===
-! Biharmonic+upwind-type+ background 
-! ===
-call viscosity_filt2xx(1)
-end if
-
-if(option==5) then
-call viscosity_filt_h_backscatter
-end if
-
+SELECT CASE (option)
+CASE (1)
+     ! ====
+     ! Laplacian+Leith parameterization + harmonic background
+     ! ====
+     call h_viscosity_leith
+     call viscosity_filtxx
+CASE (2)
+     ! ===
+     ! Laplacian+Leith+biharmonic background
+     ! ===
+     call h_viscosity_leith
+     call viscosity_filtxxx
+CASE (3)
+     ! ===
+     ! Biharmonic+Leith+ background 
+     ! ===
+     call h_viscosity_leith
+     call viscosity_filt2xx(2)
+CASE (4)
+     ! ===
+     ! Biharmonic+upwind-type+ background 
+     ! ===
+     call viscosity_filt2xx(1)
+CASE (5)
+     call viscosity_filt_h_backscatter
+CASE DEFAULT
+     if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
+     call par_ex
+     stop
+END SELECT
 end subroutine viscosity_filter  
 ! ===================================================================
 SUBROUTINE viscosity_filtxx
@@ -720,7 +712,7 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
-    le=sqrt(sum(elem_area(el)))/35.0_8
+    le=sqrt(sum(elem_area(el)))/easy_bs_scale
     DO  nz=1,minval(nlevels(el))-1
       u1=UV(1,nz,el(1))-UV(1,nz,el(2))
       v1=UV(2,nz,el(1))-UV(2,nz,el(2))
@@ -758,8 +750,8 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
   do ed=1, myDim_elem2D
          nelem=elem2D_nodes(:,ed)
          Do nz=1, nlevels(ed)-1
-         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -1.5_8*sum(U_c(nz,nelem))/3.0_8
-         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -1.5_8*sum(V_c(nz,nelem))/3.0_8 
+         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_8
+         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_8 
          END DO
   end do
  deallocate(V_c,U_c,V_b,U_b)
