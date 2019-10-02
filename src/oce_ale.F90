@@ -2012,7 +2012,7 @@ subroutine oce_timestep_ale(n)
         call calc_cvmix_tidal
         
     end if  
-    
+    t1=MPI_Wtime()    
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     if(mom_adv/=3) then
