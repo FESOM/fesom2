@@ -265,7 +265,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   prec=rain+runo+snow*(1.0_WP-A)  	        ! m water/s
 
   ! snow fall above ice
-  hsn=hsn+snow*ice_dt*A*rhowat*inv_rhosno	! Add snow fall to temporary snow thickness    !!!
+  hsn=hsn+snow*ice_dt*A*1000.0_WP*inv_rhosno	! Add snow fall to temporary snow thickness    !!!
   dhsngrowth=hsn   		        ! Store snow thickness after snow fall 
 
   evap=evap*(1.0_WP-A)    		! m water/s
