@@ -119,90 +119,150 @@ subroutine fer_gamma2vel
    END DO
    call exchange_elem(fer_uv)
 end subroutine fer_gamma2vel
-!====================================================================
+!
+!
+!
+!===============================================================================
 subroutine init_Redi_GM!fer_compute_C_K_Redi
-  USE o_MESH
-  USE o_PARAM
-  USE o_ARRAYS, ONLY: fer_c, fer_k, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node, hnode_new
-  USE g_PARSUP
-  USE g_CONFIG
-  use g_comm_auto
-  IMPLICIT NONE
+    USE o_MESH
+    USE o_PARAM
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node, hnode_new, Z_3d_n
+    USE g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    IMPLICIT NONE
 
-   integer                         :: n, nz, nzmax
-   real(kind=WP)                          :: reso, c1, rosb, scaling, rr_ratio
-   real(kind=WP)                          :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
-   real(kind=WP)                          :: c_min=0.5, f_min=1.e-6, r_max=200000.
-   real(kind=WP)                          :: zscaling(nl)
-   real(kind=WP)                          :: bvref
+    integer          :: n, nz, nzmax
+    real(kind=WP)    :: reso, c1, rosb, scaling, rr_ratio, aux_zz(nl)
+    real(kind=WP)    :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
+    real(kind=WP)    :: c_min=0.5, f_min=1.e-6, r_max=200000.
+    real(kind=WP)    :: zscaling(nl)
+    real(kind=WP)    :: bvref
 
 ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
 !******************************* F1(x,y) ***********************************************************
-   DO n=1, myDim_nod2D
-      reso=mesh_resolution(n)
-      if (Fer_GM) then
-         c1=0._wp
-         nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
-         DO nz=1, nzmax-1
-            c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
-         END DO
-         c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
-         scaling=1._WP
-         !Cutoff K_GM depending on (Resolution/Rossby radius) ratio
-         if (scaling_Rossby) then
-            rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
-            rr_ratio=min(reso/rosb, 5._WP)
-            scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
-         end if
-         !Scale K_GM with resolution (referenced to 100,000m)
-         if (scaling_resolution) then
-            scaling=scaling*(reso/100000._WP)**2 !put to repo
-         end if
-         if (reso < 40000.0_WP) then
-            scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
-         end if
-         fer_k(1,n)=min(K_GM*scaling, 2000.0_WP) !put to repo
-         fer_k(1,n)=max(fer_k(1,n), 2.0_WP)      !put to repo
-         fer_c(n)=c1*c1                          !put to repo
-      end if
-      !note, Redi can be used without GM and vise versa!
-      ! if both are used it will be reset below
-      if (Redi) then
-         Ki(1,n)=K_hor*(reso/100000.0_WP)**2
-      end if
-   END DO
+    do n=1, myDim_nod2D
+        reso=mesh_resolution(n)
+        if (Fer_GM) then
+            c1=0._wp
+            nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
+            do nz=1, nzmax-1
+                c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
+            end do
+            c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
+            scaling=1._WP
+            
+            !___________________________________________________________________
+            ! Cutoff K_GM depending on (Resolution/Rossby radius) ratio
+            if (scaling_Rossby) then
+                rosb=min(c1/max(abs(coriolis_node(n)), f_min), r_max)
+                rr_ratio=min(reso/rosb, 5._WP)
+                scaling=1._WP/(1._WP+exp(-(rr_ratio-x0)/sigma))
+            end if
+            
+            !___________________________________________________________________
+            ! Scale K_GM with resolution (referenced to 100,000m)
+            if (scaling_resolution) then
+                scaling=scaling*(reso/100000._WP)**K_GM_resscalorder !put to repo
+            end if
+            if (reso < 40000.0_WP) then
+                scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
+            end if
+            
+            !___________________________________________________________________
+            ! apply KGM scaling paramter (K_GM_scal)
+            fer_scal(n) = min(scaling,1.0_WP)
+             ! set maximum amplitude to K_GM_max
+            fer_k(1,n)  = fer_scal(n)*K_GM_max
+            ! limit lower values to K_GM_min
+            fer_k(1,n)  = max(fer_k(1,n),K_GM_min)
+            fer_c(n)=c1*c1                          !put to repo
+        end if
+        
+        !_______________________________________________________________________
+        ! note, Redi can be used without GM and vise versa!
+        ! if both are used it will be reset below
+        if (Redi) then
+            Ki(1,n)=K_hor*(reso/100000.0_WP)**2
+        end if
+    end do
  
-   !Like in FESOM 1.4 we make Redi equal GM
-   if (Redi .and. Fer_GM) then
-      Ki(1,:)=fer_k(1,:)
-   end if
+    !Like in FESOM 1.4 we make Redi equal GM
+    if (Redi .and. Fer_GM) then
+        Ki(1,:)=fer_k(1,:)
+    end if
+   
 !******************************* F2(z) (e.g. Ferreira et al., 2005) *********************************
-   DO n=1,myDim_nod2D
-      nzmax=nlevels_nod2D(n)
-      ! Allpy vertical scaling after Ferreira et al.(2005)
-      if (scaling_Ferreira) then
-         bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
-         DO nz=1, nzmax
-            zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
-            zscaling(nz)=min(zscaling(nz), 1.0_WP)
-         END DO
-      else
-         zscaling=1.0_WP
-      end if
-      ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
-      if (scaling_FESOM14) then
-         !zscaling(1:MLD1_ind(n)+1)=0.0_WP
-         DO nz=1, nzmax
-            if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3) zscaling(nz)=0.0_WP
-         END DO
-      end if
-      if (Fer_GM) then
-         fer_k(:nzmax,n)=fer_k(1,n)*zscaling(1:nzmax)
-      end if
-      if (Redi) then
-         Ki(1:nzmax-1,n)  =Ki(1,n)*0.5*(zscaling(1:nzmax-1)+zscaling(2:nzmax))
-      end if
-   END DO
+!Ferreira, D., Marshall, J. and Heimbach, P.: Estimating Eddy Stresses by Fitting Dynamics to Observations Using a
+!Residual-Mean Ocean Circulation Model and Its Adjoint, Journal of Physical Oceanography, 35(10), 1891–
+!1910, doi:10.1175/jpo2785.1, 2005.
+
+    do n=1,myDim_nod2D
+        nzmax=nlevels_nod2D(n)
+        !_______________________________________________________________________
+        ! Allpy vertical scaling after Ferreira et al.(2005)
+        if (scaling_Ferreira) then
+            !___________________________________________________________________
+            ! choose reference buoyancy
+            if (K_GM_bvref==0) then
+                ! ferreira bvref value surface (original Ferreira)
+                bvref=max(bvfreq(1, n), 1.e-6_WP)
+            elseif (K_GM_bvref==1) then
+                ! ferreira bvref value bottom mixed layer (Dima)
+                bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
+            elseif (K_GM_bvref==2) then
+                ! ferreira bvref value mean over mixed layer
+                bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+            elseif (K_GM_bvref==3) then
+                ! ferreira bvref value depth weighted mean over mixed layer
+                aux_zz=0.0_WP
+                aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
+                bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)    
+            end if 
+            
+            !___________________________________________________________________
+            ! compute scaling with respect to reference buoyancy
+            do nz=1, nzmax
+                zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
+                zscaling(nz)=min(zscaling(nz), 1.0_WP)
+            end do
+        else
+            zscaling=1.0_WP
+        end if
+        
+        !_______________________________________________________________________
+        ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
+        if (scaling_FESOM14) then
+            !zscaling(1:MLD1_ind(n)+1)=0.0_WP
+            do nz=1, nzmax
+                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3) zscaling(nz)=0.0_WP
+            end do
+        end if
+      
+        !_______________________________________________________________________
+        ! do vertical Ferreira scaling and limiting for GM diffusivity
+        if (Fer_GM) then
+            ! start with index 2 to not alternate fer_k(1,n) which contains here 
+            ! the surface template for the scaling 
+            do nz=2, nzmax
+                fer_k(nz,n)=fer_k(1,n)*zscaling(nz)
+            end do 
+            ! after vertical Ferreira scaling is done also scale surface template
+            fer_k(1,n)=fer_k(1,n)*zscaling(1)
+        end if
+        
+        !_______________________________________________________________________
+        ! do vertical Ferreira scaling and limiting for Redi diffusivity
+        if (Redi) then
+            ! start with index 2 to not alternate fer_k(1,n) which contains here 
+            ! the surface template for the scaling 
+            do nz=2, nzmax-1
+                Ki(nz,n)= Ki(1,n)*0.5*(zscaling(nz)+zscaling(nz+1))
+            end do
+            ! after vertical Ferreira scaling is done also scale surface template
+            Ki(1,n)=Ki(1,n)*0.5*(zscaling(1)+zscaling(2))
+        end if
+   end do
 
    if (Fer_GM) call exchange_nod(fer_c)
    if (Fer_GM) call exchange_nod(fer_k)

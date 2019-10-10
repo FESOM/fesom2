@@ -62,7 +62,6 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
             elif which_moc=='imoc':
                 box_moc = [48.0,77.0,9.0,32.0]
                 in_elemidx=calc_basindomain(mesh,box_moc,do_output=do_output)    
-            
             #fig = plt.figure(figsize=[6,3])
             #plt.triplot(mesh.nodes_2d_xg,mesh.nodes_2d_yg,mesh.elem_2d_i[in_elemidx,:],linewidth=0.2)
             #plt.axis('scaled')
@@ -186,7 +185,14 @@ def calc_xmoc(mesh,data,dlat=1.0,do_onelem=True,do_output=True,which_moc='gmoc',
     #___________________________________________________________________________
     t2=time.time()
     if do_output==True: print(' --> total time:{:.3f} s'.format(t2-t1))
-        
+    
+    #___________________________________________________________________________
+    if which_moc=='pmoc':
+        # rotate mesh back to starting point
+        if mesh.focus!=0:
+           mesh.focus=0
+           mesh.fesom_grid_rot_r2g(str_mode='focus')
+    
     #___________________________________________________________________________
     # variable number of output fields if you also want to write out the basin limited domain index
     #if out_elemidx==True and which_moc!='gmoc':    
@@ -282,7 +288,7 @@ def plot_xmoc(lat, depth, moc, bottom=[], which_moc='gmoc',
     #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::nstep], visible=True)
     #plt.setp(cbar1.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
     #plt.show(block=False)    
-    
+    fig.canvas.draw()
     tickl = cbar1.ax.get_yticklabels()
     idx = np.arange(0,len(tickl),1)
     idxb = np.ones((len(tickl),), dtype=bool)                

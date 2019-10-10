@@ -1,19 +1,8 @@
 !
 !
 !===============================================================================
-! module interface to FESOM2.0 for the CVMIX IDEMIX extension for the calculation 
-! of hte internal wave energy and its dissipationof in Turbulent Kinetic Energy
-! vertical mixing scheme --> Its based on the module interface for MPIOM programed 
-! by Nils Brüggeman & Oliver Gutjahr, This module calls subroutines from the 
-! CVMix library 
-!
-! @see Olbers D., Eden C.:
-!       A Global Model for the Diapycnal Diffusivity Induced Internal Gravity Waves.
-!       J. Phys. Oceanogr., 43, 1759-1779. doi: 10.1175/JPO-D-12-0207.1, 2013.
-! @see Eden C., Czeschel L., Olbers D.:
-!       Towards Energetically Consistent Ocean Models. 
-!       J. Phys. Oceanogr., 44, 3160-3184, doi: 10.1175/JPO-D-13-0260.1, 2014.
-! written by Patrick Scholz, 10.05.2019
+! module interface to FESOM2.0 for the CVMIX TIDAL extension for the calculation 
+! tidal induces vertical mixing after Simmons et al. 2004
 module g_cvmix_tidal
     
     !___________________________________________________________________________

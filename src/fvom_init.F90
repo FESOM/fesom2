@@ -697,8 +697,31 @@ DO elem=1,elem2D
    if(elem_neighbors(j,elem)>0) elem1=elem1+1
    END DO
    if (elem1<2) then
-   write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
-   write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
+    write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
+    write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
+    if (mype==0) then 
+    write(*,*) '____________________________________________________________________'
+    write(*,*) ' ERROR: The mesh you want to partitioning contains triangles that'
+    write(*,*) '        have just one neighbor, this was OK for FESOM1.4 but not'
+    write(*,*) '        for FESOM2.0.                                           '
+    write(*,*) '                                                                '
+    write(*,*) '          #########################################             '
+    write(*,*) '          ################### o ###################             '
+    write(*,*) '          ################# ./|\. #################             '
+    write(*,*) '              Land    ### ./|||||\. ###    Land                 '
+    write(*,*) '          ############## /|||||||||\ ##############             '
+    write(*,*) '          --o-----------o-----------o-----------o--             '
+    write(*,*) '          ./ \.       ./ \.       ./ \.       ./ \.             '
+    write(*,*) '               \.   ./     \.   ./     \.   ./                  '
+    write(*,*) '                 \ /         \ /         \ /                    '
+    write(*,*) '            ------o-----------o-----------o-------              '
+    write(*,*) '                ./ \.       ./ \.       ./ \.                   '
+    write(*,*) '                                                                '
+    write(*,*) '        Take a programm of your choice (Python, Matlab ...) and '
+    write(*,*) '        eliminate these triangles and the corresponding         '
+    write(*,*) '        unconnected vertice and try to re-partitioning again    '
+    write(*,*) '____________________________________________________________________'
+    end if 
    STOP
    end if
 END DO    
