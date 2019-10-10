@@ -53,6 +53,15 @@ subroutine solve_tracers_ale
         Wvel  =Wvel  -fer_Wvel
     end if
     
+    ! to avoid crash with high salinities when coupled to atmosphere
+	where (tr_arr(:,:,2) > 45.)
+           tr_arr(:,:,2)=45.
+    end where
+
+	where (tr_arr(:,:,2) < 3. )
+           tr_arr(:,:,2)=3.
+    end where
+
 end subroutine solve_tracers_ale
 !
 !

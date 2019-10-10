@@ -32,6 +32,9 @@ real(kind=WP)                 :: Smag_c=0.0_WP  ! 0.2   ! (C/pi)^2
 real(kind=WP)                 :: Abh0=8.0e12    ! 
 logical                       :: laplacian=.false.
 logical                       :: biharmonic=.true.
+integer                       :: visc_option=5
+real(kind=WP)                 :: easy_bs_scale=35.
+real(kind=WP)                 :: easy_bs_return=1.5
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -77,7 +80,6 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
 integer                       :: tracer_adv=1
-
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_exp_max=1.e-5_WP
 
@@ -134,7 +136,9 @@ character(20)                  :: which_pgf='shchepetkin'
  NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
-                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf
+                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return
+
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
 END MODULE o_PARAM  

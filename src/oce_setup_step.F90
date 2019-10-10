@@ -12,38 +12,31 @@ use g_cvmix_kpp
 use g_cvmix_tidal
 IMPLICIT NONE
 
-    if (use_ALE) then
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
     ! otherwise we set the reference salinity to zero
-        if ( .not. trim(which_ALE)=='linfs') then
-            use_virt_salt=.false.
-            ! this will force the virtual saltinity flux to be zero
-            ref_sss_local=.false.
-            ref_sss=0._WP
-            is_nonlinfs = 1.0_WP
-        else
-            use_virt_salt=.true.
-            is_nonlinfs = 0.0_WP
-        end if
+    if ( .not. trim(which_ALE)=='linfs') then
+        use_virt_salt=.false.
+        ! this will force the virtual saltinity flux to be zero
+        ref_sss_local=.false.
+        ref_sss=0._WP
+        is_nonlinfs = 1.0_WP
+    else
+        use_virt_salt=.true.
+        is_nonlinfs = 0.0_WP
     end if
     call array_setup
     
     !___________________________________________________________________________
     ! initialize arrays for ALE
-    if(use_ALE) then
-        if(mype==0) then
-            write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
-            write(*,*)
-        end if
-        call init_ale
-        call init_stiff_mat_ale !!PS test
-    else
-        call stiff_mat
-    end if    
-        
+    if (mype==0) then
+       write(*,*) '____________________________________________________________'
+       write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
+       write(*,*)
+    end if
+    call init_ale
+    call init_stiff_mat_ale !!PS test        
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
@@ -132,22 +125,19 @@ IMPLICIT NONE
          
     !___________________________________________________________________________
     ! first time fill up array for hnode & helem
-    if(use_ALE) then
-        if(mype==0) then
-                write(*,*) '____________________________________________________________'
-                write(*,*) ' --> call init_thickness_ale'
-                write(*,*)
-        end if
-        call init_thickness_ale
-    end if     
-
-	 if(mype==0) write(*,*) 'Initial state'
-if (w_split .and. mype==0) then
-	write(*,*) '******************************************************************************'
-	write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-	write(*,*) 'maximum explicit W is set to: ', w_exp_max
-	write(*,*) '******************************************************************************'
-end if
+    if (mype==0) then
+        write(*,*) '____________________________________________________________'
+        write(*,*) ' --> call init_thickness_ale'
+        write(*,*)
+    end if
+    call init_thickness_ale
+    if(mype==0) write(*,*) 'Initial state'
+    if (w_split .and. mype==0) then
+        write(*,*) '******************************************************************************'
+        write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
+        write(*,*) 'maximum explicit W is set to: ', w_exp_max
+        write(*,*) '******************************************************************************'
+    end if
 end subroutine ocean_setup
 
 !==========================================================

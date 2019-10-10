@@ -387,7 +387,11 @@ do shortstep=1, evp_rheol_steps
       
          U_ice(n) = det*(r_a*rhsu +r_b*rhsv)
          V_ice(n) = det*(r_a*rhsv -r_b*rhsu)
-      endif
+      else  ! Set velocities to 0 if ice is absent 
+         U_ice(n) = 0.0_WP
+         V_ice(n) = 0.0_WP
+      end if
+
    end do
    DO  ed=1,myDim_edge2D
    ! boundary conditions

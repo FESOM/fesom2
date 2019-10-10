@@ -1,18 +1,23 @@
 &nml_listsize
 io_listsize=100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 /
+# for sea ice related variables use_ice should be true, otherewise there will be no output
+# for 'curl_surf' to work lcurt_stress_surf must be .true. otherwise no output
+# for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
+# 'otracers' - all other tracers if applicable
+# for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
 &nml_list
-io_list =  'sst       ',1, 'm', 4, 
+io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
-	   'ssh       ',1, 'm', 4, 	
+    	   'ssh       ',1, 'm', 4,
            'vve_5     ',1, 'm', 4,
-           'uice      ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'vice      ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'a_ice     ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'm_ice     ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'thdgr     ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'thdgrsn   ',1, 'm', 4, !use_ice must be .true. otherwise no output
-           'm_snow    ',1, 'm', 4, !use_ice must be .true. otherwise no output
+           'uice      ',1, 'm', 4,
+           'vice      ',1, 'm', 4,
+           'a_ice     ',1, 'm', 4,
+           'm_ice     ',1, 'm', 4,
+           'thdgr     ',1, 'm', 4,
+           'thdgrsn   ',1, 'm', 4,
+           'm_snow    ',1, 'm', 4,
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
            'fh        ',1, 'm', 4,
@@ -28,11 +33,11 @@ io_list =  'sst       ',1, 'm', 4,
            'prec      ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
-           'curl_surf ',1, 'm', 4, !lcurt_stress_surf must be .true. otherwise no output
-           'fer_C     ',1, 'm', 4, !Fer_GM must be .true. otherwise no output
+           'curl_surf ',1, 'm', 4,
+           'fer_C     ',1, 'm', 4,
            'temp      ',1, 'y', 4,
            'salt      ',1, 'y', 4,
-           'otracers  ',1, 'y', 4, !all other tracers if applicable
+           'otracers  ',1, 'y', 4,
            'slope_x   ',1, 'y', 4,
            'slope_y   ',1, 'y', 4,
            'slope_z   ',1, 'y', 4,
@@ -42,12 +47,10 @@ io_list =  'sst       ',1, 'm', 4,
            'v         ',1, 'y', 4,
            'w         ',1, 'y', 4,
            'Av        ',1, 'y', 4,
-           'bolus_u   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
-           'bolus_v   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
-           'bolus_w   ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
-           'fer_K     ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
-	   'kpp_obldepth',1, 'm', 4, !KPP must be used otherwise no output
-           'kpp_sbuoyflx',1, 'm', 4, !KPP must be used otherwise no output
-           'fer_K     ',1, 'y', 4, !Fer_GM must be .true. otherwise no output
-           'dMOC      ',1, 'y', 4, !ldiag_dMOC must be .true. otherwise no output
+           'bolus_u   ',1, 'y', 4,
+           'bolus_v   ',1, 'y', 4,
+           'bolus_w   ',1, 'y', 4,
+	       'kpp_obldepth',1, 'm', 4,
+           'kpp_sbuoyflx',1, 'm', 4,
+           'dMOC      ',1, 'y', 4,
 /
