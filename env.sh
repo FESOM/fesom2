@@ -37,6 +37,8 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[  $LOGINHOST =~ \.jureca$ ]]; then
    STRATEGY="jureca"
+elif [[  $LOGINHOST = ubuntu ]]; then
+   STRATEGY="ubuntu"
 elif [[  $LOGINHOST =~ ^juwels[0-9]+\.fz\-juelich\.de$ ]]; then
    STRATEGY="juwels"
 else

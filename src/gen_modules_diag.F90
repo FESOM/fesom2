@@ -327,6 +327,7 @@ subroutine diag_densMOC(mode)
   implicit none
   integer, intent(in)                 :: mode
   integer                             :: nz, snz, elem, nzmax, elnodes(3), is, ie, pos
+  integer                             :: jj
   real(kind=WP), save                 :: dd
   real(kind=WP)                       :: uvdz_el(2), rhoz_el, dz, weight, dmin, dmax, ddiff, test, test1, test2, test3
   real(kind=WP), save, allocatable    :: dens(:), aux(:)
@@ -374,8 +375,23 @@ subroutine diag_densMOC(mode)
      do nz=nzmax-1,1,-1
         dmin=minval(dens(nz:nz+1))
         dmax=maxval(dens(nz:nz+1))
-        is=findloc(std_dens > dmin, value=.true., dim=1)
-        ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+!       is=findloc(std_dens > dmin, value=.true., dim=1)
+	is=1
+        do jj = 1, std_dens_N
+           if (std_dens(jj) > dmin) then
+              is = jj
+              exit
+           endif
+        end do
+
+!       ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+	ie=std_dens_N
+        do jj = std_dens_N,1,-1
+           if (std_dens(jj) < dmin) then
+              ie = jj
+              exit
+           endif
+        end do
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
         uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)

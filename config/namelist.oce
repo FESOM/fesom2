@@ -11,6 +11,9 @@ Leith_c=.05	       ! The strength of the Leith viscosity
 tau_c= 0.              ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
 Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
 biharmonic=.false.     ! Use biharmonic viscosity
+visc_option=5          ! 2=Laplacian+Leith+biharmonic background; 5=easy backscatter;
+easy_bs_scale = 35.     ! area scaling, to be used with visc_option=5 (easy backscatter)
+easy_bs_return= 1.5     ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
 Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s
 scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
 mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.

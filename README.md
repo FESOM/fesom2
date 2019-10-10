@@ -6,11 +6,9 @@ Multi-resolution ocean general circulation model that solves the equations of mo
 Documentation
 =============
 
-[Quick Start (HOWTO.run)](HOWTO.run)
+[Basic tutorial](https://fesom2.readthedocs.io/en/latest/getting_started/getting_started.html)
 
-[Basic tutorial](/docs/README.md)
-
-[Convert grid to netCDF that CDO understands](/docs/convert_grid_to_nc.md)
+[Documentation](https://fesom2.readthedocs.io/en/latest/index.html)
 
 References
 ==========
