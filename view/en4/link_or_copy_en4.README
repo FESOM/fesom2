@@ -1,0 +1,12 @@
+Pyfesom can read a seasonal or monthly climatology. However the file is too big to distribute it via our git repository (~700mb)
+If you want to use it, copy or link one of the follwing files to this folder:
+
+ollie@AWI: 
+/work/ollie/jstreffi/postprocessing/climatologies/en4_monthly.nc
+
+mistral@DKRZ: 
+/mnt/lustre01/work/ba1035/a270092/postprocessing/climatologies/en4_monthly.nc
+
+jewels@JSC: 
+/p/project/chhb19/jstreffi/postprocessing/climatologies/en4_monthly.nc
+
