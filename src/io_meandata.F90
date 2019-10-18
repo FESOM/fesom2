@@ -275,6 +275,10 @@ CASE ('fer_K     ')
     if (Fer_GM) then
     call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_K',     'GM, stirring diff.','m2/s',  fer_k(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
     end if
+CASE ('fer_scal  ')
+    if (Fer_GM) then
+    call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_scal',  'GM surface scaling','',  fer_scal(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision)
+    end if
 CASE ('dMOC      ')
     if (ldiag_dMOC) then
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'U_rho_x_DZ',     'fluxes for density MOC', 'fluxes', std_dens_UVDZ(1,:,:),   1, 'm', i_real4)
