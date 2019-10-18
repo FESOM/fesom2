@@ -165,8 +165,22 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
             if (scaling_resolution) then
                 scaling=scaling*(reso/100000._WP)**K_GM_resscalorder !put to repo
             end if
-            if (reso < 40000.0_WP) then
-                scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
+            
+            !___________________________________________________________________
+            ! resolution ramp function for the switch off of GM 
+            ! default: 
+            !     ^GM_scaling
+            !   1-|           .-----------
+            !     |         ./ |
+            !     |       ./   |
+            !   0-|------/-----|-------------->Resolution
+            !            |     |
+            !           30km   40km (FESOM1.4/2.0 default, MPAS: 20km...30km )
+!!PS             if (reso < 40000.0_WP) then
+!!PS                 scaling=scaling*max((reso/10000.0_WP-3.0_WP), 0._WP) !no GM below 30km resolution
+!!PS             end if
+            if (reso/1000.0_WP < K_GM_rampmax) then
+                scaling=scaling*max((reso/1000.0_WP-K_GM_rampmin)/(K_GM_rampmax-K_GM_rampmin), 0._WP) !no GM below 30km resolution
             end if
             
             !___________________________________________________________________

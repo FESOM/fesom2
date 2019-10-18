@@ -382,7 +382,8 @@ USE g_ic3d
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-  if(mype==0) write(*,*) 'read T/S climatology', trim(OceClimaDataName)
+  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
+  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
   call do_ic3d
   Tclim=tr_arr(:,:,1)
   Sclim=tr_arr(:,:,2)

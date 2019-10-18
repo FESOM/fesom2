@@ -49,11 +49,9 @@ e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for variables of ice model
  allocate(u_ice(n_size), v_ice(n_size))
- if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size)) 
  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
- if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
@@ -95,13 +93,7 @@ e_size=myDim_elem2D+eDim_elem2D
  rhs_mdiv=0.0_WP
  rhs_adiv=0.0_WP
  rhs_msdiv=0.0_WP
-if (use_means) then
- m_ice_mean=0.0_WP
- a_ice_mean=0.0_WP
- m_snow_mean=0.0_WP
- U_ice_mean=0.0_WP
- V_ice_mean=0.0_WP
-endif
+
 
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere

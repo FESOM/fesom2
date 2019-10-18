@@ -23,9 +23,12 @@ w_split=.false.
 w_exp_max=1.e-3
 SPP=.false.                 ! Salt Plume Parameterization
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
-K_GM_max   =3000.           ! max. GM thickness diffusivity (m2/s)
-K_GM_min   =2.              ! max. GM thickness diffusivity (m2/s)
-K_GM_bvref =2               ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_max     = 3000.0       ! max. GM thickness diffusivity (m2/s)
+K_GM_min     = 2.0          ! max. GM thickness diffusivity (m2/s)
+K_GM_bvref   = 2            ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_rampmax = 40.0         ! Resol >K_GM_rampmax[km] GM on
+K_GM_rampmin = 30.0         ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
+
 scaling_Ferreira   =.true.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
 scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
 scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
