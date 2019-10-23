@@ -216,12 +216,11 @@ if [ ${chain_id} -lt ${chain_n} ] && [ ${err_srun} -eq 0 ]; then
             -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e
 fi
 
-
 #___CHECK FOR COMPLETNES________________________________________________________
 # check if complete cycle is finished only than increase chain_id
 aux_yr_clock=$(<${dname_result_link}/fesom.clock) 
 aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
-if [ $aux_yr_clock -gt $year_e ]; then
+if [ $aux_yr_clock -gt $year_e ] && [ ${chain_id} -lt ${chain_n} ] ; then
     chain_id=$(( $chain_id + 1 ))
     echo $chain_id > file_chain_id
 fi
