@@ -1,0 +1,226 @@
+#!/bin/bash
+#___SET SLURM OPTIONS___________________________________________________________
+#SBATCH -J chain
+#SBATCH -p mpp
+#SBATCH --ntasks=432
+#SBATCH --time=10:00:00
+#SBATCH --mail-type=END
+#SBATCH --mail-user=Patrick.Scholz@awi.de
+#SBATCH -o fesom2.0_%x_%j.out
+#SBATCH -e fesom2.0_%x_%j.out
+
+#___INPUT_______________________________________________________________________
+# how many job chains should be applied
+chain_n=3 # number chain cycles
+chain_s=1 # starting chain id
+
+# time frame of model simulation 
+year_s=1948
+year_e=2009
+
+#___HELP OUTPUT_________________________________________________________________
+function usage {
+    echo "usage: $0 [-cn ...] [-cs ...] [-ys ...] [-ye ...] [-wcl ...]"
+    echo "  -cn     number of chain cylces (default: 3)"
+    echo "  -cs     starting chain id (default: 1)"
+    echo "  -ys     starting year of model simulation (default: 1948)"
+    echo "  -ye     ending year of model simulation   (default: 2009)"
+    echo "  -h      display help"
+    echo 
+    echo " --> for changing the wall-clock-time interactively use    "
+    echo "     sbatch --time=00:10:00 job_ollie_chain.ll ..."
+    echo " --> for changing the number of task interactively use    "
+    echo "     sbatch --ntask=288 job_ollie_chain.ll ..."
+    echo " --> for changing the job name interactively use    "
+    echo "     sbatch --job-name=whatever job_ollie_chain.ll ..."
+    exit 1
+}
+
+#___OVERRIDE DEFAULT INPUT BY COMMANDLINE INPUT_________________________________
+while [ "$1" != "" ]; do
+    case $1 in
+        -cn | -chain_n )  shift ; chain_n=$1 ;;
+        -cs | -chain_s )  shift ; chain_s=$1 ;;
+        -ys | -year_s  )  shift ; year_s=$1  ;;
+        -ye | -year_e  )  shift ; year_e=$1  ;;
+        -h  | --help   )  usage ; exit       ;;
+    esac
+    shift
+done
+
+#___EXTRACT WALL-CLOCK-TIME FROM JOBINFO________________________________________
+# either setted via #SBATCH time=... or at command line sbatch --time=... job_ollie_chain.ll
+# need here to extract to give the next job chain cycle as input
+jobinfo=$(scontrol show job $SLURM_JOB_ID)
+wcl=$( echo ${jobinfo##*TimeLimit=} | cut -d " " -f 1 )
+echo -e "\033[33m --> found wall-clock-time = $wcl \033[0m"
+ntasks=$( echo ${jobinfo##*NumTasks=} | cut -d " " -f 1 )
+echo -e "\033[33m --> found ntask = $ntasks \033[0m"
+
+#___SET NAMELIST'S & EXECUTABLE IF NOT ALREADY EXIST____________________________
+set -x
+ulimit -s unlimited
+ln -s ../bin/fesom.x             .           # cp -n ../bin/fvom_ini.x
+cp -n ../config/namelist.config  .
+cp -n ../config/namelist.forcing .
+cp -n ../config/namelist.oce     .
+cp -n ../config/namelist.ice     .
+
+#___SET CHAIN_ID________________________________________________________________
+if [ -f "file_chain_id" ]; then
+    chain_id=$(<file_chain_id)
+    echo -e  "\033[33m --> found file file_chain_id: with index $chain_id \033[0m"
+else 
+    chain_id=${chain_s}
+    echo $chain_id > file_chain_id
+    echo -e "\033[33m --> no file file_chain_id, initialize with index $chain_id \033[0m"
+fi
+
+#___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
+# extract resultpath from namelist.config
+dname_result_link_orig=$(grep "ResultPath=" namelist.config | grep -v '^!' | \
+                         cut -d "=" -f 2 | \
+                         cut -d "'" -f 2)
+dname_result_link=$(echo ${dname_result_link_orig::-1})
+
+# identify higher directory 
+dname_result="$(dirname "$dname_result_link")/"
+
+# check if in namelist.config a chain path is given (that mean .../chain/)if not 
+# change namelist.config accordingly
+check=$(echo $dname_result_link | grep -oP "^$dname_result\K.*")
+if [ $check != "chain" ]; then
+    echo -e "\033[33m --> replace in namelist.config ResultPath with chain path \033[0m"
+    dname_result_link="${dname_result}chain"
+    sed -i "s|${dname_result_link_orig}|${dname_result_link}/|g" namelist.config
+fi
+
+# identify real path in case a link is used
+dname_result="$(realpath "$dname_result")/"
+
+# if directory for chain_id doesn't exist --> create it 
+if [ ! -d "${dname_result}/${chain_id}" ]; then 
+    echo -e "\033[33m --> chain_id directory does not exist --> will create it \033[0m"
+    mkdir "${dname_result}/${chain_id}" 
+fi
+
+# link directory of chain_id with original linkdirectory from namelist.config
+ln -sfn ${dname_result}${chain_id} $dname_result_link
+
+#___CHECK IF SIMULATION NEEDS TO BE CONTINUED___________________________________
+is_newsimul=1
+if [ -f "$dname_result_link/fesom.clock" ] ; then
+    aux_yr_clock=$(<${dname_result_link}/fesom.clock) 
+    aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
+    if [ $aux_yr_clock -le $year_e ]; then is_newsimul=0 ; fi
+    
+    #___________________________________________________________________________
+    if [ $is_newsimul -eq 0 ] ; then
+        year_d=$(( $year_e - $aux_yr_clock + 1 ))
+        rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+        if  [ $rlen -ne $year_d ] ; then 
+            sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+        fi
+    fi
+else
+    #___________________________________________________________________________
+    # set model run length in job_script and change namelist.config accordingly 
+    # to match
+    year_d=$(( $year_e - $year_s + 1 ))
+    rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+    if  [ $rlen -ne $year_d ] ; then 
+        sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+    fi  
+fi
+
+#___CREATE CLOCK & RESTART INFRASTRUCTURE FOR COLD/WARM START___________________
+# only touch clock file when a new simulation is supposed to start, if an old one
+# should be continued dont touch it 
+if [ $is_newsimul -eq 1 ] ; then
+    
+    # --> make cold start 
+    if [ $chain_id -eq 1 ] ; then
+        # if no fesom.clock file exist create one 
+        if [ ! -f "$dname_result_link/fesom.clock" ]; then 
+            echo -e "\033[33m --> create cold start clock file \033[0m"
+            printf "0 1 ${year_s}\n0 1 ${year_s}" > $dname_result_link/fesom.clock
+        fi    
+        
+        # in case yearnew in namelist.config was changed from 1948
+        yearnew=$(grep "yearnew=" namelist.config | cut -d "=" -f 2)
+        if [ $yearnew -ne $year_s ]; then 
+            sed -i " s/yearnew=$yearnew/yearnew=$year_s/" namelist.config
+        fi
+        
+    # --> make warm start 
+    else
+        #_______________________________________________________________________
+        # create warm start clock file 
+        stepperday=$(grep "step_per_day=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        aux_sec=$(( 86400 - 86400 / $stepperday )) 
+        aux_day=365
+        aux_yr=$(( $year_s - 1 )) 
+        echo -e "\033[33m --> create warm start clock file \033[0m"
+        printf "${aux_sec} ${aux_day} ${aux_yr}\n0 1 ${year_s}" > $dname_result_link/fesom.clock
+        
+        #_______________________________________________________________________
+        # chain id from previous spinup cycle 
+        prev_chain_id=$(( $chain_id - 1 ))
+        
+        #_______________________________________________________________________
+        # copy restart ocean files from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart.nc
+        if [ ! -f "$prev_rfile" ]; then
+            echo -e "\033[1;31m --> ERROR: could not find ocean restart file \033[0m"
+            exit
+        else
+            echo -e "\033[33m --> create ocean warm start files \033[0m"
+            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.oce.restart.nc
+        fi
+        # copy restart ice files from previous spinup cycle 
+        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart.nc
+        if [ ! -f "$prev_rfile" ]; then
+            echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
+            exit
+        else
+            echo -e "\033[33m --> create ice warm start files \033[0m"
+            cp $prev_rfile $dname_result_link/fesom.${aux_yr}.ice.restart.nc
+        fi
+        
+        #_______________________________________________________________________
+        # adapt year new in namelist.config otherwise fesom is not doing a 
+        # restart
+        sed -i " s/yearnew=1948/yearnew=$aux_yr/" namelist.config
+    fi 
+fi
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2.0_${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+srun --mpi=pmi2 ./fesom.x >> ${fname}
+err_srun=$?
+echo -e "\033[33m --> err_srun=${err_srun} \033[0m"
+date
+
+#___SETUP JOBCHAIN______________________________________________________________
+# setup next chain job via dependence
+if [ ${chain_id} -lt ${chain_n} ] && [ ${err_srun} -eq 0 ]; then
+    # aftercorr:job_id --> A task of this job array can begin execution after 
+    # the corresponding task ID in the specified job has completed successfully 
+    # (ran to completion with an exit code of zero). 
+    echo -e "\033[33m --> setup next chain cycle \033[0m"
+    sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID job_ollie_chain.ll \
+            -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e
+fi
+
+#___CHECK FOR COMPLETNES________________________________________________________
+# check if complete cycle is finished only than increase chain_id
+aux_yr_clock=$(<${dname_result_link}/fesom.clock) 
+aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
+if [ $aux_yr_clock -gt $year_e ] && [ ${chain_id} -lt ${chain_n} ] ; then
+    chain_id=$(( $chain_id + 1 ))
+    echo $chain_id > file_chain_id
+fi
