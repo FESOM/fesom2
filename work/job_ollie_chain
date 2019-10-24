@@ -133,6 +133,13 @@ else
     fi  
 fi
 
+#___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________________
+if [ $chain_id -eq 1 ] && [ $is_newsimul -eq 1 ]; then
+    cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
+       namelist.cvmix ${dname_result}/.
+    cp fesom.x ${dname_result}/.
+fi
+
 #___CREATE CLOCK & RESTART INFRASTRUCTURE FOR COLD/WARM START___________________
 # only touch clock file when a new simulation is supposed to start, if an old one
 # should be continued dont touch it 
