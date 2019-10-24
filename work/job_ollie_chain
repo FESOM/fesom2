@@ -19,7 +19,7 @@ year_s=1948
 year_e=2009
 
 #___HELP OUTPUT_________________________________________________________________
-script_name=$0
+script_name=job_ollie_chain
 function usage {
     echo "usage: $script_name [-cn ...] [-cs ...] [-ys ...] [-ye ...] [-wcl ...]"
     echo "  -cn     number of chain cylces (default: 3)"
@@ -70,12 +70,17 @@ cp -n ../config/namelist.ice     .
 #___SET CHAIN_ID________________________________________________________________
 if [ -f "file_chain_id" ]; then
     chain_id=$(<file_chain_id)
-    echo -e  "\033[33m --> found file file_chain_id: with index $chain_id \033[0m"
+    echo -e "\033[33m --> found file file_chain_id: with index $chain_id \033[0m"
 else 
     chain_id=${chain_s}
     echo $chain_id > file_chain_id
     echo -e "\033[33m --> no file file_chain_id, initialize with index $chain_id \033[0m"
 fi
+
+#___PRINT INPUT INFO____________________________________________________________
+echo -e "\033[33m --> max. number of chain cycles: $chain_n \033[0m"
+echo -e "\033[33m --> actual chain id: $chain_id \033[0m"
+echo -e "\033[33m --> simulated time range: [ $year_s $year_e] \033[0m"
 
 #___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
 # extract resultpath from namelist.config
@@ -148,12 +153,12 @@ if [ $is_newsimul -eq 1 ] ; then
     
     # --> make cold start 
     if [ $chain_id -eq 1 ] ; then
-        # if no fesom.clock file exist create one 
-        if [ ! -f "$dname_result_link/fesom.clock" ]; then 
-            echo -e "\033[33m --> create cold start clock file \033[0m"
-            printf "0 1 ${year_s}\n0 1 ${year_s}" > $dname_result_link/fesom.clock
-        fi    
-        
+        #_______________________________________________________________________
+        # create cold start clock file
+        echo -e "\033[33m --> create cold start clock file \033[0m"
+        printf "0 1 ${year_s}\n0 1 ${year_s}" > $dname_result_link/fesom.clock
+            
+        #_______________________________________________________________________
         # in case yearnew in namelist.config was changed from 1948
         yearnew=$(grep "yearnew=" namelist.config | cut -d "=" -f 2)
         if [ $yearnew -ne $year_s ]; then 
