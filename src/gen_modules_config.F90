@@ -78,7 +78,8 @@ module g_config
   logical 						:: use_floatice = .false.
   logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean
+  logical                       :: flag_debug=.false.
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean, flag_debug
   
   ! *** others ***
   real(kind=WP)            	:: dt
@@ -89,6 +90,6 @@ module g_config
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
   real(kind=WP)             	:: dummy=1.e10
   
-  logical                       :: flag_debug=.false.
+  
 end module g_config
 
