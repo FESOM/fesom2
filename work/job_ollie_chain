@@ -54,8 +54,8 @@ done
 jobinfo=$(scontrol show job $SLURM_JOB_ID)
 wcl=$( echo ${jobinfo##*TimeLimit=} | cut -d " " -f 1 )
 echo -e "\033[33m --> found wall-clock-time = $wcl \033[0m"
-ntask=$( echo ${jobinfo##*NumTasks=} | cut -d " " -f 1 )
-echo -e "\033[33m --> found ntask = $ntask \033[0m"
+ntasks=$( echo ${jobinfo##*NumTasks=} | cut -d " " -f 1 )
+echo -e "\033[33m --> found ntask = $ntasks \033[0m"
 
 #___SET NAMELIST'S & EXECUTABLE IF NOT ALREADY EXIST____________________________
 set -x
@@ -212,7 +212,7 @@ if [ ${chain_id} -lt ${chain_n} ] && [ ${err_srun} -eq 0 ]; then
     # the corresponding task ID in the specified job has completed successfully 
     # (ran to completion with an exit code of zero). 
     echo -e "\033[33m --> setup next chain cycle \033[0m"
-    sbatch --time=$wcl --ntask=$ntask --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID job_ollie_chain.ll \
+    sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID job_ollie_chain.ll \
             -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e
 fi
 
