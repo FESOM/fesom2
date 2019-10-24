@@ -52,9 +52,9 @@ done
 # either setted via #SBATCH time=... or at command line sbatch --time=... job_ollie_chain.ll
 # need here to extract to give the next job chain cycle as input
 jobinfo=$(scontrol show job $SLURM_JOB_ID)
-wcl=$( echo ${jobinfo##*TimeLimit=} | cut -d " " -f 1 )
+wcl=$( echo ${jobinfo##*"TimeLimit="} | cut -d " " -f 1 )
 echo -e "\033[33m --> found wall-clock-time = $wcl \033[0m"
-ntasks=$( echo ${jobinfo##*NumTasks=} | cut -d " " -f 1 )
+ntasks=$( echo ${jobinfo##*"NumTasks="} | cut -d " " -f 1 )
 echo -e "\033[33m --> found ntask = $ntasks \033[0m"
 
 #___SET NAMELIST'S & EXECUTABLE IF NOT ALREADY EXIST____________________________
@@ -88,7 +88,7 @@ dname_result="$(dirname "$dname_result_link")/"
 
 # check if in namelist.config a chain path is given (that mean .../chain/)if not 
 # change namelist.config accordingly
-check=$(echo $dname_result_link | grep -oP "^$dname_result\K.*")
+check=${dname_result_link##*${dname_result}}
 if [ $check != "chain" ]; then
     echo -e "\033[33m --> replace in namelist.config ResultPath with chain path \033[0m"
     dname_result_link="${dname_result}chain"
