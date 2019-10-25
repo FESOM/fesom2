@@ -356,9 +356,6 @@ module g_cvmix_idemix
             ! to calculate edge contribution that crosses the halo
             call exchange_nod(iwe)
             
-            ! temporarily store old iwe values for diag
-            iwe_Thdi = iwe(:,1:myDim_nod2D)
-            
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
             ! criterium --> CFL
@@ -378,6 +375,10 @@ module g_cvmix_idemix
             !      es nicht explodiert. Eigentlich sollte der Term alles glatter 
             !      machen, aber nahe der ML kann der schon Probleme machen".
             do node = 1,node_size
+            
+                ! temporarily store old iwe values for diag
+                iwe_Thdi(:,node) = iwe(:,node)
+                
                 ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
                 
@@ -569,8 +570,10 @@ module g_cvmix_idemix
             !___________________________________________________________________
             ! diagnostic: add horizontal propgation to the total production rate
             ! of internal wave energy iwe_Tot
-            iwe_Thdi = (iwe(:,1:myDim_nod2D) - iwe_Thdi)/dt
-            iwe_Ttot = iwe_Ttot + iwe_Thdi
+            do node = 1,node_size
+                iwe_Thdi(:,node) = ( iwe(:,node) - iwe_Thdi(:,node) )/dt
+                iwe_Ttot(:,node) = iwe_Ttot(:,node) + iwe_Thdi(:,node)
+            end do
         end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         
         !_______________________________________________________________________
