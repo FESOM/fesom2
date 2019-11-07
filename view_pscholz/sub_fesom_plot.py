@@ -1521,3 +1521,35 @@ def fesom_idxinbox(mesh,data1,inputarray):
     
     return(idx_box)
 
+
+#_______________________________________________________________________________
+# select optimal color range by histogramm
+#_______________________________________________________________________________
+def fesom_choose_best_crange(in_data,in_weights,in_limit=0.99):
+    cmin, cmax = np.nanmin(in_data), np.nanmax(in_data)
+    print(' --> original cmin,cmax:',cmin,cmax)
+    
+    binrange=[cmin, cmax];
+    if cmin<0.0 and cmax>0.0 : binrange=[-max(np.abs(cmin),cmax),max(np.abs(cmin),cmax)]
+    hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000, weights=in_weights,density=True, normed=True) 
+    binedge_mid, cumsum, limit = binedge[:-1]+(binedge[1:]-binedge[:-1])/2, np.cumsum(hist*(binedge[1:]-binedge[:-1])), in_limit
+    
+    idx_min = np.where(cumsum<=1-limit)[0]
+    if len(idx_min)==0: 
+        idx_min=0
+    else: 
+        idx_min=idx_min[-1]
+    
+    idx_max = np.where(cumsum>=limit)[0]
+    if len(idx_max)==0: 
+        idx_max=len(binedge_mid)
+    else:    
+        idx_max=idx_max[0]
+    cmin, cmax = binedge_mid[idx_min], binedge_mid[idx_max]
+    
+    if cmax!=0.0: cmax = np.around(cmax, -np.int32(np.floor(np.log10(np.abs(cmax)))-1) ) 
+    if cmin!=0.0: cmin = np.around(cmin, -np.int32(np.floor(np.log10(np.abs(cmin)))-1) ) 
+    
+    print(' --> best cmin,cmax:',cmin,cmax)
+    
+    return(cmin,cmax)
