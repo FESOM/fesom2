@@ -427,17 +427,13 @@ END DO
      call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4)
   end if
   
-!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'helem', 'elemental layer thickness', 'm', helem(:,:), 1, 'm', i_real4)
-!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'hnode', 'nodal layer thickness'    , 'm', hnode(:,:), 1, 'm', i_real4)
-  
-!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_x', 'zonal pressure gradient force', 'm', pgf_x(:,:), 1, 'y', i_real4)
-!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm', pgf_y(:,:), 1, 'y', i_real4)
-  
-!!PS   call def_stream(nod2D,        myDim_nod2D,        'dum_2d_n', '????????????????', '?', dum_2d_n(:), 1  , 's', i_real4)
-!!PS   call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'dum_3d_e', '????????????????', '?', dum_3d_e(:,:), 1, 's', i_real4)
-!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'press', 'pressure'    , 'm', hpressure(:,:), 1, 's', i_real4)
-!!PS   call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'density_m_rho0', 'density'    , 'm', density_m_rho0(:,:), 1, 's', i_real4)
-  
+    !___________________________________________________________________________
+    if (ldiag_dvd) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_h', 'horiz. dvd of temperature', '°C/s' , tr_dvd_horiz(:,:,1), 1, 'm', i_real4)
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_v', 'vert. dvd of temperature' , '°C/s' , tr_dvd_vert(:,:,1) , 1, 'm', i_real4)
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_h', 'horiz. dvd of salinity'   , 'psu/s', tr_dvd_horiz(:,:,2), 1, 'm', i_real4)
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_v', 'vert. dvd of salinity'    , 'psu/s', tr_dvd_vert(:,:,2) , 1, 'm', i_real4)
+    end if 
      
 end subroutine ini_mean_io
 !

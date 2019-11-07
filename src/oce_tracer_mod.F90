@@ -25,6 +25,7 @@ DO elem=1, myDim_elem2D
 END SUBROUTINE tracer_gradient_elements
 !========================================================================================
 SUBROUTINE init_tracers_AB(tr_num)
+use g_config, only: flag_debug
 use g_parsup
 use o_PARAM, only: tracer_adv
 use o_arrays
@@ -35,20 +36,28 @@ integer :: tr_num,n,nz
 
 
 !filling work arrays
-del_ttf=0d0
+del_ttf=0.0_WP
+
 !AB interpolation
 tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
+
+if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
 call exchange_elem_begin(tr_xy)
+
+if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
 call tracer_gradient_z(tr_arr(:,:,tr_num))
 call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
-
 call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
+
+if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
 call fill_up_dn_grad
 call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
+if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 call tracer_gradient_elements(tr_arr(:,:,tr_num)) !redefine tr_arr to the current timestep
 call exchange_elem(tr_xy)
+
 END SUBROUTINE init_tracers_AB
 !========================================================================================
 SUBROUTINE relax_to_clim(tr_num)

@@ -1891,7 +1891,7 @@ end subroutine impl_vert_visc_ale
 subroutine oce_timestep_ale(n)
     use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn, &
                         rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi,&
-                        rtime_oce_mixpres,rtime_oce_dynssh,which_ale
+                        rtime_oce_mixpres,rtime_oce_dynssh,which_ale,flag_debug
     use o_MESH
     use o_ARRAYS
     use o_PARAM

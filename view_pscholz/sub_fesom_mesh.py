@@ -13,7 +13,7 @@ from set_inputarray import *
 #| and not to load it again !!!                                                |                    |
 #+_____________________________________________________________________________+
 def fesom_init_mesh(inputarray):
-    global mesh
+#     global mesh
     mesh = fesom_mesh(inputarray)
     return(mesh)
     
@@ -100,11 +100,11 @@ class fesom_mesh:
         if (inputarray['mesh_rotate'     ]==True):
             self.fesom_grid_rot_r2g('r2g')
         else:
-            self.nodes_2d_xg = self.nodes_2d_x
-            self.nodes_2d_yg = self.nodes_2d_y
-            self.nodes_2d_zg = self.nodes_2d_z
+            self.nodes_2d_xg  = self.nodes_2d_x
+            self.nodes_2d_yg  = self.nodes_2d_y
+            self.nodes_2d_zg  = self.nodes_2d_z
             self.nodes_2d_izg = self.nodes_2d_iz
-            self.nodes_2d_ig = self.nodes_2d_i
+            self.nodes_2d_ig  = self.nodes_2d_i
         
         #_______________________________________________________________________
         # change grid focus from -180...180 to e.g. 0...360
@@ -138,65 +138,43 @@ class fesom_mesh:
         
         #____load 2d node matrix________________________________________________
         print('     > nod2d.out',end='')
-        fid_n2d          = open(self.path+'nod2d.out', 'r')
-        self.n2dn        = np.uint32(fid_n2d.readline().strip())
-        #dum              = np.matrix(pa.read_table(fid_n2d, header=-1,delim_whitespace=True))
-        dum              = np.matrix(pa.read_csv(fid_n2d, header=-1,delim_whitespace=True))
-        fid_n2d.close()
-        del fid_n2d
-        self.nodes_2d_x  = np.float32(np.array(dum[:,1]).reshape(self.n2dn))
-        self.nodes_2d_y  = np.float32(np.array(dum[:,2]).reshape(self.n2dn))
-        self.nodes_2d_i  = np.uint16( np.array(dum[:,3]).reshape(self.n2dn))
-        del dum
+        file_content    = pa.read_csv(self.path+'nod2d.out', delim_whitespace=True, skiprows=1, \
+                                      names=['node_number','x','y','flag'] )
+        self.nodes_2d_x = file_content.x.values.astype('float32')
+        self.nodes_2d_y = file_content.y.values.astype('float32')
+        self.nodes_2d_i = file_content.flag.values.astype('uint16')   
+        self.n2dn       = len(self.nodes_2d_x)
         print('  : #2dn={:d}'.format(self.n2dn))
         
         #____load 2d element matrix_____________________________________________
         print('     > elem2d.out',end='')
-        fid_e2d          = open(self.path+'elem2d.out', 'r')
-        self.n2de           = np.int64(fid_e2d.readline().strip())
-        ## pandas module fastest option but not everywherre available
-        #self.elem0_2d_i  = np.matrix(pa.read_table(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
-        self.elem0_2d_i  = np.matrix(pa.read_csv(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
-        fid_e2d.close()
+        file_content    = pa.read_csv(self.path+'elem2d.out', delim_whitespace=True, skiprows=1, \
+                                       names=['1st_node_in_elem','2nd_node_in_elem','3rd_node_in_elem'])
+        self.elem0_2d_i = file_content.values.astype('uint32') - 1
+        self.n2de       = np.shape(self.elem0_2d_i)[0]
         print(' : #2de={:d}'.format(self.n2de))
         
         #____load 3d nodes alligned under 2d nodes______________________________
         print('     > aux3d.out') 
-        fid_aux3d        = open(self.path+'aux3d.out', 'r')
-        self.nlev        = np.uint16(fid_aux3d.readline().strip())
-        dum                 = np.array(pa.read_csv(fid_aux3d, 
-                                                    header=-1,
-                                                    delim_whitespace=True),
-                                        dtype='int16')
-        self.zlev        = dum[0:self.nlev].squeeze()
-        self.zmid         = (self.zlev[:-1]+self.zlev[1:])/2.
-        
-        fid_aux3d.close()
-        del fid_aux3d
-        del dum
+        with open(self.path+'aux3d.out') as f:
+            self.nlev = int(next(f))
+            self.zlev = np.array([next(f).rstrip() for x in range(self.nlev)]).astype(float)
+        self.zmid     = (self.zlev[:-1]+self.zlev[1:])/2.
         
         #____load number of levels at each node_________________________________
         print('     > nlvls.out') 
-        fid                 = open(self.path+'nlvls.out', 'r')
-        #self.nodes_2d_iz = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
-        self.nodes_2d_iz = np.array(pa.read_csv(fid, header=-1,delim_whitespace=True))
-        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
-        # which starts with zeros --> thats why minus 1
-        self.nodes_2d_iz = self.nodes_2d_iz.squeeze()-1
-        self.nodes_2d_z  = np.float32(self.zlev[self.nodes_2d_iz])
-        fid.close()
+        file_content    = pa.read_csv(self.path+'nlvls.out', delim_whitespace=True, skiprows=0, \
+                                       names=['numb_of_lev'])
+        self.nodes_2d_iz= file_content.values.astype('uint16') - 1
+        self.nodes_2d_iz= self.nodes_2d_iz.squeeze()
+        self.nodes_2d_z = np.float32(self.zlev[self.nodes_2d_iz])
         
         #____load number of levels at each elem_________________________________
         print('     > elvls.out') 
-        fid                 = open(self.path+'elvls.out', 'r')
-        #self.elem0_2d_iz  = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
-        self.elem0_2d_iz  = np.array(pa.read_csv(fid, header=-1,delim_whitespace=True))
-        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
-        # which starts with zeros --> thats why minus 1
-        self.elem0_2d_iz  = self.elem0_2d_iz.squeeze()-1
-        fid.close()
-    
-    
+        file_content    = pa.read_csv(self.path+'elvls.out', delim_whitespace=True, skiprows=0, \
+                                       names=['numb_of_lev'])
+        self.elem0_2d_iz= file_content.values.astype('uint16') - 1
+        
     #+___ROTATE GRID ROT-->GEO_________________________________________________+
     #| input : r2g (default) change coordinate from rotated-->geo              |
     #|         g2r           change coordinate from geo-->rotated              |
@@ -700,20 +678,22 @@ class fesom_mesh:
                 # find land mnask points on either the left or right
                 # side of pbnd
                 aux2_i = np.argmin(P1_y-self.nodes_2d_yg[lonly_p[aux_i]])
+                
             else:
                 # antarctica land mask points 
                 if P1_x == xmin:
-                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmax))
+                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmax)[0])
+                    
                 else:
-                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmin))
-                
+                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmin)[0])
                 aux2_i = np.array(np.argmin(np.abs(P1_y-self.nodes_2d_yg[lonly_p[aux_i]])))
                 
             P2_i      = lonly_p[aux_i[aux2_i]]
             addp_edge.append([P1_i,P2_i])
+            #print(lonly_p) 
             lonly_p   = np.array(lonly_p[np.where(lonly_p!=P1_i)])
             lonly_p   = np.array(lonly_p[np.where(lonly_p!=P2_i)])
-            
+        
         #____END WHILE LOOP_____________________________________________________
         addp_edge = np.array(addp_edge)
         addp_edge = np.sort(addp_edge,axis=1)

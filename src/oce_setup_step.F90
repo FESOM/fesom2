@@ -152,7 +152,7 @@ use g_config
 use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
-use diagnostics,     only: ldiag_dMOC
+use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -191,6 +191,12 @@ allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
 allocate(del_ttf(nl-1,node_size))
+allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
+!!PS allocate(del_ttf_diff(nl-1,node_size))
+if (ldiag_DVD) then
+    allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
+end if 
+
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 ! Ocean forcing arrays

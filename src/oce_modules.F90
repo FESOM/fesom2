@@ -273,6 +273,7 @@ real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable    :: S_rhs(:,:)
 real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable    :: del_ttf(:,:)
+real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
@@ -370,5 +371,10 @@ real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
+
+!_______________________________________________________________________________
+! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
+real(kind=WP), allocatable    :: tr_dvd_horiz(:,:,:),tr_dvd_vert(:,:,:)
+
 END MODULE o_ARRAYS
 !==========================================================

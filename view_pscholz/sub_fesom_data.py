@@ -63,6 +63,25 @@ class fesom_data(object):
 #_______________________________________________________________________________
 def fesom_load_data_horiz(mesh,data,do_output=True):
     
+    if data.var=='depth':
+        data.value 	= -mesh.nodes_2d_zg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Depth', 'm', 'wbgyr'
+        return data
+    #_______________________________________________________________________________
+    # plot triangle resolution interpolated to node
+    elif data.var=='triresol':
+        if len(mesh.nodes_2d_resol)==0: mesh.fesom_calc_triresol()
+        data.value 	= mesh.nodes_2d_resol
+        data.sname, data.lname, data.unit, data.cmap = 'triresol', 'Resolution', 'km', 'rygbw'
+        return data
+    #_______________________________________________________________________________
+    # plot triangle area interpolated to node
+    elif data.var=='triarea':
+        if len(mesh.nodes_2d_area)==0: mesh.fesom_calc_triarea()
+        data.value 	= mesh.nodes_2d_area
+        data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'cmocean.cm.balance'
+        return data
+    
     #___________________________________________________________________________
     # number of years to average 
     nyi = data.year[1]-data.year[0]+1

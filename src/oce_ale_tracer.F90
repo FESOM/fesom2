@@ -3,8 +3,9 @@
 !===============================================================================
 ! Driving routine    Here with ALE changes!!!
 subroutine solve_tracers_ale
+    use g_config, only: flag_debug
     use g_parsup
-    use o_PARAM, only: tracer_adv,num_tracers
+    use o_PARAM, only: tracer_adv, num_tracers, SPP, Fer_GM
     use o_arrays
     use o_mesh
     use g_comm_auto
@@ -13,8 +14,11 @@ subroutine solve_tracers_ale
     implicit none
     integer :: tr_num
     real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
+    !___________________________________________________________________________
     if (SPP) call cal_rejected_salt
     if (SPP) call app_rejected_salt
+    
+    !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
@@ -28,24 +32,30 @@ subroutine solve_tracers_ale
     do tr_num=1,num_tracers
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num)
         
         ! advect tracers
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
         call adv_tracers_ale(tr_num)
         
         ! diffuse tracers 
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num)
         
         ! relax to salt and temp climatology
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         call relax_to_clim(tr_num)
         
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
+    !___________________________________________________________________________
     do tr_num=1, ptracers_restore_total           
         tr_arr(:,ptracers_restore(tr_num)%ind2,ptracers_restore(tr_num)%locid)=1.
     end do
     
+    !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
         UV    =UV    -fer_UV
@@ -53,13 +63,14 @@ subroutine solve_tracers_ale
         Wvel  =Wvel  -fer_Wvel
     end if
     
+    !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
-	where (tr_arr(:,:,2) > 45.)
-           tr_arr(:,:,2)=45.
+    where (tr_arr(:,:,2) > 45.)
+        tr_arr(:,:,2)=45.
     end where
 
-	where (tr_arr(:,:,2) < 3. )
-           tr_arr(:,:,2)=3.
+    where (tr_arr(:,:,2) < 3. )
+        tr_arr(:,:,2)=3.
     end where
 
 end subroutine solve_tracers_ale
@@ -67,37 +78,69 @@ end subroutine solve_tracers_ale
 !
 !===============================================================================
 subroutine adv_tracers_ale(tr_num)
+    use g_config, only: flag_debug
+    use o_MESH, only: nlevels_nod2D
     use g_parsup
-    use g_config
     use o_PARAM, only: tracer_adv
     use o_arrays
+    use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment, compute_diag_dvd
     
     implicit none
-    integer :: tr_num
+    integer :: tr_num, node, nz
     
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
-    !     to finite volume". At the end R_T^n should contain all advection therm and 
-    !     the terms due to horizontal duffusion.
+    !     to finite volume". At the end R_T^n should contain all advection therms and 
+    !     the terms due to diffusion.
     ! del_ttf=0d0
+    
+    !___________________________________________________________________________
+    ! if ldiag_DVD=.true. --> compute tracer second moments for the calcualtion 
+    ! of discret variance decay
+    if (ldiag_DVD .and. tr_num <= 2) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd_2ndmoment'//achar(27)//'[0m'
+        call compute_diag_dvd_2ndmoment(tr_num)
+    end if    
+    
     !___________________________________________________________________________
     ! horizontal ale tracer advection 
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
+    del_ttf_advhoriz = 0.0_WP
+    del_ttf_advvert  = 0.0_WP
     select case (tracer_adv)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
             call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25)
+            
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
             call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
+            
         case(2) !MUSCL+FCT(3D)
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
             call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0)
+            
         case default !unknown
             if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
             call par_ex(1)
     end select
     
     !___________________________________________________________________________
-    ! vertical ale tracer advection --> piecewise parabolic method (ppm)
-    ! here --> add vertical advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
+    ! update array for total tracer flux del_ttf with the fluxes from horizontal
+    ! and vertical advection
+    do node=1, myDim_nod2d
+        do nz=1,nlevels_nod2D(node)-1  
+            del_ttf(nz,node)=del_ttf(nz,node)+del_ttf_advhoriz(nz,node)+del_ttf_advvert(nz,node)
+        end do
+    end do
+    
+    !___________________________________________________________________________
+    ! compute discrete variance decay after Burchard and Rennau 2008
+    if (ldiag_DVD .and. tr_num <= 2) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd'//achar(27)//'[0m'
+        call compute_diag_dvd(tr_num)
+    end if     
+    
 end subroutine adv_tracers_ale
 !
 !
@@ -284,8 +327,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
             !                                           if its at the boundary
             !___________________________________________________________________
             ! write horizontal ale advection into rhs
-            del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-            del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
+            del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+            del_ttf_advhoriz(nz,enodes(2))=del_ttf_advhoriz(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
             
         end do ! --> do nz=1, n2
         
@@ -332,8 +375,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
                 !                                           if its at the boundary
                 !_______________________________________________________________
                 ! write horizontal ale advection into rhs
-                del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-                del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2)) 
+                del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+                del_ttf_advhoriz(nz,enodes(2))=del_ttf_advhoriz(nz,enodes(2))-c1*dt/area(nz,enodes(2)) 
                 
             end do ! --> do nz=1+n2,nl1
         else
@@ -373,8 +416,8 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
                 !                                           if its at the boundary
                 !_______________________________________________________________
                 ! write horizontal ale advection into rhs
-                del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+c1*dt/area(nz,enodes(1))
-                del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
+                del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+c1*dt/area(nz,enodes(1))
+                del_ttf_advhoriz(nz,enodes(2))=del_ttf_advhoriz(nz,enodes(2))-c1*dt/area(nz,enodes(2))  
                 
             end do ! --> do nz=n2+1,nl2
         end if ! --> if(nl1>nl2) then
@@ -443,7 +486,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
             dzjp1    = hnode_new(nz,n)
             dzjp2    = hnode_new(nz+1,n)
             ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
-        
+            
             !___________________________________________________________________
             ! equation (1.7)
             ! --> Here deltaj is the average slope in the jth zone of the parabola 
@@ -541,7 +584,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
         ! writing vertical ale advection into rhs
         do nz=1, nzmax-1
             ! no division over thickness in ALE !!!
-            del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
+            del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n)
         end do
         
     end do ! --> do n=1, myDim_nod2D
@@ -585,7 +628,7 @@ subroutine adv_tracers_vert_upw(ttf)
         ! writing vertical ale advection into rhs
         do nz=1, nl1
             ! no division over thickness in ALE !!!
-            del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
+            del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
             
         end do         
     end do ! --> do n=1, myDim_nod2D
@@ -628,7 +671,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
         ! writing vertical ale advection into rhs
         do nz=1, nl1
             ! no division over thickness in ALE !!!
-            del_ttf(nz,n)=del_ttf(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
+            del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
             
         end do         
     end do ! --> do n=1, myDim_nod2D
@@ -841,7 +884,7 @@ subroutine diff_ver_part_impl_ale(tr_num)
         Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
         do nz=nzmax-1,2,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            Z_n(nz-1) = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
+            Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
         end do
         zbar_n(1) = zbar_n(2) + hnode_new(1,n)
         
@@ -854,8 +897,8 @@ subroutine diff_ver_part_impl_ale(tr_num)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
         
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty1= (Z_n(nz)     -zbar_n(nz+1))    *zinv2 *slope_tapered(3,nz,  n)**2*Ki(nz,n) + &
-             (zbar_n(nz+1)-Z_n(nz+1))   *zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n) + &
+             (zbar_n(nz+1)-Z_n(   nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
         Ty1=Ty1*isredi
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
         a(nz)=0.0_WP
@@ -879,10 +922,10 @@ subroutine diff_ver_part_impl_ale(tr_num)
             ! 1/dz(nz)
             zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
             ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-            Ty = (Z_n(nz-1)-zbar_n(nz))  *zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
-                 (zbar_n(nz)-Z_n(nz))    *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
-            Ty1= (Z_n(nz)-zbar_n(nz+1))  *zinv2 *slope_tapered(3,nz,n)**2  *Ki(nz,n)  + &
-                 (zbar_n(nz+1)-Z_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+            Ty = (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
+                 (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
+            Ty1= (Z_n(nz     )-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)+ &
+                 (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
             Ty =Ty *isredi
             Ty1=Ty1*isredi
             ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...

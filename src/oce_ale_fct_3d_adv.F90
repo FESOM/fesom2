@@ -223,6 +223,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
             !___________________________________________________________________
             ! 1st. Low order upwind solution
             cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+!!PS             cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
             fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO     
             fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO  
             
@@ -265,6 +266,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 !___________________________________________________________________
                 ! 1st. Low order upwind solution
                 cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+!!PS                 cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
                 fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO
                 fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO
                 
@@ -300,6 +302,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 !_______________________________________________________________
                 ! 1st. Low order upwind solution
                 cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+!!PS                 cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
                 fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO
                 fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO
                 
@@ -725,8 +728,8 @@ subroutine fct_ale(ttf, iter_yn)
     ! Vertical
     do n=1, myDim_nod2d
         do nz=1,nlevels_nod2D(n)-1  
-            del_ttf(nz,n)=del_ttf(nz,n)-ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
-                    (fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)
+            del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n)-ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
+                                    (fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)
         end do
     end do
     
@@ -738,8 +741,8 @@ subroutine fct_ale(ttf, iter_yn)
         nl2=0
         if(el(2)>0) nl2=nlevels(el(2))-1
         do nz=1, max(nl1,nl2)
-            del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+fct_adf_h(nz,edge)*dt/area(nz,enodes(1))
-            del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))-fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
+            del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+fct_adf_h(nz,edge)*dt/area(nz,enodes(1))
+            del_ttf_advhoriz(nz,enodes(2))=del_ttf_advhoriz(nz,enodes(2))-fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
 end subroutine fct_ale
