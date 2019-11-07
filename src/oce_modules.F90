@@ -137,7 +137,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return,visc_option
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
 		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
@@ -273,6 +273,7 @@ real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable    :: S_rhs(:,:)
 real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable    :: del_ttf(:,:)
+real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
@@ -370,5 +371,10 @@ real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
+
+!_______________________________________________________________________________
+! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
+real(kind=WP), allocatable    :: tr_dvd_horiz(:,:,:),tr_dvd_vert(:,:,:)
+
 END MODULE o_ARRAYS
 !==========================================================

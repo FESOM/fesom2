@@ -16,7 +16,8 @@ module diagnostics
   private
   public :: compute_diagnostics, ldiag_solver, rhs_diag, lcurt_stress_surf, curl_stress_surf, ldiag_curl_vel3, curl_vel3, ldiag_energy, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
-	    ldiag_dMOC, std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ
+            ldiag_dMOC, ldiag_DVD, std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ, &
+            compute_diag_dvd_2ndmoment, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
   ! A=ssh_stiff, x=d_eta, rhs=ssh_rhs; rhs_diag=A*x;
@@ -58,6 +59,10 @@ module diagnostics
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
   logical                                       :: ldiag_dMOC       =.false.
+  
+  ! flag for calculating the Discrete Variance Decay --> estimator for numerical/
+  ! spurious mixing in the advection schemes
+  logical                                       :: ldiag_DVD        =.true.
   contains
 
 ! ==============================================================
@@ -451,4 +456,125 @@ subroutine compute_diagnostics(mode)
   if (ldiag_dMOC)        call diag_densMOC(mode)
 
 end subroutine compute_diagnostics
+
+!
+!
+!_______________________________________________________________________________
+! calculate horizintal and vertical advection for squared tracer (2nd moments)
+! see: 
+! Burchard and Rennau, 2008, Comparative quantification of physically and 
+!                      numerically induced mixing in ocean models ...
+! Rennau, and Burchard, 2009, Quantitative analysis of numerically induced mixing 
+!                      in a coastal model application ...
+! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
+!                      Discrete variance decay in a Finite-Volume framework ...
+subroutine compute_diag_dvd_2ndmoment(tr_num)
+    use o_MESH, only: nlevels_nod2D
+    use o_arrays
+    use o_PARAM, only: tracer_adv
+    use g_PARSUP
+    
+    implicit none
+    integer, intent(in)     :: tr_num 
+    integer                 :: node, nz
+    real                    :: tr_sqr(nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(nl-1,myDim_nod2D+eDim_nod2D)
+  
+    !___________________________________________________________________________
+    ! square up fields for actual tracers and Adams Bashfort tracer
+    ! --> dont forget to square also the halo !!! --> that why do node = ...+eDim_nod2D
+    do node = 1, myDim_nod2D+eDim_nod2D
+        do nz = 1, nlevels_nod2D(node)-1
+            tr_sqr(nz,node)   = tr_arr(nz,node,tr_num)**2
+            trAB_sqr(nz,node) = tr_arr_old(nz,node,tr_num)**2
+        end do
+    end do
+        
+    !___________________________________________________________________________
+    ! calculate horizintal and vertical advection for squared tracer (2nd moments)
+    ! see Burchard and Rennau, 2008, Comparative quantification of physically and 
+    ! numerically induced mixing in ocean models ...
+    del_ttf_advhoriz = 0.0_WP
+    del_ttf_advvert  = 0.0_WP
+    select case (tracer_adv)
+        case(1) !MUSCL
+            ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
+            call adv_tracers_muscle_ale(trAB_sqr, .25)
+            call adv_tracers_vert_ppm_ale(tr_sqr)
+        case(2) !MUSCL+FCT(3D)
+            call adv_tracer_fct_ale(trAB_sqr,tr_sqr, 1.0)
+        case default !unknown
+            if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
+            call par_ex(1)
+    end select
+
+    !___________________________________________________________________________
+    ! add target second moment to DVD
+    do node = 1,mydim_nod2D
+        do nz = 1,nlevels_nod2D(node)-1
+            ! eq 16 & 17 Klingbeil et al. 2014
+            !
+            ! (phi^2)^(n+1) = 1/V^(n+1)*[ V^(n)*(phi^2)^(n) + dt*ADV[phi^2]  ]
+            !
+            !  DVD = 1/dt * [ (phi^2)^(n+1) -  ( phi^(n+1) )^2 ]
+            !                     |
+            !                     v
+            !                first this part
+            ! --> split it up in DVD contribution from horizontal and vertical 
+            ! advection since for the horizontal advection Adams Bashfort tracer 
+            ! are used and for the vertical the normal tracer values.
+            tr_dvd_horiz(nz,node,tr_num) = hnode(nz,node)/hnode_new(nz,node)*trAB_sqr(nz,node) - del_ttf_advhoriz(nz,node)/hnode_new(nz,node)
+            tr_dvd_vert(nz,node,tr_num)  = hnode(nz,node)/hnode_new(nz,node)*tr_sqr(  nz,node) - del_ttf_advvert( nz,node)/hnode_new(nz,node)
+        end do
+    end do
+end subroutine compute_diag_dvd_2ndmoment
+!
+!
+!_______________________________________________________________________________
+! calculate horizintal and vertical advection for squared tracer (2nd moments)
+! see: 
+! Burchard and Rennau, 2008, Comparative quantification of physically and 
+!                      numerically induced mixing in ocean models ...
+! Rennau, and Burchard, 2009, Quantitative analysis of numerically induced mixing 
+!                      in a coastal model application ...
+! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
+!                      Discrete variance decay in a Finite-Volume framework ...
+subroutine compute_diag_dvd(tr_num)
+    use g_config, only: dt
+    use o_MESH, only: nlevels_nod2D
+    use o_arrays
+    use o_PARAM, only: tracer_adv
+    use g_PARSUP
+    
+    implicit none
+    integer, intent(in)     :: tr_num 
+    integer                 :: node, nz
+    
+    !___________________________________________________________________________
+    ! add discret second moment to DVD
+    do node = 1,mydim_nod2D
+        do nz = 1,nlevels_nod2D(node)-1
+            ! eq 16 & 17 Klingbeil et al. 2014
+            !
+            ! (phi^2)^(n+1) = 1/V^(n+1)*[ V^(n)*(phi^2)^(n) + dt*ADV[phi^2]  ]
+            !
+            !  DVD = 1/dt * [ (phi^2)^(n+1) -  ( phi^(n+1) )^2 ]
+            !                                         |
+            !                                         v
+            !                                    now add this part
+            ! --> tr_dvd_horiz contains already the expected target second moments
+            ! from subroutine compute_diag_dvd_2ndmoment
+            tr_dvd_horiz(nz,node,tr_num) = (tr_dvd_horiz(nz,node,tr_num)                                    & 
+                                            -( hnode(nz,node)/hnode_new(nz,node)*tr_arr_old(nz,node,tr_num) &
+                                              -del_ttf_advhoriz(nz,node)/hnode_new(nz,node)                 &
+                                              )**2                                                          &
+                                            )/dt
+            tr_dvd_vert(nz,node,tr_num)  = (tr_dvd_vert(nz,node,tr_num)                                     &
+                                            -( hnode(nz,node)/hnode_new(nz,node)*tr_arr(    nz,node,tr_num) &
+                                              -del_ttf_advvert( nz,node)/hnode_new(nz,node)                 &
+                                              )**2                                                          &
+                                            )/dt
+        end do
+    end do
+end subroutine compute_diag_dvd
+
 end module diagnostics
