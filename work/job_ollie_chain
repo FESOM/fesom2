@@ -9,7 +9,7 @@
 #SBATCH -o fesom2.0_%x_%j.out
 #SBATCH -e fesom2.0_%x_%j.out
 
-#___DEFAULT INPUT_______________________________________________________________
+#___DEFAULT INPUT_______________________________________________________________    
 # how many job chains should be applied
 chain_n=3 # number chain cycles
 chain_s=1 # starting chain id
@@ -40,10 +40,10 @@ function usage {
 #___OVERRIDE DEFAULT INPUT BY COMMANDLINE INPUT_________________________________
 while [ "$1" != "" ]; do
     case $1 in
-        -cn | -chain_n )  shift ; chain_n=$1 ;;
-        -cs | -chain_s )  shift ; chain_s=$1 ;;
-        -ys | -year_s  )  shift ; year_s=$1  ;;
-        -ye | -year_e  )  shift ; year_e=$1  ;;
+        -cn | -chain_n | --cn | --chain_n )  shift ; chain_n=$1 ;;
+        -cs | -chain_s | --cs | --chain_s )  shift ; chain_s=$1 ;;
+        -ys | -year_s  | --ys | --year_s  )  shift ; year_s=$1  ;;
+        -ye | -year_e  | --ye | --year_e  )  shift ; year_e=$1  ;;
         -h  | --help   )  usage ; exit       ;;
     esac
     shift
