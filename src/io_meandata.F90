@@ -170,9 +170,11 @@ subroutine ini_mean_io
   call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'y', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'snow',   'precicipation snow',     'm/s',    prec_snow(:),                  1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'subli',  'sublimation',            'm/s',    sublimation(:),                1, 'm', i_real4)
 #if defined (__oifs)
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', i_real4)
 #endif

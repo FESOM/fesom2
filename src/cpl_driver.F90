@@ -442,14 +442,16 @@ contains
 
    call oasis_enddef(ierror)
    if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
+ 
+   CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
 
 #ifndef __oifs
+   CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
    if (commRank) print *, 'FESOM: calling exchange_roots'
    call exchange_roots(source_root, target_root, 1, MPI_COMM_FESOM, MPI_COMM_WORLD)
+   CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
    if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
 #endif
-
-   ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 
    allocate(cplsnd(nsend, myDim_nod2D+eDim_nod2D))
    allocate(exfld(myDim_nod2D))
@@ -457,7 +459,7 @@ contains
    o2a_call_count=0
 
    CALL MPI_BARRIER(MPI_COMM_FESOM, ierror)
-   if (mype .eq. 0) then 
+   if (commRank) then 
       print *, 'Survived cpl_oasis3mct_define'
    endif   
 
