@@ -62,7 +62,7 @@ module diagnostics
   
   ! flag for calculating the Discrete Variance Decay --> estimator for numerical/
   ! spurious mixing in the advection schemes
-  logical                                       :: ldiag_DVD        =.true.
+  logical                                       :: ldiag_DVD        =.false.
   contains
 
 ! ==============================================================
@@ -477,11 +477,13 @@ subroutine compute_diag_dvd_2ndmoment(tr_num)
     implicit none
     integer, intent(in)     :: tr_num 
     integer                 :: node, nz
-    real                    :: tr_sqr(nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(nl-1,myDim_nod2D+eDim_nod2D)
+    real(kind=WP)           :: tr_sqr(nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(nl-1,myDim_nod2D+eDim_nod2D)
   
     !___________________________________________________________________________
     ! square up fields for actual tracers and Adams Bashfort tracer
     ! --> dont forget to square also the halo !!! --> that why do node = ...+eDim_nod2D
+    tr_sqr   = 0.0_WP
+    trAB_sqr = 0.0_WP
     do node = 1, myDim_nod2D+eDim_nod2D
         do nz = 1, nlevels_nod2D(node)-1
             tr_sqr(nz,node)   = tr_arr(nz,node,tr_num)**2
@@ -495,6 +497,7 @@ subroutine compute_diag_dvd_2ndmoment(tr_num)
     ! numerically induced mixing in ocean models ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
+!!PS     del_ttf          = 0.0_WP
     select case (tracer_adv)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
