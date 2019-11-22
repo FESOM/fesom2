@@ -5,6 +5,7 @@ import pandas as pa
 import math
 from numpy.linalg import inv
 from set_inputarray import *
+import copy as cp
 
 #+___INITIALISE/LOAD FESOM2.0 MESH CLASS IN MAIN PROGRAMM______________________+
 #| IMPORTANT!!!:                                                               |                                         
@@ -174,6 +175,7 @@ class fesom_mesh:
         file_content    = pa.read_csv(self.path+'elvls.out', delim_whitespace=True, skiprows=0, \
                                        names=['numb_of_lev'])
         self.elem0_2d_iz= file_content.values.astype('uint16') - 1
+        self.elem0_2d_iz= self.elem0_2d_iz.squeeze()
         
     #+___ROTATE GRID ROT-->GEO_________________________________________________+
     #| input : r2g (default) change coordinate from rotated-->geo              |
@@ -586,7 +588,7 @@ class fesom_mesh:
         for ii in range(self.n2de):     
             data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii] 
         data_n[0:self.n2dn]=data_n[0:self.n2dn]/self.nodes_2d_area[0:self.n2dn]/3. 
-        data_n[self.n2dn:self.n2dna] = data_n[mesh.pbndn_2d_i]
+        data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
         
         return data_n
     
@@ -859,9 +861,9 @@ class fesom_mesh:
 #+___ROTATE VECTOR GRID ROT-->GEO______________________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def fesom_vector_rot(mesh,u,v):
+def fesom_vector_rot(mesh,u,v,do_output=True):
     
-    print(' --> do vector rotation rot2geo')
+    if do_output==True: print(' --> do vector rotation rot2geo')
     #___________________________________________________________________________
     alpha = mesh.alpha
     beta  = mesh.beta
@@ -926,21 +928,36 @@ def fesom_vector_rot(mesh,u,v):
         rlon = np.radians(mesh.nodes_2d_xr)
         lat  = np.radians(mesh.nodes_2d_yg)
         lon  = np.radians(mesh.nodes_2d_xg)
+        
     elif u.shape[0]==mesh.n2dn:
         rlat = np.radians(mesh.nodes_2d_yr[0:mesh.n2dn])
         rlon = np.radians(mesh.nodes_2d_xr[0:mesh.n2dn])
         lat  = np.radians(mesh.nodes_2d_yg[0:mesh.n2dn])
         lon  = np.radians(mesh.nodes_2d_xg[0:mesh.n2dn])
+        
     elif u.shape[0]==mesh.n2dea:
-        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem_2d_i],axis=1)/3.0)
-        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem_2d_i],axis=1)/3.0)
-        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3.0)
-        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3.0)
+        rlat = mesh.nodes_2d_yr[mesh.elem_2d_i]
+        rlon = mesh.nodes_2d_xr[mesh.elem_2d_i]
+        aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
+        for ii in aux:
+            for jj in range(0,3):
+                if rlon[ii,jj]<rlon[ii,:].max()-180: rlon[ii,jj] = rlon[ii,jj]+360
+        rlat = np.radians(rlat.sum(axis=1)/3.0)
+        rlon = np.radians(rlon.sum(axis=1)/3.0)
+        lat  = np.radians(mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0)
+        lon  = np.radians(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0)
+        
     elif u.shape[0]==mesh.n2de:
-        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem0_2d_i],axis=1)/3.0)
-        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem0_2d_i],axis=1)/3.0)
-        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem0_2d_i],axis=1)/3.0)
-        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem0_2d_i],axis=1)/3.0)
+        rlat = mesh.nodes_2d_yr[mesh.elem0_2d_i]
+        rlon = mesh.nodes_2d_xr[mesh.elem0_2d_i]
+        aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
+        for ii in aux:
+            for jj in range(0,3):
+                if rlon[ii,jj]<rlon[ii,:].max()-180: rlon[ii,jj] = rlon[ii,jj]+360
+        rlat = np.radians(rlat.sum(axis=1)/3.0)
+        rlon = np.radians(rlon.sum(axis=1)/3.0)
+        lat  = np.radians(mesh.nodes_2d_yg[mesh.elem0_2d_i].sum(axis=1)/3.0)
+        lon  = np.radians(mesh.nodes_2d_xg[mesh.elem0_2d_i].sum(axis=1)/3.0)
         
     ndims = u.shape
     if len(ndims)==1:
