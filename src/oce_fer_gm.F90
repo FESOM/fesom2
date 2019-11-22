@@ -190,7 +190,7 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
             fer_k(1,n)  = fer_scal(n)*K_GM_max
             ! limit lower values to K_GM_min
             fer_k(1,n)  = max(fer_k(1,n),K_GM_min)
-            fer_c(n)=c1*c1                          !put to repo
+            fer_c(n)    = c1*c1                          !put to repo
         end if
         
         !_______________________________________________________________________

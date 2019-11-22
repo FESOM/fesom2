@@ -529,6 +529,8 @@ CONTAINS
       ALLOCATE (sbcdata1(nc_Nlon,nc_Nlat), &
                 sbcdata2(nc_Nlon,nc_Nlat), STAT=sbc_alloc )
       if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'
+      sbcdata1 = 0.0_WP
+      sbcdata2 = 0.0_WP
 
       ! find time index in files
       now_date = rdate
@@ -835,11 +837,18 @@ CONTAINS
       ALLOCATE( coef_a(i_totfl,myDim_nod2D+eDim_nod2D), coef_b(i_totfl,myDim_nod2D+eDim_nod2D), &
               & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), &
                    &      STAT=sbc_alloc )
+      coef_a       = 0.0_WP             
+      coef_b       = 0.0_WP
+      atmdata      = 0.0_WP
 
       ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
               & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
                    &      STAT=sbc_alloc )
-
+      bilin_indx_i = 0.0_WP
+      bilin_indx_j = 0.0_WP
+      qns          = 0.0_WP
+      emp          = 0.0_WP
+      qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
 
       call nc_sbc_ini(rdate)

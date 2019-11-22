@@ -11,9 +11,9 @@ use i_arrays
 use g_CONFIG
 implicit none 
   ! ================ DO not change
-  ice_dt=ice_ave_steps*dt
+  ice_dt=real(ice_ave_steps,WP)*dt
  ! ice_dt=dt
-  Tevp_inv=3.0/ice_dt 
+  Tevp_inv=3.0_WP/ice_dt 
   Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                       ! it always enters 
   ! ================
@@ -98,7 +98,11 @@ e_size=myDim_elem2D+eDim_elem2D
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
+ S_oc_array = 0.0_WP
+ T_oc_array = 0.0_WP
  allocate(fresh_wa_flux(n_size), net_heat_flux(n_size))
+ fresh_wa_flux = 0.0_WP
+ net_heat_flux = 0.0_WP
  allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
  allocate(stress_atmoce_x(n_size), stress_atmoce_y(n_size))    
  allocate(elevation(n_size))           ! =ssh  of ocean        
@@ -109,13 +113,13 @@ e_size=myDim_elem2D+eDim_elem2D
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs)
   allocate(ice_alb(n_size), ice_temp(n_size))
-  ice_alb=0.
-  ice_temp=0.
+  ice_alb=0._WP
+  ice_temp=0._WP
 #endif /* (__oifs) */
-  oce_heat_flux=0.
-  ice_heat_flux=0.
-  tmp_oce_heat_flux=0.
-  tmp_ice_heat_flux=0.
+  oce_heat_flux=0._WP
+  ice_heat_flux=0._WP
+  tmp_oce_heat_flux=0._WP
+  tmp_ice_heat_flux=0._WP
 #endif /* (__oasis) */
 end subroutine ice_array_setup
 !==========================================================================
@@ -196,16 +200,16 @@ subroutine ice_initial_state
   integer        :: i
   character*100  :: filename
   real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
-  m_ice =0.
-  a_ice =0.
-  u_ice =0.
-  v_ice =0.
-  m_snow=0.
+  m_ice =0._WP
+  a_ice =0._WP
+  u_ice =0._WP
+  v_ice =0._WP
+  m_snow=0._WP
   if(mype==0) write(*,*) 'initialize the sea ice'
 
   do i=1,myDim_nod2D+eDim_nod2D                           
      if (tr_arr(1,i,1)< 0.0_WP) then
-	if (geo_coord_nod2D(2,i)>0.) then
+	if (geo_coord_nod2D(2,i)>0._WP) then
             m_ice(i) = 1.0_WP
             m_snow(i)= 0.1_WP 
         else

@@ -49,71 +49,71 @@ subroutine forcing_array_setup
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
   allocate(flux_correction_north(nrecv), flux_correction_south(nrecv))
   allocate(flux_correction_total(nrecv))
-  sublimation=0.
-  evap_no_ifrac=0.
-  tmp_sublimation = 0.
-  tmp_evap_no_ifrac = 0.
-  tmp_shortwave = 0.
-  atm_net_fluxes_north=0.
-  atm_net_fluxes_south=0.
-  oce_net_fluxes_north=0.
-  oce_net_fluxes_south=0.
-  flux_correction_north=0.
-  flux_correction_south=0.
-  flux_correction_total=0.  
+  sublimation=0.0_WP
+  evap_no_ifrac=0.0_WP
+  tmp_sublimation = 0.0_WP
+  tmp_evap_no_ifrac = 0.0_WP
+  tmp_shortwave = 0.0_WP
+  atm_net_fluxes_north=0.0_WP
+  atm_net_fluxes_south=0.0_WP
+  oce_net_fluxes_north=0.0_WP
+  oce_net_fluxes_south=0.0_WP
+  flux_correction_north=0.0_WP
+  flux_correction_south=0.0_WP
+  flux_correction_total=0.0_WP  
 #endif 
 
 
 ! Temp storage for averaging
   allocate(aver_temp(n2))
-  shortwave=0.
-  longwave=0.
-  prec_rain=0.
-  prec_snow=0.
-  u_wind=0.
-  v_wind=0.
-  Tair=0.
-  shum=0.
-  runoff=0.
+  shortwave=0.0_WP
+  longwave=0.0_WP
+  prec_rain=0.0_WP
+  prec_snow=0.0_WP
+  u_wind=0.0_WP
+  v_wind=0.0_WP
+  Tair=0.0_WP
+  shum=0.0_WP
+  runoff=0.0_WP
 
   if (l_cloud) then
      allocate(cloudiness(n2))
-     cloudiness=0.
+     cloudiness=0.0_WP
   end if
   if (l_mslp) then
      allocate(Pair(n2))
-     Pair=0.
+     Pair=0.0_WP
   end if
  
   allocate(u_wind_t(2,n2),v_wind_t(2,n2))
   allocate(Tair_t(2,n2), shum_t(2,n2))
-  u_wind_t=0.
-  v_wind_t=0.
-  Tair_t=0.
-  shum_t=0.
+  u_wind_t=0.0_WP
+  v_wind_t=0.0_WP
+  Tair_t=0.0_WP
+  shum_t=0.0_WP
 
   if(use_landice_water) then
     allocate(runoff_landice(n2))
-    runoff_landice=0.0
+    runoff_landice=0.0_WP
   end if
  
   ! shortwave penetration
   if(use_sw_pene) then
     allocate(chl(n2))
     allocate(sw_3d(nl,n2))
-    chl=.1
+    chl=0.1_WP
   endif
 
   !for ice diagnose
   if(use_ice) then
     allocate(thdgr(n2), thdgrsn(n2), flice(n2))
     allocate(olat_heat(n2), osen_heat(n2), olwout(n2))
-    thdgr=0.
-    thdgrsn=0.
-    flice=0.
-    olat_heat=0.
-    osen_heat=0.
-    olwout=0.
+    thdgr=0.0_WP
+    thdgrsn=0.0_WP
+    flice=0.0_WP
+    olat_heat=0.0_WP
+    osen_heat=0.0_WP
+    olwout=0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat

@@ -125,8 +125,8 @@ contains
      allocate (    dVsq     ( nl,   myDim_nod2D+eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
      allocate (    dbsfc    ( nl,   myDim_nod2D+eDim_nod2D        ))   ! buoyancy re sfc
      allocate (    kbl      (     myDim_nod2D+eDim_nod2D        ))   ! index of first grid level below hbl
-     ghats       = 0.0
-     hbl         = 0.0
+     ghats       = 0.0_WP
+     hbl         = 0.0_WP
 
 !      *******************************************************************
 !       Initialize some constants for kmix subroutines, and initialize
@@ -150,7 +150,7 @@ contains
 !       cg = cs in eqn. 20
 !      *******************************************************************
 
-     cg = cstar * vonk * (concs * vonk * epsilon_kpp)**(1./3.)
+     cg = cstar * vonk * (concs * vonk * epsilon_kpp)**(1._WP/3._WP)
 
 !      *******************************************************************
 !       Construct the wm and ws lookup tables (eqn. 13 & B1)
@@ -170,14 +170,14 @@ contains
              wst(i,j) = wmt(i,j)
           else
              if(zeta > zetam) then
-                wmt(i,j) = vonk* usta * (1.-conc2*zeta)**(1./4.)
+                wmt(i,j) = vonk* usta * (1._WP-conc2*zeta)**(1._WP/4._WP)
              else
-                wmt(i,j) = vonk* (conam*usta**3-concm*zehat)**(1./3.)
+                wmt(i,j) = vonk* (conam*usta**3-concm*zehat)**(1._WP/3._WP)
              endif
              if(zeta > zetas) then
-                wst(i,j) = vonk* usta * (1.-conc3*zeta)**(1./2.)
+                wst(i,j) = vonk* usta * (1._WP-conc3*zeta)**(1._WP/2._WP)
              else
-                wst(i,j) = vonk* (conas*usta**3-concs*zehat)**(1./3.)
+                wst(i,j) = vonk* (conas*usta**3-concs*zehat)**(1._WP/3._WP)
              endif
           endif
        enddo
@@ -355,7 +355,7 @@ contains
              diffK(nz,node,1) = MAX(diffK(nz,node,1), blmc(nz,node,2))
              diffK(nz,node,2) = MAX(diffK(nz,node,2), blmc(nz,node,3))                    
           ELSE
-             ghats(nz,node)=0.0    ! outside the boundary layer set nonlocal terms to zero
+             ghats(nz,node)=0.0_WP    ! outside the boundary layer set nonlocal terms to zero
           ENDIF
      END DO
   END DO    
@@ -380,7 +380,7 @@ contains
 ! this is very helpful to avoid huge surface velocity when vertical
 ! viscosity is very small derived from the KPP scheme.
 ! I strongly recommend this trick, at least in the current FESOM version.    
-  minmix=3.0e-3
+  minmix=3.0e-3_WP
   WHERE(viscAE(1,:) < minmix) 
      viscAE(1,:) = minmix
   END WHERE
@@ -534,7 +534,7 @@ contains
        !        eqn. (24)
        !-----------------------------------------------------------------------
 
-        IF (bfsfc(node) > 0.0) THEN
+        IF (bfsfc(node) > 0.0_WP) THEN
            hekman = cekman * ustar(node) / MAX( ABS (coriolis_node(node) ), epsln)
            hmonob = cmonob * ustar(node) * ustar(node) * ustar(node)     &
                 /vonk / (bfsfc(node) + epsln) 
@@ -639,17 +639,17 @@ contains
         ju    = MAX( ju , 0  )
         jup1  = ju+1
 
-        zfrac = zdiff/deltaz - FLOAT(iz)
-        ufrac = udiff/deltau - FLOAT(ju)
+        zfrac = zdiff/deltaz - real(iz,WP)
+        ufrac = udiff/deltau - real(ju,WP)
 
-        fzfrac= 1.-zfrac
+        fzfrac= 1._WP-zfrac
         wam   = (fzfrac)  * wmt(iz,jup1) + zfrac * wmt(izp1,jup1)
         wbm   = (fzfrac)  * wmt(iz,ju  ) + zfrac * wmt(izp1,ju  )
-        wm    = (1.-ufrac)* wbm          + ufrac * wam
+        wm    = (1._WP-ufrac)* wbm          + ufrac * wam
 
         was   = (fzfrac)  * wst(iz,jup1) + zfrac * wst(izp1,jup1)
         wbs   = (fzfrac)  * wst(iz,ju  ) + zfrac * wst(izp1,ju  )
-        ws    = (1.-ufrac)* wbs          + ufrac * was
+        ws    = (1._WP-ufrac)* wbs          + ufrac * was
 
      ELSE
         u3    = us*us*us
@@ -897,7 +897,7 @@ contains
         if(nl1<3) cycle  ! a temporary solution
 
       ! level thickness
-        dthick(2:nl1-1)=0.5*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
+        dthick(2:nl1-1)=0.5_WP*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
         dthick(1)=dthick(2)
         dthick(nl1)=dthick(nl1-1)
 
@@ -929,7 +929,7 @@ contains
 
        dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
        dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
-       viscp  = 0.5 * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+       viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
             R  * (dvdzdn + abs(dvdzdn)) )
 
         dvdzup = (diff_col(knm1,3) - diff_col(kn,3))/dthick(kn)
