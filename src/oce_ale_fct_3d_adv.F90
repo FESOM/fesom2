@@ -730,6 +730,8 @@ subroutine fct_ale(ttf, iter_yn)
         do nz=1,nlevels_nod2D(n)-1  
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n)-ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
                                     (fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)
+!!PS             del_ttf(nz,n)        =del_ttf(nz,n)        -ttf(nz,n)*hnode(nz,n)+fct_LO(nz,n)*hnode_new(nz,n) + &
+!!PS                                     (fct_adf_v(nz,n)-fct_adf_v(nz+1,n))*dt/area(nz,n)
         end do
     end do
     
@@ -743,6 +745,8 @@ subroutine fct_ale(ttf, iter_yn)
         do nz=1, max(nl1,nl2)
             del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+fct_adf_h(nz,edge)*dt/area(nz,enodes(1))
             del_ttf_advhoriz(nz,enodes(2))=del_ttf_advhoriz(nz,enodes(2))-fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
+!!PS             del_ttf(nz,enodes(1))         =del_ttf(nz,enodes(1))         +fct_adf_h(nz,edge)*dt/area(nz,enodes(1))
+!!PS             del_ttf(nz,enodes(2))         =del_ttf(nz,enodes(2))         -fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
 end subroutine fct_ale

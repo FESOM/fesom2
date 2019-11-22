@@ -285,16 +285,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
-    map.drawparallels(yticks,#np.arange(-90.,90.,30.),
-            labels=ylabels,
-            linewidth=0.25,
-            dashes=[1,1e-10],
-            fontsize=fsize)
-    map.drawmeridians(xticks,#np.arange(0.,360.,30.),
-            linewidth=0.25,
-            labels=xlabels,
-            dashes=[1,1e-10],
-            fontsize=fsize)
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
     
     # label lon lat grid for ortho projection 
@@ -307,6 +297,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 linewidth=1.0,
                 dashes=[1,1e-10],
                 fontsize=fsize)
+        
         for i in np.arange(len(xticks)):
             xt,yt=xy=map(xticks[i],0)
             if xticks[i]>0 :
@@ -323,6 +314,26 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
             elif yticks[i]<0: 
                 plt.text(xt,yt,' {:.1f}$^{{\\circ}}$S'.format(yticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
                 plt.plot(xt,yt,'o',linestyle='None',color='k')    
+    # label lon lat grid for cycl projection             
+    else:
+        map.drawparallels(yticks,#np.arange(-90.,90.,30.),
+            labels=ylabels,
+            linewidth=0.25,
+            dashes=[1,1e-10],
+            fontsize=fsize)
+        meridians = map.drawmeridians(xticks,#np.arange(0.,360.,30.),
+            linewidth=0.25,
+            labels=xlabels,
+            dashes=[1,1e-10],
+            fontsize=fsize)
+            
+        # try to rotate meridian labels
+        for m in meridians:
+            try:
+                meridians[m][1][0].set_rotation(25)
+            except:
+                pass
+        
     #___________________________________________________________________________
     # draw land mask patch
     if inputarray['which_mask'] == 'fesom':
@@ -391,9 +402,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     plt.sca(ax)
     
     if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
-        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='baseline')
+        plt.title(data.descript+'\n',fontdict= dict(fontsize=20),verticalalignment='baseline')
     else:    
-        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
+        plt.title(data.descript,fontdict= dict(fontsize=20),verticalalignment='center')
+#         plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     #ax.set_xlabel(' ',fontsize=20,verticalalignment='top')
     #ax.set_ylabel(' ',fontsize=30,verticalalignment='bottom')
     #+_________________________________________________________________________+
@@ -1496,23 +1508,18 @@ def fesom_idxinbox(mesh,data1,inputarray):
     idxbox_e = idxbox_e==False # true index for triangles that are within box 
     
     # case of node data
-    if data1.value.size ==mesh.n2dna:
-        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
-    elif data1.value.size ==mesh.n2dea:
-        idx_box = np.ones((mesh.n2dea,),dtype='bool')
-        
-    if data1.value.size ==mesh.n2dna:
+    if mesh.n2dna in data1.value.shape:
         idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
         idxbox_n  = np.array(idxbox_n).squeeze()
         idxbox_n  = np.unique(idxbox_n)
-        idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
+        idx_box   = np.zeros((mesh.n2dna,), dtype='bool')
         idx_box[idxbox_n]=True
         del idxbox_n 
-        #del idxbox_e
+        del idxbox_e
     # case of element data
-    elif data1.value.size ==mesh.n2dea:
-        idx_box   = idxbox_e
-        #del idxbox_e
+    elif mesh.n2dea in data1.value.shape:
+        idx_box = idxbox_e
+        del idxbox_e
     
     #___________________________________________________________________________
     # make triangle mask arrays from flat triangles and nan trinagles
@@ -1525,14 +1532,16 @@ def fesom_idxinbox(mesh,data1,inputarray):
 #_______________________________________________________________________________
 # select optimal color range by histogramm
 #_______________________________________________________________________________
-def fesom_choose_best_crange(in_data,in_weights,in_limit=0.99):
+def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=False):
     cmin, cmax = np.nanmin(in_data), np.nanmax(in_data)
-    print(' --> original cmin,cmax:',cmin,cmax)
+    if do_output:print(' --> orig cmin,cmax:',cmin,cmax)
+    
+    in_data = in_data*fac
     
     binrange=[cmin, cmax];
     if cmin<0.0 and cmax>0.0 : binrange=[-max(np.abs(cmin),cmax),max(np.abs(cmin),cmax)]
     hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000, weights=in_weights,density=True, normed=True) 
-    binedge_mid, cumsum, limit = binedge[:-1]+(binedge[1:]-binedge[:-1])/2, np.cumsum(hist*(binedge[1:]-binedge[:-1])), in_limit
+    binedge_mid, cumsum, limit = binedge[:-1]+(binedge[1:]-binedge[:-1])/2, np.cumsum(hist*(binedge[1:]-binedge[:-1])), limit
     
     idx_min = np.where(cumsum<=1-limit)[0]
     if len(idx_min)==0: 
@@ -1550,6 +1559,17 @@ def fesom_choose_best_crange(in_data,in_weights,in_limit=0.99):
     if cmax!=0.0: cmax = np.around(cmax, -np.int32(np.floor(np.log10(np.abs(cmax)))-1) ) 
     if cmin!=0.0: cmin = np.around(cmin, -np.int32(np.floor(np.log10(np.abs(cmin)))-1) ) 
     
-    print(' --> best cmin,cmax:',cmin,cmax)
+    if do_output:print(' --> best cmin,cmax:',cmin,cmax)
     
     return(cmin,cmax)
+
+#_______________________________________________________________________________
+# select optimal color range by histogramm
+#_______________________________________________________________________________
+def fesom_choose_best_cref(cmin,cmax,varname):
+    cref = cmin + (cmax-cmin)/2
+    if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1)) 
+    if varname in ['u','v','w','ssh','fw','fh'] or \
+       any(x in varname for x in ['vec','anom']):
+        cref=0.0
+    return(cref)    

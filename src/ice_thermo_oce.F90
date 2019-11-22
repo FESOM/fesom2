@@ -69,9 +69,9 @@ subroutine thermodynamics
     DO i=1, myDim_nod2D
        ustar=0.0_WP
        ustar=((u_ice(i)-u_w(i))**2+ &
-	               (v_ice(i)-v_w(i))**2)
+              (v_ice(i)-v_w(i))**2)
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
-    END DO	
+    END DO
   call exchange_nod(ustar_aux) !TODO Why do we need it?
   ! ================
   ! end: friction velocity 
@@ -222,13 +222,13 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   thick=thick+h/max(A,Armin)            ! Effective total snow-ice thickness
 
   ! Growth rate for ice in open ocean
-  rhow=0.0
-  evap=0.0
+  rhow=0.0_WP
+  evap=0.0_WP
   call obudget(qa,fsh,flo,T_oc,ug,ta,ch,ce,rhow,evap,hflatow,hfsenow,hflwrdout) 
   hflatow=hflatow*(1.0_WP-A)
   hfsenow=hfsenow*(1.0_WP-A)
   hflwrdout=hflwrdout*(1.0_WP-A)
-
+  
   ! add heat loss at open ocean due to melting snow fall
   !rhow=rhow+snow*1000.0/rhoice !qiang
   ! ice_dt and (1-A) will be multiplied afterwards
@@ -236,18 +236,20 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! growth rate of ice in ice covered part
   ! following Hibler 1984
   ! assuming ice thickness has an euqal, 7-level distribution from zero to two times h 
-  rhice=0.0                      
-  subli=0.0
+  rhice=0.0_WP                      
+  subli=0.0_WP
   if (thick.gt.hmin) then
-     do k=1,iclasses			  
-        thact = (2*k-1)*thick/float(iclasses)  	! Thicknesses of actual ice class
-        call budget(thact,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i) 
+     do k=1,iclasses
+        thact = real((2*k-1),WP)*thick/real(iclasses,WP) ! Thicknesses of actual ice class
+        call budget(thact,hsn,t,Ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,shice,subli_i) 
         !Thick ice K-class growth rate
-        rhice=rhice+shice/float(iclasses)      	! Add to average heat flux
-        subli=subli+subli_i/float(iclasses)
+        rhice=rhice+shice      	! Add to average heat flux
+        subli=subli+subli_i
      end do
+     rhice=rhice/real(iclasses,WP)      	! Add to average heat flux
+     subli=subli/real(iclasses,WP)
   end if
-
+  
   ! Convert growth rates [m ice/sec] into growth per time step DT.
   rhow=rhow*ice_dt
   rhice=rhice*ice_dt
@@ -346,7 +348,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   dhsngrowth=dhsngrowth/ice_dt   ! Conversion: 'per time step' -> 'per second'
   ! (radiation+turbulent) + freezing(-melting) sea-ice&snow 
 
-  ehf = ahf + cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth) 
+  ehf = ahf + cl*(dhgrowth+(rhosno/rhoice)*dhsngrowth)
     
   ! (prec+runoff)+evap - freezing(+melting) ice&snow
   if (.not. use_virt_salt) then
@@ -411,6 +413,7 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
   ! original code, and the simulated ice volume is only slightly larger after modification. 
   
   use i_therm_param
+  use o_param, only: WP
   implicit none
 
   integer iter, imax      ! Number of iterations
@@ -421,19 +424,23 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
   real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
   real(kind=WP), external :: TFrez
 
-  data q1 /11637800.0/, q2 /-5897.8/ 
-  data imax /5/
-
+!!PS   data q1 /11637800.0/, q2 /-5897.8/ 
+!!PS   data imax /5/
+  
+  q1   = 11637800.0_WP
+  q2   = -5897.8_WP
+  imax = 5
+  
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished.
-  if (t<0.0) then	        ! freezing condition    
-     if (hsn.gt.0.0) then	!   snow cover present  
+  if (t<0.0_WP) then	        ! freezing condition    
+     if (hsn.gt.0.0_WP) then	!   snow cover present  
         alb=albsn         	
      else              		!   no snow cover       
         alb=albi       	
      endif
   else			        ! melting condition     
-     if (hsn.gt.0.0) then	!   snow cover present  
+     if (hsn.gt.0.0_WP) then	!   snow cover present  
         alb=albsnm	    	
      else			!   no snow cover       
         alb=albim		
@@ -445,7 +452,7 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
   d3=d2*clhi
 
   ! total incoming atmospheric heat flux
-  A1=(1.0-alb)*fsh + flo + d1*ug*ta + d3*ug*qa   ! in LY2004 emiss is multiplied wiht flo
+  A1=(1.0_WP-alb)*fsh + flo + d1*ug*ta + d3*ug*qa   ! in LY2004 emiss is multiplied wiht flo
   ! NEWTON-RHAPSON TO GET TEMPERATURE AT THE TOP OF THE ICE LAYER
 
   do iter=1,imax
@@ -456,16 +463,16 @@ subroutine budget (hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
      A3=-d3*ug*B*q2/((t+tmelt)**2)		! gradient coefficient for the latent heat part
      C=con/hice                     		! gradient coefficient for downward heat conductivity
      A3=A3+C+d1*ug & 			! gradient coefficient for sensible heat and radiation 
-          +4.0*emiss_ice*boltzmann*((t+tmelt)**3)    
+          +4.0_WP*emiss_ice*boltzmann*((t+tmelt)**3)    
      C=C*(TFrez(S_oc)-t)       		! downward conductivity term
 
      t=t+(A1+A2+C)/A3 		        ! NEW ICE TEMPERATURE AS THE SUM OF ALL COMPONENTS
   end do
 
-  t=min(0.0,t)
+  t=min(0.0_WP,t)
   ! heat fluxes [W/m**2]:
 
-  hfrad= (1.0-alb)*fsh &	        ! absorbed short wave radiation
+  hfrad= (1.0_WP-alb)*fsh &	        ! absorbed short wave radiation
        +flo &           	        ! long wave radiation coming in  ! in LY2004 emiss is multiplied
        -emiss_ice*boltzmann*((t+tmelt)**4) 	! long wave radiation going out
 
@@ -502,39 +509,49 @@ subroutine obudget (qa,fsh,flo,t,ug,ta,ch,ce,fh,evap,hflatow,hfsenow,hflwrdout)
   !         evap - evaporation
 
   use i_therm_param
+  use o_param, only: WP
   implicit none
 
-  real(kind=WP) qa,t,Ta,fsh,flo,ug,ch,ce,fh,evap
+  real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
   real(kind=WP) hfsenow,hfradow,hflatow,hftotow,hflwrdout,b
   real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
   real(kind=WP) c1, c4, c5
   logical :: standard_saturation_shum_formula = .true.
-
+  integer :: ii
 
   !data c1, c4, c5 /3.8e-3, 17.67, 243.5/
-  data c1, c4, c5 /3.8e-3, 17.27, 237.3/
-  data q1 /640380./, q2 /-5107.4/
+!!PS   data c1, c4, c5 /3.8e-3, 17.27, 237.3/
+!!PS   data q1 /640380./, q2 /-5107.4/
+  
+  c1 = 3.8e-3_WP    
+  c4 = 17.27_WP
+  c5 = 237.3_WP
+  q1 = 640380._WP
+  q2 = -5107.4_WP
 
   ! (saturated) surface specific humidity
   if(standard_saturation_shum_formula) then
      b=c1*exp(c4*t/(t+c5))                      ! a standard one
   else
-     b=0.98*q1*inv_rhoair*exp(q2/(t+tmelt)) 	! LY2004 NCAR version 
+     b=0.98_WP*q1*inv_rhoair*exp(q2/(t+tmelt)) 	! LY2004 NCAR version 
   end if
-
-  ! heat fluxes [W/m**2]:
-
-  hfradow= (1.0-albw)*fsh &	                ! absorbed short wave radiation
+  
+  ! radiation heat fluxe [W/m**2]:
+  hfradow= (1.0_WP-albw)*fsh &	                ! absorbed short wave radiation
        +flo             	                ! long wave radiation coming in !put emiss/check
   hflwrdout=-emiss_wat*boltzmann*((t+tmelt)**4) ! long wave radiation going out !in LY2004 emiss=1
   hfradow=hfradow+hflwrdout
 
+  ! sensible heat fluxe [W/m**2]:
   hfsenow=rhoair*cpair*ch*ug*(ta-t)             ! sensible heat 
-  evap=rhoair*ce*ug*(qa-b)                      ! evaporation kg/m2/s
+  
+  ! latent heat fluxe [W/m**2]:
+  evap =rhoair*ce*ug*(qa-b)  ! evaporation kg/m2/s
   hflatow=clhw*evap                             ! latent heat W/m2
 
+  ! total heat fluxe [W/m**2]:
   hftotow=hfradow+hfsenow+hflatow               ! total heat W/m2
-
+  
   fh= -hftotow/cl                             	! growth rate [m ice/sec]
   !                                           	+: ML gains energy, ice melts
   !                                           	-: ML loses energy, ice grows
@@ -572,7 +589,7 @@ function TFrez(S)
   implicit none
   real(kind=WP) :: S, TFrez
 
-  TFrez= -0.0575*S+1.7105e-3 *sqrt(S**3)-2.155e-4 *S*S
+  TFrez= -0.0575_WP*S+1.7105e-3_WP *sqrt(S**3)-2.155e-4_WP *S*S
 
 end function TFrez
 !

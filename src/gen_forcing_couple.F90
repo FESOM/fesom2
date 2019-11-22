@@ -197,9 +197,9 @@ subroutine update_atm_forcing(istep)
   shum     =atmdata(i_humi, :)
   longwave =atmdata(i_qlw, :)
   shortwave=atmdata(i_qsr, :)
-  Tair     =atmdata(i_tair, :)-273.15
-  prec_rain=atmdata(i_prec, :)/1000.
-  prec_snow=atmdata(i_snow, :)/1000.
+  Tair     =atmdata(i_tair, :)-273.15_WP
+  prec_rain=atmdata(i_prec, :)/1000._WP
+  prec_snow=atmdata(i_snow, :)/1000._WP
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then

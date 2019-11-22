@@ -107,6 +107,7 @@ subroutine adv_tracers_ale(tr_num)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
+!!PS     del_ttf          = 0.0_WP
     select case (tracer_adv)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
@@ -115,7 +116,7 @@ subroutine adv_tracers_ale(tr_num)
             
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
             call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
-            
+        
         case(2) !MUSCL+FCT(3D)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
             call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0)
@@ -128,11 +129,12 @@ subroutine adv_tracers_ale(tr_num)
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
-    do node=1, myDim_nod2d
-        do nz=1,nlevels_nod2D(node)-1  
-            del_ttf(nz,node)=del_ttf(nz,node)+del_ttf_advhoriz(nz,node)+del_ttf_advvert(nz,node)
-        end do
-    end do
+!!PS     do node=1, myDim_nod2d
+!!PS         do nz=1,nlevels_nod2D(node)-1  
+!!PS             del_ttf(nz,node)=del_ttf(nz,node)+del_ttf_advhoriz(nz,node)+del_ttf_advvert(nz,node)
+!!PS         end do
+!!PS     end do
+    del_ttf=del_ttf+del_ttf_advhoriz+del_ttf_advvert
     
     !___________________________________________________________________________
     ! compute discrete variance decay after Burchard and Rennau 2008
@@ -1281,11 +1283,11 @@ FUNCTION bc_surface(n, id)
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)
-        bc_surface=0.
+        bc_surface=0.0_WP
     CASE (302)
-        bc_surface=0.
+        bc_surface=0.0_WP
     CASE (303)
-        bc_surface=0.
+        bc_surface=0.0_WP
     CASE DEFAULT
       if (mype==0) then
          write (id_string, "(I3)") id

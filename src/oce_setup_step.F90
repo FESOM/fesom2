@@ -192,9 +192,14 @@ allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
+del_ttf          = 0.0_WP
+del_ttf_advhoriz = 0.0_WP
+del_ttf_advvert  = 0.0_WP
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
     allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
+    tr_dvd_horiz = 0.0_WP
+    tr_dvd_vert  = 0.0_WP
 end if 
 
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
@@ -282,7 +287,7 @@ if (Fer_GM) then
    fer_wvel=0.0_WP
    fer_K=500.
    fer_c=1.
-   fer_scal = 0.0
+   fer_scal = 0.0_WP
 end if
 
 if (SPP) then

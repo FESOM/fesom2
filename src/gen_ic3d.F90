@@ -284,6 +284,8 @@ CONTAINS
       integer              :: ierror              ! return error code
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
+      ncdata=0.0_WP
+      data1d=0.0_WP
       tr_arr(:,:,current_tracer)=dummy
       !open NETCDF file on 0 core     
       if (mype==0) then
