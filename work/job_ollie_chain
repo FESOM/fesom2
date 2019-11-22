@@ -9,7 +9,7 @@
 #SBATCH -o fesom2.0_%x_%j.out
 #SBATCH -e fesom2.0_%x_%j.out
 
-#___DEFAULT INPUT_______________________________________________________________    
+#___DEFAULT INPUT_______________________________________________________________
 # how many job chains should be applied
 chain_n=3 # number chain cycles
 chain_s=1 # starting chain id
@@ -17,6 +17,8 @@ chain_s=1 # starting chain id
 # time frame of model simulation 
 year_s=1948
 year_e=2009
+
+fedit=1
 
 #___HELP OUTPUT_________________________________________________________________
 script_name=job_ollie_chain
@@ -27,6 +29,7 @@ function usage {
     echo "  -ys     starting year of model simulation (default: 1948)"
     echo "  -ye     ending year of model simulation   (default: 2009)"
     echo "  -h      display help"
+    echo "  -noedit no automatic editing of namelist.config"
     echo 
     echo " --> for changing the wall-clock-time interactively use    "
     echo "     sbatch --time=00:10:00 job_ollie_chain ..."
@@ -40,10 +43,11 @@ function usage {
 #___OVERRIDE DEFAULT INPUT BY COMMANDLINE INPUT_________________________________
 while [ "$1" != "" ]; do
     case $1 in
-        -cn | -chain_n | --cn | --chain_n )  shift ; chain_n=$1 ;;
-        -cs | -chain_s | --cs | --chain_s )  shift ; chain_s=$1 ;;
-        -ys | -year_s  | --ys | --year_s  )  shift ; year_s=$1  ;;
-        -ye | -year_e  | --ye | --year_e  )  shift ; year_e=$1  ;;
+        -cn | -chain_n )  shift ; chain_n=$1 ;;
+        -cs | -chain_s )  shift ; chain_s=$1 ;;
+        -ys | -year_s  )  shift ; year_s=$1  ;;
+        -ye | -year_e  )  shift ; year_e=$1  ;;
+        -noedit | --noedit ) fedit=0         ;;
         -h  | --help   )  usage ; exit       ;;
     esac
     shift
@@ -101,7 +105,7 @@ fi
 # check if in namelist.config a chain path is given (that mean 
 # ResultPath=.../ResultDir/chain/) if not change namelist.config accordingly
 check=${dname_result_link##*${dname_result}}
-if [ $check != "chain" ]; then
+if [ $fedit -eq 1 ] && [ $check != "chain" ]; then
     echo -e "\033[33m --> replace in namelist.config ResultPath with chain path \033[0m"
     dname_result_link="${dname_result}chain"
     sed -i "s|${dname_result_link_orig}|${dname_result_link}/|g" namelist.config
@@ -127,22 +131,26 @@ if [ -f "$dname_result_link/fesom.clock" ] ; then
     if [ $aux_yr_clock -le $year_e ]; then is_newsimul=0 ; fi
     
     #___________________________________________________________________________
-    if [ $is_newsimul -eq 0 ] ; then
-        year_d=$(( $year_e - $aux_yr_clock + 1 ))
-        rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
-        if  [ $rlen -ne $year_d ] ; then 
-            sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
-        fi
+    if [ $fedit -eq 1 ] ; then
+        if [ $is_newsimul -eq 0 ] ; then
+            year_d=$(( $year_e - $aux_yr_clock + 1 ))
+            rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+            if  [ $rlen -ne $year_d ] ; then 
+               sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+           fi
+       fi
     fi
 else
     #___________________________________________________________________________
     # set model run length in job_script and change namelist.config accordingly 
     # to match
-    year_d=$(( $year_e - $year_s + 1 ))
-    rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
-    if  [ $rlen -ne $year_d ] ; then 
-        sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
-    fi  
+    if [ $fedit -eq 1 ] ; then
+        year_d=$(( $year_e - $year_s + 1 ))
+        rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+        if  [ $rlen -ne $year_d ] ; then 
+            sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+        fi  
+    fi
 fi
 
 #___CREATE CLOCK & RESTART INFRASTRUCTURE FOR COLD/WARM START___________________
@@ -168,6 +176,11 @@ if [ $is_newsimul -eq 1 ] ; then
         cp namelist.config namelist.oce namelist.ice namelist.forcing namelist.io \
            namelist.cvmix ${dname_result}/.
         cp fesom.x ${dname_result}/.
+
+	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
+	if [ ! -d "${dname_result}/src" ]; then mkdir("${dname_result}/src") ; fi
+	cp ../src/*.F90 ${dname_result}/src/.
+	
         
     # --> make warm start 
     else
@@ -218,6 +231,9 @@ if [ $is_newsimul -eq 1 ] ; then
         if [ ! -f "${dname_result}/fesom.x" ]; then 
             cp fesom.x ${dname_result}/. 
         fi
+	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
+	if [ ! -d "${dname_result}/src" ]; then mkdir("${dname_result}/src") ; fi
+	cp ../src/*.F90 ${dname_result}/src/.
     fi 
 fi
 
@@ -231,6 +247,9 @@ srun --mpi=pmi2 ./fesom.x >> ${fname}
 err_srun=$?
 echo -e "\033[33m --> err_srun=${err_srun} \033[0m"
 date
+
+#___SHOW JOB INFORMATION________________________________________________________
+scontrol show job $SLURM_JOB_ID
 
 #___SETUP JOBCHAIN______________________________________________________________
 # setup next chain job via dependence
