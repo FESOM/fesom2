@@ -107,10 +107,10 @@ subroutine thermodynamics
      S_oc    = S_oc_array(inod)
      if (ref_sss_local) rsss = S_oc
 
-     ehf     = 0.
-     fw      = 0.
+     ehf     = 0._WP
+     fw      = 0._WP
 #ifdef use_fullfreesurf
-     rsf     = 0.
+     rsf     = 0._WP
 #endif
 
      !---- different lead closing parameter for NH and SH
@@ -199,7 +199,7 @@ contains
     real(kind=WP)  :: Tfrezs
 
     !---- compute freezing temperature of sea-water from salinity
-    TFrezs = -0.0575*S_oc + 1.7105e-3*sqrt(S_oc**3) - 2.155e-4*(S_oc**2)
+    TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)
 
     !---- effective thermodynamic thickness of the snow/ice layer
     heff = h + hsn*con/consn
@@ -224,8 +224,8 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
-    ahf = A*Qatmice + (1.-A)*Qatmocn
-    ohf = A*Qocnice + (1.-A)*Qocnatm
+    ahf = A*Qatmice + (1._WP-A)*Qatmocn
+    ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
@@ -239,7 +239,7 @@ contains
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
     PmEice = A*snow + A*subli
-    PmEocn = rain + runo + (1.-A)*snow + (1.-A)*evap
+    PmEocn = rain + runo + (1._WP-A)*snow + (1._WP-A)*evap
 
     !---- convert freshwater fluxes [m/s] into growth per time step dt [m]
     PmEice = PmEice*dt
@@ -251,9 +251,9 @@ contains
     !---- residual freshwater flux over ice
     if (hsn.lt.0) then
        PmEice = hsn*rhosno/rhofwt
-       hsn = 0.
+       hsn = 0._WP
     else
-       PmEice = 0.
+       PmEice = 0._WP
     endif
 
     !---- subtract sublimation from ice thickness (PmEice <= 0)
@@ -262,14 +262,14 @@ contains
     !---- residual freshwater flux over ice
     if (h.lt.0) then
        PmEice = h*rhoice/rhofwt
-       h = 0.
+       h = 0._WP
     else
-       PmEice = 0.
+       PmEice = 0._WP
     endif
 
     !---- add residual freshwater flux over ice to freshwater flux over ocean
     PmEocn = PmEocn + PmEice
-    PmEice = 0.
+    PmEice = 0._WP
 
     !---- store snow and ice thickness after snowfall and sublimation
     hsnold = hsn
@@ -278,7 +278,7 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-    dsnow = A*min(Qatmice-Qicecon,0.)
+    dsnow = A*min(Qatmice-Qicecon,0._WP)
     dsnow = max(dsnow*rhoice/rhosno,-hsn)
 
     !---- update snow thickness after atmospheric snow melt
@@ -291,12 +291,12 @@ contains
     dhice = dhice - dsnow*rhosno/rhoice
 
     !---- ice growth rate over open water (dhiow >= 0)
-    dhiow = (1.-A)*max(Qatmocn-Qocnatm,0.)
+    dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
 
-    if (htmp.lt.0.) then
+    if (htmp.lt.0._WP) then
        !---- all ice melts; now try to melt snow if still present,
        !---- but do not melt more snow than available
        hsntmp = max(htmp*rhoice/rhosno,-hsn)
@@ -305,28 +305,28 @@ contains
        hsn = hsn + hsntmp
 
        !---- new ice thickness
-       h = 0.
+       h = 0._WP
     else
        h = htmp
     endif
 
     !---- avoid very small ice thicknesses
-    if (h.lt.hcutoff) h = 0.
+    if (h.lt.hcutoff) h = 0._WP
 
     !---- ice thickness before any thermodynamic change
     !---- (for h=0 use cut-off ice thickness to avoid division by zero)
     htmp = max(hold,hcutoff)
 
     !---- ice concentration change by melting of ice (dhice <= 0)
-    dcice = 0.5*A*min(dhice,0.)/htmp
+    dcice = 0.5_WP*A*min(dhice,0._WP)/htmp
 
     !---- lateral snow melt if lateral ice melt exceeds snow melt
     !---- due to atmospheric forcing ( dcice*hsn/A - dsnow < 0 )
-    if (A.le.0.) then
+    if (A.le.0._WP) then
        dslat = -hsn
     else
        hsntmp = hsnold/max(A,Aimin)
-       dslat = min(dcice*hsntmp-dsnow,0.)
+       dslat = min(dcice*hsntmp-dsnow,0._WP)
        dslat = max(dslat,-hsn)
     endif
 
@@ -343,14 +343,14 @@ contains
     !---- alternative lead closing parameter when h0max is negative.
     !---- h0min is then interpreted as 'Phi_F' according to the ice
     !---- model by Mellor and Kantha (1989)
-    if (h0max.le.0.) then
+    if (h0max.le.0._WP) then
        htmp = hold/max(A,Aimin)
        h0cur = max(htmp,himin)/h0min
     endif
 
     !---- ice concentration change by freezing in open leads (dhiow >= 0)
     !---- NOTE: dhiow already represents an areal fraction
-    dciow = max(dhiow,0.)/h0cur
+    dciow = max(dhiow,0._WP)/h0cur
 
     !---- new ice concentration
     A = A + dcice + dciow
@@ -359,7 +359,7 @@ contains
     A = min(A,h*bigval)
 
     !---- restrict ice concentration to values between zero and one
-    A = max(0.,min(1.,A))
+    A = max(0._WP,min(1._WP,A))
 
     !---- change in snow and ice thickness due to thermodynamic effects [m/s]
     dhsngrowth = (hsn-hsnold)/dt

@@ -229,12 +229,12 @@ subroutine integrate_nod_2D(data, int2D)
   integer       :: row
   real(kind=WP) :: lval
 
-  lval=0.0
+  lval=0.0_WP
   do row=1, myDim_nod2D
      lval=lval+data(row)*area(1,row)
   end do
 
-  int2D=0.0
+  int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_2D
@@ -253,13 +253,13 @@ subroutine integrate_nod_3D(data, int3D)
   integer       :: k, row
   real(kind=WP) :: lval
 
-  lval=0.0
+  lval=0.0_WP
   do row=1, myDim_nod2D
      do k=1, nlevels_nod2D(row)-1
         lval=lval+data(k, row)*area(k,row)*hnode_new(k,row)
      end do
   end do
-  int3D=0.0
+  int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_3D
@@ -280,9 +280,9 @@ subroutine extrap_nod3D(arr)
   allocate(work_array(myDim_nod2D+eDim_nod2D))
   call exchange_nod(arr)
   loc_max=maxval(arr(1,:))
-  glob_max=0.
+  glob_max=0._WP
   call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-  DO WHILE (glob_max>0.99*dummy)  
+  DO WHILE (glob_max>0.99_WP*dummy)  
      ! extrapolate in horizontal direction
      DO nz=1, nl-1
         work_array=arr(nz,:)
@@ -290,21 +290,21 @@ subroutine extrap_nod3D(arr)
         DO WHILE (success)
            success=.false.
            DO n=1, myDim_nod2D
-              IF ((work_array(n)>0.99*dummy) .and. (nlevels_nod2D(n)>nz)) THEN
+              IF ((work_array(n)>0.99_WP*dummy) .and. (nlevels_nod2D(n)>nz)) THEN
                  cnt=0
-                 val=0.
+                 val=0._WP
                  DO k=1, nod_in_elem2D_num(n)
                     el=nod_in_elem2D(k, n)
                     enodes=elem2D_nodes(:, el)
                     DO j=1, 3
-                       if ((work_array(enodes(j))<0.99*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
+                       if ((work_array(enodes(j))<0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
                           val=val+work_array(enodes(j))
                           cnt=cnt+1              
                        end if
                     END DO
                  END DO
                  if (cnt>0) then
-                    work_array(n)=val/real(cnt)
+                    work_array(n)=val/real(cnt,WP)
                     success=.true.
                  end if
               END IF
@@ -320,7 +320,7 @@ subroutine extrap_nod3D(arr)
   DO n=1, myDim_nod2D
      nl1 = nlevels_nod2D(n)-1
      DO nz=2, nl1
-        if (arr(nz,n)>0.99*dummy) arr(nz,n)=arr(nz-1,n)
+        if (arr(nz,n)>0.99_WP*dummy) arr(nz,n)=arr(nz-1,n)
      END DO
   END DO
   call exchange_nod(arr)

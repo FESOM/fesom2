@@ -8,11 +8,11 @@ where(a_ice>1.0_WP)
  a_ice=1.0_WP
 end where
 
-where(a_ice<0.1e-8)
+where(a_ice<0.1e-8_WP)
  a_ice=0.0_WP
 end where
 
-where(m_ice<0.1e-8)
+where(m_ice<0.1e-8_WP)
  m_ice=0.0_WP
 end where
 
@@ -320,8 +320,8 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! 3.  Parameterize the ocean-to-ice heat flux (o2ihf)
   !     as a function of temperature difference and the
   !     friction velocity:
-  o2ihf= (T_oc-TFrez(S_oc))*0.006*ustar*cc*A  &
-       +(T_oc-Tfrez(S_oc))*H_ML/ice_dt*cc*(1.0-A)  	! [W/m2]
+  o2ihf= (T_oc-TFrez(S_oc))*0.006_WP*ustar*cc*A  &
+       +(T_oc-Tfrez(S_oc))*H_ML/ice_dt*cc*(1.0_WP-A)  	! [W/m2]
   rh=rh-o2ihf*ice_dt/cl
   qhst=h+rh		              		! [m]
 
@@ -336,7 +336,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! Update snow and ice depth
   hsn=sn
   h=max(qhst,0.0_WP)
-  if (h.lt.1E-6) h=0.        ! Avoid very small ice thicknesses
+  if (h.lt.1E-6_WP) h=0._WP        ! Avoid very small ice thicknesses
 
   ! heat and fresh water fluxes
   dhgrowth=h-dhgrowth        ! Change in ice thickness due to thermodynamic effects
@@ -362,11 +362,11 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
   rA= rhow - o2ihf*ice_dt/cl !Qiang: it was -(T_oc-TFrez(S_oc))*H_ML*cc/cl, changed in June 2010
   !rA= rhow - (T_oc-TFrez(S_oc))*H_ML*cc/cl*(1.0-A)
-  A=A + 0.5*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1.-A)/lid_clo  !/h0   
+  A=A + 0.5_WP*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1._WP-A)/lid_clo  !/h0   
   !meaning:           melting                         freezing
  
-  A=min(A,h*1.e6)     ! A -> 0 for h -> 0
-  A=min(max(A,0.0_WP),1.) ! A >= 0, A <= 1
+  A=min(A,h*1.e6_WP)     ! A -> 0 for h -> 0
+  A=min(max(A,0.0_WP),1._WP) ! A >= 0, A <= 1
 
   ! Flooding (snow to ice conversion)
   iflice=h

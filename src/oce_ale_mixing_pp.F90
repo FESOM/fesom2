@@ -38,7 +38,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 			shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
 					(Unode(2,nz-1,node)-Unode(2,nz,node))**2 
 			shear = shear*dz_inv*dz_inv
-			Kv(nz,node) = shear/(shear+5.*max(bvfreq(nz,node),0.0_WP)+1.0e-14)  ! To avoid NaNs at start
+			Kv(nz,node) = shear/(shear+5._WP*max(bvfreq(nz,node),0.0_WP)+1.0e-14)  ! To avoid NaNs at start
 		end do
 	end do
 	!___________________________________________________________________________
@@ -70,7 +70,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 			elnodes=elem2D_nodes(:,elem)
 			DO nz=2,nlevels(elem)-1
 				Av(nz,elem)= mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP + A_ver  &
-							+ sum(mo(nz,elnodes))/3.0 
+							+ sum(mo(nz,elnodes))/3.0_WP 
 			END DO
 		END DO
 		!_______________________________________________________________________
@@ -127,7 +127,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 	!___________________________________________________________________________
 	DO node=1, myDim_nod2D+eDim_nod2D
 		DO nz=2, nlevels_nod2d(node)-1
-			if (bvfreq(nz,node) < 0.) Kv(nz,node)=kv_conv
+			if (bvfreq(nz,node) < 0._WP) Kv(nz,node)=kv_conv
 			if (nz<=wndnl+1) then
 				Kv(nz,node)=max(Kv(nz,node), wndmix)
 			end if
@@ -137,7 +137,7 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 	DO elem=1, myDim_elem2D
 		elnodes=elem2D_nodes(:,elem)
 		DO nz=2,nlevels(elem)-1
-			if (any(bvfreq(nz, elnodes) < 0.)) Av(nz,elem)=av_conv
+			if (any(bvfreq(nz, elnodes) < 0._WP)) Av(nz,elem)=av_conv
 			if (nz<=wndnl+1) then
 				Av(nz,elem)=max(Av(nz,elem), wndmix)
 			end if
@@ -162,21 +162,21 @@ subroutine mo_length(water_flux,heat_flux,stress_x,stress_y,  &
     real(kind=WP)             :: ustar,tau, obuk
     real(kind=WP), parameter :: cosgam = 0.913632  ! cos(24.*3.14/180.)
 
-    qfm            = water_flux * 34.       ! note that water_flux>0
+    qfm            = water_flux * 34._WP       ! note that water_flux>0
     ![psu * m/s]   [m/s]   [psu]    ! f. upward fresh water flux
 
-    qtm            = - 2.38e-7 * heat_flux  ! heat_flux>0 f. upward heat flux
+    qtm            = - 2.38e-7_WP * heat_flux  ! heat_flux>0 f. upward heat flux
     ![K * m/s]
 
     tau = sqrt(stress_x**2+stress_y**2)
-    ustar = sqrt(tau/1030.)
+    ustar = sqrt(tau/1030._WP)
     uabs = sqrt(u_ice**2+v_ice**2)
 
-    qw = 1.25 * ustar**3 * (1.-a_ice) + 0.005 * uabs**3 * cosgam * a_ice  !Eq. 8 of TB04
+    qw = 1.25_WP * ustar**3 * (1._WP-a_ice) + 0.005_WP * uabs**3 * cosgam * a_ice  !Eq. 8 of TB04
 
     call pmlktmo(qfm,qtm,qw,obuk)
 
-    rtc=dt/(10.0 * 86400.0)     ! (NR: inverse of) time constant of mixed layer retreat
+    rtc=dt/(10.0_WP * 86400.0_WP)     ! (NR: inverse of) time constant of mixed layer retreat
 
     if (obuk.lt.mixlength) then
        ret = (obuk-mixlength)*rtc
@@ -206,17 +206,17 @@ subroutine pmlktmo(qfm,qtm,qw,obuk)
     real(kind=WP)            :: a1, f0, f1, ttmp, qrho
 
     qrho=betas*qfm-betat*qtm
-    ttmp=60.
+    ttmp=60._WP
 
     if(qrho>0.) then
-       ttmp=0.
+       ttmp=0._WP
     else
        do iter=1,5
           a1 = exp(-ttmp*qhw) 
-          f0 = 2.* qw * a1 + 9.81 * qrho * ttmp
-          f1 =-2.* qw * a1 * qhw + 9.81 * qrho
+          f0 = 2._WP* qw * a1 + 9.81_WP * qrho * ttmp
+          f1 =-2._WP* qw * a1 * qhw + 9.81_WP * qrho
           ttmp = ttmp - f0 / f1
-          ttmp = max(ttmp,10.) 
+          ttmp = max(ttmp,10._WP) 
        enddo
     end if
 
@@ -253,8 +253,8 @@ subroutine Kv0_background_qiang(Kv0_b,lat,dep)
 	
 	!_______________________________________________________________________
 	! latitudinal arctic scaling
-	if (lat > 70.0) then
-		if (dep <= 50.0)     then
+	if (lat > 70.0_WP) then
+		if (dep <= 50.0_WP)     then
 			ratio=4.0_WP + 6.0_WP * (50.0_WP - dep) / 50.0_WP
 		else
 			ratio=4.0_WP  
@@ -291,16 +291,16 @@ subroutine Kv0_background(Kv0_b,lat,dep)
 	
 	!_______________________________________________________________________
 	! latitudinal <70° scaling
-	if (lat < 70.0) then
+	if (lat < 70.0_WP) then
 		aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
 	! latitudinal arctic scaling
 	else
-		aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6
-		ratio=3.0
-		if (dep < 80.0)     then
-			ratio=1.0
-		elseif(dep < 100.0) then
-			ratio=2.0  
+		aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6_WP
+		ratio=3.0_WP
+		if (dep < 80.0_WP)     then
+			ratio=1.0_WP
+		elseif(dep < 100.0_WP) then
+			ratio=2.0_WP  
 		endif   
 	end if
 	!_______________________________________________________________________

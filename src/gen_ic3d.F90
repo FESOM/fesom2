@@ -310,7 +310,7 @@ CONTAINS
          iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
          ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
          ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
-         where (ncdata < -0.99*dummy ) ! dummy values are only positive
+         where (ncdata < -0.99_WP*dummy ) ! dummy values are only positive
                 ncdata = dummy
          end where
       end if
@@ -331,7 +331,7 @@ CONTAINS
          if (x<0.)   x=x+360.
          if (x>360.) x=x-360.
          if ( min(i,j)>0 ) then
-         if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99)) cycle
+         if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99_WP)) cycle
          x1 = nc_lon(i)
          x2 = nc_lon(ip1)
          y1 = nc_lat(j)
@@ -341,8 +341,8 @@ CONTAINS
          denom = (x2 - x1)*(y2 - y1)
          data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
                        ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
-         where (ncdata(i,j,:)   > 0.99*dummy .OR. ncdata(ip1,j,:)   > 0.99*dummy .OR. &
-                ncdata(i,jp1,:) > 0.99*dummy .OR. ncdata(ip1,jp1,:) > 0.99*dummy)
+         where (ncdata(i,j,:)   > 0.99_WP*dummy .OR. ncdata(ip1,j,:)   > 0.99_WP*dummy .OR. &
+                ncdata(i,jp1,:) > 0.99_WP*dummy .OR. ncdata(ip1,jp1,:) > 0.99_WP*dummy)
             data1d(:)=dummy
          end where          
          do k= 1, nl1
@@ -353,7 +353,7 @@ CONTAINS
                ! values from OB data for nearest depth           
                d1 = data1d(d_indx)
                d2 = data1d(d_indx_p1)
-               if ((d1<0.99*dummy) .and. (d2<0.99*dummy)) then
+               if ((d1<0.99_WP*dummy) .and. (d2<0.99_WP*dummy)) then
                ! line a*z+b coefficients calculation
                cf_a  = (d2 - d1)/ delta_d
                ! value of interpolated OB data on Z from model
@@ -406,12 +406,12 @@ CONTAINS
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
-      where (tr_arr > 0.9*dummy)
-            tr_arr=0.
+      where (tr_arr > 0.9_WP*dummy)
+            tr_arr=0.0_WP
       end where
 
-      where (tr_arr(:,:,1) > 100.)
-         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15
+      where (tr_arr(:,:,1) > 100._WP)
+         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
       end where
 
       if (t_insitu) then
@@ -472,14 +472,14 @@ CONTAINS
       integer                                 :: left, middle, right
       real(wp)                                :: d
 
-      d = 1e-9
+      d = 1e-9_WP
       left = 1
       right = length
       do
          if (left > right) then
             exit
          endif
-         middle = nint((left+right) / 2.0)
+         middle = nint((left+right) / 2.0_WP)
          if ( abs(array(middle) - value) <= d) then
             ind = middle
             return

@@ -21,16 +21,16 @@ use g_config,         only: dt
 implicit none
 
 integer         :: row
-real(kind=8)    :: aux
+real(kind=WP)   :: aux
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
-   if (thdgr(row)>0.0) then
+   if (thdgr(row)>0.0_WP) then
       ice_rejected_salt(row)= &
       (S_oc_array(row)-Sice)*thdgr(row)*aux*area(1, row)
       !unit: psu m3
    else
-      ice_rejected_salt(row)=0.0
+      ice_rejected_salt(row)=0.0_WP
    end if
 end do
 end subroutine cal_rejected_salt
@@ -46,26 +46,26 @@ subroutine app_rejected_salt
   implicit none
 
   integer         :: row, k, nod, nup, nlo, kml
-  real(kind=8)    :: zsurf, rhosurf, drhodz, spar(100)
+  real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)
 
   integer         :: n_distr
-  real(kind=8)    :: drhodz_cri, rho_cri
-  data drhodz_cri /0.01/  !kg/m3/m  !NH   !Nguyen2011
+  real(kind=WP)    :: drhodz_cri, rho_cri
+  data drhodz_cri /0.01_WP/  !kg/m3/m  !NH   !Nguyen2011
   data n_distr /5/
-  data rho_cri /0.4/      !kg/m3    !SH   !Duffy1999
+  data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
 
   do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
-     if (ice_rejected_salt(row)<=0.0) cycle
+     if (ice_rejected_salt(row)<=0.0_WP) cycle
      ! do not parameterize brine rejection in regions with low salinity
      ! 1. it leads to further decrease of SSS
      ! 2. in case of non zero salinity of ice (the well accepted value is 5psu) the SSS might become negative
-     if (tr_arr(1,row,2) < 10.0) cycle
-     if (geo_coord_nod2D(2,row)>0.0) then  !NH
+     if (tr_arr(1,row,2) < 10.0_WP) cycle
+     if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
         kml=1
-        spar(1)=0.0
+        spar(1)=0.0_WP
         do k=1, nlevels_nod2D(row)
            drhodz=bvfreq(k, row)*density_0/g
-           if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-50.0) exit
+           if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-50.0_WP) exit
            kml=kml+1
            spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**n_distr
         end do

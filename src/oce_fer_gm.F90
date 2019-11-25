@@ -134,8 +134,8 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
 
     integer          :: n, nz, nzmax
     real(kind=WP)    :: reso, c1, rosb, scaling, rr_ratio, aux_zz(nl)
-    real(kind=WP)    :: x0=1.5, sigma=.15 ! Fermi function parameters to cut off GM where Rossby radius is resolved
-    real(kind=WP)    :: c_min=0.5, f_min=1.e-6, r_max=200000.
+    real(kind=WP)    :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
+    real(kind=WP)    :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)    :: zscaling(nl)
     real(kind=WP)    :: bvref
 
@@ -147,7 +147,7 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
             c1=0._wp
             nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
             do nz=1, nzmax-1
-                c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2.
+                c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
             end do
             c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
             scaling=1._WP
@@ -249,7 +249,7 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
         if (scaling_FESOM14) then
             !zscaling(1:MLD1_ind(n)+1)=0.0_WP
             do nz=1, nzmax
-                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3) zscaling(nz)=0.0_WP
+                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
             end do
         end if
       
@@ -271,10 +271,10 @@ subroutine init_Redi_GM!fer_compute_C_K_Redi
             ! start with index 2 to not alternate fer_k(1,n) which contains here 
             ! the surface template for the scaling 
             do nz=2, nzmax-1
-                Ki(nz,n)= Ki(1,n)*0.5*(zscaling(nz)+zscaling(nz+1))
+                Ki(nz,n)= Ki(1,n)*0.5_WP*(zscaling(nz)+zscaling(nz+1))
             end do
             ! after vertical Ferreira scaling is done also scale surface template
-            Ki(1,n)=Ki(1,n)*0.5*(zscaling(1)+zscaling(2))
+            Ki(1,n)=Ki(1,n)*0.5_WP*(zscaling(1)+zscaling(2))
         end if
    end do
 

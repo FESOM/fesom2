@@ -114,6 +114,8 @@ contains
     
      allocate ( ghats     ( nl-1,    myDim_nod2D+eDim_nod2D         ))   ! nonlocal transport (s/m^2)
      allocate ( hbl       (    myDim_nod2D+eDim_nod2D         ))   ! boundary layer depth
+     ghats = 0.0_WP
+     hbl   = 0.0_WP
 
      allocate (    bfsfc       (       myDim_nod2D+eDim_nod2D        ))   ! surface buoyancy forcing    (m^2/s^3)
      allocate (    caseA    (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in case A; =0 in case B
@@ -125,9 +127,16 @@ contains
      allocate (    dVsq     ( nl,   myDim_nod2D+eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
      allocate (    dbsfc    ( nl,   myDim_nod2D+eDim_nod2D        ))   ! buoyancy re sfc
      allocate (    kbl      (     myDim_nod2D+eDim_nod2D        ))   ! index of first grid level below hbl
-     ghats       = 0.0_WP
-     hbl         = 0.0_WP
-
+     bfsfc = 0.0_WP
+     caseA = 0.0_WP
+     stable= 0.0_WP
+     dkm1  = 0.0_WP
+     blmc  = 0.0_WP
+     ustar = 0.0_WP
+     Bo    = 0.0_WP
+     dVsq  = 0.0_WP
+     dbsfc = 0.0_WP
+     kbl   = 0.0_WP
 !      *******************************************************************
 !       Initialize some constants for kmix subroutines, and initialize
 !       for kmix subroutine "wscale" the 2D-lookup table for wm and ws
@@ -635,7 +644,7 @@ contains
         izp1  = iz + 1
 
         udiff = us-umin
-        ju    = INT( MIN(udiff/deltau,FLOAT(nnj)))
+        ju    = INT( MIN(udiff/deltau,real(nnj,WP)))
         ju    = MAX( ju , 0  )
         jup1  = ju+1
 

@@ -21,13 +21,13 @@ subroutine oce_fluxes_mom
   ! momentum flux:
   ! ==================
   do n=1,myDim_nod2D+eDim_nod2D   
-     if(a_ice(n)>0.001) then
+     if(a_ice(n)>0.001_WP) then
        aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
        stress_iceoce_x(n) = aux * (u_ice(n)-u_w(n))
        stress_iceoce_y(n) = aux * (v_ice(n)-v_w(n))
      else
-       stress_iceoce_x(n)=0.0
-       stress_iceoce_y(n)=0.0
+       stress_iceoce_x(n)=0.0_WP
+       stress_iceoce_y(n)=0.0_WP
      end if
   end do
   DO elem=1,myDim_elem2D

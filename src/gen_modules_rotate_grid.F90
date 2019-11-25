@@ -76,8 +76,8 @@ module g_rotate_grid
 
     ! Geographical lon-lat coordinates:
     glat=asin(zg)
-    if(yg==0. .and. xg==0.) then
-       glon=0.0     ! exactly at the poles
+    if(yg==0. .and. xg==0._WP) then
+       glon=0.0_WP     ! exactly at the poles
     else
        glon=atan2(yg,xg)
     end if
@@ -107,8 +107,8 @@ module g_rotate_grid
 
     ! rotated coordinates:
     rlat=asin(zr)
-    if(yr==0. .and. xr==0.) then
-       rlon=0.0     ! exactly at the poles
+    if(yr==0._WP .and. xr==0._WP) then
+       rlon=0.0_WP     ! exactly at the poles
     else
        rlon=atan2(yr,xr)
     end if
