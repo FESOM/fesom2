@@ -52,7 +52,7 @@ subroutine solve_tracers_ale
     
     !___________________________________________________________________________
     do tr_num=1, ptracers_restore_total           
-        tr_arr(:,ptracers_restore(tr_num)%ind2,ptracers_restore(tr_num)%locid)=1.
+        tr_arr(:,ptracers_restore(tr_num)%ind2,ptracers_restore(tr_num)%locid)=1.0_WP
     end do
     
     !___________________________________________________________________________
@@ -65,12 +65,12 @@ subroutine solve_tracers_ale
     
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
-    where (tr_arr(:,:,2) > 45.)
-        tr_arr(:,:,2)=45.
+    where (tr_arr(:,:,2) > 45._WP)
+        tr_arr(:,:,2)=45._WP
     end where
 
-    where (tr_arr(:,:,2) < 3. )
-        tr_arr(:,:,2)=3.
+    where (tr_arr(:,:,2) < 3._WP )
+        tr_arr(:,:,2)=3._WP
     end where
 
 end subroutine solve_tracers_ale
@@ -112,14 +112,14 @@ subroutine adv_tracers_ale(tr_num)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25)
+            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP)
             
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
             call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
         
         case(2) !MUSCL+FCT(3D)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0)
+            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP)
             
         case default !unknown
             if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
@@ -465,7 +465,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
         tv(2)=0.5*(ttf(1,n)+ttf(2,n))
         ! tacer at bottom-1 layer
         !   tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, Wvel_e(nzmax-1,n)), 0._WP)
-        tv(nzmax-1)=0.5*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
         ! tracer at bottom layer
         tv(nzmax)=ttf(nzmax-1,n)
         
@@ -496,32 +496,32 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
             ! --> a_j^n
             deltaj   = dzj/(dzjm1+dzj+dzjp1)* &
                       ( &
-                       (2.*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
-                       (dzj    +2.*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
+                       (2._WP*dzjm1+dzj    )/(dzjp1+dzj)*(ttf(nz+1,n)-ttf(nz  ,n)) +  &
+                       (dzj    +2._WP*dzjp1)/(dzjm1+dzj)*(ttf(nz  ,n)-ttf(nz-1,n)) &
                       )
             ! --> a_(j+1)^n          
             deltajp1 = dzjp1/(dzj+dzjp1+dzjp2)* &
                       ( &
-                       (2.*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
-                       (dzjp1+2.*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
+                       (2._WP*dzj+dzjp1  )/(dzjp2+dzjp1)*(ttf(nz+2,n)-ttf(nz+1,n)) +  &
+                       (dzjp1+2._WP*dzjp2)/(dzj  +dzjp1)*(ttf(nz+1,n)-ttf(nz  ,n)) &
                       )
             !___________________________________________________________________
             ! condition (1.8)
             ! --> This modification leads to a somewhat steeper representation of 
             !     discontinuities in the solution. It also guarantees that a_(j+0.5)
             !     lies in the range of values defined by a_j; and a_(j+1);
-            if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n)) > 0. ) then
+            if ( (ttf(nz+1,n)-ttf(nz  ,n))*(ttf(nz  ,n)-ttf(nz-1,n)) > 0._WP ) then
                 deltaj = min(  abs(deltaj), &
-                             2.*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
-                             2.*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
+                             2._WP*abs(ttf(nz+1,n)-ttf(nz  ,n)),&
+                             2._WP*abs(ttf(nz  ,n)-ttf(nz-1,n)) &
                              )*sign(1.0_WP,deltaj)
             else
                 deltaj = 0.0_WP
             endif
-            if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n)) > 0. ) then
+            if ( (ttf(nz+2,n)-ttf(nz+1,n))*(ttf(nz+1,n)-ttf(nz  ,n)) > 0._WP ) then
                 deltajp1 = min(  abs(deltajp1),&
-                               2.*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
-                               2.*abs(ttf(nz+1,n)-ttf(nz,n)) &
+                               2._WP*abs(ttf(nz+2,n)-ttf(nz+1,n)),&
+                               2._WP*abs(ttf(nz+1,n)-ttf(nz,n)) &
                                )*sign(1.0_WP,deltajp1)
             else
                 deltajp1 = 0.0_WP
@@ -532,12 +532,12 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
             ! nz+1 is the interface betweel layers (segments) nz and nz+1
             tv(nz+1)=    ttf(nz,n) &
                         + dzj/(dzj+dzjp1)*(ttf(nz+1,n)-ttf(nz,n)) &
-                        + 1./(dzjm1+dzj+dzjp1+dzjp2) * &
+                        + 1._WP/(dzjm1+dzj+dzjp1+dzjp2) * &
                         ( &
-                            (2.*dzjp1*dzj)/(dzj+dzjp1)* &
-                                ((dzjm1+dzj)/(2.*dzj+dzjp1) - (dzjp2+dzjp1)/(2.*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
-                        - dzj*(dzjm1+dzj)/(2.*dzj+dzjp1)*deltajp1 &
-                        + dzjp1*(dzjp1+dzjp2)/(dzj+2.*dzjp1)*deltaj &
+                            (2._WP*dzjp1*dzj)/(dzj+dzjp1)* &
+                                ((dzjm1+dzj)/(2._WP*dzj+dzjp1) - (dzjp2+dzjp1)/(2._WP*dzjp1+dzj))*(ttf(nz+1,n)-ttf(nz,n)) &
+                        - dzj*(dzjm1+dzj)/(2._WP*dzj+dzjp1)*deltajp1 &
+                        + dzjp1*(dzjp1+dzjp2)/(dzj+2._WP*dzjp1)*deltaj &
                         )
                        !tv(nz+1)=max(min(ttf(nz, n), ttf(nz+1, n)), min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz+1)))
         end do ! --> do nz=2,nzmax-3
@@ -545,11 +545,11 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
         tvert(1:nzmax)=0._WP
         ! loop over layers (segments)
         do nz=1, nzmax-1
-            if ((Wvel_e(nz,n)<=0.) .AND. (Wvel_e(nz+1,n)>=0.)) CYCLE
+            if ((Wvel_e(nz,n)<=0._WP) .AND. (Wvel_e(nz+1,n)>=0._WP)) CYCLE
             counter=counter+1
             aL=tv(nz)
             aR=tv(nz+1)
-            if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0.) then
+            if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0._WP) then
                 !   write(*,*) aL, ttf(nz, n), aR
                 overshoot_counter=overshoot_counter+1
                 aL =ttf(nz, n)
@@ -565,12 +565,12 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
             dzj   = hnode(nz,n)
             aj=6.0_WP*(ttf(nz, n)-0.5_WP*(aL+aR))
             
-            if (Wvel_e(nz,n)>0.) then
+            if (Wvel_e(nz,n)>0._WP) then
                 x=min(Wvel_e(nz,n)*dt/dzj, 1._WP)
                 tvert(nz)=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))*area(nz,n)*Wvel_e(nz,n)
             end if
             
-            if (Wvel_e(nz+1,n)<0.) then
+            if (Wvel_e(nz+1,n)<0._WP) then
                 x=min(-Wvel_e(nz+1,n)*dt/dzj, 1._WP)
                 tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))*area(nz+1,n)*Wvel_e(nz+1,n)
             end if
@@ -759,7 +759,7 @@ subroutine diff_ver_part_expl_ale(tr_num)
     
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
-        vd_flux=0d0
+        vd_flux=0._WP
         if (tr_num==1) then
             flux  = -heat_flux(n)/vcpw
             rdata =  Tsurf(n)
@@ -767,9 +767,9 @@ subroutine diff_ver_part_expl_ale(tr_num)
         elseif (tr_num==2) then
             flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
         else
-            flux  = 0d0
-            rdata = 0d0
-            rlx=0d0
+            flux  = 0._WP
+            rdata = 0._WP
+            rlx=0._WP
         endif
         
         !_______________________________________________________________________
@@ -1135,7 +1135,7 @@ subroutine diff_ver_part_redi_expl
     
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
-        vd_flux=0d0
+        vd_flux=0._WP
         
         !_______________________________________________________________________
         zbar_n=0.0_WP

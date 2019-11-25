@@ -39,7 +39,7 @@ subroutine read_namelist
   ! ==========
   ! compute dt
   ! ========== 
-  dt=86400./float(step_per_day)
+  dt=86400._WP/real(step_per_day,WP)
   
   if(mype==0) then
 	if (mod(86400,step_per_day)==0) then

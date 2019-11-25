@@ -285,14 +285,14 @@ if (Fer_GM) then
    fer_gamma=0.0_WP
    fer_uv=0.0_WP
    fer_wvel=0.0_WP
-   fer_K=500.
-   fer_c=1.
+   fer_K=500._WP
+   fer_c=1._WP
    fer_scal = 0.0_WP
 end if
 
 if (SPP) then
    allocate(ice_rejected_salt(node_size))
-   ice_rejected_salt=0.
+   ice_rejected_salt=0._WP
 end if
 
 ! =================
@@ -320,8 +320,8 @@ end if
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
-    relax_salt=0.
-    virtual_salt=0.
+    relax_salt=0.0_WP
+    virtual_salt=0.0_WP
 
     Ssurf=0.0_WP
     water_flux_old=0.0_WP !PS
@@ -329,17 +329,17 @@ end if
     
     real_salt_flux=0.0_WP
     
-    tr_arr=0d0
-    tr_arr_old=0d0    
+    tr_arr=0.0_WP
+    tr_arr_old=0.0_WP
 
-    bvfreq=0d0
-    mixlay_dep=0d0
-    bv_ref=0d0
+    bvfreq=0.0_WP
+    mixlay_dep=0.0_WP
+    bv_ref=0.0_WP
 
     MLD1   =0.0_WP
     MLD2   =0.0_WP
-    MLD1_ind=0
-    MLD2_ind=0
+    MLD1_ind=0.0_WP
+    MLD2_ind=0.0_WP
 
     relax2clim=0.0_WP
 
@@ -400,7 +400,7 @@ USE g_ic3d
   Sclim=tr_arr(:,:,2)
   Tsurf=tr_arr(1,:,1)
   Ssurf=tr_arr(1,:,2)
-  relax2clim=0.0
+  relax2clim=0.0_WP
 
   ! count the passive tracers which require 3D source (ptracers_restore_total)
   ptracers_restore_total=0
@@ -423,14 +423,14 @@ USE g_ic3d
      id=tracer_ID(i)
      SELECT CASE (id)
        CASE (101)       ! initialize tracer ID=101
-         tr_arr(:,:,i)=0.
+         tr_arr(:,:,i)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (301) !Fram Strait 3d restored passive tracer
-         tr_arr(:,:,i)=0.
+         tr_arr(:,:,i)=0.0_WP
          rcounter3    =rcounter3+1
          counter=0
          do k=1, myDim_nod2D+eDim_nod2D

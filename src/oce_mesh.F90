@@ -177,14 +177,14 @@ IMPLICIT NONE
             !___________________________________________________________________
             ! check if input mesh is already rotated --> force_rotation flag == .False.
             if (force_rotation .and. & 
-               (rbuff(n,1)>=xp-14.5 .and. rbuff(n,1)<=xp+14.5 .and. & 
-                rbuff(n,2)>=yp-14.5 .and. rbuff(n,2)<=yp+14.5)) then
+               (rbuff(n,1)>=xp-14.5_WP .and. rbuff(n,1)<=xp+14.5_WP .and. & 
+                rbuff(n,2)>=yp-14.5_WP .and. rbuff(n,2)<=yp+14.5_WP)) then
                 flag_checkisrot = 1
             !___________________________________________________________________
             ! check if input mesh is already unrotated --> force_rotation flag ==.True.
             elseif ((.not. force_rotation) .and. & 
-               (rbuff(n,1)>=xp-14.5 .and. rbuff(n,1)<=xp+14.5 .and. & 
-                rbuff(n,2)>=yp-14.5 .and. rbuff(n,2)<=yp+14.5)) then
+               (rbuff(n,1)>=xp-14.5_WP .and. rbuff(n,1)<=xp+14.5_WP .and. & 
+                rbuff(n,2)>=yp-14.5_WP .and. rbuff(n,2)<=yp+14.5_WP)) then
                 flag_checkmustrot = 0
             end if    
         end do
@@ -369,7 +369,7 @@ IMPLICIT NONE
        ! check here if aux3d.out contains depth levels (FESOM2.0) or 3d indices
        ! (FESOM1.4) like that check if the proper mesh is loaded. 11000.0 is here 
        ! the maximum depth on earth in marianen trench
-       if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0) ) flag_wrongaux3d=1
+       if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
     end if
     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
 
@@ -667,14 +667,14 @@ real(kind=WP)   :: t0, t1
 	  b=coord_nod2D(:,elnodes(2))-a
 	  c=coord_nod2D(:,elnodes(3))-a
           
-	  if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
+	  if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
           if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
-	  if(c(1)>cyclic_length/2.) c(1)=c(1)-cyclic_length
-          if(c(1)<-cyclic_length/2.) c(1)=c(1)+cyclic_length
+	  if(c(1)>cyclic_length/2._WP) c(1)=c(1)-cyclic_length
+          if(c(1)<-cyclic_length/2._WP) c(1)=c(1)+cyclic_length
 	  
 	    
 	  r=b(1)*c(2)-b(2)*c(1)
-	  if (r>0) then
+	  if (r>0._WP) then
 	  ! Vector b is to right of c
 	  ! Exchange second and third nodes:
 	  
@@ -1069,8 +1069,8 @@ real(kind=WP) :: x, y, a(2), b(2)
 
 a=coord_nod2D(:,n1)
 b=coord_nod2D(:,n2)
-if(a(1)-b(1)>cyclic_length/2.0) a(1)=a(1)-cyclic_length
-if(a(1)-b(1)<-cyclic_length/2.0) b(1)=b(1)-cyclic_length
+if(a(1)-b(1)>cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
+if(a(1)-b(1)<-cyclic_length/2.0_WP) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
 end subroutine edge_center
@@ -1087,8 +1087,8 @@ real(kind=WP) :: x, y, ax(3), amin
    ax=coord_nod2D(1, elnodes)
    amin=minval(ax)
    DO k=1,3
-   if(ax(k)-amin>=cyclic_length/2.0) ax(k)=ax(k)-cyclic_length
-   if(ax(k)-amin<-cyclic_length/2.0) ax(k)=ax(k)+cyclic_length
+   if(ax(k)-amin>=cyclic_length/2.0_WP) ax(k)=ax(k)-cyclic_length
+   if(ax(k)-amin<-cyclic_length/2.0_WP) ax(k)=ax(k)+cyclic_length
    END DO
    x=sum(ax)/3.0_WP
    y=sum(coord_nod2D(2,elnodes))/3.0_WP
@@ -1132,10 +1132,10 @@ t0=MPI_Wtime()
     if (cartesian) ay=1.0_WP
     a=coord_nod2D(:,elnodes(2))-coord_nod2D(:,elnodes(1))
     b=coord_nod2D(:,elnodes(3))-coord_nod2D(:,elnodes(1))
-    if(a(1)>cyclic_length/2.) a(1)=a(1)-cyclic_length
-    if(a(1)<-cyclic_length/2.) a(1)=a(1)+cyclic_length
-    if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
-    if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
+    if(a(1)>cyclic_length/2._WP) a(1)=a(1)-cyclic_length
+    if(a(1)<-cyclic_length/2._WP) a(1)=a(1)+cyclic_length
+    if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
+    if(b(1)<-cyclic_length/2._WP) b(1)=b(1)+cyclic_length
     a(1)=a(1)*ay
     b(1)=b(1)*ay
     elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
@@ -1285,8 +1285,8 @@ t0=MPI_Wtime()
  DO n=1,myDim_nod2D+eDim_nod2D 
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
  ! in case of numerical noise at the boundaries
- if (lon > 2.*pi) lon=lon-2.*pi
- if (lon <-2.*pi) lon=lon+2.*pi
+ if (lon > 2._WP*pi) lon=lon-2._WP*pi
+ if (lon <-2._WP*pi) lon=lon+2._WP*pi
  geo_coord_nod2D(1,n)=lon
  geo_coord_nod2D(2,n)=lat	 
  END DO
@@ -1299,7 +1299,7 @@ t0=MPI_Wtime()
  
  
  if(fplane) then 
- coriolis=2*omega*0.71
+ coriolis=2*omega*0.71_WP
  end if
  
  ! ============
@@ -1547,7 +1547,7 @@ deallocate(center_y, center_x)
        do n=1, myDim_edge2D
           ed=edges(:, n)
           if (myList_edge2D(n)<=edge2D_in) cycle
-          bc_index_nod2D(ed)=0.
+          bc_index_nod2D(ed)=0._WP
        end do
     end if
 
@@ -1555,8 +1555,8 @@ deallocate(center_y, center_x)
   nn=0
   ns=0  
   allocate(lump2d_north(myDim_nod2D), lump2d_south(myDim_nod2D))
-  lump2d_north=0.
-  lump2d_south=0.
+  lump2d_north=0._WP
+  lump2d_south=0._WP
   do i=1, myDim_nod2D
      if (geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
@@ -1607,10 +1607,10 @@ IMPLICIT NONE
 integer              :: nz, n, elem , elnodes(3)
 real(kind=WP)	     :: vol_n(nl), vol_e(nl), aux(nl)
 
-   vol_n=0.
-   vol_e=0.
+   vol_n=0._WP
+   vol_e=0._WP
 
-   aux=0.
+   aux=0._WP
    do n=1, myDim_nod2D
       do nz=1, nlevels_nod2D(n)-1
          aux(nz)=aux(nz)+area(nz, n)
@@ -1619,7 +1619,7 @@ real(kind=WP)	     :: vol_n(nl), vol_e(nl), aux(nl)
    call MPI_AllREDUCE(aux, vol_n, nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
-   aux=0.
+   aux=0._WP
    do elem=1, myDim_elem2D
       elnodes=elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE

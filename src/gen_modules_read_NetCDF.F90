@@ -79,13 +79,14 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
 
   ! make sure range 0. - 360.
   do n=1,lonlen
-     if (lon(n)<0.0) then
-        lon(n)=lon(n)+360.
+     if (lon(n)<0.0_WP) then
+        lon(n)=lon(n)+360._WP
      end if
   end do
 
   allocate(ncdata(lonlen,latlen), ncdata_temp(lonlen,latlen))
-
+  ncdata = 0.0_WP
+  
   if (mype==0) then
     ! data
      status=nf_inq_varid(ncid, vari, varid)
@@ -107,7 +108,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      do j=1,latlen
         if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP) then  !!
            if (check_dummy) then
-              aux=0.0
+              aux=0.0_WP
               cnt=0
               do k=1,30
                  do ii=max(1,i-k),min(lonlen,i+k)
@@ -124,7 +125,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
                  end if
               end do  	!k    
            else
-              ncdata(i,j)=0.0
+              ncdata(i,j)=0.0_WP
            end if
         end if
      end do
@@ -137,7 +138,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy)
      temp_x(n)=geo_coord_nod2d(1,n)/rad              
      temp_y(n)=geo_coord_nod2d(2,n)/rad             
      ! change lon range to [0 360]
-     if(temp_x(n)<0.) temp_x(n)=temp_x(n) + 360.0  
+     if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP  
   end do
   ! interpolation
   flag=0
@@ -222,13 +223,14 @@ end subroutine read_other_NetCDF
 
   ! make sure range 0. - 360.
   do n=1,lonlen
-     if (lon(n)<0.0) then
-        lon(n)=lon(n)+360.
+     if (lon(n)<0.0_WP) then
+        lon(n)=lon(n)+360._WP
      end if
   end do
 
   ! data
   allocate(ncdata(lonlen,latlen))
+  ncdata = 0.0_WP
 
   if (mype==0) then
      status=nf_inq_varid(ncid, vari, varid)
@@ -259,7 +261,7 @@ end subroutine read_other_NetCDF
         temp_y(n)=coord_nod2d(2,n)/rad             
      end if
      ! change lon range to [0 360]
-     if(temp_x(n)<0.) temp_x(n)=temp_x(n) + 360.0  
+     if(temp_x(n)<0._WP) temp_x(n)=temp_x(n) + 360.0_WP
   end do
   ! interpolation
   call interp_2d_field_v2(lonlen, latlen, lon, lat, ncdata, miss, &

@@ -85,7 +85,7 @@ uvert=0.0_WP
 ! ======================
  
 
-KE_node(:,:)=0d0 
+KE_node(:,:)=0.0_WP 
 
 DO elem=1, myDim_elem2D
                             !! elem=myList_elem2D(m)
@@ -110,7 +110,7 @@ DO n=1,myDim_edge2D
                             !! n=myList_edge2D(m)
    if(myList_edge2D(n) > edge2D_in) then
       elnodes(1:2)=edges(:,n)
-      KE_node(:,elnodes(1:2))=0.0
+      KE_node(:,elnodes(1:2))=0.0_WP
    endif
 end DO   
  
@@ -123,8 +123,8 @@ end DO
  Do elem=1, myDim_elem2D          !! P (a)
                                   !! elem=myList_elem2D(m)
     DO nz=1,nl-1 
-       UV_rhs(1,nz,elem)=-(0.5+epsilon)*UV_rhsAB(1,nz,elem)   
-       UV_rhs(2,nz,elem)=-(0.5+epsilon)*UV_rhsAB(2,nz,elem)
+       UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
+       UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
     END DO
  END DO 
 
@@ -170,10 +170,10 @@ END DO
 
 !NR precompute
 DO nz=2,nl-1
-   dZ_inv(nz) = 1./(Z(nz-1)-Z(nz))
+   dZ_inv(nz) = 1.0_WP/(Z(nz-1)-Z(nz))
 ENDDO
 DO nz=1,nl-1
-   dzbar_inv(nz) = 1./(zbar(nz)-zbar(nz+1))
+   dzbar_inv(nz) = 1.0_WP/(zbar(nz)-zbar(nz+1))
 END DO
 
 !DO elem=1, myDim_elem2D                  
@@ -221,7 +221,7 @@ DO elem=1, myDim_elem2D
   DO nz=2, nl1-1
 !     w=sum(Wvel(nz,elnodes)+Wvel(nz+1,elnodes))/6.0_WP
 !     w=min(abs(w), 0.0001)*sign(1.0_WP, w)
-     if (w >= 0.) then
+     if (w >= 0.0_WP) then
         uvert(nz,1)=w*(UV(1,nz,elem)-UV(1,nz+1,elem))*dZ_inv(nz+1)
         uvert(nz,2)=w*(UV(2,nz,elem)-UV(2,nz+1,elem))*dZ_inv(nz+1)
      else
@@ -239,7 +239,7 @@ END DO
 ! =======================
 gg=(1.5_WP+epsilon)
 if(lfirst.and.(.not.r_restart)) then
-   gg=1.0
+   gg=1.0_WP
    lfirst=.false.
 end if
 

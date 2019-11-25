@@ -39,7 +39,7 @@ integer :: tr_num,n,nz
 del_ttf=0.0_WP
 
 !AB interpolation
-tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
+tr_arr_old(:,:,tr_num)=-(0.5_WP+epsilon)*tr_arr_old(:,:,tr_num)+(1.5_WP+epsilon)*tr_arr(:,:,tr_num)
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
@@ -69,13 +69,13 @@ use o_PARAM, only: tracer_adv
 IMPLICIT NONE
 integer :: tr_num,n,nz
 
-if ((clim_relax>1.0e-8).and.(tr_num==1)) then
+if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
    DO n=1, myDim_nod2D
       tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
   END DO
 END if
-if ((clim_relax>1.0e-8).and.(tr_num==2)) then
+if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
    DO n=1, myDim_nod2D
       tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))

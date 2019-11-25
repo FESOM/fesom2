@@ -1586,7 +1586,7 @@ subroutine vert_vel_ale
         end do
     end do
     cflmax=maxval(CFL_z(:, 1:myDim_nod2D)) !local CFL maximum is different on each mype
-    if (cflmax>1.0) then
+    if (cflmax>1.0_WP) then
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)-1
                 !!PS if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
@@ -1798,8 +1798,8 @@ DO elem=1,myDim_elem2D
         c(nz)=-Av(nz+1,elem)/(Z_n(nz)-Z_n(nz+1))*zinv
         b(nz)=-a(nz)-c(nz)+1.0_WP
         ! Update from the vertical advection
-        wu=sum(Wvel_i(nz,   elnodes))/3.
-        wd=sum(Wvel_i(nz+1, elnodes))/3.
+        wu=sum(Wvel_i(nz,   elnodes))/3._WP
+        wd=sum(Wvel_i(nz+1, elnodes))/3._WP
         a(nz)=a(nz)+min(0._WP, wu)*zinv
         b(nz)=b(nz)+max(0._WP, wu)*zinv
         
@@ -1813,7 +1813,7 @@ DO elem=1,myDim_elem2D
     c(nzmax-1)=0.0_WP
     
     ! Update from the vertical advection
-    wu=sum(Wvel_i(nzmax-1, elnodes))/3.
+    wu=sum(Wvel_i(nzmax-1, elnodes))/3._WP
     a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
     b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
     
@@ -1823,8 +1823,8 @@ DO elem=1,myDim_elem2D
     a(1)=0.0_WP
     b(1)=-c(1)+1.0_WP
     ! Update from the vertical advection
-    wu=sum(Wvel_i(1, elnodes))/3.
-    wd=sum(Wvel_i(2, elnodes))/3.
+    wu=sum(Wvel_i(1, elnodes))/3._WP
+    wd=sum(Wvel_i(2, elnodes))/3._WP
     
     b(1)=b(1)+wu*zinv
     b(1)=b(1)-min(0._WP, wd)*zinv

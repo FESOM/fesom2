@@ -29,7 +29,7 @@ subroutine stress_tensor_m
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     if(msum<=0.01) cycle !DS
+     if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -98,8 +98,8 @@ subroutine ssh2rhs
   
   ! use rhs_m and rhs_a for storing the contribution from elevation:
   do row=1, myDim_nod2d 
-     rhs_a(row)=0.0
-     rhs_m(row)=0.0
+     rhs_a(row)=0.0_WP
+     rhs_m(row)=0.0_WP
   end do
   
   !_____________________________________________________________________________
@@ -168,13 +168,13 @@ subroutine stress2rhs_m
   val3=1.0_WP/3.0_WP
   
   do row=1, myDim_nod2d 
-     u_rhs_ice(row)=0.0
-     v_rhs_ice(row)=0.0
+     u_rhs_ice(row)=0.0_WP
+     v_rhs_ice(row)=0.0_WP
   end do
 
   do elem=1,myDim_elem2d         
      elnodes=elem2D_nodes(:,elem)
-     if(sum(a_ice(elnodes)) < 0.01) cycle !DS
+     if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
      
      vol=elem_area(elem)
      dx=gradient_sca(1:3,elem)
@@ -256,8 +256,8 @@ subroutine EVPdynamics_m
   
   ! use rhs_m and rhs_a for storing the contribution from elevation:
   do row=1, myDim_nod2d 
-     rhs_a(row)=0.0
-     rhs_m(row)=0.0
+     rhs_a(row)=0.0_WP
+     rhs_m(row)=0.0_WP
   end do
   
   !_____________________________________________________________________________
@@ -337,8 +337,8 @@ subroutine EVPdynamics_m
   end do
 
   do row=1, myDim_nod2d 
-     u_rhs_ice(row)=0.0
-     v_rhs_ice(row)=0.0
+     u_rhs_ice(row)=0.0_WP
+     v_rhs_ice(row)=0.0_WP
   end do
 
 !=======================================
@@ -442,16 +442,16 @@ subroutine EVPdynamics_m
         !solve (Coriolis and water stress are treated implicitly)        
         det = bc_index_nod2D(i) / ((1.0_WP+beta_evp+drag)**2 + (rdt*coriolis_node(i))**2)
 
-        u_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
-        v_ice_aux(i) = det*((1.0+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
+        u_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
+        v_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
         end if
      end do
 
      call exchange_nod_begin(u_ice_aux, v_ice_aux)
 
      do row=1, myDim_nod2d 
-        u_rhs_ice(row)=0.0
-        v_rhs_ice(row)=0.0
+        u_rhs_ice(row)=0.0_WP
+        v_rhs_ice(row)=0.0_WP
      end do
 
      call exchange_nod_end
@@ -493,7 +493,7 @@ subroutine find_alpha_field_a
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     if(msum<=0.01) cycle !DS
+     if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -521,7 +521,7 @@ subroutine find_alpha_field_a
      pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
                                                                     ! with thickness (msum)
      !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
-     alpha_evp_array(elem)=max(50.0,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
+     alpha_evp_array(elem)=max(50.0_WP,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
      ! /voltriangle(elem) for FESOM1.4
      ! We do not allow alpha to be too small!
    end do
@@ -557,7 +557,7 @@ subroutine stress_tensor_a
      elnodes=elem2D_nodes(:,elem)
 
      msum=sum(m_ice(elnodes))*val3
-     if(msum<=0.01) cycle !DS
+     if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
      
      dx=gradient_sca(1:3,elem)
@@ -639,8 +639,8 @@ use g_comm_auto
      call stress_tensor_a
      call stress2rhs_m    ! _m=_a, so no _m version is the only one!
      do i=1,myDim_nod2D 
-         thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01)
-         thickness=max(thickness, 9.0)   ! Limit if it is too small (0.01 m)
+         thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
+         thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
          inv_thickness=1.0_WP/thickness
 
          umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
@@ -656,8 +656,8 @@ use g_comm_auto
          fc=rdt*coriolis_node(i)
          det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
          det=bc_index_nod2D(i)/det
-         u_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
-         v_ice_aux(i)=det*((1.0+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
+         u_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
+         v_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
      end do
      call exchange_nod(u_ice_aux, v_ice_aux)
   end do

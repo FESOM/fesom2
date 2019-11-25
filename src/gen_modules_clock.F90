@@ -34,9 +34,9 @@ contains
     timenew=timenew+dt          
      
     ! update day
-    if (timenew>86400.) then  !assumed that time step is less than one day!
+    if (timenew>86400._WP) then  !assumed that time step is less than one day!
        daynew=daynew+1
-       timenew=timenew-86400.
+       timenew=timenew-86400._WP
     endif
 
     ! update year
@@ -97,8 +97,8 @@ contains
     write(cyearnew,'(i4)') yearnew
 
     ! if restart model at beginning of a day, set timenew to be zero
-    if (timenew==86400.) then  
-       timenew=0.0
+    if (timenew==86400._WP) then  
+       timenew=0.0_WP
        daynew=daynew+1
     endif
 
@@ -153,8 +153,8 @@ contains
     dum_timenew = timenew
     dum_daynew  = daynew
     dum_yearnew = yearnew
-    if ((dum_daynew==ndpyr) .and. (dum_timenew==86400.)) then
-       dum_timenew=0.0
+    if ((dum_daynew==ndpyr) .and. (dum_timenew==86400._WP)) then
+       dum_timenew=0.0_WP
        dum_daynew=1
        dum_yearnew=yearold+1
     endif
@@ -170,8 +170,8 @@ contains
   subroutine clock_newyear
     implicit none
     !
-    if ((daynew>=ndpyr).and.(timenew==86400.)) then
-       timenew=0.0
+    if ((daynew>=ndpyr).and.(timenew==86400._WP)) then
+       timenew=0.0_WP
        daynew=1
        yearnew=yearold+1
        write(cyearnew,'(i4)') yearnew

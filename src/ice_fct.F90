@@ -23,9 +23,9 @@ subroutine ice_TG_rhs
    integer         :: n, q, row, elem, elnodes(3)
  ! Taylor-Galerkin (Lax-Wendroff) rhs
   DO row=1, myDim_nod2D
-     rhs_m(row)=0.
-     rhs_a(row)=0.
-     rhs_ms(row)=0.          
+     rhs_m(row)=0._WP
+     rhs_a(row)=0._WP
+     rhs_ms(row)=0._WP        
   END DO
   ! Velocities at nodes
   do elem=1,myDim_elem2D          !assembling rhs over elements
@@ -51,7 +51,7 @@ subroutine ice_TG_rhs
 		   entries(q)= vol*ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
 					dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
 			       diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-			       0.5*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)    
+			       0.5_WP*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)    
 			       
 			       
 			       
@@ -322,8 +322,8 @@ subroutine ice_fem_fct(tr_array_id)
  ! Sums of positive/negative fluxes to node row
  !=========================
  
-	 icepplus=0.
-	 icepminus=0.
+	 icepplus=0._WP
+	 icepminus=0._WP
 	 do elem=1, myDim_elem2D
 	    elnodes=elem2D_nodes(:,elem)
 	    do q=1,3
@@ -343,16 +343,16 @@ subroutine ice_fem_fct(tr_array_id)
 	 do n=1,myDim_nod2D
 	 flux=icepplus(n)
 	 if (abs(flux)>0) then
-	 icepplus(n)=min(1.0,tmax(n)/flux)
+	 icepplus(n)=min(1.0_WP,tmax(n)/flux)
 	 else
-	 icepplus(n)=0.
+	 icepplus(n)=0._WP
 	 end if
 	 
 	 flux=icepminus(n)
 	 if (abs(flux)>0) then
-	 icepminus(n)=min(1.0,tmin(n)/flux)
+	 icepminus(n)=min(1.0_WP,tmin(n)/flux)
 	 else
-	 icepminus(n)=0.
+	 icepminus(n)=0._WP
 	 end if
 	 end do
   ! pminus and pplus are to be known to neighbouting PE
@@ -363,12 +363,12 @@ subroutine ice_fem_fct(tr_array_id)
   !========================	 
 	 do elem=1, myDim_elem2D
 	    elnodes=elem2D_nodes(:,elem)
-	    ae=1.0
+	    ae=1.0_WP
 	    do q=1,3
 	    n=elnodes(q)  
 	    flux=icefluxes(elem,q)
-	    if(flux>=0.) ae=min(ae,icepplus(n))
-	    if(flux<0.) ae=min(ae,icepminus(n))
+	    if(flux>=0._WP) ae=min(ae,icepplus(n))
+	    if(flux<0._WP) ae=min(ae,icepminus(n))
 	    end do
 	    icefluxes(elem,:)=ae*icefluxes(elem,:)
 	 end do   
@@ -438,7 +438,7 @@ SUBROUTINE ice_mass_matrix_fill
   !
   ! a)
   allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
-  mass_matrix =0.0
+  mass_matrix =0.0_WP
   allocate(col_pos(myDim_nod2D+eDim_nod2D))
   
   DO elem=1,myDim_elem2D
@@ -467,7 +467,7 @@ SUBROUTINE ice_mass_matrix_fill
    offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
    n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
    aa=sum(mass_matrix(offset:n))  
-   if(abs(area(1,q)-aa)>.1) then
+   if(abs(area(1,q)-aa)>.1_WP) then
      iflag=q
      flag=1
    endif
@@ -503,12 +503,12 @@ subroutine ice_TG_rhs_div
 
   DO row=1, myDim_nod2D
                   !! row=myList_nod2D(m)
-     rhs_m(row)=0.
-     rhs_a(row)=0.
-     rhs_ms(row)=0.
-     rhs_mdiv(row)=0.0
-     rhs_adiv(row)=0.0
-     rhs_msdiv(row)=0.0          
+     rhs_m(row)=0.0_WP
+     rhs_a(row)=0.0_WP
+     rhs_ms(row)=0.0_WP
+     rhs_mdiv(row)=0.0_WP
+     rhs_adiv(row)=0.0_WP
+     rhs_msdiv(row)=0.0_WP        
   END DO
   do elem=1,myDim_elem2D          !assembling rhs over elements
                   !! elem=myList_elem2D(m)
@@ -528,11 +528,11 @@ subroutine ice_TG_rhs_div
        DO n=1,3
         row=elnodes(n)
 	DO q = 1,3 
-	   entries(q)= vol*ice_dt*((1.0_WP-0.5*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
+	   entries(q)= vol*ice_dt*((1.0_WP-0.5_WP*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
 	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
-                       0.5*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
+                       0.5_WP*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
                        !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
-           entries2(q)=0.5*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
+           entries2(q)=0.5_WP*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
 	                        dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
                                 dy(q)*(vm+v_ice(row)))  
         END DO

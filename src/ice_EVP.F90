@@ -117,8 +117,8 @@ INTEGER      :: n, elem, ed, elnodes(3), el(2), ednodes(2)
 REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 
  DO n=1, myDim_nod2D
-     U_rhs_ice(n)=0.0
-     V_rhs_ice(n)=0.0
+     U_rhs_ice(n)=0.0_WP
+     V_rhs_ice(n)=0.0_WP
  END DO
  
  ! Stress divergence
@@ -141,7 +141,7 @@ REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
  
  DO n=1, myDim_nod2D
     mass = area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)) 
-    if(mass > 1.e-3) then 
+    if(mass > 1.e-3_WP) then 
          U_rhs_ice(n) = U_rhs_ice(n) / mass
          V_rhs_ice(n) = V_rhs_ice(n) / mass
       else
@@ -181,15 +181,15 @@ REAL(kind=WP):: val3
 val3=1/3.0_WP
 
 DO  n=1, myDim_nod2D
-   U_rhs_ice(n)=0.0
-   V_rhs_ice(n)=0.0
+   U_rhs_ice(n)=0.0_WP
+   V_rhs_ice(n)=0.0_WP
 END DO
  
 do el=1,myDim_elem2D
       ! ===== Skip if ice is absent
 
 !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
-   if (ice_strength(el) > 0.) then
+   if (ice_strength(el) > 0._WP) then
 
 !$IVDEP       
       DO k=1,3
@@ -258,17 +258,17 @@ ay=sin(theta_io)
        inv_areamass(n) = 0._WP
     endif
 
-    if (a_ice(n) < 0.01) then
+    if (a_ice(n) < 0.01_WP) then
        ! Skip if ice is absent
-       inv_mass(n) = 0.
+       inv_mass(n) = 0._WP
     else
        inv_mass(n) = (rhoice*m_ice(n)+rhosno*m_snow(n))/a_ice(n)
-       inv_mass(n) = 1.0/max(inv_mass(n), 9.0)        ! Limit the mass 
+       inv_mass(n) = 1.0_WP/max(inv_mass(n), 9.0_WP)        ! Limit the mass 
                                        ! if it is too small
     endif
 
-    rhs_a(n)=0.0       ! these are used as temporal storage here
-    rhs_m(n)=0.0       ! for the contribution due to ssh
+    rhs_a(n)=0.0_WP       ! these are used as temporal storage here
+    rhs_m(n)=0.0_WP       ! for the contribution due to ssh
  enddo
     
 !_______________________________________________________________________________ !!PS
@@ -281,11 +281,11 @@ if ( .not. trim(which_ALE)=='linfs') then
 		elnodes = elem2D_nodes(:,el)
 		
 		!_______________________________________________________________________
-		if (any(m_ice(elnodes)<=0.) .or. &
-			any(a_ice(elnodes)<=0.)) then
+		if (any(m_ice(elnodes)<=0._WP) .or. &
+			any(a_ice(elnodes)<=0._WP)) then
 			
 			! There is no ice in elem
-			ice_strength(el) = 0.
+			ice_strength(el) = 0._WP
 			
 		!_______________________________________________________________________
 		else
@@ -323,11 +323,11 @@ if ( .not. trim(which_ALE)=='linfs') then
 else
 	! for linear free surface
 	do el = 1,myDim_elem2D
-		if (any(m_ice(elem2D_nodes(:,el)) <= 0.) .or. &
-			any(a_ice(elem2D_nodes(:,el)) <=0.)) then
+		if (any(m_ice(elem2D_nodes(:,el)) <= 0._WP) .or. &
+			any(a_ice(elem2D_nodes(:,el)) <=0._WP)) then
 		
 			! There is no ice in elem
-			ice_strength(el) = 0.
+			ice_strength(el) = 0._WP
 		else
 			msum = sum(m_ice(elem2D_nodes(:,el)))/3.0_WP
 			asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
@@ -337,7 +337,7 @@ else
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
 			! use rhs_m and rhs_a for storing the contribution from elevation:
-			aa = 9.81*elem_area(el)/3.0_WP
+			aa = 9.81_WP*elem_area(el)/3.0_WP
 			
 			elevation_dx = sum(gradient_sca(1:3,el)*elevation(elem2D_nodes(:,el)))	    
 			elevation_dy = sum(gradient_sca(4:6,el)*elevation(elem2D_nodes(:,el)))
@@ -367,7 +367,7 @@ do shortstep=1, evp_rheol_steps
  
    do n=1,myDim_nod2D 
     
-      if (a_ice(n) >= 0.01) then               ! Skip if ice is absent
+      if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
 
 
          umod = sqrt((U_ice(n)-U_w(n))**2+(V_ice(n)-V_w(n))**2)
@@ -380,7 +380,7 @@ do shortstep=1, evp_rheol_steps
          rhsv = V_ice(n) +rdt*(drag*(ax*V_w(n) + ay*U_w(n))+ &
               inv_mass(n)*stress_atmice_y(n) + V_rhs_ice(n))
 
-         r_a = 1. + ax*drag*rdt
+         r_a = 1._WP + ax*drag*rdt
          r_b = rdt*(coriolis_node(n) + ay*drag)
 
          det = 1.0_WP/(r_a*r_a + r_b*r_b)

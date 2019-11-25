@@ -147,8 +147,8 @@ deallocate(temp_i)
 DO n=1, myDim_edge2d
    ednodes=edges(:,n) 
    x=coord_nod2D(:,ednodes(2))-coord_nod2D(:,ednodes(1))
-      	 if(x(1)>cyclic_length/2.) x(1)=x(1)-cyclic_length
-         if(x(1)<-cyclic_length/2.) x(1)=x(1)+cyclic_length
+      	 if(x(1)>cyclic_length/2._WP) x(1)=x(1)-cyclic_length
+         if(x(1)<-cyclic_length/2._WP) x(1)=x(1)+cyclic_length
 	
    ! Find upwind (in the sense of x) triangle, i. e. 
    ! find which triangle contains -x:
@@ -165,10 +165,10 @@ DO n=1, myDim_edge2d
 	 b=coord_elem(:,1,elem)-coord_elem(:,3,elem)
 	 c=coord_elem(:,2,elem)-coord_elem(:,3,elem)
       end if
-      	 if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
-         if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
-	 if(c(1)>cyclic_length/2.) c(1)=c(1)-cyclic_length
-         if(c(1)<-cyclic_length/2.) c(1)=c(1)+cyclic_length
+      	 if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
+         if(b(1)<-cyclic_length/2._WP) b(1)=b(1)+cyclic_length
+	 if(c(1)>cyclic_length/2._WP) c(1)=c(1)-cyclic_length
+         if(c(1)<-cyclic_length/2._WP) c(1)=c(1)+cyclic_length
       ! the vector x has to be between b and c
       ! Decompose b and x into parts along c and along (-cy,cx), i.e.
       ! 90 degree counterclockwise
@@ -181,15 +181,15 @@ DO n=1, myDim_edge2d
       ax=atan2(xy,xx)
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
-      if((ab>0).and.(ax>0).and.(ax<ab)) then
+      if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
       edge_up_dn_tri(1,n)=elem
       cycle
       endif
-      if((ab<0).and.(ax<0).and.(ax>ab)) then
+      if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
       edge_up_dn_tri(1,n)=elem
       cycle
       endif
-      if((ab==ax).or.(ax==0.0)) then
+      if((ab==ax).or.(ax==0.0_WP)) then
       edge_up_dn_tri(1,n)=elem
       cycle
       endif
@@ -224,11 +224,11 @@ END DO
       ax=atan2(xy,xx)
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
-      if((ab>0).and.(ax>0).and.(ax<ab)) then
+      if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
       edge_up_dn_tri(2,n)=elem
       cycle
       endif
-      if((ab<0).and.(ax<0).and.(ax>ab)) then
+      if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
       edge_up_dn_tri(2,n)=elem
       cycle
       endif
@@ -250,7 +250,7 @@ END DO
 deallocate(e_nodes, coord_elem)
 
 
-edge_up_dn_grad=0.0
+edge_up_dn_grad=0.0_WP
 end SUBROUTINE find_up_downwind_triangles
 !=======================================================================
 SUBROUTINE fill_up_dn_grad
@@ -269,7 +269,7 @@ real(kind=WP)  :: tvol, tx, ty
 		ednodes=edges(:,edge)
 		!_______________________________________________________________________
 		! case when edge has upwind and downwind triangle on the surface
-		if((edge_up_dn_tri(1,edge).ne.0).and.(edge_up_dn_tri(2,edge).ne.0)) then
+		if((edge_up_dn_tri(1,edge).ne.0.0_WP).and.(edge_up_dn_tri(2,edge).ne.0.0_WP)) then
 			
 			!___________________________________________________________________
 			! loop over shared depth levels
@@ -283,9 +283,9 @@ real(kind=WP)  :: tvol, tx, ty
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 1 (ednodes(1))
 			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
-				tvol=0.0
-				tx=0.0
-				ty=0.0
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
 				! loop over number triangles that share the nodeedge points ednodes(1)
 				! --> calculate mean gradient at ednodes(1) over the sorounding 
 				!     triangle gradients
@@ -302,9 +302,9 @@ real(kind=WP)  :: tvol, tx, ty
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 2 (ednodes(2))
 			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
-				tvol=0.0
-				tx=0.0
-				ty=0.0
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
 				! loop over number triangles that share the nodeedge points ednodes(2)
 				! --> calculate mean gradient at ednodes(2) over the sorounding 
 				!     triangle gradients
@@ -324,9 +324,9 @@ real(kind=WP)  :: tvol, tx, ty
 		else
 			! Only linear reconstruction part
 			DO nz=1,nlevels_nod2D(ednodes(1))-1
-				tvol=0.0
-				tx=0.0
-				ty=0.0
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(1))
 					elem=nod_in_elem2D(k,ednodes(1))
 					if(nlevels(elem)-1 < nz) cycle
@@ -338,9 +338,9 @@ real(kind=WP)  :: tvol, tx, ty
 				edge_up_dn_grad(3,nz,edge)=ty/tvol
 			END DO
 			DO nz=1,nlevels_nod2D(ednodes(2))-1
-				tvol=0.0
-				tx=0.0
-				ty=0.0
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(2))
 					elem=nod_in_elem2D(k,ednodes(2))
 					if(nlevels(elem)-1 < nz) cycle
@@ -375,13 +375,13 @@ IMPLICIT NONE
  real(kind=WP):: ttfold(nl-1, myDim_nod2D+eDim_nod2D)
 
 ! Clean the rhs
-ttrhs=0d0  
+ttrhs=0.0_WP  
 ! Horizontal advection
   DO edge=1, myDim_edge2D
    enodes=edges(:,edge)   
    el=edge_tri(:,edge)
-   c1=0.0
-   c2=0.0
+   c1=0.0_WP
+   c2=0.0_WP
    nl1=nlevels(el(1))-1
    deltaX1=edge_cross_dxdy(1,edge)
    deltaY1=edge_cross_dxdy(2,edge)
@@ -456,7 +456,7 @@ ttrhs=0d0
    tvert(1)= -Wvel(1,n)*ttfold(1,n)*area(1,n)
 		    
   ! Bottom conditions	  
-   tvert(nlevels_nod2D(n))=0.	    
+   tvert(nlevels_nod2D(n))=0.0_WP	    
   
    DO nz=2, nlevels_nod2D(n)-1
       ! ============
@@ -473,7 +473,7 @@ ttrhs=0d0
 	c=zbar(nz)-Z(nz+1)
 	dg=a*b/(c+a)/(b-c)
 	db=-a*c/(b+a)/(b-c)
-	da=1.0-dg-db
+	da=1.0_WP-dg-db
 	Tmean=ttfold(nz-1,n)*da+ttfold(nz,n)*db+ttfold(nz+1,n)*dg
 	end if
       end if
@@ -487,7 +487,7 @@ ttrhs=0d0
 	c=Z(nz-2)-zbar(nz)
 	dg=a*b/(c+a)/(b-c)
 	db=-a*c/(b+a)/(b-c)
-	da=1.0-dg-db
+	da=1.0_WP-dg-db
 	Tmean=ttfold(nz,n)*da+ttfold(nz-1,n)*db+ttfold(nz-2,n)*dg
 	end if
       end if

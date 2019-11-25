@@ -5,6 +5,7 @@ MODULE gen_bulk
   use i_arrays
   use g_forcing_arrays
   use g_parsup
+  use o_param, only: WP
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud
 
   implicit none
@@ -38,26 +39,26 @@ subroutine ncar_ocean_fluxes_mode
   real(kind=WP) :: zeta, x2, x, psi_m, psi_h, stab      ! stability parameters
   real(kind=WP) :: t, ts, q, qs, u, u10, tv, xx, dux, dvy
   real(kind=WP) :: tstar, qstar, ustar, bstar
-  real(kind=WP), parameter :: grav = 9.80, vonkarm = 0.40
-  real(kind=WP), parameter :: q1=640380., q2=-5107.4    ! for saturated surface specific humidity
-  real(kind=WP), parameter :: zz = 10.0
+  real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
+  real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
+  real(kind=WP), parameter :: zz = 10.0_WP
 
   do i=1,myDim_nod2d+eDim_nod2d       
      t=tair(i) + tmelt					      ! degree celcium to Kelvin
      ts=t_oc_array(i) + tmelt				      !
      q=shum(i)
-     qs=0.98*q1*inv_rhoair*exp(q2/ts) 			      ! L-Y eqn. 5 
-     tv = t*(1.0+0.608*q)
+     qs=0.98_WP*q1*inv_rhoair*exp(q2/ts) 			      ! L-Y eqn. 5 
+     tv = t*(1.0_WP+0.608_WP*q)
      dux=u_wind(i)-u_w(i)
      dvy=v_wind(i)-v_w(i)
-     u = max(sqrt(dux**2+dvy**2), 0.5)           	      ! 0.5 m/s floor on wind (undocumented NCAR)
+     u = max(sqrt(dux**2+dvy**2), 0.5_WP)           	      ! 0.5 m/s floor on wind (undocumented NCAR)
      u10 = u                                                  ! first guess 10m wind
 
-     cd_n10 = (2.7/u10+0.142+0.0764*u10)*1.0e-3                ! L-Y eqn. 6a
+     cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.0e-3_WP                ! L-Y eqn. 6a
      cd_n10_rt = sqrt(cd_n10) 
-     ce_n10 = 34.6 *cd_n10_rt*1.0e-3       		      ! L-Y eqn. 6b
-     stab = 0.5 + sign(0.5_WP,t-ts)
-     ch_n10 = (18.0*stab+32.7*(1.0-stab))*cd_n10_rt*1.e-3      ! L-Y eqn. 6c
+     ce_n10 = 34.6_WP *cd_n10_rt*1.0e-3_WP       		      ! L-Y eqn. 6b
+     stab = 0.5_WP + sign(0.5_WP,t-ts)
+     ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP      ! L-Y eqn. 6c
 
      cd = cd_n10                                 	      ! first guess for exchange coeff's at z
      ch = ch_n10
@@ -67,34 +68,34 @@ subroutine ncar_ocean_fluxes_mode
         ustar    = cd_rt*u                                    ! L-Y eqn. 7a
         tstar    = (ch/cd_rt)*(t-ts)              	      ! L-Y eqn. 7b
         qstar    = (ce/cd_rt)*(q-qs)              	      ! L-Y eqn. 7c
-        bstar    = grav*(tstar/tv+qstar/(q+1.0/0.608))
+        bstar    = grav*(tstar/tv+qstar/(q+1.0_WP/0.608_WP))
         zeta     = vonkarm*bstar*zz/(ustar*ustar) 	      ! L-Y eqn. 8a
         zeta     = sign( min(abs(zeta),10.0_WP), zeta )          ! undocumented NCAR
-        x2 = sqrt(abs(1.-16.*zeta))                           ! L-Y eqn. 8b
-        x2 = max(x2, 1.0)                                     ! undocumented NCAR
+        x2 = sqrt(abs(1._WP-16._WP*zeta))                           ! L-Y eqn. 8b
+        x2 = max(x2, 1.0_WP)                                     ! undocumented NCAR
         x = sqrt(x2)
 
-        if (zeta > 0.) then
-           psi_m = -5.*zeta                                    ! L-Y eqn. 8c
-           psi_h = -5.*zeta                                    ! L-Y eqn. 8c
+        if (zeta > 0._WP) then
+           psi_m = -5._WP*zeta                                    ! L-Y eqn. 8c
+           psi_h = -5._WP*zeta                                    ! L-Y eqn. 8c
         else
-           psi_m = log((1.+2.*x+x2)*(1+x2)/8.)-2.*(atan(x)-atan(1.0))  ! L-Y eqn. 8d
-           psi_h = 2.*log((1.+x2)/2.)                                  ! L-Y eqn. 8e
+           psi_m = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
+           psi_h = 2._WP*log((1._WP+x2)/2._WP)                                  ! L-Y eqn. 8e
         end if
 
-        u10 = u/(1.0+cd_n10_rt*(log(zz/10.)-psi_m)/vonkarm)        ! L-Y eqn. 9 !why cd_n10_rt not cd_rt
-        cd_n10 = (2.7/u10+0.142+0.0764*u10)*1.e-3                  ! L-Y eqn. 6a again
+        u10 = u/(1.0_WP+cd_n10_rt*(log(zz/10._WP)-psi_m)/vonkarm)        ! L-Y eqn. 9 !why cd_n10_rt not cd_rt
+        cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.e-3_WP                  ! L-Y eqn. 6a again
         cd_n10_rt = sqrt(cd_n10) 
-        ce_n10 = 34.6*cd_n10_rt*1.e-3                              ! L-Y eqn. 6b again
-        stab = 0.5 + sign(0.5_WP,zeta)
-        ch_n10 = (18.0*stab+32.7*(1.0-stab))*cd_n10_rt*1.e-3       ! L-Y eqn. 6c again
+        ce_n10 = 34.6_WP*cd_n10_rt*1.e-3_WP                              ! L-Y eqn. 6b again
+        stab = 0.5_WP + sign(0.5_WP,zeta)
+        ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP       ! L-Y eqn. 6c again
         !z0 = 10*exp(-vonkarm/cd_n10_rt)                          ! diagnostic
 
-        xx = (log(zz/10.)-psi_m)/vonkarm
-        cd = cd_n10/(1.0+cd_n10_rt*xx)**2             		  ! L-Y 10a
-        xx = (log(zz/10.)-psi_h)/vonkarm
-        ch = ch_n10/(1.0+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
-        ce = ce_n10/(1.0+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
+        xx = (log(zz/10._WP)-psi_m)/vonkarm
+        cd = cd_n10/(1.0_WP+cd_n10_rt*xx)**2             		  ! L-Y 10a
+        xx = (log(zz/10._WP)-psi_h)/vonkarm
+        ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
+        ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
      end do
 
      cd_atm_oce_arr(i)=cd
@@ -119,12 +120,12 @@ subroutine cal_wind_drag_coeff
   use g_parsup
   implicit none
 
-  integer            :: i, m
+  integer            :: i
   real(kind=WP)      :: ws
 
   do i=1,myDim_nod2d+eDim_nod2d    
      ws=sqrt(u_wind(i)**2+v_wind(i)**2)
-     cd_atm_ice_arr(i)=(1.1+0.04*ws)*1.0e-3
+     cd_atm_ice_arr(i)=(1.1_WP+0.04_WP*ws)*1.0e-3_WP
   end do
 
 end subroutine cal_wind_drag_coeff
@@ -159,11 +160,11 @@ SUBROUTINE nemo_ocean_fluxes_mode
       wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
       wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
       wndm = SQRT( wdx * wdx + wdy * wdy )
-      zst  = t_oc_array(i)+273.15
+      zst  = t_oc_array(i)+273.15_WP
 
-      q_sat = 0.98 * 640380. / rhoa * EXP( -5107.4 / zst )
+      q_sat = 0.98_WP * 640380._WP / rhoa * EXP( -5107.4_WP / zst )
 
-      call core_coeff_2z(2.0_wp, 10.0_wp, zst, atmdata(i_tair,i), &
+      call core_coeff_2z(2.0_WP, 10.0_WP, zst, atmdata(i_tair,i), &
                         q_sat, atmdata(i_humi,i), wndm, Cd, Ch, Ce, t_zu, q_zu)
      cd_atm_oce_arr(i)=Cd
      ch_atm_oce_arr(i)=Ch
@@ -229,8 +230,8 @@ SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q
    integer :: j_itt
    integer,  parameter :: nb_itt = 3   ! number of itterations
    real(wp), parameter ::                        &
-      grav   = 9.8,      &  ! gravity
-      kappa  = 0.4          ! von Karman's constant
+   grav   = 9.81_WP,      &  ! gravity
+   kappa  = 0.4_WP          ! von Karman's constant
    !!----------------------------------------------------------------------
    !!  * Start
    !! Initial air/sea differences
@@ -238,11 +239,11 @@ SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q
    dT = T_zt - sst
    dq = q_zt - q_sat
    !! Neutral Drag Coefficient :
-   stab = 0.5 + sign(0.5_wp,dT)                 ! stab = 1  if dT > 0  -> STABLE
-   Cd_n10  = 1E-3*( 2.7/dU10 + 0.142 + dU10/13.09 )
+   stab = 0.5_WP + sign(0.5_wp,dT)                 ! stab = 1  if dT > 0  -> STABLE
+   Cd_n10  = 1E-3_WP*( 2.7_WP/dU10 + 0.142_WP + dU10/13.09_WP )
    sqrt_Cd_n10 = sqrt(Cd_n10)
-   Ce_n10  = 1E-3*( 34.6 * sqrt_Cd_n10 )
-   Ch_n10  = 1E-3*sqrt_Cd_n10*(18*stab + 32.7*(1 - stab))
+   Ce_n10  = 1E-3_WP*( 34.6_WP * sqrt_Cd_n10 )
+   Ch_n10  = 1E-3_WP*sqrt_Cd_n10*(18.0_WP*stab + 32.7_WP*(1.0_WP - stab))
    !! Initializing transf. coeff. with their first guess neutral equivalents :
    Cd = Cd_n10 ;  Ce = Ce_n10 ;  Ch = Ch_n10 ;  sqrt_Cd = sqrt(Cd)
    !! Initializing z_u values with z_t values :
@@ -251,16 +252,16 @@ SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q
    !!  * Now starting iteration loop
    do j_itt=1, nb_itt
       dT = T_zu - sst ;  dq = q_zu - q_sat ! Updating air/sea differences
-      T_vpot = T_zu*(1. + 0.608*q_zu)      ! Updating virtual potential temperature at zu
+      T_vpot = T_zu*(1._WP + 0.608_WP*q_zu)      ! Updating virtual potential temperature at zu
       U_star = sqrt_Cd*dU10                ! Updating turbulent scales :   (L & Y eq. (7))
       T_star  = Ch/sqrt_Cd*dT              !
       q_star  = Ce/sqrt_Cd*dq              !
       !!
       L = (U_star*U_star) &                ! Estimate the Monin-Obukov length at height zu
-           & / (kappa*grav/T_vpot*(T_star*(1.+0.608*q_zu) + 0.608*T_zu*q_star))
+           & / (kappa*grav/T_vpot*(T_star*(1._WP+0.608_WP*q_zu) + 0.608_WP*T_zu*q_star))
       !! Stability parameters :
-      zeta_u  = zu/L  ;  zeta_u = sign( min(abs(zeta_u),10.0), zeta_u )
-      zeta_t  = zt/L  ;  zeta_t = sign( min(abs(zeta_t),10.0), zeta_t )
+      zeta_u  = zu/L  ;  zeta_u = sign( min(abs(zeta_u),10.0_WP), zeta_u )
+      zeta_t  = zt/L  ;  zeta_t = sign( min(abs(zeta_t),10.0_WP), zeta_t )
       zpsi_hu = psi_h(zeta_u)
       zpsi_ht = psi_h(zeta_t)
       zpsi_m  = psi_m(zeta_u)
@@ -270,7 +271,7 @@ SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q
       !   In very rare low-wind conditions, the old way of estimating the
       !   neutral wind speed at 10m leads to a negative value that causes the code
       !   to crash. To prevent this a threshold of 0.25m/s is now imposed.
-      U_n10 = max(0.25 , dU10/(1. + sqrt_Cd_n10/kappa*(log(zu/10.) - zpsi_m)))
+      U_n10 = max(0.25_WP , dU10/(1._WP + sqrt_Cd_n10/kappa*(log(zu/10._WP) - zpsi_m)))
       !!
       !! Shifting temperature and humidity at zu :          (L & Y eq. (9b-9c))
       !T_zu = T_zt - T_star/kappa*(log(zt/zu) + psi_h(zeta_u) - psi_h(zeta_t))
@@ -279,28 +280,28 @@ SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q
       q_zu = q_zt - q_star/kappa*(log(zt/zu) + zpsi_hu - zpsi_ht)
       !!
       !! q_zu cannot have a negative value : forcing 0
-      stab = 0.5 + sign(0.5_wp,q_zu) ;  q_zu = stab*q_zu
+      stab = 0.5_WP + sign(0.5_WP,q_zu) ;  q_zu = stab*q_zu
       !!
       !! Updating the neutral 10m transfer coefficients :
-      Cd_n10  = 1E-3 * (2.7/U_n10 + 0.142 + U_n10/13.09)    ! L & Y eq. (6a)
+      Cd_n10  = 1E-3_WP * (2.7_WP/U_n10 + 0.142_WP + U_n10/13.09_WP)    ! L & Y eq. (6a)
       sqrt_Cd_n10 = sqrt(Cd_n10)
-      Ce_n10  = 1E-3 * (34.6 * sqrt_Cd_n10)                 ! L & Y eq. (6b)
-      stab    = 0.5 + sign(0.5_wp,zeta_u)
-      Ch_n10  = 1E-3*sqrt_Cd_n10*(18.*stab + 32.7*(1-stab)) ! L & Y eq. (6c-6d)
+      Ce_n10  = 1E-3_WP * (34.6_WP * sqrt_Cd_n10)                 ! L & Y eq. (6b)
+      stab    = 0.5_WP + sign(0.5_wp,zeta_u)
+      Ch_n10  = 1E-3_WP*sqrt_Cd_n10*(18._WP*stab + 32.7_WP*(1-stab)) ! L & Y eq. (6c-6d)
       !!
       !!
       !! Shifting the neutral 10m transfer coefficients to (zu,zeta_u) :
       !xct = 1. + sqrt_Cd_n10/kappa*(log(zu/10.) - psi_m(zeta_u))
-      xct = 1. + sqrt_Cd_n10/kappa*(log(zu/10.) - zpsi_m)
+      xct = 1._WP + sqrt_Cd_n10/kappa*(log(zu/10._WP) - zpsi_m)
       Cd = Cd_n10/(xct*xct) ; sqrt_Cd = sqrt(Cd)
       !!
       !xlogt = log(zu/10.) - psi_h(zeta_u)
-      xlogt = log(zu/10.) - zpsi_hu
+      xlogt = log(zu/10._WP) - zpsi_hu
       !!
-      xct = 1. + Ch_n10*xlogt/kappa/sqrt_Cd_n10
+      xct = 1._WP + Ch_n10*xlogt/kappa/sqrt_Cd_n10
       Ch  = Ch_n10*sqrt_Cd/sqrt_Cd_n10/xct
       !!
-      xct = 1. + Ce_n10*xlogt/kappa/sqrt_Cd_n10
+      xct = 1._WP + Ce_n10*xlogt/kappa/sqrt_Cd_n10
       Ce  = Ce_n10*sqrt_Cd/sqrt_Cd_n10/xct
       !!
          !!
@@ -318,10 +319,10 @@ FUNCTION psi_h( zta )
    real(wp), intent(in) ::   zta
    real(wp)             ::   psi_h
    !-------------------------------------------------------------------------------
-   X2 = sqrt(abs(1. - 16.*zta))  ;  X2 = max(X2 , 1.) ;  X  = sqrt(X2)
-   stabit    = 0.5 + sign(0.5_wp,zta)
-   psi_h = -5.*zta*stabit  &                                       ! Stable
-     &    + (1. - stabit)*(2.*log( (1. + X2)/2. ))                 ! Unstable
+   X2 = sqrt(abs(1._WP - 16._WP*zta))  ;  X2 = max(X2 , 1._WP) ;  X  = sqrt(X2)
+   stabit    = 0.5_WP + sign(0.5_WP,zta)
+   psi_h = -5._WP*zta*stabit  &                                       ! Stable
+     &    + (1._WP - stabit)*(2._WP*log( (1._WP + X2)/2._WP ))                 ! Unstable
 END FUNCTION psi_h
 
 FUNCTION psi_m( zta )
@@ -332,14 +333,14 @@ FUNCTION psi_m( zta )
    real(wp)             :: stabit
    !!
    real(wp), intent(in) ::   zta
-   real(wp), parameter  :: pi = 3.141592653589793_wp
+   real(wp), parameter  :: pi = 3.141592653589793_WP
    real(wp)             :: psi_m
    !-------------------------------------------------------------------------------
 
-   X2 = sqrt(abs(1. - 16.*zta))  ;  X2 = max(X2 , 1.0) ;  X  = sqrt(X2)
-   stabit    = 0.5 + sign(0.5_wp,zta)
-   psi_m = -5.*zta*stabit  &                                                          ! Stable
-      &    + (1. - stabit)*(2*log((1. + X)/2) + log((1. + X2)/2) - 2*atan(X) + pi/2)  ! Unstable
+   X2 = sqrt(abs(1._WP - 16._WP*zta))  ;  X2 = max(X2 , 1.0_WP) ;  X  = sqrt(X2)
+   stabit    = 0.5_WP + sign(0.5_WP,zta)
+   psi_m = -5._WP*zta*stabit  &                                                          ! Stable
+      &    + (1._WP - stabit)*(2._WP*log((1._WP + X)/2._WP) + log((1._WP + X2)/2._WP) - 2._WP*atan(X) + pi/2._WP)  ! Unstable
    !
 END FUNCTION psi_m
 END MODULE gen_bulk

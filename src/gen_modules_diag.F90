@@ -501,10 +501,10 @@ subroutine compute_diag_dvd_2ndmoment(tr_num)
     select case (tracer_adv)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-            call adv_tracers_muscle_ale(trAB_sqr, .25)
+            call adv_tracers_muscle_ale(trAB_sqr, .25_WP)
             call adv_tracers_vert_ppm_ale(tr_sqr)
         case(2) !MUSCL+FCT(3D)
-            call adv_tracer_fct_ale(trAB_sqr,tr_sqr, 1.0)
+            call adv_tracer_fct_ale(trAB_sqr,tr_sqr, 1.0_WP)
         case default !unknown
             if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
             call par_ex(1)

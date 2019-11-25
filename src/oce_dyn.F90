@@ -77,7 +77,7 @@ real(kind=WP) :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D
 
 UV_c=0.0_WP
 !NR UV_f=0.0_WP
-tau_inv=dt*tau_c/3600.0/24.0     ! SET IT experimentally 
+tau_inv=dt*tau_c/3600.0_WP/24.0_WP     ! SET IT experimentally 
   
 DO ed=1, myDim_edge2D+eDim_edge2D
    if(myList_edge2D(ed)>edge2D_in) cycle
@@ -238,7 +238,7 @@ integer       :: nz, ed, el(2)
     crosslen=sqrt(le(1)**2+le(2)**2) 
     DO  nz=1,minval(nlevels(el))-1
      vi=dt*len*(Visc(nz,el(1))+Visc(nz,el(2)))/crosslen
-     vi=max(vi,0.005*len*dt) ! This helps to reduce noise in places where 
+     vi=max(vi,0.005_WP*len*dt) ! This helps to reduce noise in places where 
                               ! Visc is small and decoupling might happen 
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))*vi
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
@@ -294,7 +294,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      ! ====
      ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
      ! ====
-     vi=max(0.2,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
+     vi=max(0.2_WP,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
@@ -310,7 +310,7 @@ if(option==2) then
      ! ===   
      ! Case 2 -- Leith +background (call h_viscosity_leith)
      ! ===
-     vi=max(Visc(nz,ed),0.15*len)
+     vi=max(Visc(nz,ed),0.15_WP*len)
      !    
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
@@ -387,7 +387,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  Do ed=1,myDim_elem2D
     len=0.01*sqrt(elem_area(ed))                     
     Do nz=1,nlevels(ed)-1
-     vi=dt*abs(min(Visc(nz,ed)-len,0.0))    
+     vi=dt*abs(min(Visc(nz,ed)-len,0.0_WP))    
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
@@ -463,7 +463,7 @@ real(kind=WP), allocatable :: aux(:,:)
 			leithx=sum(gradient_sca(1:3,elem)*div_elem)
 			leithy=sum(gradient_sca(4:6,elem)*div_elem)
 			vi=A_hor*sqrt(elem_area(elem)/scale_area)
-			Visc(nz,elem)=0.2*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
+			Visc(nz,elem)=0.2_WP*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
 				+ Leith_c*(leithx**2+leithy**2))*elem_area(elem)) &
 				+ vi, elem_area(elem)/dt)
 		end do                        !! 0.1 here comes from (2S)^{3/2}/pi^3
@@ -542,8 +542,8 @@ real(kind=8), allocatable  :: U_c(:,:), V_c(:,:)
 !
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_8
- V_c=0.0_8
+ U_c=0.0_WP
+ V_c=0.0_WP
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -559,11 +559,11 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  
  Do ed=1,myDim_elem2D
     len=sqrt(elem_area(ed))                     
-    len=len/100.0_8
+    len=len/100.0_WP
     Do nz=1,nlevels(ed)-1
      ! vi has the sense of harmonic viscosity coef. because of 
      ! division by area in the end 
-     vi=dt*max(sqrt(U_c(nz,ed)**2+V_c(nz,ed)**2), 5*(U_c(nz,ed)**2+V_c(nz,ed)**2))*len   
+     vi=dt*max(sqrt(U_c(nz,ed)**2+V_c(nz,ed)**2), 5.0_WP*(U_c(nz,ed)**2+V_c(nz,ed)**2))*len   
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
@@ -608,12 +608,12 @@ real(kind=8), allocatable  :: U_c(:,:), V_c(:,:)
 !
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_8
- V_c=0.0_8
+ U_c=0.0_WP
+ V_c=0.0_WP
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
-    len=sqrt(sum(elem_area(el)))/100.0_8
+    len=sqrt(sum(elem_area(el)))/100.0_WP
     DO  nz=1,minval(nlevels(el))-1
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -632,7 +632,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
-     len=sqrt(sum(elem_area(el)))/100.0_8
+     len=sqrt(sum(elem_area(el)))/100.0_WP
     DO  nz=1,minval(nlevels(el))-1
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
@@ -669,7 +669,7 @@ integer       :: nz, ed, el(2)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
-    le=sqrt(sum(elem_area(el)))/30.0_8
+    le=sqrt(sum(elem_area(el)))/30.0_WP
     DO  nz=1,minval(nlevels(el))-1
       u1=UV(1,nz,el(1))-UV(1,nz,el(2))
       v1=UV(2,nz,el(1))-UV(2,nz,el(2))
@@ -705,10 +705,10 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
  allocate(U_b(nl-1,ed), V_b(nl-1, ed))
  ed=myDim_nod2D+eDim_nod2D
  allocate(U_c(nl-1,ed), V_c(nl-1,ed))
- U_b=0.0_8
- V_b=0.0_8 
- U_c=0.0_8
- V_c=0.0_8
+ U_b=0.0_WP
+ V_b=0.0_WP
+ U_c=0.0_WP
+ V_c=0.0_WP
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -733,7 +733,7 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
    DO ed=1, myDim_nod2D 
     DO nz=1, nlevels_nod2D(ed)-1
        vi=0.0_WP
-       u1=0.0_8
+       u1=0.0_WP
        v1=0.0_WP
        DO k=1, nod_in_elem2D_num(ed)
            elem=nod_in_elem2D(k,ed)
@@ -750,8 +750,8 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
   do ed=1, myDim_elem2D
          nelem=elem2D_nodes(:,ed)
          Do nz=1, nlevels(ed)-1
-         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_8
-         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_8 
+         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
+         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
          END DO
   end do
  deallocate(V_c,U_c,V_b,U_b)

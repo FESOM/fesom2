@@ -49,20 +49,20 @@ subroutine fct_init
     if (fct_iter > 1) then
         allocate(fct_adf_h2(nl-1,myDim_edge2D))
         allocate(fct_adf_v2(nl, myDim_nod2D))
-        fct_adf_h2=0.
-        fct_adf_v2=0.
+        fct_adf_h2=0._WP
+        fct_adf_v2=0._WP
     end if
 
     allocate(fct_ttf_max(nl-1, my_size),fct_ttf_min(nl-1, my_size))
     allocate(fct_plus(nl-1, my_size),fct_minus(nl-1, my_size))
     ! Initialize with zeros: 
-    fct_LO=0.0
-    fct_adf_h=0.0
-    fct_adf_v=0.0
-    fct_ttf_max=0.0
-    fct_ttf_min=0.0
-    fct_plus=0.0
-    fct_minus=0.0
+    fct_LO=0.0_WP
+    fct_adf_h=0.0_WP
+    fct_adf_v=0.0_WP
+    fct_ttf_max=0.0_WP
+    fct_ttf_min=0.0_WP
+    fct_plus=0.0_WP
+    fct_minus=0.0_WP
     
     if (mype==0) write(*,*) 'FCT is initialized'
  
@@ -583,8 +583,8 @@ subroutine fct_ale(ttf, iter_yn)
     !     for the euler and navier stoke equation
     do n=1, myDim_nod2D
         do nz=1,nlevels_nod2D(n)-1
-            fct_plus(nz,n)=0.
-            fct_minus(nz,n)=0.
+            fct_plus(nz,n)=0._WP
+            fct_minus(nz,n)=0._WP
         end do
     end do
     
@@ -612,10 +612,10 @@ subroutine fct_ale(ttf, iter_yn)
             nl2=nlevels(el(2))-1
         end if   
         do nz=1, max(nl1,nl2)
-            fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0, fct_adf_h(nz,edge))
-            fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0, fct_adf_h(nz,edge))  
-            fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0,-fct_adf_h(nz,edge))
-            fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0,-fct_adf_h(nz,edge)) 
+            fct_plus (nz,enodes(1))=fct_plus (nz,enodes(1)) + max(0.0_WP, fct_adf_h(nz,edge))
+            fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, fct_adf_h(nz,edge))  
+            fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-fct_adf_h(nz,edge))
+            fct_minus(nz,enodes(2))=fct_minus(nz,enodes(2)) + min(0.0_WP,-fct_adf_h(nz,edge)) 
         end do
     end do 
     
@@ -624,9 +624,9 @@ subroutine fct_ale(ttf, iter_yn)
     do n=1,myDim_nod2D
         do nz=1,nlevels_nod2D(n)-1
             flux=fct_plus(nz,n)*dt/area(nz,n)+flux_eps
-            fct_plus(nz,n)=min(1.0,fct_ttf_max(nz,n)/flux)
+            fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
             flux=fct_minus(nz,n)*dt/area(nz,n)-flux_eps
-            fct_minus(nz,n)=min(1.0,fct_ttf_min(nz,n)/flux)
+            fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
     end do 
     
@@ -638,9 +638,9 @@ subroutine fct_ale(ttf, iter_yn)
     !Vertical
     do n=1, myDim_nod2D
         nz=1
-        ae=1.0
+        ae=1.0_WP
         flux=fct_adf_v(nz,n)
-        if(flux>=0.0) then 
+        if(flux>=0.0_WP) then 
             ae=min(ae,fct_plus(nz,n))
         else
             ae=min(ae,fct_minus(nz,n))
@@ -648,9 +648,9 @@ subroutine fct_ale(ttf, iter_yn)
         fct_adf_v(nz,n)=ae*fct_adf_v(nz,n) 
         
         do nz=2,nlevels_nod2D(n)-1
-            ae=1.0
+            ae=1.0_WP
             flux=fct_adf_v(nz,n)
-            if(flux>=0.) then 
+            if(flux>=0._WP) then 
                 ae=min(ae,fct_minus(nz-1,n))
                 ae=min(ae,fct_plus(nz,n))
             else
@@ -678,10 +678,10 @@ subroutine fct_ale(ttf, iter_yn)
             nl2=nlevels(el(2))-1
         end if  
         do nz=1, max(nl1,nl2)
-            ae=1.0
+            ae=1.0_WP
             flux=fct_adf_h(nz,edge)
             
-            if(flux>=0.) then
+            if(flux>=0._WP) then
                 ae=min(ae,fct_plus(nz,enodes(1)))
                 ae=min(ae,fct_minus(nz,enodes(2)))
             else

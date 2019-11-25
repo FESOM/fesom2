@@ -160,7 +160,7 @@ do n=1,myDim_nod2d
    enddo
 
    ! To get a clean checksum, set the remaining values to zero
-   Unode_rhs(1:2,nl1+1:nl-1,n) = 0.
+   Unode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
 
 end do
 
@@ -188,8 +188,8 @@ DO ed=1, myDim_edge2D
       ! Usually, no or only a very few levels have to be filled. In this case, 
       ! computing "zeros" is cheaper than the loop overhead.
       
-      un1(nl1+1:max(nl1,nl2)) = 0.
-      un2(nl2+1:max(nl1,nl2)) = 0.
+      un1(nl1+1:max(nl1,nl2)) = 0._WP
+      un2(nl2+1:max(nl1,nl2)) = 0._WP
 
       ! first edge node
       ! Do not calculate on Halo nodes, as the result will not be used. 
