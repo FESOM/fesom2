@@ -259,9 +259,9 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
             
         #_______________________________________________________________________    
         # compute depth mean + linear interpolation to selected depth levels
-        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx)
-        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx)
-        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx)
+        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
+        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
+        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
         
     # 2D data:
     else: 
@@ -336,9 +336,9 @@ def do_load_dataloop(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, 
             
         #_______________________________________________________________________    
         # compute depth mean + linear interpolation to selected depth levels
-        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx)
-        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx)
-        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx)
+        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
+        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
+        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
         
     # 2D data:
     else: 
@@ -396,7 +396,7 @@ def do_fileattr(fname_data,data,var_list):
 #___DO VERTICAL INTERPOLTION____________________________________________________
 #
 #_______________________________________________________________________________
-def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx):
+def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
     # only do vertical interpolation when something is written in the data.depth
     if len(idepth)!=0:
         weight   = np.zeros((len(idepth),3))
@@ -425,6 +425,11 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx):
                 
             div[isvalid] = div[isvalid]+1.0
             del isvalid    
+            
+            if weight[zi,2]<0.0 or weight[zi,2]>1.0:
+                if do_output: print(' --> WARNING --> no vertical extrapolation supported, reset weight to nearest layer')
+                weight[zi,2] = max([weight[zi,2],0.0])
+                weight[zi,2] = min([weight[zi,2],1.0])
         
         #_______________________________________________________________________
         # compute depth interpolation
@@ -604,6 +609,7 @@ def do_select_levidx(mesh,data,ndi,do_output):
                 auxidx     = np.searchsorted(-mesh.zmid,aux)
                 if auxidx>=1 and auxidx-1 not in sel_levidx: sel_levidx.append(auxidx-1)
                 if (auxidx not in sel_levidx): sel_levidx.append(auxidx)
+                if (auxidx==0 and 1 not in sel_levidx): sel_levidx.append(auxidx+1)
                 
     if do_output==True: print(' --> sel_levidx    :',sel_levidx)            
     
