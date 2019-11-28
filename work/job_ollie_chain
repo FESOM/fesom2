@@ -9,6 +9,8 @@
 #SBATCH -o fesom2.0_%x_%j.out
 #SBATCH -e fesom2.0_%x_%j.out
 
+## module load intel.compiler intel.mpi netcdf centoslibs
+
 #___DEFAULT INPUT_______________________________________________________________
 # how many job chains should be applied
 chain_n=3 # number chain cycles
@@ -178,7 +180,7 @@ if [ $is_newsimul -eq 1 ] ; then
         cp fesom.x ${dname_result}/.
 
 	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
-	if [ ! -d "${dname_result}/src" ]; then mkdir("${dname_result}/src") ; fi
+	if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
 	cp ../src/*.F90 ${dname_result}/src/.
 	
         
@@ -232,7 +234,7 @@ if [ $is_newsimul -eq 1 ] ; then
             cp fesom.x ${dname_result}/. 
         fi
 	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
-	if [ ! -d "${dname_result}/src" ]; then mkdir("${dname_result}/src") ; fi
+	if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
 	cp ../src/*.F90 ${dname_result}/src/.
     fi 
 fi
