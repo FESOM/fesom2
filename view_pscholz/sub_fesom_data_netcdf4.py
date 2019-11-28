@@ -37,6 +37,7 @@ class fesom_data(object):
     
     #____data varaible___________________________
     value, value2, value3, time = [], [], [], []
+    rescale                     = []
     which_mean                  = 'monthly'
     anom                        = False
     
@@ -59,6 +60,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
                                   which_files='default', \
                                   do_tmean=True,         \
                                   do_loadloop=False,     \
+                                  do_rescale='auto',     \
                                   do_output=True):
     
     #___________________________________________________________________________
@@ -105,7 +107,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         
     #___________________________________________________________________________
     # do nessessary postprocesssing to rotate vectors, compute norm, set NaNs ...
-    data        = do_postprocess(mesh, data, do_output)
+    data        = do_postprocess(mesh, data, do_rescale, do_output)
     
     #___________________________________________________________________________
     # add augmented periodic boundary
@@ -411,23 +413,21 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             
             weight[zi,0], weight[zi,1] = sel_levidx.index(auxidx), sel_levidx.index(auxidx+1)
             if ndi!=mesh.nlev: 
-                weight[zi,2] = (idepth[zi]+mesh.zmid[auxidx])/(mesh.zmid[auxidx]-mesh.zmid[auxidx+1])
-                #isvalid      = mesh.nodes_2d_izg[:nsi]-1>=auxidx
+                depth = mesh.zmid
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=auxidx
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=auxidx
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
-            else             : 
-                weight[zi,2] = (idepth[zi]+mesh.zlev[auxidx])/(mesh.zlev[auxidx]-mesh.zlev[auxidx+1])
-                #isvalid      = mesh.nodes_2d_izg[:nsi]>=auxidx
+            else             :
+                depth = mesh.zlev
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=auxidx
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=auxidx
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
-                
+            weight[zi,2] = (idepth[zi]+depth[auxidx])/(depth[auxidx]-depth[auxidx+1])    
             div[isvalid] = div[isvalid]+1.0
             del isvalid    
             
             if weight[zi,2]<0.0 or weight[zi,2]>1.0:
-                if do_output: print(' --> WARNING --> no vertical extrapolation supported, reset weight to nearest layer')
+                if do_output: print(' --> WARNING !!!   : no vert. extrap. supported! reset '+str(idepth[zi])+'m to nearest layer '+str(abs(depth[auxidx]))+'m')
                 weight[zi,2] = max([weight[zi,2],0.0])
                 weight[zi,2] = min([weight[zi,2],1.0])
         
@@ -472,7 +472,7 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
 #___DO NECCESSARY POSTPROCESSING________________________________________________
 #
 #_______________________________________________________________________________
-def do_postprocess(mesh,data,do_output):
+def do_postprocess(mesh,data,do_rescale,do_output):
 
     # in case more than one variable has been loaded compute norm, vec, ...
     if any(x in data.var for x in ['tuv','suv']):
@@ -504,11 +504,18 @@ def do_postprocess(mesh,data,do_output):
     if data.var in ['a_ice','m_ice']: data.value[data.value<=0.0]=np.nan
     
     # cutoff exponentials --> add therefore string to unit parameter
-    if np.nanmax(np.abs(data.value))<1e-2 and np.nanmax(np.abs(data.value))>0.0:
-        scal = 10**(np.floor(np.log10(max(abs(np.nanmin(data.value)),abs(np.nanmax(data.value))))-1))
-        data.value = data.value/scal
-        if any(x in data.var for x in ['vec']): data.value2 = data.value2/scal
-        data.unit  = ' $ \cdot 10^{'+str(int(np.log10(scal)))+'} $'+data.unit
+    if do_rescale=='auto':
+        if np.nanmax(np.abs(data.value))<1e-2 and np.nanmax(np.abs(data.value))>0.0:
+            scal = 10**(np.floor(np.log10(max(abs(np.nanmin(data.value)),abs(np.nanmax(data.value))))-1))
+            data.value = data.value/scal
+            data.rescale=scal
+            if any(x in data.var for x in ['vec']): data.value2 = data.value2/scal
+            data.unit  = ' $ \cdot 10^{'+str(int(np.log10(scal)))+'} $'+data.unit
+    elif do_rescale=='log10':
+        data.value = np.log10(data.value)
+        data.rescale='log10'
+        if any(x in data.var for x in ['vec']): data.value2 = np.log10(data.value2)
+        data.unit  = ' log10() '+data.unit
         
     return(data)
 

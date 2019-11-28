@@ -229,7 +229,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     if clevel.size>50: do_drawedges=False
     
     #if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
-    if data.sname.find('MLD')==0:
+    if 'MLD' in data.var:
         if data.anom==False:
             # make no sea ice transparent
             from matplotlib.colors import ListedColormap
@@ -1566,10 +1566,10 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
 #_______________________________________________________________________________
 # select optimal color range by histogramm
 #_______________________________________________________________________________
-def fesom_choose_best_cref(cmin,cmax,varname):
+def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto'):
     cref = cmin + (cmax-cmin)/2
     if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1)) 
     if varname in ['u','v','w','ssh','fw','fh'] or \
-       any(x in varname for x in ['vec','anom']):
-        cref=0.0
+       any(x in varname for x in ['vec','anom','dvd']):
+       if not do_rescale=='log10': cref=0.0
     return(cref)    
