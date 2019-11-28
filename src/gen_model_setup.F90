@@ -16,6 +16,8 @@ subroutine read_namelist
   use g_forcing_param
   use g_parsup
   use g_config
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
+                         ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
   use g_ic3d  
   implicit none
@@ -93,6 +95,11 @@ subroutine read_namelist
   read (20,NML=ice_therm)
   close (20)
   endif
+  
+  nmlfile ='namelist.io'    ! name of forcing namelist file
+  open (20,file=nmlfile)
+  read (20,NML=diag_list)
+  close (20)
 
   if(mype==0) write(*,*) 'Namelist files are read in'
 
