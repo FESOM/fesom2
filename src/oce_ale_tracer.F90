@@ -83,7 +83,8 @@ subroutine adv_tracers_ale(tr_num)
     use g_parsup
     use o_PARAM, only: tracer_adv
     use o_arrays
-    use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment, compute_diag_dvd
+    use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
+                           compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
     
     implicit none
     integer :: tr_num, node, nz
@@ -99,7 +100,8 @@ subroutine adv_tracers_ale(tr_num)
     ! of discret variance decay
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd_2ndmoment'//achar(27)//'[0m'
-        call compute_diag_dvd_2ndmoment(tr_num)
+        call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num)
+        !!PS call compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
     end if    
     
     !___________________________________________________________________________
@@ -107,19 +109,26 @@ subroutine adv_tracers_ale(tr_num)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-!!PS     del_ttf          = 0.0_WP
     select case (tracer_adv)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP)
+            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1)
+            !                                                      |    | 
+            !             fraction of fourth-order contribution <--'    |
+            !                              1st tracer moment is used <--'
             
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
-            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num))
-        
+            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1)
+            !                                                 | 
+            !                    1st tracer moment is used <--'
+            
         case(2) !MUSCL+FCT(3D)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP)
+            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1)
+            !                                                                     |    | 
+            !                            fraction of fourth-order contribution <--'    | 
+            !                                             1st tracer moment is used <--'
             
         case default !unknown
             if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
@@ -129,11 +138,6 @@ subroutine adv_tracers_ale(tr_num)
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
-!!PS     do node=1, myDim_nod2d
-!!PS         do nz=1,nlevels_nod2D(node)-1  
-!!PS             del_ttf(nz,node)=del_ttf(nz,node)+del_ttf_advhoriz(nz,node)+del_ttf_advvert(nz,node)
-!!PS         end do
-!!PS     end do
     del_ttf=del_ttf+del_ttf_advhoriz+del_ttf_advvert
     
     !___________________________________________________________________________
@@ -157,7 +161,7 @@ end subroutine adv_tracers_ale
 ! ttfAB --> corresponds to array tr_arr_old(:,:,tr_num) which is created by routine 
 !             call init_tracers_AB(tr_num)
 !             tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
+subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment)
     use o_MESH
     use o_ARRAYS
     use o_PARAM
@@ -167,6 +171,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
     implicit none
     integer       :: el(2), enodes(2), n, nz, ed
     integer       :: nl1, nl2, n2
+    integer       :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
     real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
     real(kind=WP) :: c_lo(2)
     real(kind=WP) :: Tmean1, Tmean2, a
@@ -316,17 +321,31 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
             ! if vflux (+) --> c1 = 2*vflux*Tmean1
             ! if vflux (-) --> c1 = -2*vflux*Tmean2
             ! so only use upwind tracer flux !!!!!!!!!!!!!
-            c1=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
+            c1=(vflux+abs(vflux))*( Tmean1**do_Xmoment )+ &
+               (vflux-abs(vflux))*( Tmean2**do_Xmoment )
+            !                                   ||
+            !                                  _||_
+            !                                  \  / 
+            !                                   \/
+            ! for the calculation of the discrete variance decay (DVD) diagnostic of 
+            ! Klingbeil et al, 2014, Quantification of spurious dissipation and mixing 
+            ! - Discrete variance decay in a Finite-Volume framework
+            ! --> need the second moments of the tracers times flux at the control 
+            !     volume interface
+            ! --> if : do_Xmoment==1 --> 1st tracer moment  
+            ! --> if : do_Xmoment==2 --> 2nd tracer moment  
             
             !___________________________________________________________________
             ! combined with centered
             ! num_ord is the fraction of fourth-order contribution in the HO solution
             ! (1-num_ord) is done with 3rd order upwind
-            c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-            !                                            |____________|
-            !                                                  v
+!!PS             c1=-0.5_WP*( (1.0_WP-num_ord)*c1+vflux*num_ord*( (Tmean1+Tmean2)**do_Xmoment ) )
+            c1=-0.5_WP*(1.0_WP-num_ord)*c1 - vflux*num_ord*( (0.5_WP*(Tmean1+Tmean2))**do_Xmoment ) 
+            !                                                         |____________|
+            !                                                            v
             !                                           dont use fourth order solution
             !                                           if its at the boundary
+            
             !___________________________________________________________________
             ! write horizontal ale advection into rhs
             del_ttf_advhoriz(nz,enodes(1))=del_ttf_advhoriz(nz,enodes(1))+c1*dt/area(nz,enodes(1))
@@ -364,15 +383,17 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
                 
                 !_______________________________________________________________
                 ! tracer flux upwind
-                c1=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
+                c1=(vflux+abs(vflux))*( Tmean1**do_Xmoment ) + &
+                   (vflux-abs(vflux))*( Tmean2**do_Xmoment )
                 
                 !_______________________________________________________________
                 ! combined with centered
                 ! num_ord is the fraction of fourth-order contribution in the HO solution
                 ! (1-num_ord) is done with 3rd order upwind
-                c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-                !                                            |____________|
-                !                                                  v
+!!PS                 c1=-0.5_WP*( (1.0_WP-num_ord)*c1+vflux*num_ord*( (Tmean1+Tmean2)**do_Xmoment ) )
+                c1=-0.5_WP*(1.0_WP-num_ord)*c1 - vflux*num_ord*( (0.5_WP*(Tmean1+Tmean2))**do_Xmoment )
+                !                                                         |____________|
+                !                                                            v
                 !                                           dont use fourth order solution
                 !                                           if its at the boundary
                 !_______________________________________________________________
@@ -405,15 +426,17 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord)
                 
                 !_______________________________________________________________
                 ! tracer flux upwind
-                c1=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
+                c1=(vflux+abs(vflux))*( Tmean1**do_Xmoment )+&
+                   (vflux-abs(vflux))*( Tmean2**do_Xmoment )
                 
                 !_______________________________________________________________
                 ! combined with centered
                 ! num_ord is the fraction of fourth-order contribution in the HO solution
                 ! (1-num_ord) is done with 3rd order upwind
-                c1=-0.5_WP*((1.0_WP-num_ord)*c1+vflux*num_ord*(Tmean1+Tmean2))
-                !                                            |____________|
-                !                                                  v
+!!PS                 c1=-0.5_WP*( (1.0_WP-num_ord)*c1+vflux*num_ord*( (Tmean1+Tmean2)**do_Xmoment ) )
+                c1=-0.5_WP*(1.0_WP-num_ord)*c1 - vflux*num_ord*( (0.5_WP*(Tmean1+Tmean2))**do_Xmoment )
+                !                                                        |_____________|
+                !                                                           v
                 !                                           dont use fourth order solution
                 !                                           if its at the boundary
                 !_______________________________________________________________
@@ -429,7 +452,7 @@ end subroutine adv_tracers_muscle_ale
 !
 !===============================================================================
 ! Vertical ALE advection with PPM reconstruction (5th order)
-subroutine adv_tracers_vert_ppm_ale(ttf)
+subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment)
     use g_config
     use o_MESH
     use o_ARRAYS
@@ -438,6 +461,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
     use g_forcing_arrays
     implicit none
     integer       :: n, nz, nzmax
+    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: tvert(nl), tv(nl), aL, aR, aj, x
     real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
     real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
@@ -567,18 +591,22 @@ subroutine adv_tracers_vert_ppm_ale(ttf)
             
             if (Wvel_e(nz,n)>0._WP) then
                 x=min(Wvel_e(nz,n)*dt/dzj, 1._WP)
-                tvert(nz)=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))*area(nz,n)*Wvel_e(nz,n)
+                tvert(nz  )=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))
+                tvert(nz  )=( tvert(nz)**do_Xmoment ) ! compute 2nd moment for DVD
+                tvert(nz  )=tvert(nz)*area(nz,n)*Wvel_e(nz,n)
             end if
             
             if (Wvel_e(nz+1,n)<0._WP) then
                 x=min(-Wvel_e(nz+1,n)*dt/dzj, 1._WP)
-                tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))*area(nz+1,n)*Wvel_e(nz+1,n)
+                tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))
+                tvert(nz+1)=( tvert(nz+1)**do_Xmoment ) ! compute 2nd moment for DVD
+                tvert(nz+1)=tvert(nz+1)*area(nz+1,n)*Wvel_e(nz+1,n)
             end if
         end do
         
         !_______________________________________________________________________
         ! Surface flux
-        tvert(1)= -tv(1)*Wvel_e(1,n)*area(1,n)
+        tvert(1)= -( tv(1)**do_Xmoment )*Wvel_e(1,n)*area(1,n)
         ! Zero bottom flux
         tvert(nzmax)=0.0_WP        
         
@@ -596,7 +624,7 @@ end subroutine adv_tracers_vert_ppm_ale
 !
 !===============================================================================
 ! Vertical ALE advection with upwind reconstruction (1st order)
-subroutine adv_tracers_vert_upw(ttf)
+subroutine adv_tracers_vert_upw(ttf, do_Xmoment)
     use g_config
     use o_MESH
     use o_ARRAYS
@@ -605,6 +633,7 @@ subroutine adv_tracers_vert_upw(ttf)
     use g_forcing_arrays
     implicit none
     integer       :: n, nz, nl1
+    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: tvert(nl), tv
     real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
     
@@ -616,14 +645,15 @@ subroutine adv_tracers_vert_upw(ttf)
         nl1=nlevels_nod2D(n)-1
         !_______________________________________________________________________
         ! Surface flux
-        tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)
+        tvert(1)= -Wvel_e(1,n)*(ttf(1,n)**do_Xmoment)*area(1,n)
         !_______________________________________________________________________
         ! Zero bottom flux
         tvert(nl1+1)=0.0_WP
         !_______________________________________________________________________
         ! Other levels
         do nz=2, nl1
-            tv=ttf(nz-1,n)*min(Wvel_e(nz,n), 0._WP)+ttf(nz,n)*max(Wvel_e(nz,n), 0._WP)
+            tv=(ttf(nz-1,n)**do_Xmoment)*min(Wvel_e(nz,n), 0._WP)+ &
+               (ttf(nz  ,n)**do_Xmoment)*max(Wvel_e(nz,n), 0._WP)
             tvert(nz)= -tv*area(nz,n)
         end do
         !_______________________________________________________________________
@@ -631,7 +661,6 @@ subroutine adv_tracers_vert_upw(ttf)
         do nz=1, nl1
             ! no division over thickness in ALE !!!
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
-            
         end do         
     end do ! --> do n=1, myDim_nod2D
 end subroutine adv_tracers_vert_upw
@@ -639,7 +668,7 @@ end subroutine adv_tracers_vert_upw
 !
 !===============================================================================
 ! Vertical ALE advection with central difference reconstruction (2nd order)
-subroutine adv_tracers_vert_cdiff(ttf)
+subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment)
     use g_config
     use o_MESH
     use o_ARRAYS
@@ -648,6 +677,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
     use g_forcing_arrays
     implicit none
     integer       :: n, nz, nl1
+    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: tvert(nl), tv
     real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
     
@@ -659,7 +689,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
         nl1=nlevels_nod2D(n)-1
         !_______________________________________________________________________
         ! Surface flux
-        tvert(1)= -Wvel_e(1,n)*ttf(1,n)*area(1,n)        
+        tvert(1)= -Wvel_e(1,n)*(ttf(1,n)**do_Xmoment)*area(1,n)        
         !_______________________________________________________________________
         ! Zero bottom flux
         tvert(nl1+1)=0.0_WP        
@@ -667,6 +697,7 @@ subroutine adv_tracers_vert_cdiff(ttf)
         ! Other levels
         do nz=2, nl1
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
+            tv=tv**do_Xmoment
             tvert(nz)= -tv*Wvel_e(nz,n)*area(nz,n)
         end do
         !_______________________________________________________________________
@@ -674,7 +705,6 @@ subroutine adv_tracers_vert_cdiff(ttf)
         do nz=1, nl1
             ! no division over thickness in ALE !!!
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
-            
         end do         
     end do ! --> do n=1, myDim_nod2D
 end subroutine adv_tracers_vert_cdiff

@@ -2,7 +2,7 @@
 !
 !===============================================================================
 ! Caller routine for FCT tracer advection 
-subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
+subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment)
     use o_ARRAYS
     use o_MESH
     use o_PARAM
@@ -12,9 +12,10 @@ subroutine adv_tracer_fct_ale(ttfAB,ttf,num_ord)
 
     real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), ttf(nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)  :: num_ord
+    integer        :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     integer        :: i
     ! 1st. first calculate Low and High order solution
-    call fct_ale_muscl_LH(ttfAB,ttf,num_ord)
+    call fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
         
     if (w_split) then
         call fct_LO_impl_ale
@@ -70,7 +71,7 @@ end subroutine fct_init
 !
 !
 !===============================================================================
-subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
+subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
     use o_MESH
     use o_ARRAYS
     use o_PARAM
@@ -81,6 +82,7 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
     
     integer       :: el(2), enodes(2), n, nz, edge
     integer       :: n2, nl1, nl2,tr_num
+    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
     real(kind=WP) :: tvert(nl), tvert_e(nl), a, b, c, d, da, db, dg, vflux, Tupw1
@@ -222,7 +224,21 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
             
             !___________________________________________________________________
             ! 1st. Low order upwind solution
-            cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+            cLO=-0.5_WP*(                                                     &
+                         (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
+                         (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux)))
+            !                                   ||
+            !                                  _||_
+            !                                  \  / 
+            !                                   \/
+            ! for the calculation of the discrete variance decay (DVD) diagnostic of 
+            ! Klingbeil et al, 2014, Quantification of spurious dissipation and mixing 
+            ! - Discrete variance decay in a Finite-Volume framework
+            ! --> need the second moments of the tracers times flux at the control 
+            !     volume interface
+            ! --> if : do_Xmoment==1 --> 1st tracer moment  
+            ! --> if : do_Xmoment==2 --> 2nd tracer moment 
+            
 !!PS             cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
             fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO     
             fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO  
@@ -231,8 +247,10 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
             ! 2nd. High order solution
             ! num_ord is the fraction of fourth-order contribution in the HO solution
             ! (1-num_ord) is done with 3rd order upwind
-            cHO=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
-            cHO=-0.5_WP*((1.0_WP-num_ord)*cHO+vflux*num_ord*(Tmean1+Tmean2))
+            cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment)+ &
+                (vflux-abs(vflux))*(Tmean2**do_Xmoment)
+!!PS             cHO=-0.5_WP*( (1.0_WP-num_ord)*cHO+vflux*num_ord*( (Tmean1+Tmean2)**do_Xmoment ) )
+            cHO=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment
             
             !___________________________________________________________________
             ! 3nd. calculate Antidiffusive edge flux: AEF=[HO - LO]
@@ -265,7 +283,10 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 
                 !___________________________________________________________________
                 ! 1st. Low order upwind solution
-                cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+                cLO=-0.5_WP*(                                                     &
+                             (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
+                             (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux))  &
+                            )
 !!PS                 cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
                 fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO
                 fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO
@@ -274,8 +295,10 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 ! 2nd. High order solution 
                 ! num_ord is the fraction of fourth-order contribution in the HO solution
                 ! (1-num_ord) is done with 3rd order upwind
-                cHO=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
-                cHO=-0.5_WP*((1.0_WP-num_ord)*cHO+vflux*num_ord*(Tmean1+Tmean2))
+                cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment)+ &
+                    (vflux-abs(vflux))*(Tmean2**do_Xmoment)
+!!PS                 cHO=-0.5_WP*((1.0_WP-num_ord)*cHO+vflux*num_ord*((Tmean1+Tmean2)**do_Xmoment) )
+                cHO=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment
                 
                 !_______________________________________________________________
                 ! 3nd. calculate Antidiffusive edge flux: AEF=-[HO - LO]
@@ -301,7 +324,9 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 
                 !_______________________________________________________________
                 ! 1st. Low order upwind solution
-                cLO=-0.5_WP*(ttf(nz, enodes(1))*(vflux+abs(vflux))+ttf(nz, enodes(2))*(vflux-abs(vflux)))
+                cLO=-0.5_WP*(                                                     &
+                             (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
+                             (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux)))
 !!PS                 cLO=-0.5_WP*(ttfAB(nz, enodes(1))*(vflux+abs(vflux))+ttfAB(nz, enodes(2))*(vflux-abs(vflux)))
                 fct_LO(nz,enodes(1))=fct_LO(nz,enodes(1))+cLO
                 fct_LO(nz,enodes(2))=fct_LO(nz,enodes(2))-cLO
@@ -310,8 +335,10 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
                 ! 2nd. High order solution 
                 ! num_ord is the fraction of fourth-order contribution in the HO solution
                 ! (1-num_ord) is done with 3rd order upwind
-                cHO=(vflux+abs(vflux))*Tmean1+(vflux-abs(vflux))*Tmean2
-                cHO=-0.5_WP*((1.0_WP-num_ord)*cHO+vflux*num_ord*(Tmean1+Tmean2))
+                cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment)+&
+                    (vflux-abs(vflux))*(Tmean2**do_Xmoment)
+!!PS                 cHO=-0.5_WP*( (1.0_WP-num_ord)*cHO+vflux*num_ord*((Tmean1+Tmean2)**do_Xmoment) )
+                cHO=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment
                 
                 !_______________________________________________________________
                 ! 3nd. calculate Antidiffusive edge flux: AEF=-[HO - LO]
@@ -340,17 +367,19 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
         nz=2
         ! low order
         if (w_split) then
-            cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-            ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+            cLO=-0.5_WP*(                                                            &
+                         (ttf(nz  ,n)**do_Xmoment)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                         (ttf(nz-1,n)**do_Xmoment)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
             tvert_e(nz)=cLO*area(nz,n)
         end if
     
-        cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-                     ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+        cLO=-0.5_WP*(                                                        &
+                     (ttf(nz  ,n)**do_Xmoment)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+                     (ttf(nz-1,n)**do_Xmoment)*(Wvel(nz,n)-abs(Wvel(nz,n))))
         tvert(nz)=cLO*area(nz,n)
         
         ! high order
-        cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
+        cHO=-( (0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n)))**do_Xmoment )*Wvel(nz,n)
         
         ! antidiffusive flux: (HO-LO)
         fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
@@ -360,17 +389,19 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
         nz=nl1-1
         ! low order
         if (w_split) then
-            cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-            ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+            cLO=-0.5_WP*(                                                            &
+                         (ttf(nz  ,n)**do_Xmoment)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                         (ttf(nz-1,n)**do_Xmoment)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
             tvert_e(nz)=cLO*area(nz,n)
         end if
         
-        cLO=-0.5_WP*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-                     ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+        cLO=-0.5_WP*(                                                        &
+                     (ttf(nz  ,n)**do_Xmoment)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+                     (ttf(nz-1,n)**do_Xmoment)*(Wvel(nz,n)-abs(Wvel(nz,n))))
         tvert(nz)=cLO*area(nz,n)
         
         ! high order
-        cHO=-0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n))*Wvel(nz,n)
+        cHO=-( (0.5_WP*(ttfAB(nz-1,n)+ttfAB(nz,n)))**do_Xmoment )*Wvel(nz,n)
         
         ! antidiffusive flux: (HO-LO)
         fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
@@ -394,24 +425,27 @@ subroutine fct_ale_muscl_LH(ttfAB,ttf, num_ord)
         do nz=3,nl1-2
             ! low order --> First-order upwind estimate
             if (w_split) then
-                cLO=-0.5*(ttf(nz  ,n)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
-                          ttf(nz-1,n)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
+                cLO=-0.5*(                                                            &
+                          (ttf(nz  ,n)**do_Xmoment)*(Wvel_e(nz,n)+abs(Wvel_e(nz,n)))+ &
+                          (ttf(nz-1,n)**do_Xmoment)*(Wvel_e(nz,n)-abs(Wvel_e(nz,n))))
                 tvert_e(nz)=cLO*area(nz,n)
             end if
-            
-            cLO=-0.5*(ttf(nz  ,n)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
-                      ttf(nz-1,n)*(Wvel(nz,n)-abs(Wvel(nz,n))))
+            cLO=-0.5*(                                                        &
+                      (ttf(nz  ,n)**do_Xmoment)*(Wvel(nz,n)+abs(Wvel(nz,n)))+ &
+                      (ttf(nz-1,n)**do_Xmoment)*(Wvel(nz,n)-abs(Wvel(nz,n))))
             tvert(nz)=cLO*area(nz,n)
+            
             ! high order --> centered (4th order)
-            qc=(ttfAB(nz-1,n)-ttfAB(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
-            qu=(ttfAB(nz  ,n)-ttfAB(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
-            qd=(ttfAB(nz-2,n)-ttfAB(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
+            qc    =(ttfAB(nz-1,n)-ttfAB(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
+            qu    =(ttfAB(nz  ,n)-ttfAB(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
+            qd    =(ttfAB(nz-2,n)-ttfAB(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
             
             Tmean1=ttfAB(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
             Tmean2=ttfAB(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-            Tmean =(Wvel(nz,n)+abs(Wvel(nz,n)))*Tmean1+ &
-                   (Wvel(nz,n)-abs(Wvel(nz,n)))*Tmean2
-            cHO=-0.5_WP*(num_ord*(Tmean1+Tmean2)*Wvel(nz,n)+(1.0_WP-num_ord)*Tmean)
+            Tmean =(Wvel(nz,n)+abs(Wvel(nz,n)))*(Tmean1**do_Xmoment)+ &
+                   (Wvel(nz,n)-abs(Wvel(nz,n)))*(Tmean2**do_Xmoment)
+!!PS             cHO   =-0.5_WP*( num_ord*((Tmean1+Tmean2)**do_Xmoment)*Wvel(nz,n)+(1.0_WP-num_ord)*Tmean )
+            cHO   =-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*Wvel(nz,n)
             
             ! antidiffusive flux: (HO-LO)
             fct_adf_v(nz,n)=(cHO-cLO)*area(nz,n)
