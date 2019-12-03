@@ -414,13 +414,13 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             weight[zi,0], weight[zi,1] = sel_levidx.index(auxidx), sel_levidx.index(auxidx+1)
             if ndi!=mesh.nlev: 
                 depth = mesh.zmid
-                if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=auxidx
-                elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=auxidx
+                if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=auxidx+1
+                elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=auxidx+1
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             else             :
                 depth = mesh.zlev
-                if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=auxidx
-                elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=auxidx
+                if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=auxidx+1
+                elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=auxidx+1
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             weight[zi,2] = (idepth[zi]+depth[auxidx])/(depth[auxidx]-depth[auxidx+1])    
             div[isvalid] = div[isvalid]+1.0
@@ -430,15 +430,15 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
                 if do_output: print(' --> WARNING !!!   : no vert. extrap. supported! reset '+str(idepth[zi])+'m to nearest layer '+str(abs(depth[auxidx]))+'m')
                 weight[zi,2] = max([weight[zi,2],0.0])
                 weight[zi,2] = min([weight[zi,2],1.0])
-        
+                
         #_______________________________________________________________________
         # compute depth interpolation
         if idata.ndim==2:
-            idata = idata[:,weight[:,0].astype('int')]         \
+            idata = (idata[:,weight[:,0].astype('int')]         \
                     + (                                           \
                         idata[:,weight[:,1].astype('int')]\
                         -idata[:,weight[:,0].astype('int')]\
-                        )*weight[:,2]*valid_lay
+                        )*weight[:,2])*valid_lay
             idata = idata.sum(axis=1)
             
             #___________________________________________________________________
@@ -447,16 +447,17 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             idata[isvalid]                 = idata[isvalid]/div[isvalid]
             # set nodes where are no valid layers for interpolation to nan 
             idata[np.logical_not(isvalid)] = np.nan
+        
         # compute depth interpolation in case no time mean was applied    
         elif idata.ndim==3:
             nt,ns,nd=idata.shape
             idata2 = np.zeros((nt,ns,len(idepth)))
             for it in range(0,nt):
-                idata2[it,:,:] =  np.transpose(idata[it,:,weight[:,0].astype('int')])         \
+                idata2[it,:,:] =  (np.transpose(idata[it,:,weight[:,0].astype('int')])         \
                                 + np.transpose(                                           \
                                     idata[it,:,weight[:,1].astype('int')]\
                                     -idata[it,:,weight[:,0].astype('int')]\
-                                )*weight[:,2]*valid_lay
+                                )*weight[:,2])*valid_lay
                         
             idata = idata2.sum(axis=2)
             #_______________________________________________________________________
