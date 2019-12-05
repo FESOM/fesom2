@@ -1,6 +1,6 @@
 module io_mesh_info
 use g_PARSUP
-use o_MESH
+use MOD_MESH
 use g_config
 use g_comm_auto
 use o_ARRAYS
@@ -33,9 +33,9 @@ contains
 !-------------------------------------------------------------------------
 ! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation. 
 ! info: fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
-subroutine write_mesh_info
+subroutine write_mesh_info(mesh)
 implicit none
-
+  type(t_mesh), intent(in)   :: mesh
   integer                    :: status, ncid, j
   integer                    :: nod_n_id, elem_n_id, edge_n_id, nod_part_id, elem_part_id
   integer                    :: nl_id, nl1_id
@@ -57,6 +57,12 @@ implicit none
   character(2000)            :: att_text, short_name
   integer                    :: vtype
   integer, pointer           :: pid
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
   
   call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -106,7 +112,7 @@ implicit none
   ! nodal areas
   allocate(rbuffer(nod2D))
   do k=1, nl
-     call gather_nod(area(k, :), rbuffer)
+     call gather_nod(area(k, :), rbuffer, mesh)
      call my_put_vara(ncid, nod_area_id, (/1, k/), (/nod2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
@@ -137,13 +143,13 @@ implicit none
 
   ! number of levels below nodes
   allocate(ibuffer(nod2D))
-  call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer)
+  call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer, mesh)
   call my_put_vara(ncid, nlevels_nod2D_id, 1, nod2D, ibuffer)
   deallocate(ibuffer)
   
   ! number of elements containing the node
   allocate(ibuffer(nod2D))
-  call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer)
+  call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer, mesh)
   call my_put_vara(ncid, nod_in_elem2D_num_id, 1, nod2D, ibuffer)
   deallocate(ibuffer)
 
@@ -157,7 +163,7 @@ implicit none
               lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
            end if
         end do
-     call gather_nod(lbuffer, ibuffer)
+     call gather_nod(lbuffer, ibuffer, mesh)
      call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/nod2D, 1/), ibuffer)
   END DO
   deallocate(lbuffer, ibuffer)
@@ -166,7 +172,7 @@ implicit none
   allocate(ibuffer(nod2D))
   allocate(lbuffer(myDim_nod2D))  
   lbuffer=mype
-  call gather_nod(lbuffer, ibuffer)
+  call gather_nod(lbuffer, ibuffer, mesh)
   call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer)
   deallocate(lbuffer, ibuffer)
 
@@ -182,7 +188,7 @@ implicit none
   ! nodes (GEO coordinates)
   allocate(rbuffer(nod2D))
   do i=1, 2
-     call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer)
+     call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer, mesh)
      call my_put_vara(ncid, nod_id, (/1, i/), (/nod2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
@@ -244,7 +250,7 @@ implicit none
   
   ! nodal bottom depth (take into account partial cells if used)
   allocate(rbuffer(nod2D))
-  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer)
+  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer, mesh)
   call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer)
   deallocate(rbuffer)
 
@@ -256,7 +262,7 @@ implicit none
   
   call my_close(ncid)
   
-  
+  end associate
 end subroutine write_mesh_info
 !
 !============================================================================

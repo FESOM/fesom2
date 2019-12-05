@@ -1,39 +1,42 @@
 !============================================================================================
 MODULE o_tracers
+USE MOD_MESH
 IMPLICIT NONE
 CONTAINS
 !=======================================================================
-SUBROUTINE tracer_gradient_elements(ttf)
+SUBROUTINE tracer_gradient_elements(ttf, mesh)
 !computes elemental gradient of tracer 
 
 USE o_PARAM
-USE o_MESH
 USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
-real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
-integer           :: elem,  elnodes(3)
-integer           :: n, nz
 
+type(t_mesh), intent(in) :: mesh
+real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+integer                  :: elem,  elnodes(3)
+integer                  :: n, nz
+associate(elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels, gradient_sca=>mesh%gradient_sca)
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
    DO nz=1, nlevels(elem)-1   
       tr_xy(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
       tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
    END DO
- END DO     
+ END DO
+end associate
 END SUBROUTINE tracer_gradient_elements
 !========================================================================================
-SUBROUTINE init_tracers_AB(tr_num)
+SUBROUTINE init_tracers_AB(tr_num, mesh)
 use g_config, only: flag_debug
 use g_parsup
 use o_PARAM, only: tracer_adv
 use o_arrays
-use o_mesh
 use g_comm_auto
+use mod_mesh
 IMPLICIT NONE
-integer :: tr_num,n,nz 
-
+integer                    :: tr_num,n,nz 
+type(t_mesh), intent(in)   :: mesh
 
 !filling work arrays
 del_ttf=0.0_WP
@@ -42,32 +45,35 @@ del_ttf=0.0_WP
 tr_arr_old(:,:,tr_num)=-(0.5_WP+epsilon)*tr_arr_old(:,:,tr_num)+(1.5_WP+epsilon)*tr_arr(:,:,tr_num)
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-call tracer_gradient_elements(tr_arr_old(:,:,tr_num))
-call exchange_elem_begin(tr_xy)
+call tracer_gradient_elements(tr_arr_old(:,:,tr_num), mesh)
+call exchange_elem_begin(tr_xy, mesh)
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
 call tracer_gradient_z(tr_arr(:,:,tr_num))
 call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
-call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
+call exchange_nod_begin(tr_z, mesh) ! not used in fill_up_dn_grad 
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
 call fill_up_dn_grad
 call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-call tracer_gradient_elements(tr_arr(:,:,tr_num)) !redefine tr_arr to the current timestep
-call exchange_elem(tr_xy)
+call tracer_gradient_elements(tr_arr(:,:,tr_num), mesh) !redefine tr_arr to the current timestep
+call exchange_elem(tr_xy, mesh)
 
 END SUBROUTINE init_tracers_AB
 !========================================================================================
-SUBROUTINE relax_to_clim(tr_num)
-use o_mesh
+SUBROUTINE relax_to_clim(tr_num, mesh)
 use g_config,only: dt
 USE g_PARSUP
 use o_arrays
 use o_PARAM, only: tracer_adv
 IMPLICIT NONE
-integer :: tr_num,n,nz
+
+type(t_mesh), intent(in) :: mesh
+integer                  :: tr_num,n,nz
+
+associate(nlevels_nod2D=>mesh%nlevels_nod2D)
 
 if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
    DO n=1, myDim_nod2D
@@ -81,20 +87,24 @@ if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
             relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
    END DO
 END IF 
+end associate
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
 !========================================================================================
-SUBROUTINE tracer_gradient_z(ttf)
+SUBROUTINE tracer_gradient_z(ttf, mesh)
 !computes vertical gradient of tracer
 USE o_PARAM
-USE o_MESH
+USE MOD_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-real(kind=WP)     :: ttf(nl-1,myDim_nod2D+eDim_nod2D)
-real(kind=WP)     :: dz
-integer           :: n, nz, nlev
+type(t_mesh), intent(in) :: mesh
+real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)            :: dz
+integer                  :: n, nz, nlev
+
+associate(nlevels_nod2D=>mesh%nlevels_nod2D)
 DO n=1, myDim_nod2D+eDim_nod2D
    nlev=nlevels_nod2D(n)
    DO nz=2,  nlev-1
@@ -104,4 +114,5 @@ DO n=1, myDim_nod2D+eDim_nod2D
    tr_z(1,    n)=0.0_WP
    tr_z(nlev, n)=0.0_WP
 END DO
+end associate
 END SUBROUTINE tracer_gradient_z

@@ -26,7 +26,7 @@ module g_cvmix_idemix
     ! module calls from FESOM
     use g_config , only: dt
     use o_param           
-    use o_mesh
+    use mod_mesh
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -110,12 +110,19 @@ module g_cvmix_idemix
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_idemix
-        
-        character(len=100) :: nmlfile
-        logical            :: file_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_idemix(mesh)
+        implicit none
+        character(len=100)       :: nmlfile
+        logical                  :: file_exist=.False.
+        integer                  :: node_size
+
+        type(t_mesh), intent(in) :: mesh
+
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+             nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+             coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+             edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+             edge2D_in=>mesh%edge2D_in, area=>mesh%area)          
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -213,7 +220,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true.) 
+            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
             
@@ -236,7 +243,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true.) 
+            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., mesh) 
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
             
@@ -255,22 +262,28 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
         call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
-        
+        end associate
     end subroutine init_cvmix_idemix
     !
     !
     !
     !===========================================================================
     ! calculate IDEMIX internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix
-    
+    subroutine calc_cvmix_idemix(mesh)
+        implicit none
+        type(t_mesh), intent(in) :: mesh
         integer       :: node, elem, edge, node_size
         integer       :: nz, nln, nl1, nl2, nl12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
-        real(kind=WP) :: dz_trr(nl), dz_trr2(nl), bvfreq2(nl), vflux, dz_el, aux, cflfac
+        real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         logical       :: debug=.false.
-        
+
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
         ! nils
         tstep_count = tstep_count + 1
           
@@ -354,7 +367,7 @@ module g_cvmix_idemix
         
             ! make boundary exchange for iwe, and iwe_v0 --> for propagation need
             ! to calculate edge contribution that crosses the halo
-            call exchange_nod(iwe)
+            call exchange_nod(iwe,mesh)
             
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
@@ -411,8 +424,8 @@ module g_cvmix_idemix
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
             end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli)
-            call exchange_nod(iwe_v0)
+            call exchange_nod(vol_wcelli, mesh)
+            call exchange_nod(iwe_v0, mesh)
             
             !___________________________________________________________________
             ! calculate horizontal diffusion term for internal wave energy
@@ -582,12 +595,12 @@ module g_cvmix_idemix
         if(mix_scheme_nmb==6) then 
             !___________________________________________________________________
             ! write out diffusivity
-            call exchange_nod(iwe_Kv)
+            call exchange_nod(iwe_Kv, mesh)
             Kv = iwe_Kv
             
             !___________________________________________________________________
             ! write out viscosity -->interpolate therefor from nodes to elements
-            call exchange_nod(iwe_Av) !Warning: don't forget to communicate before averaging on elements!!!
+            call exchange_nod(iwe_Av, mesh) !Warning: don't forget to communicate before averaging on elements!!!
             do elem=1, myDim_elem2D
                 elnodes1=elem2D_nodes(:,elem)
                 do nz=1,nlevels(elem)-1
@@ -595,6 +608,6 @@ module g_cvmix_idemix
                 end do
             end do
         end if 
-        
+        end associate
     end subroutine calc_cvmix_idemix
 end module g_cvmix_idemix

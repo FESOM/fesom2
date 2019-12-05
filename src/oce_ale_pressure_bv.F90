@@ -1,26 +1,31 @@
 !
 !
 !===============================================================================
-subroutine pressure_bv
+subroutine pressure_bv(mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency 
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
     use g_config
     USE o_PARAM
-    USE o_MESH
+    USE MOD_MESH
     USE o_ARRAYS
     USE g_PARSUP
     use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     IMPLICIT NONE
-    
-    real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
-    integer               :: node, nz, nl1, nzmax
-    real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
-    real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
-    real(kind=WP)         :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
-    logical               :: flag1, flag2, mixing_kpp
+    type(t_mesh), intent(in) :: mesh    
+    real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    integer                  :: node, nz, nl1, nzmax
+    real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
+    real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
+    real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
+    logical                  :: flag1, flag2, mixing_kpp
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
     
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
@@ -178,6 +183,7 @@ subroutine pressure_bv
         end do
         !_______________________________________________________________________
     ! BV is defined on full levels except for the first and the last ones.
+        end associate
 end subroutine pressure_bv
 !
 !
@@ -219,15 +225,18 @@ end subroutine pressure_force_4_linfs
 !
 !===============================================================================
 ! calculate pressure gradient force for linfs in case full cells
-subroutine pressure_force_4_linfs_fullcell
+subroutine pressure_force_4_linfs_fullcell(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
     implicit none
     
-    integer             :: elem, elnodes(3), nle, nlz
+    integer                  :: elem, elnodes(3), nle, nlz
+    type(t_mesh), intent(in) :: mesh
+    associate(gradient_sca=>mesh%gradient_sca, nlevels=>mesh%nlevels, elem2D_nodes=>mesh%elem2D_nodes) 
+
     
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -248,6 +257,7 @@ subroutine pressure_force_4_linfs_fullcell
             pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do 
     end do !-->do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_linfs_fullcell   
 !
 !
@@ -261,9 +271,9 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
-subroutine pressure_force_4_linfs_nemo
+subroutine pressure_force_4_linfs_nemo(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -275,7 +285,12 @@ subroutine pressure_force_4_linfs_nemo
     real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
-        
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -397,6 +412,7 @@ subroutine pressure_force_4_linfs_nemo
         pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
         
     end do ! --> do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_linfs_nemo
 !
 !
@@ -409,9 +425,9 @@ end subroutine pressure_force_4_linfs_nemo
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_shchepetkin
+subroutine pressure_force_4_linfs_shchepetkin(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -420,7 +436,12 @@ subroutine pressure_force_4_linfs_shchepetkin
     integer             :: elem, elnodes(3), nle, nlz
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-    
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -514,6 +535,7 @@ subroutine pressure_force_4_linfs_shchepetkin
         int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         
     end do ! --> do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_linfs_shchepetkin
 !
 !
@@ -521,9 +543,9 @@ end subroutine pressure_force_4_linfs_shchepetkin
 !===============================================================================
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_cubicspline
+subroutine pressure_force_4_linfs_cubicspline(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -536,7 +558,12 @@ subroutine pressure_force_4_linfs_cubicspline
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz 
-    
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -664,6 +691,7 @@ subroutine pressure_force_4_linfs_cubicspline
         int_dp_dx(2)    = int_dp_dx(2) + auxp
         
     end do ! --> do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_linfs_cubicspline
 !
 !
@@ -700,9 +728,9 @@ end subroutine pressure_force_4_zxxxx
 ! interpolation.
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
-subroutine pressure_force_4_zxxxx_cubicspline
+subroutine pressure_force_4_zxxxx_cubicspline(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -714,7 +742,12 @@ subroutine pressure_force_4_zxxxx_cubicspline
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
-    
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -860,6 +893,7 @@ subroutine pressure_force_4_zxxxx_cubicspline
             
         end do ! --> do nlz=1,nle
     end do ! --> do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_zxxxx_cubicspline
 !
 !
@@ -872,9 +906,9 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_zxxxx_shchepetkin
+subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -883,7 +917,12 @@ subroutine pressure_force_4_zxxxx_shchepetkin
     integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-      
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)       
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1019,13 +1058,14 @@ subroutine pressure_force_4_zxxxx_shchepetkin
         int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         
     end do ! --> do elem=1, myDim_elem2D
+    end associate
 end subroutine pressure_force_4_zxxxx_shchepetkin
 !
 !
 !
 !===============================================================================
-SUBROUTINE densityJM_local(t, s, pz, rho_out)
-USE o_MESH
+SUBROUTINE densityJM_local(t, s, pz, rho_out, mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 use g_PARSUP, only: par_ex,pe_status
@@ -1044,6 +1084,12 @@ IMPLICIT NONE
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
   real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
   !compute secant bulk modulus
 
   call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
@@ -1051,12 +1097,12 @@ IMPLICIT NONE
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2) 
 
   rho_out = bulk*rhopot / (bulk + 0.1_WP*pz) - density_0
-
+  end associate
 end subroutine densityJM_local
 		
 ! ===========================================================================
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-USE o_MESH
+SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 use g_PARSUP, only: par_ex,pe_status
@@ -1101,6 +1147,12 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bst4 = 5.38750e-9	
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
+  type(t_mesh), intent(in) :: mesh
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
   !compute secant bulk modulus
 
@@ -1120,7 +1172,7 @@ IMPLICIT NONE
                + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s* bss2)
-
+  end associate
 end subroutine densityJM_components
 ! ===================================================================
 function ptheta(s,t,p,pr)
@@ -1198,7 +1250,7 @@ end function atg
 !
 !----------------------------------------------------------------------------
 !
-subroutine sw_alpha_beta(TF1,SF1)
+subroutine sw_alpha_beta(TF1,SF1, mesh)
   ! DESCRIPTION:
   !   A function to calculate the thermal expansion coefficient
   !   and saline contraction coefficient. (elementwise)
@@ -1222,16 +1274,22 @@ subroutine sw_alpha_beta(TF1,SF1)
   !    sw_beta=0.72088e-3 psu^-1 @ S=40.0psu, ptmp=10.0C (ITS-90), p=4000db
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
-  use o_mesh
+  use mod_mesh
   use o_arrays
   use g_parsup
   use o_param
   implicit none
   !
+  type(t_mesh), intent(in) :: mesh
   integer        :: n, nz
   real(kind=WP)  :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
   real(kind=WP)  :: a_over_b    
-  real(kind=WP)  :: TF1(nl-1, myDim_nod2D+eDim_nod2D),SF1(nl-1, myDim_nod2D+eDim_nod2D)
+  real(kind=WP)  :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D),SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
   do n = 1,myDim_nod2d
      do nz=1, nlevels_nod2D(n)-1
@@ -1272,12 +1330,13 @@ subroutine sw_alpha_beta(TF1,SF1)
      ! calculate alpha
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
- end do     
+ end do
+ end associate
 end subroutine sw_alpha_beta
 !
 !----------------------------------------------------------------------------
 !
-subroutine compute_sigma_xy(TF1,SF1)
+subroutine compute_sigma_xy(TF1,SF1, mesh)
   !--------------------------------------------------------------------
   ! DESCRIPTION:
   !   computes density gradient
@@ -1290,17 +1349,22 @@ subroutine compute_sigma_xy(TF1,SF1)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use o_mesh
+  use mod_mesh
   use o_param
   use o_arrays
   use g_parsup
   use g_comm_auto
   implicit none
   !
-  real(kind=WP), intent(IN)   :: TF1(nl-1, myDim_nod2D+eDim_nod2D), SF1(nl-1, myDim_nod2D+eDim_nod2D)
-  real(kind=WP)               :: tx(nl-1), ty(nl-1), sx(nl-1), sy(nl-1), vol(nl-1), testino(2)
+  type(t_mesh),  intent(in)   :: mesh
+  real(kind=WP), intent(IN)   :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D), SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+  real(kind=WP)               :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                     :: n, nz, elnodes(3),el, k, nl1
-  
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)   
   !
   DO n=1, myDim_nod2D
         nl1 = nlevels_nod2D(n)-1
@@ -1339,13 +1403,14 @@ subroutine compute_sigma_xy(TF1,SF1)
         sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
   END DO 
 
-  call exchange_nod(sigma_xy)
+  call exchange_nod(sigma_xy, mesh)
+  end associate
 end subroutine compute_sigma_xy
 !===============================================================================
-subroutine compute_neutral_slope
+subroutine compute_neutral_slope(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     use o_param
     use g_config
     use g_comm_auto
@@ -1354,7 +1419,12 @@ subroutine compute_neutral_slope
     integer         :: edge
     integer         :: n,nz,nl1,el(2),elnodes(3),enodes(2)
     real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
-
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
     !if sigma_xy is not computed
     eps=5.0e-6_WP
     S_cr=1.0e-2_WP
@@ -1377,14 +1447,15 @@ subroutine compute_neutral_slope
         enddo
     enddo
 
-        call exchange_nod(neutral_slope)
-        call exchange_nod(slope_tapered)
+        call exchange_nod(neutral_slope, mesh)
+        call exchange_nod(slope_tapered, mesh)
+    end associate
 end subroutine compute_neutral_slope
 !===============================================================================
 !converts insitu temperature to a potential one
 !               tr_arr(:,:,1) will be modified!
-subroutine insitu2pot
-  use o_mesh
+subroutine insitu2pot(mesh)
+  use mod_mesh
   use o_param
   use o_arrays
   use g_config
@@ -1393,6 +1464,8 @@ subroutine insitu2pot
   real(kind=WP), external     :: ptheta
   real(kind=WP)               :: pp, pr, tt, ss
   integer                     :: n, nz
+  type(t_mesh), intent(in) :: mesh
+  associate(nlevels_nod2D=>mesh%nlevels_nod2D, Z=>mesh%Z) 
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
   do n=1,myDim_nod2d+eDim_nod2D
@@ -1403,6 +1476,7 @@ subroutine insitu2pot
         tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
      end do	
   end do
+  end associate
 end subroutine insitu2pot
 
 

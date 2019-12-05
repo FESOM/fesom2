@@ -11,16 +11,24 @@
 ! The code is adapted from  FESOM
 !
 ! =====================================================================
-subroutine ice_TG_rhs
-  use o_MESH
+subroutine ice_TG_rhs(mesh)
+  use MOD_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-   integer         :: n, q, row, elem, elnodes(3)
+  real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+  integer         :: n, q, row, elem, elnodes(3)
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)  
+
  ! Taylor-Galerkin (Lax-Wendroff) rhs
   DO row=1, myDim_nod2D
      rhs_m(row)=0._WP
@@ -61,18 +69,27 @@ subroutine ice_TG_rhs
 		rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
 		rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
 	     END DO
-	  end do  
+	  end do
+     end associate
 end subroutine ice_TG_rhs   
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_init
+subroutine ice_fct_init(mesh)
   use o_PARAM
-  use o_MESH
+  use MOD_MESH
   use i_ARRAYS
   use g_PARSUP
   implicit none
   integer   :: n_size
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)  
+
   
   n_size=myDim_nod2D+eDim_nod2D
   
@@ -88,27 +105,30 @@ subroutine ice_fct_init
   
   ! Fill in  the mass matrix    
   call ice_mass_matrix_fill
+  end associate
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_solve
+subroutine ice_fct_solve(mesh)
+  use MOD_MESH
   implicit none
+  type(t_mesh), intent(in)              :: mesh
   ! Driving routine
-  call ice_solve_high_order   ! uses arrays of low-order solutions as temp
+  call ice_solve_high_order(mesh)   ! uses arrays of low-order solutions as temp
                               ! storage. It should preceed the call of low
 			      ! order solution.  
-  call ice_solve_low_order
+  call ice_solve_low_order(mesh)
 
-  call ice_fem_fct(1)    ! m_ice
-  call ice_fem_fct(2)    ! a_ice
-  call ice_fem_fct(3)    ! m_snow
+  call ice_fem_fct(1, mesh)    ! m_ice
+  call ice_fem_fct(2, mesh)    ! a_ice
+  call ice_fem_fct(3, mesh)    ! m_snow
 end subroutine ice_fct_solve
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_solve_low_order
+subroutine ice_solve_low_order(mesh)
  
  !============================
  ! Low-order solution
@@ -121,6 +141,7 @@ subroutine ice_solve_low_order
  ! matrices acting on the field from the previous time step. The consistent 
  ! mass matrix on the lhs is replaced with the lumped one.   
  
+  use MOD_MESH
   use o_MESH
   use i_ARRAYS
   use i_PARAM
@@ -129,6 +150,13 @@ subroutine ice_solve_low_order
   implicit none
   integer       :: row, clo, clo2, cn, location(100)
   real(kind=WP) :: gamma
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
   
   gamma=ice_gamma_fct       ! Added diffusivity parameter
                             ! Adjust it to ensure posivity of solution    
@@ -151,13 +179,15 @@ subroutine ice_solve_low_order
      call exchange_nod(m_icel,a_icel,m_snowl)
 
         ! Low-order solution must be known to neighbours
+ end associate
 end subroutine ice_solve_low_order     
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_solve_high_order
+subroutine ice_solve_high_order(mesh)
 
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_ARRAYS
   use g_PARSUP
   use o_PARAM
@@ -167,7 +197,13 @@ subroutine ice_solve_high_order
   integer                              :: n,i,clo,clo2,cn,location(100),row
   real(kind=WP)                        :: rhs_new
   integer                              :: num_iter_solve=3
+  type(t_mesh), intent(in)              :: mesh
 
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
   ! Does Taylor-Galerkin solution
   !
   !the first approximation
@@ -200,12 +236,12 @@ subroutine ice_solve_high_order
      call exchange_nod(dm_ice, da_ice, dm_snow)
 
   end do
- 
+  end associate
 end subroutine ice_solve_high_order
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fem_fct(tr_array_id)
+subroutine ice_fem_fct(tr_array_id, mesh)
 ! Flux corrected transport algorithm for tracer advection
 !
 ! It is based on Loehner et al. (Finite-element flux-corrected 
@@ -214,7 +250,8 @@ subroutine ice_fem_fct(tr_array_id)
 ! Turek. (kuzmin@math.uni-dortmund.de) 
 !
 
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_arrays
   use i_param
   use o_PARAM
@@ -226,7 +263,13 @@ subroutine ice_fem_fct(tr_array_id)
   integer   :: icoef(3,3),n,q, elem,elnodes(3),row
   real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
   real(kind=WP)   :: vol, flux, ae, gamma
-  
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)    
   
   gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
@@ -418,12 +461,14 @@ subroutine ice_fem_fct(tr_array_id)
         call exchange_nod(m_ice, a_ice, m_snow)
 
 	deallocate(tmin, tmax)
+        end associate
 end subroutine ice_fem_fct
 !
 !=======================================================================
-SUBROUTINE ice_mass_matrix_fill
+SUBROUTINE ice_mass_matrix_fill(mesh)
 ! Used in ice_fct inherited from FESOM
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_PARAM
   use i_ARRAYS
   use g_PARSUP
@@ -435,6 +480,13 @@ SUBROUTINE ice_mass_matrix_fill
   integer, allocatable                :: col_pos(:)
   real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
   !
   ! a)
   allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
@@ -481,22 +533,30 @@ SUBROUTINE ice_mass_matrix_fill
     write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
    endif
   deallocate(col_pos)
-      
+  end associate
 END SUBROUTINE ice_mass_matrix_fill
 !
 !=========================================================
 !
-subroutine ice_TG_rhs_div
-  use o_MESH
+subroutine ice_TG_rhs_div(mesh)
+  use MOD_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=WP)    :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-   integer          :: n, q, row, elem, elnodes(3)
-   real(kind=WP)    :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+  real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+  integer                  :: n, q, row, elem, elnodes(3)
+  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+  type(t_mesh), intent(in) :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
  ! In this version I tr to split divergent term off, so that FCT works without it.
@@ -547,13 +607,15 @@ subroutine ice_TG_rhs_div
         rhs_msdiv(row)=rhs_msdiv(row)-cx3
 
      END DO
-  end do   
+  end do
+  end associate
 end subroutine ice_TG_rhs_div 
 !
 !=========================================================
 !
-subroutine ice_update_for_div
-  use o_MESH
+subroutine ice_update_for_div(mesh)
+  use MOD_MESH
+  use O_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
@@ -565,6 +627,13 @@ subroutine ice_update_for_div
   integer                                 :: n,i,clo,clo2,cn,location(100),row
   real(kind=WP)                           :: rhs_new
   integer                                 :: num_iter_solve=3
+  type(t_mesh), intent(in)                :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
  
   ! Does Taylor-Galerkin solution
   !
@@ -606,5 +675,6 @@ subroutine ice_update_for_div
   m_ice=m_ice+dm_ice
   a_ice=a_ice+da_ice
   m_snow=m_snow+dm_snow
+  end associate
 end subroutine ice_update_for_div
 ! =============================================================

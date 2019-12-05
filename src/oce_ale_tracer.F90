@@ -2,18 +2,25 @@
 !
 !===============================================================================
 ! Driving routine    Here with ALE changes!!!
-subroutine solve_tracers_ale
+subroutine solve_tracers_ale(mesh)
     use g_config, only: flag_debug
     use g_parsup
     use o_PARAM, only: tracer_adv, num_tracers, SPP, Fer_GM
     use o_arrays
-    use o_mesh
+    use mod_mesh
     use g_comm_auto
     use o_tracers
     
     implicit none
-    integer :: tr_num
-    real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: tr_num
+    real(kind=WP)            :: aux_tr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt
     if (SPP) call app_rejected_salt
@@ -33,21 +40,21 @@ subroutine solve_tracers_ale
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
-        call init_tracers_AB(tr_num)
+        call init_tracers_AB(tr_num, mesh)
         
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-        call adv_tracers_ale(tr_num)
+        call adv_tracers_ale(tr_num, mesh)
         
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
-        call diff_tracers_ale(tr_num)
+        call diff_tracers_ale(tr_num, mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        call relax_to_clim(tr_num)
+        call relax_to_clim(tr_num, mesh)
         
-        call exchange_nod(tr_arr(:,:,tr_num))
+        call exchange_nod(tr_arr(:,:,tr_num), mesh)
     end do
     
     !___________________________________________________________________________
@@ -72,23 +79,22 @@ subroutine solve_tracers_ale
     where (tr_arr(:,:,2) < 3._WP )
         tr_arr(:,:,2)=3._WP
     end where
-
+    end associate
 end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
-subroutine adv_tracers_ale(tr_num)
+subroutine adv_tracers_ale(tr_num, mesh)
     use g_config, only: flag_debug
-    use o_MESH, only: nlevels_nod2D
     use g_parsup
+    use mod_mesh
     use o_PARAM, only: tracer_adv
     use o_arrays
     use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
                            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
-    
     implicit none
     integer :: tr_num, node, nz
-    
+    type(t_mesh), intent(in) :: mesh    
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
     !     to finite volume". At the end R_T^n should contain all advection therms and 
@@ -100,7 +106,7 @@ subroutine adv_tracers_ale(tr_num)
     ! of discret variance decay
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd_2ndmoment'//achar(27)//'[0m'
-        call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num)
+        call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
         !!PS call compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
     end if    
     
@@ -144,7 +150,7 @@ subroutine adv_tracers_ale(tr_num)
     ! compute discrete variance decay after Burchard and Rennau 2008
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd'//achar(27)//'[0m'
-        call compute_diag_dvd(tr_num)
+        call compute_diag_dvd(tr_num, mesh)
     end if     
     
 end subroutine adv_tracers_ale
@@ -161,23 +167,31 @@ end subroutine adv_tracers_ale
 ! ttfAB --> corresponds to array tr_arr_old(:,:,tr_num) which is created by routine 
 !             call init_tracers_AB(tr_num)
 !             tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment)
-    use o_MESH
+subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
-    integer       :: el(2), enodes(2), n, nz, ed
-    integer       :: nl1, nl2, n2
-    integer       :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
-    real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
-    real(kind=WP) :: c_lo(2)
-    real(kind=WP) :: Tmean1, Tmean2, a
-    real(kind=WP) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP) :: num_ord
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: el(2), enodes(2), n, nz, ed
+    integer                  :: nl1, nl2, n2
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
+    real(kind=WP)            :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
+    real(kind=WP)            :: c_lo(2)
+    real(kind=WP)            :: Tmean1, Tmean2, a
+    real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)            :: num_ord
     
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)  
+
     !___________________________________________________________________________
     ! Horizontal advection
     ! loop over loval edges 
@@ -447,25 +461,34 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment)
             end do ! --> do nz=n2+1,nl2
         end if ! --> if(nl1>nl2) then
     end do ! --> do ed=1, myDim_edge2D
+    end associate
 end subroutine adv_tracers_muscle_ale
 !
 !
 !===============================================================================
 ! Vertical ALE advection with PPM reconstruction (5th order)
-subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment)
+subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nzmax
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv(nl), aL, aR, aj, x
-    real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    integer       :: overshoot_counter, counter
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: n, nz, nzmax
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
+    real(kind=WP)            :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    integer                  :: overshoot_counter, counter
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -619,23 +642,31 @@ subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment)
         
     end do ! --> do n=1, myDim_nod2D
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
+    end associate
 end subroutine adv_tracers_vert_ppm_ale
 !
 !
 !===============================================================================
 ! Vertical ALE advection with upwind reconstruction (1st order)
-subroutine adv_tracers_vert_upw(ttf, do_Xmoment)
+subroutine adv_tracers_vert_upw(ttf, do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nl1
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: n, nz, nl1
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
     
     ! --------------------------------------------------------------------------
     ! Vertical advection
@@ -663,24 +694,30 @@ subroutine adv_tracers_vert_upw(ttf, do_Xmoment)
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
         end do         
     end do ! --> do n=1, myDim_nod2D
+    end associate
 end subroutine adv_tracers_vert_upw
 !
 !
 !===============================================================================
 ! Vertical ALE advection with central difference reconstruction (2nd order)
-subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment)
+subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nl1
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: n, nz, nl1
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)      
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -707,20 +744,26 @@ subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment)
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
         end do         
     end do ! --> do n=1, myDim_nod2D
+    end associate
 end subroutine adv_tracers_vert_cdiff
 !
 !
 !===============================================================================
-subroutine diff_tracers_ale(tr_num)
-    use o_mesh
+subroutine diff_tracers_ale(tr_num, mesh)
+    use mod_mesh
     use g_PARSUP
     use o_arrays
     use o_tracers
     implicit none
     
-    integer, intent(in) :: tr_num
-    integer             :: n, nzmax
-    
+    integer, intent(in)      :: tr_num
+    integer                  :: n, nzmax
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)      
     !___________________________________________________________________________
     ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
     ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
@@ -767,26 +810,31 @@ subroutine diff_tracers_ale(tr_num)
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
-    
+    end associate
 end subroutine diff_tracers_ale
 !
 !
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):                                                                            
-subroutine diff_ver_part_expl_ale(tr_num)
+subroutine diff_ver_part_expl_ale(tr_num, mesh)
     use o_ARRAYS
     use g_forcing_arrays
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use g_config,only: dt
     
     implicit none 
-    
-    real(kind=WP) :: vd_flux(nl-1)
-    real(kind=WP) :: rdata,flux,rlx
-    integer       :: nz,nl1,tr_num,n
-    real(kind=WP) :: zinv1,Ty
-    
+    type(t_mesh), intent(in) :: mesh    
+    real(kind=WP)            :: vd_flux(mesh%nl-1)
+    real(kind=WP)            :: rdata,flux,rlx
+    integer                  :: nz,nl1,tr_num,n
+    real(kind=WP)            :: zinv1,Ty
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)      
+    !___________________________________________________________________________    
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         vd_flux=0._WP
@@ -826,13 +874,13 @@ subroutine diff_ver_part_expl_ale(tr_num)
         del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
-    
+    end associate
 end subroutine diff_ver_part_expl_ale
 !
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
-subroutine diff_ver_part_impl_ale(tr_num)
-    use o_MESH
+subroutine diff_ver_part_impl_ale(tr_num, mesh)
+    use MOD_MESH
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS
@@ -842,14 +890,21 @@ subroutine diff_ver_part_impl_ale(tr_num)
         use o_mixing_KPP_mod !for ghats _GO_        
         
     implicit none
-    real(kind=WP)       :: bc_surface    
-    real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
-    real(kind=WP)       :: cp(nl), tp(nl)
-    integer             :: nz, n, nzmax,tr_num
-    real(kind=WP)       :: m, zinv, dt_inv, dz
-    real(kind=WP)       :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
-    real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
-    real(kind=WP)       :: isredi=0._WP
+    type(t_mesh), intent(in) :: mesh
+    real(kind=WP)            :: bc_surface    
+    real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
+    integer                  :: nz, n, nzmax,tr_num
+    real(kind=WP)            :: m, zinv, dt_inv, dz
+    real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
+    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+    real(kind=WP)            :: isredi=0._WP
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)      
+    !___________________________________________________________________________
     
     if (Redi) isredi=1._WP
     dt_inv=1.0_WP/dt
@@ -1126,23 +1181,30 @@ subroutine diff_ver_part_impl_ale(tr_num)
         end do
         
     end do ! --> do n=1,myDim_nod2D   
-    
+    end associate
 end subroutine diff_ver_part_impl_ale
 !
 !
 !===============================================================================
-subroutine diff_ver_part_redi_expl
+subroutine diff_ver_part_redi_expl(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     USE o_param
     use g_config
     use g_comm_auto
     IMPLICIT NONE
-    integer         :: elem,k
-    integer         :: n2,nl1,nl2,nz,n
-    real(kind=WP)   :: Tx, Ty
-    real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D), vd_flux(nl)
+    type(t_mesh), intent(in) :: mesh
+    integer                  :: elem,k
+    integer                  :: n2,nl1,nl2,nz,n
+    real(kind=WP)            :: Tx, Ty
+    real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,myDim_nod2D+eDim_nod2D), vd_flux(mesh%nl)
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)
     
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
@@ -1190,23 +1252,31 @@ subroutine diff_ver_part_redi_expl
             del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
         enddo
     end do
+    end associate
 end subroutine diff_ver_part_redi_expl!
 !
 !
 !===============================================================================
-subroutine diff_part_hor_redi
+subroutine diff_part_hor_redi(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     use o_param
     use g_config
     IMPLICIT NONE
-    real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
-    integer         :: edge
-    integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
-    real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
-    real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh, dz
-    real(kind=WP)   :: isredi=0._WP
+    type(t_mesh), intent(in) :: mesh
+    real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
+    integer                  :: edge
+    integer                  :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
+    real(kind=WP)            :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
+    real(kind=WP)            :: rhs1(mesh%nl-1), rhs2(mesh%nl-1), Kh, dz
+    real(kind=WP)            :: isredi=0._WP
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)  
     
     if (Redi) isredi=1._WP
     
@@ -1283,6 +1353,7 @@ subroutine diff_part_hor_redi
         del_ttf(1:n2,enodes(2))=del_ttf(1:n2,enodes(2))+rhs2(1:n2)*dt/area(1:n2,enodes(2))
         
     end do
+    end associate
 end subroutine diff_part_hor_redi
 !
 !

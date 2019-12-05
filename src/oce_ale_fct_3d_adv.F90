@@ -2,24 +2,26 @@
 !
 !===============================================================================
 ! Caller routine for FCT tracer advection 
-subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment)
+subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     use o_ARRAYS
+    use MOD_MESH
     use o_MESH
     use o_PARAM
     use g_PARSUP
     use g_comm_auto
     implicit none
+    type(t_mesh), intent(in) :: mesh
+    real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)            :: num_ord
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    integer                  :: i
 
-    real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP)  :: num_ord
-    integer        :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    integer        :: i
     ! 1st. first calculate Low and High order solution
-    call fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
+    call fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
         
     if (w_split) then
-        call fct_LO_impl_ale
-        call exchange_nod(fct_LO)
+        call fct_LO_impl_ale(mesh)
+        call exchange_nod(fct_LO, mesh)
     end if
 
     !just for using the low order:
@@ -28,19 +30,27 @@ subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment)
  
     ! 2nd. apply constrained bounds
     do i=1, fct_iter
-        call fct_ale(ttf, (fct_iter-i > 0))
+        call fct_ale(ttf, (fct_iter-i > 0), mesh)
     end do
 end subroutine adv_tracer_fct_ale
 !
 !
 !===============================================================================
-subroutine fct_init
-    use o_MESH
+subroutine fct_init(mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     implicit none
-    integer      :: my_size
+    integer                  :: my_size
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(fct_LO(nl-1, my_size))        ! Low-order solution 
@@ -66,28 +76,34 @@ subroutine fct_init
     fct_minus=0.0_WP
     
     if (mype==0) write(*,*) 'FCT is initialized'
- 
+    end associate
 end subroutine fct_init
 !
 !
 !===============================================================================
-subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
-    use o_MESH
+subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
-    
+    type(t_mesh), intent(in) :: mesh    
     integer       :: el(2), enodes(2), n, nz, edge
     integer       :: n2, nl1, nl2,tr_num
     integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
-    real(kind=WP) :: tvert(nl), tvert_e(nl), a, b, c, d, da, db, dg, vflux, Tupw1
+    real(kind=WP) :: tvert(mesh%nl), tvert_e(mesh%nl), a, b, c, d, da, db, dg, vflux, Tupw1
     real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
-    real(kind=WP) :: ttfAB(nl-1,myDim_nod2D+eDim_nod2D), ttf(nl-1,myDim_nod2D+eDim_nod2D)
+    real(kind=WP) :: ttfAB(mesh%nl-1,myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
     
     ! --------------------------------------------------------------------------
     ! It is assumed that velocity is at n+1/2, hence only tracer field 
@@ -468,36 +484,45 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
     end do ! --> do n=1, myDim_nod2D
     
     !___________________________________________________________________________
-    call exchange_nod(fct_LO) 
+    call exchange_nod(fct_LO, mesh) 
     ! Summary:   
     ! fct_LO contains full low-order solution
     ! fct_adf_h contains antidiffusive component of horizontal flux 
     ! fct_adf_v contains antidiffusive component of vertical fluxes
+    end associate
 end subroutine fct_ale_muscl_LH
 !
 !
 !===============================================================================
-subroutine fct_ale(ttf, iter_yn)
+subroutine fct_ale(ttf, iter_yn, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
     ! LO ==Low-order  (first-order upwind)
     ! HO ==High-order (3rd/4th order gradient reconstruction method)
     ! Adds limited fluxes to the LO solution   
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
+    type(t_mesh), intent(in)  :: mesh
     integer                   :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
-    real(kind=WP)             :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
-    real(kind=WP), intent(in) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)             :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
+    real(kind=WP), intent(in) :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)             :: flux_eps=1e-16
     real(kind=WP)             :: bignumber=1e3
     integer                   :: vlimit=1
     logical, intent(in)       :: iter_yn !more iterations to be made with fct_ale?
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment 
@@ -665,7 +690,7 @@ subroutine fct_ale(ttf, iter_yn)
     end do 
     
     ! fct_minus and fct_plus must be known to neighbouring PE
-    call exchange_nod(fct_plus, fct_minus)
+    call exchange_nod(fct_plus, fct_minus, mesh)
     
     !___________________________________________________________________________
     ! b3. Limiting   
@@ -783,13 +808,15 @@ subroutine fct_ale(ttf, iter_yn)
 !!PS             del_ttf(nz,enodes(2))         =del_ttf(nz,enodes(2))         -fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
+    end associate
 end subroutine fct_ale
 !
 !
 !===============================================================================
 ! implicit vertical advection with wvel_i to solve for fct_LO
-subroutine fct_LO_impl_ale
-    use o_MESH
+subroutine fct_LO_impl_ale(mesh)
+    use MOD_MESH
+    use O_MESH
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS
@@ -799,12 +826,17 @@ subroutine fct_LO_impl_ale
     use o_mixing_KPP_mod !for ghats _GO_        
     
     implicit none
-    
-    real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
-    real(kind=WP)       :: cp(nl), tp(nl)
+    type(t_mesh), intent(in) :: mesh    
+    real(kind=WP)       :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP)       :: cp(mesh%nl), tp(mesh%nl)
     integer             :: nz, n, nzmax,tr_num
     real(kind=WP)       :: m, zinv, dt_inv, dz
     real(kind=WP)       :: c1, v_adv
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
     
     dt_inv=1.0_WP/dt
     
@@ -905,7 +937,8 @@ subroutine fct_LO_impl_ale
         do nz=1,nzmax-1
             fct_LO(nz,n)=fct_LO(nz,n)+tr(nz)
         end do
-    end do ! --> do n=1,myDim_nod2D   
+    end do ! --> do n=1,myDim_nod2D
+    end associate
 end subroutine fct_LO_impl_ale
 !
 !

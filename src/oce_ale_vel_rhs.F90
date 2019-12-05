@@ -1,8 +1,8 @@
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs
-    use o_MESH
+subroutine compute_vel_rhs(mesh)
+    use MOD_MESH
     use o_ARRAYS
     use i_ARRAYS
     use i_therm_param
@@ -13,13 +13,20 @@ subroutine compute_vel_rhs
     use g_comm_auto
     
     implicit none 
-    integer          :: elem, elnodes(3), nz 
-    real(kind=WP)    :: eta(3), ff, mm 
-    real(kind=WP)    :: Fx, Fy, pre(3)
-    logical, save    :: lfirst=.true.
-    real(kind=WP)    :: t1, t2, t3, t4
-    real(kind=WP)    :: p_ice(3)
-    integer          :: use_pice
+    type(t_mesh), intent(in) :: mesh   
+    integer                  :: elem, elnodes(3), nz 
+    real(kind=WP)            :: eta(3), ff, mm 
+    real(kind=WP)            :: Fx, Fy, pre(3)
+    logical, save            :: lfirst=.true.
+    real(kind=WP)            :: t1, t2, t3, t4
+    real(kind=WP)            :: p_ice(3)
+    integer                  :: use_pice
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
     t1=MPI_Wtime()
     use_pice=0
@@ -109,26 +116,33 @@ subroutine compute_vel_rhs
     !    write(*,*) 'h adv       ', t3-t2
     !    write(*,*) 'vert. part  ', t4-t3
     ! end if     
+    end associate
 END SUBROUTINE compute_vel_rhs
 ! ===================================================================
 !
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
-subroutine momentum_adv_scalar
-USE o_MESH
+subroutine momentum_adv_scalar(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 use g_comm_auto
 IMPLICIT NONE
 
-integer        :: n, nz, el1, el2
-integer        :: nl1, nl2, nod(2), el, ed, k, nle
-real(kind=WP)  :: un1(1:nl-1), un2(1:nl-1)
-real(kind=WP)  :: wu(1:nl), wv(1:nl)
-real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
+type(t_mesh), intent(in) :: mesh
+integer                  :: n, nz, el1, el2
+integer                  :: nl1, nl2, nod(2), el, ed, k, nle
+real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
+real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
 
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels, area_inv=>mesh%area_inv) 
 
 
 !_______________________________________________________________________________
@@ -239,7 +253,7 @@ do n=1,myDim_nod2d
 end do
 
 !_______________________________________________________________________________
-call exchange_nod(Unode_rhs)
+call exchange_nod(Unode_rhs, mesh)
 
 !_______________________________________________________________________________
 do el=1, myDim_elem2D
@@ -250,7 +264,7 @@ do el=1, myDim_elem2D
         + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
    
 end do
-
+end associate
 end subroutine momentum_adv_scalar
 
 

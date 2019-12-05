@@ -1,10 +1,16 @@
 !=============================================================================
-SUBROUTINE com_global2local
+SUBROUTINE com_global2local(mesh)
 USE g_PARSUP
-USE o_MESH
+use MOD_MESH
 IMPLICIT NONE
+
+type(t_mesh), intent(in)           :: mesh
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, nlevels_nod2d=>mesh%nlevels_nod2d, elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels, geo_coord_nod2D=>mesh%geo_coord_nod2D, &
+          nl=>mesh%nl, elem_neighbors=>mesh%elem_neighbors, edges=>mesh%edges)
+
 allocate(temp(max(nod2D, elem2D))) 
 ! =========
 ! nodes
@@ -100,21 +106,25 @@ allocate(temp(max(nod2D, elem2D)))
 	 ! com_elem2%rlist should be 
 	 ! myDim_elem2D+1:myDim_elem2D+eDim_elem2D
 deallocate(temp)
+end associate
 END SUBROUTINE com_global2local       	  
 !=============================================================================
-SUBROUTINE save_dist_mesh
+SUBROUTINE save_dist_mesh(mesh)
   USE g_CONFIG
-  USE o_MESH
+  USE MOD_MESH
   USE o_ARRAYS
   USE g_PARSUP 
   IMPLICIT NONE
 
+  type(t_mesh), intent(in)           :: mesh
   Integer        n, m, q, q2, counter, fileID, nend, nini,ed(2)
   character*10   mype_string,npes_string
   character*200   file_name
   character*200   dist_mesh_dir
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
+
+  associate(nod2D=>mesh%nod2D, edge2D=>mesh%edge2D, edges=>mesh%edges, elem_edges=>mesh%elem_edges)
 
 !!$  allocate(temp(nod2D))  ! serves for mapping
 !!$  allocate(ncount(npes+1))
@@ -297,6 +307,5 @@ SUBROUTINE save_dist_mesh
      deallocate(ncount, temp)
      close(fileID)
   end if
-
-!!$  write(*,*) 'Distributed mesh is saved for rank ', mype
+  end associate
 END subroutine  save_dist_mesh

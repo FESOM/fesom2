@@ -2,14 +2,14 @@
 ! New evp implementation following Bouillion et al. 2013
 ! and Kimmritz et al. 2015 (mEVP) and Kimmritz et al. 2016 (aEVP)
 ! ====================================================================  
-subroutine stress_tensor_m
+subroutine stress_tensor_m(mesh)
   ! Internal stress tensor
   ! New implementation following Boullion et al, Ocean Modelling 2013.
   ! SD, 30.07.2014
   !===================================================================
   use o_param
   use i_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use g_parsup
@@ -20,7 +20,13 @@ subroutine stress_tensor_m
   real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
   real(kind=WP)   :: val3, meancos, usum, vsum, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
-  
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)  
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
   det2=1.0_WP/(1.0_WP+alpha_evp)
@@ -72,28 +78,34 @@ subroutine stress_tensor_m
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
  ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
  ! and similarly for si2 and sigma12
-  
+  end associate
 end subroutine stress_tensor_m
 
 !
 ! ==================================================================
 ! 
-subroutine ssh2rhs
+subroutine ssh2rhs(mesh)
   ! Compute the contribution from the elevation to the rhs
   ! S.D. 30.07.2014
   use o_param
   use i_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use g_parsup
   use i_therm_param
   implicit none
   
-  integer        :: row, elem, elnodes(3), n
-  real(kind=WP)  :: dx(3), dy(3), vol
-  real(kind=WP)  :: val3, meancos, aa, bb, p_ice(3)
-  
+  integer                  :: row, elem, elnodes(3), n
+  real(kind=WP)            :: dx(3), dy(3), vol
+  real(kind=WP)            :: val3, meancos, aa, bb, p_ice(3)
+  type(t_mesh), intent(in) :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)
   val3=1.0_WP/3.0_WP
   
   ! use rhs_m and rhs_a for storing the contribution from elevation:
@@ -139,14 +151,12 @@ subroutine ssh2rhs
         rhs_m(elnodes)=rhs_m(elnodes)-bb
     end do
   end if 
-  
-  
-  
+end associate
 end subroutine ssh2rhs
 !
 !===================================================================
 !
-subroutine stress2rhs_m
+subroutine stress2rhs_m(mesh)
 
   ! add internal stress to the rhs
   ! SD, 30.07.2014
@@ -154,16 +164,23 @@ subroutine stress2rhs_m
   use o_param
   use i_param
   use i_therm_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use g_parsup
   implicit none
   
-  integer        :: k, row, elem, elnodes(3)
-  real(kind=WP)  :: dx(3), dy(3), vol
-  real(kind=WP)  :: val3, mf, aa, bb
-  real(kind=WP)  :: mass, cluster_area, elevation_elem(3)
+  integer                  :: k, row, elem, elnodes(3)
+  real(kind=WP)            :: dx(3), dy(3), vol
+  real(kind=WP)            :: val3, mf, aa, bb
+  real(kind=WP)            :: mass, cluster_area, elevation_elem(3)
+  type(t_mesh), intent(in) :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
   val3=1.0_WP/3.0_WP
   
@@ -198,12 +215,12 @@ subroutine stress2rhs_m
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
   end do
-
+  end associate
 end subroutine stress2rhs_m
 !
 !===================================================================
 !
-subroutine EVPdynamics_m
+subroutine EVPdynamics_m(mesh)
   ! assemble rhs and solve for ice velocity
   ! New implementation based on Bouillion et al. Ocean Modelling 2013
   ! SD 30.07.14
@@ -212,7 +229,7 @@ subroutine EVPdynamics_m
   use o_param
   use i_param
   use i_therm_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use o_arrays
@@ -237,7 +254,13 @@ subroutine EVPdynamics_m
   real(kind=WP)  :: vol
   real(kind=WP)  :: mf,aa, bb,p_ice(3)
   real(kind=WP)  :: mass(myDim_nod2D)
+  type(t_mesh), intent(in)              :: mesh
 
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
   
   val3=1.0_WP/3.0_WP
@@ -459,7 +482,7 @@ subroutine EVPdynamics_m
 
   u_ice=u_ice_aux
   v_ice=v_ice_aux
-
+  end associate
 end subroutine EVPdynamics_m
 !
 !
@@ -469,7 +492,7 @@ end subroutine EVPdynamics_m
 ! The subroutines involved are with _a.
 ! ====================================================================
 !
-subroutine find_alpha_field_a
+subroutine find_alpha_field_a(mesh)
   ! EVP stability parameter alpha is computed at each element
   ! aEVP implementation
   ! SD, 13.02.2017
@@ -477,16 +500,24 @@ subroutine find_alpha_field_a
   use o_param
   use i_param
   use i_therm_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use g_parsup
   implicit none
 
-  integer         :: elem, elnodes(3)
-  real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
-  real(kind=WP)   :: val3, meancos, usum, vsum, vale
+  integer                  :: elem, elnodes(3)
+  real(kind=WP)            :: dx(3), dy(3), msum, asum
+  real(kind=WP)            :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)            :: val3, meancos, usum, vsum, vale
+  type(t_mesh), intent(in) :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
+
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
@@ -525,10 +556,11 @@ subroutine find_alpha_field_a
      ! /voltriangle(elem) for FESOM1.4
      ! We do not allow alpha to be too small!
    end do
+   end associate
   end subroutine find_alpha_field_a  
 ! ====================================================================
 
-subroutine stress_tensor_a
+subroutine stress_tensor_a(mesh)
   ! Internal stress tensor
   ! New implementation following Boullion et al, Ocean Modelling 2013.
   ! and Kimmritz et al., Ocean Modelling 2016
@@ -536,17 +568,24 @@ subroutine stress_tensor_a
   !===================================================================
   use o_param
   use i_param
-  use o_mesh
+  use mod_mesh
   use g_config
   use i_arrays
   use g_parsup
   implicit none
 
-  integer         :: elem, elnodes(3)
-  real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
-  real(kind=WP)   :: val3, meancos, usum, vsum, vale
-  real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
+  integer                   :: elem, elnodes(3)
+  real(kind=WP)             :: dx(3), dy(3), msum, asum
+  real(kind=WP)             :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)             :: val3, meancos, usum, vsum, vale
+  real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
+  type(t_mesh), intent(in)  :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)
   
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
@@ -600,21 +639,20 @@ subroutine stress_tensor_a
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
  ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
  ! and similarly for si2 and sigma12
-  
+  end associate
 end subroutine stress_tensor_a
 !
 !===================================================================
 !
-subroutine EVPdynamics_a
+subroutine EVPdynamics_a(mesh)
   ! assemble rhs and solve for ice velocity
   ! New implementation based on Bouillion et al. Ocean Modelling 2013
   ! and Kimmritz et al., Ocean Modelling  2016 
   ! SD 14.02.17
   !---------------------------------------------------------
 
-use o_mesh
 use o_param
-use o_mesh
+use mod_mesh
 use i_arrays
 USE o_arrays
 use i_param
@@ -628,7 +666,14 @@ use g_comm_auto
   real(kind=WP)    :: rdt, drag, det, fc
   real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
   REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
- 
+  type(t_mesh), intent(in)              :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area)
+
   steps=evp_rheol_steps
   rdt=ice_dt
   u_ice_aux=u_ice    ! Initialize solver variables
@@ -668,23 +713,34 @@ use g_comm_auto
   call find_alpha_field_a             ! alpha_evp_array is initialized with alpha_evp;
                                       ! At this stage we already have non-trivial velocities. 
   call find_beta_field_a
+  end associate
 end subroutine EVPdynamics_a
 !
 ! =================================================================
 !
-subroutine find_beta_field_a 
+subroutine find_beta_field_a(mesh)
 ! beta_evp_array is defined at nodes, and this is the only 
 ! reason we need it in addition to alpha_evp_array (we work with 
 ! alpha=beta, and keep different names for generality; mEVP can work with 
 ! alpha \ne beta, but not aEVP).
 
-use o_mesh
+use mod_mesh
 use o_param
 USE i_param
 use i_arrays
 use g_parsup 
 Implicit none
 integer :: n
+
+type(t_mesh), intent(in)              :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
+
+
     DO n=1, myDim_nod2D
        ! ==============
        ! FESOM1.4 and stand-alone FESIM
@@ -693,7 +749,7 @@ integer :: n
        ! FESOM2.0
        beta_evp_array(n) =  maxval(alpha_evp_array(nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
     END DO
-
+end associate
 end subroutine find_beta_field_a
 ! 
 ! ================================================================

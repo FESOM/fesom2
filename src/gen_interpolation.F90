@@ -281,7 +281,7 @@ end subroutine interp_2d_field
 !
 subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
      lon_reg, lat_reg, lay_reg, data_reg, &
-     num_mod_z, num_mod, lon_mod, lat_mod, lay_mod, data_mod)
+     num_mod_z, num_mod, lon_mod, lat_mod, lay_mod, data_mod, mesh)
   !-------------------------------------------------------------------------------------
   ! This routine does 3d interpolation from a regular grid to specified nodes.
   ! The regular grid is assumed to be global.
@@ -310,7 +310,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  use o_MESH, only: nlevels_nod2D
+  use MOD_MESH
   use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz
@@ -329,7 +329,10 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
-  
+  type(t_mesh),  intent(in)     :: mesh  
+
+  associate(nlevels_nod2D=>mesh%nlevels_nod2D)
+
   do n=1,num_mod
   do nz=1,nlevels_nod2D(n)-1
 !  do nz=1,num_mod_z-1
@@ -426,6 +429,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
 
   end do
   end do
+  end associate
 end subroutine interp_3d_field
 !
 !---------------------------------------------------------------------------

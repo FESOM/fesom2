@@ -1,5 +1,6 @@
 ! =================================================================
-subroutine ocean_setup
+subroutine ocean_setup(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE g_PARSUP
 USE o_ARRAYS
@@ -11,7 +12,7 @@ use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
 IMPLICIT NONE
-
+    type(t_mesh), intent(in) :: mesh
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -62,34 +63,34 @@ IMPLICIT NONE
     
     ! initialise fesom1.4 like KPP
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-        call oce_mixing_kpp_init
+        call oce_mixing_kpp_init(mesh)
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
     
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
-        call init_cvmix_kpp    
+        call init_cvmix_kpp(mesh)
         
     ! initialise cvmix_PP    
     elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
-        call init_cvmix_pp
+        call init_cvmix_pp(mesh)
         
     ! initialise cvmix_TKE    
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
-        call init_cvmix_tke
+        call init_cvmix_tke(mesh)
         
     endif
     
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
-        call init_cvmix_idemix
+        call init_cvmix_idemix(mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
     elseif (mod(mix_scheme_nmb,10)==7) then
-        call init_cvmix_tidal    
+        call init_cvmix_tidal(mesh)
     end if         
 
     !___________________________________________________________________________
@@ -142,8 +143,8 @@ end subroutine ocean_setup
 
 !==========================================================
 !
-SUBROUTINE array_setup
-USE o_MESH
+SUBROUTINE array_setup(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -156,6 +157,14 @@ use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, mesh_resolution=>mesh%mesh_resolution)  
+
+
 elem_size=myDim_elem2D+eDim_elem2D
 node_size=myDim_nod2D+eDim_nod2D
 
@@ -263,7 +272,7 @@ do n=1, node_size
 !  Ki(n)=K_hor*area(1,n)/scale_area
    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
 end do
-call exchange_nod(Ki)
+call exchange_nod(Ki, mesh)
 
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP
@@ -370,13 +379,13 @@ end if
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
-    
+end associate
 END SUBROUTINE array_setup
 !==========================================================================
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
 ! ID = 0 and 1 are reserved for temperature and salinity
-SUBROUTINE oce_initial_state
-USE o_MESH
+SUBROUTINE oce_initial_state(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
@@ -385,8 +394,14 @@ USE g_ic3d
   ! reads the initial state or the restart file for the ocean
   !
   implicit none
-  integer           :: i, k, counter, rcounter3, id
-  character(len=10) :: i_string, id_string
+  integer                  :: i, k, counter, rcounter3, id
+  character(len=10)        :: i_string, id_string
+  type(t_mesh), intent(in) :: mesh
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
 
   if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
   if (mype==0) write(*,*) 'tracer IDs are: ', tracer_ID(1:num_tracers)
@@ -395,7 +410,7 @@ USE g_ic3d
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
   if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
   if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
-  call do_ic3d
+  call do_ic3d(mesh)
   Tclim=tr_arr(:,:,1)
   Sclim=tr_arr(:,:,2)
   Tsurf=tr_arr(1,:,1)
@@ -522,6 +537,7 @@ USE g_ic3d
          call par_ex
          stop
      END SELECT
-  END DO    
+  END DO
+  end associate
 end subroutine oce_initial_state
 !==========================================================================

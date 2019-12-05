@@ -14,7 +14,7 @@ module g_cvmix_tidal
     ! module calls from FESOM
     use g_config , only: dt
     use o_param           
-    use o_mesh
+    use mod_mesh
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -68,12 +68,17 @@ module g_cvmix_tidal
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tidal
+    subroutine init_cvmix_tidal(mesh)
         
-        character(len=100) :: nmlfile
-        logical            :: file_exist=.False.
-        integer            :: node_size
-        
+        character(len=100)       :: nmlfile
+        logical                  :: file_exist=.False.
+        integer                  :: node_size
+        type(t_mesh), intent(in) :: mesh
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area)        
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -125,7 +130,7 @@ module g_cvmix_tidal
         inquire(file=trim(tidal_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read TIDAL near tidal bottom forcing'
-            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true.) 
+            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., mesh) 
             !!PS ! convert from W/m^2 to m^3/s^3
             !!PS tidal_forc_bottom_2D  = tidal_forc_bottom_2D/density_0
             ! --> the tidal energy for dissipation is divided by rho0 in 
@@ -150,20 +155,25 @@ module g_cvmix_tidal
                               max_coefficient      = tidal_max_coeff,        &
                               local_mixing_frac    = tidal_lcl_mixfrac,      &
                               depth_cutoff         = tidal_depth_cutoff)
-        
+        end associate
     end subroutine init_cvmix_tidal
     !
     !
     !
     !===========================================================================
     ! calculate TIDAL mixing parameterisation
-    subroutine calc_cvmix_tidal
-    
+    subroutine calc_cvmix_tidal(mesh)
+        type(t_mesh), intent(in) :: mesh
         integer       :: node, elem, node_size
         integer       :: nz, nln
         integer       :: elnodes(3)
-        real(kind=WP) :: simmonscoeff, vertdep(nl)
-        
+        real(kind=WP) :: simmonscoeff, vertdep(mesh%nl)
+
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)         
         !_______________________________________________________________________
         node_size = myDim_nod2D
         do node = 1,node_size
@@ -216,19 +226,19 @@ module g_cvmix_tidal
         ! 
         ! MPIOM note 2: background diffusivities were already added in the mixed layer 
         !               scheme (KPP)
-        call exchange_nod(tidal_Kv)
+        call exchange_nod(tidal_Kv, mesh)
         Kv = Kv + tidal_Kv
             
         !_______________________________________________________________________
         ! add tidal viscosity to main model diffusivity Av -->interpolate 
         ! therefor from nodes to elements
-        call exchange_nod(tidal_Av)
+        call exchange_nod(tidal_Av, mesh)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             do nz=1,nlevels(elem)-1
                 Av(nz,elem) = Av(nz,elem) + sum(tidal_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
+        end associate
     end subroutine calc_cvmix_tidal
 end module g_cvmix_tidal

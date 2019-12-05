@@ -34,7 +34,7 @@ MODULE g_sbf
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
    USE o_ARRAYS
-   USE o_MESH
+   USE MOD_MESH
    USE o_PARAM
    USE g_PARSUP
    USE g_comm_auto
@@ -394,7 +394,7 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   SUBROUTINE nc_sbc_ini(rdate)
+   SUBROUTINE nc_sbc_ini(rdate, mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : initialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
@@ -412,7 +412,13 @@ CONTAINS
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
       type(flfi_type), pointer :: flf
+type(t_mesh), intent(in)              :: mesh
 
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
 ! used for interpolate on elements
 !      ALLOCATE( bilin_indx_i(elem2D),bilin_indx_j(elem2D), &
@@ -471,13 +477,14 @@ CONTAINS
       end if
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
-         call getcoeffld(fld_idx, rdate)
+         call getcoeffld(fld_idx, rdate, mesh)
       end do
          ! interpolate in time
       call data_timeinterp(rdate)
+      end associate
    END SUBROUTINE nc_sbc_ini
 
-   SUBROUTINE getcoeffld(fld_idx, rdate)
+   SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -514,6 +521,8 @@ CONTAINS
       character(len=256), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
+      type(t_mesh), intent(in) :: mesh
+      associate(geo_coord_nod2D=>mesh%geo_coord_nod2D)
 
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
@@ -675,6 +684,7 @@ CONTAINS
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost, file_name)
       DEALLOCATE( sbcdata2, sbcdata1 )
+      end associate
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
@@ -700,10 +710,9 @@ CONTAINS
       end do !fld_idx
 !!$OMP END DO
 !!$OMP END PARALLEL
-
    END SUBROUTINE data_timeinterp
 
-   SUBROUTINE sbc_ini
+   SUBROUTINE sbc_ini(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_ini ***
       !!
@@ -719,6 +728,7 @@ CONTAINS
       integer            :: sbc_alloc                   !: allocation status
 
       real(wp)           :: tx, ty
+      type(t_mesh), intent(in)   :: mesh
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
@@ -851,13 +861,13 @@ CONTAINS
       qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
 
-      call nc_sbc_ini(rdate)
+      call nc_sbc_ini(rdate, mesh)
       !==========================================================================
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false.) 
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -865,7 +875,7 @@ CONTAINS
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
 
-   SUBROUTINE sbc_do
+   SUBROUTINE sbc_do(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -882,8 +892,8 @@ CONTAINS
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-
-     
+      type(t_mesh), intent(in) :: mesh
+      associate(coord_nod2D=>mesh%coord_nod2D)
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
@@ -909,7 +919,7 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
-            call getcoeffld(fld_idx, rdate)
+            call getcoeffld(fld_idx, rdate, mesh)
             if (fld_idx==i_xwind) do_rotation=.true.
          endif
       end do
@@ -927,13 +937,14 @@ CONTAINS
                i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true.) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
             end if
          end if
       end if
 
       ! interpolate in time
       call data_timeinterp(rdate)
+      end associate
    END SUBROUTINE sbc_do
 
 

@@ -25,7 +25,7 @@ module g_cvmix_tke
     ! module calls from FESOM
     use g_config , only: dt
     use o_param           
-    use o_mesh
+    use mod_mesh
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -116,11 +116,17 @@ module g_cvmix_tke
     !===========================================================================
     ! allocate and initialize TKE 2D and 3D variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tke
-        character(len=100) :: nmlfile
-        logical            :: nmlfile_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_tke(mesh)
+        implicit none
+        character(len=100)       :: nmlfile
+        logical                  :: nmlfile_exist=.False.
+        integer                  :: node_size
+        type(t_mesh), intent(in) :: mesh
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)         
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -234,19 +240,25 @@ module g_cvmix_tke
                       only_tke       = tke_only,           &
                       tke_min        = tke_min,            &
                       tke_surf_min   = tke_surf_min    )
-            
+        end associate            
     end subroutine init_cvmix_tke
     !
     !
     !
     !===========================================================================
     ! calculate TKE vertical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_tke
-        
+    subroutine calc_cvmix_tke(mesh)
+        implicit none
+        type(t_mesh), intent(in) :: mesh
         integer       :: node, elem, nelem, nz, nln, elnodes(3), node_size
         real(kind=WP) :: tvol
-        real(kind=WP) :: dz_trr(nl), bvfreq2(nl), vshear2(nl)
-        real(kind=WP) :: tke_Av_old(nl), tke_Kv_old(nl), tke_old(nl)
+        real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
+        real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
         
         node_size = myDim_nod2D
         !_______________________________________________________________________
@@ -371,12 +383,12 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         ! write out diffusivity
-        call exchange_nod(tke_Kv)
+        call exchange_nod(tke_Kv, mesh)
         Kv = tke_Kv
             
         !_______________________________________________________________________
         ! write out viscosity -->interpolate therefor from nodes to elements
-        call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
+        call exchange_nod(tke_Av, mesh) !Warning: don't forget to communicate before averaging on elements!!!
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
@@ -384,6 +396,6 @@ module g_cvmix_tke
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
+        end associate
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

@@ -8,10 +8,10 @@
 ! Ref: Duffy1997, Duffy1999, Nguyen2009
 ! Originaly coded by Qiang Wang in FESOM 1.4 
 !--------------------------------------------------------
-subroutine cal_rejected_salt
+subroutine cal_rejected_salt(mesh)
 use g_parsup
 use o_arrays
-use o_mesh
+use mod_mesh
 use g_comm_auto
 use o_tracers
 use g_forcing_arrays, only: thdgr
@@ -22,6 +22,8 @@ implicit none
 
 integer         :: row
 real(kind=WP)   :: aux
+type(t_mesh), intent(in) :: mesh
+associate(area=>mesh%area)
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
@@ -33,14 +35,15 @@ do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
       ice_rejected_salt(row)=0.0_WP
    end if
 end do
+end associate
 end subroutine cal_rejected_salt
 !
 !----------------------------------------------------------------------------
 !
-subroutine app_rejected_salt
+subroutine app_rejected_salt(mesh)
   use g_parsup
   use o_arrays
-  use o_mesh
+  use mod_mesh
   use g_comm_auto
   use o_tracers
   implicit none
@@ -53,6 +56,13 @@ subroutine app_rejected_salt
   data drhodz_cri /0.01_WP/  !kg/m3/m  !NH   !Nguyen2011
   data n_distr /5/
   data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
+
+  type(t_mesh), intent(in) :: mesh
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
 
   do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
      if (ice_rejected_salt(row)<=0.0_WP) cycle
@@ -79,4 +89,5 @@ subroutine app_rejected_salt
         endif
       endif
   end do
+  end associate
 end subroutine app_rejected_salt

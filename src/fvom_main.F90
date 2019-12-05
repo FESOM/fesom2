@@ -7,7 +7,7 @@
 !=============================================================================!    
 
 program main
-USE o_MESH
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -33,7 +33,8 @@ real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
 real(kind=real32) :: runtime_alltimesteps
-  
+
+type(t_mesh)      :: mesh
 
 
 #ifndef __oifs
@@ -86,7 +87,7 @@ real(kind=real32) :: runtime_alltimesteps
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
     endif
     if (mype==0) t5=MPI_Wtime()
-    call compute_diagnostics(0) ! allocate arrays for diagnostic
+    call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
     call cpl_oasis3mct_define_unstr
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -101,11 +102,11 @@ real(kind=real32) :: runtime_alltimesteps
     ! if l_write  is TRUE the restart will be forced
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
-    call restart(0, .false., r_restart) ! istep, l_write, l_read
+    call restart(0, .false., r_restart, mesh) ! istep, l_write, l_read
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
-    if (.not. r_restart) call write_mesh_info
+    if (.not. r_restart) call write_mesh_info(mesh)
 
     !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
     !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
@@ -205,19 +206,19 @@ real(kind=real32) :: runtime_alltimesteps
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-        call oce_timestep_ale(n)
+        call oce_timestep_ale(n, mesh)
         t3 = MPI_Wtime()
         
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-        call compute_diagnostics(1)
+        call compute_diagnostics(1, mesh)
         t4 = MPI_Wtime()
         
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n)
+        call output (n, mesh)
         t5 = MPI_Wtime()
-        call restart(n, .false., .false.)
+        call restart(n, .false., .false., mesh)
         t6 = MPI_Wtime()
         
         rtime_fullice       = rtime_fullice       + t2 - t1

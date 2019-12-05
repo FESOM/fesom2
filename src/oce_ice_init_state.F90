@@ -4,8 +4,8 @@
 ! for ocean and ice.
 ! ============================================================================ 
 ! ============================================================================
-subroutine initial_state_test
-  use o_MESH
+subroutine initial_state_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -13,8 +13,17 @@ subroutine initial_state_test
   implicit none
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: elevation, strat, wind, cooling, tperturb
-  real(kind=WP)                       :: lon, lat, a, dst  
-  real(kind=WP)                       :: minlat,maxlat,tt,rwidth 
+  real(kind=WP)                      :: lon, lat, a, dst  
+  real(kind=WP)                      :: minlat,maxlat,tt,rwidth 
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+ 
+
 ! Now updated for the box mesh, it was originally designed for hex mesh.
 ! In that case, the southern boundary is 40, the northern 48.83, and 0:18 the
 ! longitudinal extent.
@@ -107,12 +116,12 @@ Tsurf=tr_arr(1,:,1)
 
   ! Fix for too low salinity
   where (tr_arr(:,:,2)<20.4) tr_arr(:,:,2)=20.4
-
+  end associate
 end subroutine initial_state_test
 ! ====================================================================
 
-subroutine initial_state_channel_test
-  use o_MESH
+subroutine initial_state_channel_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -122,6 +131,13 @@ subroutine initial_state_channel_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)  
   
 
   ! Default values
@@ -228,11 +244,11 @@ subroutine initial_state_channel_test
 	!end if
      end do
   end do 
- 
+  end associate
 end subroutine initial_state_channel_test
 ! ====================================================================
-subroutine initial_state_channel_narrow_test
-  use o_MESH
+subroutine initial_state_channel_narrow_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -242,6 +258,13 @@ subroutine initial_state_channel_narrow_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)  
   
 
   ! Default values
@@ -348,11 +371,11 @@ return
         tr_arr(nz,n,1)=tr_arr(nz,n,1)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
      end do
   end do 
-
+  end associate
 end subroutine initial_state_channel_narrow_test
 ! ================================================================ 
-subroutine init_fields_na_test
-  use o_MESH
+subroutine init_fields_na_test(mesh)
+  use MOD_MESH
   use o_PARAM
   use o_ARRAYS
   use g_PARSUP
@@ -362,6 +385,14 @@ subroutine init_fields_na_test
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat,lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
@@ -451,10 +482,11 @@ subroutine init_fields_na_test
   where (tr_arr(:,:,2)<20.4)
      tr_arr(:,:,2)=20.4
   end where
+  end associate
 end subroutine init_fields_na_test  
 ! ================================================================  
-subroutine init_fields_global_test
-  use o_MESH
+subroutine init_fields_global_test(mesh)
+  use MOD_MESH
   use o_PARAM
   use o_ARRAYS
   use g_PARSUP
@@ -464,6 +496,14 @@ subroutine init_fields_global_test
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat, lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
@@ -536,13 +576,13 @@ subroutine init_fields_global_test
      END DO
      end if
   end do
-  
+  end associate
 end subroutine init_fields_global_test
 ! ================================================================ 
 ! ====================================================================
 
-subroutine initial_state_channel_dima_test
-  use o_MESH
+subroutine initial_state_channel_dima_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -551,6 +591,13 @@ subroutine initial_state_channel_dima_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, nlevels=>mesh%nlevels)  
   
 
   ! Default values
@@ -611,14 +658,15 @@ subroutine initial_state_channel_dima_test
      if(lat>43.5*rad) relax2clim(n)=clim_relax*(1.0-(45*rad-lat)/(1.5*rad))
      if(lat<31.5*rad) relax2clim(n)=clim_relax*(1.0+(30*rad-lat)/(1.5*rad))
   END DO
+  end associate
 end subroutine initial_state_channel_dima_test
 ! ====================================================================
-subroutine ice_init_fields_test
+subroutine ice_init_fields_test(mesh)
 !
 ! Simple initialization for a box model to test the dynamical part.
 ! No thermodinamics is initialized here 
 !
-use o_mesh
+use mod_mesh
 use i_arrays
 use i_param
 use o_param
@@ -628,8 +676,16 @@ use g_CONFIG
 use g_comm_auto
 
 IMPLICIT NONE
-real(kind=WP)  :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
-integer       :: n, elnodes(3)   
+real(kind=WP)              :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
+integer                    :: n, elnodes(3)   
+type(t_mesh), intent(in)   :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
+
    
   coriolis=1.4e-4  ! redefines Coriolis
   coriolis_node=1.4e-4  
@@ -669,14 +725,14 @@ integer       :: n, elnodes(3)
                     (coord_nod2d(1,n)-xmin)**2/Lx -&
 		    (coord_nod2d(1,n)-xmin))
    END DO
-  	    
+   end associate
 end subroutine ice_init_fields_test
 ! =============================================================================
-Subroutine ice_update_forcing_test(step)
+Subroutine ice_update_forcing_test(step, mesh)
 !
 ! Here only simple wind variability is introduced
 !
-use o_mesh
+use mod_mesh
 use i_arrays
 use i_param
 use o_param
@@ -685,8 +741,15 @@ use g_PARSUP
 use g_forcing_arrays
 USE g_CONFIG
 IMPLICIT NONE
-real(kind=WP)  :: xmin, xm, ym, ymin, Lx, Ly, td, cdwin
-integer       :: step, n, elnodes(3)    
+real(kind=WP)             :: xmin, xm, ym, ymin, Lx, Ly, td, cdwin
+integer                   :: step, n, elnodes(3)    
+type(t_mesh), intent(in)  :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
 
    cdwin=0.00225_WP
    ! Set wind velocity (stationary in time):
@@ -709,14 +772,14 @@ integer       :: step, n, elnodes(3)
    
    stress_atmice_x = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*u_wind
    stress_atmice_y = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*v_wind
-   
+   end associate
 end subroutine ice_update_forcing_test
 !
 !==============================================================================
 ! Simple initialization for tests for GM with the real geometry
 ! ============================================================================ 
-subroutine ini_global_ocean
-  use o_MESH
+subroutine ini_global_ocean(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -725,6 +788,13 @@ subroutine ini_global_ocean
   implicit none
   integer                            :: n, nz
   real(kind=WP)                      :: minlat,maxlat, lon, lat, val
+  type(t_mesh), intent(in)           :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
 
  tr_arr(:,:,1)=20.0_WP
  tr_arr(:,:,2)=34.0_WP
@@ -749,7 +819,8 @@ subroutine ini_global_ocean
      DO nz=1, nlevels_nod2D(n)-1 
         tr_arr(nz,n,1)=tr_arr(nz,n,1)-(lat-minlat)/(maxlat-minlat)*2.0_WP
      END DO
-  END DO   
+  END DO
+  end associate
 end subroutine ini_global_ocean
 ! ====================================================================
 !
@@ -760,7 +831,6 @@ subroutine zero_dynamics
    use g_parsup
    use o_PARAM, only: tracer_adv,num_tracers
    use o_arrays
-   use o_mesh
    use g_comm_auto
    use o_tracers
    use g_forcing_arrays

@@ -2,14 +2,21 @@
 ! (curl u+f)\times u+grad(u^2/2)+w du/dz
 !
 ! ===================================================================
-subroutine relative_vorticity
+subroutine relative_vorticity(mesh)
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
   use g_comm_auto
 IMPLICIT NONE
 integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge
 real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)   
 
 DO n=1,myDim_nod2D
                                  !! n=myList_nod2D(m)
@@ -57,26 +64,32 @@ DO n=1,myDim_nod2D
       vorticity(nz,n)=vorticity(nz,n)/area(nz,n)
    END DO
 END DO      
- call exchange_nod(vorticity)
+ call exchange_nod(vorticity, mesh)
 ! Now it the relative vorticity known on neighbors too
-
+end associate
 end subroutine relative_vorticity
 ! ==========================================================================
-subroutine compute_vel_rhs_vinv !vector invariant
+subroutine compute_vel_rhs_vinv(mesh) !vector invariant
 USE o_PARAM
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
 USE g_CONFIG
-  use g_comm_auto
+use g_comm_auto
 IMPLICIT NONE
+type(t_mesh), intent(in) :: mesh
 integer           :: n, n1, nz, elem, elnodes(3), nl1, j
 real(kind=WP)     :: a, b, c, da, db, dc, dg, ff(3), gg, eta(3), pre(3), Fx, Fy,w
-real(kind=WP)     :: uvert(nl,2), umean, vmean, friction
+real(kind=WP)     :: uvert(mesh%nl,2), umean, vmean, friction
 logical, save     :: lfirst=.true.
-real(kind=WP)     :: KE_node(nl-1,myDim_nod2D+eDim_nod2D)
-real(kind=WP)     :: dZ_inv(2:nl-1), dzbar_inv(nl-1), elem_area_inv
+real(kind=WP)     :: KE_node(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: dZ_inv(2:mesh%nl-1), dzbar_inv(mesh%nl-1), elem_area_inv
 real(kind=WP)     :: density0_inv = 1./density_0
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)   
 
 uvert=0.0_WP 
 
@@ -114,7 +127,7 @@ DO n=1,myDim_edge2D
    endif
 end DO   
  
- call exchange_nod(KE_node)
+ call exchange_nod(KE_node, mesh)
 ! Now gradients of KE will be correct on myDim_elem2D
 
 ! ==================
@@ -252,5 +265,5 @@ DO elem=1, myDim_elem2D                    !! P(e) elem=1, elem2D
    END DO
 END DO
 ! U_rhs contains all contributions to velocity from old time steps   
-
+end associate
 end subroutine compute_vel_rhs_vinv

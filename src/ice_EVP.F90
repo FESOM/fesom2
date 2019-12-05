@@ -2,13 +2,13 @@
 ! Contains routines of EVP dynamics
 !
 !===================================================================
-subroutine stress_tensor(ice_strength)
+subroutine stress_tensor(ice_strength, mesh)
 ! EVP rheology. The routine computes stress tensor components based on ice 
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
 use o_param
 use i_param
-use o_mesh
+use mod_mesh
 use i_arrays
 use g_parsup
 USE g_CONFIG
@@ -20,6 +20,14 @@ integer         :: el, elnodes(3)
 real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
 real(kind=WP)   :: zeta, delta_inv, d1, d2
+
+type(t_mesh), intent(in)              :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
   vale = 1.0_WP/(ellipse**2)
    
@@ -93,10 +101,10 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
         sigma22(el) = 0.5_WP*(si1-si2)
      endif
   end do
-    
+  end associate  
 end subroutine stress_tensor
 !===================================================================
-subroutine stress2rhs_e
+subroutine stress2rhs_e(mesh)
 ! EVP implementation:
 ! Computes the divergence of stress tensor and puts the result into the
 ! rhs vectors. Velocity is at nodes. 
@@ -104,7 +112,7 @@ subroutine stress2rhs_e
 ! approach in stress2rhs_e inherited from FESOM
 
 
-USE o_MESH
+USE MOD_MESH
 USE o_PARAM
 USE i_PARAM
 USE i_therm_param
@@ -115,6 +123,14 @@ USE g_PARSUP
 IMPLICIT NONE
 INTEGER      :: n, elem, ed, elnodes(3), el(2), ednodes(2)  
 REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
+
+type(t_mesh), intent(in)              :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
  DO n=1, myDim_nod2D
      U_rhs_ice(n)=0.0_WP
@@ -159,14 +175,15 @@ REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
      U_rhs_ice(elnodes)=U_rhs_ice(elnodes) - uc/area(1,elnodes)
      V_rhs_ice(elnodes)=V_rhs_ice(elnodes) - vc/area(1,elnodes)
  END DO
+end associate
 end subroutine stress2rhs_e
 !===================================================================
-subroutine stress2rhs(inv_areamass,ice_strength)
+subroutine stress2rhs(inv_areamass, ice_strength, mesh)
 ! EVP implementation:
 ! Computes the divergence of stress tensor and puts the result into the
 ! rhs vectors 
 
-USE o_MESH
+USE MOD_MESH
 USE o_PARAM
 USE i_PARAM
 USE i_THERM_PARAM
@@ -177,6 +194,13 @@ IMPLICIT NONE
 REAL(kind=WP), intent(in) :: inv_areamass(myDim_nod2D), ice_strength(mydim_elem2D)
 INTEGER      :: n, el,  k
 REAL(kind=WP):: val3
+type(t_mesh), intent(in)              :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
 
 val3=1/3.0_WP
 
@@ -218,13 +242,13 @@ do el=1,myDim_elem2D
         V_rhs_ice(n) = 0._WP
      endif
   END DO 
-  
+  end associate
 end subroutine stress2rhs
 !===================================================================
-subroutine EVPdynamics
+subroutine EVPdynamics(mesh)
 ! EVP implementation. Does subcycling and boundary conditions.  
 ! Velocities at nodes
-USE o_MESH
+USE MOD_MESH
 USE o_PARAM
 USE i_ARRAYS
 USE i_PARAM
@@ -235,16 +259,23 @@ USE g_CONFIG
 USE g_comm_auto
 
 IMPLICIT NONE
-integer          :: steps, shortstep
-real(kind=WP)    :: rdt, asum, msum, r_a, r_b
-real(kind=WP)    :: drag, det, umod, rhsu, rhsv
-integer          :: n, ed, ednodes(2), el,  elnodes(3)
-real(kind=WP)    :: ax, ay, aa, elevation_dx, elevation_dy
+integer                   :: steps, shortstep
+real(kind=WP)             :: rdt, asum, msum, r_a, r_b
+real(kind=WP)             :: drag, det, umod, rhsu, rhsv
+integer                   :: n, ed, ednodes(2), el,  elnodes(3)
+real(kind=WP)             :: ax, ay, aa, elevation_dx, elevation_dy
 
-real(kind=WP)    :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
-real(kind=WP)    :: ice_strength(myDim_elem2D), elevation_elem(3), p_ice(3)
-integer          :: use_pice
-    
+real(kind=WP)             :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
+real(kind=WP)             :: ice_strength(myDim_elem2D), elevation_elem(3), p_ice(3)
+integer                   :: use_pice
+type(t_mesh), intent(in)  :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area)
+
 rdt=ice_dt/(1.0*evp_rheol_steps)
 ax=cos(theta_io)
 ay=sin(theta_io)
@@ -403,5 +434,5 @@ do shortstep=1, evp_rheol_steps
  
    call exchange_nod(U_ice,V_ice)
 END DO
- 
+end associate
 end subroutine EVPdynamics

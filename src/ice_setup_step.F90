@@ -5,7 +5,6 @@
 subroutine ice_setup
 use o_param
 use g_parsup
-use o_mesh
 use i_param
 use i_arrays
 use g_CONFIG
@@ -27,23 +26,26 @@ implicit none
   if(mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 ! ============================================================================
-subroutine ice_array_setup
+subroutine ice_array_setup(mesh)
 !
 ! inializing sea ice model 
 !
 ! Variables that serve for exchange with atmosphere are nodal, to keep 
 ! back compatibility with FESOM input routines
  
-
 use o_param
 use i_param
-use o_mesh
+use MOD_MESH
 use i_arrays
 use g_parsup
 USE g_CONFIG
 
 implicit none
+type(t_mesh), intent(in)           :: mesh
 integer   :: n_size, e_size, mn, k, n, n1, n2
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D)
+
+
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
@@ -121,6 +123,7 @@ e_size=myDim_elem2D+eDim_elem2D
   tmp_oce_heat_flux=0._WP
   tmp_ice_heat_flux=0._WP
 #endif /* (__oasis) */
+end associate
 end subroutine ice_array_setup
 !==========================================================================
 subroutine ice_timestep(step)
@@ -187,19 +190,22 @@ endif
 end subroutine ice_timestep
 !==============================================================================
 
-subroutine ice_initial_state
+subroutine ice_initial_state(mesh)
   !sets inital values or reads restart file for ice model
   use i_ARRAYs
-  use o_MESH    
+  USE MOD_MESH
   use o_PARAM   
   use o_arrays        
   use g_parsup 
   USE g_CONFIG
   implicit none
   !
-  integer        :: i
-  character*100  :: filename
-  real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+  type(t_mesh), intent(in)           :: mesh
+  integer                            :: i
+  character*100                      :: filename
+  real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
+
+  associate(geo_coord_nod2D=>mesh%geo_coord_nod2D)
   m_ice =0._WP
   a_ice =0._WP
   u_ice =0._WP
@@ -222,4 +228,5 @@ subroutine ice_initial_state
         v_ice(i) = 0.0_WP
      endif
   enddo
+  end associate
 end subroutine ice_initial_state

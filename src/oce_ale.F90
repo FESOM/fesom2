@@ -20,17 +20,22 @@
 !    
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
-subroutine init_ale
+subroutine init_ale(mesh)
     USE o_PARAM
-    USE o_MESH
+    USE MOD_MESH
     USE g_PARSUP
     USE o_ARRAYS
     USE g_config, only: which_ale
     USE g_forcing_param, only: use_virt_salt
     Implicit NONE
     
-    integer             :: n, nzmax
-    
+    integer                  :: n, nzmax
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
@@ -95,13 +100,14 @@ subroutine init_ale
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
+    end associate
 end subroutine init_ale
 !
 !
 !===============================================================================
-subroutine init_bottom_elem_thickness
+subroutine init_bottom_elem_thickness(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell
@@ -111,6 +117,12 @@ subroutine init_bottom_elem_thickness
     
     integer       :: elem, elnodes(3), nle
     real(kind=WP) :: dd
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     
     !___________________________________________________________________________
     ! If we use partial cells, the thickness of bottom cell is adjusted.
@@ -186,14 +198,14 @@ subroutine init_bottom_elem_thickness
             zbar_e_bot(elem) = zbar(nle)
         end do
     end if 
-    
+    end associate
 END subroutine init_bottom_elem_thickness
 !
 !
 !===============================================================================
-subroutine init_bottom_node_thickness
+subroutine init_bottom_node_thickness(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell
@@ -204,6 +216,12 @@ subroutine init_bottom_node_thickness
     integer       :: node, nln, elem, elemi, nelem
     real(kind=WP) :: dd 
     real(kind=WP) :: hnbot, tvol 
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     
     !___________________________________________________________________________
     ! If we use partial cells, the thickness of bottom cell is adjusted.
@@ -280,13 +298,13 @@ subroutine init_bottom_node_thickness
             zbar_n_bot(node) = zbar(nln)
         end do
     end if 
-    
+    end associate
 END subroutine init_bottom_node_thickness
 !
 !
 !===============================================================================
 ! initialize thickness arrays based on the current hbar 
-subroutine init_thickness_ale
+subroutine init_thickness_ale(mesh)
 ! For z-star case: we stretch scalar thicknesses (nodal) 
 ! through nlevels_nod2D_min -2 layers. Layer nlevels_nod2D_min-1
 ! should not be touched if partial cell is implemented (it is).
@@ -294,12 +312,19 @@ subroutine init_thickness_ale
 ! Important: nlevels_nod2D_min has to be allocated and filled. 
     use g_config,only: dt, which_ale
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use g_PARSUP
     use o_ARRAYS
     implicit none
     integer :: n, nz, elem, elnodes(3)
     real(kind=WP) :: dd 
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -454,21 +479,29 @@ subroutine init_thickness_ale
     
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
-    
+    end associate
 end subroutine init_thickness_ale
 !
 !
 !===============================================================================
 ! update thickness arrays based on the current hbar 
-subroutine update_thickness_ale
+subroutine update_thickness_ale(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use g_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
     integer :: n, nz, elem, elnodes(3),nzmax
     integer      , dimension(:), allocatable :: idx
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
+
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->->->       z-level      <-<-<-<-<-<-<-<-<-<-<-<-<
     !___________________________________________________________________________
@@ -570,21 +603,27 @@ subroutine update_thickness_ale
             end do
         end do
     endif
-    
+    end associate
 end subroutine update_thickness_ale
 !
 !
 !===============================================================================
 ! update thickness arrays based on the current hbar 
-subroutine restart_thickness_ale
+subroutine restart_thickness_ale(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmax, lcl_lzstar_lev
     integer      , dimension(:), allocatable :: idx
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     
     if(mype==0) then
         write(*,*) '____________________________________________________________'
@@ -628,6 +667,7 @@ subroutine restart_thickness_ale
             
         end do
     endif
+    end associate
 end subroutine restart_thickness_ale
 !
 !
@@ -646,9 +686,9 @@ end subroutine restart_thickness_ale
 ! 
 ! To achive it we should use global arrays n_num and n_pos.
 ! Reserved for future. 
-subroutine init_stiff_mat_ale
+subroutine init_stiff_mat_ale(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use o_ARRAYS, only:zbar_e_bot
     use g_CONFIG
@@ -664,6 +704,12 @@ subroutine init_stiff_mat_ale
     character*1000                      :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
+    type(t_mesh), intent(inout)            :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels, ssh_stiff=>mesh%ssh_stiff)    
     
     t0=MPI_Wtime()
     if (mype==0) then
@@ -675,7 +721,7 @@ subroutine init_stiff_mat_ale
     ! a) pre allocate stiff_mat: dimenssion,  reduced row vector ... and number 
     ! of neighbors and idices of neighbors
     ssh_stiff%dim=nod2D
-    allocate(ssh_stiff%rowptr(myDim_nod2D+1), ssh_stiff%rowptr_loc(myDim_nod2D+1))
+    allocate(mesh%ssh_stiff%rowptr(myDim_nod2D+1), mesh%ssh_stiff%rowptr_loc(myDim_nod2D+1))
     ssh_stiff%rowptr(1)=1               ! This has to be updated as
                                         ! contiguous numbering is required
     
@@ -725,8 +771,8 @@ subroutine init_stiff_mat_ale
     
     ! allocate column as colind value array of sparse matrix, have length of nonzero 
     ! entrie of sparse matrix 
-    allocate(ssh_stiff%colind(ssh_stiff%nza), ssh_stiff%colind_loc(ssh_stiff%nza))
-    allocate(ssh_stiff%values(ssh_stiff%nza))
+    allocate(mesh%ssh_stiff%colind(ssh_stiff%nza), mesh%ssh_stiff%colind_loc(ssh_stiff%nza))
+    allocate(mesh%ssh_stiff%values(ssh_stiff%nza))
     ssh_stiff%values=0.0_WP  
     
     !___________________________________________________________________________
@@ -903,6 +949,7 @@ subroutine init_stiff_mat_ale
         write(*,*) '     took: ',t1-t0, ' sec'
         write(*,*) 
     endif
+    end associate
 end subroutine init_stiff_mat_ale
 !
 !
@@ -920,10 +967,11 @@ end subroutine init_stiff_mat_ale
 !                                                                         due to changes in ssh is done here 
 !   = ssh_rhs                                                             in the update of the stiff matrix
 !
-subroutine update_stiff_mat_ale
+subroutine update_stiff_mat_ale(mesh)
     use g_config,only: dt
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use g_PARSUP
     use o_ARRAYS
     !
@@ -934,6 +982,12 @@ subroutine update_stiff_mat_ale
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
+    type(t_mesh), intent(inout)         :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels, ssh_stiff=>mesh%ssh_stiff)    
     
     !___________________________________________________________________________
     ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
@@ -1014,6 +1068,7 @@ subroutine update_stiff_mat_ale
 !end do
 !end if
 !DS
+end associate
 end subroutine update_stiff_mat_ale
 !
 !
@@ -1022,9 +1077,9 @@ end subroutine update_stiff_mat_ale
 !"FESOM2: from finite elements to finite volumes"
 !
 ! ssh_rhs = alpha * grad[  int_hbot^hbar(n+0.5)( u^n+deltau)dz + W(n+0.5) ]
-subroutine compute_ssh_rhs_ale
+subroutine compute_ssh_rhs_ale(mesh)
     use g_config,only: which_ALE,dt
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -1037,6 +1092,12 @@ subroutine compute_ssh_rhs_ale
     integer       :: ed, el(2), enodes(2),  nz,n
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
+    type(t_mesh), intent(inout) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     
     ssh_rhs=0.0_WP
     !___________________________________________________________________________
@@ -1099,7 +1160,7 @@ subroutine compute_ssh_rhs_ale
         end do
     end if
     call exchange_nod(ssh_rhs)
-    
+    end associate
 end subroutine compute_ssh_rhs_ale
 !
 !
@@ -1113,9 +1174,9 @@ end subroutine compute_ssh_rhs_ale
 ! hbar(n+0.5) = hbar(n-0.5) - tau*ssh_rhs_old
 !
 ! in S. Danilov et al.: "FESOM2: from finite elements to finite volumes"
-subroutine compute_hbar_ale
+subroutine compute_hbar_ale(mesh)
     use g_config,only: dt, which_ALE
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -1130,6 +1191,13 @@ subroutine compute_hbar_ale
     
     integer      :: ed, el(2), enodes(2),  nz,n, elnodes(3), elem
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
+
     !___________________________________________________________________________
     ! compute the rhs
     ssh_rhs_old=0.0_WP
@@ -1185,7 +1253,7 @@ subroutine compute_hbar_ale
         elnodes=elem2D_nodes(:,elem)
         dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
     end do
-    
+    end associate
 end subroutine compute_hbar_ale
 !
 !
@@ -1202,9 +1270,10 @@ end subroutine compute_hbar_ale
 ! > for zlevel: dh_k/dt_k=1 != 0
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
-subroutine vert_vel_ale
+subroutine vert_vel_ale(mesh)
     use g_config,only: dt, which_ALE,min_hnode,lzstar_lev
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -1223,6 +1292,12 @@ subroutine vert_vel_ale
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int  !PS
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr,cumsum_maxdhbar,distrib_dhbar
     integer      , dimension(:), allocatable :: idx
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
     
     !___________________________________________________________________________
     ! Contributions from levels in divergence
@@ -1569,9 +1644,9 @@ subroutine vert_vel_ale
     endif
     
     !___________________________________________________________________________
-    call exchange_nod(Wvel) 
-    call exchange_nod(hnode_new)   ! Or extend cycles above  
-    if (Fer_GM) call exchange_nod(fer_Wvel)
+    call exchange_nod(Wvel, mesh) 
+    call exchange_nod(hnode_new, mesh)   ! Or extend cycles above  
+    if (Fer_GM) call exchange_nod(fer_Wvel, mesh)
     
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
@@ -1622,15 +1697,16 @@ subroutine vert_vel_ale
         Wvel_e=Wvel
     end if
     Wvel_i=Wvel-Wvel_e
+    end associate
 end subroutine vert_vel_ale
 !
 !
 !===============================================================================
 ! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
 ! for (eta^(n+1)-eta^n) = d_eta
-subroutine solve_ssh_ale
+subroutine solve_ssh_ale(mesh)
 use o_PARAM
-use o_MESH
+use MOD_MESH
 use o_ARRAYS
 use g_PARSUP
 use g_comm_auto
@@ -1656,6 +1732,14 @@ logical, save                   :: lfirst=.true.
 real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
 real(kind=WP)                   :: cssh1,cssh2,crhs
 integer                         :: i
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels, ssh_stiff=>mesh%ssh_stiff)    
+
+
 Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
 if (lfirst) then   
    Pmode = Pmode+PET_STRUCT+PET_PMVALS + PET_PCASM+PET_OVL_2 !+PET_PCBJ+PET_ILU
@@ -1669,7 +1753,7 @@ call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
      soltol,   &
      part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
      ssh_rhs, d_eta, &
-     rinfo, MPI_COMM_FESOM)
+     rinfo, MPI_COMM_FESOM, mesh)
     !
     !
     !___USE PARMS SOLVER (recommended)__________________________________________
@@ -1684,6 +1768,7 @@ integer(kind=C_INT)  :: n3, reuse, new_values
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
 integer :: n
+type(t_mesh), intent(in) :: mesh
 
 interface
    subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
@@ -1705,6 +1790,12 @@ interface
 
    end subroutine psolve
 end interface
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels, ssh_stiff=>mesh%ssh_stiff)   
 
 ident=1
 maxiter=2000
@@ -1754,22 +1845,30 @@ end if
     !
     !___________________________________________________________________________
 call exchange_nod(d_eta) !is this required after calling psolve ?
+end associate
 end subroutine solve_ssh_ale
 !
 !
 !===============================================================================
-subroutine impl_vert_visc_ale
-USE o_MESH
+subroutine impl_vert_visc_ale(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG,only: dt
 IMPLICIT NONE
 
-real(kind=WP)              ::  a(nl-1), b(nl-1), c(nl-1), ur(nl-1), vr(nl-1)
-real(kind=WP)              ::  cp(nl-1), up(nl-1), vp(nl-1)
+type(t_mesh), intent(in)   :: mesh
+real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
+real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
 integer                    ::  nz, elem, nzmax, elnodes(3)
 real(kind=WP)              ::  zinv, m, friction, wu, wd
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
+
 DO elem=1,myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
     
@@ -1884,15 +1983,16 @@ DO elem=1,myDim_elem2D
         UV_rhs(2,nz,elem)=vr(nz)
     end do
 end do   !!! cycle over elements
+end associate
 end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n)
+subroutine oce_timestep_ale(n, mesh)
     use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn, &
                         rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi,&
                         rtime_oce_mixpres,rtime_oce_dynssh,which_ale,flag_debug
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -1909,37 +2009,44 @@ subroutine oce_timestep_ale(n)
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
     integer           :: n
+    type(t_mesh), intent(in) :: mesh
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)    
+
     
     t0=MPI_Wtime()
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
-    call pressure_bv               !!!!! HeRE change is made. It is linear EoS now.
+    call pressure_bv(mesh)            !!!!! HeRE change is made. It is linear EoS now.
     
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_force_4_...'//achar(27)//'[0m'
     if (trim(which_ale)=='linfs') then
-        call pressure_force_4_linfs  
+        call pressure_force_4_linfs(mesh)
     else  
-        call pressure_force_4_zxxxx
+        call pressure_force_4_zxxxx(mesh)
     end if
         
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
-    call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
+    call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2), mesh)
     
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
-    call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2))
+    call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2), mesh)
     
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
-    call compute_neutral_slope
+    call compute_neutral_slope(mesh)
     
     !___________________________________________________________________________
-    call status_check
+    call status_check(mesh)
     
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
@@ -1961,35 +2068,35 @@ subroutine oce_timestep_ale(n)
     ! for debugging
     if  (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
-        call calc_cvmix_idemix
+        call calc_cvmix_idemix(mesh)
     end if 
     
     !___MAIN MIXING SCHEMES_____________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
-        call oce_mixing_KPP(Av, Kv_double)
+        call oce_mixing_KPP(Av, Kv_double, mesh)
         Kv=Kv_double(:,:,1)
-        call mo_convect
+        call mo_convect(mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
-        call oce_mixing_PP
+        call oce_mixing_PP(mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp
-        call mo_convect
+        call calc_cvmix_kpp(mesh)
+        call mo_convect(mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
     ! N^2 and vertical horizontal velocity shear dui/dz
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
-        call calc_cvmix_pp
+        call calc_cvmix_pp(mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -1997,7 +2104,7 @@ subroutine oce_timestep_ale(n)
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
-        call calc_cvmix_tke
+        call calc_cvmix_tke(mesh)
         
     end if     
     
@@ -2009,24 +2116,24 @@ subroutine oce_timestep_ale(n)
     ! mixing schemes
     if ( mod(mix_scheme_nmb,10)==7) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tidal'//achar(27)//'[0m'
-        call calc_cvmix_tidal
+        call calc_cvmix_tidal(mesh)
         
     end if  
     t1=MPI_Wtime()    
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     if(mom_adv/=3) then
-        call compute_vel_rhs
+        call compute_vel_rhs(mesh)
     else
-        call compute_vel_rhs_vinv
+        call compute_vel_rhs_vinv(mesh)
     end if
     
     !___________________________________________________________________________
-    call viscosity_filter(visc_option)
+    call viscosity_filter(visc_option, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
-    if(i_vert_visc) call impl_vert_visc_ale
+    if(i_vert_visc) call impl_vert_visc_ale(mesh)
     t2=MPI_Wtime()
     
     !___________________________________________________________________________
@@ -2038,23 +2145,23 @@ subroutine oce_timestep_ale(n)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
-    call compute_ssh_rhs_ale
+    call compute_ssh_rhs_ale(mesh)
     
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
-    call solve_ssh_ale
+    call solve_ssh_ale(mesh)
     t3=MPI_Wtime() 
     
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
-    call update_vel
+    call update_vel(mesh)
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
     
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
-    call compute_hbar_ale
+    call compute_hbar_ale(mesh)
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2067,7 +2174,7 @@ subroutine oce_timestep_ale(n)
     t5=MPI_Wtime() 
     
     if (Fer_GM .or. Redi) then
-        call init_Redi_GM
+        call init_Redi_GM(mesh)
     end if
     
     !___________________________________________________________________________
@@ -2075,8 +2182,8 @@ subroutine oce_timestep_ale(n)
     ! does not belong directly to ALE formalism
     if (Fer_GM) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
-        call fer_solve_Gamma
-        call fer_gamma2vel
+        call fer_solve_Gamma(mesh)
+        call fer_gamma2vel(mesh)
     end if
     t6=MPI_Wtime() 
     
@@ -2084,28 +2191,28 @@ subroutine oce_timestep_ale(n)
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-    call vert_vel_ale 
+    call vert_vel_ale(mesh)
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale
+    call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
-    call update_thickness_ale  
+    call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! write out global fields for debugging
-    call write_step_info(n,logfile_outfreq)
+    call write_step_info(n,logfile_outfreq, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
-    call check_blowup(n)
+    call check_blowup(n, mesh)
     t10=MPI_Wtime()
     
     !___________________________________________________________________________
@@ -2137,6 +2244,6 @@ subroutine oce_timestep_ale(n)
         write(*,*)
         write(*,*)
     end if
-    
+    end associate
 end subroutine oce_timestep_ale
 

@@ -29,7 +29,7 @@ end subroutine cut_off
 ! by Qiang Wang, 13.01.2009
 !----------------------------------------------------------------------------
 
-subroutine thermodynamics
+subroutine thermodynamics(mesh)
   !
   ! For every surface node, this subroutine extracts the information
   ! needed for computation of thermodydnamics, calls the relevant
@@ -38,7 +38,7 @@ subroutine thermodynamics
   !------------------------------------------------------------------------
   
   use o_param
-  use o_mesh
+  use mod_mesh
   use i_therm_param
   use i_param
   use i_arrays
@@ -56,6 +56,9 @@ subroutine thermodynamics
   integer        :: i, j, elem
   real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
+
+  type(t_mesh), intent(in)   :: mesh  
+  associate(geo_coord_nod2D=>mesh%geo_coord_nod2D) 
 
   rsss=ref_sss
 
@@ -153,6 +156,7 @@ subroutine thermodynamics
 
   end do
      deallocate(ustar_aux)
+  end associate
 end subroutine thermodynamics
 !
 !===================================================================

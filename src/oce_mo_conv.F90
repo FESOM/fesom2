@@ -1,6 +1,6 @@
-subroutine mo_convect
+subroutine mo_convect(mesh)
 USE o_PARAM
-USE o_MESH
+USE MOD_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
@@ -8,8 +8,15 @@ use i_arrays
 use g_comm_auto
 IMPLICIT NONE
 
-integer               :: node, elem, nz, elnodes(3)
-real(kind=WP)         :: kv_conv=0.1_WP, av_conv=0.1_WP
+integer                  :: node, elem, nz, elnodes(3)
+real(kind=WP)            :: kv_conv=0.1_WP, av_conv=0.1_WP
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
 if (mo_on) then
     do node=1, myDim_nod2D+eDim_nod2D
@@ -49,6 +56,6 @@ DO elem=1, myDim_elem2D
     END DO
 END DO
 !!PS call exchange_elem(Av)
-
+end associate
 end subroutine mo_convect
 

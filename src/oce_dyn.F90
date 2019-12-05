@@ -2,8 +2,8 @@
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes, viscosity_filt2x
 ! ===================================================================
-SUBROUTINE update_vel
-USE o_MESH
+SUBROUTINE update_vel(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -13,6 +13,12 @@ IMPLICIT NONE
 integer       :: elem, elnodes(3), nz, m
 real(kind=WP) :: eta(3) 
 real(kind=WP) :: Fx, Fy
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
 
  DO elem=1, myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
@@ -25,11 +31,12 @@ real(kind=WP) :: Fx, Fy
     END DO
  END DO
 eta_n=eta_n+d_eta
-call exchange_elem(UV)
+call exchange_elem(UV, mesh)
+end associate
 end subroutine update_vel
 !==========================================================================
-subroutine compute_vel_nodes
-USE o_MESH
+subroutine compute_vel_nodes(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE o_ARRAYS
 USE g_PARSUP
@@ -37,6 +44,13 @@ use g_comm_auto
 IMPLICIT NONE
 integer            :: n, nz, k, elem
 real(kind=WP)      :: tx, ty, tvol
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
+
 DO n=1, myDim_nod2D 
    DO nz=1, nlevels_nod2D(n)-1
       tvol=0.0_WP
@@ -53,22 +67,28 @@ DO n=1, myDim_nod2D
       Unode(2,nz,n)=ty/tvol
    END DO
 END DO
-call exchange_nod(Unode)
+call exchange_nod(Unode, mesh)
+end associate
 end subroutine compute_vel_nodes
 !===========================================================================
-SUBROUTINE viscosity_filt2x
-USE o_MESH
+SUBROUTINE viscosity_filt2x(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 USE g_config
 USE g_comm_auto
 IMPLICIT NONE
-
+type(t_mesh), intent(in) :: mesh
 real(kind=WP) :: u1, v1, tau_inv, s, factor, factor1, factor2
 integer       :: ed, el(2), nz, elem
-real(kind=WP) :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D+eDim_elem2D)
- 
+real(kind=WP) :: UV_c(2,mesh%nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,mesh%nl-1,myDim_elem2D+eDim_elem2D)
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
+
 ! Filter is applied twice. It should be approximately 
 ! equivalent to biharmonic operator with the coefficient
 ! (tau_c/day)a^3/9. Scaling inside is found to help 
@@ -121,7 +141,7 @@ END DO
 !NR   END DO
 !NR end do
 
-call exchange_elem(UV_c)
+call exchange_elem(UV_c, mesh)
 
 
 DO ed=1, myDim_edge2D+eDim_edge2D
@@ -160,15 +180,16 @@ END DO
 !NR       UV_rhs(2,nz,elem) = UV_rhs(2,nz,elem)+UV_f(2,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
 !NR    END DO 
 !NR END DO
-
-
+end associate
 end subroutine viscosity_filt2x
 !===========================================================================
-subroutine viscosity_filter(option)
+subroutine viscosity_filter(option, mesh)
 use o_PARAM
 use g_PARSUP
+use MOD_MESH
 IMPLICIT NONE 
-integer      ::  option
+integer                  :: option
+type(t_mesh), intent(in) :: mesh
 ! Driving routine 
 ! Background viscosity is selected in terms of Vl, where V is 
 ! background velocity scale and l is the resolution. V is 0.005 
@@ -183,27 +204,27 @@ CASE (1)
      ! ====
      ! Laplacian+Leith parameterization + harmonic background
      ! ====
-     call h_viscosity_leith
-     call viscosity_filtxx
+     call h_viscosity_leith(mesh)
+     call viscosity_filtxx(mesh)
 CASE (2)
      ! ===
      ! Laplacian+Leith+biharmonic background
      ! ===
-     call h_viscosity_leith
-     call viscosity_filtxxx
+     call h_viscosity_leith(mesh)
+     call viscosity_filtxxx(mesh)
 CASE (3)
      ! ===
      ! Biharmonic+Leith+ background 
      ! ===
-     call h_viscosity_leith
-     call viscosity_filt2xx(2)
+     call h_viscosity_leith(mesh)
+     call viscosity_filt2xx(2, mesh)
 CASE (4)
      ! ===
      ! Biharmonic+upwind-type+ background 
      ! ===
-     call viscosity_filt2xx(1)
+     call viscosity_filt2xx(1, mesh)
 CASE (5)
-     call viscosity_filt_h_backscatter
+     call viscosity_filt_h_backscatter(mesh)
 CASE DEFAULT
      if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
      call par_ex
@@ -211,8 +232,8 @@ CASE DEFAULT
 END SELECT
 end subroutine viscosity_filter  
 ! ===================================================================
-SUBROUTINE viscosity_filtxx
-USE o_MESH
+SUBROUTINE viscosity_filtxx(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -221,6 +242,14 @@ IMPLICIT NONE
 
 real(kind=WP) :: u1, v1, le(2), len, crosslen, vi 
 integer       :: nz, ed, el(2)
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
  ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
@@ -247,12 +276,13 @@ integer       :: nz, ed, el(2)
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-    END DO 
+    END DO
  END DO
+ end associate
 end subroutine viscosity_filtxx
 ! ===================================================================
-SUBROUTINE viscosity_filt2xx(option)
-USE o_MESH
+SUBROUTINE viscosity_filt2xx(option, mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -266,7 +296,13 @@ IMPLICIT NONE
 real(kind=WP) :: u1, v1, vi, len
 integer       :: ed, el(2), nz, option
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) :: mesh
 
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -318,8 +354,8 @@ if(option==2) then
  end do
  end if
 
- call exchange_elem(U_c)
- call exchange_elem(V_c)
+ call exchange_elem(U_c, mesh)
+ call exchange_elem(V_c, mesh)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -334,11 +370,11 @@ if(option==2) then
  END DO
      
  deallocate(V_c,U_c)
-   
+ end associate   
 end subroutine viscosity_filt2xx
 ! ===================================================================
-SUBROUTINE viscosity_filtxxx
-USE o_MESH
+SUBROUTINE viscosity_filtxxx(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -353,6 +389,14 @@ IMPLICIT NONE
 real(kind=WP) :: u1, v1, vi, len, crosslen, le(2)
 integer       :: ed, el(2), nz
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -392,8 +436,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
  end do
- call exchange_elem(U_c)
- call exchange_elem(V_c)
+ call exchange_elem(U_c, mesh)
+ call exchange_elem(V_c, mesh)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -408,12 +452,12 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
-   
+ end associate   
 end subroutine viscosity_filtxxx
 
 ! ===================================================================
 
-SUBROUTINE h_viscosity_leith
+SUBROUTINE h_viscosity_leith(mesh)
 !
 ! Coefficient of horizontal viscosity is a combination of 
 ! the Leith and modified Leith (with Div_c)
@@ -423,7 +467,7 @@ SUBROUTINE h_viscosity_leith
 ! Can only be used with the  momentum invariant 
 ! form
 !
-USE o_MESH
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -434,6 +478,12 @@ real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
 integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
 real(kind=WP), allocatable :: aux(:,:) 
+type(t_mesh), intent(in) :: mesh
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
 	!  
 	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
 	! Fill in viscosity:
@@ -486,7 +536,7 @@ real(kind=WP), allocatable :: aux(:,:)
 				aux(nz,n)=vi/dz
 			END DO
 		END DO 
-		call exchange_nod(aux)
+		call exchange_nod(aux, mesh)
 		do elem=1, myDim_elem2D
 			elnodes=elem2D_nodes(:,elem)
 			nl1=nlevels(elem)-1
@@ -498,8 +548,9 @@ real(kind=WP), allocatable :: aux(:,:)
 			END Do
 		end do
 	end do
-	call exchange_elem(Visc)  
+	call exchange_elem(Visc, mesh)  
 	deallocate(aux)
+  end associate
 END subroutine h_viscosity_leith
 ! =======================================================================
 !A collection of viscosity routines
@@ -521,8 +572,8 @@ END subroutine h_viscosity_leith
 !Important:  We do not need to call routines computing the Leith viscosity and velocity gradient.
 !This makes code faster. Do not forget this!
 ! ===================================================================
-SUBROUTINE viscosity_filt_bh
-USE o_MESH
+SUBROUTINE viscosity_filt_bh(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -538,6 +589,13 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, vi, len
 integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
 !
 !
 ed=myDim_elem2D+eDim_elem2D
@@ -568,8 +626,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
  end do
- call exchange_elem(U_c)
- call exchange_elem(V_c)
+ call exchange_elem(U_c, mesh)
+ call exchange_elem(V_c, mesh)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -584,11 +642,11 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
-   
+ end associate
 end subroutine viscosity_filt_bh
 ! ===================================================================
-SUBROUTINE viscosity_filt_bh2
-USE o_MESH
+SUBROUTINE viscosity_filt_bh2(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -604,6 +662,13 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, vi, len
 integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
 !
 !
 ed=myDim_elem2D+eDim_elem2D
@@ -627,8 +692,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
     END DO 
  END DO
  
- call exchange_elem(U_c)
- call exchange_elem(V_c)
+ call exchange_elem(U_c, mesh)
+ call exchange_elem(V_c, mesh)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -647,11 +712,11 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
-   
+ end associate   
 end subroutine viscosity_filt_bh2
 ! ===================================================================
-SUBROUTINE viscosity_filt_h
-USE o_MESH
+SUBROUTINE viscosity_filt_h(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -661,6 +726,13 @@ IMPLICIT NONE
 
 real(kind=8)  :: u1, v1, le, vi 
 integer       :: nz, ed, el(2)
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
  ! An analog of harmonic viscosity operator.  
  ! The contribution from boundary edges is neglected (free slip).
  !
@@ -682,10 +754,11 @@ integer       :: nz, ed, el(2)
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
+end associate
 end subroutine viscosity_filt_h
 ! ===================================================================
-SUBROUTINE viscosity_filt_h_backscatter
-USE o_MESH
+SUBROUTINE viscosity_filt_h_backscatter(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -696,6 +769,13 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, le, vi 
 integer       :: nz, ed, el(2), nelem(3),k, elem
 real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
+type(t_mesh), intent(in) :: mesh
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
  ! An analog of harmonic viscosity operator.
  ! Same as visc_filt_h, but with the backscatter. 
  ! Here the contribution from squared velocities is added to the viscosity.    
@@ -725,8 +805,8 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
      V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
- call exchange_elem(U_b)
- call exchange_elem(V_b)
+ call exchange_elem(U_b, mesh)
+ call exchange_elem(V_b, mesh)
  ! ===========
  ! Compute smoothed viscous term: 
  ! ===========
@@ -745,8 +825,8 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
         V_c(nz,ed)=v1/vi
     END DO
     END DO
-  call exchange_nod(U_c)
-  call exchange_nod(V_c)
+  call exchange_nod(U_c, mesh)
+  call exchange_nod(V_c, mesh)
   do ed=1, myDim_elem2D
          nelem=elem2D_nodes(:,ed)
          Do nz=1, nlevels(ed)-1
@@ -755,6 +835,7 @@ real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)
          END DO
   end do
  deallocate(V_c,U_c,V_b,U_b)
+ end associate
 end subroutine viscosity_filt_h_backscatter
 
 ! ===================================================================

@@ -1,9 +1,9 @@
 !
 !
 !===============================================================================
-subroutine write_step_info(istep,outfreq)
+subroutine write_step_info(istep,outfreq, mesh)
 	use g_config, only: dt
-	use o_MESH
+	use MOD_MESH
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
@@ -20,7 +20,12 @@ subroutine write_step_info(istep,outfreq)
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-	
+        type(t_mesh), intent(in)                                :: mesh
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff, ocean_area=>mesh%ocean_area)  	
 	if (mod(istep,outfreq)==0) then
 		
 		!_______________________________________________________________________
@@ -169,13 +174,14 @@ subroutine write_step_info(istep,outfreq)
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then
+        end associate
 end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep)
+subroutine check_blowup(istep, mesh)
 	use g_config, only: logfile_outfreq, which_ALE
-	use o_MESH
+	use MOD_MESH
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
@@ -188,6 +194,12 @@ subroutine check_blowup(istep)
 	
 	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
 	integer 		  :: el, elidx
+        type(t_mesh), intent(in) :: mesh
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+                  nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+                  coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+                  edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+                  edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
 ! ! 		if (mype==0) then 
@@ -430,9 +442,9 @@ subroutine check_blowup(istep)
 				write(*,*) '                  _____.,-#%&$@%#&#~,._____'
 				write(*,*)
 			end if
-			call blowup(istep)
+			call blowup(istep, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
 			call par_ex
 		endif 
-		
+		end associate
 end subroutine

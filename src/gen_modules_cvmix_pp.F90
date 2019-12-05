@@ -24,7 +24,7 @@ module g_cvmix_pp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use o_mesh
+    use MOD_MESH
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -72,11 +72,14 @@ module g_cvmix_pp
     !===========================================================================
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_pp
-        character(len=100) :: nmlfile
-        logical            :: nmlfile_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in) :: mesh        
+        character(len=100)       :: nmlfile
+        logical                  :: nmlfile_exist=.False.
+        integer                  :: node_size
+        associate(nl=>mesh%nl, geo_coord_nod2D=>mesh%geo_coord_nod2D)
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -160,17 +163,20 @@ module g_cvmix_pp
                                 PP_nu_b     = pp_Avbckg,      &
                                 PP_kappa_b  = pp_Kvbckg)      
         end if
+        end associate
     end subroutine init_cvmix_pp
     !
     !
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp
-        
+    subroutine calc_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in) :: mesh                
         integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-        
+        associate(nl=>mesh%nl, nlevels_nod2D=>mesh%nlevels_nod2D, elem2D_nodes=>mesh%elem2D_nodes, geo_coord_nod2D=>mesh%geo_coord_nod2D, nlevels=>mesh%nlevels)
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -315,13 +321,13 @@ module g_cvmix_pp
         
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(pp_Kv)
+        call exchange_nod(pp_Kv, mesh)
         Kv = pp_Kv
            
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(pp_Av)
+        call exchange_nod(pp_Av, mesh)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
@@ -329,6 +335,6 @@ module g_cvmix_pp
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
+        end associate
     end subroutine calc_cvmix_pp
 end module g_cvmix_pp

@@ -1,7 +1,7 @@
 module diagnostics
 
   use g_config
-  use o_mesh
+  use mod_mesh
   use g_parsup
   use g_clock
   use g_comm_auto
@@ -73,12 +73,13 @@ module diagnostics
 
 ! ==============================================================
 !rhs_diag=ssh_rhs?
-subroutine diag_solver(mode)
+subroutine diag_solver(mode, mesh)
   implicit none
   integer, intent(in)           :: mode
   integer                       :: n, is, ie
   logical, save                 :: firstcall=.true.
-
+  type(t_mesh), intent(in)      :: mesh
+  associate(ssh_stiff=>mesh%ssh_stiff)
 !=====================
 
   if (firstcall) then !allocate the stuff at the first call
@@ -92,17 +93,23 @@ subroutine diag_solver(mode)
      ie=ssh_stiff%rowptr_loc(n+1)-1
      rhs_diag(n)=sum(ssh_stiff%values(is:ie)*d_eta(ssh_stiff%colind_loc(is:ie)))
   end do
+  end associate
 end subroutine diag_solver
 ! ==============================================================
 !curt(stress_surf)
-subroutine diag_curl_stress_surf(mode)
+subroutine diag_curl_stress_surf(mode, mesh)
   implicit none
-  integer, intent(in)           :: mode
-  logical, save                 :: firstcall=.true.
-  integer         :: enodes(2), el(2), ed, n
-  real(kind=WP)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
-
+  integer, intent(in)        :: mode
+  logical, save              :: firstcall=.true.
+  integer                    :: enodes(2), el(2), ed, n
+  real(kind=WP)              :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+  type(t_mesh), intent(in)   :: mesh
 !=====================
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
   if (firstcall) then  !allocate the stuff at the first call
      allocate(curl_stress_surf(myDim_nod2D+eDim_nod2D))
@@ -133,15 +140,23 @@ subroutine diag_curl_stress_surf(mode)
   DO n=1, myDim_nod2D+eDim_nod2D
      curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
   END DO
+  end associate
 end subroutine diag_curl_stress_surf
 ! ==============================================================
 !3D curl(velocity)
-subroutine diag_curl_vel3(mode)
+subroutine diag_curl_vel3(mode, mesh)
   implicit none
-  integer, intent(in)           :: mode
-  logical, save                 :: firstcall=.true.
-  integer         :: enodes(2), el(2), ed, n, nz, nl1, nl2
-  real(kind=WP)   :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+  integer, intent(in)        :: mode
+  logical, save              :: firstcall=.true.
+  integer                    :: enodes(2), el(2), ed, n, nz, nl1, nl2
+  real(kind=WP)              :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+  type(t_mesh), intent(in)   :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
@@ -186,19 +201,26 @@ subroutine diag_curl_vel3(mode)
       DO nz=1, nlevels_nod2D(n)-1
          curl_vel3(nz,n)=curl_vel3(nz,n)/area(nz,n)
       END DO
-   END DO    
+   END DO
+   end associate
 end subroutine diag_curl_vel3
 ! ==============================================================
 !energy budget
-subroutine diag_energy(mode)
+subroutine diag_energy(mode, mesh)
   implicit none
-  integer, intent(in)           :: mode
-  logical, save                 :: firstcall=.true.
-  integer            :: n, nz, k, i, elem, nzmax, elnodes(3)
-  integer            :: iup, ilo
-  real(kind=WP)      :: ux, vx, uy, vy, tvol, rval(2)
-  real(kind=WP)      :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
+  integer, intent(in)        :: mode
+  type(t_mesh), intent(in)   :: mesh
+  logical, save              :: firstcall=.true.
+  integer                    :: n, nz, k, i, elem, nzmax, elnodes(3)
+  integer                    :: iup, ilo
+  real(kind=WP)              :: ux, vx, uy, vy, tvol, rval(2)
+  real(kind=WP)              :: geo_grad_x(3), geo_grad_y(3), geo_u(3), geo_v(3)
 
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
      allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
@@ -332,9 +354,10 @@ subroutine diag_energy(mode)
         dvdy(nz,n)=vy/tvol
      END DO
   END DO
+  end associate
 end subroutine diag_energy
 ! ==============================================================
-subroutine diag_densMOC(mode)
+subroutine diag_densMOC(mode, mesh)
   implicit none
   integer, intent(in)                 :: mode
   integer                             :: nz, snz, elem, nzmax, elnodes(3), is, ie, pos
@@ -344,6 +367,13 @@ subroutine diag_densMOC(mode)
   real(kind=WP), save, allocatable    :: dens(:), aux(:)
   real(kind=WP), save, allocatable    :: std_dens_w(:,:)
   logical, save                       :: firstcall=.true.
+  type(t_mesh), intent(in)            :: mesh
+
+  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
 !=====================
 
 
@@ -435,31 +465,33 @@ subroutine diag_densMOC(mode)
   where (std_dens_w > 0.)
         std_dens_RHOZ=std_dens_RHOZ/std_dens_w
   end where
+  end associate
 end subroutine diag_densMOC
 ! ==============================================================
-subroutine compute_diagnostics(mode)
+subroutine compute_diagnostics(mode, mesh)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
-  real(kind=WP)                 :: val  
+  real(kind=WP)                 :: val
+  type(t_mesh), intent(in)   :: mesh
   !1. solver diagnostic
-  if (ldiag_solver)      call diag_solver(mode)
+  if (ldiag_solver)      call diag_solver(mode, mesh)
   !2. compute curl(stress_surf)
-  if (lcurt_stress_surf) call diag_curl_stress_surf(mode)
+  if (lcurt_stress_surf) call diag_curl_stress_surf(mode, mesh)
   !3. compute curl(velocity)
-  if (ldiag_curl_vel3)   call diag_curl_vel3(mode)
+  if (ldiag_curl_vel3)   call diag_curl_vel3(mode, mesh)
   !4. compute energy budget
-  if (ldiag_energy)      call diag_energy(mode)
+  if (ldiag_energy)      call diag_energy(mode, mesh)
   !5. print integrated temperature 
   if (ldiag_salt3d) then
      if (mod(mstep,logfile_outfreq)==0) then
-        call integrate_nod(tr_arr(:,:,2), val)
+        call integrate_nod(tr_arr(:,:,2), val, mesh)
         if (mype==0) then
            write(*,*) 'total integral of salinity at timestep :', mstep, val
         end if
      end if
   end if
   !6. MOC in density coordinate
-  if (ldiag_dMOC)        call diag_densMOC(mode)
+  if (ldiag_dMOC)        call diag_densMOC(mode, mesh)
 
 end subroutine compute_diagnostics
 
@@ -474,16 +506,22 @@ end subroutine compute_diagnostics
 !                      in a coastal model application ...
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
-    use o_MESH, only: nlevels_nod2D
+subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     use o_arrays
     use o_PARAM, only: tracer_adv
     use g_PARSUP
     
     implicit none
-    integer, intent(in)     :: tr_num 
-    integer                 :: node, nz
-    real(kind=WP)           :: tr_sqr(nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(nl-1,myDim_nod2D+eDim_nod2D)
+    type(t_mesh), intent(in) :: mesh
+    integer, intent(in)      :: tr_num 
+    integer                  :: node, nz
+    real(kind=WP)            :: tr_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
   
     !___________________________________________________________________________
     ! square up fields for actual tracers and Adams Bashfort tracer
@@ -537,6 +575,7 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
             tr_dvd_vert(nz,node,tr_num)  = hnode(nz,node)/hnode_new(nz,node)*tr_sqr(  nz,node) - del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
+    end associate
 end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 !
 !
@@ -547,16 +586,21 @@ end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 ! see: 
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num)
-    use o_MESH, only: nlevels_nod2D
+subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     use o_arrays
     use o_PARAM, only: tracer_adv
     use g_PARSUP
     
     implicit none
-    integer, intent(in)     :: tr_num 
-    integer                 :: node, nz
-    
+    integer, intent(in)      :: tr_num 
+    integer                  :: node, nz
+    type(t_mesh), intent(in) :: mesh
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
     !___________________________________________________________________________
     ! calculate horizintal and vertical advection for squared tracer (2nd moments)
     ! see Burchard and Rennau, 2008, Comparative quantification of physically and 
@@ -608,6 +652,7 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num)
                                            - del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
+    end associate
 end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
 !
 !
@@ -620,17 +665,22 @@ end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
 !                      in a coastal model application ...
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd(tr_num)
+subroutine compute_diag_dvd(tr_num, mesh)
     use g_config, only: dt
-    use o_MESH, only: nlevels_nod2D
     use o_arrays
     use o_PARAM, only: tracer_adv
     use g_PARSUP
     
     implicit none
-    integer, intent(in)     :: tr_num 
-    integer                 :: node, nz
-    
+    integer, intent(in)      :: tr_num 
+    integer                  :: node, nz
+    type(t_mesh), intent(in) :: mesh
+
+    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
+              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
     !___________________________________________________________________________
     ! add discret second moment to DVD
     do node = 1,mydim_nod2D
@@ -657,6 +707,7 @@ subroutine compute_diag_dvd(tr_num)
                                             )/dt
         end do
     end do
+    end associate
 end subroutine compute_diag_dvd
 
 end module diagnostics
