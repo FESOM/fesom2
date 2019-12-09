@@ -69,7 +69,7 @@ subroutine pressure_bv(mesh)
             do nz=1, nl1
                 t=tr_arr(nz, node,1)
                 s=tr_arr(nz, node,2)
-                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
             enddo
             
             !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
@@ -190,25 +190,26 @@ end subroutine pressure_bv
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
-subroutine pressure_force_4_linfs
+subroutine pressure_force_4_linfs(mesh)
     use g_config
     use g_PARSUP
+    use mod_mesh
     implicit none
-    
+    type(t_mesh), intent(in) :: mesh    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell ) then
-        call pressure_force_4_linfs_fullcell
+        call pressure_force_4_linfs_fullcell(mesh)
         
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
         if     (trim(which_pgf)=='nemo') then
-            call pressure_force_4_linfs_nemo
+            call pressure_force_4_linfs_nemo(mesh)
         elseif (trim(which_pgf)=='shchepetkin') then
-            call pressure_force_4_linfs_shchepetkin
+            call pressure_force_4_linfs_shchepetkin(mesh)
         elseif (trim(which_pgf)=='cubicspline') then
-            call pressure_force_4_linfs_cubicspline    
+            call pressure_force_4_linfs_cubicspline(mesh)
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -385,7 +386,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
                 ! calculate density at element mid-depth bottom depth via 
                 ! equation of state from linear interpolated temperature and 
                 ! salinity
-                call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
+                call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
                 interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))-density_0
                 
@@ -698,16 +699,17 @@ end subroutine pressure_force_4_linfs_cubicspline
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
-subroutine pressure_force_4_zxxxx
+subroutine pressure_force_4_zxxxx(mesh)
     use g_PARSUP
     use g_config
+    use mod_mesh
     implicit none
-    
+    type(t_mesh), intent(in) :: mesh    
     !___________________________________________________________________________
     if (trim(which_pgf)=='shchepetkin') then
-        call pressure_force_4_zxxxx_shchepetkin
+        call pressure_force_4_zxxxx_shchepetkin(mesh)
     elseif (trim(which_pgf)=='cubicspline') then
-        call pressure_force_4_zxxxx_cubicspline  
+        call pressure_force_4_zxxxx_cubicspline(mesh)
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -1092,7 +1094,7 @@ IMPLICIT NONE
               edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
   !compute secant bulk modulus
 
-  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
+  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
 
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2) 
 

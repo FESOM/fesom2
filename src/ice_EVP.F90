@@ -390,8 +390,8 @@ do n=1,myDim_nod2D
 
 do shortstep=1, evp_rheol_steps 
  
-   call stress_tensor(ice_strength)
-   call stress2rhs(inv_areamass,ice_strength) 
+   call stress_tensor(ice_strength, mesh)
+   call stress2rhs(inv_areamass,ice_strength, mesh) 
  
    U_ice_old = U_ice !PS
    V_ice_old = V_ice !PS

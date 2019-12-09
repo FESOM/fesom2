@@ -678,11 +678,11 @@ use g_comm_auto
   rdt=ice_dt
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
-  call ssh2rhs
+  call ssh2rhs(mesh)
  
   do shortstep=1, steps 
-     call stress_tensor_a
-     call stress2rhs_m    ! _m=_a, so no _m version is the only one!
+     call stress_tensor_a(mesh)
+     call stress2rhs_m(mesh)    ! _m=_a, so no _m version is the only one!
      do i=1,myDim_nod2D 
          thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
          thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
@@ -710,9 +710,9 @@ use g_comm_auto
     u_ice=u_ice_aux
     v_ice=v_ice_aux
  
-  call find_alpha_field_a             ! alpha_evp_array is initialized with alpha_evp;
+  call find_alpha_field_a(mesh)             ! alpha_evp_array is initialized with alpha_evp;
                                       ! At this stage we already have non-trivial velocities. 
-  call find_beta_field_a
+  call find_beta_field_a(mesh)
   end associate
 end subroutine EVPdynamics_a
 !

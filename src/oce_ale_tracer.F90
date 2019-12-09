@@ -22,8 +22,8 @@ subroutine solve_tracers_ale(mesh)
               edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
               edge2D_in=>mesh%edge2D_in, area=>mesh%area, ssh_stiff=>mesh%ssh_stiff)  
     !___________________________________________________________________________
-    if (SPP) call cal_rejected_salt
-    if (SPP) call app_rejected_salt
+    if (SPP) call cal_rejected_salt(mesh)
+    if (SPP) call app_rejected_salt(mesh)
     
     !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
@@ -119,19 +119,19 @@ subroutine adv_tracers_ale(tr_num, mesh)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1)
+            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1, mesh)
             !                                                      |    | 
             !             fraction of fourth-order contribution <--'    |
             !                              1st tracer moment is used <--'
             
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
-            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1)
+            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1, mesh)
             !                                                 | 
             !                    1st tracer moment is used <--'
             
         case(2) !MUSCL+FCT(3D)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1)
+            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1, mesh)
             !                                                                     |    | 
             !                            fraction of fourth-order contribution <--'    | 
             !                                             1st tracer moment is used <--'
@@ -775,14 +775,14 @@ subroutine diff_tracers_ale(tr_num, mesh)
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
-    call diff_part_hor_redi ! seems to be ~9% faster than diff_part_hor
+    call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicite 
-    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
+    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-    if (Redi) call diff_ver_part_redi_expl
+    if (Redi) call diff_ver_part_redi_expl(mesh)
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -804,7 +804,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
     !___________________________________________________________________________
     if (i_vert_diff) then
         ! do vertical diffusion: implicite 
-        call diff_ver_part_impl_ale(tr_num)
+        call diff_ver_part_impl_ale(tr_num, mesh)
         
     end if
     

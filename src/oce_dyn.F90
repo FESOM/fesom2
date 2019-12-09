@@ -485,7 +485,7 @@ associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_no
           edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
           edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
 	!  
-	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
+	if(mom_adv<4) call relative_vorticity(mesh)  !!! vorticity array should be allocated
 	! Fill in viscosity:
 	DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
 									!! elem=myList_elem2D(m)

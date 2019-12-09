@@ -88,7 +88,7 @@ subroutine compute_vel_rhs(mesh)
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(1)
     elseif (mom_adv==2) then
-       call momentum_adv_scalar
+       call momentum_adv_scalar(mesh)
     end if
     t3=MPI_Wtime() 
 

@@ -2,27 +2,30 @@
 ! ice initialization + array allocation + time stepping
 !
 !==============================================================================
-subroutine ice_setup
+subroutine ice_setup(mesh)
 use o_param
 use g_parsup
 use i_param
 use i_arrays
 use g_CONFIG
+use mod_mesh
 implicit none 
+type(t_mesh), intent(in)           :: mesh
   ! ================ DO not change
   ice_dt=real(ice_ave_steps,WP)*dt
  ! ice_dt=dt
   Tevp_inv=3.0_WP/ice_dt 
   Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
-                                                      ! it always enters 
+                                                          ! it always enters
+
   ! ================
-  call ice_array_setup
-  call ice_fct_init 
+  call ice_array_setup(mesh)
+  call ice_fct_init(mesh)
   ! ================
   ! Initialization routine, user input is required 
   ! ================
   !call ice_init_fields_test
-  call ice_initial_state     ! Use it unless running test example
+  call ice_initial_state(mesh)   ! Use it unless running test example
   if(mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 ! ============================================================================
@@ -126,7 +129,7 @@ e_size=myDim_elem2D+eDim_elem2D
 end associate
 end subroutine ice_array_setup
 !==========================================================================
-subroutine ice_timestep(step)
+subroutine ice_timestep(step, mesh)
 ! 
 ! Sea ice model step
 !
@@ -134,19 +137,21 @@ use o_param
 use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
-implicit none
-integer       :: step 
-REAL(kind=WP) :: t0,t1, t2, t3
+use mod_mesh
+implicit none 
+type(t_mesh), intent(in)   :: mesh
+integer                    :: step 
+REAL(kind=WP)              :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
 if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
 SELECT CASE (whichEVP)
    CASE (0)
-      call EVPdynamics
+      call EVPdynamics(mesh)
    CASE (1)
-      call EVPdynamics_m
+      call EVPdynamics_m(mesh)
    CASE (2)
-      call EVPdynamics_a
+      call EVPdynamics_a(mesh)
    CASE DEFAULT
       if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
       call par_ex
@@ -161,22 +166,20 @@ END SELECT
 ! call cut_off
 ! new FCT routines from Sergey Danilov 08.05.2018
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
- call ice_TG_rhs_div   
+ call ice_TG_rhs_div(mesh)   
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
- call ice_fct_solve
+ call ice_fct_solve(mesh)
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
- call ice_update_for_div
+ call ice_update_for_div(mesh)
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
  call cut_off
-
  t2=MPI_Wtime()
  ! ===== Thermodynamic part
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
- call thermodynamics
+ call thermodynamics(mesh)
  t3=MPI_Wtime()
  rtime_ice = rtime_ice + (t3-t0)
  rtime_tot = rtime_tot + (t3-t0)
-
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0

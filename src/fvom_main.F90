@@ -34,7 +34,7 @@ real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
 real(kind=real32) :: runtime_alltimesteps
 
-type(t_mesh)      :: mesh
+type(t_mesh), target, save      :: mesh
 
 
 #ifndef __oifs
@@ -63,7 +63,8 @@ type(t_mesh)      :: mesh
     call setup_model          ! Read Namelists, always before clock_init
     call clock_init           ! read the clock file 
     call get_run_steps(nsteps)
-    call mesh_setup
+    call mesh_setup(mesh)
+
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
     
     !=====================
@@ -71,17 +72,17 @@ type(t_mesh)      :: mesh
     ! and additional arrays needed for 
     ! fancy advection etc.  
     !=====================
-    call check_mesh_consistency
+    call check_mesh_consistency(mesh)
     if (mype==0) t2=MPI_Wtime()
-    call ocean_setup
+    call ocean_setup(mesh)
     if (mype==0) then
        write(*,*) 'FESOM ocean_setup... complete'
        t3=MPI_Wtime()
     endif
-    call forcing_setup
+    call forcing_setup(mesh)
     if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
-        call ice_setup
+        call ice_setup(mesh)
         ice_steps_since_upd = ice_ave_steps-1
         ice_update=.true.
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
@@ -173,18 +174,18 @@ type(t_mesh)      :: mesh
         call clock
         
         !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes 
+        call compute_vel_nodes(mesh)
         
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice
+            call ocean2ice(mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
-            call update_atm_forcing(n)
+            call update_atm_forcing(n, mesh)
             
             !___compute ice step________________________________________________
             if (ice_steps_since_upd>=ice_ave_steps-1) then
@@ -195,12 +196,11 @@ type(t_mesh)      :: mesh
                 ice_steps_since_upd=ice_steps_since_upd+1
             endif
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n)
-            
+            if (ice_update) call ice_timestep(n, mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom ! momentum only
-            call oce_fluxes
+            call oce_fluxes_mom(mesh) ! momentum only
+            call oce_fluxes(mesh)
         end if  
         t2 = MPI_Wtime()
         
@@ -208,12 +208,10 @@ type(t_mesh)      :: mesh
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
         call oce_timestep_ale(n, mesh)
         t3 = MPI_Wtime()
-        
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
         call compute_diagnostics(1, mesh)
         t4 = MPI_Wtime()
-        
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, mesh)

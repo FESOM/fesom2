@@ -49,12 +49,12 @@ call tracer_gradient_elements(tr_arr_old(:,:,tr_num), mesh)
 call exchange_elem_begin(tr_xy, mesh)
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-call tracer_gradient_z(tr_arr(:,:,tr_num))
+call tracer_gradient_z(tr_arr(:,:,tr_num), mesh)
 call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
 call exchange_nod_begin(tr_z, mesh) ! not used in fill_up_dn_grad 
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
-call fill_up_dn_grad
+call fill_up_dn_grad(mesh)
 call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'

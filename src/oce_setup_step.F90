@@ -12,7 +12,7 @@ use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
 IMPLICIT NONE
-    type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) :: mesh
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -27,8 +27,7 @@ IMPLICIT NONE
         use_virt_salt=.true.
         is_nonlinfs = 0.0_WP
     end if
-    call array_setup
-    
+    call array_setup(mesh)
     !___________________________________________________________________________
     ! initialize arrays for ALE
     if (mype==0) then
@@ -36,8 +35,8 @@ IMPLICIT NONE
        write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
        write(*,*)
     end if
-    call init_ale
-    call init_stiff_mat_ale !!PS test        
+    call init_ale(mesh)
+    call init_stiff_mat_ale(mesh) !!PS test        
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
@@ -60,7 +59,7 @@ IMPLICIT NONE
             stop "!not existing mixing scheme!"
             call par_ex
     end select
-    
+
     ! initialise fesom1.4 like KPP
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         call oce_mixing_kpp_init(mesh)
@@ -80,7 +79,7 @@ IMPLICIT NONE
         call init_cvmix_tke(mesh)
         
     endif
-    
+  
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
@@ -98,17 +97,17 @@ IMPLICIT NONE
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	call fct_init
-    call muscl_adv_init !!PS test
+	call fct_init(mesh)
+    call muscl_adv_init(mesh) !!PS test
 	!=====================
 	! Initialize fields
 	! A user-defined routine has to be called here!
 	!=====================
     if(toy_ocean) then  
 #ifdef NA_TEST
-        call init_fields_na_test
+        call init_fields_na_test(mesh)
 #else
-        call initial_state_test
+        call initial_state_test(mesh)
 #endif
         !call initial_state_channel_test 
         !call initial_state_channel_narrow_test
@@ -116,9 +115,9 @@ IMPLICIT NONE
         !call init_fields_global_test
     else
 #ifdef NA_TEST
-        call init_fields_na_test
+        call init_fields_na_test(mesh)
 #else
-        call oce_initial_state   ! Use it if not running tests
+        call oce_initial_state(mesh)   ! Use it if not running tests
 #endif
     end if
 
@@ -131,7 +130,7 @@ IMPLICIT NONE
         write(*,*) ' --> call init_thickness_ale'
         write(*,*)
     end if
-    call init_thickness_ale
+    call init_thickness_ale(mesh)
     if(mype==0) write(*,*) 'Initial state'
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'

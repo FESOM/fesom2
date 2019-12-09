@@ -104,7 +104,7 @@ subroutine ice_fct_init(mesh)
   m_snowl=0.0_WP
   
   ! Fill in  the mass matrix    
-  call ice_mass_matrix_fill
+  call ice_mass_matrix_fill(mesh)
   end associate
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init

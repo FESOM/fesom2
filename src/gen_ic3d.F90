@@ -424,7 +424,7 @@ CONTAINS
 
       if (t_insitu) then
          if (mype==0) write(*,*) "converting insitu temperature to potential..."
-         call insitu2pot
+         call insitu2pot(mesh)
       end if
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    

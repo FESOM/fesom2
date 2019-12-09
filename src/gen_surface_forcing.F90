@@ -860,7 +860,6 @@ associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_no
       emp          = 0.0_WP
       qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
-
       call nc_sbc_ini(rdate, mesh)
       !==========================================================================
       ! runoff    

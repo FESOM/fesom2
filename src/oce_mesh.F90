@@ -13,14 +13,14 @@ IMPLICIT NONE
       type(t_mesh), intent(in) :: mesh
 
       call set_mesh_transform_matrix  !(rotated grid)
-      call read_mesh
+      call read_mesh(mesh)
       call set_par_support(mesh)
-      call find_levels
-      call test_tri
-      call load_edges
-      call find_neighbors
-      call mesh_areas
-      call mesh_auxiliary_arrays
+      call find_levels(mesh)
+      call test_tri(mesh)
+      call load_edges(mesh)
+      call find_neighbors(mesh)
+      call mesh_areas(mesh)
+      call mesh_auxiliary_arrays(mesh)
 END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
@@ -214,8 +214,8 @@ type(t_mesh), intent(inout) :: mesh
         end if        
         if (mapping(n)>0) then
            mesh_check=mesh_check+1
-           coord_nod2D(1,mapping(n))=x
-           coord_nod2D(2,mapping(n))=y
+           mesh%coord_nod2D(1,mapping(n))=x
+           mesh%coord_nod2D(2,mapping(n))=y
         end if
      end do
   end do
@@ -301,9 +301,9 @@ type(t_mesh), intent(inout) :: mesh
 
      do n=1, k
         if (mapping(n)>0) then
-           elem2D_nodes(1,mapping(n))=ibuff(n,1)
-           elem2D_nodes(2,mapping(n))=ibuff(n,2)
-           elem2D_nodes(3,mapping(n))=ibuff(n,3)
+           mesh%elem2D_nodes(1,mapping(n))=ibuff(n,1)
+           mesh%elem2D_nodes(2,mapping(n))=ibuff(n,2)
+           mesh%elem2D_nodes(3,mapping(n))=ibuff(n,3)
         end if
      end do
   end do
@@ -320,18 +320,18 @@ type(t_mesh), intent(inout) :: mesh
      end do
      do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
         do m=1,3
-           nn=elem2D_nodes(m, n)
+           nn=mesh%elem2D_nodes(m, n)
            ipos=(nn-1)/chunk_size
            if (ipos==nchunk) then
               iofs=nn-nchunk*chunk_size
               ! minus sign is required to avoid modified entry being modified in another chunk
               ! will be changed to plus at the end
-              elem2D_nodes(m,n)=-mapping(iofs) 
+              mesh%elem2D_nodes(m,n)=-mapping(iofs) 
            end if
         end do
      end do
   end do
-  elem2D_nodes=-elem2D_nodes
+  mesh%elem2D_nodes=-mesh%elem2D_nodes
  if (mype==0) write(*,*) 'elements are read' 
  !==============================
  ! read depth data
@@ -350,12 +350,12 @@ type(t_mesh), intent(inout) :: mesh
     stop
  end if
  allocate(mesh%zbar(nl))              ! allocate the array for storing the standard depths
- if (mype==0) read(fileID,*) zbar
- call MPI_BCast(zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
- if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+ if (mype==0) read(fileID,*) mesh%zbar
+ call MPI_BCast(mesh%zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+ if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
  allocate(mesh%Z(nl-1))
- Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
- Z=0.5_WP*Z 
+ mesh%Z=mesh%zbar(1:nl-1)+mesh%zbar(2:nl)  ! mid-depths of cells
+ mesh%Z=0.5_WP*mesh%Z 
 
  ! 0 proc reads the data in chunks and distributes it between other procs
  mesh_check=0
@@ -384,10 +384,10 @@ type(t_mesh), intent(inout) :: mesh
     do n=1, k
        x=rbuff(n,1)
        if (x>0) x=-x !deps must be negative!
-       if (x>zbar(5)) x=zbar(5) !threshold for depth
+       if (x>mesh%zbar(5)) x=mesh%zbar(5) !threshold for depth
        if (mapping(n)>0) then
           mesh_check=mesh_check+1
-          depth(mapping(n))=x
+          mesh%depth(mapping(n))=x
         end if
      end do
  end do
@@ -593,7 +593,7 @@ IMPLICIT NONE
     do n=1, k      
        if (mapping(n)>0) then
           mesh_check=mesh_check+1
-          nlevels(mapping(n))=ibuff(n)
+          mesh%nlevels(mapping(n))=ibuff(n)
        end if
     end do
  end do
@@ -635,7 +635,7 @@ IMPLICIT NONE
     do n=1, k      
        if (mapping(n)>0) then
           mesh_check=mesh_check+1
-          nlevels_nod2D(mapping(n))=ibuff(n)
+          mesh%nlevels_nod2D(mapping(n))=ibuff(n)
        end if
     end do
  end do
@@ -653,7 +653,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 
  if (mype==0) then
     write(*,*) '3D mesh was read in ', t1-t0, ' seconds'
-    write(*,*) 'Min/max depth on mype : ', mype, -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+    write(*,*) 'Min/max depth on mype : ', mype, -mesh%zbar(minval(mesh%nlevels)),-mesh%zbar(maxval(mesh%nlevels))
     write(*,*) '========================='
  endif
  end associate
@@ -802,8 +802,8 @@ chunk_size=100000
     do n=1, k      
        if (mapping(n)>0) then
           mesh_check=mesh_check+1
-          edges   (:, mapping(n))=ibuff(1:2,n)
-          edge_tri(:, mapping(n))=ibuff(3:4,n)
+          mesh%edges   (:, mapping(n))=ibuff(1:2,n)
+          mesh%edge_tri(:, mapping(n))=ibuff(3:4,n)
        end if
     end do
  end do
@@ -834,19 +834,19 @@ chunk_size=100000
      end do
      do n=1, myDim_edge2D+eDim_edge2D
         do m=1, 2
-           nn=edges(m, n)
+           nn=mesh%edges(m, n)
            ipos=(nn-1)/chunk_size
            if (ipos==nchunk) then
               mesh_check=mesh_check+1
               iofs=nn-nchunk*chunk_size
               ! minus sign is required to avoid modified entry being modified in another chunk
               ! will be changed to plus at the end
-              edges(m,n)=-mapping(iofs) 
+              mesh%edges(m,n)=-mapping(iofs) 
            end if
         end do
      end do
   end do
-  edges=-edges
+  mesh%edges=-mesh%edges
   mesh_check=mesh_check/2
   if (mesh_check/=myDim_edge2D+eDim_edge2D) then
      write(*,*) 'ERROR while transforming edge nodes to local indexing on mype=', mype
@@ -859,8 +859,8 @@ chunk_size=100000
 
 !*** Vadym pointed to the bug with bilding edge_tri
 ! if not doing so the land boundary elements will be set to 999 instead of being zeros or negative!
-  where (edge_tri<0)
-         edge_tri=0
+  where (mesh%edge_tri<0)
+         mesh%edge_tri=0
   end where
 !***
   mesh_check=0
@@ -875,19 +875,19 @@ chunk_size=100000
      end do
      do n=1, myDim_edge2D+eDim_edge2D
         do m=1, 2
-           nn=edge_tri(m, n)
+           nn=mesh%edge_tri(m, n)
            ipos=(nn-1)/chunk_size
            if (ipos==nchunk .and. nn > 0) then
               mesh_check=mesh_check+abs(m-2) !only first triangle will contribute to statistic
               iofs=nn-nchunk*chunk_size
               ! minus sign is required to avoid modified entry being modified in another chunk
               ! will be changed to plus at the end
-              edge_tri(m,n)=-mapping(iofs) 
+              mesh%edge_tri(m,n)=-mapping(iofs) 
            end if
         end do
      end do
   end do
-  edge_tri=-edge_tri
+  mesh%edge_tri=-mesh%edge_tri
   if (mesh_check/=myDim_edge2D+eDim_edge2D) then
      write(*,*) 'ERROR while transforming edge elements to local indexing on mype=', mype
      write(*,*) mesh_check, ' edges have been transformed!'
@@ -906,10 +906,10 @@ allocate(aux(myDim_elem2D))
 aux=0
 DO n=1, myDim_edge2D+eDim_edge2D
    DO k=1,2
-      q=edge_tri(k,n)   ! triangle number
+      q=mesh%edge_tri(k,n)   ! triangle number
 	  if((q>0).and.(q<=myDim_elem2D)) then
 	  aux(q)=aux(q)+1
-	  elem_edges(aux(q),q)=n
+	  mesh%elem_edges(aux(q),q)=n
 	  end if
    END DO
 END DO
@@ -917,13 +917,13 @@ deallocate(aux)
 ! The edges in this list should be ordered so that they
 ! are listed in the same rotation sense as nodes.
 DO elem=1,myDim_elem2D
-   elnodes=elem2D_nodes(:,elem)
-   eledges=elem_edges(:,elem)
+   elnodes=mesh%elem2D_nodes(:,elem)
+   eledges=mesh%elem_edges(:,elem)
    DO q=1,3
       DO k=1,3
-         if((edges(1,eledges(k)).ne.elnodes(q)).and. &
-            (edges(2,eledges(k)).ne.elnodes(q))) then
-           elem_edges(q,elem)=eledges(k)
+         if((mesh%edges(1,eledges(k)).ne.elnodes(q)).and. &
+            (mesh%edges(2,eledges(k)).ne.elnodes(q))) then
+           mesh%elem_edges(q,elem)=eledges(k)
 	   exit
          end if
       END DO
@@ -976,14 +976,14 @@ t0=MPI_Wtime()
  ! elem neighbors == those that share edges
  ! =============
    allocate(mesh%elem_neighbors(3,myDim_elem2D))
-   elem_neighbors=0
+   mesh%elem_neighbors=0
   
 DO elem=1,myDim_elem2D
    eledges=elem_edges(:,elem)
    DO j=1,3
-   elem1=edge_tri(1,eledges(j))
-   if(elem1==elem) elem1=edge_tri(2,eledges(j))
-   elem_neighbors(j,elem)=elem1
+   elem1=mesh%edge_tri(1,eledges(j))
+   if(elem1==elem) elem1=mesh%edge_tri(2,eledges(j))
+   mesh%elem_neighbors(j,elem)=elem1
    END DO
 END DO
  ! =============
@@ -994,45 +994,45 @@ END DO
  ! these neighbor elements: it is eDim_elem2D+eXDim_elem2D
  ! =============	 
  allocate(mesh%nod_in_elem2D_num(myDim_nod2D+eDim_nod2D)) 
- nod_in_elem2D_num=0
+ mesh%nod_in_elem2D_num=0
  do n=1,myDim_elem2D
     do j=1,3
-    node=elem2D_nodes(j,n)
+    node=mesh%elem2D_nodes(j,n)
     if (node>myDim_nod2D) cycle
-    nod_in_elem2D_num(node)=nod_in_elem2D_num(node)+1
+    mesh%nod_in_elem2D_num(node)=mesh%nod_in_elem2D_num(node)+1
     end do
  end do
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 
  mymax=0
  rmax=0
- mymax(mype+1)=maxval(nod_in_elem2D_num(1:myDim_nod2D))
+ mymax(mype+1)=maxval(mesh%nod_in_elem2D_num(1:myDim_nod2D))
  call MPI_AllREDUCE( mymax, rmax, &
        npes, MPI_INTEGER,MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
  allocate(mesh%nod_in_elem2D(maxval(rmax),myDim_nod2D+eDim_nod2D))
- nod_in_elem2D=0
- nod_in_elem2D_num=0
+ mesh%nod_in_elem2D=0
+ mesh%nod_in_elem2D_num=0
  do n=1,myDim_elem2D   
     do j=1,3
     node=elem2D_nodes(j,n)
     if (node>myDim_nod2D) cycle 
-    nod_in_elem2D_num(node)=nod_in_elem2D_num(node)+1
-    nod_in_elem2D(nod_in_elem2D_num(node),node)=n
+    mesh%nod_in_elem2D_num(node)=mesh%nod_in_elem2D_num(node)+1
+    mesh%nod_in_elem2D(mesh%nod_in_elem2D_num(node),node)=n
     end do
  end do
 
- call exchange_nod(nod_in_elem2D_num)
+ call exchange_nod(mesh%nod_in_elem2D_num)
  allocate (temp_i(myDim_nod2D+eDim_nod2D))
  temp_i=0
  DO n=1, maxval(rmax)
        ! Exchange global element numbers
        do j=1,myDim_nod2D
-         if (nod_in_elem2D(n,j)>0) temp_i(j)=myList_elem2D(nod_in_elem2D(n,j))
+         if (mesh%nod_in_elem2D(n,j)>0) temp_i(j)=myList_elem2D(mesh%nod_in_elem2D(n,j))
        enddo
        call exchange_nod(temp_i)
-       nod_in_elem2D(n,:)=temp_i
+       mesh%nod_in_elem2D(n,:)=temp_i
  END DO
  deallocate(temp_i)
  ! Substitute back local element numbers
@@ -1042,8 +1042,8 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     temp_i(myList_elem2D(n))=n
  END DO
  DO n=1, myDim_nod2D+eDim_nod2D     
-    DO j=1, nod_in_elem2D_num(n)
-       nod_in_elem2D(j,n)=temp_i(nod_in_elem2D(j,n))
+    DO j=1, mesh%nod_in_elem2D_num(n)
+       mesh%nod_in_elem2D(j,n)=temp_i(mesh%nod_in_elem2D(j,n))
     END DO
  END DO
  deallocate(temp_i)
@@ -1057,7 +1057,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 DO elem=1,myDim_elem2D
    elem1=0
    DO j=1,3
-   if(elem_neighbors(j,elem)>0) elem1=elem1+1
+   if(mesh%elem_neighbors(j,elem)>0) elem1=elem1+1
    END DO
    if (elem1<2) then
     write(*,*) 'Insufficient number of neighbors ', myList_elem2D(elem)
@@ -1068,18 +1068,18 @@ END DO
 
 
 #if defined (__oasis)
-    allocate(x_corners(myDim_nod2D, maxval(rmax)))
-    allocate(y_corners(myDim_nod2D, maxval(rmax)))
+    allocate(mesh%x_corners(myDim_nod2D, maxval(rmax)))
+    allocate(mesh%y_corners(myDim_nod2D, maxval(rmax)))
     DO n=1, myDim_nod2D
-       DO j=1, nod_in_elem2D_num(n)
-           elem=nod_in_elem2D(j,n)
-           call elem_center(elem, rx, ry)
+       DO j=1, mesh%nod_in_elem2D_num(n)
+           elem=mesh%nod_in_elem2D(j,n)
+           call elem_center(elem, rx, ry, mesh)
            call r2g(gx, gy, rx, ry)
-           x_corners(n, j)=gx/rad
-           y_corners(n, j)=gy/rad
+           mesh%x_corners(n, j)=gx/rad
+           mesh%y_corners(n, j)=gy/rad
        END DO
-       x_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=x_corners(n,nod_in_elem2D_num(n)) !or -999?
-       y_corners(n, nod_in_elem2D_num(n)+1:maxval(rmax))=y_corners(n,nod_in_elem2D_num(n)) !or -999?
+       mesh%x_corners(n, mesh%nod_in_elem2D_num(n)+1:maxval(rmax))=mesh%x_corners(n,mesh%nod_in_elem2D_num(n)) !or -999?
+       mesh%y_corners(n, mesh%nod_in_elem2D_num(n)+1:maxval(rmax))=mesh%y_corners(n,mesh%nod_in_elem2D_num(n)) !or -999?
        ! to get the max number of corners use size(x_corners, 2)
     END DO
 #endif
@@ -1188,20 +1188,20 @@ t0=MPI_Wtime()
     if(b(1)<-cyclic_length/2._WP) b(1)=b(1)+cyclic_length
     a(1)=a(1)*ay
     b(1)=b(1)*ay
-    elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
+    mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
  END DO
- call exchange_elem(elem_area)
+ call exchange_elem(mesh%elem_area)
  ! =============
  ! Scalar element 
  ! areas at different levels (there can be partly land)
  ! =============
  
- area=0.0_WP
+ mesh%area=0.0_WP
  DO n=1, myDim_nod2D
-    DO j=1,nod_in_elem2D_num(n)
-       elem=nod_in_elem2D(j,n)
-       DO nz=1,nlevels(elem)-1
-       area(nz,n)=area(nz,n)+elem_area(elem)/3.0_WP
+    DO j=1,mesh%nod_in_elem2D_num(n)
+       elem=mesh%nod_in_elem2D(j,n)
+       DO nz=1,mesh%nlevels(elem)-1
+       mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
        END DO
     END DO
  END DO
@@ -1211,17 +1211,17 @@ t0=MPI_Wtime()
  ! ===========
  ! Update to proper dimension
  ! ===========
- elem_area=elem_area*r_earth*r_earth
- area=area*r_earth*r_earth
+ mesh%elem_area=mesh%elem_area*r_earth*r_earth
+ mesh%area=mesh%area*r_earth*r_earth
  
- call exchange_nod(area, mesh)
+ call exchange_nod(mesh%area, mesh)
 
 do n=1,myDim_nod2d+eDim_nod2D
    do nz=1,nl
-      if (area(nz,n) > 0._WP) then
-         area_inv(nz,n) = 1._WP/area(nz,n)
+      if (mesh%area(nz,n) > 0._WP) then
+         mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
       else
-         area_inv(nz,n) = 0._WP
+         mesh%area_inv(nz,n) = 0._WP
       end if
    end do
 end do
@@ -1230,29 +1230,29 @@ end do
  
 
  allocate(work_array(myDim_nod2D))
- mesh_resolution=sqrt(area(1, :)/pi)*2._WP
+ mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
  DO q=1, 3 !apply mass matrix N times to smooth the field
     DO n=1, myDim_nod2D
        vol=0._WP
        work_array(n)=0._WP
-       DO j=1, nod_in_elem2D_num(n)
-          elem=nod_in_elem2D(j, n)
-          elnodes=elem2D_nodes(:,elem)
-          work_array(n)=work_array(n)+sum(mesh_resolution(elnodes))/3._WP*elem_area(elem)
-          vol=vol+elem_area(elem)
+       DO j=1, mesh%nod_in_elem2D_num(n)
+          elem=mesh%nod_in_elem2D(j, n)
+          elnodes=mesh%elem2D_nodes(:,elem)
+          work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
+          vol=vol+mesh%elem_area(elem)
        END DO
        work_array(n)=work_array(n)/vol
     END DO
     DO n=1,myDim_nod2D
-       mesh_resolution(n)=work_array(n)
+       mesh%mesh_resolution(n)=work_array(n)
     ENDDO
-    call exchange_nod(mesh_resolution)
+    call exchange_nod(mesh%mesh_resolution)
  END DO
  deallocate(work_array)
 
  vol=0.0_WP
  do n=1, myDim_nod2D
-    vol=vol+area(1, n)
+    vol=vol+mesh%area(1, n)
  end do
  ocean_area=0.0
  call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -1260,9 +1260,9 @@ end do
 
 if (mype==0) then
  write(*,*)  mype, 'Mesh statistics:'
- write(*,*)  mype, 'maxArea ',maxval(elem_area), '   MinArea ', minval(elem_area)
- write(*,*)  mype, 'maxScArea ',maxval(area(1,:)), &
-            '   MinScArea ', minval(area(1,:))
+ write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
+ write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
+            '   MinScArea ', minval(mesh%area(1,:))
  write(*,*)  mype, 'Edges:    ', edge2D, ' internal ', edge2D_in
  if (mype==0) then
     write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
@@ -1310,11 +1310,6 @@ real(kind=WP)              :: t0, t1
 integer                    :: i, nn, ns
 type(t_mesh), intent(inout):: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, edge2D_in=>mesh%edge2D_in)
-
 t0=MPI_Wtime()
 
  allocate(mesh%edge_dxdy(2,myDim_edge2D+eDim_edge2D))
@@ -1328,7 +1323,11 @@ t0=MPI_Wtime()
  allocate(mesh%geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
- 
+
+associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
+          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
+          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
+          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, edge2D_in=>mesh%edge2D_in)
 
  ! ============
  ! coriolis
@@ -1337,6 +1336,7 @@ t0=MPI_Wtime()
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
  coriolis_node(n)=2*omega*sin(lat)	 
  END DO
+
  DO n=1,myDim_nod2D+eDim_nod2D 
  call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
  ! in case of numerical noise at the boundaries
@@ -1346,22 +1346,22 @@ t0=MPI_Wtime()
  geo_coord_nod2D(2,n)=lat	 
  END DO
  
+
  DO n=1,myDim_elem2D 
- call elem_center(n, ax, ay)
+ call elem_center(n, ax, ay, mesh)
  call r2g(lon, lat, ax, ay)
  coriolis(n)=2*omega*sin(lat)	 
  END DO
- 
- 
+  
  if(fplane) then 
  coriolis=2*omega*0.71_WP
  end if
- 
+
  ! ============
  ! cos on elements + metric factor (tan/R_earth) 
  ! ============
  DO n=1,myDim_elem2D
- call elem_center(n, ax, ay)
+ call elem_center(n, ax, ay, mesh)
  center_x(n)=ax
  center_y(n)=ay
  elem_cos(n)=cos(ay)
@@ -1376,7 +1376,7 @@ t0=MPI_Wtime()
  elem_cos=1.0_WP
  metric_factor=0.0_WP
  end if
- 
+
  ! ===========
  ! Distances along the edge
  ! We need them in radian measure!
@@ -1401,7 +1401,7 @@ t0=MPI_Wtime()
     ! the halo ones). 
     ed=edges(:,n)
     el=edge_tri(:,n)
-    call edge_center(ed(1), ed(2), a(1), a(2))
+    call edge_center(ed(1), ed(2), a(1), a(2), mesh)
     b(1)=center_x(el(1))
     b(2)=center_y(el(1))
     b=b-a
@@ -1571,7 +1571,7 @@ DO elem=1,myDim_elem2D
         else
             ! Virtual element center is taken
             ed=edges(:,elem_edges(j,elem))
-            call edge_center(ed(1), ed(2), b(1), b(2))
+            call edge_center(ed(1), ed(2), b(1), b(2), mesh)
             x(j)=(b(1)-a(1))
             if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
             if(x(j)<-cyclic_length/2)  x(j)=x(j)+cyclic_length
@@ -1591,18 +1591,14 @@ DO elem=1,myDim_elem2D
 END DO
 deallocate(center_y, center_x)
 
-
-
-
-
     !array of 2D boundary conditions is used in ice_maEVP
     if (whichEVP > 0) then
        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
-       bc_index_nod2D=1._WP
+       mesh%bc_index_nod2D=1._WP
        do n=1, myDim_edge2D
-          ed=edges(:, n)
+          ed=mesh%edges(:, n)
           if (myList_edge2D(n)<=edge2D_in) cycle
-          bc_index_nod2D(ed)=0._WP
+          mesh%bc_index_nod2D(ed)=0._WP
        end do
     end if
 
@@ -1627,12 +1623,12 @@ deallocate(center_y, center_x)
   ns=0
   nn=0
   do i=1, myDim_nod2D
-     if (geo_coord_nod2D(2, i) > 0) then
+     if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-	ind_north(nn)=i
+	mesh%ind_north(nn)=i
      else
         ns=ns+1
-	ind_south(ns)=i	
+	mesh%ind_south(ns)=i	
      end if	     
   end do     
 #endif 

@@ -205,7 +205,7 @@ subroutine oce_fluxes(mesh)
   relax_salt=relax_salt-net/ocean_area
 
   deallocate(flux)
-  if (use_sw_pene) call cal_shortwave_rad
+  if (use_sw_pene) call cal_shortwave_rad(mesh)
   end associate
 end subroutine oce_fluxes
 !

@@ -81,8 +81,8 @@ subroutine init_ale(mesh)
     ! calculate thickness of partial bottom layer cells
     zbar_n_bot = 0.0
     zbar_e_bot = 0.0
-    call init_bottom_elem_thickness
-    call init_bottom_node_thickness
+    call init_bottom_elem_thickness(mesh)
+    call init_bottom_node_thickness(mesh)
     
     ! initialise 3d field of depth levels and mid-depth levels
     zbar_3d_n=0.0_WP
@@ -2107,7 +2107,7 @@ subroutine oce_timestep_ale(n, mesh)
         call calc_cvmix_tke(mesh)
         
     end if     
-    
+
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
     ! in a numerical model of the ocean general circulation", ocean modelling to 
@@ -2118,7 +2118,7 @@ subroutine oce_timestep_ale(n, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tidal'//achar(27)//'[0m'
         call calc_cvmix_tidal(mesh)
         
-    end if  
+    end if
     t1=MPI_Wtime()    
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
@@ -2151,7 +2151,7 @@ subroutine oce_timestep_ale(n, mesh)
     t30=MPI_Wtime() 
     call solve_ssh_ale(mesh)
     t3=MPI_Wtime() 
-    
+
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
@@ -2186,26 +2186,22 @@ subroutine oce_timestep_ale(n, mesh)
         call fer_gamma2vel(mesh)
     end if
     t6=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
     t7=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq, mesh)
@@ -2214,7 +2210,6 @@ subroutine oce_timestep_ale(n, mesh)
     ! togeather around 2.5% of model runtime
     call check_blowup(n, mesh)
     t10=MPI_Wtime()
-    
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
     rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
