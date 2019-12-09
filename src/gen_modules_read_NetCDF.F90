@@ -297,7 +297,9 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   character(300), intent(in) 	:: file
   character(15),  intent(in)    :: vari
   integer                       :: ierror           ! return error code
+
   associate(nod2D=>mesh%nod2D)
+
   if (mype==0) then
     ! open file
     status=nf_open(file, nf_nowrite, ncid)

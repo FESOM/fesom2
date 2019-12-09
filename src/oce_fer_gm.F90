@@ -20,7 +20,8 @@ subroutine fer_solve_Gamma(mesh)
 	real(kind=WP)                          :: cp(mesh%nl), tp(2,mesh%nl)
 	real(kind=WP), dimension(:,:), pointer :: tr
 
-        associate(zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, nlevels=>mesh%nlevels, nod_in_elem2D=>mesh%nod_in_elem2D, nod_in_elem2D_num=>mesh%nod_in_elem2D_num)
+#include "associate_mesh.h"
+
 	DO n=1,myDim_nod2D
 		tr=>fer_gamma(:,:,n)
 ! 		!_____________________________________________________________________
@@ -107,7 +108,8 @@ subroutine fer_gamma2vel(mesh)
    integer                                :: nz, nzmax, el, elnod(3)
    real(kind=WP)                          :: zinv
    real(kind=WP)                          :: onethird=1._WP/3._WP
-   type(t_mesh), intent(in)               :: mesh	
+   type(t_mesh), intent(in)               :: mesh
+
    associate(nlevels=>mesh%nlevels, elem2D_nodes=>mesh%elem2D_nodes)
 
    DO el=1, myDim_elem2D
@@ -142,8 +144,9 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
-    associate(nlevels=>mesh%nlevels, nlevels_nod2D=>mesh%nlevels_nod2D, elem2D_nodes=>mesh%elem2D_nodes, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, mesh_resolution=>mesh%mesh_resolution, nl=>mesh%nl)
+
+#include "associate_mesh.h"
+
 ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
 !******************************* F1(x,y) ***********************************************************
     do n=1, myDim_nod2D

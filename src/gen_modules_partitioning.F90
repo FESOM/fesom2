@@ -156,6 +156,7 @@ subroutine set_par_support(mesh)
   integer                          :: i, max_nb, nb, nini, nend, nl1, n_val
   integer, allocatable             :: blocklen(:),     displace(:)
   integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
+
   associate(nl=>mesh%nl)
 
   !

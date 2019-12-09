@@ -51,9 +51,7 @@ subroutine smooth_nod2D(arr, N, mesh)
   integer                                    :: node, elem, j, q, elnodes(3)
   real(kind=WP)                              :: vol
 
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, edges=>mesh%edges, elem_area=>mesh%elem_area)
-
+#include "associate_mesh.h"
   allocate(work_array(myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
      DO node=1, myDim_nod2D
@@ -88,9 +86,7 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
   real(kind=WP)                  :: vol(mesh%nl,myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
 
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, nlevels_nod2d=>mesh%nlevels_nod2d)
-
+#include "associate_mesh.h"
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
   
@@ -164,9 +160,7 @@ subroutine smooth_elem2D(arr, N, mesh)
     real(KIND=WP), dimension(:), intent(inout) :: arr
     integer                                    :: node, elem, j, q, elnodes(3)
     real(kind=WP)                              :: vol
-    associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, edges=>mesh%edges, elem_area=>mesh%elem_area)
-    
+#include "associate_mesh.h"    
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
         DO node=1, myDim_nod2D+eDim_nod2D
@@ -198,15 +192,13 @@ subroutine smooth_elem3D(arr, N, mesh)
   type(t_mesh), intent(in)                     :: mesh
   integer, intent(in)                          :: N
   real(KIND=WP), dimension(:,:), intent(inout) :: arr
-  integer                                      :: node, elem, nl, nz, j, q, elnodes(3)
+  integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
   real(kind=WP)                                :: vol
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, nlevels_nod2d=>mesh%nlevels_nod2d)
-  
+#include "associate_mesh.h"  
   allocate(work_array(myDim_nod2D+eDim_nod2D))
-  nl=ubound(arr,1)
+  my_nl=ubound(arr,1)
   DO q=1, N !apply mass matrix N times to smooth the field
-     DO nz=1, nl
+     DO nz=1, my_nl
         DO node=1, myDim_nod2D+eDim_nod2D
            vol=0._WP
            work_array(node)=0._WP
@@ -246,9 +238,7 @@ subroutine integrate_nod_2D(data, int2D, mesh)
 
   integer       :: row
   real(kind=WP) :: lval
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, edges=>mesh%edges, area=>mesh%area)
-
+#include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
      lval=lval+data(row)*area(1,row)
@@ -301,8 +291,7 @@ subroutine extrap_nod3D(arr, mesh)
   logical                        :: success
   real(kind=WP)                  :: loc_max, glob_max
 
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, nl=>mesh%nl, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, edges=>mesh%edges, elem_edges=>mesh%elem_edges, nlevels_nod2D=>mesh%nlevels_nod2D)
+#include "associate_mesh.h"
 
   allocate(work_array(myDim_nod2D+eDim_nod2D))
   call exchange_nod(arr, mesh)

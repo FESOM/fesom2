@@ -30,8 +30,7 @@ real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), 
 real(kind=WP)            :: bulk_up, bulk_dn
 real(kind=WP)            :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 
-associate(nod_in_elem2D_num=>mesh%nod_in_elem2D_num, nlevels_nod2d=>mesh%nlevels_nod2d, elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels, geo_coord_nod2D=>mesh%geo_coord_nod2D, &
-          nl=>mesh%nl, elem_neighbors=>mesh%elem_neighbors)
+#include "associate_mesh.h"
 	!___________________________________________________________________________
 	do node=1, myDim_nod2D+eDim_nod2D
 		!___________________________________________________________________

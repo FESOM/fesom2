@@ -72,7 +72,7 @@ MODULE io_BLOWUP
 		character(500)            :: filename
 		character(500)            :: trname, units
 		character(4)              :: cyear
-                associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
@@ -343,8 +343,8 @@ MODULE io_BLOWUP
 		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
-                type(t_mesh), intent(in)      :: mesh
-                associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D)
+        type(t_mesh), intent(in)      :: mesh
+        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D)
 		! Serial output implemented so far
 		if (mype==0) then
 			c=1
