@@ -21,12 +21,7 @@ subroutine pressure_bv(mesh)
     real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
     real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     logical                  :: flag1, flag2, mixing_kpp
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
-    
+#include "associate_mesh.h"
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
@@ -287,11 +282,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -438,11 +429,7 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -560,11 +547,7 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz 
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -745,11 +728,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(mesh)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -920,11 +899,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)       
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1086,12 +1061,8 @@ IMPLICIT NONE
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
   real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
-    type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+  type(t_mesh), intent(in)   :: mesh
+#include "associate_mesh.h"
   !compute secant bulk modulus
 
   call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
@@ -1150,11 +1121,8 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
   type(t_mesh), intent(in) :: mesh
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+
+#include "associate_mesh.h"
 
   !compute secant bulk modulus
 
@@ -1287,11 +1255,8 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
   real(kind=WP)  :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
   real(kind=WP)  :: a_over_b    
   real(kind=WP)  :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D),SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+
+#include "associate_mesh.h"
 
   do n = 1,myDim_nod2d
      do nz=1, nlevels_nod2D(n)-1
@@ -1362,11 +1327,8 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
   real(kind=WP), intent(IN)   :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D), SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
   real(kind=WP)               :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                     :: n, nz, elnodes(3),el, k, nl1
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-            coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-            edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-            edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)   
+
+#include "associate_mesh.h"
   !
   DO n=1, myDim_nod2D
         nl1 = nlevels_nod2D(n)-1
@@ -1422,11 +1384,8 @@ subroutine compute_neutral_slope(mesh)
     integer         :: n,nz,nl1,el(2),elnodes(3),enodes(2)
     real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
     type(t_mesh), intent(in) :: mesh
-    associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-              nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-              coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-              edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-              edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels) 
+
+#include "associate_mesh.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
     S_cr=1.0e-2_WP

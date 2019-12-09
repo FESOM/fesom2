@@ -8,8 +8,7 @@ type(t_mesh), intent(in)           :: mesh
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, nlevels_nod2d=>mesh%nlevels_nod2d, elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels, geo_coord_nod2D=>mesh%geo_coord_nod2D, &
-          nl=>mesh%nl, elem_neighbors=>mesh%elem_neighbors, edges=>mesh%edges)
+#include "associate_mesh.h"
 
 allocate(temp(max(nod2D, elem2D))) 
 ! =========

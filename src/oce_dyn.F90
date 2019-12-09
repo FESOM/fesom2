@@ -14,11 +14,8 @@ integer       :: elem, elnodes(3), nz, m
 real(kind=WP) :: eta(3) 
 real(kind=WP) :: Fx, Fy
 type(t_mesh), intent(in) :: mesh
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
+
+#include "associate_mesh.h"
 
  DO elem=1, myDim_elem2D
     elnodes=elem2D_nodes(:,elem)
@@ -45,11 +42,8 @@ IMPLICIT NONE
 integer            :: n, nz, k, elem
 real(kind=WP)      :: tx, ty, tvol
 type(t_mesh), intent(in) :: mesh
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
+
+#include "associate_mesh.h"
 
 DO n=1, myDim_nod2D 
    DO nz=1, nlevels_nod2D(n)-1
@@ -83,11 +77,8 @@ type(t_mesh), intent(in) :: mesh
 real(kind=WP) :: u1, v1, tau_inv, s, factor, factor1, factor2
 integer       :: ed, el(2), nz, elem
 real(kind=WP) :: UV_c(2,mesh%nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,mesh%nl-1,myDim_elem2D+eDim_elem2D)
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)
+
+#include "associate_mesh.h"
 
 ! Filter is applied twice. It should be approximately 
 ! equivalent to biharmonic operator with the coefficient
@@ -244,11 +235,7 @@ real(kind=WP) :: u1, v1, le(2), len, crosslen, vi
 integer       :: nz, ed, el(2)
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+#include "associate_mesh.h"
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -298,11 +285,8 @@ integer       :: ed, el(2), nz, option
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+#include "associate_mesh.h"
+
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -391,11 +375,7 @@ integer       :: ed, el(2), nz
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+#include "associate_mesh.h"
 
  ! Filter is applied twice. 
 ed=myDim_elem2D+eDim_elem2D
@@ -479,11 +459,9 @@ integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
 real(kind=WP), allocatable :: aux(:,:) 
 type(t_mesh), intent(in) :: mesh
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
+
+#include "associate_mesh.h"
+
 	!  
 	if(mom_adv<4) call relative_vorticity(mesh)  !!! vorticity array should be allocated
 	! Fill in viscosity:
@@ -591,12 +569,7 @@ integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)          
-!
+#include "associate_mesh.h"
 !
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -664,12 +637,7 @@ integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
-!
+#include "associate_mesh.h"
 !
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -728,11 +696,8 @@ real(kind=8)  :: u1, v1, le, vi
 integer       :: nz, ed, el(2)
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
+#include "associate_mesh.h"
+
  ! An analog of harmonic viscosity operator.  
  ! The contribution from boundary edges is neglected (free slip).
  !
@@ -771,11 +736,8 @@ integer       :: nz, ed, el(2), nelem(3),k, elem
 real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
 type(t_mesh), intent(in) :: mesh
 
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-          nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, elem_cos=>mesh%elem_cos, &
-          coord_nod2D=>mesh%coord_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, metric_factor=>mesh%metric_factor, edges=>mesh%edges, edge_dxdy=>mesh%edge_dxdy, edge_tri=>mesh%edge_tri, &
-          edge_cross_dxdy=>mesh%edge_cross_dxdy, gradient_sca=>mesh%gradient_sca, gradient_vec=>mesh%gradient_vec, elem_edges=>mesh%elem_edges, bc_index_nod2D=>mesh%bc_index_nod2D, &
-          edge2D_in=>mesh%edge2D_in, area=>mesh%area, nlevels=>mesh%nlevels)     
+#include "associate_mesh.h"
+
  ! An analog of harmonic viscosity operator.
  ! Same as visc_filt_h, but with the backscatter. 
  ! Here the contribution from squared velocities is added to the viscosity.    

@@ -263,8 +263,7 @@ subroutine integrate_nod_3D(data, int3D, mesh)
 
   integer       :: k, row
   real(kind=WP) :: lval
-  associate(elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-            nod_in_elem2D=>mesh%nod_in_elem2D, nlevels_nod2D=>mesh%nlevels_nod2D, area=>mesh%area)
+#include "associate_mesh.h"
 
   lval=0.0_WP
   do row=1, myDim_nod2D
