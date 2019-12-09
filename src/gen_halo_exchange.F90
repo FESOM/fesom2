@@ -323,7 +323,7 @@ real(real64), intent(inout) :: nod_array3D(:,:)
  
  integer  :: n, sn, rn
  integer  :: nz, nl1
- associate(nl=>mesh%nl)
+#include "associate_mesh.h"
  if (npes > 1) then
     sn=com_nod2D%sPEnum
     rn=com_nod2D%rPEnum
@@ -392,7 +392,7 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
  integer  :: n, sn, rn
  integer  :: nz, nl1, nl2
 
- associate(nl=>mesh%nl)
+#include "associate_mesh.h"
 
  if (npes > 1) then
     sn=com_nod2D%sPEnum
@@ -473,8 +473,7 @@ real(real64), intent(inout) :: nod_array3D(:,:,:)
  
  integer  :: n, sn, rn
  integer  :: nz, nl1, n_val
- associate(nl=>mesh%nl)
-
+#include "associate_mesh.h"
 if (npes>1) then
  ! nod_array3D(n_val,nl1,nod2D_size)
   nl1= ubound(nod_array3D,2)
@@ -674,7 +673,7 @@ type(t_mesh), intent(in)    :: mesh
 real(real64), intent(inout) :: elem_array3D(:,:) 
 integer  :: n, sn, rn, nl1
 
-associate(nl=>mesh%nl)
+#include "associate_mesh.h"
 
 if (npes> 1) then
 
@@ -820,7 +819,8 @@ IMPLICIT NONE
  real(real64), intent(inout) :: elem_array3D(:,:,:) 
  integer  :: n, sn, rn, n_val, nl1
 
- associate(nl=>mesh%nl)
+#include "associate_mesh.h"
+
  if (npes> 1) then
  nl1   = ubound(elem_array3D,2)
  n_val = ubound(elem_array3D,1)
@@ -1050,7 +1050,8 @@ real(real64) ::  arr3Dglobal(:,:)
 real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: node_size
 type(t_mesh), intent(in)    :: mesh
-associate(nl=>mesh%nl)
+
+#include "associate_mesh.h"
 
 node_size=myDim_nod2D+eDim_nod2D
 nl1=ubound(arr3D,1)
@@ -1166,7 +1167,8 @@ real(real64) ::  arr3Dglobal(:,:)
 real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: elem_size
 
-associate(nl=>mesh%nl)
+#include "associate_mesh.h"
+
 elem_size=myDim_elem2D+eDim_elem2D
 
 nl1=ubound(arr3D,1)
@@ -1290,7 +1292,9 @@ real(real64) ::  arr3D_global(:,:)
 real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
-associate(nl=>mesh%nl, nod2D=>mesh%nod2D)
+
+#include "associate_mesh.h"
+
 if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
@@ -1354,7 +1358,7 @@ real(real32), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
-associate(nl=>mesh%nl, nod2D=>mesh%nod2D)
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -1418,7 +1422,7 @@ integer(int16), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
-associate(nl=>mesh%nl, nod2D=>mesh%nod2D)
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -1645,7 +1649,8 @@ real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-associate(nl=>mesh%nl)
+
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -1716,7 +1721,7 @@ integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
 
-associate(nl=>mesh%nl)
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -1788,7 +1793,7 @@ integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
 
-associate(nl=>mesh%nl)
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -2035,7 +2040,9 @@ real(real32), allocatable :: recvbuf(:,:)
 real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D, ierr
-associate(nl=>mesh%nl, nod2D=>mesh%nod2D)
+
+#include "associate_mesh.h"
+
  if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -2158,7 +2165,7 @@ real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D
 
-associate(nl=>mesh%nl)
+#include "associate_mesh.h"
 
  if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)

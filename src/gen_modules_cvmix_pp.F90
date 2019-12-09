@@ -79,7 +79,7 @@ module g_cvmix_pp
         character(len=100)       :: nmlfile
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
-        associate(nl=>mesh%nl, geo_coord_nod2D=>mesh%geo_coord_nod2D)
+#include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -176,7 +176,7 @@ module g_cvmix_pp
         type(t_mesh), intent(in) :: mesh                
         integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-        associate(nl=>mesh%nl, nlevels_nod2D=>mesh%nlevels_nod2D, elem2D_nodes=>mesh%elem2D_nodes, geo_coord_nod2D=>mesh%geo_coord_nod2D, nlevels=>mesh%nlevels)
+#include "associate_mesh.h"
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size

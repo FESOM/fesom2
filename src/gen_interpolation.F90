@@ -318,20 +318,20 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   integer                       :: ind_lay_h, ind_lay_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_lay_reg
   integer, intent(in)          	:: num_mod_z,num_mod
-  real(kind=WP) 			:: x, y, z, diff 
+  real(kind=WP) 		:: x, y, z, diff 
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
-  real(kind=WP)                  :: rt_lay1, rt_lay2, v_dup, v_dlo
-  real(kind=WP)                  :: data_ll, data_lh, data_hl, data_hh
-  real(kind=WP)                  :: v_col(4), z_col(4), H, aux1, aux2
-  real(kind=WP)                  :: dz, a, b, c, d
+  real(kind=WP)                 :: rt_lay1, rt_lay2, v_dup, v_dlo
+  real(kind=WP)                 :: data_ll, data_lh, data_hl, data_hh
+  real(kind=WP)                 :: v_col(4), z_col(4), H, aux1, aux2
+  real(kind=WP)                 :: dz, a, b, c, d
   real(kind=WP), intent(in)	:: lon_reg(num_lon_reg), lat_reg(num_lat_reg)
-  real(kind=WP), intent(in)      :: lay_reg(num_lay_reg)
+  real(kind=WP), intent(in)     :: lay_reg(num_lay_reg)
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
   type(t_mesh),  intent(in)     :: mesh  
 
-  associate(nlevels_nod2D=>mesh%nlevels_nod2D)
+  associate(nlevels_nod2D=>mesh%nlevels_nod2D) !do not replace with include statement to avoid naming conflict with mesh%Z
 
   do n=1,num_mod
   do nz=1,nlevels_nod2D(n)-1

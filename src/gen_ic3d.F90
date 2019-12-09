@@ -225,7 +225,7 @@ CONTAINS
       integer                  :: elnodes(3)
       real(wp)                 :: x, y       ! coordinates of elements
       type(t_mesh), intent(in) :: mesh
-      associate(geo_coord_nod2D=>mesh%geo_coord_nod2D) 
+#include "associate_mesh.h"
       
       warn = 0
 
@@ -286,7 +286,7 @@ CONTAINS
       integer              :: ierror              ! return error code
 
       type(t_mesh), intent(in) :: mesh
-      associate(geo_coord_nod2D=>mesh%geo_coord_nod2D, nlevels_nod2D=>mesh%nlevels_nod2D) 
+#include "associate_mesh.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP

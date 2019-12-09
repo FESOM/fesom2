@@ -224,7 +224,7 @@ module g_cvmix_kpp
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
         type(t_mesh), intent(in)  :: mesh
-        associate(nl=>mesh%nl)
+#include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -353,7 +353,7 @@ module g_cvmix_kpp
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
-        associate(nlevels_nod2D=>mesh%nlevels_nod2D, geo_coord_nod2D=>mesh%geo_coord_nod2D, nl=>mesh%nl, elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels)
+#include "associate_mesh.h"
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP

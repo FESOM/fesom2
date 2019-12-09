@@ -34,8 +34,7 @@ subroutine forcing_array_setup(mesh)
   implicit none
   type(t_mesh), intent(in)   :: mesh
   integer    :: n2
-  associate(nl=>mesh%nl)
-   
+#include "associate_mesh.h"
   n2=myDim_nod2D+eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))
