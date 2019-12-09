@@ -52,8 +52,7 @@ type(t_mesh), intent(inout) :: mesh
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
  integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
 
- associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D, elem2D_nodes=>mesh%elem2D_nodes, elem_neighbors=>mesh%elem_neighbors, nod_in_elem2D_num=>mesh%nod_in_elem2D_num, &
-           nod_in_elem2D=>mesh%nod_in_elem2D, elem_area=>mesh%elem_area, depth=>mesh%depth, nl=>mesh%nl, zbar=>mesh%zbar, z=>mesh%z, nlevels_nod2D=>mesh%nlevels_nod2D, coord_nod2D=>mesh%coord_nod2D)
+#include "associate_mesh.h"
 
   !mesh related files will be read in chunks of chunk_size
   chunk_size=100000
