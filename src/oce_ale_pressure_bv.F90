@@ -1038,7 +1038,7 @@ SUBROUTINE densityJM_local(t, s, pz, rho_out, mesh)
 USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP, only: par_ex,pe_status
+use g_PARSUP !, only: par_ex,pe_status
 IMPLICIT NONE
 
   !
@@ -1070,7 +1070,7 @@ SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
 USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP, only: par_ex,pe_status
+use g_PARSUP !, only: par_ex,pe_status
 IMPLICIT NONE
 
   !

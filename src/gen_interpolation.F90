@@ -312,6 +312,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   !-------------------------------------------------------------------------------------
   use MOD_MESH
   use o_param, only: WP
+  use g_parsup
   implicit none
   integer             		:: n, i, flag,nz
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l

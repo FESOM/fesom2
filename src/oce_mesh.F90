@@ -672,16 +672,14 @@ real(kind=WP)               ::  a(2), b(2), c(2),  r
 integer                     ::  n, nx, elnodes(3)
 real(kind=WP)               :: t0, t1
 
-#include "associate_mesh.h"
-
    t0=MPI_Wtime()
    
    DO n=1, myDim_elem2D
-      elnodes=elem2D_nodes(:,n)
+      elnodes=mesh%elem2D_nodes(:,n)
 	  
-          a=coord_nod2D(:,elnodes(1))
-	  b=coord_nod2D(:,elnodes(2))-a
-	  c=coord_nod2D(:,elnodes(3))-a
+          a=mesh%coord_nod2D(:,elnodes(1))
+	  b=mesh%coord_nod2D(:,elnodes(2))-a
+	  c=mesh%coord_nod2D(:,elnodes(3))-a
           
 	  if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
           if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
@@ -697,7 +695,7 @@ real(kind=WP)               :: t0, t1
 	  nx=elnodes(2)
 	  elnodes(2)=elnodes(3)
 	  elnodes(3)=nx
-	  elem2D_nodes(:,n)=elnodes
+	  mesh%elem2D_nodes(:,n)=elnodes
       end if
    END DO
    t1=MPI_Wtime()
@@ -1097,10 +1095,8 @@ integer                     :: n1, n2   ! nodes of the edge
 real(kind=WP)               :: x, y, a(2), b(2)
 type(t_mesh), intent(inout), target :: mesh
 
-#include "associate_mesh.h"
-
-a=coord_nod2D(:,n1)
-b=coord_nod2D(:,n2)
+a=mesh%coord_nod2D(:,n1)
+b=mesh%coord_nod2D(:,n2)
 if(a(1)-b(1)>cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
 if(a(1)-b(1)<-cyclic_length/2.0_WP) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
@@ -1118,17 +1114,15 @@ real(kind=WP) :: x, y, ax(3), amin
 
 type(t_mesh), intent(inout), target :: mesh
 
-#include "associate_mesh.h"
-
-   elnodes=elem2D_nodes(:,elem)
-   ax=coord_nod2D(1, elnodes)
+   elnodes=mesh%elem2D_nodes(:,elem)
+   ax=mesh%coord_nod2D(1, elnodes)
    amin=minval(ax)
    DO k=1,3
    if(ax(k)-amin>=cyclic_length/2.0_WP) ax(k)=ax(k)-cyclic_length
    if(ax(k)-amin<-cyclic_length/2.0_WP) ax(k)=ax(k)+cyclic_length
    END DO
    x=sum(ax)/3.0_WP
-   y=sum(coord_nod2D(2,elnodes))/3.0_WP
+   y=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
 
 end subroutine elem_center
 !==========================================================================
