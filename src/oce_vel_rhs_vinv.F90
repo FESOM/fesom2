@@ -11,7 +11,7 @@ IMPLICIT NONE
 integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge
 real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
 DO n=1,myDim_nod2D
@@ -62,7 +62,6 @@ DO n=1,myDim_nod2D
 END DO      
  call exchange_nod(vorticity, mesh)
 ! Now it the relative vorticity known on neighbors too
-end associate
 end subroutine relative_vorticity
 ! ==========================================================================
 subroutine compute_vel_rhs_vinv(mesh) !vector invariant
@@ -73,7 +72,7 @@ USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 integer           :: n, n1, nz, elem, elnodes(3), nl1, j
 real(kind=WP)     :: a, b, c, da, db, dc, dg, ff(3), gg, eta(3), pre(3), Fx, Fy,w
 real(kind=WP)     :: uvert(mesh%nl,2), umean, vmean, friction
@@ -258,5 +257,4 @@ DO elem=1, myDim_elem2D                    !! P(e) elem=1, elem2D
    END DO
 END DO
 ! U_rhs contains all contributions to velocity from old time steps   
-end associate
 end subroutine compute_vel_rhs_vinv

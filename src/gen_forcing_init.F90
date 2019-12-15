@@ -8,7 +8,7 @@ use g_CONFIG
 use g_sbf, only: sbc_ini
 use mod_mesh
 implicit none
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   if (mype==0) write(*,*) '****************************************************'
   if (use_ice) then
      call forcing_array_setup(mesh)
@@ -32,7 +32,7 @@ subroutine forcing_array_setup(mesh)
   use cpl_driver, only : nrecv
 #endif   
   implicit none
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   integer    :: n2
 #include "associate_mesh.h"
   n2=myDim_nod2D+eDim_nod2D      
@@ -128,7 +128,6 @@ subroutine forcing_array_setup(mesh)
     allocate(Cd_atm_ice_arr(n2)) 
     Cd_atm_ice_arr=Cd_atm_ice   
   endif
-  end associate
   if(mype==0) write(*,*) 'forcing arrays have been set up'  
 end subroutine forcing_array_setup
 !

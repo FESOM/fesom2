@@ -84,8 +84,9 @@ subroutine ini_ocean_io(year, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh), intent(in)  :: mesh
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -145,7 +146,6 @@ subroutine ini_ocean_io(year, mesh)
   call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
   call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
   call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
-  end associate
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
@@ -161,8 +161,9 @@ subroutine ini_ice_io(year, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh), intent(in)  :: mesh
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D)
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -181,7 +182,6 @@ subroutine ini_ice_io(year, mesh)
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
 
-  end associate
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
@@ -196,7 +196,7 @@ subroutine restart(istep, l_write, l_read, mesh)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
-  type(t_mesh), intent(in)  :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
@@ -424,11 +424,13 @@ subroutine write_restart(id, istep, mesh)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
-  type(t_mesh), intent(in)      :: mesh
+  type(t_mesh), intent(in)     , target :: mesh
   real(kind=WP), allocatable    :: aux(:), laux(:)
   integer                       :: i, lev, size1, size2, shape
   integer                       :: c
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D)
+
+#include  "associate_mesh.h"
+
   ! Serial output implemented so far
   if (mype==0) then
      c=1
@@ -485,7 +487,6 @@ subroutine write_restart(id, istep, mesh)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
   call was_error(id)
-  end associate
 end subroutine write_restart
 !
 !--------------------------------------------------------------------------------------------
@@ -499,9 +500,9 @@ subroutine read_restart(id, mesh, arg)
   integer                          :: rec2read, c
   real(kind=WP)                    :: rtime !timestamp of the record
 
-  type(t_mesh), intent(in)         :: mesh
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+  type(t_mesh), intent(in)        , target :: mesh
 
+#include  "associate_mesh.h"
 
   laux=0.
   ! Serial output implemented so far
@@ -580,7 +581,6 @@ subroutine read_restart(id, mesh, arg)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
   call was_error(id)
-  end associate
 end subroutine read_restart
 !
 !--------------------------------------------------------------------------------------------

@@ -10,7 +10,7 @@ use i_arrays
 use g_CONFIG
 use mod_mesh
 implicit none 
-type(t_mesh), intent(in)           :: mesh
+type(t_mesh), intent(in)           , target :: mesh
   ! ================ DO not change
   ice_dt=real(ice_ave_steps,WP)*dt
  ! ice_dt=dt
@@ -44,10 +44,10 @@ use g_parsup
 USE g_CONFIG
 
 implicit none
-type(t_mesh), intent(in)           :: mesh
+type(t_mesh), intent(in)           , target :: mesh
 integer   :: n_size, e_size, mn, k, n, n1, n2
-associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D)
 
+#include  "associate_mesh.h"
 
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
@@ -126,7 +126,6 @@ e_size=myDim_elem2D+eDim_elem2D
   tmp_oce_heat_flux=0._WP
   tmp_ice_heat_flux=0._WP
 #endif /* (__oasis) */
-end associate
 end subroutine ice_array_setup
 !==========================================================================
 subroutine ice_timestep(step, mesh)
@@ -139,7 +138,7 @@ use g_CONFIG
 use i_PARAM, only: whichEVP
 use mod_mesh
 implicit none 
-type(t_mesh), intent(in)   :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer                    :: step 
 REAL(kind=WP)              :: t0,t1, t2, t3
 t0=MPI_Wtime()
@@ -203,12 +202,13 @@ subroutine ice_initial_state(mesh)
   USE g_CONFIG
   implicit none
   !
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
   integer                            :: i
   character*100                      :: filename
   real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
-  associate(geo_coord_nod2D=>mesh%geo_coord_nod2D)
+#include  "associate_mesh.h"
+
   m_ice =0._WP
   a_ice =0._WP
   u_ice =0._WP
@@ -231,5 +231,4 @@ subroutine ice_initial_state(mesh)
         v_ice(i) = 0.0_WP
      endif
   enddo
-  end associate
 end subroutine ice_initial_state

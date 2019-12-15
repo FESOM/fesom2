@@ -73,7 +73,7 @@ module g_cvmix_tidal
         character(len=100)       :: nmlfile
         logical                  :: file_exist=.False.
         integer                  :: node_size
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
@@ -151,7 +151,6 @@ module g_cvmix_tidal
                               max_coefficient      = tidal_max_coeff,        &
                               local_mixing_frac    = tidal_lcl_mixfrac,      &
                               depth_cutoff         = tidal_depth_cutoff)
-        end associate
     end subroutine init_cvmix_tidal
     !
     !
@@ -159,7 +158,7 @@ module g_cvmix_tidal
     !===========================================================================
     ! calculate TIDAL mixing parameterisation
     subroutine calc_cvmix_tidal(mesh)
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, node_size
         integer       :: nz, nln
         integer       :: elnodes(3)
@@ -231,6 +230,5 @@ module g_cvmix_tidal
                 Av(nz,elem) = Av(nz,elem) + sum(tidal_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        end associate
     end subroutine calc_cvmix_tidal
 end module g_cvmix_tidal

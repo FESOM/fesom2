@@ -116,7 +116,7 @@ module g_cvmix_idemix
         logical                  :: file_exist=.False.
         integer                  :: node_size
 
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
 
 #include "associate_mesh.h"     
         !_______________________________________________________________________
@@ -258,7 +258,6 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
         call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
-        end associate
     end subroutine init_cvmix_idemix
     !
     !
@@ -267,7 +266,7 @@ module g_cvmix_idemix
     ! calculate IDEMIX internal wave energy and its dissipation
     subroutine calc_cvmix_idemix(mesh)
         implicit none
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, edge, node_size
         integer       :: nz, nln, nl1, nl2, nl12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
@@ -600,6 +599,5 @@ module g_cvmix_idemix
                 end do
             end do
         end if 
-        end associate
     end subroutine calc_cvmix_idemix
 end module g_cvmix_idemix

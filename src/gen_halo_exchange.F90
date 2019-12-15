@@ -299,7 +299,7 @@ subroutine exchange_nod3D(nod_array3D, mesh)
 USE g_PARSUP
 USE MOD_MESH
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
@@ -316,7 +316,7 @@ USE g_PARSUP
 USE MOD_MESH
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
@@ -357,7 +357,6 @@ real(real64), intent(inout) :: nod_array3D(:,:)
     com_nod2D%nreq = rn+sn
 
  endif
- end associate
 END SUBROUTINE exchange_nod3D_begin
 
 ! ========================================================================
@@ -365,7 +364,7 @@ subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, mesh)
 USE MOD_MESH
 USE g_PARSUP
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod1_array3D(:,:) 
 real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
@@ -383,7 +382,7 @@ USE MOD_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod1_array3D(:,:) 
 real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
@@ -441,7 +440,6 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
     com_nod2D%nreq = 2*(rn+sn)
 
  endif
- end associate
 END SUBROUTINE exchange_nod3D_2fields_begin
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D, mesh)
@@ -449,7 +447,7 @@ USE g_PARSUP
 USE MOD_MESH
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod_array3D(:,:,:) 
  
 if (npes>1) then
@@ -466,7 +464,7 @@ USE g_PARSUP
 USE MOD_MESH
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: nod_array3D(:,:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
@@ -516,7 +514,6 @@ if (npes>1) then
   com_nod2D%nreq = rn+sn
 
  endif
- end associate
 END SUBROUTINE exchange_nod3D_n_begin
 
 !=======================================
@@ -654,7 +651,7 @@ USE g_PARSUP
 USE MOD_MESH
 IMPLICIT NONE
 
- type(t_mesh), intent(in)    :: mesh
+ type(t_mesh), intent(in)   , target :: mesh
  real(real64), intent(inout) :: elem_array3D(:,:) 
 
  call exchange_elem3D_begin(elem_array3D, mesh)
@@ -669,7 +666,7 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(real64), intent(inout) :: elem_array3D(:,:) 
 integer  :: n, sn, rn, nl1
 
@@ -787,7 +784,6 @@ if (npes> 1) then
    endif
 
 endif
-end associate
 END SUBROUTINE exchange_elem3D_begin
 
 !=============================================================================
@@ -798,7 +794,7 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
- type(t_mesh), intent(in)    :: mesh 
+ type(t_mesh), intent(in)   , target :: mesh 
  real(real64), intent(inout) :: elem_array3D(:,:,:) 
 
  if (npes> 1) then
@@ -815,7 +811,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
 
- type(t_mesh), intent(in)    :: mesh 
+ type(t_mesh), intent(in)   , target :: mesh 
  real(real64), intent(inout) :: elem_array3D(:,:,:) 
  integer  :: n, sn, rn, n_val, nl1
 
@@ -891,7 +887,6 @@ IMPLICIT NONE
 
   end if
 endif
-end associate
 END SUBROUTINE exchange_elem3D_n_begin
 !========================================================================
 subroutine exchange_elem2D(elem_array2D)
@@ -1049,7 +1044,7 @@ real(real64) ::  arr3D(:,:)
 real(real64) ::  arr3Dglobal(:,:)
 real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: node_size
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1099,7 +1094,6 @@ ELSE
     DEALLOCATE(recvbuf)
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-end associate
 end subroutine broadcast_nod3D
 !
 !============================================================================
@@ -1158,7 +1152,7 @@ use g_PARSUP
 USE MOD_MESH
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
@@ -1216,7 +1210,6 @@ ELSE
     DEALLOCATE(recvbuf)
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-end associate
 end subroutine broadcast_elem3D
 !
 !============================================================================
@@ -1282,7 +1275,7 @@ USE MOD_MESH
 
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 
 INTEGER      :: nl1
 integer      :: n
@@ -1332,7 +1325,6 @@ ELSE
    
 ENDIF
 end if
-end associate
 end subroutine gather_nod3D
 !
 !============================================================================
@@ -1348,7 +1340,7 @@ USE MOD_MESH
 
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 
@@ -1397,7 +1389,6 @@ ELSE
    
 ENDIF
 end if
-end associate
 end subroutine gather_real4_nod3D
 !=======================================================
 
@@ -1412,7 +1403,7 @@ USE MOD_MESH
 
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 
@@ -1461,7 +1452,6 @@ ELSE
    
 ENDIF
 end if
-end associate
 end subroutine gather_int2_nod3D
 !==============================================
 subroutine gather_nod2D(arr2D, arr2D_global, mesh)
@@ -1472,7 +1462,7 @@ use g_PARSUP
 use MOD_MESH
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer      :: n
 real(real64) ::  arr2D(:)
 real(real64) ::  arr2D_global(:)
@@ -1527,7 +1517,7 @@ USE MOD_MESH
 
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer      :: n
 real(real32)  ::  arr2D(:)
 real(real32)  ::  arr2D_global(:)
@@ -1582,7 +1572,7 @@ use g_PARSUP
 USE MOD_MESH
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer      :: n
 integer(int16) ::  arr2D(:)
 integer(int16) ::  arr2D_global(:)
@@ -1640,7 +1630,7 @@ USE MOD_MESH
 
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 real(real64) ::  arr3D(:,:)
@@ -1693,7 +1683,6 @@ ELSE
    
 ENDIF
 endif
-end associate
 end subroutine gather_elem3D
 
 !===================================================================
@@ -1710,7 +1699,7 @@ USE MOD_MESH
 
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER        :: nl1
 integer        :: n
 
@@ -1764,7 +1753,6 @@ ELSE
    
 ENDIF
 endif
-end associate
 end subroutine gather_real4_elem3D
 
 
@@ -1782,7 +1770,7 @@ USE MOD_MESH
 
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 
@@ -1836,7 +1824,6 @@ ELSE
    
 ENDIF
 endif
-end associate
 end subroutine gather_int2_elem3D
 
 
@@ -2030,7 +2017,7 @@ USE MOD_MESH
 
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 
@@ -2085,7 +2072,6 @@ ELSE
 ENDIF
 
 end if
-end associate
 end subroutine gather_real8to4_nod3D
 !==============================================
 subroutine gather_real8to4_nod2D(arr2D, arr2D_global, mesh)
@@ -2097,7 +2083,7 @@ use MOD_MESH
 
 IMPLICIT NONE
 
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer      :: n
 real(real64)  ::  arr2D(:)
 real(real32)   ::  arr2D_global(:)
@@ -2154,7 +2140,7 @@ USE MOD_MESH
 
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 INTEGER      :: nl1
 integer      :: n
 
@@ -2206,7 +2192,6 @@ ELSE
 ENDIF
 
 end if
-end associate
 end subroutine gather_real8to4_elem3D
 !==============================================
 subroutine gather_real8to4_elem2D(arr2D, arr2D_global)
@@ -2310,7 +2295,7 @@ use g_PARSUP
 USE MOD_MESH
 
 IMPLICIT NONE
-type(t_mesh), intent(in)    :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 integer  :: n
 integer  :: arr2D(:)
 integer  :: arr2D_global(:)

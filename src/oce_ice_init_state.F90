@@ -15,7 +15,7 @@ subroutine initial_state_test(mesh)
   integer                            :: elevation, strat, wind, cooling, tperturb
   real(kind=WP)                      :: lon, lat, a, dst  
   real(kind=WP)                      :: minlat,maxlat,tt,rwidth 
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
  
@@ -112,7 +112,6 @@ Tsurf=tr_arr(1,:,1)
 
   ! Fix for too low salinity
   where (tr_arr(:,:,2)<20.4) tr_arr(:,:,2)=20.4
-  end associate
 end subroutine initial_state_test
 ! ====================================================================
 
@@ -127,7 +126,7 @@ subroutine initial_state_channel_test(mesh)
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -235,7 +234,6 @@ subroutine initial_state_channel_test(mesh)
 	!end if
      end do
   end do 
-  end associate
 end subroutine initial_state_channel_test
 ! ====================================================================
 subroutine initial_state_channel_narrow_test(mesh)
@@ -249,7 +247,7 @@ subroutine initial_state_channel_narrow_test(mesh)
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -357,7 +355,6 @@ return
         tr_arr(nz,n,1)=tr_arr(nz,n,1)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
      end do
   end do 
-  end associate
 end subroutine initial_state_channel_narrow_test
 ! ================================================================ 
 subroutine init_fields_na_test(mesh)
@@ -371,7 +368,7 @@ subroutine init_fields_na_test(mesh)
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat,lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -464,7 +461,6 @@ subroutine init_fields_na_test(mesh)
   where (tr_arr(:,:,2)<20.4)
      tr_arr(:,:,2)=20.4
   end where
-  end associate
 end subroutine init_fields_na_test  
 ! ================================================================  
 subroutine init_fields_global_test(mesh)
@@ -478,7 +474,7 @@ subroutine init_fields_global_test(mesh)
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat, lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -554,7 +550,6 @@ subroutine init_fields_global_test(mesh)
      END DO
      end if
   end do
-  end associate
 end subroutine init_fields_global_test
 ! ================================================================ 
 ! ====================================================================
@@ -569,7 +564,7 @@ subroutine initial_state_channel_dima_test(mesh)
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -631,7 +626,6 @@ subroutine initial_state_channel_dima_test(mesh)
      if(lat>43.5*rad) relax2clim(n)=clim_relax*(1.0-(45*rad-lat)/(1.5*rad))
      if(lat<31.5*rad) relax2clim(n)=clim_relax*(1.0+(30*rad-lat)/(1.5*rad))
   END DO
-  end associate
 end subroutine initial_state_channel_dima_test
 ! ====================================================================
 subroutine ice_init_fields_test(mesh)
@@ -651,7 +645,7 @@ use g_comm_auto
 IMPLICIT NONE
 real(kind=WP)              :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
 integer                    :: n, elnodes(3)   
-type(t_mesh), intent(in)   :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -694,7 +688,6 @@ type(t_mesh), intent(in)   :: mesh
                     (coord_nod2d(1,n)-xmin)**2/Lx -&
 		    (coord_nod2d(1,n)-xmin))
    END DO
-   end associate
 end subroutine ice_init_fields_test
 ! =============================================================================
 Subroutine ice_update_forcing_test(step, mesh)
@@ -712,7 +705,7 @@ USE g_CONFIG
 IMPLICIT NONE
 real(kind=WP)             :: xmin, xm, ym, ymin, Lx, Ly, td, cdwin
 integer                   :: step, n, elnodes(3)    
-type(t_mesh), intent(in)  :: mesh
+type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -737,7 +730,6 @@ type(t_mesh), intent(in)  :: mesh
    
    stress_atmice_x = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*u_wind
    stress_atmice_y = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*v_wind
-   end associate
 end subroutine ice_update_forcing_test
 !
 !==============================================================================
@@ -753,7 +745,7 @@ subroutine ini_global_ocean(mesh)
   implicit none
   integer                            :: n, nz
   real(kind=WP)                      :: minlat,maxlat, lon, lat, val
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -781,7 +773,6 @@ subroutine ini_global_ocean(mesh)
         tr_arr(nz,n,1)=tr_arr(nz,n,1)-(lat-minlat)/(maxlat-minlat)*2.0_WP
      END DO
   END DO
-  end associate
 end subroutine ini_global_ocean
 ! ====================================================================
 !

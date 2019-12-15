@@ -21,7 +21,7 @@ subroutine ice_TG_rhs(mesh)
   implicit none 
   real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer         :: n, q, row, elem, elnodes(3)
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -66,7 +66,6 @@ subroutine ice_TG_rhs(mesh)
 		rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
 	     END DO
 	  end do
-     end associate
 end subroutine ice_TG_rhs   
 !
 !----------------------------------------------------------------------------
@@ -78,7 +77,7 @@ subroutine ice_fct_init(mesh)
   use g_PARSUP
   implicit none
   integer   :: n_size
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -97,7 +96,6 @@ subroutine ice_fct_init(mesh)
   
   ! Fill in  the mass matrix    
   call ice_mass_matrix_fill(mesh)
-  end associate
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init
 !
@@ -106,7 +104,7 @@ end subroutine ice_fct_init
 subroutine ice_fct_solve(mesh)
   use MOD_MESH
   implicit none
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
   ! Driving routine
   call ice_solve_high_order(mesh)   ! uses arrays of low-order solutions as temp
                               ! storage. It should preceed the call of low
@@ -142,7 +140,7 @@ subroutine ice_solve_low_order(mesh)
   implicit none
   integer       :: row, clo, clo2, cn, location(100)
   real(kind=WP) :: gamma
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -167,7 +165,6 @@ subroutine ice_solve_low_order(mesh)
      call exchange_nod(m_icel,a_icel,m_snowl)
 
         ! Low-order solution must be known to neighbours
- end associate
 end subroutine ice_solve_low_order     
 !
 !----------------------------------------------------------------------------
@@ -185,7 +182,7 @@ subroutine ice_solve_high_order(mesh)
   integer                              :: n,i,clo,clo2,cn,location(100),row
   real(kind=WP)                        :: rhs_new
   integer                              :: num_iter_solve=3
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
   ! Does Taylor-Galerkin solution
@@ -220,7 +217,6 @@ subroutine ice_solve_high_order(mesh)
      call exchange_nod(dm_ice, da_ice, dm_snow)
 
   end do
-  end associate
 end subroutine ice_solve_high_order
 !
 !----------------------------------------------------------------------------
@@ -247,7 +243,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
   integer   :: icoef(3,3),n,q, elem,elnodes(3),row
   real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
   real(kind=WP)   :: vol, flux, ae, gamma
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
   
@@ -441,7 +437,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         call exchange_nod(m_ice, a_ice, m_snow)
 
 	deallocate(tmin, tmax)
-        end associate
 end subroutine ice_fem_fct
 !
 !=======================================================================
@@ -460,7 +455,7 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
   integer, allocatable                :: col_pos(:)
   real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
   !
@@ -509,7 +504,6 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
     write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
    endif
   deallocate(col_pos)
-  end associate
 END SUBROUTINE ice_mass_matrix_fill
 !
 !=========================================================
@@ -525,7 +519,7 @@ subroutine ice_TG_rhs_div(mesh)
   real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer                  :: n, q, row, elem, elnodes(3)
   real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -580,7 +574,6 @@ subroutine ice_TG_rhs_div(mesh)
 
      END DO
   end do
-  end associate
 end subroutine ice_TG_rhs_div 
 !
 !=========================================================
@@ -599,7 +592,7 @@ subroutine ice_update_for_div(mesh)
   integer                                 :: n,i,clo,clo2,cn,location(100),row
   real(kind=WP)                           :: rhs_new
   integer                                 :: num_iter_solve=3
-  type(t_mesh), intent(in)                :: mesh
+  type(t_mesh), intent(in)                , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -643,6 +636,5 @@ subroutine ice_update_for_div(mesh)
   m_ice=m_ice+dm_ice
   a_ice=a_ice+da_ice
   m_snow=m_snow+dm_snow
-  end associate
 end subroutine ice_update_for_div
 ! =============================================================

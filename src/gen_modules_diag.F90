@@ -78,7 +78,7 @@ subroutine diag_solver(mode, mesh)
   integer, intent(in)           :: mode
   integer                       :: n, is, ie
   logical, save                 :: firstcall=.true.
-  type(t_mesh), intent(in)      :: mesh
+  type(t_mesh), intent(in)     , target :: mesh
 #include "associate_mesh.h"
 !=====================
 
@@ -93,7 +93,6 @@ subroutine diag_solver(mode, mesh)
      ie=ssh_stiff%rowptr_loc(n+1)-1
      rhs_diag(n)=sum(ssh_stiff%values(is:ie)*d_eta(ssh_stiff%colind_loc(is:ie)))
   end do
-  end associate
 end subroutine diag_solver
 ! ==============================================================
 !curt(stress_surf)
@@ -103,7 +102,7 @@ subroutine diag_curl_stress_surf(mode, mesh)
   logical, save              :: firstcall=.true.
   integer                    :: enodes(2), el(2), ed, n
   real(kind=WP)              :: deltaX1, deltaY1, deltaX2, deltaY2, c1
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
 !=====================
 #include "associate_mesh.h"
 
@@ -136,7 +135,6 @@ subroutine diag_curl_stress_surf(mode, mesh)
   DO n=1, myDim_nod2D+eDim_nod2D
      curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
   END DO
-  end associate
 end subroutine diag_curl_stress_surf
 ! ==============================================================
 !3D curl(velocity)
@@ -146,7 +144,7 @@ subroutine diag_curl_vel3(mode, mesh)
   logical, save              :: firstcall=.true.
   integer                    :: enodes(2), el(2), ed, n, nz, nl1, nl2
   real(kind=WP)              :: deltaX1, deltaY1, deltaX2, deltaY2, c1
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -194,14 +192,13 @@ subroutine diag_curl_vel3(mode, mesh)
          curl_vel3(nz,n)=curl_vel3(nz,n)/area(nz,n)
       END DO
    END DO
-   end associate
 end subroutine diag_curl_vel3
 ! ==============================================================
 !energy budget
 subroutine diag_energy(mode, mesh)
   implicit none
   integer, intent(in)        :: mode
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   logical, save              :: firstcall=.true.
   integer                    :: n, nz, k, i, elem, nzmax, elnodes(3)
   integer                    :: iup, ilo
@@ -342,7 +339,6 @@ subroutine diag_energy(mode, mesh)
         dvdy(nz,n)=vy/tvol
      END DO
   END DO
-  end associate
 end subroutine diag_energy
 ! ==============================================================
 subroutine diag_densMOC(mode, mesh)
@@ -355,7 +351,7 @@ subroutine diag_densMOC(mode, mesh)
   real(kind=WP), save, allocatable    :: dens(:), aux(:)
   real(kind=WP), save, allocatable    :: std_dens_w(:,:)
   logical, save                       :: firstcall=.true.
-  type(t_mesh), intent(in)            :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
 
 #include "associate_mesh.h"
 !=====================
@@ -449,14 +445,13 @@ subroutine diag_densMOC(mode, mesh)
   where (std_dens_w > 0.)
         std_dens_RHOZ=std_dens_RHOZ/std_dens_w
   end where
-  end associate
 end subroutine diag_densMOC
 ! ==============================================================
 subroutine compute_diagnostics(mode, mesh)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                 :: val
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   !1. solver diagnostic
   if (ldiag_solver)      call diag_solver(mode, mesh)
   !2. compute curl(stress_surf)
@@ -496,7 +491,7 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     use g_PARSUP
     
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in), target :: mesh
     integer, intent(in)      :: tr_num 
     integer                  :: node, nz
     real(kind=WP)            :: tr_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
@@ -555,7 +550,6 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
             tr_dvd_vert(nz,node,tr_num)  = hnode(nz,node)/hnode_new(nz,node)*tr_sqr(  nz,node) - del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
-    end associate
 end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 !
 !
@@ -574,7 +568,7 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     implicit none
     integer, intent(in)      :: tr_num 
     integer                  :: node, nz
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in), target :: mesh
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -628,7 +622,6 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
                                            - del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
-    end associate
 end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
 !
 !
@@ -650,7 +643,7 @@ subroutine compute_diag_dvd(tr_num, mesh)
     implicit none
     integer, intent(in)      :: tr_num 
     integer                  :: node, nz
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in), target :: mesh
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -679,7 +672,6 @@ subroutine compute_diag_dvd(tr_num, mesh)
                                             )/dt
         end do
     end do
-    end associate
 end subroutine compute_diag_dvd
 
 end module diagnostics

@@ -34,7 +34,7 @@ USE g_PARSUP
 USE g_rotate_grid 
 IMPLICIT NONE
 
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 
  integer        :: n, nn, k, m, fileID
  integer        :: error_status !0/1=no error/error
@@ -52,7 +52,8 @@ type(t_mesh), intent(inout) :: mesh
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
  integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
 
-#include "associate_mesh.h"
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 
   !mesh related files will be read in chunks of chunk_size
   chunk_size=100000
@@ -138,14 +139,14 @@ type(t_mesh), intent(inout) :: mesh
   ! read 2d node data
   !==============================
   ! read the nod2D from nod2d.out and check whether it is equal to part(npes+1)-1
-  nod2D=part(npes+1)-1
+  mesh%nod2D=part(npes+1)-1
   allocate(mesh%coord_nod2D(2,myDim_nod2D+eDim_nod2D))
   if (mype==0) then
     file_name=trim(meshpath)//'nod2d.out'
     open(fileID, file=file_name)
     read(fileID,*) n      ! nod2D, we know it already
      error_status=0
-     if (n/=nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
+     if (n/=mesh%nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
     write(*,*) 'reading '// trim(file_name)   
   end if
   ! check the error status
@@ -166,7 +167,7 @@ type(t_mesh), intent(inout) :: mesh
   yp = yp/rad
   flag_checkisrot=0
   flag_checkmustrot=1
-  do nchunk=0, (nod2D-1)/chunk_size
+  do nchunk=0, (mesh%nod2D-1)/chunk_size
      !create the mapping for the current chunk
      mapping(1:chunk_size)=0
      do n=1, myDim_nod2D+eDim_nod2D
@@ -177,7 +178,7 @@ type(t_mesh), intent(inout) :: mesh
         end if
      end do
      !read the chunk into the buffers
-     k=min(chunk_size, nod2D-nchunk*chunk_size)
+     k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
      if (mype==0) then
         do n=1, k
            read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
@@ -270,14 +271,14 @@ type(t_mesh), intent(inout) :: mesh
   if (mype==0)  then 
      file_name=trim(meshpath)//'elem2d.out'
      open(fileID, file=file_name)
-     read(fileID,*) elem2d
+     read(fileID,*) mesh%elem2d
      write(*,*) 'reading '// trim(file_name)   
   end if
-  call MPI_BCast(elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(mesh%elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   allocate(mesh%elem2D_nodes(3, myDim_elem2D+eDim_elem2D+eXDim_elem2D))
 
   ! 0 proc reads the data in chunks and distributes it between other procs
-  do nchunk=0, (elem2D-1)/chunk_size
+  do nchunk=0, (mesh%elem2D-1)/chunk_size
      mapping(1:chunk_size)=0
      do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
         ipos=(myList_elem2D(n)-1)/chunk_size
@@ -287,7 +288,7 @@ type(t_mesh), intent(inout) :: mesh
         end if
      end do
 
-     k=min(chunk_size, elem2D-nchunk*chunk_size)
+     k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
      if (mype==0) then
         do n=1, k
            read(fileID,*) ibuff(n,1), ibuff(n,2), ibuff(n,3)
@@ -308,7 +309,7 @@ type(t_mesh), intent(inout) :: mesh
   end do
   if (mype==0) close(fileID)
   ! nodes in elem2d are in global numbering. convert to local:
-  do nchunk=0, (nod2D-1)/chunk_size
+  do nchunk=0, (mesh%nod2D-1)/chunk_size
      mapping(1:chunk_size)=0
      do n=1, myDim_nod2D+eDim_nod2D
         ipos=(myList_nod2D(n)-1)/chunk_size
@@ -340,25 +341,25 @@ type(t_mesh), intent(inout) :: mesh
  if (mype==0) then !open the file for reading on 0 proc
     file_name=trim(meshpath)//'aux3d.out' 
     open(fileID, file=file_name)
-    read(fileID,*) nl  ! the number of levels 
+    read(fileID,*) mesh%nl  ! the number of levels 
  end if
- call MPI_BCast(nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
- if (nl < 3) then
+ call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+ if (mesh%nl < 3) then
     write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
     call par_ex
     stop
  end if
- allocate(mesh%zbar(nl))              ! allocate the array for storing the standard depths
+ allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
  if (mype==0) read(fileID,*) mesh%zbar
- call MPI_BCast(mesh%zbar, nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+ call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
  if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
- allocate(mesh%Z(nl-1))
- mesh%Z=mesh%zbar(1:nl-1)+mesh%zbar(2:nl)  ! mid-depths of cells
+ allocate(mesh%Z(mesh%nl-1))
+ mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
  mesh%Z=0.5_WP*mesh%Z 
 
  ! 0 proc reads the data in chunks and distributes it between other procs
  mesh_check=0
- do nchunk=0, (nod2D-1)/chunk_size
+ do nchunk=0, (mesh%nod2D-1)/chunk_size
     mapping(1:chunk_size)=0
     do n=1, myDim_nod2D+eDim_nod2D
        ipos=(myList_nod2D(n)-1)/chunk_size
@@ -368,7 +369,7 @@ type(t_mesh), intent(inout) :: mesh
        end if
     end do
 
-    k=min(chunk_size, nod2D-nchunk*chunk_size)
+    k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
           read(fileID,*) rbuff(n,1)
@@ -523,10 +524,10 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  if (mype==0) then
     write(*,*) '========================='
     write(*,*) '2D mesh was read in ', t1-t0, ' seconds'
-    write(*,*) '2D mesh info : ', 'nod2D=', nod2D,' elem2D=', elem2D
+    write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D
     write(*,*) '========================='
  endif
- end associate
+
  END subroutine  read_mesh
 !============================================================ 
 subroutine find_levels(mesh)
@@ -537,7 +538,7 @@ USE g_config
 !
 IMPLICIT NONE
 !
- type(t_mesh), intent(inout)            :: mesh
+ type(t_mesh), intent(inout), target    :: mesh
  character*1000                         :: file_name
  integer                                :: ierror   ! MPI return error code
  integer                                :: k, n, fileID
@@ -546,7 +547,8 @@ IMPLICIT NONE
  integer, allocatable, dimension(:)     :: ibuff
  real(kind=WP)                          :: t0, t1
 
-#include "associate_mesh.h"
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 
  t0=MPI_Wtime()
  allocate(mesh%nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
@@ -569,7 +571,7 @@ IMPLICIT NONE
  end if
  ! 0 proc reads the data in chunks and distributes it between other procs
  mesh_check=0
- do nchunk=0, (elem2D-1)/chunk_size
+ do nchunk=0, (mesh%elem2D-1)/chunk_size
     !create the mapping for the current chunk
     mapping(1:chunk_size)=0
     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
@@ -580,7 +582,7 @@ IMPLICIT NONE
        end if
     end do
     !read the chunk into the buffers
-    k=min(chunk_size, elem2D-nchunk*chunk_size)
+    k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
           read(fileID,*) ibuff(n)
@@ -611,7 +613,7 @@ IMPLICIT NONE
  end if
  ! 0 proc reads the data in chunks and distributes it between other procs
  mesh_check=0
- do nchunk=0, (nod2D-1)/chunk_size
+ do nchunk=0, (mesh%nod2D-1)/chunk_size
     !create the mapping for the current chunk
     mapping(1:chunk_size)=0
     do n=1, myDim_nod2D+eDim_nod2D
@@ -622,7 +624,7 @@ IMPLICIT NONE
        end if
     end do
     !read the chunk into the buffers
-    k=min(chunk_size, nod2D-nchunk*chunk_size)
+    k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
           read(fileID,*) ibuff(n)
@@ -654,7 +656,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     write(*,*) 'Min/max depth on mype : ', mype, -mesh%zbar(minval(mesh%nlevels)),-mesh%zbar(maxval(mesh%nlevels))
     write(*,*) '========================='
  endif
- end associate
+
 END SUBROUTINE find_levels
 !===========================================================================
 SUBROUTINE test_tri(mesh)
@@ -665,7 +667,7 @@ USE g_CONFIG
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 real(kind=WP)               ::  a(2), b(2), c(2),  r
 integer                     ::  n, nx, elnodes(3)
 real(kind=WP)               :: t0, t1
@@ -703,7 +705,7 @@ real(kind=WP)               :: t0, t1
       write(*,*) 'test_tri finished in ', t1-t0, ' seconds'
       write(*,*) '========================='
    endif
-   end associate
+
 END SUBROUTINE  test_tri
 !=========================================================================
 SUBROUTINE load_edges(mesh)
@@ -712,7 +714,7 @@ USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-type(t_mesh), intent(inout)           :: mesh
+type(t_mesh), intent(inout), target   :: mesh
 character*1000                        :: file_name
 integer                               :: counter, n, m, nn, k, q, fileID
 integer                               :: elems(2), elem
@@ -724,7 +726,8 @@ integer, allocatable, dimension(:)    :: mapping
 integer, allocatable, dimension(:,:)  :: ibuff
 integer                               :: ierror              ! return error code
 
-#include "associate_mesh.h"
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 
 t0=MPI_Wtime()
 
@@ -746,13 +749,13 @@ chunk_size=100000
     file_name=trim(meshpath)//'edgenum.out'
     write(*,*) 'reading '// trim(file_name)
     open(fileID, file=trim(file_name))
-    read(fileID,*) edge2D
-    read(fileID,*) edge2D_in
-    write(*,*) '2D mesh info : edge2D=', edge2D
+    read(fileID,*) mesh%edge2D
+    read(fileID,*) mesh%edge2D_in
+    write(*,*) '2D mesh info : edge2D=', mesh%edge2D
     close(fileID)
   end if
-  call MPI_BCast(edge2D,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(edge2D_in, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(mesh%edge2D,    1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(mesh%edge2D_in, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
   allocate(mesh%edges(2,myDim_edge2D+eDim_edge2D))
   allocate(mesh%edge_tri(2,myDim_edge2D+eDim_edge2D))
@@ -769,7 +772,7 @@ chunk_size=100000
   end if
 
  mesh_check=0
- do nchunk=0, (edge2D-1)/chunk_size
+ do nchunk=0, (mesh%edge2D-1)/chunk_size
     !create the mapping for the current chunk
     mapping(1:chunk_size)=0
     do n=1, myDim_edge2D+eDim_edge2D
@@ -780,7 +783,7 @@ chunk_size=100000
        end if
     end do
     !read the chunk into the buffers
-    k=min(chunk_size, edge2D-nchunk*chunk_size)
+    k=min(chunk_size, mesh%edge2D-nchunk*chunk_size)
     if (mype==0) then
        do n=1, k
           read(fileID  ,*) ibuff(1:2,n) !edge nodes
@@ -816,7 +819,7 @@ chunk_size=100000
 ! edges are in global numbering, transform it to local indexing
 ! =========
   mesh_check=0
-  do nchunk=0, (nod2D-1)/chunk_size
+  do nchunk=0, (mesh%nod2D-1)/chunk_size
      mapping(1:chunk_size)=0
      do n=1, myDim_nod2D+eDim_nod2D
         ipos=(myList_nod2D(n)-1)/chunk_size
@@ -857,7 +860,7 @@ chunk_size=100000
   end where
 !***
   mesh_check=0
-  do nchunk=0, (elem2D-1)/chunk_size
+  do nchunk=0, (mesh%elem2D-1)/chunk_size
      mapping(1:chunk_size)=0
      do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
         ipos=(myList_elem2D(n)-1)/chunk_size
@@ -933,7 +936,7 @@ if (mype==0) then
    write(*,*) 'load_edges finished in ', t1-t0, ' seconds'
    write(*,*) '========================='
 endif
-end associate
+
 END SUBROUTINE load_edges
 !===========================================================================
 SUBROUTINE find_neighbors(mesh)
@@ -951,14 +954,15 @@ USE g_PARSUP
 USE g_ROTATE_grid
 use g_comm_auto
 implicit none
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 integer                     :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz
 integer, allocatable        :: temp_i(:)
 integer                     :: mymax(npes), rmax(npes)
 real(kind=WP)               :: gx,gy,rx,ry
 real(kind=WP)               :: t0, t1
 
-#include "associate_mesh.h"
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 t0=MPI_Wtime()
@@ -970,7 +974,7 @@ t0=MPI_Wtime()
    mesh%elem_neighbors=0
   
 DO elem=1,myDim_elem2D
-   eledges=elem_edges(:,elem)
+   eledges=mesh%elem_edges(:,elem)
    DO j=1,3
    elem1=mesh%edge_tri(1,eledges(j))
    if(elem1==elem) elem1=mesh%edge_tri(2,eledges(j))
@@ -1007,7 +1011,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  mesh%nod_in_elem2D_num=0
  do n=1,myDim_elem2D   
     do j=1,3
-    node=elem2D_nodes(j,n)
+    node=mesh%elem2D_nodes(j,n)
     if (node>myDim_nod2D) cycle 
     mesh%nod_in_elem2D_num(node)=mesh%nod_in_elem2D_num(node)+1
     mesh%nod_in_elem2D(mesh%nod_in_elem2D_num(node),node)=n
@@ -1027,7 +1031,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  END DO
  deallocate(temp_i)
  ! Substitute back local element numbers
- allocate(temp_i(elem2D))
+ allocate(temp_i(mesh%elem2D))
  temp_i=0
  Do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
     temp_i(myList_elem2D(n))=n
@@ -1080,17 +1084,18 @@ if (mype==0) then
    write(*,*) 'find_neighbors finished in ', t1-t0, ' seconds'
    write(*,*) '========================='
 endif
-end associate
+
 END SUBROUTINE find_neighbors
 !==========================================================================
 subroutine edge_center(n1, n2, x, y, mesh)
+
 USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG 
 implicit none
 integer                     :: n1, n2   ! nodes of the edge
 real(kind=WP)               :: x, y, a(2), b(2)
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1100,7 +1105,7 @@ if(a(1)-b(1)>cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
 if(a(1)-b(1)<-cyclic_length/2.0_WP) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
-end associate
+
 end subroutine edge_center
 !==========================================================================
 subroutine elem_center(elem, x, y, mesh)
@@ -1111,7 +1116,7 @@ implicit none
 integer      :: elem, elnodes(3), k    
 real(kind=WP) :: x, y, ax(3), amin
 
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1124,7 +1129,7 @@ type(t_mesh), intent(inout) :: mesh
    END DO
    x=sum(ax)/3.0_WP
    y=sum(coord_nod2D(2,elnodes))/3.0_WP
-   end associate
+
 end subroutine elem_center
 !==========================================================================
 SUBROUTINE mesh_areas(mesh)
@@ -1144,29 +1149,30 @@ integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
 real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol
 real(kind=WP), allocatable,dimension(:)   :: work_array
 real(kind=WP)                             :: t0, t1
-type(t_mesh), intent(inout)               :: mesh
+type(t_mesh), intent(inout), target       :: mesh
 
-#include "associate_mesh.h"
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 
 t0=MPI_Wtime()
 
  allocate(mesh%elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  !allocate(elem_area(myDim_elem2D))
- allocate(mesh%area(nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
+ allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
                                              !! in some further routines
- allocate(mesh%area_inv(nl,myDim_nod2d+eDim_nod2D)) 
+ allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D)) 
  allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
  ! ============
  ! The areas of triangles:
  ! ============
  DO n=1, myDim_elem2D
  !DO n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
-    elnodes=elem2D_nodes(:,n)
-    ay=sum(coord_nod2D(2,elnodes))/3.0_WP
+    elnodes=mesh%elem2D_nodes(:,n)
+    ay=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
     ay=cos(ay)
     if (cartesian) ay=1.0_WP
-    a=coord_nod2D(:,elnodes(2))-coord_nod2D(:,elnodes(1))
-    b=coord_nod2D(:,elnodes(3))-coord_nod2D(:,elnodes(1))
+    a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
+    b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
     if(a(1)>cyclic_length/2._WP) a(1)=a(1)-cyclic_length
     if(a(1)<-cyclic_length/2._WP) a(1)=a(1)+cyclic_length
     if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
@@ -1202,7 +1208,7 @@ t0=MPI_Wtime()
  call exchange_nod(mesh%area, mesh)
 
 do n=1,myDim_nod2d+eDim_nod2D
-   do nz=1,nl
+   do nz=1,mesh%nl
       if (mesh%area(nz,n) > 0._WP) then
          mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
       else
@@ -1239,8 +1245,8 @@ end do
  do n=1, myDim_nod2D
     vol=vol+mesh%area(1, n)
  end do
- ocean_area=0.0
- call MPI_AllREDUCE(vol, ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+ mesh%ocean_area=0.0
+ call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
@@ -1248,9 +1254,9 @@ if (mype==0) then
  write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
  write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
             '   MinScArea ', minval(mesh%area(1,:))
- write(*,*)  mype, 'Edges:    ', edge2D, ' internal ', edge2D_in
+ write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
  if (mype==0) then
-    write(*,*) 'Total ocean area is: ', ocean_area, ' m^2'
+    write(*,*) 'Total ocean area is: ', mesh%ocean_area, ' m^2'
  end if
 endif
 
@@ -1259,7 +1265,6 @@ if (mype==0) then
    write(*,*) 'mesh_areas finished in ', t1-t0, ' seconds'
    write(*,*) '========================='
 endif
-end associate
 END SUBROUTINE mesh_areas
 
 !===================================================================
@@ -1293,8 +1298,10 @@ real(kind=WP)        :: x(3), y(3), cxx, cxy, cyy, d
 real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:) 
 real(kind=WP)              :: t0, t1
 integer                    :: i, nn, ns
-type(t_mesh), intent(inout):: mesh
+type(t_mesh), intent(inout), target :: mesh
 
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
 t0=MPI_Wtime()
 
  allocate(mesh%edge_dxdy(2,myDim_edge2D+eDim_edge2D))
@@ -1309,34 +1316,33 @@ t0=MPI_Wtime()
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 
 
-#include "associate_mesh.h"
 
  ! ============
  ! coriolis
  ! ============
  DO n=1,myDim_nod2D+eDim_nod2D 
- call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
- coriolis_node(n)=2*omega*sin(lat)	 
+    call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    coriolis_node(n)=2*omega*sin(lat)	 
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
- call r2g(lon, lat, coord_nod2D(1,n), coord_nod2D(2,n))
- ! in case of numerical noise at the boundaries
- if (lon > 2._WP*pi) lon=lon-2._WP*pi
- if (lon <-2._WP*pi) lon=lon+2._WP*pi
- geo_coord_nod2D(1,n)=lon
- geo_coord_nod2D(2,n)=lat	 
+    call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    ! in case of numerical noise at the boundaries
+    if (lon > 2._WP*pi) lon=lon-2._WP*pi
+    if (lon <-2._WP*pi) lon=lon+2._WP*pi
+    mesh%geo_coord_nod2D(1,n)=lon
+    mesh%geo_coord_nod2D(2,n)=lat	 
  END DO
  
 
  DO n=1,myDim_elem2D 
- call elem_center(n, ax, ay, mesh)
- call r2g(lon, lat, ax, ay)
- coriolis(n)=2*omega*sin(lat)	 
+    call elem_center(n, ax, ay, mesh)
+    call r2g(lon, lat, ax, ay)
+    coriolis(n)=2*omega*sin(lat)	 
  END DO
   
  if(fplane) then 
- coriolis=2*omega*0.71_WP
+    coriolis=2*omega*0.71_WP
  end if
 
  ! ============
@@ -1346,17 +1352,17 @@ t0=MPI_Wtime()
  call elem_center(n, ax, ay, mesh)
  center_x(n)=ax
  center_y(n)=ay
- elem_cos(n)=cos(ay)
- metric_factor=tan(ay)/r_earth
+ mesh%elem_cos(n)=cos(ay)
+ mesh%metric_factor=tan(ay)/r_earth
  END DO
 
- call exchange_elem(metric_factor)
- call exchange_elem(elem_cos)
+ call exchange_elem(mesh%metric_factor)
+ call exchange_elem(mesh%elem_cos)
  call exchange_elem(center_x)
  call exchange_elem(center_y)  
  if (cartesian) then
- elem_cos=1.0_WP
- metric_factor=0.0_WP
+    mesh%elem_cos=1.0_WP
+    mesh%metric_factor=0.0_WP
  end if
 
  ! ===========
@@ -1364,13 +1370,13 @@ t0=MPI_Wtime()
  ! We need them in radian measure!
  ! ===========
  DO n=1, myDim_edge2D+eDim_edge2D
- ed=edges(:,n)
- a=coord_nod2D(:,ed(2))-coord_nod2D(:, ed(1))
- if(a(1)>cyclic_length/2) a(1)=a(1)-cyclic_length
- if(a(1)<-cyclic_length/2) a(1)=a(1)+cyclic_length
+    ed=mesh%edges(:,n)
+    a=mesh%coord_nod2D(:,ed(2))-mesh%coord_nod2D(:, ed(1))
+    if(a(1)>cyclic_length/2) a(1)=a(1)-cyclic_length
+    if(a(1)<-cyclic_length/2) a(1)=a(1)+cyclic_length
       !a(1)=a(1)*aux_cos_edge(n)
       !a=a*r_earth
- edge_dxdy(:,n)=a
+    mesh%edge_dxdy(:,n)=a
  END DO
 
  ! ===========
@@ -1381,27 +1387,27 @@ t0=MPI_Wtime()
     ! Since we know elem centers on the extended halo of elements
     ! the computations can be carried out for all edges (owned and
     ! the halo ones). 
-    ed=edges(:,n)
-    el=edge_tri(:,n)
+    ed=mesh%edges(:,n)
+    el=mesh%edge_tri(:,n)
     call edge_center(ed(1), ed(2), a(1), a(2), mesh)
     b(1)=center_x(el(1))
     b(2)=center_y(el(1))
     b=b-a
     call trim_cyclic(b(1))
-    b(1)=b(1)*elem_cos(el(1))
+    b(1)=b(1)*mesh%elem_cos(el(1))
     b=b*r_earth
-    edge_cross_dxdy(1:2,n)=b(1:2)
+    mesh%edge_cross_dxdy(1:2,n)=b(1:2)
  
    if(el(2)>0) then
-    b(1)=center_x(el(2)) 
-    b(2)=center_y(el(2))
-    b=b-a
-    call trim_cyclic(b(1))
-    b(1)=b(1)*elem_cos(el(2))
-    b=b*r_earth
-    edge_cross_dxdy(3:4,n)=b(1:2)
+      b(1)=center_x(el(2)) 
+      b(2)=center_y(el(2))
+      b=b-a
+      call trim_cyclic(b(1))
+      b(1)=b(1)*mesh%elem_cos(el(2))
+      b=b*r_earth
+      mesh%edge_cross_dxdy(3:4,n)=b(1:2)
    else
-    edge_cross_dxdy(3:4,n)=0.0_WP
+      mesh%edge_cross_dxdy(3:4,n)=0.0_WP
    end if
  END DO
 
@@ -1450,29 +1456,29 @@ t0=MPI_Wtime()
 !       = -f1*(gradN_2+gradN_3) + f2*gradN_2 + f3*gradN_3
 !
 DO elem=1, myDim_elem2D
-   elnodes=elem2D_nodes(:,elem)
+   elnodes = mesh%elem2D_nodes(:,elem)
    
-   deltaX31=coord_nod2D(1,elnodes(3))-coord_nod2D(1,elnodes(1))
+   deltaX31 = mesh%coord_nod2D(1,elnodes(3)) - mesh%coord_nod2D(1,elnodes(1))
    if(deltaX31>cyclic_length/2) deltaX31=deltaX31-cyclic_length
    if(deltaX31<-cyclic_length/2) deltaX31=deltaX31+cyclic_length
-   deltaX31=elem_cos(elem)*deltaX31
+   deltaX31 = mesh%elem_cos(elem)*deltaX31
    
-   deltaX21=coord_nod2D(1,elnodes(2))-coord_nod2D(1,elnodes(1))
+   deltaX21 = mesh%coord_nod2D(1,elnodes(2)) - mesh%coord_nod2D(1,elnodes(1))
    if(deltaX21>cyclic_length/2) deltaX21=deltaX21-cyclic_length
    if(deltaX21<-cyclic_length/2) deltaX21=deltaX21+cyclic_length
-   deltaX21=elem_cos(elem)*deltaX21
+   deltaX21 = mesh%elem_cos(elem)*deltaX21
    
-   deltaY31=coord_nod2D(2,elnodes(3))-coord_nod2D(2,elnodes(1))
-   deltaY21=coord_nod2D(2,elnodes(2))-coord_nod2D(2,elnodes(1))
+   deltaY31 = mesh%coord_nod2D(2,elnodes(3)) - mesh%coord_nod2D(2,elnodes(1))
+   deltaY21 = mesh%coord_nod2D(2,elnodes(2)) - mesh%coord_nod2D(2,elnodes(1))
    
-   dfactor=-0.5_WP*r_earth/elem_area(elem)
-   gradient_sca(1,elem)=(-deltaY31+deltaY21)*dfactor
-   gradient_sca(2,elem)=deltaY31*dfactor
-   gradient_sca(3,elem)=-deltaY21*dfactor
+   dfactor = -0.5_WP*r_earth/mesh%elem_area(elem)
+   mesh%gradient_sca(1,elem)=(-deltaY31+deltaY21)*dfactor
+   mesh%gradient_sca(2,elem)=deltaY31*dfactor
+   mesh%gradient_sca(3,elem)=-deltaY21*dfactor
    
-   gradient_sca(4,elem)=(deltaX31-deltaX21)*dfactor
-   gradient_sca(5,elem)=-deltaX31*dfactor
-   gradient_sca(6,elem)=deltaX21*dfactor
+   mesh%gradient_sca(4,elem)=(deltaX31-deltaX21)*dfactor
+   mesh%gradient_sca(5,elem)=-deltaX31*dfactor
+   mesh%gradient_sca(6,elem)=deltaX21*dfactor
 END DO
 
 ! ==========================
@@ -1541,9 +1547,9 @@ DO elem=1,myDim_elem2D
     a(1)=center_x(elem)
     a(2)=center_y(elem)
     DO j=1,3
-        el(1)=elem_neighbors(j,elem)
+        el(1)=mesh%elem_neighbors(j,elem)
         if (el(1)>0) then
-                !elnodes_=elem2D_nodes(:,el(1))
+                !elnodes_=mesh%elem2D_nodes(:,el(1))
             b(1)=center_x(el(1))
             b(2)=center_y(el(1))
             x(j)=b(1)-a(1)
@@ -1552,7 +1558,7 @@ DO elem=1,myDim_elem2D
             y(j)=b(2)-a(2)
         else
             ! Virtual element center is taken
-            ed=edges(:,elem_edges(j,elem))
+            ed=mesh%edges(:,mesh%elem_edges(j,elem))
             call edge_center(ed(1), ed(2), b(1), b(2), mesh)
             x(j)=(b(1)-a(1))
             if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
@@ -1561,15 +1567,15 @@ DO elem=1,myDim_elem2D
             y(j)=2*(b(2)-a(2))
         end if
     END DO
-    x=x*elem_cos(elem)*r_earth
+    x=x*mesh%elem_cos(elem)*r_earth
     y=y*r_earth
     cxx=sum(x**2)
     cxy=sum(x*y)
     cyy=sum(y**2)
     d=cxy*cxy-cxx*cyy
     ! coefficients to compute gradients of velocity
-    gradient_vec(1:3,elem)=(cxy*y-cyy*x)/d
-    gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
+    mesh%gradient_vec(1:3,elem)=(cxy*y-cyy*x)/d
+    mesh%gradient_vec(4:6,elem)=(cxy*x-cxx*y)/d
 END DO
 deallocate(center_y, center_x)
 
@@ -1579,7 +1585,7 @@ deallocate(center_y, center_x)
        mesh%bc_index_nod2D=1._WP
        do n=1, myDim_edge2D
           ed=mesh%edges(:, n)
-          if (myList_edge2D(n)<=edge2D_in) cycle
+          if (myList_edge2D(n) <= mesh%edge2D_in) cycle
           mesh%bc_index_nod2D(ed)=0._WP
        end do
     end if
@@ -1588,15 +1594,15 @@ deallocate(center_y, center_x)
   nn=0
   ns=0  
   allocate(mesh%lump2d_north(myDim_nod2D), mesh%lump2d_south(myDim_nod2D))
-  lump2d_north=0._WP
-  lump2d_south=0._WP
+  mesh%lump2d_north=0._WP
+  mesh%lump2d_south=0._WP
   do i=1, myDim_nod2D
-     if (geo_coord_nod2D(2, i) > 0) then
+     if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-        lump2d_north(i)=area(1, i)
+        mesh%lump2d_north(i)=mesh%area(1, i)
      else
         ns=ns+1     
-        lump2d_south(i)=area(1, i)
+        mesh%lump2d_south(i)=mesh%area(1, i)
      end if	   
   end do   
 
@@ -1620,7 +1626,7 @@ deallocate(center_y, center_x)
        write(*,*) 'mesh_auxiliary_arrays finished in ', t1-t0, ' seconds'
        write(*,*) '========================='
     endif
-end associate
+
 END SUBROUTINE mesh_auxiliary_arrays
 
 !===================================================================
@@ -1636,43 +1642,42 @@ IMPLICIT NONE
 ! Allocated and filled in are:
 ! elem_area(myDim_elem2D)
 ! area(nl, myDim_nod2D)
-type(t_mesh), intent(inout) :: mesh
+type(t_mesh), intent(inout), target :: mesh
 integer                     :: nz, n, elem , elnodes(3)
 real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
 
-#include "associate_mesh.h"
 
    vol_n=0._WP
    vol_e=0._WP
 
    aux=0._WP
    do n=1, myDim_nod2D
-      do nz=1, nlevels_nod2D(n)-1
-         aux(nz)=aux(nz)+area(nz, n)
+      do nz=1, mesh%nlevels_nod2D(n)-1
+         aux(nz)=aux(nz)+mesh%area(nz, n)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_n, nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
    aux=0._WP
    do elem=1, myDim_elem2D
-      elnodes=elem2D_nodes(:, elem)
+      elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=1, nlevels(elem)         
-         aux(nz)=aux(nz)+elem_area(elem)
+      do nz=1, mesh%nlevels(elem)         
+         aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_e, nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
 write(*,*) '***start level area_test***'
-do nz=1, nl
+do nz=1, mesh%nl
    write(*,*) vol_n(nz), vol_e(nz)
 end do
 write(*,*) '***end level area_test***'
 end if
-end associate
+
 !call par_ex
 !stop
 END SUBROUTINE check_mesh_consistency

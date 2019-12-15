@@ -21,7 +21,7 @@ real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
 real(kind=WP)   :: zeta, delta_inv, d1, d2
 
-type(t_mesh), intent(in)              :: mesh
+type(t_mesh), intent(in), target  :: mesh
 
 #include "associate_mesh.h"
 
@@ -97,8 +97,104 @@ type(t_mesh), intent(in)              :: mesh
         sigma22(el) = 0.5_WP*(si1-si2)
      endif
   end do
-  end associate  
 end subroutine stress_tensor
+!===================================================================
+subroutine stress_tensor_no1(ice_strength, mesh)
+! EVP rheology. The routine computes stress tensor components based on ice 
+! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
+! sigma12). The ocean velocity is at nodal locations.
+use o_param
+use i_param
+use mod_mesh
+use i_arrays
+use g_parsup
+USE g_CONFIG
+implicit none
+
+real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
+real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta, aa
+integer         :: el, elnodes(3)
+real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
+real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
+real(kind=WP)   :: zeta, delta_inv, d1, d2
+
+type(t_mesh), intent(in)              , target :: mesh
+
+!! #include "associate_mesh.h"
+
+  vale = 1.0_WP/(ellipse**2)
+   
+  dte  = ice_dt/(1.0_WP*evp_rheol_steps)
+  det1 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte)
+  det2 = 1.0_WP/(1.0_WP + 0.5_WP*Tevp_inv*dte) !*ellipse**2 
+     
+
+  do el=1,myDim_elem2D
+     
+      ! ===== Check if there is ice on elem
+
+     ! There is no ice in elem 
+     ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE     
+     if (ice_strength(el) > 0.) then
+      ! =====	
+      ! ===== Deformation rate tensor on element elem:
+           !du/dx
+
+        eps11 = sum(mesh%gradient_sca(1:3,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+               -mesh% metric_factor(el) * sum(V_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
+
+        eps22 = sum(mesh%gradient_sca(4:6, el)*V_ice(mesh%elem2D_nodes(1:3,el)))
+
+        eps12 = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+                      + sum(mesh%gradient_sca(1:3,el)*V_ice(mesh%elem2D_nodes(1:3,el))) &
+                       + mesh%metric_factor(el) * sum(U_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
+        ! ===== moduli:
+        delta = sqrt((eps11*eps11 + eps22*eps22)*(1.0_WP+vale) + 4.0_WP*vale*eps12*eps12 + &
+                              2.0_WP*eps11*eps22*(1.0_WP-vale))
+
+       ! =======================================
+       ! ===== Here the EVP rheology piece starts
+       ! =======================================
+
+      ! ===== viscosity zeta should exceed zeta_min
+      ! (done via limiting delta from above)
+      
+      !if(delta>pressure/zeta_min) delta=pressure/zeta_min
+           !It does not work properly by 
+	   !creating response where ice_strength is small
+           ! Uncomment and test if necessary
+      
+      ! ===== if delta is too small or zero, viscosity will too large (unlimited)
+      ! (limit delta_inv)
+        delta_inv = 1.0_WP/max(delta,delta_min) 
+        zeta = ice_strength(el)*delta_inv			     
+      ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
+      ! is too large in some regions and CFL criterion is violated.
+      ! The regularization below was introduced by Hunke, 
+      ! but seemingly is not used in the current CICE. 
+      ! Without it divergence and zeta can be noisy (but code 
+      ! remains stable), using it reduces viscosities too strongly.
+      ! It is therefore commented
+      
+      !if (zeta>Clim_evp*voltriangle(el)) then
+      !zeta=Clim_evp*voltriangle(el)
+      !end if 
+      
+        zeta = zeta*Tevp_inv
+      				     
+        r1  = zeta*(eps11+eps22) - ice_strength(el)*Tevp_inv
+        r2  = zeta*(eps11-eps22)*vale
+        r3  = zeta*eps12*vale
+        
+        si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
+        si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
+        
+        sigma12(el) = det2*(sigma12(el)+dte*r3)
+        sigma11(el) = 0.5_WP*(si1+si2)
+        sigma22(el) = 0.5_WP*(si1-si2)
+     endif
+  end do
+end subroutine stress_tensor_no1
 !===================================================================
 subroutine stress2rhs_e(mesh)
 ! EVP implementation:
@@ -120,7 +216,7 @@ IMPLICIT NONE
 INTEGER      :: n, elem, ed, elnodes(3), el(2), ednodes(2)  
 REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 
-type(t_mesh), intent(in)              :: mesh
+type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -167,7 +263,6 @@ type(t_mesh), intent(in)              :: mesh
      U_rhs_ice(elnodes)=U_rhs_ice(elnodes) - uc/area(1,elnodes)
      V_rhs_ice(elnodes)=V_rhs_ice(elnodes) - vc/area(1,elnodes)
  END DO
-end associate
 end subroutine stress2rhs_e
 !===================================================================
 subroutine stress2rhs(inv_areamass, ice_strength, mesh)
@@ -186,7 +281,7 @@ IMPLICIT NONE
 REAL(kind=WP), intent(in) :: inv_areamass(myDim_nod2D), ice_strength(mydim_elem2D)
 INTEGER      :: n, el,  k
 REAL(kind=WP):: val3
-type(t_mesh), intent(in)              :: mesh
+type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -230,7 +325,6 @@ do el=1,myDim_elem2D
         V_rhs_ice(n) = 0._WP
      endif
   END DO 
-  end associate
 end subroutine stress2rhs
 !===================================================================
 subroutine EVPdynamics(mesh)
@@ -256,7 +350,17 @@ real(kind=WP)             :: ax, ay, aa, elevation_dx, elevation_dy
 real(kind=WP)             :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
 real(kind=WP)             :: ice_strength(myDim_elem2D), elevation_elem(3), p_ice(3)
 integer                   :: use_pice
-type(t_mesh), intent(in)  :: mesh
+
+real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta
+integer         :: k
+real(kind=WP)   :: vale, dx(3), dy(3), val3
+real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
+real(kind=WP)   :: zeta, delta_inv, d1, d2
+
+INTEGER      :: elem
+REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
+
+type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -418,5 +522,4 @@ do shortstep=1, evp_rheol_steps
  
    call exchange_nod(U_ice,V_ice)
 END DO
-end associate
 end subroutine EVPdynamics

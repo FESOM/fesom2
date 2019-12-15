@@ -13,7 +13,7 @@ subroutine communication_nodn(mesh)
   use MOD_MESH
   use g_PARSUP
   implicit none
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in), target :: mesh
   integer                  :: n, np, prank, el, r_count, s_count, q, i, j, nod, k, l
   integer                  :: num_send(0:npes-1), num_recv(0:npes-1), nd_count
   integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
@@ -212,7 +212,6 @@ subroutine communication_nodn(mesh)
   ! comm_nod2D%list(:)
 
   deallocate(recv_from_pe, send_to_pes)
-  end associate
 end subroutine communication_nodn
 
 !==========================================================================
@@ -221,7 +220,7 @@ subroutine communication_elemn(mesh)
   use g_PARSUP
   implicit none
 
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in), target :: mesh
   integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
   logical                  :: max_laendereck_too_small=.false.
   integer                  :: n, k, ep, np, prank, el, nod
@@ -513,7 +512,6 @@ subroutine communication_elemn(mesh)
   end do
 
   deallocate(recv_from_pe, send_to_pes)
-  end associate
 end subroutine communication_elemn
 !==========================================================================
 subroutine mymesh(mesh)
@@ -521,7 +519,7 @@ subroutine mymesh(mesh)
   use g_PARSUP 
   implicit none
 
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in), target :: mesh
   integer                  :: n, counter, q, k, elem, q2, eledges(4)
   integer, allocatable     :: aux(:)
 #include "associate_mesh.h"
@@ -640,7 +638,6 @@ subroutine mymesh(mesh)
   ! contains external edges which mype needs;    
   ! myList_edge2D(1:myDim_edge2D) contains owned edges +
   ! shared edges which mype updates
-  end associate
 end subroutine mymesh
 !=================================================================
 #ifndef FVOM_INIT

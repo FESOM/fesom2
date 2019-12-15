@@ -16,8 +16,9 @@ subroutine oce_fluxes_mom(mesh)
   
   integer                  :: n, elem, elnodes(3),n1
   real(kind=WP)            :: aux, aux1
-  type(t_mesh), intent(in) :: mesh
-  associate(elem2D_nodes=>mesh%elem2D_nodes) 
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
  ! ==================
   ! momentum flux:
@@ -39,7 +40,6 @@ subroutine oce_fluxes_mom(mesh)
      stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                              stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
   END DO
-  end associate
 end subroutine oce_fluxes_mom
 !
 !======================================================================================
@@ -57,10 +57,12 @@ subroutine ocean2ice(mesh)
   use g_comm_auto
   implicit none
 
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   integer :: n, elem, k
   real(kind=WP) :: uw,vw
-  associate(nod_in_elem2D_num=>mesh%nod_in_elem2D_num, elem_area=>mesh%elem_area, nod_in_elem2D=>mesh%nod_in_elem2D, area=>mesh%area) 
+
+#include  "associate_mesh.h"
+
   ! the arrays in the ice model are renamed
      
 if (ice_update) then
@@ -98,7 +100,6 @@ else
 endif
      enddo
      call exchange_nod(u_w, v_w)
-end associate
 end subroutine ocean2ice
 !
 !======================================================================================
@@ -116,11 +117,12 @@ subroutine oce_fluxes(mesh)
   use i_therm_param
 
   implicit none
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)   , target :: mesh
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
-  associate(ocean_area=>mesh%ocean_area)
+
+#include  "associate_mesh.h"
 
   allocate(flux(myDim_nod2D+eDim_nod2D))
   ! ==================
@@ -206,7 +208,6 @@ subroutine oce_fluxes(mesh)
 
   deallocate(flux)
   if (use_sw_pene) call cal_shortwave_rad(mesh)
-  end associate
 end subroutine oce_fluxes
 !
 !======================================================================================

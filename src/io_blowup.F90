@@ -64,7 +64,7 @@ MODULE io_BLOWUP
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
 	subroutine ini_blowup_io(year, mesh)
 		implicit none
-                type(t_mesh), intent(in)  :: mesh
+                type(t_mesh), intent(in) , target :: mesh
 		integer, intent(in)       :: year
 		integer                   :: ncid, j
 		integer                   :: varid
@@ -72,7 +72,9 @@ MODULE io_BLOWUP
 		character(500)            :: filename
 		character(500)            :: trname, units
 		character(4)              :: cyear
-        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+
+#include  "associate_mesh.h"
+
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
@@ -155,14 +157,13 @@ MODULE io_BLOWUP
 !!PS 		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
 		
 		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
-		end associate
 	end subroutine ini_blowup_io
 !
 !
 !_______________________________________________________________________________
 	subroutine blowup(istep, mesh)
 		implicit none
-                type(t_mesh), intent(in)  :: mesh		
+                type(t_mesh), intent(in) , target :: mesh		
 		integer                   :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
@@ -343,8 +344,10 @@ MODULE io_BLOWUP
 		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
-        type(t_mesh), intent(in)      :: mesh
-        associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, edge2D=>mesh%edge2D)
+        type(t_mesh), intent(in)     , target :: mesh
+
+#include  "associate_mesh.h"
+
 		! Serial output implemented so far
 		if (mype==0) then
 			c=1
@@ -390,7 +393,6 @@ MODULE io_BLOWUP
 		if (mype==0) id%error_status(1)=nf_close(id%ncid);
 		id%error_count=1
 		call was_error(id)
-                end associate
 	end subroutine write_blowup
 !
 !

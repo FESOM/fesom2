@@ -35,7 +35,7 @@ contains
 ! info: fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
 subroutine write_mesh_info(mesh)
 implicit none
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   integer                    :: status, ncid, j
   integer                    :: nod_n_id, elem_n_id, edge_n_id, nod_part_id, elem_part_id
   integer                    :: nl_id, nl1_id
@@ -258,7 +258,6 @@ implicit none
   
   call my_close(ncid)
   
-  end associate
 end subroutine write_mesh_info
 !
 !============================================================================

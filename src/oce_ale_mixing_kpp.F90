@@ -112,7 +112,7 @@ contains
 
      integer :: i, j
 
-     type(t_mesh), intent(in) :: mesh
+     type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -196,7 +196,6 @@ contains
           endif
        enddo
     enddo
-    end associate
   end subroutine oce_mixing_kpp_init
 
   !#######################################################################
@@ -244,7 +243,7 @@ contains
 !     Define allocatble arrays under oce_modules.F90
 !     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
-     type(t_mesh), intent(in)   :: mesh
+     type(t_mesh), intent(in)   , target :: mesh
      integer                    :: node, kn, elem, elnodes(3)
      integer                    :: nz, ns, j, q, lay, lay_mi
      real(KIND=WP)              :: smftu, smftv, aux, vol
@@ -403,7 +402,6 @@ contains
   END WHERE
     
 ! non-local contribution will be added to oce_tracer_mod directly
-  end associate
   END SUBROUTINE oce_mixing_kpp
 
 
@@ -460,7 +458,7 @@ contains
      real(KIND=WP), parameter :: cekman = 0.7_WP  ! constant for Ekman depth
      real(KIND=WP), parameter :: cmonob = 1.0_WP  ! constant for Monin-Obukhov depth
 
-     type(t_mesh), intent(in) :: mesh
+     type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -608,7 +606,6 @@ contains
         caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
 
   END DO 
-  end associate
   END SUBROUTINE bldepth
 
 
@@ -693,7 +690,7 @@ contains
   !
   subroutine ri_iwmix(viscA, diffK, mesh)
      IMPLICIT NONE
-     type(t_mesh), intent(in)    :: mesh
+     type(t_mesh), intent(in)    , target :: mesh
      integer                     :: node, nz, mr
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
@@ -787,7 +784,6 @@ contains
         diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
         
     end do !-->do node=1, myDim_nod2D+eDim_nod2D
-    end associate
   end subroutine ri_iwmix
 
  !#######################################################################
@@ -804,7 +800,7 @@ contains
   subroutine ddmix(diffK, mesh)
 
      IMPLICIT NONE
-     type(t_mesh), intent(in)       :: mesh
+     type(t_mesh), intent(in)       , target :: mesh
      real(KIND=WP), parameter       :: Rrho0               = 1.9_WP          ! limit for double diffusive density ratio
      real(KIND=WP), parameter       :: dsfmax              = 1.e-4_WP        ! (m^2/s) max diffusivity in case of salt fingering
      real(KIND=WP), parameter       :: viscosity_molecular = 1.5e-6_WP       ! (m^2/s)
@@ -871,7 +867,6 @@ contains
         diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
 
      END DO
-     end associate
   end subroutine ddmix
 
  !#######################################################################
@@ -899,7 +894,7 @@ contains
   subroutine blmix_kpp(viscA,diffK, mesh)
 
      IMPLICIT NONE
-     type(t_mesh), intent(in) :: mesh
+     type(t_mesh), intent(in) , target :: mesh
      integer           :: node, nz, kn, elem, elnodes(3), knm1, knp1, nl1
      real(KIND=WP)     :: delhat, R, dvdzup, dvdzdn
      real(KIND=WP)     :: viscp, difsp, diftp, visch, difsh, difth, f1
@@ -1055,7 +1050,6 @@ contains
         dkm1(node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs)
 
      END DO
-     end associate
   end subroutine blmix_kpp
 
   !#######################################################################
@@ -1077,7 +1071,7 @@ contains
   !
   subroutine enhance(viscA, diffK, mesh)
      IMPLICIT NONE
-     type(t_mesh), intent(in)                                                   :: mesh
+     type(t_mesh), intent(in)                                                   , target :: mesh
      real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D),   intent(inout) :: viscA !for momentum (nodes)
      real(kind=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D,2), intent(inout) :: diffK !for T and S
 
@@ -1114,7 +1108,6 @@ contains
 
         ghats(k,node) = (1.0_WP-caseA(node)) * ghats(k,node) ! plot ghats
      END DO
-     end associate
   end subroutine enhance
 
 END MODULE o_mixing_KPP_mod

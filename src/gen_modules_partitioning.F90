@@ -151,14 +151,13 @@ subroutine set_par_support(mesh)
   use MOD_MESH
   implicit none
 
-  type(t_mesh), intent(in)         :: mesh
+  type(t_mesh), intent(in)         , target :: mesh
   integer                          :: n, offset
   integer                          :: i, max_nb, nb, nini, nend, nl1, n_val
   integer, allocatable             :: blocklen(:),     displace(:)
   integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-  associate(nl=>mesh%nl)
-
+#include "associate_mesh.h"  
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
@@ -471,7 +470,6 @@ subroutine set_par_support(mesh)
    endif
 
    call init_gatherLists
-   end associate
    if(mype==0) write(*,*) 'Communication arrays are set' 
 end subroutine set_par_support
 

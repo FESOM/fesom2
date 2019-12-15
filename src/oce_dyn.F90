@@ -13,7 +13,7 @@ IMPLICIT NONE
 integer       :: elem, elnodes(3), nz, m
 real(kind=WP) :: eta(3) 
 real(kind=WP) :: Fx, Fy
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -29,7 +29,6 @@ type(t_mesh), intent(in) :: mesh
  END DO
 eta_n=eta_n+d_eta
 call exchange_elem(UV, mesh)
-end associate
 end subroutine update_vel
 !==========================================================================
 subroutine compute_vel_nodes(mesh)
@@ -41,7 +40,7 @@ use g_comm_auto
 IMPLICIT NONE
 integer            :: n, nz, k, elem
 real(kind=WP)      :: tx, ty, tvol
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -62,7 +61,6 @@ DO n=1, myDim_nod2D
    END DO
 END DO
 call exchange_nod(Unode, mesh)
-end associate
 end subroutine compute_vel_nodes
 !===========================================================================
 SUBROUTINE viscosity_filt2x(mesh)
@@ -73,7 +71,7 @@ USE g_PARSUP
 USE g_config
 USE g_comm_auto
 IMPLICIT NONE
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 real(kind=WP) :: u1, v1, tau_inv, s, factor, factor1, factor2
 integer       :: ed, el(2), nz, elem
 real(kind=WP) :: UV_c(2,mesh%nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,mesh%nl-1,myDim_elem2D+eDim_elem2D)
@@ -171,7 +169,6 @@ END DO
 !NR       UV_rhs(2,nz,elem) = UV_rhs(2,nz,elem)+UV_f(2,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
 !NR    END DO 
 !NR END DO
-end associate
 end subroutine viscosity_filt2x
 !===========================================================================
 subroutine viscosity_filter(option, mesh)
@@ -180,7 +177,7 @@ use g_PARSUP
 use MOD_MESH
 IMPLICIT NONE 
 integer                  :: option
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 ! Driving routine 
 ! Background viscosity is selected in terms of Vl, where V is 
 ! background velocity scale and l is the resolution. V is 0.005 
@@ -233,7 +230,7 @@ IMPLICIT NONE
 
 real(kind=WP) :: u1, v1, le(2), len, crosslen, vi 
 integer       :: nz, ed, el(2)
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -265,7 +262,6 @@ type(t_mesh), intent(in) :: mesh
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
     END DO
  END DO
- end associate
 end subroutine viscosity_filtxx
 ! ===================================================================
 SUBROUTINE viscosity_filt2xx(option, mesh)
@@ -283,7 +279,7 @@ IMPLICIT NONE
 real(kind=WP) :: u1, v1, vi, len
 integer       :: ed, el(2), nz, option
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -354,7 +350,6 @@ if(option==2) then
  END DO
      
  deallocate(V_c,U_c)
- end associate   
 end subroutine viscosity_filt2xx
 ! ===================================================================
 SUBROUTINE viscosity_filtxxx(mesh)
@@ -373,7 +368,7 @@ IMPLICIT NONE
 real(kind=WP) :: u1, v1, vi, len, crosslen, le(2)
 integer       :: ed, el(2), nz
 real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -432,7 +427,6 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
- end associate   
 end subroutine viscosity_filtxxx
 
 ! ===================================================================
@@ -458,7 +452,7 @@ real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
 integer        :: elem, nl1, nz, elnodes(3),n,k, nt
 real(kind=WP)  :: leithx, leithy
 real(kind=WP), allocatable :: aux(:,:) 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -528,7 +522,6 @@ type(t_mesh), intent(in) :: mesh
 	end do
 	call exchange_elem(Visc, mesh)  
 	deallocate(aux)
-  end associate
 END subroutine h_viscosity_leith
 ! =======================================================================
 !A collection of viscosity routines
@@ -567,7 +560,7 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, vi, len
 integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 !
@@ -615,7 +608,6 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
- end associate
 end subroutine viscosity_filt_bh
 ! ===================================================================
 SUBROUTINE viscosity_filt_bh2(mesh)
@@ -635,7 +627,7 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, vi, len
 integer       :: ed, el(2), nz
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:) 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 !
@@ -680,7 +672,6 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  END DO
      
  deallocate(V_c,U_c)
- end associate   
 end subroutine viscosity_filt_bh2
 ! ===================================================================
 SUBROUTINE viscosity_filt_h(mesh)
@@ -694,7 +685,7 @@ IMPLICIT NONE
 
 real(kind=8)  :: u1, v1, le, vi 
 integer       :: nz, ed, el(2)
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -719,7 +710,6 @@ type(t_mesh), intent(in) :: mesh
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
-end associate
 end subroutine viscosity_filt_h
 ! ===================================================================
 SUBROUTINE viscosity_filt_h_backscatter(mesh)
@@ -734,7 +724,7 @@ IMPLICIT NONE
 real(kind=8)  :: u1, v1, le, vi 
 integer       :: nz, ed, el(2), nelem(3),k, elem
 real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -797,7 +787,6 @@ type(t_mesh), intent(in) :: mesh
          END DO
   end do
  deallocate(V_c,U_c,V_b,U_b)
- end associate
 end subroutine viscosity_filt_h_backscatter
 
 ! ===================================================================

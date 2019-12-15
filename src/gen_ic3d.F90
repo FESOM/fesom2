@@ -224,7 +224,7 @@ CONTAINS
       integer                  :: i
       integer                  :: elnodes(3)
       real(wp)                 :: x, y       ! coordinates of elements
-      type(t_mesh), intent(in) :: mesh
+      type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
       
       warn = 0
@@ -256,7 +256,6 @@ CONTAINS
                bilin_indx_j(i)=-1         
          end if
       end do
-      end associate
    END SUBROUTINE nc_ic3d_ini
 
    SUBROUTINE getcoeffld(mesh)
@@ -285,7 +284,7 @@ CONTAINS
       integer              :: elnodes(3)
       integer              :: ierror              ! return error code
 
-      type(t_mesh), intent(in) :: mesh
+      type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
@@ -376,7 +375,6 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       DEALLOCATE( ncdata, data1d )
-      end associate
    END SUBROUTINE getcoeffld  
    
    SUBROUTINE do_ic3d(mesh)
@@ -387,7 +385,7 @@ CONTAINS
       !!----------------------------------------------------------------------
       IMPLICIT NONE
       integer                       :: n
-      type(t_mesh), intent(in)      :: mesh
+      type(t_mesh), intent(in)     , target :: mesh
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 

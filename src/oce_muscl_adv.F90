@@ -26,7 +26,7 @@ subroutine muscl_adv_init(mesh)
     IMPLICIT NONE
     integer     :: n, k, n1, n2, n_num
     integer     :: nz
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -101,7 +101,7 @@ subroutine muscl_adv_init(mesh)
         nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
     end do
     call exchange_nod(nlevels_nod2D_min)
-    end associate
+
 end SUBROUTINE muscl_adv_init
 !=======================================================================
 SUBROUTINE find_up_downwind_triangles(mesh)
@@ -118,7 +118,7 @@ real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax
 real(kind=WP), allocatable :: coord_elem(:, :,:), temp(:)
 integer, allocatable       :: temp_i(:), e_nodes(:,:)
 
-type(t_mesh), intent(in)   :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 #include "associate_mesh.h"
 
 allocate(edge_up_dn_tri(2,myDim_edge2D))
@@ -260,7 +260,7 @@ deallocate(e_nodes, coord_elem)
 
 
 edge_up_dn_grad=0.0_WP
-end associate
+
 end SUBROUTINE find_up_downwind_triangles
 !=======================================================================
 SUBROUTINE fill_up_dn_grad(mesh)
@@ -274,7 +274,7 @@ USE g_PARSUP
 IMPLICIT NONE
 integer                  :: n, nz, elem, k, edge, ednodes(2)
 real(kind=WP)            :: tvol, tx, ty
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -368,7 +368,7 @@ type(t_mesh), intent(in) :: mesh
 			END DO
 		end if  
 	END DO 
-   end associate
+
 END SUBROUTINE fill_up_dn_grad
 !===========================================================================
 ! It is assumed that velocity is at n+1/2, hence only tracer field 
@@ -382,7 +382,7 @@ USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
- type(t_mesh), intent(in) :: mesh
+ type(t_mesh), intent(in) , target :: mesh
  integer      :: el(2), enodes(2), n, nz, edge
  integer      :: nl1, nl2,tr_num
  real(kind=WP):: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, flux=0.0 
@@ -530,7 +530,7 @@ ttrhs=0.0_WP
         dttf(nz,n)=dttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
      END DO
   END DO
-  end associate
+
 end subroutine adv_tracer_muscl
 
 !===========================================================================

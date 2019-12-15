@@ -23,7 +23,7 @@ USE g_config
 use i_arrays
 IMPLICIT NONE
 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
 integer                  :: node, nz, nzmax, elem, elnodes(3), i
 real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl)
@@ -145,7 +145,6 @@ real(kind=WP)            :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_W
 			end if
 		END DO
 	END DO
-end associate	
 end subroutine oce_mixing_pp
 ! ========================================================================
 subroutine mo_length(water_flux,heat_flux,stress_x,stress_y,  &

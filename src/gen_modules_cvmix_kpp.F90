@@ -223,7 +223,7 @@ module g_cvmix_kpp
         character(len=100) :: nmlfile
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
-        type(t_mesh), intent(in)  :: mesh
+        type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
@@ -335,7 +335,6 @@ module g_cvmix_kpp
                             lenhanced_diff = kpp_use_enhanceKv,       &
                             l_LMD_ws       = kpp_use_LMDws,           & 
                             lnonzero_surf_nonlocal = kpp_cs_is_one)
-    end associate
     end subroutine init_cvmix_kpp
     !
     !
@@ -343,7 +342,7 @@ module g_cvmix_kpp
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
     subroutine calc_cvmix_kpp(mesh)
-        type(t_mesh), intent(in)   :: mesh
+        type(t_mesh), intent(in)  , target :: mesh
         integer       :: node, elem, nz, nln, elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -874,6 +873,5 @@ module g_cvmix_kpp
                 Av(nz,elem) = sum(kpp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-    end associate
     end subroutine calc_cvmix_kpp    
 end module g_cvmix_kpp

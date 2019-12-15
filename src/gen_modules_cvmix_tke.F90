@@ -121,7 +121,7 @@ module g_cvmix_tke
         character(len=100)       :: nmlfile
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
@@ -236,7 +236,6 @@ module g_cvmix_tke
                       only_tke       = tke_only,           &
                       tke_min        = tke_min,            &
                       tke_surf_min   = tke_surf_min    )
-        end associate            
     end subroutine init_cvmix_tke
     !
     !
@@ -245,7 +244,7 @@ module g_cvmix_tke
     ! calculate TKE vertical mixing coefficients from CVMIX library
     subroutine calc_cvmix_tke(mesh)
         implicit none
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, nelem, nz, nln, elnodes(3), node_size
         real(kind=WP) :: tvol
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
@@ -389,6 +388,5 @@ module g_cvmix_tke
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        end associate
     end subroutine calc_cvmix_tke
 end module g_cvmix_tke

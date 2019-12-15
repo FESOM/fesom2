@@ -22,8 +22,9 @@ implicit none
 
 integer         :: row
 real(kind=WP)   :: aux
-type(t_mesh), intent(in) :: mesh
-associate(area=>mesh%area)
+type(t_mesh), intent(in), target :: mesh
+
+#include  "associate_mesh.h"
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
@@ -35,7 +36,7 @@ do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
       ice_rejected_salt(row)=0.0_WP
    end if
 end do
-end associate
+
 end subroutine cal_rejected_salt
 !
 !----------------------------------------------------------------------------
@@ -57,7 +58,7 @@ subroutine app_rejected_salt(mesh)
   data n_distr /5/
   data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
 
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -86,5 +87,5 @@ subroutine app_rejected_salt(mesh)
         endif
       endif
   end do
-  end associate
+
 end subroutine app_rejected_salt

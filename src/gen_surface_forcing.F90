@@ -412,7 +412,7 @@ CONTAINS
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
       type(flfi_type), pointer :: flf
-      type(t_mesh), intent(in)              :: mesh
+      type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -477,7 +477,6 @@ CONTAINS
       end do
          ! interpolate in time
       call data_timeinterp(rdate)
-      end associate
    END SUBROUTINE nc_sbc_ini
 
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
@@ -517,8 +516,9 @@ CONTAINS
       character(len=256), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
-      type(t_mesh), intent(in) :: mesh
-      associate(geo_coord_nod2D=>mesh%geo_coord_nod2D)
+      type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
@@ -680,7 +680,6 @@ CONTAINS
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost, file_name)
       DEALLOCATE( sbcdata2, sbcdata1 )
-      end associate
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
@@ -724,7 +723,7 @@ CONTAINS
       integer            :: sbc_alloc                   !: allocation status
 
       real(wp)           :: tx, ty
-      type(t_mesh), intent(in)   :: mesh
+      type(t_mesh), intent(in)   , target :: mesh
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
@@ -887,9 +886,9 @@ CONTAINS
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-      type(t_mesh), intent(in) :: mesh
+      type(t_mesh), intent(in) , target :: mesh
       
-      associate(coord_nod2D=>mesh%coord_nod2D)
+#include  "associate_mesh.h"
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
@@ -940,7 +939,6 @@ CONTAINS
 
       ! interpolate in time
       call data_timeinterp(rdate)
-      end associate
    END SUBROUTINE sbc_do
 
 

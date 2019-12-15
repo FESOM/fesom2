@@ -20,7 +20,7 @@ subroutine stress_tensor_m(mesh)
   real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
   real(kind=WP)   :: val3, meancos, usum, vsum, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -75,7 +75,6 @@ subroutine stress_tensor_m(mesh)
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
  ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
  ! and similarly for si2 and sigma12
-  end associate
 end subroutine stress_tensor_m
 
 !
@@ -96,7 +95,7 @@ subroutine ssh2rhs(mesh)
   integer                  :: row, elem, elnodes(3), n
   real(kind=WP)            :: dx(3), dy(3), vol
   real(kind=WP)            :: val3, meancos, aa, bb, p_ice(3)
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   
 #include "associate_mesh.h"
 
@@ -145,7 +144,6 @@ subroutine ssh2rhs(mesh)
         rhs_m(elnodes)=rhs_m(elnodes)-bb
     end do
   end if 
-end associate
 end subroutine ssh2rhs
 !
 !===================================================================
@@ -168,7 +166,7 @@ subroutine stress2rhs_m(mesh)
   real(kind=WP)            :: dx(3), dy(3), vol
   real(kind=WP)            :: val3, mf, aa, bb
   real(kind=WP)            :: mass, cluster_area, elevation_elem(3)
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -205,7 +203,6 @@ subroutine stress2rhs_m(mesh)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
   end do
-  end associate
 end subroutine stress2rhs_m
 !
 !===================================================================
@@ -244,7 +241,7 @@ subroutine EVPdynamics_m(mesh)
   real(kind=WP)  :: vol
   real(kind=WP)  :: mf,aa, bb,p_ice(3)
   real(kind=WP)  :: mass(myDim_nod2D)
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -467,7 +464,6 @@ subroutine EVPdynamics_m(mesh)
 
   u_ice=u_ice_aux
   v_ice=v_ice_aux
-  end associate
 end subroutine EVPdynamics_m
 !
 !
@@ -495,7 +491,7 @@ subroutine find_alpha_field_a(mesh)
   real(kind=WP)            :: dx(3), dy(3), msum, asum
   real(kind=WP)            :: eps11, eps12, eps22, eps1, eps2, pressure, delta
   real(kind=WP)            :: val3, meancos, usum, vsum, vale
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -537,7 +533,6 @@ subroutine find_alpha_field_a(mesh)
      ! /voltriangle(elem) for FESOM1.4
      ! We do not allow alpha to be too small!
    end do
-   end associate
   end subroutine find_alpha_field_a  
 ! ====================================================================
 
@@ -560,7 +555,7 @@ subroutine stress_tensor_a(mesh)
   real(kind=WP)             :: eps11, eps12, eps22, eps1, eps2, pressure, delta
   real(kind=WP)             :: val3, meancos, usum, vsum, vale
   real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
-  type(t_mesh), intent(in)  :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
   
@@ -616,7 +611,6 @@ subroutine stress_tensor_a(mesh)
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
  ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
  ! and similarly for si2 and sigma12
-  end associate
 end subroutine stress_tensor_a
 !
 !===================================================================
@@ -643,7 +637,7 @@ use g_comm_auto
   real(kind=WP)    :: rdt, drag, det, fc
   real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
   REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
-  type(t_mesh), intent(in)              :: mesh
+  type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -686,7 +680,6 @@ use g_comm_auto
   call find_alpha_field_a(mesh)             ! alpha_evp_array is initialized with alpha_evp;
                                       ! At this stage we already have non-trivial velocities. 
   call find_beta_field_a(mesh)
-  end associate
 end subroutine EVPdynamics_a
 !
 ! =================================================================
@@ -705,7 +698,7 @@ use g_parsup
 Implicit none
 integer :: n
 
-type(t_mesh), intent(in)              :: mesh
+type(t_mesh), intent(in)              , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -717,7 +710,6 @@ type(t_mesh), intent(in)              :: mesh
        ! FESOM2.0
        beta_evp_array(n) =  maxval(alpha_evp_array(nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
     END DO
-end associate
 end subroutine find_beta_field_a
 ! 
 ! ================================================================

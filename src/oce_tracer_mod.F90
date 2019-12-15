@@ -12,11 +12,14 @@ USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 integer                  :: elem,  elnodes(3)
 integer                  :: n, nz
-associate(elem2D_nodes=>mesh%elem2D_nodes, nlevels=>mesh%nlevels, gradient_sca=>mesh%gradient_sca)
+
+
+#include  "associate_mesh.h"
+
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
    DO nz=1, nlevels(elem)-1   
@@ -24,7 +27,6 @@ DO elem=1, myDim_elem2D
       tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
    END DO
  END DO
-end associate
 END SUBROUTINE tracer_gradient_elements
 !========================================================================================
 SUBROUTINE init_tracers_AB(tr_num, mesh)
@@ -36,7 +38,7 @@ use g_comm_auto
 use mod_mesh
 IMPLICIT NONE
 integer                    :: tr_num,n,nz 
-type(t_mesh), intent(in)   :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 
 !filling work arrays
 del_ttf=0.0_WP
@@ -70,10 +72,10 @@ use o_arrays
 use o_PARAM, only: tracer_adv
 IMPLICIT NONE
 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 integer                  :: tr_num,n,nz
 
-associate(nlevels_nod2D=>mesh%nlevels_nod2D)
+#include  "associate_mesh.h"
 
 if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
    DO n=1, myDim_nod2D
@@ -87,7 +89,6 @@ if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
             relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
    END DO
 END IF 
-end associate
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
 !========================================================================================
@@ -99,12 +100,13 @@ USE o_ARRAYS
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 real(kind=WP)            :: dz
 integer                  :: n, nz, nlev
 
-associate(nlevels_nod2D=>mesh%nlevels_nod2D)
+#include  "associate_mesh.h"
+
 DO n=1, myDim_nod2D+eDim_nod2D
    nlev=nlevels_nod2D(n)
    DO nz=2,  nlev-1
@@ -114,5 +116,4 @@ DO n=1, myDim_nod2D+eDim_nod2D
    tr_z(1,    n)=0.0_WP
    tr_z(nlev, n)=0.0_WP
 END DO
-end associate
 END SUBROUTINE tracer_gradient_z

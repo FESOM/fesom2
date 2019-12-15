@@ -12,7 +12,7 @@ use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
 IMPLICIT NONE
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -156,7 +156,7 @@ use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -375,7 +375,6 @@ end if
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
-end associate
 END SUBROUTINE array_setup
 !==========================================================================
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
@@ -392,7 +391,7 @@ USE g_ic3d
   implicit none
   integer                  :: i, k, counter, rcounter3, id
   character(len=10)        :: i_string, id_string
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -531,6 +530,5 @@ USE g_ic3d
          stop
      END SELECT
   END DO
-  end associate
 end subroutine oce_initial_state
 !==========================================================================

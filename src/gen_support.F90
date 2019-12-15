@@ -45,7 +45,7 @@ contains
 !
 subroutine smooth_nod2D(arr, N, mesh)
   IMPLICIT NONE
-  type(t_mesh), intent(in)                   :: mesh
+  type(t_mesh), intent(in)                  , target :: mesh
   integer, intent(in)                        :: N
   real(KIND=WP), dimension(:), intent(inout) :: arr
   integer                                    :: node, elem, j, q, elnodes(3)
@@ -71,14 +71,13 @@ subroutine smooth_nod2D(arr, N, mesh)
     call exchange_nod(arr)
   END DO
   deallocate(work_array)
-  end associate
 end subroutine smooth_nod2D
 !
 !--------------------------------------------------------------------------------------------
 !
 subroutine smooth_nod3D(arr, N_smooth, mesh)
   IMPLICIT NONE
-  type(t_mesh), intent(in)       :: mesh
+  type(t_mesh), intent(in)      , target :: mesh
   integer, intent(in)            :: N_smooth
   real(KIND=WP), intent(inout)   :: arr(:,:)
 
@@ -147,7 +146,6 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
   enddo
 
   deallocate(work_array)
-  end associate
 end subroutine smooth_nod3D
 
 !
@@ -155,7 +153,7 @@ end subroutine smooth_nod3D
 !
 subroutine smooth_elem2D(arr, N, mesh)
     IMPLICIT NONE
-    type(t_mesh), intent(in)                   :: mesh
+    type(t_mesh), intent(in)                  , target :: mesh
     integer, intent(in)                        :: N
     real(KIND=WP), dimension(:), intent(inout) :: arr
     integer                                    :: node, elem, j, q, elnodes(3)
@@ -182,14 +180,13 @@ subroutine smooth_elem2D(arr, N, mesh)
         call exchange_elem(arr)
     END DO
     deallocate(work_array)
-    end associate
 end subroutine smooth_elem2D
 !
 !--------------------------------------------------------------------------------------------
 !
 subroutine smooth_elem3D(arr, N, mesh)
   IMPLICIT NONE
-  type(t_mesh), intent(in)                     :: mesh
+  type(t_mesh), intent(in)                    , target :: mesh
   integer, intent(in)                          :: N
   real(KIND=WP), dimension(:,:), intent(inout) :: arr
   integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
@@ -221,7 +218,6 @@ subroutine smooth_elem3D(arr, N, mesh)
     call exchange_elem(arr, mesh)
   END DO
   deallocate(work_array)
-  end associate
 end subroutine smooth_elem3D
 !
 !--------------------------------------------------------------------------------------------
@@ -232,7 +228,7 @@ subroutine integrate_nod_2D(data, int2D, mesh)
   use g_comm_auto
 
   IMPLICIT NONE
-  type(t_mesh),  intent(in)       :: mesh
+  type(t_mesh),  intent(in)      , target :: mesh
   real(kind=WP), intent(in)       :: data(:)
   real(kind=WP), intent(inout)    :: int2D
 
@@ -247,7 +243,6 @@ subroutine integrate_nod_2D(data, int2D, mesh)
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
-  end associate
 end subroutine integrate_nod_2D
 !
 !--------------------------------------------------------------------------------------------
@@ -257,7 +252,7 @@ subroutine integrate_nod_3D(data, int3D, mesh)
   use g_comm_auto
 
   IMPLICIT NONE
-  type(t_mesh),  intent(in)       :: mesh
+  type(t_mesh),  intent(in)      , target :: mesh
   real(kind=WP), intent(in)       :: data(:,:)
   real(kind=WP), intent(inout)    :: int3D
 
@@ -274,14 +269,13 @@ subroutine integrate_nod_3D(data, int3D, mesh)
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
-  end associate
 end subroutine integrate_nod_3D
 !
 !--------------------------------------------------------------------------------------------
 !
 subroutine extrap_nod3D(arr, mesh)
   IMPLICIT NONE
-  type(t_mesh),  intent(in)      :: mesh
+  type(t_mesh),  intent(in)     , target :: mesh
   real(KIND=WP), intent(inout)   :: arr(:,:)
   integer                        :: n, nl1, nz, k, j, el, cnt, jj
   real(kind=WP), allocatable     :: work_array(:)
@@ -340,7 +334,6 @@ subroutine extrap_nod3D(arr, mesh)
   END DO
   call exchange_nod(arr, mesh)
   deallocate(work_array)
-  end associate
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------

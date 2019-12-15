@@ -20,7 +20,7 @@ subroutine cal_shortwave_rad(mesh)
   real(kind=WP):: swsurf, aux
   real(kind=WP):: c, c2, c3, c4, c5
   real(kind=WP):: v1, v2, sc1, sc2
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -84,5 +84,4 @@ subroutine cal_shortwave_rad(mesh)
   end do
 !call par_ex
 !stop
-  end associate
 end subroutine cal_shortwave_rad

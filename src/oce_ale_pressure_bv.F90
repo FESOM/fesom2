@@ -14,7 +14,7 @@ subroutine pressure_bv(mesh)
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     IMPLICIT NONE
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                  :: node, nz, nl1, nzmax
     real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
@@ -178,7 +178,6 @@ subroutine pressure_bv(mesh)
         end do
         !_______________________________________________________________________
     ! BV is defined on full levels except for the first and the last ones.
-        end associate
 end subroutine pressure_bv
 !
 !
@@ -190,7 +189,7 @@ subroutine pressure_force_4_linfs(mesh)
     use g_PARSUP
     use mod_mesh
     implicit none
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell ) then
@@ -230,9 +229,9 @@ subroutine pressure_force_4_linfs_fullcell(mesh)
     implicit none
     
     integer                  :: elem, elnodes(3), nle, nlz
-    type(t_mesh), intent(in) :: mesh
-    associate(gradient_sca=>mesh%gradient_sca, nlevels=>mesh%nlevels, elem2D_nodes=>mesh%elem2D_nodes) 
+    type(t_mesh), intent(in) , target :: mesh
 
+#include  "associate_mesh.h"
     
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -253,7 +252,6 @@ subroutine pressure_force_4_linfs_fullcell(mesh)
             pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
         end do 
     end do !-->do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_linfs_fullcell   
 !
 !
@@ -281,7 +279,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
     real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -404,7 +402,6 @@ subroutine pressure_force_4_linfs_nemo(mesh)
         pgf_y(nle,elem) = sum(gradient_sca(4:6,elem)*hpress_n_bottom)/density_0
         
     end do ! --> do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_linfs_nemo
 !
 !
@@ -428,7 +425,7 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
     integer             :: elem, elnodes(3), nle, nlz
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -523,7 +520,6 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         
     end do ! --> do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_linfs_shchepetkin
 !
 !
@@ -546,7 +542,7 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz 
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -675,7 +671,6 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
         int_dp_dx(2)    = int_dp_dx(2) + auxp
         
     end do ! --> do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_linfs_cubicspline
 !
 !
@@ -687,7 +682,7 @@ subroutine pressure_force_4_zxxxx(mesh)
     use g_config
     use mod_mesh
     implicit none
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
     if (trim(which_pgf)=='shchepetkin') then
         call pressure_force_4_zxxxx_shchepetkin(mesh)
@@ -727,7 +722,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(mesh)
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -874,7 +869,6 @@ subroutine pressure_force_4_zxxxx_cubicspline(mesh)
             
         end do ! --> do nlz=1,nle
     end do ! --> do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_zxxxx_cubicspline
 !
 !
@@ -898,7 +892,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
     integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -1035,7 +1029,6 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         
     end do ! --> do elem=1, myDim_elem2D
-    end associate
 end subroutine pressure_force_4_zxxxx_shchepetkin
 !
 !
@@ -1061,7 +1054,7 @@ IMPLICIT NONE
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
   real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)   , target :: mesh
 #include "associate_mesh.h"
   !compute secant bulk modulus
 
@@ -1070,7 +1063,6 @@ IMPLICIT NONE
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2) 
 
   rho_out = bulk*rhopot / (bulk + 0.1_WP*pz) - density_0
-  end associate
 end subroutine densityJM_local
 		
 ! ===========================================================================
@@ -1120,7 +1112,7 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bst4 = 5.38750e-9	
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1142,7 +1134,6 @@ IMPLICIT NONE
                + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s* bss2)
-  end associate
 end subroutine densityJM_components
 ! ===================================================================
 function ptheta(s,t,p,pr)
@@ -1250,7 +1241,7 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
   use o_param
   implicit none
   !
-  type(t_mesh), intent(in) :: mesh
+  type(t_mesh), intent(in) , target :: mesh
   integer        :: n, nz
   real(kind=WP)  :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
   real(kind=WP)  :: a_over_b    
@@ -1298,7 +1289,6 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
  end do
- end associate
 end subroutine sw_alpha_beta
 !
 !----------------------------------------------------------------------------
@@ -1323,7 +1313,7 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
   use g_comm_auto
   implicit none
   !
-  type(t_mesh),  intent(in)   :: mesh
+  type(t_mesh),  intent(in)   , target :: mesh
   real(kind=WP), intent(IN)   :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D), SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
   real(kind=WP)               :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                     :: n, nz, elnodes(3),el, k, nl1
@@ -1368,7 +1358,6 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
   END DO 
 
   call exchange_nod(sigma_xy, mesh)
-  end associate
 end subroutine compute_sigma_xy
 !===============================================================================
 subroutine compute_neutral_slope(mesh)
@@ -1383,7 +1372,7 @@ subroutine compute_neutral_slope(mesh)
     integer         :: edge
     integer         :: n,nz,nl1,el(2),elnodes(3),enodes(2)
     real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
     !if sigma_xy is not computed
@@ -1410,7 +1399,6 @@ subroutine compute_neutral_slope(mesh)
 
         call exchange_nod(neutral_slope, mesh)
         call exchange_nod(slope_tapered, mesh)
-    end associate
 end subroutine compute_neutral_slope
 !===============================================================================
 !converts insitu temperature to a potential one
@@ -1425,8 +1413,10 @@ subroutine insitu2pot(mesh)
   real(kind=WP), external     :: ptheta
   real(kind=WP)               :: pp, pr, tt, ss
   integer                     :: n, nz
-  type(t_mesh), intent(in) :: mesh
-  associate(nlevels_nod2D=>mesh%nlevels_nod2D, Z=>mesh%Z) 
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+ 
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
   do n=1,myDim_nod2d+eDim_nod2D
@@ -1437,7 +1427,6 @@ subroutine insitu2pot(mesh)
         tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
      end do	
   end do
-  end associate
 end subroutine insitu2pot
 
 

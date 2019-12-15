@@ -57,8 +57,9 @@ subroutine thermodynamics(mesh)
   real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
 
-  type(t_mesh), intent(in)   :: mesh  
-  associate(geo_coord_nod2D=>mesh%geo_coord_nod2D) 
+  type(t_mesh), intent(in)   , target :: mesh  
+
+#include  "associate_mesh.h"
 
   rsss=ref_sss
 
@@ -156,7 +157,6 @@ subroutine thermodynamics(mesh)
 
   end do
      deallocate(ustar_aux)
-  end associate
 end subroutine thermodynamics
 !
 !===================================================================

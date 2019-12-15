@@ -10,7 +10,7 @@ subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     use g_PARSUP
     use g_comm_auto
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)            :: num_ord
     integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -44,7 +44,7 @@ subroutine fct_init(mesh)
     use g_PARSUP
     implicit none
     integer                  :: my_size
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -73,7 +73,6 @@ subroutine fct_init(mesh)
     fct_minus=0.0_WP
     
     if (mype==0) write(*,*) 'FCT is initialized'
-    end associate
 end subroutine fct_init
 !
 !
@@ -87,7 +86,7 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     use g_CONFIG
     use g_comm_auto
     implicit none
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     integer       :: el(2), enodes(2), n, nz, edge
     integer       :: n2, nl1, nl2,tr_num
     integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -483,7 +482,6 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     ! fct_LO contains full low-order solution
     ! fct_adf_h contains antidiffusive component of horizontal flux 
     ! fct_adf_v contains antidiffusive component of vertical fluxes
-    end associate
 end subroutine fct_ale_muscl_LH
 !
 !
@@ -503,7 +501,7 @@ subroutine fct_ale(ttf, iter_yn, mesh)
     use g_CONFIG
     use g_comm_auto
     implicit none
-    type(t_mesh), intent(in)  :: mesh
+    type(t_mesh), intent(in)  , target :: mesh
     integer                   :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
     real(kind=WP)             :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
     real(kind=WP), intent(in) :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -799,7 +797,6 @@ subroutine fct_ale(ttf, iter_yn, mesh)
 !!PS             del_ttf(nz,enodes(2))         =del_ttf(nz,enodes(2))         -fct_adf_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
-    end associate
 end subroutine fct_ale
 !
 !
@@ -817,7 +814,7 @@ subroutine fct_LO_impl_ale(mesh)
     use o_mixing_KPP_mod !for ghats _GO_        
     
     implicit none
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     real(kind=WP)       :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)       :: cp(mesh%nl), tp(mesh%nl)
     integer             :: nz, n, nzmax,tr_num
@@ -926,7 +923,6 @@ subroutine fct_LO_impl_ale(mesh)
             fct_LO(nz,n)=fct_LO(nz,n)+tr(nz)
         end do
     end do ! --> do n=1,myDim_nod2D
-    end associate
 end subroutine fct_LO_impl_ale
 !
 !

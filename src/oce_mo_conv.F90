@@ -10,7 +10,7 @@ IMPLICIT NONE
 
 integer                  :: node, elem, nz, elnodes(3)
 real(kind=WP)            :: kv_conv=0.1_WP, av_conv=0.1_WP
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -52,6 +52,5 @@ DO elem=1, myDim_elem2D
     END DO
 END DO
 !!PS call exchange_elem(Av)
-end associate
 end subroutine mo_convect
 

@@ -4,7 +4,7 @@ USE g_PARSUP
 use MOD_MESH
 IMPLICIT NONE
 
-type(t_mesh), intent(in)           :: mesh
+type(t_mesh), intent(in)           , target :: mesh
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
 
@@ -105,7 +105,6 @@ allocate(temp(max(nod2D, elem2D)))
 	 ! com_elem2%rlist should be 
 	 ! myDim_elem2D+1:myDim_elem2D+eDim_elem2D
 deallocate(temp)
-end associate
 END SUBROUTINE com_global2local       	  
 !=============================================================================
 SUBROUTINE save_dist_mesh(mesh)
@@ -115,7 +114,7 @@ SUBROUTINE save_dist_mesh(mesh)
   USE g_PARSUP 
   IMPLICIT NONE
 
-  type(t_mesh), intent(in)           :: mesh
+  type(t_mesh), intent(in)           , target :: mesh
   Integer        n, m, q, q2, counter, fileID, nend, nini,ed(2)
   character*10   mype_string,npes_string
   character*200   file_name
@@ -123,7 +122,7 @@ SUBROUTINE save_dist_mesh(mesh)
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
 
-  associate(nod2D=>mesh%nod2D, edge2D=>mesh%edge2D, edges=>mesh%edges, elem_edges=>mesh%elem_edges)
+#include  "associate_mesh.h"
 
 !!$  allocate(temp(nod2D))  ! serves for mapping
 !!$  allocate(ncount(npes+1))
@@ -306,5 +305,4 @@ SUBROUTINE save_dist_mesh(mesh)
      deallocate(ncount, temp)
      close(fileID)
   end if
-  end associate
 END subroutine  save_dist_mesh

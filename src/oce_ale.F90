@@ -30,7 +30,7 @@ subroutine init_ale(mesh)
     Implicit NONE
     
     integer                  :: n, nzmax
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
@@ -96,7 +96,7 @@ subroutine init_ale(mesh)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
-    end associate
+
 end subroutine init_ale
 !
 !
@@ -113,7 +113,7 @@ subroutine init_bottom_elem_thickness(mesh)
     
     integer       :: elem, elnodes(3), nle
     real(kind=WP) :: dd
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     
     !___________________________________________________________________________
@@ -190,7 +190,7 @@ subroutine init_bottom_elem_thickness(mesh)
             zbar_e_bot(elem) = zbar(nle)
         end do
     end if 
-    end associate
+
 END subroutine init_bottom_elem_thickness
 !
 !
@@ -208,7 +208,7 @@ subroutine init_bottom_node_thickness(mesh)
     integer       :: node, nln, elem, elemi, nelem
     real(kind=WP) :: dd 
     real(kind=WP) :: hnbot, tvol 
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     
     !___________________________________________________________________________
@@ -286,7 +286,7 @@ subroutine init_bottom_node_thickness(mesh)
             zbar_n_bot(node) = zbar(nln)
         end do
     end if 
-    end associate
+
 END subroutine init_bottom_node_thickness
 !
 !
@@ -307,7 +307,7 @@ subroutine init_thickness_ale(mesh)
     implicit none
     integer :: n, nz, elem, elnodes(3)
     real(kind=WP) :: dd 
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     
     if(mype==0) then
@@ -463,7 +463,7 @@ subroutine init_thickness_ale(mesh)
     
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
-    end associate
+   
 end subroutine init_thickness_ale
 !
 !
@@ -479,7 +479,7 @@ subroutine update_thickness_ale(mesh)
     implicit none
     integer :: n, nz, elem, elnodes(3),nzmax
     integer      , dimension(:), allocatable :: idx
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -584,7 +584,7 @@ subroutine update_thickness_ale(mesh)
             end do
         end do
     endif
-    end associate
+
 end subroutine update_thickness_ale
 !
 !
@@ -599,7 +599,7 @@ subroutine restart_thickness_ale(mesh)
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmax, lcl_lzstar_lev
     integer      , dimension(:), allocatable :: idx
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
     if(mype==0) then
@@ -644,7 +644,7 @@ subroutine restart_thickness_ale(mesh)
             
         end do
     endif
-    end associate
+
 end subroutine restart_thickness_ale
 !
 !
@@ -681,7 +681,7 @@ subroutine init_stiff_mat_ale(mesh)
     character*1000                      :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
-    type(t_mesh), intent(inout)            :: mesh
+    type(t_mesh), intent(inout)            , target :: mesh
 #include "associate_mesh.h"
 
     t0=MPI_Wtime()
@@ -922,7 +922,7 @@ subroutine init_stiff_mat_ale(mesh)
         write(*,*) '     took: ',t1-t0, ' sec'
         write(*,*) 
     endif
-    end associate
+
 end subroutine init_stiff_mat_ale
 !
 !
@@ -955,7 +955,7 @@ subroutine update_stiff_mat_ale(mesh)
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
-    type(t_mesh), intent(inout)         :: mesh
+    type(t_mesh), intent(inout)         , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1038,7 +1038,7 @@ subroutine update_stiff_mat_ale(mesh)
 !end do
 !end if
 !DS
-end associate
+
 end subroutine update_stiff_mat_ale
 !
 !
@@ -1062,7 +1062,7 @@ subroutine compute_ssh_rhs_ale(mesh)
     integer       :: ed, el(2), enodes(2),  nz,n
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
-    type(t_mesh), intent(inout) :: mesh
+    type(t_mesh), intent(inout) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1127,7 +1127,7 @@ subroutine compute_ssh_rhs_ale(mesh)
         end do
     end if
     call exchange_nod(ssh_rhs)
-    end associate
+  
 end subroutine compute_ssh_rhs_ale
 !
 !
@@ -1158,7 +1158,7 @@ subroutine compute_hbar_ale(mesh)
     
     integer      :: ed, el(2), enodes(2),  nz,n, elnodes(3), elem
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1217,7 +1217,7 @@ subroutine compute_hbar_ale(mesh)
         elnodes=elem2D_nodes(:,elem)
         dhe(elem)=sum(hbar(elnodes)-hbar_old(elnodes))/3.0_WP
     end do
-    end associate
+
 end subroutine compute_hbar_ale
 !
 !
@@ -1256,7 +1256,7 @@ subroutine vert_vel_ale(mesh)
     real(kind=WP) :: dhbar_total, dhbar_rest, distrib_dhbar_int  !PS
     real(kind=WP), dimension(:), allocatable :: max_dhbar2distr,cumsum_maxdhbar,distrib_dhbar
     integer      , dimension(:), allocatable :: idx
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1658,7 +1658,7 @@ subroutine vert_vel_ale(mesh)
         Wvel_e=Wvel
     end if
     Wvel_i=Wvel-Wvel_e
-    end associate
+ 
 end subroutine vert_vel_ale
 !
 !
@@ -1693,7 +1693,7 @@ logical, save                   :: lfirst=.true.
 real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
 real(kind=WP)                   :: cssh1,cssh2,crhs
 integer                         :: i
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1725,7 +1725,7 @@ integer(kind=C_INT)  :: n3, reuse, new_values
 integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
 real(kind=C_DOUBLE)  :: droptol, soltol
 integer :: n
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 
 interface
    subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
@@ -1798,7 +1798,7 @@ end if
     !
     !___________________________________________________________________________
 call exchange_nod(d_eta) !is this required after calling psolve ?
-end associate
+
 end subroutine solve_ssh_ale
 !
 !
@@ -1811,7 +1811,7 @@ USE g_PARSUP
 USE g_CONFIG,only: dt
 IMPLICIT NONE
 
-type(t_mesh), intent(in)   :: mesh
+type(t_mesh), intent(in)   , target :: mesh
 real(kind=WP)              ::  a(mesh%nl-1), b(mesh%nl-1), c(mesh%nl-1), ur(mesh%nl-1), vr(mesh%nl-1)
 real(kind=WP)              ::  cp(mesh%nl-1), up(mesh%nl-1), vp(mesh%nl-1)
 integer                    ::  nz, elem, nzmax, elnodes(3)
@@ -1933,7 +1933,7 @@ DO elem=1,myDim_elem2D
         UV_rhs(2,nz,elem)=vr(nz)
     end do
 end do   !!! cycle over elements
-end associate
+
 end subroutine impl_vert_visc_ale
 !
 !
@@ -1959,7 +1959,7 @@ subroutine oce_timestep_ale(n, mesh)
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
     integer           :: n
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -2185,6 +2185,6 @@ subroutine oce_timestep_ale(n, mesh)
         write(*,*)
         write(*,*)
     end if
-    end associate
+
 end subroutine oce_timestep_ale
 

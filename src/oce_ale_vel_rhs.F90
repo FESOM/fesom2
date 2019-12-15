@@ -13,7 +13,7 @@ subroutine compute_vel_rhs(mesh)
     use g_comm_auto
     
     implicit none 
-    type(t_mesh), intent(in) :: mesh   
+    type(t_mesh), intent(in) , target :: mesh   
     integer                  :: elem, elnodes(3), nz 
     real(kind=WP)            :: eta(3), ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
@@ -112,7 +112,6 @@ subroutine compute_vel_rhs(mesh)
     !    write(*,*) 'h adv       ', t3-t2
     !    write(*,*) 'vert. part  ', t4-t3
     ! end if     
-    end associate
 END SUBROUTINE compute_vel_rhs
 ! ===================================================================
 !
@@ -127,7 +126,7 @@ USE g_PARSUP
 use g_comm_auto
 IMPLICIT NONE
 
-type(t_mesh), intent(in) :: mesh
+type(t_mesh), intent(in) , target :: mesh
 integer                  :: n, nz, el1, el2
 integer                  :: nl1, nl2, nod(2), el, ed, k, nle
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
@@ -255,7 +254,6 @@ do el=1, myDim_elem2D
         + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
    
 end do
-end associate
 end subroutine momentum_adv_scalar
 
 

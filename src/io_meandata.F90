@@ -96,8 +96,9 @@ subroutine ini_mean_io(mesh)
   integer                   :: iost
   character(len=10)         :: id_string
 
-  type(t_mesh), intent(in)  :: mesh
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
@@ -452,7 +453,6 @@ END DO
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_h', 'horiz. dvd of salinity'   , 'psu/s', tr_dvd_horiz(:,:,2), 1, 'm', i_real4, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_v', 'vert. dvd of salinity'    , 'psu/s', tr_dvd_vert(:,:,2) , 1, 'm', i_real4, mesh)
     end if 
-    end associate
 end subroutine ini_mean_io
 !
 !--------------------------------------------------------------------------------------------
@@ -460,9 +460,11 @@ end subroutine ini_mean_io
 function get_dimname(n, mesh) result(s)
   implicit none
   integer       :: n
-  type(t_mesh)  :: mesh
+  type(t_mesh) , target :: mesh
   character(50) :: s
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+
+#include  "associate_mesh.h"
+
   if (n==nod2D) then
      s='nod2'
   elseif (n==elem2D) then
@@ -477,7 +479,6 @@ function get_dimname(n, mesh) result(s)
      s='unknown'
      if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with zise of ', n
   end if
-  end associate
   end function
 !
 !--------------------------------------------------------------------------------------------
@@ -595,10 +596,12 @@ subroutine write_mean(entry, mesh)
   real(real64)  , allocatable   :: aux_r8(:)
   real(real32),   allocatable   :: aux_r4(:)
   integer(int16), allocatable   :: aux_i2(:)
-  type(t_mesh), intent(in)      :: mesh  
+  type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: i, size1, size2
   integer                       :: c, lev
-  associate(nod2D=>mesh%nod2D, elem2D=>mesh%elem2D, nl=>mesh%nl)
+
+#include  "associate_mesh.h"
+
   ! Serial output implemented so far
   if (mype==0) then
      c=1
@@ -699,7 +702,6 @@ subroutine write_mean(entry, mesh)
   if (mype==0) entry%error_status(1)=nf_close(entry%ncid);
   entry%error_count=1
   call was_error(entry)
-  end associate
 end subroutine write_mean
 !
 !--------------------------------------------------------------------------------------------
@@ -764,7 +766,7 @@ subroutine output(istep, mesh)
   type(Meandata), pointer :: entry
   real(real64)  :: inv_addcounter_r8
   real(real32)  :: inv_addcounter_r4, inv_scale_factor
-  type(t_mesh), intent(in)  :: mesh
+  type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io(mesh)
@@ -855,7 +857,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   real(kind=WP), intent(in), optional  :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)             :: mesh
+  type(t_mesh), intent(in)            , target :: mesh
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)
   end if
@@ -932,7 +934,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer, intent(in), optional        :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)             :: mesh
+  type(t_mesh), intent(in)            , target :: mesh
 
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)

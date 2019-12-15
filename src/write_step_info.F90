@@ -20,7 +20,7 @@ subroutine write_step_info(istep,outfreq, mesh)
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-    type(t_mesh), intent(in)                                :: mesh
+    type(t_mesh), intent(in)                               , target :: mesh
 #include "associate_mesh.h"
 	if (mod(istep,outfreq)==0) then
 		
@@ -170,7 +170,6 @@ subroutine write_step_info(istep,outfreq, mesh)
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then
-        end associate
 end subroutine write_step_info
 !
 !
@@ -190,7 +189,7 @@ subroutine check_blowup(istep, mesh)
 	
 	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
 	integer 		  :: el, elidx
-        type(t_mesh), intent(in) :: mesh
+        type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
@@ -438,5 +437,4 @@ subroutine check_blowup(istep, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
 			call par_ex
 		endif 
-		end associate
 end subroutine

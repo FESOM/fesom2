@@ -12,7 +12,7 @@ subroutine solve_tracers_ale(mesh)
     use o_tracers
     
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: tr_num
     real(kind=WP)            :: aux_tr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 
@@ -75,7 +75,6 @@ subroutine solve_tracers_ale(mesh)
     where (tr_arr(:,:,2) < 3._WP )
         tr_arr(:,:,2)=3._WP
     end where
-    end associate
 end subroutine solve_tracers_ale
 !
 !
@@ -90,7 +89,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
                            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
     implicit none
     integer :: tr_num, node, nz
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
     !     to finite volume". At the end R_T^n should contain all advection therms and 
@@ -172,7 +171,7 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
     use g_CONFIG
     use g_comm_auto
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: el(2), enodes(2), n, nz, ed
     integer                  :: nl1, nl2, n2
     integer                  :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
@@ -453,7 +452,6 @@ subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
             end do ! --> do nz=n2+1,nl2
         end if ! --> if(nl1>nl2) then
     end do ! --> do ed=1, myDim_edge2D
-    end associate
 end subroutine adv_tracers_muscle_ale
 !
 !
@@ -467,7 +465,7 @@ subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: n, nz, nzmax
     integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP)            :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
@@ -630,7 +628,6 @@ subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
         
     end do ! --> do n=1, myDim_nod2D
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
-    end associate
 end subroutine adv_tracers_vert_ppm_ale
 !
 !
@@ -644,7 +641,7 @@ subroutine adv_tracers_vert_upw(ttf, do_Xmoment, mesh)
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: n, nz, nl1
     integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP)            :: tvert(mesh%nl), tv
@@ -678,7 +675,6 @@ subroutine adv_tracers_vert_upw(ttf, do_Xmoment, mesh)
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
         end do         
     end do ! --> do n=1, myDim_nod2D
-    end associate
 end subroutine adv_tracers_vert_upw
 !
 !
@@ -692,7 +688,7 @@ subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: n, nz, nl1
     integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP)            :: tvert(mesh%nl), tv
@@ -726,7 +722,6 @@ subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
         end do         
     end do ! --> do n=1, myDim_nod2D
-    end associate
 end subroutine adv_tracers_vert_cdiff
 !
 !
@@ -740,7 +735,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
     
     integer, intent(in)      :: tr_num
     integer                  :: n, nzmax
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -789,7 +784,6 @@ subroutine diff_tracers_ale(tr_num, mesh)
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
-    end associate
 end subroutine diff_tracers_ale
 !
 !
@@ -803,7 +797,7 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     use g_config,only: dt
     
     implicit none 
-    type(t_mesh), intent(in) :: mesh    
+    type(t_mesh), intent(in) , target :: mesh    
     real(kind=WP)            :: vd_flux(mesh%nl-1)
     real(kind=WP)            :: rdata,flux,rlx
     integer                  :: nz,nl1,tr_num,n
@@ -850,7 +844,6 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
         del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
-    end associate
 end subroutine diff_ver_part_expl_ale
 !
 !===============================================================================
@@ -866,7 +859,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         use o_mixing_KPP_mod !for ghats _GO_        
         
     implicit none
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: bc_surface    
     real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
@@ -1155,7 +1148,6 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         end do
         
     end do ! --> do n=1,myDim_nod2D   
-    end associate
 end subroutine diff_ver_part_impl_ale
 !
 !
@@ -1168,7 +1160,7 @@ subroutine diff_ver_part_redi_expl(mesh)
     use g_config
     use g_comm_auto
     IMPLICIT NONE
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     integer                  :: elem,k
     integer                  :: n2,nl1,nl2,nz,n
     real(kind=WP)            :: Tx, Ty
@@ -1222,7 +1214,6 @@ subroutine diff_ver_part_redi_expl(mesh)
             del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
         enddo
     end do
-    end associate
 end subroutine diff_ver_part_redi_expl!
 !
 !
@@ -1234,7 +1225,7 @@ subroutine diff_part_hor_redi(mesh)
     use o_param
     use g_config
     IMPLICIT NONE
-    type(t_mesh), intent(in) :: mesh
+    type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
     integer                  :: edge
     integer                  :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
@@ -1318,7 +1309,6 @@ subroutine diff_part_hor_redi(mesh)
         del_ttf(1:n2,enodes(2))=del_ttf(1:n2,enodes(2))+rhs2(1:n2)*dt/area(1:n2,enodes(2))
         
     end do
-    end associate
 end subroutine diff_part_hor_redi
 !
 !

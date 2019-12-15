@@ -318,7 +318,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   integer                       :: ind_lay_h, ind_lay_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_lay_reg
   integer, intent(in)          	:: num_mod_z,num_mod
-  real(kind=WP) 		:: x, y, z, diff 
+  real(kind=WP) 		:: x, y, zz, diff 
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
   real(kind=WP)                 :: rt_lay1, rt_lay2, v_dup, v_dlo
   real(kind=WP)                 :: data_ll, data_lh, data_hl, data_hh
@@ -329,16 +329,16 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
-  type(t_mesh),  intent(in)     :: mesh  
+  type(t_mesh),  intent(in)    , target :: mesh  
 
-  associate(nlevels_nod2D=>mesh%nlevels_nod2D) !do not replace with include statement to avoid naming conflict with mesh%Z
+#include "associate_mesh.h"
 
   do n=1,num_mod
   do nz=1,nlevels_nod2D(n)-1
 !  do nz=1,num_mod_z-1
      x=lon_mod(n)
      y=lat_mod(n)
-     z=lay_mod(nz)
+     zz=lay_mod(nz)
 
      ! find the surrounding box and get interpolation ratios
 
@@ -391,17 +391,17 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
      end if
 
      ! 3) up-down direction
-     if(z>lay_reg(1)) then
+     if(zz>lay_reg(1)) then
         ind_lay_h=1
         ind_lay_l=2
-        z=lay_reg(1)
-     elseif(z<lay_reg(num_lay_reg)) then
+        zz=lay_reg(1)
+     elseif(zz<lay_reg(num_lay_reg)) then
         ind_lay_h=num_lay_reg-1
         ind_lay_l=num_lay_reg
-        z=lay_reg(num_lay_reg)
+        zz=lay_reg(num_lay_reg)
      else
         do i=2,num_lay_reg
-           if(lay_reg(i)<=z) then
+           if(lay_reg(i)<=zz) then
               ind_lay_h=i-1
               ind_lay_l=i
               exit
@@ -409,7 +409,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
         end do
      end if
      diff=lay_reg(ind_lay_h)-lay_reg(ind_lay_l)
-     rt_lay1=(z-lay_reg(ind_lay_l))/diff
+     rt_lay1=(zz-lay_reg(ind_lay_l))/diff
      rt_lay2=1.0_WP-rt_lay1
      data_ll=data_reg(ind_lon_l,ind_lat_l,ind_lay_h)
      data_lh=data_reg(ind_lon_l,ind_lat_h,ind_lay_h)
@@ -429,7 +429,6 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
 
   end do
   end do
-  end associate
 end subroutine interp_3d_field
 !
 !---------------------------------------------------------------------------

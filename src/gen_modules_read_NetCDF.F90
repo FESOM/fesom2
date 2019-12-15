@@ -20,7 +20,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)   :: mesh
+  type(t_mesh), intent(in)  , target :: mesh
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
   integer                    :: itime, latlen, lonlen
   integer                    :: status, ncid, varid
@@ -36,7 +36,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   logical                    :: check_dummy
   integer                    :: ierror           ! return error code
 
-  associate(geo_coord_nod2D=>mesh%geo_coord_nod2D)
+#include  "associate_mesh.h"
 
   if (mype==0) then
      ! open file
@@ -146,7 +146,6 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
        model_2Darray, flag) 
   deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
-  end associate
 end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
@@ -168,7 +167,7 @@ end subroutine read_other_NetCDF
     implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)      :: mesh
+  type(t_mesh), intent(in)     , target :: mesh
   integer                       :: i, j,  n, num
   integer                       :: itime, latlen, lonlen
   integer                       :: status, ncid, varid
@@ -184,7 +183,7 @@ end subroutine read_other_NetCDF
   logical                       :: check_dummy
   integer                       :: ierror           ! return error code
 
-  associate(coord_nod2D=>mesh%coord_nod2D)
+#include  "associate_mesh.h"
 
   if (mype==0) then
      ! open file
@@ -270,7 +269,6 @@ end subroutine read_other_NetCDF
   call interp_2d_field_v2(lonlen, latlen, lon, lat, ncdata, miss, &
        num, temp_x, temp_y, model_2Darray) 
   deallocate(temp_y, temp_x, ncdata, lon, lat)
-  end associate
 end subroutine read_surf_hydrography_NetCDF
 !
 !------------------------------------------------------------------------------------
@@ -287,7 +285,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)      :: mesh
+  type(t_mesh), intent(in)     , target :: mesh
   integer                       :: n, i
   integer                       :: itime
   integer                       :: status, ncid, varid
@@ -298,7 +296,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   character(15),  intent(in)    :: vari
   integer                       :: ierror           ! return error code
 
-  associate(nod2D=>mesh%nod2D)
+#include  "associate_mesh.h"
 
   if (mype==0) then
     ! open file
@@ -322,7 +320,6 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   end if      
   call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
-  end associate    
 end subroutine read_2ddata_on_grid_NetCDF
   
 end module g_read_other_NetCDF
