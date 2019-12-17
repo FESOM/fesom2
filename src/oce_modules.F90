@@ -69,8 +69,8 @@ integer                       :: mix_scheme_nmb = 1       ! choosen in oce_setup
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 
-logical                       :: hbl_diag =.false.   ! writen boundary layer depth
-
+logical                       :: hbl_diag =.false.       ! writen boundary layer depth
+logical                       :: use_global_tides=.true. ! tidal potential will be computed and used in the SSH gradient computation
 ! Time stepping                               
 ! real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
@@ -287,7 +287,7 @@ real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
-
+real(kind=WP), allocatable    :: ssh_gp(:)
 ! Passive and age tracers
 real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      

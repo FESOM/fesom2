@@ -61,6 +61,11 @@ subroutine compute_vel_rhs
         ! the sea surface height as well as ice pressure in case of floating sea ice
         ! to velocity rhs
         pre = -(eta+p_ice)!+atmospheric pressure etc.
+
+        if (use_global_tides) then
+           pre=pre-ssh_gp(elnodes)
+        end if
+
         Fx  = sum(gradient_sca(1:3,elem)*pre)
         Fy  = sum(gradient_sca(4:6,elem)*pre)
         do nz=1,nlevels(elem)-1
