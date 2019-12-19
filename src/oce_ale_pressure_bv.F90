@@ -1357,7 +1357,7 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
         sigma_xy(2,1:nl1,n) = (-sw_alpha(1:nl1,n)*ty(1:nl1)+sw_beta(1:nl1,n)*sy(1:nl1))/vol(1:nl1)*density_0
   END DO 
 
-  call exchange_nod(sigma_xy, mesh)
+  call exchange_nod(sigma_xy)
 end subroutine compute_sigma_xy
 !===============================================================================
 subroutine compute_neutral_slope(mesh)
@@ -1397,8 +1397,8 @@ subroutine compute_neutral_slope(mesh)
         enddo
     enddo
 
-        call exchange_nod(neutral_slope, mesh)
-        call exchange_nod(slope_tapered, mesh)
+        call exchange_nod(neutral_slope)
+        call exchange_nod(slope_tapered)
 end subroutine compute_neutral_slope
 !===============================================================================
 !converts insitu temperature to a potential one

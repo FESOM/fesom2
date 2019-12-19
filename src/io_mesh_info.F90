@@ -108,7 +108,7 @@ implicit none
   ! nodal areas
   allocate(rbuffer(nod2D))
   do k=1, nl
-     call gather_nod(area(k, :), rbuffer, mesh)
+     call gather_nod(area(k, :), rbuffer)
      call my_put_vara(ncid, nod_area_id, (/1, k/), (/nod2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
@@ -139,13 +139,13 @@ implicit none
 
   ! number of levels below nodes
   allocate(ibuffer(nod2D))
-  call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer, mesh)
+  call gather_nod(nlevels_nod2D(1:myDim_nod2D), ibuffer)
   call my_put_vara(ncid, nlevels_nod2D_id, 1, nod2D, ibuffer)
   deallocate(ibuffer)
   
   ! number of elements containing the node
   allocate(ibuffer(nod2D))
-  call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer, mesh)
+  call gather_nod(nod_in_elem2D_num(1:myDim_nod2D), ibuffer)
   call my_put_vara(ncid, nod_in_elem2D_num_id, 1, nod2D, ibuffer)
   deallocate(ibuffer)
 
@@ -159,7 +159,7 @@ implicit none
               lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
            end if
         end do
-     call gather_nod(lbuffer, ibuffer, mesh)
+     call gather_nod(lbuffer, ibuffer)
      call my_put_vara(ncid, nod_in_elem2D_id, (/1, i/), (/nod2D, 1/), ibuffer)
   END DO
   deallocate(lbuffer, ibuffer)
@@ -168,7 +168,7 @@ implicit none
   allocate(ibuffer(nod2D))
   allocate(lbuffer(myDim_nod2D))  
   lbuffer=mype
-  call gather_nod(lbuffer, ibuffer, mesh)
+  call gather_nod(lbuffer, ibuffer)
   call my_put_vara(ncid, nod_part_id, 1, nod2D, ibuffer)
   deallocate(lbuffer, ibuffer)
 
@@ -184,7 +184,7 @@ implicit none
   ! nodes (GEO coordinates)
   allocate(rbuffer(nod2D))
   do i=1, 2
-     call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer, mesh)
+     call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer)
      call my_put_vara(ncid, nod_id, (/1, i/), (/nod2D, 1/), rbuffer)
   end do
   deallocate(rbuffer)
@@ -246,7 +246,7 @@ implicit none
   
   ! nodal bottom depth (take into account partial cells if used)
   allocate(rbuffer(nod2D))
-  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer, mesh)
+  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer)
   call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer)
   deallocate(rbuffer)
 

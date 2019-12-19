@@ -1199,7 +1199,7 @@ t0=MPI_Wtime()
  mesh%elem_area=mesh%elem_area*r_earth*r_earth
  mesh%area=mesh%area*r_earth*r_earth
  
- call exchange_nod(mesh%area, mesh)
+ call exchange_nod(mesh%area)
 
 do n=1,myDim_nod2d+eDim_nod2D
    do nz=1,mesh%nl

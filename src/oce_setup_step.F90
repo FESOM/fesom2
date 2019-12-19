@@ -268,7 +268,7 @@ do n=1, node_size
 !  Ki(n)=K_hor*area(1,n)/scale_area
    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
 end do
-call exchange_nod(Ki, mesh)
+call exchange_nod(Ki)
 
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP

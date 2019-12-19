@@ -28,7 +28,7 @@ type(t_mesh), intent(in) , target :: mesh
     END DO
  END DO
 eta_n=eta_n+d_eta
-call exchange_elem(UV, mesh)
+call exchange_elem(UV)
 end subroutine update_vel
 !==========================================================================
 subroutine compute_vel_nodes(mesh)
@@ -60,7 +60,7 @@ DO n=1, myDim_nod2D
       Unode(2,nz,n)=ty/tvol
    END DO
 END DO
-call exchange_nod(Unode, mesh)
+call exchange_nod(Unode)
 end subroutine compute_vel_nodes
 !===========================================================================
 SUBROUTINE viscosity_filt2x(mesh)
@@ -130,7 +130,7 @@ END DO
 !NR   END DO
 !NR end do
 
-call exchange_elem(UV_c, mesh)
+call exchange_elem(UV_c)
 
 
 DO ed=1, myDim_edge2D+eDim_edge2D
@@ -334,8 +334,8 @@ if(option==2) then
  end do
  end if
 
- call exchange_elem(U_c, mesh)
- call exchange_elem(V_c, mesh)
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -411,8 +411,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
  end do
- call exchange_elem(U_c, mesh)
- call exchange_elem(V_c, mesh)
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -508,7 +508,7 @@ type(t_mesh), intent(in) , target :: mesh
 				aux(nz,n)=vi/dz
 			END DO
 		END DO 
-		call exchange_nod(aux, mesh)
+		call exchange_nod(aux)
 		do elem=1, myDim_elem2D
 			elnodes=elem2D_nodes(:,elem)
 			nl1=nlevels(elem)-1
@@ -520,7 +520,7 @@ type(t_mesh), intent(in) , target :: mesh
 			END Do
 		end do
 	end do
-	call exchange_elem(Visc, mesh)  
+	call exchange_elem(Visc)
 	deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
@@ -592,8 +592,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
  end do
- call exchange_elem(U_c, mesh)
- call exchange_elem(V_c, mesh)
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -652,8 +652,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
     END DO 
  END DO
  
- call exchange_elem(U_c, mesh)
- call exchange_elem(V_c, mesh)
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -757,8 +757,8 @@ type(t_mesh), intent(in) , target :: mesh
      V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
- call exchange_elem(U_b, mesh)
- call exchange_elem(V_b, mesh)
+ call exchange_elem(U_b)
+ call exchange_elem(V_b)
  ! ===========
  ! Compute smoothed viscous term: 
  ! ===========
@@ -777,8 +777,8 @@ type(t_mesh), intent(in) , target :: mesh
         V_c(nz,ed)=v1/vi
     END DO
     END DO
-  call exchange_nod(U_c, mesh)
-  call exchange_nod(V_c, mesh)
+  call exchange_nod(U_c)
+  call exchange_nod(V_c)
   do ed=1, myDim_elem2D
          nelem=elem2D_nodes(:,ed)
          Do nz=1, nlevels(ed)-1

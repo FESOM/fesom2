@@ -112,7 +112,7 @@ type(t_mesh), target, save      :: mesh
     !___IF RESTART WITH ZLEVEL OR ZSTAR IS DONE, ALSO THE ACTUAL LEVELS AND ____
     !___MIDDEPTH LEVELS NEEDS TO BE CALCULATET AT RESTART_______________________
     if (r_restart) then
-        call restart_thickness_ale
+        call restart_thickness_ale(mesh)
     end if
 
     if (mype==0) then

@@ -21,7 +21,7 @@ subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment, mesh)
         
     if (w_split) then
         call fct_LO_impl_ale(mesh)
-        call exchange_nod(fct_LO, mesh)
+        call exchange_nod(fct_LO)
     end if
 
     !just for using the low order:
@@ -477,7 +477,7 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     end do ! --> do n=1, myDim_nod2D
     
     !___________________________________________________________________________
-    call exchange_nod(fct_LO, mesh) 
+    call exchange_nod(fct_LO)
     ! Summary:   
     ! fct_LO contains full low-order solution
     ! fct_adf_h contains antidiffusive component of horizontal flux 
@@ -679,7 +679,7 @@ subroutine fct_ale(ttf, iter_yn, mesh)
     end do 
     
     ! fct_minus and fct_plus must be known to neighbouring PE
-    call exchange_nod(fct_plus, fct_minus, mesh)
+    call exchange_nod(fct_plus, fct_minus)
     
     !___________________________________________________________________________
     ! b3. Limiting   

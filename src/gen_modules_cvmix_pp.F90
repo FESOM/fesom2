@@ -320,13 +320,13 @@ module g_cvmix_pp
         
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(pp_Kv, mesh)
+        call exchange_nod(pp_Kv)
         Kv = pp_Kv
            
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(pp_Av, mesh)
+        call exchange_nod(pp_Av)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

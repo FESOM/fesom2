@@ -358,7 +358,7 @@ module g_cvmix_idemix
         
             ! make boundary exchange for iwe, and iwe_v0 --> for propagation need
             ! to calculate edge contribution that crosses the halo
-            call exchange_nod(iwe,mesh)
+            call exchange_nod(iwe)
             
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
@@ -415,8 +415,8 @@ module g_cvmix_idemix
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
             end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli, mesh)
-            call exchange_nod(iwe_v0, mesh)
+            call exchange_nod(vol_wcelli)
+            call exchange_nod(iwe_v0)
             
             !___________________________________________________________________
             ! calculate horizontal diffusion term for internal wave energy
@@ -586,12 +586,12 @@ module g_cvmix_idemix
         if(mix_scheme_nmb==6) then 
             !___________________________________________________________________
             ! write out diffusivity
-            call exchange_nod(iwe_Kv, mesh)
+            call exchange_nod(iwe_Kv)
             Kv = iwe_Kv
             
             !___________________________________________________________________
             ! write out viscosity -->interpolate therefor from nodes to elements
-            call exchange_nod(iwe_Av, mesh) !Warning: don't forget to communicate before averaging on elements!!!
+            call exchange_nod(iwe_Av) !Warning: don't forget to communicate before averaging on elements!!!
             do elem=1, myDim_elem2D
                 elnodes1=elem2D_nodes(:,elem)
                 do nz=1,nlevels(elem)-1

@@ -1605,9 +1605,9 @@ subroutine vert_vel_ale(mesh)
     endif
     
     !___________________________________________________________________________
-    call exchange_nod(Wvel, mesh) 
-    call exchange_nod(hnode_new, mesh)   ! Or extend cycles above  
-    if (Fer_GM) call exchange_nod(fer_Wvel, mesh)
+    call exchange_nod(Wvel) 
+    call exchange_nod(hnode_new)   ! Or extend cycles above  
+    if (Fer_GM) call exchange_nod(fer_Wvel)
     
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting

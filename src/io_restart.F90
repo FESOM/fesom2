@@ -449,7 +449,7 @@ subroutine write_restart(id, istep, mesh)
      if (shape==1) then
         size1=id%var(i)%dims(1)
         if (mype==0) allocate(aux(size1))
-        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux, mesh)
+        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
         if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
         if (mype==0) then
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
@@ -466,7 +466,7 @@ subroutine write_restart(id, istep, mesh)
            laux=id%var(i)%pt2(lev,:)
 !          if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2(lev,:), aux)
 !          if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2(lev,:), aux)
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (laux, aux, mesh)
+           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (laux, aux)
            if (size1==elem2D .or. size2==elem2D) call gather_elem(laux, aux)
            if (mype==0) then
               id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1

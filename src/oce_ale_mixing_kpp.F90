@@ -351,9 +351,9 @@ contains
     CALL enhance(viscA, diffK, mesh)
 
     if (smooth_blmc) then
-       call exchange_nod(blmc(:,:,1), mesh) 
-       call exchange_nod(blmc(:,:,2), mesh)
-       call exchange_nod(blmc(:,:,3), mesh)
+       call exchange_nod(blmc(:,:,1))
+       call exchange_nod(blmc(:,:,2))
+       call exchange_nod(blmc(:,:,3))
        do j=1, 3
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
@@ -379,11 +379,11 @@ contains
   !_____________________________________________________________________________
   ! do all node loops only over myDim_nod2D --> therefore do an halo exchange 
   ! only at the end should save some time
-  call exchange_nod(diffK(:,:,1), mesh)
-  call exchange_nod(diffK(:,:,2), mesh)
+  call exchange_nod(diffK(:,:,1))
+  call exchange_nod(diffK(:,:,2))
 
 ! OVER ELEMENTS 
-  call exchange_nod(viscA, mesh) !Warning: don't forget to communicate before averaging on elements!!!
+  call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      DO nz=1,nlevels(elem)-1

@@ -822,9 +822,9 @@ module g_cvmix_kpp
         ! 8) horizontal smoothing of the OBL mixing coefficient --> approach from
         ! original kpp parameterisation of FESOM1.4 & FESOM2.0
         if (kpp_use_smoothblmc .and. kpp_use_fesomkpp) then
-            call exchange_nod(kpp_oblmixc(:,:,1), mesh)
-            call exchange_nod(kpp_oblmixc(:,:,2), mesh)
-            call exchange_nod(kpp_oblmixc(:,:,3), mesh)
+            call exchange_nod(kpp_oblmixc(:,:,1))
+            call exchange_nod(kpp_oblmixc(:,:,2))
+            call exchange_nod(kpp_oblmixc(:,:,3))
             do nz=1, 3
                 !_______________________________________________________________
                 ! all loops go over myDim_nod2D so no halo information --> for 
@@ -859,13 +859,13 @@ module g_cvmix_kpp
         
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(kpp_Kv, mesh)
+        call exchange_nod(kpp_Kv)
         Kv = kpp_Kv
         
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(kpp_Av, mesh)
+        call exchange_nod(kpp_Av)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

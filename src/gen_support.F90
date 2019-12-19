@@ -117,7 +117,7 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
      END DO
   end DO
-  call exchange_nod(arr, mesh)
+  call exchange_nod(arr)
 
 ! And the remaining smoothing sweeps
 
@@ -142,7 +142,7 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
      end DO
-     call exchange_nod(arr, mesh)
+     call exchange_nod(arr)
   enddo
 
   deallocate(work_array)
@@ -215,7 +215,7 @@ subroutine smooth_elem3D(arr, N, mesh)
        elnodes=elem2D_nodes(:, elem)
        arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
     ENDDO
-    call exchange_elem(arr, mesh)
+    call exchange_elem(arr)
   END DO
   deallocate(work_array)
 end subroutine smooth_elem3D
@@ -287,7 +287,7 @@ subroutine extrap_nod3D(arr, mesh)
 #include "associate_mesh.h"
 
   allocate(work_array(myDim_nod2D+eDim_nod2D))
-  call exchange_nod(arr, mesh)
+  call exchange_nod(arr)
   loc_max=maxval(arr(1,:))
   glob_max=0._WP
   call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -321,7 +321,7 @@ subroutine extrap_nod3D(arr, mesh)
         END DO
      arr(nz,:)=work_array
      ENDDO
-     call exchange_nod(arr, mesh)
+     call exchange_nod(arr)
      loc_max=maxval(arr(1,:))
      call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)         
   END DO
@@ -332,7 +332,7 @@ subroutine extrap_nod3D(arr, mesh)
         if (arr(nz,n)>0.99_WP*dummy) arr(nz,n)=arr(nz-1,n)
      END DO
   END DO
-  call exchange_nod(arr, mesh)
+  call exchange_nod(arr)
   deallocate(work_array)
 end subroutine extrap_nod3D
 !

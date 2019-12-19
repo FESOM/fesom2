@@ -92,7 +92,7 @@ subroutine fer_solve_Gamma(mesh)
 		end do
 	END DO   !!! cycle over nodes
 	
-	call exchange_nod(fer_gamma, mesh)
+	call exchange_nod(fer_gamma)
 END subroutine fer_solve_Gamma
 !====================================================================
 subroutine fer_gamma2vel(mesh)
@@ -121,7 +121,7 @@ subroutine fer_gamma2vel(mesh)
          fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
       END DO
    END DO
-   call exchange_elem(fer_uv, mesh)
+   call exchange_elem(fer_uv)
 end subroutine fer_gamma2vel
 !
 !
@@ -285,7 +285,7 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
    end do
 
    if (Fer_GM) call exchange_nod(fer_c)
-   if (Fer_GM) call exchange_nod(fer_k, mesh)
-   if (Redi)   call exchange_nod(Ki, mesh)
+   if (Fer_GM) call exchange_nod(fer_k)
+   if (Redi)   call exchange_nod(Ki)
 end subroutine init_Redi_GM
 !====================================================================

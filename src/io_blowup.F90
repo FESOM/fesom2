@@ -364,7 +364,7 @@ MODULE io_BLOWUP
 			if (shape==1) then
 				size1=id%var(i)%dims(1)
 				if (mype==0) allocate(aux1(size1))
-				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1, mesh)
+				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1)
 				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1)
 				if (mype==0) then
 				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
@@ -375,8 +375,8 @@ MODULE io_BLOWUP
 				size1=id%var(i)%dims(1)
 				size2=id%var(i)%dims(2)
 				if (mype==0) allocate(aux2(size1, size2))
-				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2, mesh)
-				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2, mesh)
+				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2)
+				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2)
 				if (mype==0) then
 				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
 				end if

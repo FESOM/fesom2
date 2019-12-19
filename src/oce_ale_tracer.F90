@@ -50,7 +50,7 @@ subroutine solve_tracers_ale(mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         call relax_to_clim(tr_num, mesh)
         
-        call exchange_nod(tr_arr(:,:,tr_num), mesh)
+        call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
     !___________________________________________________________________________

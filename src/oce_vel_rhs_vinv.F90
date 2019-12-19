@@ -60,7 +60,7 @@ DO n=1,myDim_nod2D
       vorticity(nz,n)=vorticity(nz,n)/area(nz,n)
    END DO
 END DO      
- call exchange_nod(vorticity, mesh)
+ call exchange_nod(vorticity)
 ! Now it the relative vorticity known on neighbors too
 end subroutine relative_vorticity
 ! ==========================================================================
@@ -119,7 +119,7 @@ DO n=1,myDim_edge2D
    endif
 end DO   
  
- call exchange_nod(KE_node, mesh)
+ call exchange_nod(KE_node)
 ! Now gradients of KE will be correct on myDim_elem2D
 
 ! ==================

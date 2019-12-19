@@ -217,13 +217,13 @@ module g_cvmix_tidal
         ! 
         ! MPIOM note 2: background diffusivities were already added in the mixed layer 
         !               scheme (KPP)
-        call exchange_nod(tidal_Kv, mesh)
+        call exchange_nod(tidal_Kv)
         Kv = Kv + tidal_Kv
             
         !_______________________________________________________________________
         ! add tidal viscosity to main model diffusivity Av -->interpolate 
         ! therefor from nodes to elements
-        call exchange_nod(tidal_Av, mesh)
+        call exchange_nod(tidal_Av)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             do nz=1,nlevels(elem)-1
