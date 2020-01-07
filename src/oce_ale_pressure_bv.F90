@@ -192,7 +192,11 @@ subroutine pressure_force_4_linfs
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell ) then
-        call pressure_force_4_linfs_fullcell
+        if     (trim(which_pgf)=='fullcell_test') then
+            call pressure_force_4_linfs_fullcell_test
+        else
+            call pressure_force_4_linfs_fullcell
+        end if    
         
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
@@ -249,6 +253,53 @@ subroutine pressure_force_4_linfs_fullcell
         end do 
     end do !-->do elem=1, myDim_elem2D
 end subroutine pressure_force_4_linfs_fullcell   
+!
+!
+!
+!===============================================================================
+! calculate pressure gradient force for linfs in case full cells
+subroutine pressure_force_4_linfs_fullcell_test
+    use o_PARAM
+    use o_MESH
+    use o_ARRAYS
+    use g_PARSUP
+    use g_config
+    implicit none
+    
+    integer             :: elem, elnodes(3), nle, nlz
+    real(kind=WP)       :: int_dp_dx(2), drho_dx, aux_sum
+    
+    !___________________________________________________________________________
+    ! loop over triangular elemments
+    do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        ! number of levels at elem
+        nle=nlevels(elem)-1
+            
+        !_______________________________________________________________________
+        ! node indices of elem 
+        elnodes = elem2D_nodes(:,elem)
+        
+        int_dp_dx     = 0.0_WP
+        do nlz=1,nle
+            !___________________________________________________________________
+            ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! --> in case linfs: dz_dx == 0.0
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+            
+        end do ! --> do nlz=1,nle-1
+    end do !-->do elem=1, myDim_elem2D
+end subroutine pressure_force_4_linfs_fullcell_test
 !
 !
 !
