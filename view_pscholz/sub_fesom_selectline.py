@@ -426,29 +426,33 @@ class fesom_line:
             if usemidpts==True:
                 distances, inds = create_indexes_and_distances(mesh,
                                                 np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
-                                                k=10, n_jobs=2,which=which)
+                                                k=3, n_jobs=2,which=which)
+                                                #k=10, n_jobs=2,which=which)
             else:
                 distances, inds = create_indexes_and_distances(mesh,
                                                     np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),\
-                                                    k=10, n_jobs=2,which=which)
-            
+                                                    k=3, n_jobs=2,which=which)
+                                                    #k=10, n_jobs=2,which=which)            
             if len(bckp_value3)!=0:
                 which='node'
                 if bckp_value3.shape[0]==mesh.n2dea: which='elem'
                 if usemidpts==True:
                     distances3, inds3 = create_indexes_and_distances(mesh,
                                                 np.array(self.line_interp_pm[ii][0]), np.array(self.line_interp_pm[ii][1]),
-                                                k=10, n_jobs=2,which=which)
+                                                k=3, n_jobs=2,which=which)
+                                                #k=10, n_jobs=2,which=which)                    
                 else:
                     distances3, inds3 = create_indexes_and_distances(mesh,
                                                 np.array(self.line_interp_p[ii][0]), np.array(self.line_interp_p[ii][1]),
-                                                k=10, n_jobs=2,which=which)
+                                                k=3, n_jobs=2,which=which)
+                                                #k=10, n_jobs=2,which=which)                    
                 
             #___________________________________________________________________
             for di in range(0,nlev):
                 data_di   = np.copy(bckp_value[:,di])
                 if bckp_value.shape[0]==mesh.n2dna:
-                    data_di[di>=mesh.nodes_2d_izg-1]=np.nan
+                    #data_di[di>=mesh.nodes_2d_izg-1]=np.nan
+                    data_di[di>mesh.nodes_2d_izg-1]=np.nan
                 elif bckp_value.shape[0]==mesh.n2dea:
                     data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
                     
@@ -456,7 +460,6 @@ class fesom_line:
                     #aux = fesom2regular(data_di, mesh,
                                     #np.array(self.line_interp_pm[ii][0]),np.array(self.line_interp_pm[ii][1]),
                                     #distances=distances, inds=inds)
-                    
                     self.value[ii][:,di]=fesom2regular(data_di, mesh,
                                     np.array(self.line_interp_pm[ii][0]),np.array(self.line_interp_pm[ii][1]),
                                     distances=distances, inds=inds)
@@ -906,7 +909,7 @@ class fesom_line:
     #+_________________________________________________________________________+
     def plot_lines_dist_x_z(self,numb=[],figsize=[],do_subplot=[],do_output=True,
                             do_xlabel=True,do_ylabel=True,do_title=True,do_cbar=True,
-                            allow_save=True,maxdep=[],which_lines=[1,1,1]):
+                            allow_save=True,maxdep=[],which_lines=[1,1,1],do_2ndax=True,do_lname=False):
         from set_inputarray import inputarray
         fsize = 12
         
@@ -926,9 +929,11 @@ class fesom_line:
                 fig,ax1 = plt.figure(figsize=figsize), plt.gca()
             else:
                 fig,ax1 = do_subplot[0], do_subplot[1]
+                fig.sca(ax1)
             
             if np.unique(self.line_interp_p[0][0]).size!=1 and \
-               np.unique(self.line_interp_p[0][1]).size!=1: ax2  = ax1.twiny()
+               np.unique(self.line_interp_p[0][1]).size!=1: 
+                if do_2ndax: ax2  = ax1.twiny()
             
             #___________________________________________________________________
             if self.var.find('vec')!=-1:
@@ -965,7 +970,7 @@ class fesom_line:
             #___________________________________________________________________
             # set x-axis
             if np.unique(self.line_interp_p[0][0]).size==1:
-                xvec,str_xlabel = np.array(self.line_interp_pm[ii][1]),'Lattitude [deg]'
+                xvec,str_xlabel = np.array(self.line_interp_pm[ii][1]),'Latitude [deg]'
             elif np.unique(self.line_interp_p[0][1]).size==1:    
                 xvec,str_xlabel = np.array(self.line_interp_pm[ii][0]),'Longitude [deg]'
             else:    
@@ -1063,15 +1068,19 @@ class fesom_line:
                 ax1.set_yticklabels([])
             #if do_title:  ax1.set_title(self.descript+' '+self.line_define[0][2]+'\n',fontdict= dict(fontsize=fsize+2),verticalalignment='bottom')
             
-            txtx, txty = xvec[0]+5,maxdep-100
-            ax1.text(txtx,txty,self.descript+' '+self.line_define[0][2] , fontsize=14, fontweight='bold',horizontalalignment='left')
+            txtx, txty = xvec[0]+(xvec[-1]-xvec[0])*0.025,maxdep-(maxdep*0.025)
+            if do_lname:
+                ax1.text(txtx,txty,self.descript+' '+self.line_define[0][2] , fontsize=14, fontweight='bold',horizontalalignment='left')
+            else: 
+                ax1.text(txtx,txty,self.descript, fontsize=14, fontweight='bold',horizontalalignment='left')
             #___________________________________________________________________
             # set upper secondary x-axes
             if np.unique(self.line_interp_p[0][0]).size!=1 and \
-               np.unique(self.line_interp_p[0][1]).size!=1:  
+               np.unique(self.line_interp_p[0][1]).size!=1 and do_2ndax:  
                 ax2.set_xlim(xvec.min(),xvec.max())
                 ax2.set_ylim(0,maxdep)
                 ax2.invert_yaxis()
+                ax1.invert_yaxis()
                 #_______________________________________________________________
                 lonticklabels=[]
                 for jj in range(0,len(self.line_define[ii][0])): 
@@ -1080,6 +1089,9 @@ class fesom_line:
                     strlat='N' ; 
                     if self.line_define[ii][1][jj]<0:strlat='S'
                     lonticklabels.append('{:2.2f}$^{{\\circ}}${:s}\n{:2.2f}$^{{\\circ}}${:s}'.format((self.line_define[ii][0][jj]),strlon,(self.line_define[ii][1][jj]),strlat))
+                ax2.plot(self.line_define_dist[ii][0],0 ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.0,0.8,0.0],mec='k',clip_on=False)
+                ax2.plot(self.line_define_dist[ii][1],0 ,color='k',linewidth=0.5,marker='s',markersize=8,mfc=[0.8,0.0,0.0],mec='k',clip_on=False)
+                
                 ax2.set_xticks(self.line_define_dist[ii])
                 ax2.set_xticklabels(lonticklabels,fontdict=dict(fontsize=10))
                 #ax2.set_xlabel('Longitude/Latitude [deg]',fontdict=dict(fontsize=fsize),verticalalignment='top')
@@ -1117,7 +1129,7 @@ class fesom_line:
             # bug fix workaround to proper draw secondary axes
             fig.canvas.draw()
             if np.unique(self.line_interp_p[0][0]).size!=1 and \
-               np.unique(self.line_interp_p[0][1]).size!=1: ax2.set_position(ax1.get_position())
+               np.unique(self.line_interp_p[0][1]).size!=1 and do_2ndax: ax2.set_position(ax1.get_position())
             
             #___________________________________________________________________
             # save figure
@@ -1146,10 +1158,12 @@ class fesom_line:
     #+_________________________________________________________________________+
     #|                         PLOT LINE POSITION                                |
     #+_________________________________________________________________________+
-    def plot_lines_position(self,mesh,numb=[]):
+    def plot_lines_position(self,mesh,cmap,clevel,cref,numb=[],figsize=[],
+                            do_subplot=[],do_nvec=False, do_cbar=True, allow_save=True,do_grid=False):
         from set_inputarray import inputarray
-        fsize=16
+        fsize=10
         
+        if len(figsize)==0 : figsize=[12,6]
         #_______________________________________________________________________
         if isinstance(numb,int)==True : numb = [numb]
         if len(numb)==0 : numb=range(0,len(self.line_define))
@@ -1157,15 +1171,26 @@ class fesom_line:
         #_______________________________________________________________________
         # draw position of line
         for ii in numb:
-        
+            #_______________________________________________________________________
+            # plot is not part of subplot
+            if len(do_subplot)==0:
+                fig,ax = plt.figure(figsize=figsize), plt.gca()
+            else:
+                fig,ax = do_subplot[0], do_subplot[1]
+                fig.sca(ax)
+                
             #___________________________________________________________________
             xmin,xmax = np.min(self.line_define[ii][0]), np.max(self.line_define[ii][0])
             ymin,ymax = np.min(self.line_define[ii][1]), np.max(self.line_define[ii][1])
-            xmin,xmax,ymin,ymax = xmin-20.0, xmax+20.0, ymin-20.0, ymax+20.0
+            
+            if xmin==xmax: xmin,xmax = xmin-(ymax-ymin)/2,xmin+(ymax-ymin)/2,  
+            if ymin==ymax: ymin,ymax = ymin-(xmax-xmin)/2,ymin+(xmax-xmin)/2,  
+            
+            xmin,xmax,ymin,ymax = xmin-5.0, xmax+5.0, ymin-5.0, ymax+5.0
             xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
             print(xmin,xmax,ymin,ymax)
             #___________________________________________________________________
-            fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
+            #fig, ax = plt.figure(figsize=(13, 13)), plt.gca()
             map     = Basemap(projection = 'cyl',resolution = 'c',
                         llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
             mx,my     = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -1177,15 +1202,28 @@ class fesom_line:
             idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<ymin)
             idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>ymax)
             tri.set_mask(idxbox_e)
-            hp1        = plt.tripcolor(tri,-mesh.nodes_2d_zg,
-                        cmap=cmocean.cm.dense, #cm.gist_ncar, #cm.nipy_spectral, #cmocean.cm.deep,
-                        antialiased=False,
-                        edgecolors='None',
-                        shading='gouraud')
-            
+            #hp1        = plt.tripcolor(tri,-mesh.nodes_2d_zg,
+                        #cmap=cmap, #cm.gist_ncar, #cm.nipy_spectral, #cmocean.cm.deep,
+                        #antialiased=False,
+                        #edgecolors='None',
+                        #shading='gouraud')
+            data_plot = -mesh.nodes_2d_zg
+            data_plot[data_plot<clevel[ 0]] = clevel[ 0]+np.finfo(np.float32).eps
+            data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
+            hp1=ax.tricontourf(tri,data_plot,levels=clevel,antialiased=False,extend='both',cmap=cmap)
+            if do_grid: ax.triplot(tri,color='k',linewidth=.8,alpha=0.8)
+    
             #___________________________________________________________________
+            step=np.array([1.0,2.0,5.0,10.0,15.0,30.0,45.0,60.0])
+            nxyl = [5,5]
+            idx = np.array(np.where(step>=(xmax-xmin)/nxyl[0])[0])
+            if idx.size==0 : idx = np.array([step.size-1])
+            stepx=step[idx[0]]
+            idx = np.array(np.where(step>=(ymax-ymin)/nxyl[1])[0])
+            if idx.size==0 : idx = np.array([step.size-1])
+            stepy=step[idx[0]]
+            xticks , yticks =np.arange(-180.,180.+1,stepx), np.arange(-90.,90.+1,stepy)
             xlabels,ylabels=[0,0,0,1],[1,0,0,0]
-            xticks,yticks = np.arange(0.,360.,10.), np.arange(-90.,90.,5.)
             map.drawparallels(yticks,labels=ylabels,fontsize=fsize)
             map.drawmeridians(xticks,labels=xlabels,fontsize=fsize)
             fesom_plot_lmask(map,mesh,ax,'0.6','k')
@@ -1200,23 +1238,48 @@ class fesom_line:
             
             #ax.plot(self.line_interp_pm[ii][0],self.line_interp_pm[ii][1] ,
             #color='r',linewidth=4,marker='+',linestyle='None',axes=ax,markersize=6,mfc='r')
-            # plot arrow in middle of each line section element
-            for jj in range(0,len(self.line_define_dist[ii])-1):
-                middist = self.line_define_dist[ii][jj]+(self.line_define_dist[ii][jj+1]-self.line_define_dist[ii][jj])/2
-                mididx  = np.abs(np.array(self.line_interp_pm_dist[0]-middist)).argmin()
-                ax.quiver(self.line_interp_pm[ii][0][mididx],self.line_interp_pm[ii][1][mididx],
-                      self.line_interp_pm_nvec[ii][0][mididx],self.line_interp_pm_nvec[ii][1][mididx],color='w',scale=10.0)
-            plt.title(self.line_define[ii][2],fontdict=dict(fontsize=fsize*2),verticalalignment='bottom')
+            if do_nvec:
+                # plot arrow in middle of each line section element
+                for jj in range(0,len(self.line_define_dist[ii])-1):
+                    middist = self.line_define_dist[ii][jj]+(self.line_define_dist[ii][jj+1]-self.line_define_dist[ii][jj])/2
+                    mididx  = np.abs(np.array(self.line_interp_pm_dist[0]-middist)).argmin()
+                    ax.quiver(self.line_interp_pm[ii][0][mididx],self.line_interp_pm[ii][1][mididx],
+                        self.line_interp_pm_nvec[ii][0][mididx],self.line_interp_pm_nvec[ii][1][mididx],color='w',scale=10.0)
+                plt.title(self.line_define[ii][2],fontdict=dict(fontsize=fsize*2),verticalalignment='bottom')
             
             #___________________________________________________________________
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size="2.5%", pad=0.1)
-            
-            cbar = plt.colorbar(hp1,cax=cax,ticks=np.arange(0,6500,500))
+            #divider = make_axes_locatable(ax)
+            #cax = divider.append_axes("right", size="2.5%", pad=0.1)
+            if do_cbar:
+                cbar = plt.colorbar(hp1,ax=ax,orientation='vertical',\
+                            ticks=clevel,drawedges=True,extend='neither',\
+                            extendrect=True,extendfrac='auto')
+                ncl=10
+                
+                cbar.set_label('depth [m]', size=12)
+                if cbar.orientation=='vertical': tickl = cbar.ax.get_yticklabels()
+                else:                            tickl = cbar.ax.get_xticklabels()
+                ncbar_l=len(tickl[:])
+                idx_cref = np.where(clevel==cref)[0]
+                idx_cref = np.asscalar(idx_cref)
+                nstep = ncbar_l/ncl
+                nstep = np.int(np.floor(nstep))
+                if nstep==0: nstep=1
+                idx = np.arange(0,len(tickl),1)
+                idxb = np.ones((len(tickl),), dtype=bool)                
+                idxb[idx_cref::nstep]  = False
+                idxb[idx_cref::-nstep] = False
+                idx = idx[idxb==True]
+                for jj in list(idx):
+                    tickl[jj]=''
+                if cbar.orientation=='vertical':cbar.ax.set_yticklabels(tickl)
+                else:                           cbar.ax.set_xticklabels(tickl)    
+            plt.show(block=False)
+            fig.canvas.draw()
             
             #___________________________________________________________________
             # save figure
-            if inputarray['save_fig']==True:
+            if inputarray['save_fig']==True and allow_save:
                 print(' --> save figure: png')
                 sfname = 'lineplot_'+self.line_define[ii][2]+'_position'+'.png'
                 sdname = inputarray['save_figpath']
@@ -1227,5 +1290,8 @@ class fesom_line:
                             transparent=True,frameon=True)
             
             #___________________________________________________________________
-            plt.show(block=False)
-            fig.canvas.draw()
+            if do_cbar : 
+                return(fig,ax,cbar,clevel,hp1)
+            else:
+                return(fig,ax,clevel,hp1)
+            

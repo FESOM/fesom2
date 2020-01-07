@@ -579,16 +579,35 @@ class fesom_mesh:
         if len(self.elem0_2d_area)==0: self.fesom_calc_triarea()
         if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
         
-        if data_e.size==self.n2de:
-            data_e=data_e*self.elem0_2d_area
-        elif data_e.size==self.n2dea:
-            data_e=data_e*np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
-        
-        data_n=np.zeros((self.n2dna,))
-        for ii in range(self.n2de):     
-            data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii] 
-        data_n[0:self.n2dn]=data_n[0:self.n2dn]/self.nodes_2d_area[0:self.n2dn]/3. 
-        data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
+        if data_e.ndim==1:
+            if data_e.size==self.n2de:
+                data_e=data_e*self.elem0_2d_area
+            elif data_e.size==self.n2dea:
+                data_e=data_e*np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
+            
+            data_n=np.zeros((self.n2dna,))
+            for ii in range(self.n2de):     
+                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii] 
+            data_n[0:self.n2dn]=data_n[0:self.n2dn]/self.nodes_2d_area[0:self.n2dn]/3. 
+            data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
+            
+        elif data_e.ndim==2:
+            nd1 = data_e.shape[0]
+            nd2 = data_e.shape[1]
+            
+            if data_e.shape[0]==self.n2de:
+                data_e=data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
+            elif data_e.shape[0]==self.n2dea:
+                area_di = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
+                data_e=data_e*np.matlib.repmat(area_di,nd2,1).transpose()
+                del area_di
+            
+            data_n=np.zeros((self.n2dna,nd2))
+            for ii in range(self.n2de):     
+                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e[ii,:],3,1)  
+            data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/np.matlib.repmat(self.nodes_2d_area[0:self.n2dn]/3.,nd2,1).transpose()
+            data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
+            
         
         return data_n
     
