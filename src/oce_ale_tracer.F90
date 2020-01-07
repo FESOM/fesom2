@@ -12,7 +12,7 @@ subroutine solve_tracers_ale
     use o_tracers
     
     implicit none
-    integer :: tr_num
+    integer :: tr_num, node, nzmax
     real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
     !___________________________________________________________________________
     if (SPP) call cal_rejected_salt
@@ -65,13 +65,19 @@ subroutine solve_tracers_ale
     
     !___________________________________________________________________________
     ! to avoid crash with high salinities when coupled to atmosphere
-    where (tr_arr(:,:,2) > 45._WP)
-        tr_arr(:,:,2)=45._WP
-    end where
+    ! --> if we do only where (tr_arr(:,:,2) < 3._WP ) we also fill up the bottom 
+    !     topogrpahy with values which are then writte into the output --> thats why
+    !     do node=1,.... and tr_arr(node,1:nzmax,2)
+    do node=1,myDim_nod2D+eDim_nod2D
+        nzmax=nlevels_nod2D(node)-1
+        where (tr_arr(node,1:nzmax,2) > 45._WP)
+            tr_arr(node,1:nzmax,2)=45._WP
+        end where
 
-    where (tr_arr(:,:,2) < 3._WP )
-        tr_arr(:,:,2)=3._WP
-    end where
+        where (tr_arr(node,1:nzmax,2) < 3._WP )
+            tr_arr(node,1:nzmax,2)=3._WP
+        end where
+    end do    
 
 end subroutine solve_tracers_ale
 !

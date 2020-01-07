@@ -15,7 +15,8 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False, which_orient='vertical' ):
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False, 
+                      which_orient='vertical', nmax_cbar_l=8 ):
     if do_output==True:
         print('')
         print('___PLOT 2D DATA____________________________________________')
@@ -77,7 +78,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         ylabels=[1,0,0,0]
         xlabels=[0,0,0,1]
         ticknr   = 8
-        tickstep = np.array([1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
+        tickstep = np.array([0.5,1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
         idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
@@ -260,19 +261,19 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 antialiased=False,
                 edgecolors='None',
                 cmap=cmap0,
-                shading='flat',
+                shading='gouraud',
                 clim=[clevel[0],clevel[-1]],
                 vmin=clevel[0],vmax=clevel[-1])
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.25)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.25)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
@@ -281,14 +282,14 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     clim=[clevel[0],clevel[-1]],
                     vmin=clevel[0],vmax=clevel[-1])
         
-        if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
+        if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.15)
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
     
     # label lon lat grid for ortho projection 
-    if (data.proj=='ortho'   or data.proj=='stere'):
+    if data.proj in ['ortho','stere']:
         map.drawparallels([0.0],
                 linewidth=1.0,
                 dashes=[1,1e-10],
@@ -328,11 +329,12 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
             fontsize=fsize)
             
         # try to rotate meridian labels
-        for m in meridians:
-            try:
-                meridians[m][1][0].set_rotation(25)
-            except:
-                pass
+        if data.proj=='cyl':
+            for m in meridians:
+                try:
+                    meridians[m][1][0].set_rotation(25)
+                except:
+                    pass
         
     #___________________________________________________________________________
     # draw land mask patch
@@ -373,7 +375,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     idx_cref = np.where(clevel==cref)[0]
     idx_cref = np.asscalar(idx_cref)
     
-    nmax_cbar_l = 10
+    #nmax_cbar_l = 12
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
@@ -1532,7 +1534,7 @@ def fesom_idxinbox(mesh,data1,inputarray):
 #_______________________________________________________________________________
 # select optimal color range by histogramm
 #_______________________________________________________________________________
-def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=False):
+def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=False,increace_dezimal=0):
     cmin, cmax = np.nanmin(in_data), np.nanmax(in_data)
     if do_output:print(' --> orig cmin,cmax:',cmin,cmax)
     
@@ -1540,7 +1542,11 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
     
     binrange=[cmin, cmax];
     if cmin<0.0 and cmax>0.0 : binrange=[-max(np.abs(cmin),cmax),max(np.abs(cmin),cmax)]
-    hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000, weights=in_weights,density=True, normed=True) 
+    if len(in_weights)!=0:
+        hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000, weights=in_weights,density=True, normed=True) 
+    else:
+        hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000,density=True, normed=True) 
+        
     binedge_mid, cumsum, limit = binedge[:-1]+(binedge[1:]-binedge[:-1])/2, np.cumsum(hist*(binedge[1:]-binedge[:-1])), limit
     
     idx_min = np.where(cumsum<=1-limit)[0]
@@ -1556,8 +1562,8 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
         idx_max=idx_max[0]
     cmin, cmax = binedge_mid[idx_min], binedge_mid[idx_max]
     
-    if cmax!=0.0: cmax = np.around(cmax, -np.int32(np.floor(np.log10(np.abs(cmax)))-1) ) 
-    if cmin!=0.0: cmin = np.around(cmin, -np.int32(np.floor(np.log10(np.abs(cmin)))-1) ) 
+    if cmax!=0.0: cmax = np.around(cmax, -np.int32(np.floor(np.log10(np.abs(cmax)))-1+increace_dezimal) ) 
+    if cmin!=0.0: cmin = np.around(cmin, -np.int32(np.floor(np.log10(np.abs(cmin)))-1+increace_dezimal) ) 
     
     if do_output:print(' --> best cmin,cmax:',cmin,cmax)
     
@@ -1566,9 +1572,9 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
 #_______________________________________________________________________________
 # select optimal color range by histogramm
 #_______________________________________________________________________________
-def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto'):
+def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto',fac=0):
     cref = cmin + (cmax-cmin)/2
-    if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1)) 
+    if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1+fac)) 
     if varname in ['u','v','w','ssh','fw','fh'] or \
        any(x in varname for x in ['vec','anom','dvd']):
        if not do_rescale=='log10': cref=0.0
