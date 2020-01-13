@@ -70,12 +70,12 @@ subroutine solve_tracers_ale
     !     do node=1,.... and tr_arr(node,1:nzmax,2)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
-        where (tr_arr(node,1:nzmax,2) > 45._WP)
-            tr_arr(node,1:nzmax,2)=45._WP
+        where (tr_arr(1:nzmax,node,2) > 45._WP)
+            tr_arr(1:nzmax,node,2)=45._WP
         end where
 
-        where (tr_arr(node,1:nzmax,2) < 3._WP )
-            tr_arr(node,1:nzmax,2)=3._WP
+        where (tr_arr(1:nzmax,node,2) < 3._WP )
+            tr_arr(1:nzmax,node,2)=3._WP
         end where
     end do    
 
