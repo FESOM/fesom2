@@ -1,8 +1,8 @@
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs
-    use o_MESH
+subroutine compute_vel_rhs(mesh)
+    use MOD_MESH
     use o_ARRAYS
     use i_ARRAYS
     use i_therm_param
@@ -13,13 +13,16 @@ subroutine compute_vel_rhs
     use g_comm_auto
     
     implicit none 
-    integer          :: elem, elnodes(3), nz 
-    real(kind=WP)    :: eta(3), ff, mm 
-    real(kind=WP)    :: Fx, Fy, pre(3)
-    logical, save    :: lfirst=.true.
-    real(kind=WP)    :: t1, t2, t3, t4
-    real(kind=WP)    :: p_ice(3)
-    integer          :: use_pice
+    type(t_mesh), intent(in) , target :: mesh   
+    integer                  :: elem, elnodes(3), nz 
+    real(kind=WP)            :: eta(3), ff, mm 
+    real(kind=WP)            :: Fx, Fy, pre(3)
+    logical, save            :: lfirst=.true.
+    real(kind=WP)            :: t1, t2, t3, t4
+    real(kind=WP)            :: p_ice(3)
+    integer                  :: use_pice
+
+#include "associate_mesh.h"
 
     t1=MPI_Wtime()
     use_pice=0
@@ -81,7 +84,7 @@ subroutine compute_vel_rhs
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(1)
     elseif (mom_adv==2) then
-       call momentum_adv_scalar
+       call momentum_adv_scalar(mesh)
     end if
     t3=MPI_Wtime() 
 
@@ -115,21 +118,22 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
-subroutine momentum_adv_scalar
-USE o_MESH
+subroutine momentum_adv_scalar(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 use g_comm_auto
 IMPLICIT NONE
 
-integer        :: n, nz, el1, el2
-integer        :: nl1, nl2, nod(2), el, ed, k, nle
-real(kind=WP)  :: un1(1:nl-1), un2(1:nl-1)
-real(kind=WP)  :: wu(1:nl), wv(1:nl)
-real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
+type(t_mesh), intent(in) , target :: mesh
+integer                  :: n, nz, el1, el2
+integer                  :: nl1, nl2, nod(2), el, ed, k, nle
+real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
+real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
 
-
+#include "associate_mesh.h"
 
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
@@ -250,7 +254,6 @@ do el=1, myDim_elem2D
         + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
    
 end do
-
 end subroutine momentum_adv_scalar
 
 

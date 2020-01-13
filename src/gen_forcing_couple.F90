@@ -1,8 +1,8 @@
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep)
+subroutine update_atm_forcing(istep, mesh)
   use o_PARAM
-  use o_MESH
+  use mod_MESH
   use o_arrays
   use i_arrays
   use i_param
@@ -23,11 +23,11 @@ subroutine update_atm_forcing(istep)
   use gen_bulk
 
   implicit none
-
-  integer		:: i, istep,itime,n2,n,nz,k,elem
-  real(kind=WP)		:: i_coef, aux
-  real(kind=WP)		:: dux, dvy,tx,ty,tvol
-  real(kind=WP)       	:: t1, t2
+  type(t_mesh), intent(in) :: mesh
+  integer		   :: i, istep,itime,n2,n,nz,k,elem
+  real(kind=WP)            :: i_coef, aux
+  real(kind=WP)	           :: dux, dvy,tx,ty,tvol
+  real(kind=WP)            :: t1, t2
 #ifdef __oasis
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
@@ -191,7 +191,7 @@ subroutine update_atm_forcing(istep)
          do_rotate_ice_wind=.false.
       end if
 #else	
-  call sbc_do
+  call sbc_do(mesh)
   u_wind   =atmdata(i_xwind, :)
   v_wind   =atmdata(i_ywind, :)
   shum     =atmdata(i_humi, :)

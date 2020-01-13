@@ -2,25 +2,26 @@
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12
 ! ==========================================================
-subroutine forcing_setup
+subroutine forcing_setup(mesh)
 use g_parsup
 use g_CONFIG
 use g_sbf, only: sbc_ini
+use mod_mesh
 implicit none
-
+  type(t_mesh), intent(in)  , target :: mesh
   if (mype==0) write(*,*) '****************************************************'
   if (use_ice) then
-     call forcing_array_setup
+     call forcing_array_setup(mesh)
 #ifndef __oasis
-     call sbc_ini         ! initialize forcing fields
+     call sbc_ini(mesh)         ! initialize forcing fields
 #endif
   endif 
 end subroutine forcing_setup
 ! ==========================================================
-subroutine forcing_array_setup
+subroutine forcing_array_setup(mesh)
   !inializing forcing fields 
   use o_param
-  use o_mesh
+  use mod_mesh
   use i_arrays
   use g_forcing_arrays
   use g_forcing_param
@@ -31,9 +32,9 @@ subroutine forcing_array_setup
   use cpl_driver, only : nrecv
 #endif   
   implicit none
-
+  type(t_mesh), intent(in)  , target :: mesh
   integer    :: n2
-   
+#include "associate_mesh.h"
   n2=myDim_nod2D+eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))
@@ -127,7 +128,6 @@ subroutine forcing_array_setup
     allocate(Cd_atm_ice_arr(n2)) 
     Cd_atm_ice_arr=Cd_atm_ice   
   endif
-
   if(mype==0) write(*,*) 'forcing arrays have been set up'  
 end subroutine forcing_array_setup
 !

@@ -2,14 +2,17 @@
 ! (curl u+f)\times u+grad(u^2/2)+w du/dz
 !
 ! ===================================================================
-subroutine relative_vorticity
+subroutine relative_vorticity(mesh)
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
   use g_comm_auto
 IMPLICIT NONE
 integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge
 real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
 DO n=1,myDim_nod2D
                                  !! n=myList_nod2D(m)
@@ -59,24 +62,26 @@ DO n=1,myDim_nod2D
 END DO      
  call exchange_nod(vorticity)
 ! Now it the relative vorticity known on neighbors too
-
 end subroutine relative_vorticity
 ! ==========================================================================
-subroutine compute_vel_rhs_vinv !vector invariant
+subroutine compute_vel_rhs_vinv(mesh) !vector invariant
 USE o_PARAM
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
 USE g_CONFIG
-  use g_comm_auto
+use g_comm_auto
 IMPLICIT NONE
+type(t_mesh), intent(in) , target :: mesh
 integer           :: n, n1, nz, elem, elnodes(3), nl1, j
 real(kind=WP)     :: a, b, c, da, db, dc, dg, ff(3), gg, eta(3), pre(3), Fx, Fy,w
-real(kind=WP)     :: uvert(nl,2), umean, vmean, friction
+real(kind=WP)     :: uvert(mesh%nl,2), umean, vmean, friction
 logical, save     :: lfirst=.true.
-real(kind=WP)     :: KE_node(nl-1,myDim_nod2D+eDim_nod2D)
-real(kind=WP)     :: dZ_inv(2:nl-1), dzbar_inv(nl-1), elem_area_inv
+real(kind=WP)     :: KE_node(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: dZ_inv(2:mesh%nl-1), dzbar_inv(mesh%nl-1), elem_area_inv
 real(kind=WP)     :: density0_inv = 1./density_0
+
+#include "associate_mesh.h"
 
 uvert=0.0_WP 
 
@@ -252,5 +257,4 @@ DO elem=1, myDim_elem2D                    !! P(e) elem=1, elem2D
    END DO
 END DO
 ! U_rhs contains all contributions to velocity from old time steps   
-
 end subroutine compute_vel_rhs_vinv

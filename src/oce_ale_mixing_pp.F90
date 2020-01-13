@@ -1,5 +1,5 @@
 !=======================================================================
-subroutine oce_mixing_pp
+subroutine oce_mixing_pp(mesh)
     !  Compute Richardson number dependent Av and Kv following
     !  Pacanowski and Philander, 1981
     !  Av = Avmax * factor**2 + Av0,
@@ -15,20 +15,22 @@ subroutine oce_mixing_pp
     ! SD no if in Kv computations (only minor differences are introduced)
     !    
     !      
+use MOD_MESH
 USE o_PARAM
-USE o_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
 use i_arrays
 IMPLICIT NONE
 
-real(kind=WP)         :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
-integer               :: node, nz, nzmax, elem, elnodes(3), i
-real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl)
-real(kind=WP)         :: bulk_up, bulk_dn
-real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
+type(t_mesh), intent(in) , target :: mesh
+real(kind=WP)            :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
+integer                  :: node, nz, nzmax, elem, elnodes(3), i
+real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl)
+real(kind=WP)            :: bulk_up, bulk_dn
+real(kind=WP)            :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 
+#include "associate_mesh.h"
 	!___________________________________________________________________________
 	do node=1, myDim_nod2D+eDim_nod2D
 		!___________________________________________________________________
@@ -143,7 +145,6 @@ real(kind=WP)         :: wndmix=1.e-3, wndnl=2, kv_conv=0.1_WP, av_conv=0.1_WP
 			end if
 		END DO
 	END DO
-	
 end subroutine oce_mixing_pp
 ! ========================================================================
 subroutine mo_length(water_flux,heat_flux,stress_x,stress_y,  &

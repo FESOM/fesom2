@@ -24,7 +24,7 @@ module g_cvmix_pp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use o_mesh
+    use MOD_MESH
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -72,11 +72,14 @@ module g_cvmix_pp
     !===========================================================================
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_pp
-        character(len=100) :: nmlfile
-        logical            :: nmlfile_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in), target :: mesh        
+        character(len=100)       :: nmlfile
+        logical                  :: nmlfile_exist=.False.
+        integer                  :: node_size
+#include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -166,11 +169,13 @@ module g_cvmix_pp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp
-        
+    subroutine calc_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in), target :: mesh                
         integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-        
+#include "associate_mesh.h"
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -329,6 +334,5 @@ module g_cvmix_pp
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
     end subroutine calc_cvmix_pp
 end module g_cvmix_pp

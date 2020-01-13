@@ -22,7 +22,7 @@ module g_cvmix_kpp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use o_mesh
+    use mod_mesh
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -218,11 +218,13 @@ module g_cvmix_kpp
     !===========================================================================
     ! allocate and initialize CVMIX KPP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_kpp
+    subroutine init_cvmix_kpp(mesh)
+        implicit none
         character(len=100) :: nmlfile
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
-        
+        type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -333,24 +335,24 @@ module g_cvmix_kpp
                             lenhanced_diff = kpp_use_enhanceKv,       &
                             l_LMD_ws       = kpp_use_LMDws,           & 
                             lnonzero_surf_nonlocal = kpp_cs_is_one)
-
     end subroutine init_cvmix_kpp
     !
     !
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp
-        
+    subroutine calc_cvmix_kpp(mesh)
+        type(t_mesh), intent(in)  , target :: mesh
         integer       :: node, elem, nz, nln, elnodes(3), aux_nz
-        real(kind=WP) :: vshear2, dz2, aux, aux_wm(nl), aux_ws(nl)
+        real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
-        real(kind=WP) :: aux_ustar, aux_surfbuoyflx_nl(nl)
+        real(kind=WP) :: aux_ustar, aux_surfbuoyflx_nl(mesh%nl)
         
         integer       :: nzsfc, nztmp
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
+#include "associate_mesh.h"
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP
@@ -827,7 +829,7 @@ module g_cvmix_kpp
                 !_______________________________________________________________
                 ! all loops go over myDim_nod2D so no halo information --> for 
                 ! smoothing haloinfo is required --> therefor exchange_nod
-                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb)
+                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb, mesh)
             end do
         end if 
         
@@ -871,6 +873,5 @@ module g_cvmix_kpp
                 Av(nz,elem) = sum(kpp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
     end subroutine calc_cvmix_kpp    
 end module g_cvmix_kpp

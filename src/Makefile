@@ -29,6 +29,7 @@ OBJ_INI =  fvom_init.o \
 # objects
 
 MODULES = oce_modules.o \
+          MOD_MESH.o \
           ice_modules.o \
           gen_modules_config.o \
           gen_modules_partitioning.o \
@@ -43,6 +44,20 @@ MODULES = oce_modules.o \
           psolve.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
+          cvmix_kinds_and_types.o \
+          cvmix_utils.o \
+          cvmix_put_get.o \
+          cvmix_tke.o \
+	  cvmix_idemix.o \
+          gen_modules_cvmix_idemix.o \
+          gen_modules_cvmix_tke.o \
+          cvmix_math.o \
+          cvmix_kpp.o \
+          gen_modules_cvmix_kpp.o \
+          cvmix_tidal.o \
+          gen_modules_cvmix_tidal.o \
+          cvmix_shear.o \
+          gen_modules_cvmix_pp.o \
           io_meandata.o \
           io_restart.o \
           io_blowup.o \

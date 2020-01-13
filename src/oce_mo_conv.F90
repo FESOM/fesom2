@@ -1,6 +1,6 @@
-subroutine mo_convect
+subroutine mo_convect(mesh)
 USE o_PARAM
-USE o_MESH
+USE MOD_MESH
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
@@ -8,8 +8,11 @@ use i_arrays
 use g_comm_auto
 IMPLICIT NONE
 
-integer               :: node, elem, nz, elnodes(3)
-real(kind=WP)         :: kv_conv=0.1_WP, av_conv=0.1_WP
+integer                  :: node, elem, nz, elnodes(3)
+real(kind=WP)            :: kv_conv=0.1_WP, av_conv=0.1_WP
+type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
 
 if (mo_on) then
     do node=1, myDim_nod2D+eDim_nod2D
@@ -49,6 +52,5 @@ DO elem=1, myDim_elem2D
     END DO
 END DO
 !!PS call exchange_elem(Av)
-
 end subroutine mo_convect
 

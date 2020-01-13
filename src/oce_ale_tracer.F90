@@ -2,21 +2,24 @@
 !
 !===============================================================================
 ! Driving routine    Here with ALE changes!!!
-subroutine solve_tracers_ale
+subroutine solve_tracers_ale(mesh)
     use g_config, only: flag_debug
     use g_parsup
     use o_PARAM, only: tracer_adv, num_tracers, SPP, Fer_GM
     use o_arrays
-    use o_mesh
+    use mod_mesh
     use g_comm_auto
     use o_tracers
     
     implicit none
-    integer :: tr_num, node, nzmax
-    real(kind=WP) :: aux_tr(nl-1,myDim_nod2D+eDim_nod2D)
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: tr_num, node, nzmax
+    real(kind=WP)            :: aux_tr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+
+#include "associate_mesh.h"
     !___________________________________________________________________________
-    if (SPP) call cal_rejected_salt
-    if (SPP) call app_rejected_salt
+    if (SPP) call cal_rejected_salt(mesh)
+    if (SPP) call app_rejected_salt(mesh)
     
     !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
@@ -33,19 +36,19 @@ subroutine solve_tracers_ale
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
-        call init_tracers_AB(tr_num)
+        call init_tracers_AB(tr_num, mesh)
         
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-        call adv_tracers_ale(tr_num)
+        call adv_tracers_ale(tr_num, mesh)
         
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
-        call diff_tracers_ale(tr_num)
+        call diff_tracers_ale(tr_num, mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        call relax_to_clim(tr_num)
+        call relax_to_clim(tr_num, mesh)
         
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
@@ -77,24 +80,22 @@ subroutine solve_tracers_ale
         where (tr_arr(1:nzmax,node,2) < 3._WP )
             tr_arr(1:nzmax,node,2)=3._WP
         end where
-    end do    
-
+    end do
 end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
-subroutine adv_tracers_ale(tr_num)
+subroutine adv_tracers_ale(tr_num, mesh)
     use g_config, only: flag_debug
-    use o_MESH, only: nlevels_nod2D
     use g_parsup
+    use mod_mesh
     use o_PARAM, only: tracer_adv
     use o_arrays
     use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
                            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
-    
     implicit none
     integer :: tr_num, node, nz
-    
+    type(t_mesh), intent(in) , target :: mesh    
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
     !     to finite volume". At the end R_T^n should contain all advection therms and 
@@ -106,7 +107,7 @@ subroutine adv_tracers_ale(tr_num)
     ! of discret variance decay
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd_2ndmoment'//achar(27)//'[0m'
-        call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num)
+        call compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
         !!PS call compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
     end if    
     
@@ -119,19 +120,19 @@ subroutine adv_tracers_ale(tr_num)
         case(1) !MUSCL
             ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1)
+            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1, mesh)
             !                                                      |    | 
             !             fraction of fourth-order contribution <--'    |
             !                              1st tracer moment is used <--'
             
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
-            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1)
+            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1, mesh)
             !                                                 | 
             !                    1st tracer moment is used <--'
             
         case(2) !MUSCL+FCT(3D)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1)
+            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1, mesh)
             !                                                                     |    | 
             !                            fraction of fourth-order contribution <--'    | 
             !                                             1st tracer moment is used <--'
@@ -150,7 +151,7 @@ subroutine adv_tracers_ale(tr_num)
     ! compute discrete variance decay after Burchard and Rennau 2008
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd'//achar(27)//'[0m'
-        call compute_diag_dvd(tr_num)
+        call compute_diag_dvd(tr_num, mesh)
     end if     
     
 end subroutine adv_tracers_ale
@@ -167,23 +168,27 @@ end subroutine adv_tracers_ale
 ! ttfAB --> corresponds to array tr_arr_old(:,:,tr_num) which is created by routine 
 !             call init_tracers_AB(tr_num)
 !             tr_arr_old(:,:,tr_num)=-(0.5+epsilon)*tr_arr_old(:,:,tr_num)+(1.5+epsilon)*tr_arr(:,:,tr_num)
-subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment)
-    use o_MESH
+subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
-    integer       :: el(2), enodes(2), n, nz, ed
-    integer       :: nl1, nl2, n2
-    integer       :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
-    real(kind=WP) :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
-    real(kind=WP) :: c_lo(2)
-    real(kind=WP) :: Tmean1, Tmean2, a
-    real(kind=WP) :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP) :: num_ord
-    
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: el(2), enodes(2), n, nz, ed
+    integer                  :: nl1, nl2, n2
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st or 2nd moment of tracer transport
+    real(kind=WP)            :: c1, deltaX1, deltaY1, deltaX2, deltaY2, vflux=0.0_WP
+    real(kind=WP)            :: c_lo(2)
+    real(kind=WP)            :: Tmean1, Tmean2, a
+    real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)            :: num_ord
+
+#include "associate_mesh.h"
+
     !___________________________________________________________________________
     ! Horizontal advection
     ! loop over loval edges 
@@ -458,20 +463,24 @@ end subroutine adv_tracers_muscle_ale
 !
 !===============================================================================
 ! Vertical ALE advection with PPM reconstruction (5th order)
-subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment)
+subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nzmax
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv(nl), aL, aR, aj, x
-    real(kind=WP) :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    integer       :: overshoot_counter, counter
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: n, nz, nzmax
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
+    real(kind=WP)            :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    integer                  :: overshoot_counter, counter
+
+#include "associate_mesh.h"
+
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -630,19 +639,22 @@ end subroutine adv_tracers_vert_ppm_ale
 !
 !===============================================================================
 ! Vertical ALE advection with upwind reconstruction (1st order)
-subroutine adv_tracers_vert_upw(ttf, do_Xmoment)
+subroutine adv_tracers_vert_upw(ttf, do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nl1
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: n, nz, nl1
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+
+#include "associate_mesh.h"
+
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -674,19 +686,22 @@ end subroutine adv_tracers_vert_upw
 !
 !===============================================================================
 ! Vertical ALE advection with central difference reconstruction (2nd order)
-subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment)
+subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
     use g_config
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
     implicit none
-    integer       :: n, nz, nl1
-    integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    real(kind=WP) :: tvert(nl), tv
-    real(kind=WP) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: n, nz, nl1
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP)            :: tvert(mesh%nl), tv
+    real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     
+#include "associate_mesh.h"
+
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -717,16 +732,18 @@ end subroutine adv_tracers_vert_cdiff
 !
 !
 !===============================================================================
-subroutine diff_tracers_ale(tr_num)
-    use o_mesh
+subroutine diff_tracers_ale(tr_num, mesh)
+    use mod_mesh
     use g_PARSUP
     use o_arrays
     use o_tracers
     implicit none
     
-    integer, intent(in) :: tr_num
-    integer             :: n, nzmax
-    
+    integer, intent(in)      :: tr_num
+    integer                  :: n, nzmax
+    type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
     ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
@@ -738,14 +755,14 @@ subroutine diff_tracers_ale(tr_num)
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
-    call diff_part_hor_redi ! seems to be ~9% faster than diff_part_hor
+    call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicite 
-    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num)
+    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-    if (Redi) call diff_ver_part_redi_expl
+    if (Redi) call diff_ver_part_redi_expl(mesh)
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -767,32 +784,33 @@ subroutine diff_tracers_ale(tr_num)
     !___________________________________________________________________________
     if (i_vert_diff) then
         ! do vertical diffusion: implicite 
-        call diff_ver_part_impl_ale(tr_num)
+        call diff_ver_part_impl_ale(tr_num, mesh)
         
     end if
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
-    
 end subroutine diff_tracers_ale
 !
 !
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):                                                                            
-subroutine diff_ver_part_expl_ale(tr_num)
+subroutine diff_ver_part_expl_ale(tr_num, mesh)
     use o_ARRAYS
     use g_forcing_arrays
-    use o_MESH
+    use MOD_MESH
     use g_PARSUP
     use g_config,only: dt
     
     implicit none 
-    
-    real(kind=WP) :: vd_flux(nl-1)
-    real(kind=WP) :: rdata,flux,rlx
-    integer       :: nz,nl1,tr_num,n
-    real(kind=WP) :: zinv1,Ty
-    
+    type(t_mesh), intent(in) , target :: mesh    
+    real(kind=WP)            :: vd_flux(mesh%nl-1)
+    real(kind=WP)            :: rdata,flux,rlx
+    integer                  :: nz,nl1,tr_num,n
+    real(kind=WP)            :: zinv1,Ty
+
+#include "associate_mesh.h"
+    !___________________________________________________________________________    
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         vd_flux=0._WP
@@ -832,13 +850,12 @@ subroutine diff_ver_part_expl_ale(tr_num)
         del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
-    
 end subroutine diff_ver_part_expl_ale
 !
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
-subroutine diff_ver_part_impl_ale(tr_num)
-    use o_MESH
+subroutine diff_ver_part_impl_ale(tr_num, mesh)
+    use MOD_MESH
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS
@@ -848,14 +865,19 @@ subroutine diff_ver_part_impl_ale(tr_num)
         use o_mixing_KPP_mod !for ghats _GO_        
         
     implicit none
-    real(kind=WP)       :: bc_surface    
-    real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
-    real(kind=WP)       :: cp(nl), tp(nl)
-    integer             :: nz, n, nzmax,tr_num
-    real(kind=WP)       :: m, zinv, dt_inv, dz
-    real(kind=WP)       :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
-    real(kind=WP), external    :: TFrez  ! Sea water freeze temperature.
-    real(kind=WP)       :: isredi=0._WP
+    type(t_mesh), intent(in) , target :: mesh
+    real(kind=WP)            :: bc_surface    
+    real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
+    integer                  :: nz, n, nzmax,tr_num
+    real(kind=WP)            :: m, zinv, dt_inv, dz
+    real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
+    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
+    real(kind=WP)            :: isredi=0._WP
+
+#include "associate_mesh.h"
+
+    !___________________________________________________________________________
     
     if (Redi) isredi=1._WP
     dt_inv=1.0_WP/dt
@@ -1132,24 +1154,26 @@ subroutine diff_ver_part_impl_ale(tr_num)
         end do
         
     end do ! --> do n=1,myDim_nod2D   
-    
 end subroutine diff_ver_part_impl_ale
 !
 !
 !===============================================================================
-subroutine diff_ver_part_redi_expl
+subroutine diff_ver_part_redi_expl(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     USE o_param
     use g_config
     use g_comm_auto
     IMPLICIT NONE
-    integer         :: elem,k
-    integer         :: n2,nl1,nl2,nz,n
-    real(kind=WP)   :: Tx, Ty
-    real(kind=WP)   :: tr_xynodes(2,nl-1,myDim_nod2D+eDim_nod2D), vd_flux(nl)
-    
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: elem,k
+    integer                  :: n2,nl1,nl2,nz,n
+    real(kind=WP)            :: Tx, Ty
+    real(kind=WP)            :: tr_xynodes(2,mesh%nl-1,myDim_nod2D+eDim_nod2D), vd_flux(mesh%nl)
+
+#include "associate_mesh.h"
+
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         do nz=1, nl1
@@ -1200,22 +1224,24 @@ end subroutine diff_ver_part_redi_expl!
 !
 !
 !===============================================================================
-subroutine diff_part_hor_redi
+subroutine diff_part_hor_redi(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     use o_param
     use g_config
     IMPLICIT NONE
-    real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
-    integer         :: edge
-    integer         :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
-    real(kind=WP)   :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
-    real(kind=WP)   :: rhs1(nl-1), rhs2(nl-1), Kh, dz
-    real(kind=WP)   :: isredi=0._WP
-    
+    type(t_mesh), intent(in) , target :: mesh
+    real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
+    integer                  :: edge
+    integer                  :: n2,nl1,nl2,nz,el(2),elnodes(3),n,enodes(2)
+    real(kind=WP)            :: c, Fx, Fy,Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
+    real(kind=WP)            :: rhs1(mesh%nl-1), rhs2(mesh%nl-1), Kh, dz
+    real(kind=WP)            :: isredi=0._WP
+
+#include "associate_mesh.h"
+
     if (Redi) isredi=1._WP
-    
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP

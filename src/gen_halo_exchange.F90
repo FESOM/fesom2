@@ -333,7 +333,7 @@ real(real64), intent(inout) :: nod_array3D(:,:)
 
     nl1=ubound(nod_array3D,1)
 
-    if ((nl1<nl-1) .or. (nl1>nl)) then
+    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -400,7 +400,7 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
 
     nl1 = ubound(nod1_array3D,1)
 
-    if ((nl1<nl-1) .or. (nl1>nl)) then
+    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -409,7 +409,7 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
     endif
 
     nl2 = ubound(nod2_array3D,1)
-    if ((nl2<nl-1) .or. (nl2>nl)) then
+    if ((nl2<ubound(r_mpitype_nod3D, 2)-1) .or. (nl2>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -476,13 +476,13 @@ if (npes>1) then
   nl1= ubound(nod_array3D,2)
   n_val = ubound(nod_array3D,1)
 
-  if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 3)) then
+  if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
 
      ! This routine also works for swapped dimensions nod_array3D(nl1,n_val, nod2D_size) 
-     nl1= ubound(nod_array3D,1)
+     nl1   = ubound(nod_array3D,1)
      n_val = ubound(nod_array3D,2)
 
-     if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 3)) then
+     if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
         if (mype==0) then
            print *,'Subroutine exchange_nod3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
@@ -681,7 +681,7 @@ if (npes> 1) then
       sn=com_elem2D%sPEnum
       rn=com_elem2D%rPEnum
 
-      if (nl1==nl .or. nl1==nl-1) then
+      if (nl1==ubound(r_mpitype_elem3D, 2) .or. nl1==ubound(r_mpitype_elem3D, 2)-1) then
 
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
@@ -733,7 +733,7 @@ if (npes> 1) then
       sn=com_elem2D_full%sPEnum
       rn=com_elem2D_full%rPEnum
 
-      if (nl1==nl .or. nl1==nl-1) then
+      if (nl1==ubound(r_mpitype_elem3D_full, 2) .or. nl1==ubound(r_mpitype_elem3D_full, 2)-1) then
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
          call check_mpi_comm(rn, sn, r_mpitype_elem3D_full(:,nl1,1), &
@@ -817,13 +817,13 @@ IMPLICIT NONE
  nl1   = ubound(elem_array3D,2)
  n_val = ubound(elem_array3D,1)
  
-  if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 4)) then
+  if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
 
      ! This routine also works for swapped dimensions elem_array3D(nl1,n_val, elem2D_size) 
      nl1= ubound(elem_array3D,1)
      n_val = ubound(elem_array3D,2)
 
-     if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 4)) then
+     if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
         if (mype==0) then
            print *,'Subroutine exchange_elem3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
@@ -1296,7 +1296,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -1359,7 +1359,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -1420,7 +1420,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -1463,7 +1463,7 @@ integer      :: n
 
 real(real64) ::  arr2D(:)
 real(real64) ::  arr2D_global(:)
-real(real64) :: recvbuf(nod2D)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1476,7 +1476,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1489,7 +1489,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1518,7 +1518,7 @@ integer      :: n
 
 real(real32)  ::  arr2D(:)
 real(real32)  ::  arr2D_global(:)
-real(real32)  :: recvbuf(nod2D)
+real(real32), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1531,7 +1531,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1544,7 +1544,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1574,7 +1574,7 @@ integer      :: n
 
 integer(int16) ::  arr2D(:)
 integer(int16) ::  arr2D_global(:)
-integer(int16) :: recvbuf(nod2D)
+integer(int16), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1587,7 +1587,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1600,7 +1600,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -2035,7 +2035,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
+      allocate(recvbuf(nl1, ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -2082,8 +2082,9 @@ IMPLICIT NONE
 integer      :: n
 
 real(real64)  ::  arr2D(:)
-real(real32)   ::  arr2D_global(:)
-real(real32)   :: recvbuf(nod2D), sendbuf(myDim_nod2D)
+real(real32)   :: arr2D_global(:)
+real(real32)   :: sendbuf(myDim_nod2D)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -2094,7 +2095,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -2107,7 +2108,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -2293,12 +2294,12 @@ USE o_MESH
 
 IMPLICIT NONE
 
-integer  :: n
-integer  :: arr2D(:)
-integer  :: arr2D_global(:)
-integer  :: recvbuf(nod2D)
-integer  :: req(npes-1)
-integer  :: start, n2D
+integer              :: n
+integer              :: arr2D(:)
+integer              :: arr2D_global(:)
+integer, allocatable :: recvbuf(:)
+integer              :: req(npes-1)
+integer              :: start, n2D
 
 if (npes> 1) then
 
@@ -2309,7 +2310,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global, 1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -2322,7 +2323,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
