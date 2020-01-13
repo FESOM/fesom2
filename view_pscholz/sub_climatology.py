@@ -58,8 +58,8 @@ class clim_data(object):
         self.depth = np.copy(ncid.variables['depth'][:])
         #______________________________________________________________________#
         # load WOA 2005 data
-        if self.fname=='woa2005TS.nc':
-            self.descript = 'WOA2005'
+        if 'woa' in self.fname:
+            self.descript = 'WOA'
             valueT= np.copy(ncid.variables['t00an1'][:,:,:,:]).squeeze()
             valueS= np.copy(ncid.variables['s00an1'][:,:,:,:]).squeeze()
         elif self.fname=='phc3.0_annual.nc':
@@ -75,8 +75,9 @@ class clim_data(object):
         
         #__________________________________________________________________#
         # shift coordinates from 0...360 --> -180...180
-        valueT, dum      = shiftgrid(180.0,valueT, self.lon,start=False,cyclic=359)
-        valueS, self.lon = shiftgrid(180.0,valueS, self.lon,start=False,cyclic=359)
+        if self.lon.max()>180:
+            valueT, dum      = shiftgrid(180.0,valueT, self.lon,start=False,cyclic=359)
+            valueS, self.lon = shiftgrid(180.0,valueS, self.lon,start=False,cyclic=359)
         
         #__________________________________________________________________#
         # calculate potential temperature
@@ -108,8 +109,9 @@ def clim_load_data(data):
     
     #______________________________________________________________________#
     # load WOA 2005 data
-    if data.fname=='woa2005TS.nc':
-        data.descript = 'WOA2005'
+    if 'woa' in data.fname:
+        if '2005' in data.fname: data.descript = 'WOA05'
+        if '2018' in data.fname: data.descript = 'WOA18'
         valueT= np.copy(ncid.variables['t00an1'][:,:,:,:]).squeeze()
         valueS= np.copy(ncid.variables['s00an1'][:,:,:,:]).squeeze()
     elif data.fname=='phc3.0_annual.nc':
@@ -125,8 +127,9 @@ def clim_load_data(data):
     
     #__________________________________________________________________#
     # shift coordinates from 0...360 --> -180...180
-    valueT, dum      = shiftgrid(180.0,valueT, data.lon,start=False,cyclic=359)
-    valueS, data.lon = shiftgrid(180.0,valueS, data.lon,start=False,cyclic=359)
+    if data.lon.max()>180:
+        valueT, dum      = shiftgrid(180.0,valueT, data.lon,start=False,cyclic=359)
+        valueS, data.lon = shiftgrid(180.0,valueS, data.lon,start=False,cyclic=359)
     
     #__________________________________________________________________#
     # calculate potential temperature
