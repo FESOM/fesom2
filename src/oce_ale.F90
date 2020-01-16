@@ -2087,7 +2087,7 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     ! Update stiffness matrix by dhe=hbar(n+1/2)-hbar(n-1/2) on elements, only
     ! needed for zlevel and zstar
-    if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale
+    if (.not. trim(which_ale)=='linfs') call update_stiff_mat_ale(mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_ssh_rhs_ale'//achar(27)//'[0m'
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
