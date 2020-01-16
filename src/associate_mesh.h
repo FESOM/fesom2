@@ -24,6 +24,7 @@ real(kind=WP), dimension(:)  , pointer :: zbar, Z, elem_depth
 integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D
 real(kind=WP), dimension(:,:), pointer :: area, area_inv
 real(kind=WP), dimension(:)  , pointer :: mesh_resolution
+real(kind=WP), dimension(:)  , pointer :: lump2d_north, lump2d_south
 type(sparse_matrix)          , pointer :: ssh_stiff
 
 nod2D              => mesh%nod2D              
@@ -92,4 +93,6 @@ nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
 area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                     => mesh%area     
 area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                 => mesh%area_inv     
 mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution    
-ssh_stiff                                                  => mesh%ssh_stiff          
+ssh_stiff                                                  => mesh%ssh_stiff
+lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north
+lump2d_south(1:myDim_nod2d)                                => mesh%lump2d_south

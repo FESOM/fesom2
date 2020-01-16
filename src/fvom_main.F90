@@ -90,7 +90,7 @@ type(t_mesh), target, save      :: mesh
     if (mype==0) t5=MPI_Wtime()
     call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
-    call cpl_oasis3mct_define_unstr
+    call cpl_oasis3mct_define_unstr(mesh)
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
     

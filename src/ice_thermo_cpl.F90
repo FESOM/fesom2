@@ -1,5 +1,5 @@
 #if defined (__oasis)
-subroutine thermodynamics
+subroutine thermodynamics(mesh)
 
   !===================================================================
   !
@@ -45,7 +45,7 @@ subroutine thermodynamics
 #endif
 
   use o_param
-  use o_mesh
+  use mod_mesh
   use i_therm_param
   use i_param
   use i_arrays
@@ -77,6 +77,10 @@ subroutine thermodynamics
   real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
   real(kind=WP)  :: h0min = 0.50, h0max = 1.5
+  type(t_mesh), intent(in)   , target :: mesh  
+
+#include  "associate_mesh.h"
+
 
   rsss = ref_sss
 

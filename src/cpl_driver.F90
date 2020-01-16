@@ -157,19 +157,19 @@ contains
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_define_unstr
+  subroutine cpl_oasis3mct_define_unstr(mesh)
    
 #ifdef __oifs
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
 #else
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
 #endif
-    use o_mesh
+    use mod_mesh
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-
+    type(t_mesh), intent(in), target :: mesh
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
     ! exchange between FESOM, ECHAM6 and OASIS3-MCT.
@@ -223,6 +223,8 @@ contains
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
     real(kind=WP), allocatable :: all_elem_area(:,:)    
+
+#include "associate_mesh.h"
 
 #ifdef VERBOSE
       print *, '=============================================================='
