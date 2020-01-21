@@ -397,7 +397,7 @@ SUBROUTINE compute_residual(field2d, mask, n, mesh)
 
 #include "associate_mesh.h"
   !compute net flux (for flux n) on ocean side
-  call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask)
+  call integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, mesh)
   oce_net_fluxes_north(n)=flux_global(1)
   oce_net_fluxes_south(n)=flux_global(2)
   
