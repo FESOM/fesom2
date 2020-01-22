@@ -254,6 +254,7 @@ def do_filedims(fname_data,nyi,do_output):
 def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
                    nsi, ndi, do_tmean, do_output,):    
     if ndi!=0:
+        
         #_______________________________________________________________________
         # select time+depth range + compute time mean
         if do_tmean:
@@ -291,12 +292,18 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
             
         #_______________________________________________________________________    
         # compute depth mean + linear interpolation to selected depth levels
-        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
-        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
-        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
+        if do_tmean:
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[0], sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[0], sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[0], sel_levidx,do_output)
+        else:
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[1], sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[1], sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[1], sel_levidx,do_output)
         
     # 2D data:
     else: 
+        
         if do_tmean:
             data.value = MFDataset(fname_list[0],'r').variables[var_list[0]][sel_timeidx,:].mean(axis=0)
             if len(fname_list[1]): data.value2 = MFDataset(fname_list[1],'r').variables[var_list[1]][sel_timeidx,:].mean(axis=0)
@@ -426,8 +433,8 @@ def do_fileattr(fname_data,data,var_list):
                 if attrname=='units'       : data.unit  = '['+getattr(auxvariable, attrname)+']'
     if any(x in data.var for x in ['ptemp']): data.lname='potential temperature'
     if any(x in data.var for x in ['pdens','sigma']): data.lname,data.unit='potential density','[kg/m^3]'
-    if any(x in data.var for x in ['tuv'  ]): data.lname='temperature advection'
-    if any(x in data.var for x in ['suv'  ]): data.lname='salt advection'  
+    if any(x in data.var for x in ['tuv'  ]): data.lname,data.unit='temperature advection', '[°C*m/s]'
+    if any(x in data.var for x in ['suv'  ]): data.lname,data.unit='salt advection', '[psu*m/s]'  
     if any(x in data.var for x in ['norm_uv'  ]): data.lname='norm of horizontal velocity'
     if any(x in data.var for x in ['norm_tuv','norm_suv']): data.lname='norm of horizontal '+data.lname
     if data.var == 'v' : data.lname='meridional velocity'
@@ -534,7 +541,7 @@ def do_postprocess(mesh,data,do_rescale,do_output):
     if any(x in data.var for x in ['norm','vec']) or \
        data.var in ['u','v','uice','vice']:
         data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
-    
+        
     # compute norm of vector data
     if all(x in data.var for x in ['norm']):
         data.value, data.value2 = np.sqrt(data.value**2+data.value2**2),[]
@@ -547,9 +554,10 @@ def do_postprocess(mesh,data,do_rescale,do_output):
     if 'vec' not in data.var:
         if data.value.ndim==1 and data.value.shape[0]==mesh.n2de:
             data.value = mesh.fesom_interp_e2n(np.array(data.value))
+            
         elif data.value.ndim>1 and (data.value.shape[0]==mesh.n2de or data.value.shape[1]==mesh.n2dea):
             data.value = mesh.fesom_interp_e2n(np.array(data.value))
-        
+            
     # customise sea ice variables
     if data.var in ['a_ice']        : data.value = data.value * 100.0
     #if data.var in ['a_ice','m_ice']: data.value[data.value<=0.0]=np.nan
