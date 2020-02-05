@@ -111,7 +111,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     
     # case of node data
     if data.value.size ==mesh.n2dna:
-        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
+        idx_box = np.ones((mesh.n2dna,),dtype='bool') 
     elif data.value.size ==mesh.n2dea:
         idx_box = np.ones((mesh.n2dea,),dtype='bool')
     
@@ -438,7 +438,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_fac=1.0):
+def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_fac=1.0, nmax_cbar_l=8):
     if do_output==True: 
         print('')
         print('___PLOT 2D VECTOR DATA____________________________________________')
@@ -700,8 +700,10 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
                     #headaxislength=2.5,
                     #headwidth=1.5)
     
+    mx,my,data_plotu,data_plotv,norm = mx[::2], my[::2], data_plotu[::2], data_plotv[::2], norm[::2]
+    
     hp1=map.quiver(mx,my,data_plotu,data_plotv,norm,#  
-                    scale_units='xy',scale=1/aux*80*scal_fac*clevel[-1], #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
+                    scale_units='xy',scale=1/aux*50*scal_fac*clevel[-1], #scale=1/aux*80*scal_fac*clevel[-1], #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
                     edgecolor='k',
                     linewidth=0.1,
                     cmap = cmap0,#alpha=0.9,
@@ -781,22 +783,34 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     
     # kickout some colormap labels if there are to many
     ncbar_l=len(cbar.ax.get_yticklabels()[:])
+    idx_cref = np.where(clevel==cref)[0]
+    idx_cref = np.asscalar(idx_cref)
     
-    
-    #print(cbar_ticks)
-    nmax_cbar_l = 15
+    #nmax_cbar_l = 12
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
-    plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-    plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
     
+    fig.canvas.draw() # this is need so cbar.ax.get_yticklabels() always finds the labels
+    if cbar.orientation=='vertical':
+        tickl = cbar.ax.get_yticklabels()
+    else:
+        tickl = cbar.ax.get_xticklabels()
+    idx = np.arange(0,len(tickl),1)
+    idxb = np.ones((len(tickl),), dtype=bool)                
+    idxb[idx_cref::nstep]  = False
+    idxb[idx_cref::-nstep] = False
+    idx = idx[idxb==True]
+    for ii in list(idx):
+        tickl[ii]=''
+    if cbar.orientation=='vertical':    
+        cbar.ax.set_yticklabels(tickl)
+    else:    
+        cbar.ax.set_xticklabels(tickl)
     #___________________________________________________________________________
     ax.tick_params(axis='both', direction='out')
-    ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
-    ax.get_yaxis().tick_left()
-    
     plt.sca(ax)
+    
     #plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
         plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='baseline')
