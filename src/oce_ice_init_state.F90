@@ -156,7 +156,7 @@ subroutine initial_state_channel_test(mesh)
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(15*rad))  
       ! 40 is the south boundary of the box
   END DO
@@ -208,7 +208,7 @@ subroutine initial_state_channel_test(mesh)
   
    
    !Do n=1, elem2D
-   !call elem_center(n, lon,lat)
+   !call elem_center(n, lon, lat, mesh)
    !lat=lat-30.0*rad
    !UV(1,:,n)=-(20*rad/dst)*0.1*cos(pi*lat/dst)*sin(2*pi*lon/(20*rad))
    !UV(2,:,n)= 0.2*sin(pi*lat/dst)*cos(2*pi*lon/(20*rad))    
@@ -277,7 +277,7 @@ subroutine initial_state_channel_narrow_test(mesh)
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(10*rad))  
       ! 40 is the south boundary of the box
   END DO
@@ -332,7 +332,7 @@ return
   
    
    Do n=1, myDim_elem2D
-   call elem_center(n, lon,lat)
+   call elem_center(n, lon, lat, mesh)
    lat=lat-30.0*rad
    UV(1,:,n)=-0.1*(dst/10.0/rad)*cos(pi*lat/dst)*sin(2*pi*lon/(10*rad))
    UV(2,:,n)= 0.2*sin(pi*lat/dst)*cos(2*pi*lon/(10*rad))    
@@ -594,7 +594,7 @@ subroutine initial_state_channel_dima_test(mesh)
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(15*rad))  
       ! 40 is the south boundary of the box
   END DO
