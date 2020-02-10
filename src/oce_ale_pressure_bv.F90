@@ -11,6 +11,7 @@ subroutine pressure_bv(mesh)
     USE o_ARRAYS
     USE g_PARSUP
     use i_arrays
+    use g_forcing_arrays, only: Pair
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     IMPLICIT NONE
@@ -107,7 +108,7 @@ subroutine pressure_bv(mesh)
             ! calculate pressure 
             if (trim(which_ale)=='linfs') then
 !!PS                 hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
-                hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
+                hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g + Pair(node)
                 DO nz=2, nl1
                     ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
                     ! thickness of previouse layer and half layer thickness of actual 

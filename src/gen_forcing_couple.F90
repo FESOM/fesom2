@@ -39,11 +39,11 @@ subroutine update_atm_forcing(istep, mesh)
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
 #endif
-  character(15)                         :: vari, filevari
-  character(4)                          :: fileyear
-  integer, parameter                    :: nci=192, ncj=94 ! T62 grid
-  real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
-  character(500)                        :: file
+  !character(15)                         :: vari, filevari
+  !character(4)                          :: fileyear
+  !integer, parameter                    :: nci=192, ncj=94 ! T62 grid
+  !real(kind=WP), dimension(nci,ncj)     :: array_nc, array_nc2,array_nc3,x
+  !character(500)                        :: file
 #include "associate_mesh.h"
   t1=MPI_Wtime()
 #ifdef __oasis
@@ -200,6 +200,8 @@ subroutine update_atm_forcing(istep, mesh)
   Tair     =atmdata(i_tair, :)-273.15_WP
   prec_rain=atmdata(i_prec, :)/1000._WP
   prec_snow=atmdata(i_snow, :)/1000._WP
+  Pair=atmdata(i_mslp,:)
+
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
