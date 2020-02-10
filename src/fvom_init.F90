@@ -85,14 +85,15 @@ REAL(kind=WP)                       :: x1, x2
 INTEGER	                            :: tag
 INTEGER, allocatable                :: elem_data(:)
 INTEGER                             :: i_error
- 
+#include "associate_mesh_ini.h"
 ! ===================
 ! Surface mesh
 ! ===================
   open (20,file=trim(meshpath)//'nod2d.out', status='old')
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
   READ(20,*) mesh%nod2D
-  ALLOCATE(mesh%coord_nod2D(2,mesh%nod2D))
+  ALLOCATE(mesh%coord_nod2D(2,mesh%nod2D)) 
+  coord_nod2D => mesh%coord_nod2D !required after the allocation, otherwise the pointer remains undefined
     
   do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
@@ -108,6 +109,7 @@ INTEGER                             :: i_error
       
   READ(21,*)  mesh%elem2D    
   ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
+  elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
   ALLOCATE(elem_data(4*mesh%elem2D))
   elem_data(:)=-1
   
@@ -222,7 +224,7 @@ END DO                 ! neighbor elements are found
 ! connected by edges!
 allocate(aux1(nod2D))                   
 aux1=0
- 
+
 DO n=1, nod2D
     counter=0
     DO k=1, ne_num(n)
@@ -321,8 +323,12 @@ deallocate(aux1)
  end do
  edge2D=counter
 
- allocate(edges(2,edge2D), edge_tri(2, edge2D))
+ allocate(mesh%edges   (2, edge2D))
+ allocate(mesh%edge_tri(2, edge2D))
+ edges    => mesh%edges    !required after the allocation, otherwise the pointer remains undefined
+ edge_tri => mesh%edge_tri !required after the allocation, otherwise the pointer remains undefined
  counter_in=0 
+
  DO n=1,nod2D
     DO q=2,nn_num(n)
        node=nn_pos(q,n)
@@ -357,7 +363,7 @@ deallocate(aux1)
     END DO
  END DO
  edge2D_in=counter_in
- 
+
  ! Repeat to collect boundary edges:   
  counter=0
  DO n=1,nod2D
@@ -408,7 +414,7 @@ deallocate(aux1)
        edge_tri(1,n)=elem1
        edge_tri(2,n)=elem
     endif
-    call elem_center(edge_tri(1,n), xc(1), xc(2))
+    call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
     if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
@@ -437,7 +443,8 @@ deallocate(aux1)
  ! (e) We need an array inverse to edge_tri listing edges
  ! of a given triangle 
  ! ====================
- allocate(elem_edges(4,elem2D))
+ allocate(mesh%elem_edges(4,elem2D))
+ elem_edges => mesh%elem_edges !required after the allocation, otherwise the pointer remains undefined
  allocate(aux1(elem2D))
  aux1=0
  DO n=1, edge2D
@@ -517,15 +524,17 @@ type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
 
-ALLOCATE(depth(nod2D))
-        
+ALLOCATE(mesh%depth(nod2D))
+depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
 file_name=trim(meshpath)//'aux3d.out'
 open(fileID, file=file_name)
 read(fileID,*) nl          ! the number of levels 
-allocate(zbar(nl))         ! their standard depths
+allocate(mesh%zbar(nl))         ! their standard depths
+zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
 read(fileID,*) zbar
 if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
-allocate(Z(nl-1))
+allocate(mesh%Z(nl-1))
+Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
 Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
 Z=0.5_WP*Z
 DO n=1,nod2D
@@ -539,9 +548,10 @@ close(fileID)
 if(depth(2)>0) depth=-depth  ! depth is negative
 
 
-allocate(nlevels(elem2D))
-allocate(nlevels_nod2D(nod2D))
-
+allocate(mesh%nlevels(elem2D))
+nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
+allocate(mesh%nlevels_nod2D(nod2D))
+nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
 ! ===================
 ! Compute the number of levels
@@ -691,7 +701,8 @@ integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
-allocate(elem_neighbors(4,elem2D))
+allocate(mesh%elem_neighbors(4,elem2D))
+elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
 elem_neighbors=0
 DO elem=1,elem2D
    
@@ -751,13 +762,15 @@ END DO
  ! To facilitate computations the neibourhood
  ! information is assembled
  ! =============	 
- allocate(nod_in_elem2D_num(nod2D))
+ allocate(mesh%nod_in_elem2D_num(nod2D))
+ nod_in_elem2D_num => mesh%nod_in_elem2D_num !required after the allocation, otherwise the pointer remains undefined
  nod_in_elem2D_num=0
  do n=1,elem2D
     elnodes=elem2D_nodes(1:3,n)
     nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
  end do
- allocate(nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ nod_in_elem2D => mesh%nod_in_elem2D
  nod_in_elem2D=0
  
  nod_in_elem2D_num=0
@@ -783,7 +796,8 @@ subroutine stiff_mat_ini(mesh)
 #include "associate_mesh_ini.h"
 
   ssh_stiff%dim = nod2D   
-  allocate(ssh_stiff%rowptr(nod2D+1))
+  allocate(mesh%ssh_stiff%rowptr(nod2D+1))
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
 
   allocate(num_ne(nod2D), ne(MAX_ADJACENT,nod2D))
   num_ne(:)           = 0
@@ -827,6 +841,9 @@ subroutine stiff_mat_ini(mesh)
   end do
 
   allocate(ssh_stiff%colind(ssh_stiff%rowptr(nod2D+1)-1))  
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
+
+  !required after the allocation, otherwise the pointer remains undefined
   do n=1,nod2D
      ssh_stiff%colind(ssh_stiff%rowptr(n):ssh_stiff%rowptr(n+1)-1) = ne(1:num_ne(n),n)
   end do
@@ -870,10 +887,10 @@ subroutine communication_ini(mesh)
 !$OMP DO
   do n = 0, npes-1
      mype = n ! mype is threadprivate and must not be iterator
-     call communication_nodn
-     call communication_elemn
+     call communication_nodn(mesh)
+     call communication_elemn(mesh)
 
-     call save_dist_mesh         ! Write out communication file com_infoxxxxx.out
+     call save_dist_mesh(mesh)         ! Write out communication file com_infoxxxxx.out
   end do
 !$OMP END DO
 !$OMP END PARALLEL
@@ -932,7 +949,7 @@ subroutine set_par_support_ini(mesh)
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-  call check_partitioning
+  call check_partitioning(mesh)
 
   write(*,*) 'Partitioning is done.'
 
