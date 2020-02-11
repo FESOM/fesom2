@@ -954,11 +954,11 @@ subroutine set_par_support_ini(mesh)
   write(*,*) 'Partitioning is done.'
 
 ! The stiffness matrix is no longer needed. 
-  deallocate(ssh_stiff%rowptr)
-  deallocate(ssh_stiff%colind)
+  deallocate(mesh%ssh_stiff%rowptr)
+  deallocate(mesh%ssh_stiff%colind)
         
   !NR No longer needed - last use was as weight for partitioning
-  deallocate(nlevels_nod2D)
+  deallocate(mesh%nlevels_nod2D)
 end subroutine set_par_support_ini
 !=======================================================================
 subroutine check_partitioning(mesh)
