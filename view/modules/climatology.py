@@ -56,7 +56,7 @@ class climatology(object):
         zonal mean of salinity
 
     '''
-    def __init__(self, path, climname, record):
+    def __init__(self, path, climname='woa05', record=0):
         if climname=='woa05':
             ncfile = Dataset(os.path.join(path, 'woa2005TS.nc'))
             self.T = np.copy(ncfile.variables['t00an1'][0,:,:,:])
