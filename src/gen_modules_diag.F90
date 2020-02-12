@@ -15,7 +15,7 @@ module diagnostics
 
   private
 !!PS   
-  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
+  public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ, &
@@ -66,8 +66,10 @@ module diagnostics
   ! spurious mixing in the advection schemes
   logical                                       :: ldiag_DVD        =.false.
   
+  logical                                       :: ldiag_forc       =.false.
+  
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_energy, &
-                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D
+                       ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc
   
   contains
 
