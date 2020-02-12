@@ -122,7 +122,7 @@ SUBROUTINE save_dist_mesh(mesh)
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
 
-#include  "associate_mesh.h"
+#include  "associate_mesh_ini.h"
 
 !!$  allocate(temp(nod2D))  ! serves for mapping
 !!$  allocate(ncount(npes+1))

@@ -19,7 +19,7 @@ subroutine communication_nodn(mesh)
   integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
   logical                  :: max_laendereck_too_small=.false.
   integer                  :: IERR
-#include "associate_mesh.h"
+#include "associate_mesh_ini.h"
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
 
@@ -227,7 +227,7 @@ subroutine communication_elemn(mesh)
   integer                  :: p, q, j, elem, i, l, r_count, s_count, el_count
   integer                  :: num_send(0:npes-1), num_recv(0:npes-1)
   integer                  :: IERR
-#include "associate_mesh.h"
+#include "associate_mesh_ini.h"
   ! Assume we have 2D partitioning vector in part. Find communication
   ! rules. An elem is external to element n if neither of its nodes 
   ! belongs to PE, but it is among the neighbors. Element n belongs to PE if 

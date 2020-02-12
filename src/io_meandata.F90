@@ -94,6 +94,13 @@ subroutine ini_mean_io(mesh)
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 102       ! unit to open namelist file
   integer                   :: iost
+  integer,dimension(12)     :: sel_forcvar=0
+  ! sel_forcvar(1) = uwind   ! sel_forcvar(2) = vwind
+  ! sel_forcvar(3) = tair    ! sel_forcvar(4) = shum
+  ! sel_forcvar(5) = prec    ! sel_forcvar(6) = snow
+  ! sel_forcvar(7) = evap    ! sel_forcvar(8) = swr
+  ! sel_forcvar(9) = lwr     ! sel_forcvar(10)= runoff
+  ! sel_forcvar(11) = tx_surf! sel_forcvar(12)= ty_surf
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -194,24 +201,34 @@ CASE ('alpha     ')
 CASE ('beta      ')
     call def_stream(nod2D, myDim_nod2D, 'beta',     'saline contraction',              'none',   sw_beta (1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('runoff    ')
+    sel_forcvar(10)= 1
     call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('evap      ')
+    sel_forcvar(7) = 1
     call def_stream(nod2D, myDim_nod2D, 'evap',     'evaporation',                     'm/s',    evaporation(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('prec      ')
+    sel_forcvar(5) = 1
     call def_stream(nod2D, myDim_nod2D, 'prec',     'precicipation rain',              'm/s',    prec_rain(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('snow      ')
+    sel_forcvar(6) = 1
     call def_stream(nod2D, myDim_nod2D, 'snow',     'precicipation snow',              'm/s',    prec_snow(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('tair      ')
+    sel_forcvar(3) = 1
     call def_stream(nod2D, myDim_nod2D, 'tair',     'surface air temperature',         '°C',     Tair(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('shum      ')
+    sel_forcvar(4) = 1
     call def_stream(nod2D, myDim_nod2D, 'shum',     'specific humidity',               '',       shum(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('swr ')
+    sel_forcvar(8) = 1
     call def_stream(nod2D, myDim_nod2D, 'swr',      'short wave radiation',            'W/m^2',  shortwave(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('lwr ')
+    sel_forcvar(9) = 1
     call def_stream(nod2D, myDim_nod2D, 'lwr',      'long wave radiation',             'W/m^2',  longwave(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('uwind ')
+    sel_forcvar(1) = 1
     call def_stream(nod2D, myDim_nod2D, 'uwind',    '10m zonal surface wind velocity', 'm/s',    u_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('vwind ')
+    sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
     
@@ -230,8 +247,10 @@ CASE ('kpp_sbuoyflx')
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('tx_sur    ')
+    sel_forcvar(11) = 1
     call def_stream(elem2D, myDim_elem2D,  'tx_sur',    'zonal wind str. to ocean',       'm/s2',   stress_surf(1, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('ty_sur    ')
+    sel_forcvar(12) = 1
     call def_stream(elem2D, myDim_elem2D,  'ty_sur',    'meridional wind str. to ocean',  'm/s2',   stress_surf(2, :),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('curl_surf ')
     if (lcurt_stress_surf) then
@@ -305,6 +324,12 @@ CASE ('dMOC      ')
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'RHO_Z',          'drho/dz',                'kg/m4' , std_dens_RHOZ(:,:),     1, 'm', i_real4, mesh)
        call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      1, 'm', i_real4, mesh)
     end if
+!___________________________________________________________________________________________________________________________________
+CASE ('pgf_x     ')    
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_x', 'zonal pressure gradient force'     , 'm/s^2', pgf_x(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('pgf_y     ')    
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm/s^2', pgf_y(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!___________________________________________________________________________________________________________________________________    
 CASE DEFAULT
     if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
 END SELECT
@@ -345,8 +370,8 @@ END DO
      call def_stream(elem2D, myDim_elem2D,   'v_surf',     'surface velocity',                 'm/s', u_surf(1:myDim_elem2D),        1, 'm', i_real4, mesh)
      call def_stream(elem2D, myDim_elem2D,   'tx_bot',     'bottom stress x',                 'N/m2', stress_bott(1, 1:myDim_elem2D),1, 'm', i_real4, mesh)
      call def_stream(elem2D, myDim_elem2D,   'ty_bot',     'bottom stress y',                 'N/m2', stress_bott(2, 1:myDim_elem2D),1, 'm', i_real4, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'tx_surm',     'zonal wind stress to ocean',     'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4, mesh)
-     call def_stream(elem2D, myDim_elem2D,   'ty_surm',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, mesh)
+     if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D,   'tx_sur',     'zonal wind stress to ocean',     'm/s2', stress_surf(1, 1:myDim_elem2D),1, 'm', i_real4, mesh) ; sel_forcvar(11)=1
+     if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D,   'ty_sur',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, mesh) ; sel_forcvar(12)=1
   end if
 
 #if defined (__oifs)
@@ -433,18 +458,18 @@ END DO
   !   call def_stream(nod2D, myDim_nod2D, 'd_eta',   'd_eta',         'm',      d_eta (1:myDim_nod2D),     1, 's', i_real4, mesh)
   !end if
   
-  !___________________________________________________________________________________________________________________________________
-  if (ldiag_curl_vel3) then
-     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, mesh)
- !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u100',  'relative vorticity at 100m',  '1/s',   vorticity(12,1:myDim_nod2D), 1, 'd', i_real4, mesh)
- !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u280',  'relative vorticity at 280m',  '1/s',   vorticity(16,1:myDim_nod2D), 1, 'd', i_real4, mesh)
-  end if
+    !___________________________________________________________________________________________________________________________________
+    if (ldiag_curl_vel3) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, mesh)
+    !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u100',  'relative vorticity at 100m',  '1/s',   vorticity(12,1:myDim_nod2D), 1, 'd', i_real4, mesh)
+    !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u280',  'relative vorticity at 280m',  '1/s',   vorticity(16,1:myDim_nod2D), 1, 'd', i_real4, mesh)
+    end if
 
-  !___________________________________________________________________________________________________________________________________
-  if (whichEVP==2) then
-     call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, mesh)
-     call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, mesh)
-  end if
+    !___________________________________________________________________________________________________________________________________
+    if (whichEVP==2) then
+        call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, mesh)
+        call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, mesh)
+    end if
   
     !___________________________________________________________________________
     if (ldiag_dvd) then
@@ -453,6 +478,24 @@ END DO
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_h', 'horiz. dvd of salinity'   , 'psu/s', tr_dvd_horiz(:,:,2), 1, 'm', i_real4, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_v', 'vert. dvd of salinity'    , 'psu/s', tr_dvd_vert(:,:,2) , 1, 'm', i_real4, mesh)
     end if 
+    
+    !___________________________________________________________________________
+    if (ldiag_forc) then
+        if (sel_forcvar( 1)==0) call def_stream(nod2D , myDim_nod2D , 'uwind' , '10m zonal surface wind velocity', 'm/s'  , u_wind(:)        , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 2)==0) call def_stream(nod2D , myDim_nod2D , 'vwind' , '10m merid surface wind velocity', 'm/s'  , v_wind(:)        , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 3)==0) call def_stream(nod2D , myDim_nod2D , 'tair'  , 'surface air temperature'        , '°C'   , Tair(:)          , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 4)==0) call def_stream(nod2D , myDim_nod2D , 'shum'  , 'specific humidity'              , ''     , shum(:)          , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 5)==0) call def_stream(nod2D , myDim_nod2D , 'prec'  , 'precicipation rain'             , 'm/s'  , prec_rain(:)     , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 6)==0) call def_stream(nod2D , myDim_nod2D , 'snow'  , 'precicipation snow'             , 'm/s'  , prec_snow(:)     , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 7)==0) call def_stream(nod2D , myDim_nod2D , 'evap'  , 'evaporation'                    , 'm/s'  , evaporation(:)   , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 8)==0) call def_stream(nod2D , myDim_nod2D , 'swr'   , 'short wave radiation'           , 'W/m^2', shortwave(:)     , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 9)==0) call def_stream(nod2D , myDim_nod2D , 'lwr'   , 'long wave radiation'            , 'W/m^2', longwave(:)      , 1, 'm', i_real4, mesh)
+        if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
+        if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
+        if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
+    end if
+    
+    
 end subroutine ini_mean_io
 !
 !--------------------------------------------------------------------------------------------
@@ -509,7 +552,7 @@ subroutine create_new_file(entry)
 
   att_text='time'
   entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   if (entry%accuracy == i_real8) then

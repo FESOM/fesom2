@@ -6,6 +6,7 @@ ldiag_energy     =.false.
 ldiag_salt3D     =.false.
 ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
+ldiag_forc       =.false.
 /
 
 &nml_listsize
@@ -61,7 +62,7 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_u   ',1, 'y', 4,
            'bolus_v   ',1, 'y', 4,
            'bolus_w   ',1, 'y', 4,
-	       'kpp_obldepth',1, 'm', 4,
+	   'kpp_obldepth',1, 'm', 4,
            'kpp_sbuoyflx',1, 'm', 4,
            'dMOC      ',1, 'y', 4,
 /
