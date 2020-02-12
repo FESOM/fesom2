@@ -889,14 +889,13 @@ subroutine communication_ini(mesh)
      mype = n ! mype is threadprivate and must not be iterator
      call communication_nodn(mesh)
      call communication_elemn(mesh)
-
      call save_dist_mesh(mesh)         ! Write out communication file com_infoxxxxx.out
   end do
 !$OMP END DO
 !$OMP END PARALLEL
 
-  deallocate(elem_neighbors)
-  deallocate(elem_edges)
+  deallocate(mesh%elem_neighbors)
+  deallocate(mesh%elem_edges)
   deallocate(part)
   write(*,*) 'Communication arrays have been set up'   
 end subroutine communication_ini
@@ -945,7 +944,7 @@ subroutine set_par_support_ini(mesh)
      stop
   end if
   
-  write(*,*) 'Calling partit'
+  write(*,*) 'Calling partit for npes=', np
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 

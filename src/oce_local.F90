@@ -8,7 +8,7 @@ type(t_mesh), intent(in)           , target :: mesh
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
 
-#include "associate_mesh.h"
+#include "associate_mesh_ini.h"
 
 allocate(temp(max(nod2D, elem2D))) 
 ! =========
@@ -216,7 +216,7 @@ SUBROUTINE save_dist_mesh(mesh)
   ! =========================  
   ! communication information
   ! ========================= 
-  call com_global2local   ! Do not call this subroutine earlier, global numbering is needed!
+  call com_global2local(mesh)   ! Do not call this subroutine earlier, global numbering is needed!
   file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out' 
   fileID=10+mype  
   open(fileID, file=file_name)

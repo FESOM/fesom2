@@ -12,7 +12,7 @@ save
 #endif
 
  integer                                :: MPI_COMM_FESOM
- integer, parameter   :: MAX_LAENDERECK=8
+ integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
      integer                                       :: rPEnum ! the number of PE I receive info from 
