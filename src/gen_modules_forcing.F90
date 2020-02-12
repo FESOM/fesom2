@@ -28,8 +28,11 @@ real(kind=WP)  :: Cd_atm_ice=1.32e-3 ! drag coeff. between atmosphere and ice
   ! *** coefficients in bulk formulae ***
   logical                       :: AOMIP_drag_coeff=.false.
   logical                       :: ncar_bulk_formulae=.false.
+  real(kind=WP)                 :: ncar_bulk_z_wind=10.0_WP
+  real(kind=WP)                 :: ncar_bulk_z_tair=10.0_WP
+  real(kind=WP)                 :: ncar_bulk_z_shum=10.0_WP
 
-  namelist /forcing_bulk/ AOMIP_drag_coeff, ncar_bulk_formulae
+  namelist /forcing_bulk/ AOMIP_drag_coeff, ncar_bulk_formulae, ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
 
   ! *** add land ice melt water ***
   logical                       :: use_landice_water=.false.
