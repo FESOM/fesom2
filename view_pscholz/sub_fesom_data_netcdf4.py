@@ -63,6 +63,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
                                   do_tmean=True,         \
                                   do_loadloop=False,     \
                                   do_rescale='auto',     \
+                                  do_interp_e2n=True,    \
                                   do_output=True):
     #_______________________________________________________________________________
     # plot depth
@@ -129,7 +130,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         
     #___________________________________________________________________________
     # do nessessary postprocesssing to rotate vectors, compute norm, set NaNs ...
-    data        = do_postprocess(mesh, data, do_rescale, do_output)
+    data        = do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_output)
     
     #___________________________________________________________________________
     # add augmented periodic boundary
@@ -194,7 +195,22 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['uice', 'vice',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
-            
+            elif any(x in data.var for x in ['f_uwind','f_vwind','f_uvwind']):
+                var_list = ['f_uwind', 'f_vwind',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['uwind','vwind','uvwind']):
+                var_list = ['uwind', 'vwind',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['f_tx_sur','f_ty_sur','f_txy_sur']):
+                var_list = ['f_tx_sur', 'f_ty_sur',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['tx_sur','ty_sur','txy_sur']):
+                var_list = ['tx_sur', 'ty_sur',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
             elif any(x in data.var for x in ['pdens','ptemp','sigma']):   
                 var_list = ['temp', 'salt',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -529,7 +545,7 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
 #___DO NECCESSARY POSTPROCESSING________________________________________________
 #
 #_______________________________________________________________________________
-def do_postprocess(mesh,data,do_rescale,do_output):
+def do_postprocess(mesh,data,do_rescale,do_interp_e2n,do_output):
 
     # in case more than one variable has been loaded compute norm, vec, ...
     if any(x in data.var for x in ['tuv','suv']):
@@ -551,7 +567,7 @@ def do_postprocess(mesh,data,do_rescale,do_output):
     if data.var in ['v','vice']: data.value, data.value2  = data.value2, []
     
     # interpolate elemental values to nodes
-    if 'vec' not in data.var:
+    if 'vec' not in data.var and do_interp_e2n==True:
         if data.value.ndim==1 and data.value.shape[0]==mesh.n2de:
             data.value = mesh.fesom_interp_e2n(np.array(data.value))
             
@@ -587,26 +603,38 @@ def do_postprocess(mesh,data,do_rescale,do_output):
 def do_pbnd_augmentation(mesh, data, nti, ndi, do_tmean):
     if len(data.depth)!=0 or ndi==0:
         if do_tmean or nti==1: 
-            if data.value.shape[0]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i]))
+            if data.value.shape[0]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i]))
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndn_2d_i]))
             if data.value.shape[0]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[mesh.pbndtri_2d_i]))
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndtri_2d_i]))
         else:
-            if data.value.shape[1]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i]),axis=1)
+            if data.value.shape[1]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i]),axis=1)
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndn_2d_i]),axis=1)
             if data.value.shape[1]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[:,mesh.pbndtri_2d_i]),axis=1)
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndtri_2d_i]),axis=1)
     else:
         if do_tmean or nti==1:
-            if data.value.shape[0]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i,:]))
+            if data.value.shape[0]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i,:]))
+                if any(x in data.var for x in ['vec']):
+                    data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndn_2d_i,:]))
             if data.value.shape[0]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[mesh.pbndtri_2d_i,:]))
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndtri_2d_i,:]))    
         else:
-            if data.value.shape[1]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i,:]),axis=1)
+            if data.value.shape[1]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i,:]),axis=1)
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndn_2d_i,:]),axis=1)
             if data.value.shape[1]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[:,mesh.pbndtri_2d_i,:]), axis=1)
                 if any(x in data.var for x in ['vec']): 

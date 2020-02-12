@@ -40,7 +40,7 @@ type(t_mesh), intent(inout), target :: mesh
  integer        :: error_status !0/1=no error/error
  integer        :: vert_nodes(1000)
  integer        :: nchunk, chunk_size, ipos, iofs, mesh_check, flag_checkisrot, flag_checkmustrot
- real(kind=WP)  :: x, y, rx, ry, xp, yp
+ real(kind=WP)  :: x, y, rx, ry, xp, yp, dbox, offset
  real(kind=WP)  :: t0, t1
  character*10   :: mype_string,npes_string
  character*500  :: file_name
@@ -165,6 +165,8 @@ type(t_mesh), intent(inout), target :: mesh
   call r2g(xp, yp, 0.0_WP*rad, 90.0_WP*rad)
   xp = xp/rad
   yp = yp/rad
+  dbox = 2.5_WP
+  
   flag_checkisrot=0
   flag_checkmustrot=1
   do nchunk=0, (mesh%nod2D-1)/chunk_size
@@ -183,16 +185,26 @@ type(t_mesh), intent(inout), target :: mesh
         do n=1, k
            read(fileID,*) ibuff(n,1), rbuff(n,1), rbuff(n,2), ibuff(n,2)
             !___________________________________________________________________
+            ! put here offset parameter so that the checkrotation flag also works 
+            ! for the pi mesh an others there the points around -40 longitude are 
+            ! shifted by 360° --> therefor shift them back with offset parameter
+            offset=0.0_WP
+            if (rbuff(n,1)>180.0_WP) then 
+                offset=-360.0_WP
+            elseif (rbuff(n,1)<-180.0_WP) then    
+                offset=360.0_WP
+            end if    
+            !___________________________________________________________________
             ! check if input mesh is already rotated --> force_rotation flag == .False.
             if (force_rotation .and. & 
-               (rbuff(n,1)>=xp-14.5_WP .and. rbuff(n,1)<=xp+14.5_WP .and. & 
-                rbuff(n,2)>=yp-14.5_WP .and. rbuff(n,2)<=yp+14.5_WP)) then
+               (rbuff(n,1)+offset>=xp-dbox .and. rbuff(n,1)+offset<=xp+dbox .and. & 
+                rbuff(n,2)       >=yp-dbox .and. rbuff(n,2)       <=yp+dbox)) then
                 flag_checkisrot = 1
             !___________________________________________________________________
             ! check if input mesh is already unrotated --> force_rotation flag ==.True.
             elseif ((.not. force_rotation) .and. & 
-               (rbuff(n,1)>=xp-14.5_WP .and. rbuff(n,1)<=xp+14.5_WP .and. & 
-                rbuff(n,2)>=yp-14.5_WP .and. rbuff(n,2)<=yp+14.5_WP)) then
+               (rbuff(n,1)+offset>=xp-dbox .and. rbuff(n,1)+offset<=xp+dbox .and. & 
+                rbuff(n,2)       >=yp-dbox .and. rbuff(n,2)       <=yp+dbox)) then
                 flag_checkmustrot = 0
             end if    
         end do
