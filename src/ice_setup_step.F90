@@ -55,7 +55,8 @@ e_size=myDim_elem2D+eDim_elem2D
 ! Allocate memory for variables of ice model
  allocate(u_ice(n_size), v_ice(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
- allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size)) 
+ allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size))
+ allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
  allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
@@ -94,6 +95,9 @@ e_size=myDim_elem2D+eDim_elem2D
  sigma11=0.0_WP
  sigma22=0.0_WP
  sigma12=0.0_WP
+ eps11=0.0_WP
+ eps12=0.0_WP
+ eps22=0.0_WP
  t_skin=0.0_WP
  rhs_mdiv=0.0_WP
  rhs_adiv=0.0_WP
