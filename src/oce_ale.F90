@@ -1,3 +1,52 @@
+module oce_ale_interfaces
+  interface
+    subroutine init_bottom_elem_thickness(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine init_bottom_node_thickness(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine impl_vert_visc_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine update_stiff_mat_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine compute_ssh_rhs_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine solve_ssh_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine compute_hbar_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine vert_vel_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine update_thickness_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! CONTENT:
 ! ------------
 !    subroutine ale_init
@@ -27,6 +76,7 @@ subroutine init_ale(mesh)
     USE o_ARRAYS
     USE g_config, only: which_ale
     USE g_forcing_param, only: use_virt_salt
+    use oce_ale_interfaces
     Implicit NONE
     
     integer                  :: n, nzmax
@@ -1955,6 +2005,7 @@ subroutine oce_timestep_ale(n, mesh)
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+    use oce_ale_interfaces
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10

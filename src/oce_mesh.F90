@@ -1,3 +1,80 @@
+module read_mesh_interface
+  interface
+    subroutine read_mesh(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module find_levels_interface
+  interface
+    subroutine find_levels(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module test_tri_interface
+  interface
+    subroutine test_tri(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module load_edges_interface
+  interface
+    subroutine load_edges(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module find_neighbors_interface
+  interface
+    subroutine find_neighbors(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module mesh_areas_interface
+  interface
+    subroutine mesh_areas(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module elem_center_interface
+  interface
+    subroutine elem_center(elem, x, y, mesh)
+      use mod_mesh
+      integer      :: elem    
+      real(kind=WP) :: x, y
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module edge_center_interface
+  interface
+    subroutine edge_center(n1, n2, x, y, mesh)
+      USE MOD_MESH
+      integer                     :: n1, n2
+      real(kind=WP)               :: x, y
+      type(t_mesh), intent(inout), target :: mesh
+    end subroutine
+  end interface
+end module
+module mesh_auxiliary_arrays_interface
+  interface
+    subroutine mesh_auxiliary_arrays(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
 ! Auxiliary arrays with mesh information are assembled.
@@ -8,6 +85,13 @@ SUBROUTINE mesh_setup(mesh)
 USE MOD_MESH
 USE g_parsup
 USE g_ROTATE_grid
+use read_mesh_interface
+use find_levels_interface
+use mesh_auxiliary_arrays_interface
+use test_tri_interface
+use load_edges_interface
+use find_neighbors_interface
+use mesh_areas_interface
 IMPLICIT NONE
 
       type(t_mesh), intent(inout) :: mesh
@@ -1295,6 +1379,8 @@ USE g_PARSUP
 USE o_ARRAYS
 USE g_ROTATE_grid
 use g_comm_auto
+use elem_center_interface
+use edge_center_interface
 IMPLICIT NONE
 
 integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3),node

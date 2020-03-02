@@ -1,3 +1,62 @@
+module densityJM_components_interface
+  interface
+    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+      USE MOD_MESH
+      real(kind=WP), intent(IN)  :: t,s
+      real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rhopot
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_fullcell_interface
+  interface
+    subroutine pressure_force_4_linfs_fullcell(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_nemo_interface
+  interface
+    subroutine pressure_force_4_linfs_nemo(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_shchepetkin_interface
+  interface
+    subroutine pressure_force_4_linfs_shchepetkin(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_cubicspline_interface
+  interface
+    subroutine pressure_force_4_linfs_cubicspline(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_shchepetkin_interface
+  interface
+    subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_cubicspline_interface
+  interface
+    subroutine pressure_force_4_zxxxx_cubicspline(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
@@ -13,6 +72,7 @@ subroutine pressure_bv(mesh)
     use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
+    use densityJM_components_interface
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh    
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
@@ -188,6 +248,10 @@ subroutine pressure_force_4_linfs(mesh)
     use g_config
     use g_PARSUP
     use mod_mesh
+    use pressure_force_4_linfs_fullcell_interface
+    use pressure_force_4_linfs_nemo_interface
+    use pressure_force_4_linfs_shchepetkin_interface
+    use pressure_force_4_linfs_cubicspline_interface
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
@@ -322,6 +386,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
     use o_ARRAYS
     use g_PARSUP
     use g_config
+    use densityJM_components_interface
     implicit none
     
     logical             :: do_interpTS=.true.
@@ -732,6 +797,8 @@ subroutine pressure_force_4_zxxxx(mesh)
     use g_PARSUP
     use g_config
     use mod_mesh
+    use pressure_force_4_zxxxx_shchepetkin_interface
+    use pressure_force_4_zxxxx_cubicspline_interface
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
@@ -1090,6 +1157,7 @@ USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 use g_PARSUP !, only: par_ex,pe_status
+use densityJM_components_interface
 IMPLICIT NONE
 
   !
