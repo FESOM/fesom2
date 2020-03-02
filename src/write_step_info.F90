@@ -413,7 +413,7 @@ subroutine check_blowup(istep, mesh)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1)
+			call write_step_info(istep,1,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)

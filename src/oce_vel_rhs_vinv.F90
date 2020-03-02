@@ -133,7 +133,7 @@ end DO
     END DO
  END DO 
 
- call relative_vorticity 
+ call relative_vorticity(mesh)
 ! ====================
 ! Sea level and pressure contribution   -\nabla(g\eta +hpressure/rho_0+V^2/2)
 ! and the Coriolis force (elemental part)
