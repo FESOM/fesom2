@@ -955,7 +955,7 @@ subroutine update_stiff_mat_ale(mesh)
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
-    type(t_mesh), intent(inout)         , target :: mesh
+    type(t_mesh), intent(in)         , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1062,7 +1062,7 @@ subroutine compute_ssh_rhs_ale(mesh)
     integer       :: ed, el(2), enodes(2),  nz,n
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 

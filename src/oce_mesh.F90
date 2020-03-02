@@ -10,7 +10,7 @@ USE g_parsup
 USE g_ROTATE_grid
 IMPLICIT NONE
 
-      type(t_mesh), intent(in) :: mesh
+      type(t_mesh), intent(inout) :: mesh
 
       call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh(mesh)
