@@ -1,10 +1,11 @@
 ! ==============================================================
 subroutine setup_model
   implicit none
+
   call read_namelist    ! should be before clock_init
 end subroutine setup_model
 ! ==============================================================
-subroutine read_namelist
+subroutine read_namelist(icepack_settings)
   ! Reads namelist files and overwrites default parameters.
   !
   ! Coded by Lars Nerger
@@ -19,10 +20,15 @@ subroutine read_namelist
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
-  use g_ic3d  
+  use g_ic3d
+  ! Refactored
+  use icedrv_settings  
   implicit none
-
+ 
   character(len=100)   :: nmlfile
+  type(t_icepack_settings), intent(inout), target :: icepack_settings
+#include "icepack_drivers/associate_icepack_settings.h"
+
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
@@ -100,6 +106,56 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=diag_list)
   close (20)
+
+  if (use_ice .and. use_icepack) then      !LZ
+
+        namelist / env_nml /  nicecat, nfsdcat, nicelyr, nsnwlyr, ntraero, trzaero, tralg,     &
+                              trdoc,   trdic,   trdon,   trfed,   trfep,   nbgclyr, trbgcz,    &
+                              trzs,    trbri,   trage,   trfy,    trlvl,   trpnd,   trbgcs
+
+        nmlfile ='namelist.icepack'        ! name of icepack namelist file
+        open (10,file=nmlfile)
+        read (10,NML=env_nml)
+        close (10)
+
+        ncat      = nicecat    ! number of categories
+        nilyr     = nicelyr    ! number of ice layers per category
+        nslyr     = nsnwlyr    ! number of snow layers per category
+        n_aero    = ntraero    ! number of aerosols in use
+        n_zaero   = trzaero    ! number of z aerosols in use
+        n_algae   = tralg      ! number of algae in use
+        n_doc     = trdoc      ! number of DOC pools in use
+        n_dic     = trdic      ! number of DIC pools in use
+        n_don     = trdon      ! number of DON pools in use
+        n_fed     = trfed      ! number of Fe  pools in use dissolved Fe
+        n_fep     = trfep      ! number of Fe  pools in use particulate Fe
+        nblyr     = nbgclyr    ! number of bio/brine layers per category
+                               ! maximum number of biology tracers + aerosols
+                               ! *** add to kscavz in icepack_zbgc_shared.F90
+        n_bgc     = (n_algae*2 + n_doc + n_dic + n_don + n_fed + n_fep + n_zaero &
+                  + 8)         ! nit, am, sil, dmspp, dmspd, dms, pon, humic
+        nltrcr    = (n_bgc*trbgcz+trzs)*trbri ! number of zbgc (includes zaero)
+                                              ! and zsalinity tracers
+        max_nsw   = (nilyr+nslyr+2) & ! total chlorophyll plus aerosols
+                  * (1+trzaero)       ! number of tracers active in shortwave calculation
+        max_ntrcr =   1         & ! 1 = surface temperature
+                  + nilyr       & ! ice salinity
+                  + nilyr       & ! ice enthalpy
+                  + nslyr       & ! snow enthalpy
+                                  !!!!! optional tracers:
+                  + trage       & ! age
+                  + trfy        & ! first-year area
+                  + trlvl*2     & ! level/deformed ice
+                  + trpnd*3     & ! ponds
+                  + n_aero*4    & ! number of aerosols * 4 aero layers
+                  + trbri       & ! brine height
+                  + trbgcs*n_bgc           & ! skeletal layer BGC
+                  + trzs  *trbri* nblyr    & ! zsalinity  (off if TRBRI=0)
+                  + n_bgc*trbgcz*trbri*(nblyr+3) & ! zbgc (off if TRBRI=0)
+                  + n_bgc*trbgcz           & ! mobile/stationary phase tracer
+                  + 1             ! for unused tracer flags
+
+  endif
 
   if(mype==0) write(*,*) 'Namelist files are read in'
 

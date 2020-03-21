@@ -5,7 +5,9 @@ project(fesom C Fortran)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-file(GLOB sources_Fortran ${src_home}/*.F90)
+file(GLOB sources_Fortran ${src_home}/*.F90
+                          ${src_home}/icepack_drivers/*.F90
+                          ${src_home}/../Icepack/columnphysics/*.F90)
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
