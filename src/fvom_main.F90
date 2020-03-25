@@ -21,6 +21,10 @@ use io_RESTART
 use io_MEANDATA
 use io_mesh_info
 use diagnostics
+
+! Icepack modules
+use icedrv_settings
+
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -34,8 +38,8 @@ real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
 real(kind=real32) :: runtime_alltimesteps
 
-type(t_mesh), target, save      :: mesh
-
+type(t_mesh),             target, save :: mesh
+type(t_icepack_settings), target, save :: icepack_settings
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -60,7 +64,7 @@ type(t_mesh), target, save      :: mesh
     ! load the mesh and fill in 
     ! auxiliary mesh arrays
     !=====================
-    call setup_model          ! Read Namelists, always before clock_init
+    call setup_model(icepack_settings)         ! Read Namelists, always before clock_init
     call clock_init           ! read the clock file 
     call get_run_steps(nsteps)
     call mesh_setup(mesh)
