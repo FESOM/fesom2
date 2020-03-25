@@ -1,3 +1,5 @@
+! env namelist
+
 integer (kind=int_kind), pointer :: nicecat              ! number of ice thickness categories
 integer (kind=int_kind), pointer :: nfsdcat              ! number of floe size categories
 integer (kind=int_kind), pointer :: nicelyr              ! number of vertical layers in the ice
@@ -20,6 +22,7 @@ integer (kind=int_kind), pointer :: trlvl                ! set to 1 for level an
 integer (kind=int_kind), pointer :: trpnd                ! set to 1 for melt pond tracers
 integer (kind=int_kind), pointer :: trbgcs               ! set to 1 for skeletal layer tracers (needs TRBGCZ = 0)
 
+! setting variables used by the model
 
 integer (kind=int_kind), pointer :: ncat                 ! number of categories in use
 integer (kind=int_kind), pointer :: nfsd                 ! number of floe size categories in use
@@ -39,6 +42,70 @@ integer (kind=int_kind), pointer :: nltrcr               ! number of zbgc (inclu
 integer (kind=int_kind), pointer :: max_nsw              ! number of tracers active in shortwave calculation
 integer (kind=int_kind), pointer :: max_ntrcr            ! number of tracers in total
 integer (kind=int_kind), pointer :: nfreq                ! number of wave frequencies ! HARDWIRED FOR NOW
+
+! tracer namelist
+
+logical (kind=log_kind), pointer :: tr_iage
+logical (kind=log_kind), pointer :: tr_FY
+logical (kind=log_kind), pointer :: tr_lvl
+logical (kind=log_kind), pointer :: tr_pond_cesm
+logical (kind=log_kind), pointer :: tr_pond_topo
+logical (kind=log_kind), pointer :: tr_pond_lvl
+logical (kind=log_kind), pointer :: tr_aero
+logical (kind=log_kind), pointer :: tr_fsd
+
+! thermo namelist
+
+integer (kind=int_kind),  pointer :: kitd
+integer (kind=int_kind),  pointer :: ktherm
+character (len=char_len), pointer :: conduct
+real (kind=dbl_kind),     pointer :: a_rapid_mode
+real (kind=dbl_kind),     pointer :: Rac_rapid_mode
+real (kind=dbl_kind),     pointer :: aspect_rapid_mode
+real (kind=dbl_kind),     pointer :: dSdt_slow_mode
+real (kind=dbl_kind),     pointer :: phi_c_slow_mode
+real (kind=dbl_kind),     pointer :: phi_i_mushy
+
+! dynamics namelist
+
+integer (kind=int_kind), pointer  :: kstrength
+integer (kind=int_kind), pointer  :: krdg_partic
+integer (kind=int_kind), pointer  :: krdg_redist
+integer (kind=int_kind), pointer  :: mu_rdg
+real (kind=dbl_kind),    pointer  :: Cf
+
+! shortwave namelist
+
+character (len=char_len), pointer :: shortwave
+character (len=char_len), pointer :: albedo_type
+real (kind=dbl_kind),     pointer :: albicev
+real (kind=dbl_kind),     pointer :: albicei
+real (kind=dbl_kind),     pointer :: albsnowv
+real (kind=dbl_kind),     pointer :: albsnowi
+real (kind=dbl_kind),     pointer :: ahmax
+real (kind=dbl_kind),     pointer :: R_ice
+real (kind=dbl_kind),     pointer :: R_pnd
+real (kind=dbl_kind),     pointer :: R_snw
+real (kind=dbl_kind),     pointer :: dT_mlt
+real (kind=dbl_kind),     pointer :: rsnw_mlt
+real (kind=dbl_kind),     pointer :: kalg
+
+! forcing namelist
+
+logical (kind=log_kind),  pointer :: formdrag
+character (len=char_len), pointer :: atmbndy
+logical (kind=log_kind),  pointer :: calc_strair
+logical (kind=log_kind),  pointer :: calc_Tsfc
+logical (kind=log_kind),  pointer :: highfreq
+integer (kind=int_kind),  pointer :: natmiter
+real (kind=dbl_kind),     pointer :: ustar_min
+real (kind=dbl_kind),     pointer :: emissivity
+character (len=char_len), pointer :: fbot_xfer_type
+logical (kind=log_kind),  pointer :: update_ocn_f
+logical (kind=log_kind),  pointer :: l_mpond_fresh
+character (len=char_len), pointer :: tfrz_option
+logical (kind=log_kind),  pointer :: oceanmixed_ice
+character (len=char_len), pointer :: wave_spec_type
 
 nicecat => icepack_settings%nicecat
 nfsdcat => icepack_settings%nfsdcat
@@ -81,8 +148,59 @@ max_nsw => icepack_settings%max_nsw
 nfreq   => icepack_settings%nfreq
 max_ntrcr => icepack_settings%max_ntrcr
 
+tr_iage      => icepack_settings%tr_iage
+tr_FY        => icepack_settings%tr_FY
+tr_lvl       => icepack_settings%tr_lvl
+tr_pond_cesm => icepack_settings%tr_pond_cesm
+tr_pond_topo => icepack_settings%tr_pond_topo
+tr_pond_lvl  => icepack_settings%tr_pond_lvl
+tr_aero      => icepack_settings%tr_aero
+tr_fsd       => icepack_settings%tr_fsd
 
+kitd               => icepack_settings%kitd
+ktherm             => icepack_settings%ktherm
+conduct            => icepack_settings%conduct
+a_rapid_mode       => icepack_settings%a_rapid_mode
+Rac_rapid_mode     => icepack_settings%Rac_rapid_mode
+aspect_rapid_mode  => icepack_settings%aspect_rapid_mode
+dSdt_slow_mode     => icepack_settings%dSdt_slow_mode
+phi_c_slow_mode    => icepack_settings%phi_c_slow_mode
+phi_i_mushy        => icepack_settings%phi_i_mushy
 
+kstrength   => icepack_settings%kstrength
+krdg_partic => icepack_settings%krdg_partic
+krdg_redist => icepack_settings%krdg_redist
+mu_rdg      => icepack_settings%mu_rdg
+Cf          => icepack_settings%Cf
+
+shortwave   => icepack_settings%shortwave
+albedo_type => icepack_settings%albedo_type
+albicev     => icepack_settings%albicev
+albicei     => icepack_settings%albicei
+albsnowv    => icepack_settings%albsnowv
+albsnowi    => icepack_settings%albsnowi
+ahmax       => icepack_settings%ahmax
+R_ice       => icepack_settings%R_ice
+R_pnd       => icepack_settings%R_pnd
+R_snw       => icepack_settings%R_snw
+dT_mlt      => icepack_settings%dT_mlt
+rsnw_mlt    => icepack_settings%rsnw_mlt
+kalg        => icepack_settings%kalg
+
+formdrag       => icepack_settings%formdrag
+atmbndy        => icepack_settings%atmbndy
+calc_strair    => icepack_settings%calc_strair
+calc_Tsfc      => icepack_settings%calc_Tsfc
+highfreq       => icepack_settings%highfreq
+natmiter       => icepack_settings%natmiter
+ustar_min      => icepack_settings%ustar_min
+emissivity     => icepack_settings%emissivity
+fbot_xfer_type => icepack_settings%fbot_xfer_type
+update_ocn_f   => icepack_settings%update_ocn_f
+l_mpond_fresh  => icepack_settings%l_mpond_fresh
+tfrz_option    => icepack_settings%tfrz_option
+oceanmixed_ice => icepack_settings%oceanmixed_ice
+wave_spec_type => icepack_settings%wave_spec_type
 
 
 

@@ -75,6 +75,7 @@
           n_don     = trdon      ! number of DON pools in use
           n_fed     = trfed      ! number of Fe  pools in use dissolved Fe
           n_fep     = trfep      ! number of Fe  pools in use particulate Fe
+          nfreq     = 25         ! number of wave frequencies ! HARDWIRED FOR NOW
           nblyr     = nbgclyr    ! number of bio/brine layers per category
                                  ! maximum number of biology tracers +
                                  ! aerosols
