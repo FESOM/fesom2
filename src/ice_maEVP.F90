@@ -1,3 +1,32 @@
+module ice_maEVP_interfaces
+  interface
+    subroutine ssh2rhs(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+
+    subroutine stress_tensor_a(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+
+    subroutine stress2rhs_m(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+
+    subroutine find_alpha_field_a(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+
+    subroutine find_beta_field_a(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+  end interface  
+end module
+
 ! ====================================================================
 ! New evp implementation following Bouillion et al. 2013
 ! and Kimmritz et al. 2015 (mEVP) and Kimmritz et al. 2016 (aEVP)
@@ -631,6 +660,7 @@ use o_PARAM
 use i_therm_param
 use g_parsup
 use g_comm_auto
+  use ice_maEVP_interfaces
 
   implicit none
   integer          :: steps, shortstep, i, ed

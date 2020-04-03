@@ -1,3 +1,12 @@
+module find_up_downwind_triangles_interface
+  interface
+    subroutine find_up_downwind_triangles(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! A set of routines to implement MUSCL-type of advection
 ! For description, see Abalakin, I., Dervieux, A., Kozubskaya, T., 2002. A
 ! vertex-centered high-order MUSCL scheme applying to linearized Euler acoustics.
@@ -23,6 +32,7 @@ subroutine muscl_adv_init(mesh)
     use g_PARSUP
     use g_comm_auto
     use g_config
+    use find_up_downwind_triangles_interface
     IMPLICIT NONE
     integer     :: n, k, n1, n2, n_num
     integer     :: nz

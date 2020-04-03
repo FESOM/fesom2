@@ -1,3 +1,21 @@
+module ice_EVP_interfaces
+  interface
+    subroutine stress_tensor(ice_strength, mesh)
+      use g_parsup
+      use mod_mesh
+      real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
+      type(t_mesh), intent(in), target  :: mesh
+    end subroutine
+
+    subroutine stress2rhs(inv_areamass, ice_strength, mesh)
+    USE MOD_MESH
+    USE g_PARSUP
+    REAL(kind=WP), intent(in) :: inv_areamass(myDim_nod2D), ice_strength(mydim_elem2D)
+    type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+  end interface  
+end module
+
 !
 ! Contains routines of EVP dynamics
 !
@@ -339,6 +357,7 @@ USE g_PARSUP
 USE o_ARRAYS
 USE g_CONFIG
 USE g_comm_auto
+use ice_EVP_interfaces
 
 IMPLICIT NONE
 integer                   :: steps, shortstep

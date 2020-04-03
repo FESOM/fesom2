@@ -1,3 +1,13 @@
+module write_step_info_interface
+  interface
+    subroutine write_step_info(istep,outfreq, mesh)
+      use MOD_MESH
+      integer								:: istep,outfreq
+      type(t_mesh), intent(in)                               , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
@@ -185,6 +195,7 @@ subroutine check_blowup(istep, mesh)
 	use io_BLOWUP
 	use g_forcing_arrays
 	use diagnostics
+	use write_step_info_interface
 	implicit none
 	
 	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
@@ -413,7 +424,7 @@ subroutine check_blowup(istep, mesh)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1)
+			call write_step_info(istep,1,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)

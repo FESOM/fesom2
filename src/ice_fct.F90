@@ -1,3 +1,28 @@
+module ice_fct_interfaces
+  interface
+    subroutine ice_mass_matrix_fill(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+
+    subroutine ice_solve_high_order(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+
+    subroutine ice_solve_low_order(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+    
+    subroutine ice_fem_fct(tr_array_id, mesh)
+      use MOD_MESH
+      integer   :: tr_array_id
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! 
 ! This file collect subroutines implementing FE-FCT
 ! advection scheme by Loehner et al.
@@ -75,6 +100,7 @@ subroutine ice_fct_init(mesh)
   use MOD_MESH
   use i_ARRAYS
   use g_PARSUP
+  use ice_fct_interfaces
   implicit none
   integer   :: n_size
   type(t_mesh), intent(in)              , target :: mesh
@@ -103,6 +129,7 @@ end subroutine ice_fct_init
 !
 subroutine ice_fct_solve(mesh)
   use MOD_MESH
+  use ice_fct_interfaces
   implicit none
   type(t_mesh), intent(in)              , target :: mesh
   ! Driving routine

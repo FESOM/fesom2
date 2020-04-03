@@ -1,3 +1,17 @@
+module ice_setup_step_interfaces
+  interface
+    subroutine ice_array_setup(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine ice_initial_state(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 ! ice initialization + array allocation + time stepping
 !
@@ -9,6 +23,7 @@ use i_param
 use i_arrays
 use g_CONFIG
 use mod_mesh
+  use ice_setup_step_interfaces
 implicit none 
 type(t_mesh), intent(in)           , target :: mesh
   ! ================ DO not change
