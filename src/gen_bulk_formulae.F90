@@ -104,20 +104,20 @@ subroutine ncar_ocean_fluxes_mode
             !___________________________________________________________________
             ! (2b) calculate stability parameter zeta_tq = z_tq/L, L...Monin-Obukov length
             zeta_tq = vonkarm*bstar*ncar_bulk_z_tair/(ustar*ustar)! L-Y eqn. 8a
-            zeta_tq = sign( min(abs(zeta_tq),10.0), zeta_tq )     ! undocumented NCAR
-            x2      = sqrt(abs(1.-16.*zeta_tq))                   ! L-Y eqn. 8b
-            x2      = max(x2, 1.0)                                ! undocumented NCAR
+            zeta_tq = sign( min(abs(zeta_tq),10.0_WP), zeta_tq )     ! undocumented NCAR
+            x2      = sqrt(abs(1.-16._WP*zeta_tq))                   ! L-Y eqn. 8b
+            x2      = max(x2, 1.0_WP)                                ! undocumented NCAR
             x       = sqrt(x2)
             
             !___________________________________________________________________
             ! calculate integrals of dimensionless flux profiles of momentum 
             ! psi_m... and heat and moisture psi_h...
-            if (zeta_tq > 0.) then
-                psi_m_tq = -5.*zeta_tq                             ! L-Y eqn. 8c
-                psi_h_tq = -5.*zeta_tq                             ! L-Y eqn. 8c
+            if (zeta_tq > 0._WP) then
+                psi_m_tq = -5._WP*zeta_tq                             ! L-Y eqn. 8c
+                psi_h_tq = -5._WP*zeta_tq                             ! L-Y eqn. 8c
             else
-                psi_m_tq = log((1.+2.*x+x2)*(1+x2)/8.)-2.*(atan(x)-atan(1.0))! L-Y eqn. 8d
-                psi_h_tq = 2.*log((1.+x2)/2.)                                ! L-Y eqn. 8e
+                psi_m_tq = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
+                psi_h_tq = 2._WP*log((1._WP+x2)/2._WP)                              ! L-Y eqn. 8e
             end if
             
             !___________________________________________________________________
