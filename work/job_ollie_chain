@@ -20,7 +20,6 @@ chain_s=1 # starting chain id
 # ___COREv2___
 year_s=1948
 year_e=2009
-
 # ___JRA55____
 #year_s=1958
 #year_e=2018
@@ -257,7 +256,8 @@ if [ $is_newsimul -eq 1 ] ; then
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
         # restart
-        sed -i " s/yearnew=1948/yearnew=$aux_yr/" namelist.config
+	aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        sed -i " s/yearnew=$aux/yearnew=$aux_yr/" namelist.config
         
         #_______________________________________________________________________
         # backup namelist.* & fesom.x in case they dont exist
@@ -294,13 +294,15 @@ aux_yr_clock=$(<${dname_result_link}/fesom.clock)
 aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
 
 # setup next chain job via dependence
-if [ $aux_yr_clock -lt $year_e ] && [ ${chain_id} -le ${chain_n} ] && [ ${err_srun} -eq 0 ]; then
-    # aftercorr:job_id --> A task of this job array can begin execution after 
-    # the corresponding task ID in the specified job has completed successfully 
-    # (ran to completion with an exit code of zero). 
-    echo -e "\033[33m --> setup next chain cycle \033[0m"
-    sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID $script_name \
-            -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e -rl $prescribe_rlen
+if [ ${err_srun} -eq 0 ]; then
+    if [ $aux_yr_clock -lt $year_e ] || [ ${chain_id} -lt ${chain_n} ]; then
+        # aftercorr:job_id --> A task of this job array can begin execution after 
+        # the corresponding task ID in the specified job has completed successfully 
+        # (ran to completion with an exit code of zero). 
+        echo -e "\033[33m --> setup next chain cycle \033[0m"
+        sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID $script_name \
+               -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e -rl $prescribe_rlen
+    fi
 fi
 
 #___CHECK FOR COMPLETNES________________________________________________________
