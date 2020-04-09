@@ -482,7 +482,7 @@ class fesom_mesh:
         #_______________________________________________________________________
         # mean resolutiuon per element
         self.elem_2d_resol = jacobian.mean(axis=1)
-        self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
+        #self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
     
     
     #___CALCULATE TRIANGLE AREA("volume")_______________________________________
@@ -577,8 +577,9 @@ class fesom_mesh:
     #+_________________________________________________________________________+
     def fesom_interp_e2n(self,data_e):
         if len(self.elem0_2d_area)==0: self.fesom_calc_triarea()
-        if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
-        
+        #if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
+        print(' --> calc. compute e2n interpolation',end='')
+        t1 = time.time()
         #_______________________________________________________________________
         # case of one dimensional elemental data
         if data_e.ndim==1:
@@ -627,6 +628,8 @@ class fesom_mesh:
             data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]/3.
             data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
             
+        t2 = time.time()
+        print(' >> time:{:.3f} s'.format(t2-t1))
         
         return data_n
     
@@ -961,19 +964,25 @@ def fesom_vector_rot(mesh,u,v,do_output=True):
     u = np.squeeze(np.array(u))
     v = np.squeeze(np.array(v))
     #___________________________________________________________________________
-    if u.shape[0]==mesh.n2dna:
+    #if u.shape[0]==mesh.n2dna:
+    if any(x in u.shape for x in [mesh.n2dna]):
+        which_size = mesh.n2dna
         rlat = np.radians(mesh.nodes_2d_yr)
         rlon = np.radians(mesh.nodes_2d_xr)
         lat  = np.radians(mesh.nodes_2d_yg)
         lon  = np.radians(mesh.nodes_2d_xg)
         
-    elif u.shape[0]==mesh.n2dn:
+    #elif u.shape[0]==mesh.n2dn:
+    elif any(x in u.shape for x in [mesh.n2dn]):
+        which_size = mesh.n2dn
         rlat = np.radians(mesh.nodes_2d_yr[0:mesh.n2dn])
         rlon = np.radians(mesh.nodes_2d_xr[0:mesh.n2dn])
         lat  = np.radians(mesh.nodes_2d_yg[0:mesh.n2dn])
         lon  = np.radians(mesh.nodes_2d_xg[0:mesh.n2dn])
         
-    elif u.shape[0]==mesh.n2dea:
+    #elif u.shape[0]==mesh.n2dea:
+    elif any(x in u.shape for x in [mesh.n2dea]):
+        which_size = mesh.n2dea
         rlat = mesh.nodes_2d_yr[mesh.elem_2d_i]
         rlon = mesh.nodes_2d_xr[mesh.elem_2d_i]
         aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
@@ -985,7 +994,9 @@ def fesom_vector_rot(mesh,u,v,do_output=True):
         lat  = np.radians(mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0)
         lon  = np.radians(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0)
         
-    elif u.shape[0]==mesh.n2de:
+    #elif u.shape[0]==mesh.n2de:
+    elif any(x in u.shape for x in [mesh.n2de]):
+        which_size = mesh.n2de
         rlat = mesh.nodes_2d_yr[mesh.elem0_2d_i]
         rlon = mesh.nodes_2d_xr[mesh.elem0_2d_i]
         aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
@@ -1017,24 +1028,45 @@ def fesom_vector_rot(mesh,u,v,do_output=True):
         v = np.transpose(np.array(v,ndmin=2)).squeeze();
     elif len(ndims)    == 2:
         
-        #___________________________________________________________________________
+        which_index = list(u.shape).index(which_size)
         txg,tyg,tzg = np.zeros(u.shape), np.zeros(u.shape), np.zeros(u.shape)
-        for ii in range(0,u.shape[1]):
-            txg[:,ii] = -v[:,ii]*np.sin(rlat)*np.cos(rlon) - u[:,ii]*np.sin(rlon)
-            tyg[:,ii] = -v[:,ii]*np.sin(rlat)*np.sin(rlon) + u[:,ii]*np.cos(rlon)
-            tzg[:,ii] =  v[:,ii]*np.cos(rlat)
-        
-        txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
-        tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
-        tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
-        
-        #___________________________________________________________________________
-        for ii in range(0,u.shape[1]):
-            v[:,ii] = txr[:,ii]*(-np.sin(lat))*np.cos(lon) - \
-                      tyr[:,ii]*np.sin(lat)*np.sin(lon) + \
-                      tzr[:,ii]*np.cos(lat)
-            u[:,ii] = txr[:,ii]*(-np.sin(lon)) + tyr[:,ii]*np.cos(lon)
-        
+            
+        if which_index==0:
+            #___________________________________________________________________________
+            for ii in range(0,u.shape[1]):
+                txg[:,ii] = -v[:,ii]*np.sin(rlat)*np.cos(rlon) - u[:,ii]*np.sin(rlon)
+                tyg[:,ii] = -v[:,ii]*np.sin(rlat)*np.sin(rlon) + u[:,ii]*np.cos(rlon)
+                tzg[:,ii] =  v[:,ii]*np.cos(rlat)
+            
+            txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
+            tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
+            tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
+            
+            #___________________________________________________________________________
+            for ii in range(0,u.shape[1]):
+                v[:,ii] = txr[:,ii]*(-np.sin(lat))*np.cos(lon) - \
+                          tyr[:,ii]*np.sin(lat)*np.sin(lon) + \
+                          tzr[:,ii]*np.cos(lat)
+                u[:,ii] = txr[:,ii]*(-np.sin(lon)) + tyr[:,ii]*np.cos(lon)
+                
+        elif which_index==1:
+            #___________________________________________________________________________
+            for ii in range(0,u.shape[0]):
+                txg[ii,:] = -v[ii,:]*np.sin(rlat)*np.cos(rlon) - u[ii,:]*np.sin(rlon)
+                tyg[ii,:] = -v[ii,:]*np.sin(rlat)*np.sin(rlon) + u[ii,:]*np.cos(rlon)
+                tzg[ii,:] =  v[ii,:]*np.cos(rlat)
+            
+            txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
+            tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
+            tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
+            
+            #___________________________________________________________________________
+            for ii in range(0,u.shape[0]):
+                v[ii,:] = txr[ii,:]*(-np.sin(lat))*np.cos(lon) - \
+                         tyr[ii,:]*np.sin(lat)*np.sin(lon) + \
+                         tzr[ii,:]*np.cos(lat)
+                u[ii,:] = txr[ii,:]*(-np.sin(lon)) + tyr[ii,:]*np.cos(lon)
+            
     return(u,v)
     
     

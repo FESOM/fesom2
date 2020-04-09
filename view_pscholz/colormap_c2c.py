@@ -1,5 +1,5 @@
 # Patrick Scholz, 14.12.2017
-def colormap_c2c(cmin,cmax,cref,cnumb,cname):
+def colormap_c2c(cmin,cmax,cref,cnumb,cname,cstep=[]):
     
     import numpy as np
     from matplotlib.colors import LinearSegmentedColormap
@@ -32,12 +32,14 @@ def colormap_c2c(cmin,cmax,cref,cnumb,cname):
     
     #___________________________________________________________________________
     # calculate optimal color step size
-    cdelta   = (cmax-cmin)/cnumb
-    cstep_all= np.array([0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 2.5, 5.0, 10.0, 20.0, 25.0, 50.0])
-    cstep_all=cstep_all*(10**np.floor(np.log10( np.abs(cdelta) )))
-    cstep_i  = np.squeeze(np.where(cstep_all<=cdelta))
-    cstep_i  = cstep_i[-1] 
-    cstep    = cstep_all[cstep_i]
+    if not cstep:
+        cdelta   = (cmax-cmin)/cnumb
+        cstep_all= np.array([0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 2.5, 5.0, 10.0, 20.0, 25.0, 50.0])
+        cstep_all=cstep_all*(10**np.floor(np.log10( np.abs(cdelta) )))
+        cstep_i  = np.squeeze(np.where(cstep_all<=cdelta))
+        cstep_i  = cstep_i[-1] 
+        cstep    = cstep_all[cstep_i]
+        
     #print('[cmin,cmax,cref]=',cmin,cmax,cref)
     #print('cstep  = ',cstep)
     #print('cdelta = ',cdelta)
