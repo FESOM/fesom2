@@ -29,7 +29,7 @@ subroutine init_ale(mesh)
     USE g_forcing_param, only: use_virt_salt
     Implicit NONE
     
-    integer                  :: n, nzmax
+    integer                  :: n, nzmax, elnodes(3), elem
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___allocate________________________________________________________________
@@ -96,6 +96,15 @@ subroutine init_ale(mesh)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
+    
+!!PS     do elem=1, myDim_elem2D
+!!PS         nzmax=nlevels(elem)
+!!PS         elnodes=elem2D_nodes(:,elem) 
+!!PS         zbar_e_bot(elem) = sum(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS !!PS         zbar_e_bot(elem) = minval(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS !!PS         zbar_e_bot(elem) = maxval(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS         bottom_elem_thickness(elem)=zbar(nzmax-1)-zbar_e_bot(elem)
+!!PS     end do
 
 end subroutine init_ale
 !
@@ -1626,12 +1635,12 @@ subroutine vert_vel_ale(mesh)
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)-1
                 !!PS if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
-                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.0_WP .and. CFL_z(nz,n)<=2.0_WP ) then
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.2_WP .and. CFL_z(nz,n)<=2.0_WP ) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
                 elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.0_WP) then          
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
                     !!PS write(*,*) '***********************************************************'
