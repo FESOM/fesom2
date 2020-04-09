@@ -746,94 +746,95 @@ type(t_mesh), intent(in) , target :: mesh
     el=edge_tri(:,ed)
     le=sqrt(sum(elem_area(el)))/30.0_WP
     DO  nz=1,minval(nlevels(el))-1
-      u1=UV(1,nz,el(1))-UV(1,nz,el(2))
-      v1=UV(2,nz,el(1))-UV(2,nz,el(2))
-      vi=dt*sqrt(u1*u1+v1*v1)*le
-      u1=u1*vi
-      v1=v1*vi
-     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
-     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+        v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+        vi=dt*sqrt(u1*u1+v1*v1)*le
+        u1=u1*vi
+        v1=v1*vi
+        UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+        UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+        UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+        UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
 end subroutine viscosity_filt_h
 ! ===================================================================
 SUBROUTINE viscosity_filt_h_backscatter(mesh)
-USE MOD_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE g_CONFIG
-USE g_comm_auto
-IMPLICIT NONE
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
 
-real(kind=8)  :: u1, v1, le, vi 
-integer       :: nz, ed, el(2), nelem(3),k, elem
-real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
-type(t_mesh), intent(in) , target :: mesh
+    real(kind=8)  :: u1, v1, le, vi 
+    integer       :: nz, ed, el(2), nelem(3),k, elem
+    real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
- ! An analog of harmonic viscosity operator.
- ! Same as visc_filt_h, but with the backscatter. 
- ! Here the contribution from squared velocities is added to the viscosity.    
- ! The contribution from boundary edges is neglected (free slip). 
+    ! An analog of harmonic viscosity operator.
+    ! Same as visc_filt_h, but with the backscatter. 
+    ! Here the contribution from squared velocities is added to the viscosity.    
+    ! The contribution from boundary edges is neglected (free slip). 
 
- ed=myDim_elem2D+eDim_elem2D
- allocate(U_b(nl-1,ed), V_b(nl-1, ed))
- ed=myDim_nod2D+eDim_nod2D
- allocate(U_c(nl-1,ed), V_c(nl-1,ed))
- U_b=0.0_WP
- V_b=0.0_WP
- U_c=0.0_WP
- V_c=0.0_WP
- DO ed=1, myDim_edge2D+eDim_edge2D
-    if(myList_edge2D(ed)>edge2D_in) cycle
-    el=edge_tri(:,ed)
-    le=sqrt(sum(elem_area(el)))/easy_bs_scale
-    DO  nz=1,minval(nlevels(el))-1
-      u1=UV(1,nz,el(1))-UV(1,nz,el(2))
-      v1=UV(2,nz,el(1))-UV(2,nz,el(2))
-      vi=dt*max(sqrt(u1*u1+v1*v1),10*(u1*u1+v1*v1))*le
-      u1=u1*vi
-      v1=v1*vi
-     U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
-     U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
-     V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
-     V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
-    END DO 
- END DO
- call exchange_elem(U_b)
- call exchange_elem(V_b)
- ! ===========
- ! Compute smoothed viscous term: 
- ! ===========
-   DO ed=1, myDim_nod2D 
-    DO nz=1, nlevels_nod2D(ed)-1
-       vi=0.0_WP
-       u1=0.0_WP
-       v1=0.0_WP
-       DO k=1, nod_in_elem2D_num(ed)
-           elem=nod_in_elem2D(k,ed)
-           vi=vi+elem_area(elem)
-           u1=u1+U_b(nz,elem)*elem_area(elem)
-           v1=v1+V_b(nz,elem)*elem_area(elem)
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_b(nl-1,ed), V_b(nl-1, ed))
+    ed=myDim_nod2D+eDim_nod2D
+    allocate(U_c(nl-1,ed), V_c(nl-1,ed))
+    U_b=0.0_WP
+    V_b=0.0_WP
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        le=sqrt(sum(elem_area(el)))/easy_bs_scale
+        DO  nz=1,minval(nlevels(el))-1
+            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+            vi=dt*max(sqrt(u1*u1+v1*v1),10*(u1*u1+v1*v1))*le
+            u1=u1*vi
+            v1=v1*vi
+            U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
+            U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
+            V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+            V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+        END DO 
+    END DO
+    call exchange_elem(U_b)
+    call exchange_elem(V_b)
+    ! ===========
+    ! Compute smoothed viscous term: 
+    ! ===========
+    DO ed=1, myDim_nod2D 
+        DO nz=1, nlevels_nod2D(ed)-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, nod_in_elem2D_num(ed)
+                elem=nod_in_elem2D(k,ed)
+                vi=vi+elem_area(elem)
+                u1=u1+U_b(nz,elem)*elem_area(elem)
+                v1=v1+V_b(nz,elem)*elem_area(elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
         END DO
-	U_c(nz,ed)=u1/vi
-        V_c(nz,ed)=v1/vi
     END DO
-    END DO
-  call exchange_nod(U_c)
-  call exchange_nod(V_c)
-  do ed=1, myDim_elem2D
-         nelem=elem2D_nodes(:,ed)
-         Do nz=1, nlevels(ed)-1
-         UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
-         UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
-         END DO
-  end do
- deallocate(V_c,U_c,V_b,U_b)
+    call exchange_nod(U_c)
+    call exchange_nod(V_c)
+    
+    do ed=1, myDim_elem2D
+        nelem=elem2D_nodes(:,ed)
+        Do nz=1, nlevels(ed)-1
+            UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
+            UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
+        END DO
+    end do
+    deallocate(V_c,U_c,V_b,U_b)
 end subroutine viscosity_filt_h_backscatter
 
 ! ===================================================================

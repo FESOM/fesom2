@@ -50,6 +50,10 @@ module g_cvmix_idemix
     
     ! dissipation parameter (dimensionless)
     real(kind=WP) :: idemix_mu0   = 1.33333333
+
+    ! amount of surface forcing that is used
+    real(kind=WP) :: idemix_sforcusage = 0.2
+    
     
     integer       :: idemix_n_hor_iwe_prop_iter = 1
     
@@ -60,7 +64,7 @@ module g_cvmix_idemix
     character(200):: idemix_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
     
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, & 
-                            idemix_surforc_file, idemix_botforc_file
+                            idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
                             
                             
     
@@ -218,7 +222,7 @@ module g_cvmix_idemix
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
             call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
-            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
+            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
             
         else
             if (mype==0) then

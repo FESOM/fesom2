@@ -1592,4 +1592,5 @@ def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto',fac=0):
     if varname in ['u','v','w','ssh','fw','fh'] or \
        any(x in varname for x in ['vec','anom','dvd']):
        if not do_rescale=='log10': cref=0.0
+    if varname in ['Kv']: cref = np.around(cref,0)
     return(cref)    

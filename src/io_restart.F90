@@ -41,7 +41,7 @@ MODULE io_RESTART
     integer :: rec, Tid, Iid
     integer :: ncid
     integer :: rec_count=0
-    integer :: error_status(200), error_count
+    integer :: error_status(250), error_count
     logical :: is_in_use=.false.
   end type nc_file
 !
@@ -499,7 +499,7 @@ subroutine read_restart(id, mesh, arg)
   integer                          :: i, lev, size1, size2, shape
   integer                          :: rec2read, c
   real(kind=WP)                    :: rtime !timestamp of the record
-
+  logical                          :: file_exist=.False.
   type(t_mesh), intent(in)        , target :: mesh
 
 #include  "associate_mesh.h"
@@ -508,11 +508,20 @@ subroutine read_restart(id, mesh, arg)
   ! Serial output implemented so far
   c=1
   if (mype==0) then
-     write(*,*) 'reading restart file ', trim(id%filename)
-     id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
-     id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
-     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
-
+     file_exist=.False.
+     inquire(file=id%filename,exist=file_exist) 
+     if (file_exist) then
+        write(*,*) '     reading restart file:  ', trim(id%filename)
+        id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
+        id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
+        id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
+     else
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: could not find restart_file:',trim(id%filename),'!'    
+        write(*,*) '____________________________________________________________________'
+        call par_ex
+     end if 
+     
      if (.not. present(arg)) then
         rec2read=id%rec_count
      else
