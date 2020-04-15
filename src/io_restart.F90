@@ -516,9 +516,13 @@ subroutine read_restart(id, mesh, arg)
         id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
         id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
      else
+        write(*,*)
+        print *, achar(27)//'[33m'
         write(*,*) '____________________________________________________________________'
         write(*,*) ' ERROR: could not find restart_file:',trim(id%filename),'!'    
         write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
         call par_ex
      end if 
      
