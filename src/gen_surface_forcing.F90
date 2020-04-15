@@ -743,6 +743,51 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+      
+    ! check if include_fleapyear flag is right, for CORE2 forcing include_fleapyear=.false., 
+    ! for ERA, JRA55 and NCEP include_fleapyear MUST!!! be .true. otherwise the 
+    ! calendars (julian, gregorian) are not working.
+    if (mype==0) then
+        if ((index(lowercase(nm_xwind_file),'core') .ne. 0) .and. include_fleapyear .eq. .true.) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?, but setted '
+            write(*,*) '          include_fleapyear=.true.. CORE forcing does not contain any'
+            write(*,*) '          fleapyears or particular calender option (julian, gregorian).'
+            write(*,*) '          So if im right, please go to namelist.config and set'
+            write(*,*) '          include_fleapyear=.false. otherwise comment this message block'
+            write(*,*) '          in gen_surface_forcing.F90'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex(0)
+        end if 
+        if (((index(lowercase(nm_xwind_file),'era') .ne. 0) .or. & 
+             (index(lowercase(nm_xwind_file),'jra') .ne. 0) .or. &
+             (index(lowercase(nm_xwind_file),'ncep') .ne. 0)) .and. &
+            include_fleapyear .eq. .false.) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA or NCEP forcing,'
+            write(*,*) '          Right?, but setted include_fleapyear=.false.. JRA55, ERA or NCEP'
+            write(*,*) '          contain all fleapyears and use a specific calendar option (julian,'
+            write(*,*) '          gregorian). So that the calendars in FESOM2.0 work properly, when'
+            write(*,*) '          using these forcings include_fleapyear must be true. '
+            write(*,*) '          So if im right, please go to namelist.config and set'
+            write(*,*) '          include_fleapyear=.true. otherwise comment this message block'
+            write(*,*) '          in gen_surface_forcing.F90'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex(0)
+        end if 
+    end if    
+      
+      
+      
+      
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
@@ -1892,6 +1937,23 @@ CONTAINS
    return
    end function short_wave_radiation
 !EOC
+
+    !_______________________________________________________________________________
+    ! make inserted string all in lower case
+    function lowercase(string)
+        implicit none
+    !!PS     character(256) :: string, lowercase
+        character(len=:),allocatable :: lowercase
+        character(len=*)             :: string 
+        character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(len=26)            :: small='abcdefghijklmnopqrstuvwxyz'
+        integer                      :: i ,pos
+        lowercase = trim(string)
+        do i=1,len_trim(lowercase)
+            pos = index(cap,lowercase(i:i))
+            if (pos .ne. 0) lowercase(i:i)=small(pos:pos)
+        end do
+    end function lowercase 
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
