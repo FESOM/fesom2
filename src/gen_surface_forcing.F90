@@ -150,6 +150,7 @@ MODULE g_sbf
    type, public ::   flfi_type    !flux file informations
       character(len = 256)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
+      character(len = 34)                  :: calendar  ! variable name in the NetCDF file
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
@@ -186,6 +187,8 @@ CONTAINS
       integer                      :: nf_start(4)
       integer                      :: nf_edges(4)         
       integer                      :: ierror              ! return error code
+      character(len=20)            :: aux_calendar
+      integer                      :: aux_len
 
       !open file
       if (mype==0) then
@@ -288,8 +291,9 @@ CONTAINS
          deallocate(flf%nc_time)
            allocate(flf%nc_time(flf%nc_Ntime))
       end if
-   !read variables from file
-   ! coordinates
+    !____________________________________________________________________________   
+    !read variables from file
+    ! read lat
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlat
@@ -297,6 +301,8 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+    ! read lon  
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlon-2
@@ -306,16 +312,86 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-   ! time
+    !____________________________________________________________________________
+    ! read time axis from file
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
+         ! digg for calendar attribute in time axis variable
+         
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+      ! digg for calendar attribute in time axis variable
+      if (mype==0) then
+         iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
+         iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+         aux_calendar = aux_calendar(1:aux_len)
+         
+         if (iost .ne. NF_NOERR) then
+            flf%calendar='none'
+            write(*,*) ' --> could not find/read calendar attribute in the time axis'
+            write(*,*) '     of the  forcing file (Is this right?). I assume there is'
+            write(*,*) '     none and proceed in CORE2 style without leap years!'
+         else
+            flf%calendar=lowercase(aux_calendar)
+            write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|' 
+         end if 
+         
+         ! check for calendar and include_fleapyear consistency
+         if ((trim(flf%calendar).eq.'none')   .or. &
+             (trim(flf%calendar).eq.'noleap') .or. &
+             (trim(flf%calendar).eq.'365_days')) then
+            if (include_fleapyear==.true.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
+                write(*,*) '          but setted include_fleapyear=.true.. CORE forcing '
+                write(*,*) '          does not contain any leap years or particular '
+                write(*,*) '          calender option (julian, gregorian). So if im right,'
+                write(*,*) '          please go to namelist.config and set '
+                write(*,*) '          include_fleapyear=.false. otherwise comment this '
+                write(*,*) '          message block in gen_surface_forcing.F90.'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if
+         elseif ((trim(flf%calendar).eq.'julian')    .or. &
+                 (trim(flf%calendar).eq.'gregorian') .or. &
+                 (trim(flf%calendar).eq.'standard')) then
+            if (include_fleapyear==.false.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
+                write(*,*) '          NCEP or a similar forcing, Right?, but setted '
+                write(*,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
+                write(*,*) '          all fleapyears and use a specific calendar option '
+                write(*,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
+                write(*,*) '          work properly, when using these forcings '
+                write(*,*) '          include_fleapyear must be true. So if im right, please go'
+                write(*,*) '          to namelist.config and set include_fleapyear=.true. '
+                write(*,*) '          otherwise comment this message block in'
+                write(*,*) '          gen_surface_forcing.F90'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if 
+         else
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' ERROR: I am not familiar with the found calendar option,'
+            write(*,*) '        dont know what to do. Talk to the FESOM2 developers!!!'
+            write(*,*) '____________________________________________________________'
+            print *, achar(27)//'[0m'
+            call par_ex(0)
+         end if 
+      end if
+      
+      
+    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
       if (nm_nc_tmid/=1) then
          if (flf%nc_Ntime > 1) then
@@ -327,9 +403,10 @@ CONTAINS
       end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-      !flip lat and data in case of lat from -90 to 90
-      !!!! WARNING this is temporal solution, needs some more checks
+    
+    !___________________________________________________________________________
+    !flip lat and data in case of lat from -90 to 90
+    !!!! WARNING this is temporal solution, needs some more checks
       flip_lat = 0
       if ( flf%nc_Nlat > 1 ) then
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
@@ -744,46 +821,46 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
-    ! check if include_fleapyear flag is right, for CORE2 forcing include_fleapyear=.false., 
-    ! for ERA, JRA55 and NCEP include_fleapyear MUST!!! be .true. otherwise the 
-    ! calendars (julian, gregorian) are not working.
-    if (mype==0) then
-        if ((index(lowercase(nm_xwind_file),'core') .ne. 0) .and. include_fleapyear .eq. .true.) then
-            write(*,*)
-            print *, achar(27)//'[33m'
-            write(*,*) '____________________________________________________________________'
-            write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?, but setted '
-            write(*,*) '          include_fleapyear=.true.. CORE forcing does not contain any'
-            write(*,*) '          fleapyears or particular calender option (julian, gregorian).'
-            write(*,*) '          So if im right, please go to namelist.config and set'
-            write(*,*) '          include_fleapyear=.false. otherwise comment this message block'
-            write(*,*) '          in gen_surface_forcing.F90'
-            write(*,*) '____________________________________________________________________'
-            print *, achar(27)//'[0m'
-            write(*,*)
-            call par_ex(0)
-        end if 
-        if (((index(lowercase(nm_xwind_file),'era') .ne. 0) .or. & 
-             (index(lowercase(nm_xwind_file),'jra') .ne. 0) .or. &
-             (index(lowercase(nm_xwind_file),'ncep') .ne. 0)) .and. &
-            include_fleapyear .eq. .false.) then
-            write(*,*)
-            print *, achar(27)//'[33m'
-            write(*,*) '____________________________________________________________________'
-            write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA or NCEP forcing,'
-            write(*,*) '          Right?, but setted include_fleapyear=.false.. JRA55, ERA or NCEP'
-            write(*,*) '          contain all fleapyears and use a specific calendar option (julian,'
-            write(*,*) '          gregorian). So that the calendars in FESOM2.0 work properly, when'
-            write(*,*) '          using these forcings include_fleapyear must be true. '
-            write(*,*) '          So if im right, please go to namelist.config and set'
-            write(*,*) '          include_fleapyear=.true. otherwise comment this message block'
-            write(*,*) '          in gen_surface_forcing.F90'
-            write(*,*) '____________________________________________________________________'
-            print *, achar(27)//'[0m'
-            write(*,*)
-            call par_ex(0)
-        end if 
-    end if    
+!!PS     ! check if include_fleapyear flag is right, for CORE2 forcing include_fleapyear=.false., 
+!!PS     ! for ERA, JRA55 and NCEP include_fleapyear MUST!!! be .true. otherwise the 
+!!PS     ! calendars (julian, gregorian) are not working.
+!!PS     if (mype==0) then
+!!PS         if ((index(lowercase(nm_xwind_file),'core') .ne. 0) .and. include_fleapyear .eq. .true.) then
+!!PS             write(*,*)
+!!PS             print *, achar(27)//'[33m'
+!!PS             write(*,*) '____________________________________________________________________'
+!!PS             write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?, but setted '
+!!PS             write(*,*) '          include_fleapyear=.true.. CORE forcing does not contain any'
+!!PS             write(*,*) '          fleapyears or particular calender option (julian, gregorian).'
+!!PS             write(*,*) '          So if im right, please go to namelist.config and set'
+!!PS             write(*,*) '          include_fleapyear=.false. otherwise comment this message block'
+!!PS             write(*,*) '          in gen_surface_forcing.F90'
+!!PS             write(*,*) '____________________________________________________________________'
+!!PS             print *, achar(27)//'[0m'
+!!PS             write(*,*)
+!!PS             call par_ex(0)
+!!PS         end if 
+!!PS         if (((index(lowercase(nm_xwind_file),'era') .ne. 0) .or. & 
+!!PS              (index(lowercase(nm_xwind_file),'jra') .ne. 0) .or. &
+!!PS              (index(lowercase(nm_xwind_file),'ncep') .ne. 0)) .and. &
+!!PS             include_fleapyear .eq. .false.) then
+!!PS             write(*,*)
+!!PS             print *, achar(27)//'[33m'
+!!PS             write(*,*) '____________________________________________________________________'
+!!PS             write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA or NCEP forcing,'
+!!PS             write(*,*) '          Right?, but setted include_fleapyear=.false.. JRA55, ERA or NCEP'
+!!PS             write(*,*) '          contain all fleapyears and use a specific calendar option (julian,'
+!!PS             write(*,*) '          gregorian). So that the calendars in FESOM2.0 work properly, when'
+!!PS             write(*,*) '          using these forcings include_fleapyear must be true. '
+!!PS             write(*,*) '          So if im right, please go to namelist.config and set'
+!!PS             write(*,*) '          include_fleapyear=.true. otherwise comment this message block'
+!!PS             write(*,*) '          in gen_surface_forcing.F90'
+!!PS             write(*,*) '____________________________________________________________________'
+!!PS             print *, achar(27)//'[0m'
+!!PS             write(*,*)
+!!PS             call par_ex(0)
+!!PS         end if 
+!!PS     end if    
       
       
       
@@ -1938,21 +2015,35 @@ CONTAINS
    end function short_wave_radiation
 !EOC
 
-    !_______________________________________________________________________________
-    ! make inserted string all in lower case
+    !___________________________________________________________________________
+    ! make inserted string all in lower case and kick out weired mystery characters
     function lowercase(string)
         implicit none
-    !!PS     character(256) :: string, lowercase
-        character(len=:),allocatable :: lowercase
+        character(len=:),allocatable :: lowercase, aux_string
         character(len=*)             :: string 
+        character(len=48)            :: aux_string_end=''
         character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        character(len=26)            :: small='abcdefghijklmnopqrstuvwxyz'
-        integer                      :: i ,pos
-        lowercase = trim(string)
-        do i=1,len_trim(lowercase)
-            pos = index(cap,lowercase(i:i))
-            if (pos .ne. 0) lowercase(i:i)=small(pos:pos)
+        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_-'
+        integer                      :: i, i1 ,pos_c, pos_s
+        i1 = 0
+        aux_string = trim(string)
+        do i=1,len_trim(aux_string)
+            pos_c = index(cap,string(i:i))
+            pos_s = index(small,string(i:i))
+            ! there is problem in the JRA55 calendar attribut string, at the end of
+            ! that string there is a character which is not seeable, which is no letter 
+            ! and also no whitespace and which can not be removed with trim() --> 
+            ! to get rid of that lowercase will use only character that are 
+            ! found in either cap or small otherwise the sring comparison fails 
+            if (pos_c .ne. 0 .and. pos_s .eq. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=small(pos_c:pos_c)
+            elseif (pos_c .eq. 0 .and. pos_s .ne. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=aux_string(i:i)
+            end if
         end do
+        lowercase=trim(aux_string_end)
     end function lowercase 
 
 !-----------------------------------------------------------------------
