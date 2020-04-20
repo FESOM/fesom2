@@ -1,3 +1,45 @@
+module h_viscosity_leith_interface
+  interface
+    subroutine h_viscosity_leith(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module viscosity_filtxx_interface
+  interface
+    subroutine viscosity_filtxx(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module viscosity_filtxxx_interface
+  interface
+    subroutine viscosity_filtxxx(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module viscosity_filt2xx_interface
+  interface
+    subroutine viscosity_filt2xx(option, mesh)
+      use mod_mesh
+      integer       :: option
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module viscosity_filt_h_backscatter_interface
+  interface
+    subroutine viscosity_filt_h_backscatter(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes, viscosity_filt2x
@@ -175,6 +217,11 @@ subroutine viscosity_filter(option, mesh)
 use o_PARAM
 use g_PARSUP
 use MOD_MESH
+use h_viscosity_leith_interface
+use viscosity_filtxx_interface
+use viscosity_filtxxx_interface
+use viscosity_filt2xx_interface
+use viscosity_filt_h_backscatter_interface
 IMPLICIT NONE 
 integer                  :: option
 type(t_mesh), intent(in) , target :: mesh

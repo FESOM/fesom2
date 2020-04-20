@@ -1,3 +1,12 @@
+module forcing_array_setup_interfaces
+  interface
+    subroutine forcing_array_setup(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12
@@ -7,6 +16,7 @@ use g_parsup
 use g_CONFIG
 use g_sbf, only: sbc_ini
 use mod_mesh
+use forcing_array_setup_interfaces
 implicit none
   type(t_mesh), intent(in)  , target :: mesh
   if (mype==0) write(*,*) '****************************************************'

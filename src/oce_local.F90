@@ -1,3 +1,12 @@
+module com_global2local_interface
+  interface
+    subroutine com_global2local(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !=============================================================================
 SUBROUTINE com_global2local(mesh)
 USE g_PARSUP
@@ -112,6 +121,7 @@ SUBROUTINE save_dist_mesh(mesh)
   USE MOD_MESH
   USE o_ARRAYS
   USE g_PARSUP 
+  use com_global2local_interface
   IMPLICIT NONE
 
   type(t_mesh), intent(in)           , target :: mesh

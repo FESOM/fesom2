@@ -145,7 +145,7 @@ module g_cvmix_kpp
     ! Parameters to run shear-dependent LM94 scheme below the mixed layer
     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
     real(kind=WP)     :: kpp_Av0 = 5.0e-3 
-    real(kind=WP)     :: kpp_Kv0 = 5.0e-2 
+    real(kind=WP)     :: kpp_Kv0 = 5.0e-3 
     
     ! critical shear  Richardson number value, units: unitless (0.7 in LMD94)
     real(kind=WP)     :: kpp_Ri0 = 0.7

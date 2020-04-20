@@ -1,3 +1,20 @@
+module array_setup_interface
+  interface
+    subroutine array_setup(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module oce_initial_state_interface
+  interface
+    subroutine oce_initial_state(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! =================================================================
 subroutine ocean_setup(mesh)
 USE MOD_MESH
@@ -11,6 +28,8 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use array_setup_interface
+use oce_initial_state_interface
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________

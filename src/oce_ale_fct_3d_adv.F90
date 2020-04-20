@@ -1,3 +1,29 @@
+module oce_ale_fct_3d_adv_interfaces
+  interface
+    subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh    
+      integer       :: do_Xmoment
+      real(kind=WP) :: num_ord
+      real(kind=WP) :: ttfAB(mesh%nl-1,myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+    end subroutine
+
+    subroutine fct_LO_impl_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine fct_ale(ttf, iter_yn, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in)  , target :: mesh
+      real(kind=WP), intent(in) :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      logical, intent(in)       :: iter_yn
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
@@ -9,6 +35,7 @@ subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     use o_PARAM
     use g_PARSUP
     use g_comm_auto
+    use oce_ale_fct_3d_adv_interfaces
     implicit none
     type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)

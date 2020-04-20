@@ -49,7 +49,7 @@ kpp_matchtechc     = "ParabolicNonLocal" ! Setting diffusivity and NLT profile f
 kpp_internalmix    = "KPP"      ! Ri-number dependet mixing scheme below the OBL: 'PP' or 'KPP'
 kpp_reduce_tauuice = .false.    ! If True, reduce the wind stress (ustar) under sea ice.
 kpp_Av0            = 5.0e-3     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
-kpp_Kv0            = 5.0e-2 
+kpp_Kv0            = 5.0e-3 
 kpp_Ri0            = 0.7        ! critical Richardson number value, units: unitless (0.7 in LMD94)
 kpp_pp_Av0         = 0.01       ! Parameter in case of PP mixing below the OBL
 kpp_use_nonconstKvb= .true.     ! If True use non constant background diffusivity of Qiang from FESOM1.4

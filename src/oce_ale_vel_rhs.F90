@@ -1,3 +1,12 @@
+module momentum_adv_scalar_interface
+  interface
+    subroutine momentum_adv_scalar(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
@@ -11,6 +20,7 @@ subroutine compute_vel_rhs(mesh)
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
     use g_comm_auto
+    use momentum_adv_scalar_interface
     
     implicit none 
     type(t_mesh), intent(in) , target :: mesh   

@@ -1,3 +1,12 @@
+module relative_vorticity_interface
+  interface
+    subroutine relative_vorticity(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! Vector invariant momentum advection:
 ! (curl u+f)\times u+grad(u^2/2)+w du/dz
 !
@@ -71,6 +80,7 @@ USE MOD_MESH
 USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
+use relative_vorticity_interface
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
 integer           :: n, n1, nz, elem, elnodes(3), nl1, j
@@ -133,7 +143,7 @@ end DO
     END DO
  END DO 
 
- call relative_vorticity 
+ call relative_vorticity(mesh)
 ! ====================
 ! Sea level and pressure contribution   -\nabla(g\eta +hpressure/rho_0+V^2/2)
 ! and the Coriolis force (elemental part)
