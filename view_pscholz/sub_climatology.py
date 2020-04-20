@@ -18,6 +18,7 @@ from colormap_c2c import colormap_c2c
 #|                                                                             |
 #+_____________________________________________________________________________+
 class clim_data(object):
+    which_obj                   = 'data'
     #____data run variables______________________
     var                         = ''
     path, fname, descript       = '', '', ''

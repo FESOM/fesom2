@@ -334,7 +334,7 @@ CONTAINS
          if (iost .ne. NF_NOERR) then
             flf%calendar='none'
             write(*,*) ' --> could not find/read calendar attribute in the time axis'
-            write(*,*) '     of the  forcing file (Is this right?). I assume there is'
+            write(*,*) '     of the forcing file (Is this right?). I assume there is'
             write(*,*) '     none and proceed in CORE2 style without leap years!'
          else
             flf%calendar=lowercase(aux_calendar)
@@ -389,7 +389,6 @@ CONTAINS
             call par_ex(0)
          end if 
       end if
-      
       
     ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
@@ -820,50 +819,6 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
-      
-!!PS     ! check if include_fleapyear flag is right, for CORE2 forcing include_fleapyear=.false., 
-!!PS     ! for ERA, JRA55 and NCEP include_fleapyear MUST!!! be .true. otherwise the 
-!!PS     ! calendars (julian, gregorian) are not working.
-!!PS     if (mype==0) then
-!!PS         if ((index(lowercase(nm_xwind_file),'core') .ne. 0) .and. include_fleapyear .eq. .true.) then
-!!PS             write(*,*)
-!!PS             print *, achar(27)//'[33m'
-!!PS             write(*,*) '____________________________________________________________________'
-!!PS             write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?, but setted '
-!!PS             write(*,*) '          include_fleapyear=.true.. CORE forcing does not contain any'
-!!PS             write(*,*) '          fleapyears or particular calender option (julian, gregorian).'
-!!PS             write(*,*) '          So if im right, please go to namelist.config and set'
-!!PS             write(*,*) '          include_fleapyear=.false. otherwise comment this message block'
-!!PS             write(*,*) '          in gen_surface_forcing.F90'
-!!PS             write(*,*) '____________________________________________________________________'
-!!PS             print *, achar(27)//'[0m'
-!!PS             write(*,*)
-!!PS             call par_ex(0)
-!!PS         end if 
-!!PS         if (((index(lowercase(nm_xwind_file),'era') .ne. 0) .or. & 
-!!PS              (index(lowercase(nm_xwind_file),'jra') .ne. 0) .or. &
-!!PS              (index(lowercase(nm_xwind_file),'ncep') .ne. 0)) .and. &
-!!PS             include_fleapyear .eq. .false.) then
-!!PS             write(*,*)
-!!PS             print *, achar(27)//'[33m'
-!!PS             write(*,*) '____________________________________________________________________'
-!!PS             write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA or NCEP forcing,'
-!!PS             write(*,*) '          Right?, but setted include_fleapyear=.false.. JRA55, ERA or NCEP'
-!!PS             write(*,*) '          contain all fleapyears and use a specific calendar option (julian,'
-!!PS             write(*,*) '          gregorian). So that the calendars in FESOM2.0 work properly, when'
-!!PS             write(*,*) '          using these forcings include_fleapyear must be true. '
-!!PS             write(*,*) '          So if im right, please go to namelist.config and set'
-!!PS             write(*,*) '          include_fleapyear=.true. otherwise comment this message block'
-!!PS             write(*,*) '          in gen_surface_forcing.F90'
-!!PS             write(*,*) '____________________________________________________________________'
-!!PS             print *, achar(27)//'[0m'
-!!PS             write(*,*)
-!!PS             call par_ex(0)
-!!PS         end if 
-!!PS     end if    
-      
-      
-      
       
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
       rdate = real(julday(yearnew,1,1))

@@ -34,11 +34,7 @@ pp_alpha           = 5.0        ! alpha param eq. (1) in Pacanowski and Philande
 pp_exp             = 2.0        ! n param eq. (1) in Pacanowski and Philander 1981
 pp_Avbckg          = 1.0e-4     ! const. pp background viscosity
 pp_Kvbckg          = 1.0e-5     ! const. pp background diffusivity
-pp_use_monob       = .true.     ! use additional mixing with monin-obukov length
-pp_monob_Kv        = 0.01       ! strength of monin obukov mixing
 pp_use_nonconstKvb = .true.     ! use lat and depth dependent background diffusivity
-pp_use_windmix     = .true.     ! enhance mixing in upper to layers
-pp_use_instabmix   = .true.     ! enhance mixing when instable  stratification
 /
 
 ! namelist for KPP

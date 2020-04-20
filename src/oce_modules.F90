@@ -109,10 +109,28 @@ integer                       :: mom_adv=2
 
 logical                       :: open_b=.false.   ! Reserved    
 
-logical                       :: mo_on=.true. !.false. !Monin-Obukhov
-real(kind=WP) :: modiff=0.01                   !for PP, mixing coefficient within MO length
+!_______________________________________________________________________________
+!--> mixing enhancement than can be applied via subroutine mo_convect(mesh) 
+!    additionally to every mixing scheme i.e. KPP, PP, cvmix_KPP, cvmix_PP, cvmix_TKE
 
-  ! *** active tracer cutoff
+! Switch for Monin-Obukov TB04 mixing --> can be additionally applied for all mixing schemes
+! --> definetely recommented for KPP
+logical                       :: use_momix     = .true. !.false. !Monin-Obukhov -> TB04 mixing on/off
+real(kind=WP)                 :: momix_lat     = -50.0_WP ! latitudinal treshhold to apply mo_on <lat
+real(kind=WP)                 :: momix_kv      = 0.01   ! for PP/KPP, mixing coefficient within MO length
+
+! Switch for enhanced vertical mixing in case of instable stratification --> enhanced
+! convection 
+logical                       :: use_instabmix = .true.
+real(kind=WP)                 :: instabmix_kv  = 0.1
+
+! Switch for enhanced wind mixing --> nasty trick from pp mixing in FESOM1.4
+logical                       :: use_windmix   = .false.
+real(kind=WP)                 :: windmix_kv    = 1.e-3
+integer                       :: windmix_nl    = 2
+
+!_______________________________________________________________________________
+! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
 real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s to s_min
@@ -140,7 +158,11 @@ character(20)                  :: which_pgf='shchepetkin'
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return, visc_option
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
+            ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
+            use_momix, momix_lat, momix_kv, &
+            use_instabmix, instabmix_kv, instabmix_av, &
+            use_windmix, windmix_kv, windmix_av, windmix_nl
+            
 END MODULE o_PARAM  
 !==========================================================
 
