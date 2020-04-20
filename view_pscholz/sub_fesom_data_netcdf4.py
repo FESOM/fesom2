@@ -803,6 +803,8 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
 def fesom_data_anom(data,data2):
     anom = fesom_data([])
     
+    anom.which_obj = 'data'
+    
     #____data run variables______________________
     if data.var!=data2.var:
         anom.var                        = data.var+'-'+data2.var
