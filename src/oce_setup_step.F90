@@ -181,8 +181,8 @@ allocate(ssh_rhs(node_size))
 ! ================
 ! Monin-Obukhov
 ! ================
-if (use_ice .and. mo_on) allocate(mo(nl,node_size),mixlength(node_size))
-if (use_ice .and. mo_on) mixlength=0.
+if (use_ice .and. use_momix) allocate(mo(nl,node_size),mixlength(node_size))
+if (use_ice .and. use_momix) mixlength=0.
 ! ================
 ! Vertical velocity and pressure
 ! ================

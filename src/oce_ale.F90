@@ -2039,6 +2039,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(mesh)
+        call mo_convect(mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -2052,6 +2053,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(mesh)
+        call mo_convect(mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -2060,6 +2062,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(mesh)
+        call mo_convect(mesh)
         
     end if     
 
