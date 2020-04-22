@@ -466,6 +466,12 @@ END DO
     end if
 
     !___________________________________________________________________________________________________________________________________
+    if (whichEVP==1) then
+        !call def_stream(elem2D, myDim_elem2D, 'eps12', 'eps12', 'n/a', eps12,  1, 'd', i_real4, mesh)
+        !call def_stream(elem2D, myDim_elem2D, 'eps11', 'eps12', 'n/a', eps11,  1, 'd', i_real4, mesh)
+        !call def_stream(elem2D, myDim_elem2D, 'eps22', 'eps22', 'n/a', eps22,  1, 'd', i_real4, mesh)
+    end if
+    
     if (whichEVP==2) then
         call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, mesh)
         call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, mesh)
