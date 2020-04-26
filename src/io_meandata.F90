@@ -105,10 +105,10 @@ subroutine ini_mean_io(mesh)
 
   type(t_mesh), intent(in) , target :: mesh
 
+#include  "associate_mesh.h"
 
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
-#include  "associate_mesh.h"
   ! OPEN and read namelist for I/O
   open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
   if (iost == 0) then
@@ -449,7 +449,11 @@ END DO
      call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, mesh)
   end if
 
- 
+  !___________________________________________________________________________________________________________________________________
+  ! output Monin-Obukov (TB04) mixing length
+  if (use_momix) then
+     call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, mesh)
+  end if
   !___________________________________________________________________________________________________________________________________
   !if (ldiag_solver) then
   !   call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     1, 's', i_real4, mesh)

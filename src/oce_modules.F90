@@ -160,8 +160,8 @@ character(20)                  :: which_pgf='shchepetkin'
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
             ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
-            use_instabmix, instabmix_kv, instabmix_av, &
-            use_windmix, windmix_kv, windmix_av, windmix_nl
+            use_instabmix, instabmix_kv, &
+            use_windmix, windmix_kv, windmix_nl
             
 END MODULE o_PARAM  
 !==========================================================
