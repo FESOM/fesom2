@@ -345,7 +345,7 @@ CONTAINS
          if ((trim(flf%calendar).eq.'none')   .or. &
              (trim(flf%calendar).eq.'noleap') .or. &
              (trim(flf%calendar).eq.'365_days')) then
-            if (include_fleapyear==.true.) then
+            if (include_fleapyear .eqv. .true.) then
                 print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________'
                 write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
@@ -362,7 +362,7 @@ CONTAINS
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
                  (trim(flf%calendar).eq.'standard')) then
-            if (include_fleapyear==.false.) then
+            if (include_fleapyear .eqv. .false.) then
                 print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________'
                 write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
