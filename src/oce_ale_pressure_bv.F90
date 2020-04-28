@@ -11,7 +11,6 @@ subroutine pressure_bv(mesh)
     USE o_ARRAYS
     USE g_PARSUP
     use i_arrays
-    use g_forcing_arrays, only: Pair
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     IMPLICIT NONE
