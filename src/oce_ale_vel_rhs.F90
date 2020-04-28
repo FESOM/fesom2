@@ -62,8 +62,8 @@ subroutine compute_vel_rhs(mesh)
         !___________________________________________________________________________
         ! contribution from sea level pressure
         if (l_mslp) then
-            p_air = press_air(elnodes)/rhoair
-        else                   !|-> convert press_air from: Pa = kg/m/s^2 --> m^2/s^2)
+            p_air = press_air(elnodes)/1000
+        else                   !|-> convert press_air from: Pa--> bar)
             p_air = 0.0_WP
         end if
         
