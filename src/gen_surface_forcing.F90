@@ -41,9 +41,9 @@ MODULE g_sbf
    USE g_support
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
-   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
+   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff
-   USE g_read_other_NetCDF, only: read_other_NetCDF
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -86,6 +86,8 @@ MODULE g_sbf
 
    character(10),      save   :: sss_data_source   ='CORE2'
    character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+
+   logical :: runoff_climatology =.false.
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -345,7 +347,7 @@ CONTAINS
          if ((trim(flf%calendar).eq.'none')   .or. &
              (trim(flf%calendar).eq.'noleap') .or. &
              (trim(flf%calendar).eq.'365_days')) then
-            if (include_fleapyear==.true.) then
+            if (include_fleapyear .eqv. .true.) then
                 print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________'
                 write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
@@ -362,7 +364,7 @@ CONTAINS
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
                  (trim(flf%calendar).eq.'standard')) then
-            if (include_fleapyear==.false.) then
+            if (include_fleapyear .eqv. .false.) then
                 print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________'
                 write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
@@ -807,7 +809,7 @@ CONTAINS
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
+                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -959,10 +961,11 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation, force_newcoeff
+      logical      :: do_rotation, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
+      character(len=256)   :: filename
       type(t_mesh), intent(in) , target :: mesh
       
 #include  "associate_mesh.h"
@@ -1003,9 +1006,15 @@ CONTAINS
          end do
       end if
       
+      !==========================================================================
+
+      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+
+      ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if ((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP)) then
+            if (update_monthly_flag) then
                i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
@@ -1013,6 +1022,39 @@ CONTAINS
             end if
          end if
       end if
+
+     ! runoff  
+     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+       
+       if(update_monthly_flag) then
+         if(runoff_climatology) then
+           !climatology monthly mean
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+           filename=trim(nm_runoff_file)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         else
+           !monthly data
+
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         end if
+       end if
+
+     end if
+
 
       ! interpolate in time
       call data_timeinterp(rdate)

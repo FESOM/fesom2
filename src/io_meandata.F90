@@ -104,11 +104,11 @@ subroutine ini_mean_io(mesh)
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
+  namelist /nml_listsize/ io_listsize
+  namelist /nml_list    / io_list
 
 #include  "associate_mesh.h"
 
-  namelist /nml_listsize/ io_listsize
-  namelist /nml_list    / io_list
   ! OPEN and read namelist for I/O
   open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
   if (iost == 0) then
