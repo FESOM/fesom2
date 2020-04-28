@@ -92,8 +92,8 @@ subroutine forcing_array_setup(mesh)
      cloudiness=0.0_WP
   end if
   if (l_mslp) then
-     allocate(Pair(n2))
-     Pair=0.0_WP
+     allocate(press_air(n2))
+     press_air=0.0_WP
   end if
  
   allocate(u_wind_t(2,n2),v_wind_t(2,n2))
