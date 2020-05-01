@@ -56,3 +56,4 @@ landice_end_mon=10
    !runoff_climatology =.true.
    nm_sss_data_file   ='/work/ollie/dsein/input/forcing/CORE2/PHC2_salx.nc'
    sss_data_source    ='CORE2'
+/
