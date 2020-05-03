@@ -28,11 +28,11 @@ jobs:
     
     - name: Install software
       run: sudo apt-get -y install make gfortran gcc g++ libblas-dev libopenmpi-dev cmake vim git libnetcdf-dev libnetcdff-dev libpmi2-pmix bzip2 wget
-    - name: Get the data
-      run: |
-        wget https://swiftbrowser.dkrz.de/download/fesom2_files/FESOM2_minimal_input.tar
-        tar -xvz FESOM2_minimal_input.tar
-        ls
+#     - name: Get the data
+#       run: |
+#         wget https://swiftbrowser.dkrz.de/download/fesom2_files/FESOM2_minimal_input.tar
+#         tar -xvz FESOM2_minimal_input.tar
+#         ls
     # Runs a set of commands using the runners shell
     - name: Run a multi-line script
       run: |
