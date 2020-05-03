@@ -25,6 +25,8 @@ jobs:
       run: |
         echo Runung in the container
         pwd
+        ls
+        
         
   # This workflow contains a single job called "build"
 #   build:
