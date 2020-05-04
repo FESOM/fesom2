@@ -29,11 +29,15 @@ jobs:
         bash -l configure.sh ubuntu
     - name: Create test run
       run: |
-        mkrun pi shorttest_pi -m docker
+        mkrun pi test_pi -m docker
     - name: FESOM2 test run
       run: |    
         cd work_pi
         chmod +x job_docker_new
         ./job_docker_new
+    - name: Check results
+        cd work_pi
+        fcheck .
+        
     
 
