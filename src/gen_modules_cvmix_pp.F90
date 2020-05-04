@@ -221,14 +221,12 @@ module g_cvmix_pp
             ! calculate and add latitudinal and depth dependend background 
             ! diffusivity of Q. Wang from FESOM1.4
             if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
-                do node = 1,node_size
-                    do nz = 2,nlevels_nod2D(node)-1
-                        call Kv0_background_qiang(Kvb,                       &
+                do nz = 2,nlevels_nod2D(node)-1
+                    call Kv0_background_qiang(Kvb,                       &
                                                 geo_coord_nod2D(2,node)/rad, &
                                                 abs(zbar_3d_n(nz,node))      &
                                                 )
-                        pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
-                    end do
+                    pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
                 end do
             else
                 pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
