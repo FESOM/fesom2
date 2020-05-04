@@ -215,15 +215,31 @@ module g_cvmix_pp
             ! needs to be tested if this is an advantage for FESOM2.0 or not 
             if (pp_use_fesompp .and. pp_use_AvbinKv .eqv. .false.) then
                  pp_Av(2:nln,node) = pp_Av(2:nln,node) + pp_Avbckg
-                 pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
             end if  
+            
+            !_______________________________________________________________________
+            ! calculate and add latitudinal and depth dependend background 
+            ! diffusivity of Q. Wang from FESOM1.4
+            if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
+                do node = 1,node_size
+                    do nz = 2,nlevels_nod2D(node)-1
+                        call Kv0_background_qiang(Kvb,                       &
+                                                geo_coord_nod2D(2,node)/rad, &
+                                                abs(zbar_3d_n(nz,node))      &
+                                                )
+                        pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
+                    end do
+                end do
+            else
+                pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
+            end if 
             
             !___________________________________________________________________
             pp_Av(1,node)=0.0_WP
             pp_Kv(1,node)=0.0_WP
             
         end do !--> do node = 1,myDim_nod2D
-        
+
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
         call exchange_nod(pp_Kv)
