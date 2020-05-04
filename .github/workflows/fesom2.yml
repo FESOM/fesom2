@@ -25,7 +25,6 @@ jobs:
     
     - name: Run a multi-line script
       run: |
-        cd fesom2
         bash -l configure.sh ubuntu
         mkrun pi shorttest_pi -m docker
         cd work_pi
