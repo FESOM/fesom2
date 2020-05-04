@@ -21,9 +21,17 @@ jobs:
 
     # Service containers to run with `container-job`
     steps:
+    - uses: actions/checkout@v2
+    
     - name: Run a multi-line script
       run: |
-        echo Runung in the container
+        cd fesom2
+        bash -l configure.sh ubuntu
+        mkrun pi shorttest_pi -m docker
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new
+                
         pwd
         ls
         
