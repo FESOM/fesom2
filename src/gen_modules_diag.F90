@@ -18,7 +18,7 @@ module diagnostics
   public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
-            std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ, &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_RHOZ, std_dens_dVdT, std_dens_flux, dens_flux, &
             compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -35,23 +35,22 @@ module diagnostics
 ! defining a set of standard density bins which will be used for computing densMOC
 ! integer,        parameter                      :: std_dens_N  = 100
 ! real(kind=WP),  save, target                   :: std_dens(std_dens_N)
-  integer,        parameter                      :: std_dens_N  =72
+  integer,        parameter                      :: std_dens_N  =89
   real(kind=WP),  save, target                   :: std_dens(std_dens_N)=(/ &
-                                                            0.0000,   30.00000, 30.55556, 31.11111, 31.66667, 32.22222, &
-                                                            32.77778, 33.33333, 33.88889, 34.44444, 35.00000, 35.10622, &
-                                                            35.20319, 35.29239, 35.37498, 35.45187, 35.52380, 35.59136, &
-                                                            35.65506, 35.71531, 35.77247, 35.82685, 35.87869, 35.92823, &
-                                                            35.97566, 36.02115, 36.06487, 36.10692, 36.14746, 36.18656, &
-                                                            36.22434, 36.26089, 36.29626, 36.33056, 36.36383, 36.39613, &
-                                                            36.42753, 36.45806, 36.48778, 36.51674, 36.54495, 36.57246, &
-                                                            36.59932, 36.62555, 36.65117, 36.67621, 36.70071, 36.72467, &
-                                                            36.74813, 36.77111, 36.79363, 36.81570, 36.83733, 36.85857, &
-                                                            36.87940, 36.89985, 36.91993, 36.93965, 36.95904, 36.97808, &
-                                                            36.99682, 37.01524, 37.03336, 37.05119, 37.06874, 37.08602, &
-                                                            37.10303, 37.11979, 37.13630, 37.15257, 37.16861, 37.18441/)
+                                                            0.0000,   30.00000, 30.55556, 31.11111, 31.36000, 31.66667, 31.91000, 32.22222, 32.46000, &
+                                                            32.77778, 33.01000, 33.33333, 33.56000, 33.88889, 34.11000, 34.44444, 34.62000, 35.00000, &
+                                                            35.05000, 35.10622, 35.20319, 35.29239, 35.37498, 35.41300, 35.45187, 35.52380, 35.59136, &
+                                                            35.65506, 35.71531, 35.77247, 35.82685, 35.87869, 35.92823, 35.97566, 35.98000, 36.02115, &
+                                                            36.06487, 36.10692, 36.14746, 36.18656, 36.22434, 36.26089, 36.29626, 36.33056, 36.36383, &
+                                                            36.39613, 36.42753, 36.45806, 36.48778, 36.51674, 36.54495, 36.57246, 36.59500, 36.59932, &
+                                                            36.62555, 36.65117, 36.67621, 36.68000, 36.70071, 36.72467, 36.74813, 36.75200, 36.77111, &
+                                                            36.79363, 36.81570, 36.83733, 36.85857, 36.87500, 36.87940, 36.89985, 36.91993, 36.93965, &
+                                                            36.95904, 36.97808, 36.99682, 37.01524, 37.03336, 37.05119, 37.06874, 37.08602, 37.10303, &
+                                                            37.11979, 37.13630, 37.15257, 37.16861, 37.18441, 37.50000, 37.75000, 40.00000/)
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
-  real(kind=WP),  save, target                   :: std_dens_min=1012., std_dens_max=1039.
-  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_RHOZ(:,:)
+  real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
+  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_RHOZ(:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:)
+  real(kind=WP),  save, allocatable, target      :: dens_flux(:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
@@ -346,109 +345,240 @@ end subroutine diag_energy
 subroutine diag_densMOC(mode, mesh)
   implicit none
   integer, intent(in)                 :: mode
+  type(t_mesh), intent(in)  , target  :: mesh
   integer                             :: nz, snz, elem, nzmax, elnodes(3), is, ie, pos
+  integer                             :: e, edge, enodes(2), eelems(2)
+  real(kind=WP)                       :: div, deltaX, deltaY, locz
   integer                             :: jj
-  real(kind=WP), save                 :: dd
-  real(kind=WP)                       :: uvdz_el(2), rhoz_el, dz, weight, dmin, dmax, ddiff, test, test1, test2, test3
-  real(kind=WP), save, allocatable    :: dens(:), aux(:)
-  real(kind=WP), save, allocatable    :: std_dens_w(:,:)
-  logical, save                       :: firstcall=.true.
-  type(t_mesh), intent(in)           , target :: mesh
+  real(kind=WP), save                 :: dd, wdiff
+  real(kind=WP)                       :: uvdz_el(2), rhoz_el, vol_el, dz, weight, dmin, dmax, ddiff, test, test1, test2, test3
+  real(kind=WP), save, allocatable    :: dens(:), aux(:), el_depth(:)
+  real(kind=WP), save, allocatable    :: std_dens_w(:,:), std_dens_VOL1(:,:), std_dens_VOL2(:,:)
+  logical, save                       :: firstcall_s=.true., firstcall_e=.true.
 
 #include "associate_mesh.h"
-!=====================
 
-
-  if (firstcall) then !allocate the stuff at the first call
+  if (firstcall_s) then !allocate the stuff at the first call
      allocate(std_dens_UVDZ(2,std_dens_N, myDim_elem2D))
      allocate(std_dens_RHOZ(  std_dens_N, myDim_elem2D))
      allocate(std_dens_w   (  std_dens_N, myDim_elem2D))
-     allocate(aux(nl-1))
-     allocate(dens(nl))
+     allocate(std_dens_dVdT(  std_dens_N, myDim_elem2D))
+     allocate(std_dens_DIV (  std_dens_N, myDim_nod2D+eDim_nod2D))
+     allocate(std_dens_VOL1(  std_dens_N, myDim_elem2D))
+     allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
+     allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
+     allocate(std_dens_Z   (  std_dens_N, myDim_elem2D))
+     allocate(dens_flux(elem2D))
+     allocate(aux  (nl-1))
+     allocate(dens (nl))
+     allocate(el_depth(nl))
 !
-!std_dens(1)=27.5
-!do nz=2, std_dens_N
-!std_dens(nz)=std_dens(nz-1)+10.5/real(std_dens_N)
+!std_dens(1)=0.
+!std_dens(2)=30.
+!do nz=3, std_dens_N-1
+!std_dens(nz)=std_dens(nz-1)+10.5/real(std_dens_N-2)
 !end do
+!std_dens(std_dens_N)=40.
 !
      std_dd(:)=std_dens(2:)-std_dens(:std_dens_N-1)
      dens         =0.
      std_dens_UVDZ=0.
      std_dens_RHOZ=0.
-     firstcall=.false.
+     std_dens_dVdT=0.
+     std_dens_DIV =0.
+     std_dens_VOL1=0.
+     std_dens_VOL2=0.
+     std_dens_Z   =0.
+     depth        =0.
+     el_depth     =0.
+     firstcall_s=.false.
      if (mode==0) return
   end if
 
   std_dens_UVDZ=0.
   std_dens_RHOZ=0.
   std_dens_w   =0.
+  std_dens_flux=0.
+  dens_flux    =0.
+  std_dens_VOL2=0.
+  std_dens_DIV =0.
+  std_dens_Z   =0.
   do elem=1, myDim_elem2D
-     elnodes=elem2D_nodes(:,elem)    
+     elnodes=elem2D_nodes(:,elem)     
      nzmax =nlevels(elem)
+
+     dens_flux(elem)=sum(sw_alpha(1,elnodes) * heat_flux(elnodes)  / vcpw + sw_beta(1,elnodes) * (relax_salt(elnodes) + water_flux(elnodes) * tr_arr(1,elnodes,2)))/3.
+
      do nz=1, nzmax-1
-       aux(nz)=sum(density_dmoc(nz, elnodes))/3.-1000.
+        aux(nz)=sum(density_dmoc(nz, elnodes))/3.-1000.
      end do
+     
+     el_depth(nzmax)=zbar_e_bot(elem)
      do nz=nzmax-1,2,-1
-        dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
-                      aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+        dens(nz)       = (aux(nz)     * helem(nz-1,elem)+&
+                          aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+        el_depth(nz)   = el_depth(nz+1) + helem(nz, elem)
      end do
      dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
      dens(1)    =dens(2)      +(dens(2)-dens(3))            *helem(1, elem)/helem(2,elem)
+     el_depth(1)=0.
 
+     is=minloc(abs(std_dens-dens(1)),1)
+!    std_dens_flux(is,elem)=std_dens_flux(is,elem)+dens_flux
+     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux (elnodes   ))/3./vcpw
+     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt(elnodes   ))/3.
+     std_dens_flux(3, is,elem)=std_dens_flux(3, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * water_flux(elnodes) * tr_arr(1,  elnodes, 2))/3.
+     
      do nz=nzmax-1,1,-1
-        dmin=minval(dens(nz:nz+1))
-        dmax=maxval(dens(nz:nz+1))
-!       is=findloc(std_dens > dmin, value=.true., dim=1)
-	is=1
-        do jj = 1, std_dens_N
-           if (std_dens(jj) > dmin) then
-              is = jj
-              exit
-           endif
-        end do
+        dmin  =minval(dens(nz:nz+1))
+        dmax  =maxval(dens(nz:nz+1))
+        ddiff =abs(dens(nz)-dens(nz+1))
+        is=findloc(std_dens > dmin, value=.true., dim=1)
+!	is=1
+!        do jj = 1, std_dens_N
+!           if (std_dens(jj) > dmin) then
+!              is = jj
+!              exit
+!           endif
+!        end do
 
-!       ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
-	ie=std_dens_N
-        do jj = std_dens_N,1,-1
-           if (std_dens(jj) < dmin) then
-              ie = jj
-              exit
-           endif
-        end do
+        ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+!	ie=std_dens_N
+!        do jj = std_dens_N,1,-1
+!           if (std_dens(jj) < dmin) then
+!              ie = jj
+!              exit
+!           endif
+!        end do
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
         uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
         rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
-        ddiff=abs(dens(nz)-dens(nz+1))
+        vol_el =helem(nz,elem)*elem_area(elem)
+        wdiff  =sum(wvel(elnodes, nz)-wvel(elnodes, nz+1))/3.*elem_area(elem)
         if (ie-is > 0) then
            weight=(std_dens(is)-dmin)+std_dd(is)/2.
            weight=max(weight, 0.)/ddiff
            std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+weight*uvdz_el
            std_dens_RHOZ(   is, elem)=std_dens_RHOZ(   is, elem)+weight*rhoz_el
-           std_dens_w(   is, elem)   =std_dens_w(   is, elem)   +weight
+           std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+weight*vol_el
+           locz=el_depth(nz+1)+weight*helem(nz,elem)
+           std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+locz*weight
+           std_dens_w(      is, elem)   =std_dens_w(   is, elem)+weight
            do snz=is+1, ie-1
               weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
               std_dens_UVDZ(:, snz, elem)=std_dens_UVDZ(:, snz, elem)+weight*uvdz_el
               std_dens_RHOZ(   snz, elem)=std_dens_RHOZ(   snz, elem)+weight*rhoz_el
-              std_dens_w   (   snz, elem)=std_dens_w   (   snz, elem)+weight
+              std_dens_VOL2(   snz, elem)=std_dens_VOL2(   snz, elem)+weight*vol_el
+              locz=locz+weight*helem(nz,elem)
+              std_dens_Z   (   snz, elem) =std_dens_Z    (  snz, elem)+locz*weight
+              std_dens_w   (   snz, elem) =std_dens_w    (  snz, elem)+weight
            end do
            weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
            weight=max(weight, 0.)/ddiff
            std_dens_UVDZ(:, ie, elem)=std_dens_UVDZ(:, ie, elem)+weight*uvdz_el
            std_dens_RHOZ(   ie, elem)=std_dens_RHOZ(   ie, elem)+weight*rhoz_el
-           std_dens_w   (   ie, elem)=std_dens_w   (   ie, elem)+weight
+           std_dens_VOL2(   ie, elem)=std_dens_VOL2(   ie, elem)+weight*vol_el
+           locz=locz+weight*helem(nz,elem)
+           std_dens_Z   (   ie, elem) =std_dens_Z   (  ie, elem)+locz*weight
+           std_dens_w   (   ie, elem) =std_dens_w   (  ie, elem)+weight
         else
            std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+uvdz_el
            std_dens_RHOZ(   is, elem)=std_dens_RHOZ(   is, elem)+rhoz_el
+           std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+vol_el
+           std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+el_depth(nz+1)+helem(nz,elem)/2.
            std_dens_w   (   is, elem)=std_dens_w   (   is, elem)+1._wp
         end if
      end do
   end do
+
+  do edge=1, myDim_edge2D
+     if (myList_edge2D(edge) > edge2D_in) cycle
+     enodes=edges(:,edge)
+     eelems=edge_tri(:,edge)
+     nzmax =nlevels(eelems(1))
+     if (eelems(2)>0) nzmax=max(nzmax, nlevels(eelems(2)))
+     do nz=1, nzmax-1
+        aux(nz)=sum(density_dmoc(nz, enodes))/2.-1000.
+     end do
+
+     do e=1,2
+        elem=eelems(e)
+        if (elem<=0) CYCLE
+        deltaX=edge_cross_dxdy(1+(e-1)*2,edge) 
+        deltaY=edge_cross_dxdy(2+(e-1)*2,edge)
+        nzmax =nlevels(elem)
+
+        do nz=nzmax-1,2,-1
+           dens(nz)   = (aux(nz)     * helem(nz-1,elem)+&
+                         aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
+        end do
+        dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
+        dens(1)    =dens(2)      +(dens(2)-dens(3))            *helem(1, elem)     /helem(2,elem)
+
+        is=minloc(abs(std_dens-dens(1)),1)
+
+        do nz=nzmax-1,1,-1
+           div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
+           if (e==2) div=-div
+           dmin =minval(dens(nz:nz+1))
+           dmax =maxval(dens(nz:nz+1))
+           ddiff=abs(dens(nz)-dens(nz+1))
+           is=findloc(std_dens > dmin, value=.true., dim=1)
+!          is=1
+!          do jj = 1, std_dens_N
+!             if (std_dens(jj) > dmin) then
+!                is = jj
+!                exit
+!             endif
+!          end do
+
+           ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+!          ie=std_dens_N
+!          do jj = std_dens_N,1,-1
+!             if (std_dens(jj) < dmin) then
+!                ie = jj
+!                exit
+!             endif
+!          end do
+
+        if (std_dens(is)>=dmax) is=ie
+        if (std_dens(ie)<=dmin) ie=is
+        if (ie-is > 0) then
+           weight=(std_dens(is)-dmin)+std_dd(is)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
+           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
+           do snz=is+1, ie-1
+              weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+              std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
+              std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
+           end do
+           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
+           weight=max(weight, 0.)/ddiff
+           std_dens_DIV(ie, enodes(1))=std_dens_DIV(ie, enodes(1))+weight*div
+           std_dens_DIV(ie, enodes(2))=std_dens_DIV(ie, enodes(2))-weight*div
+        else
+           std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+div
+           std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-div
+        end if
+      end do
+    end do
+  end do
+
   where (std_dens_w > 0.)
         std_dens_RHOZ=std_dens_RHOZ/std_dens_w
+        std_dens_Z   =std_dens_Z   /std_dens_w
   end where
+
+  if (.not. firstcall_e) then
+     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/dt
+  end if
+  std_dens_VOL1=std_dens_VOL2
+  firstcall_e=.false.
 end subroutine diag_densMOC
 ! ==============================================================
+
 subroutine compute_diagnostics(mode, mesh)
   implicit none
   integer, intent(in)           :: mode !constructor mode (0=only allocation; any other=do diagnostic)
