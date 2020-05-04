@@ -36,6 +36,7 @@ jobs:
         chmod +x job_docker_new
         ./job_docker_new
     - name: Check results
+      run: |
         cd work_pi
         fcheck .
         
