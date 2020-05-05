@@ -276,7 +276,8 @@ CONTAINS
       integer              :: nf_edges(4)         
       integer              :: fld_idx, i,j,ii, ip1, jp1, k
       integer              :: d_indx, d_indx_p1  ! index of neares      
-      real(wp)             :: cf_a, cf_b, delta_d, nl1
+      real(wp)             :: cf_a, cf_b, delta_d
+      integer              :: nl1
       real(wp)             :: denom, x1, x2, y1, y2, x, y, d1,d2     
       
       real(wp), allocatable, dimension(:,:,:)  :: ncdata
