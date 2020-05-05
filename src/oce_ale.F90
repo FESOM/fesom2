@@ -2052,7 +2052,7 @@ subroutine oce_timestep_ale(n, mesh)
     call compute_neutral_slope(mesh)
     
     !___________________________________________________________________________
-    call status_check(mesh)
+    call status_check
     
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
