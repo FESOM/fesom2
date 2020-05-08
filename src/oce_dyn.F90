@@ -6,7 +6,8 @@
 ! 2. gamma1 is nondimensional. In commonly used Leith or Smagorinsky parameterizations it is C/pi^2=0.1 (C is about 1). 
 !    We therefore try to follow this, allowing some adjustments (because our mesh is triangular, our resolution is different, etc.). 
 !    We however, try to keep gamma1<0.1
-! 3. gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in easy backscatter option!
+! 3. gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
+!    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
 ! 4. Div_c  =1.    should be default
 ! 5. Leith_c=?    (need to be adjusted)
 module h_viscosity_leith_interface
@@ -50,7 +51,22 @@ module visc_filt_bcksct_interface
     end subroutine
   end interface
 end module
-
+module visc_filt_bilapl_interface
+  interface
+    subroutine visc_filt_bilapl(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_bidiff_interface
+  interface
+    subroutine visc_filt_bidiff(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
@@ -125,6 +141,8 @@ use visc_filt_harmon_interface
 use visc_filt_hbhmix_interface
 use visc_filt_biharm_interface
 use visc_filt_bcksct_interface
+use visc_filt_bilapl_interface
+use visc_filt_bidiff_interface
 IMPLICIT NONE 
 integer                  :: option
 type(t_mesh), intent(in) , target :: mesh
@@ -163,6 +181,10 @@ CASE (4)
      call visc_filt_biharm(1, mesh)
 CASE (5)
      call visc_filt_bcksct(mesh)
+CASE (6)
+     call visc_filt_bilapl(mesh)
+CASE (7)
+     call visc_filt_bidiff(mesh)
 CASE DEFAULT
      if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
      call par_ex
@@ -412,7 +434,7 @@ type(t_mesh), intent(in) , target :: mesh
 			div_elem=vorticity(nz,elnodes)
 			leithx=sum(gradient_sca(1:3,elem)*div_elem)
 			leithy=sum(gradient_sca(4:6,elem)*div_elem)
-			Visc(nz,elem)=0.2_WP*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
+			Visc(nz,elem)=min(gamma1*elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
 				+ Leith_c*(leithx**2+leithy**2))*elem_area(elem)), elem_area(elem)/dt)
 		end do            !! 0.1 here comes from (2S)^{3/2}/pi^3
 		do nz=nl1+1, nl-1
@@ -530,4 +552,132 @@ SUBROUTINE visc_filt_bcksct(mesh)
 end subroutine visc_filt_bcksct
 
 ! ===================================================================
-
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity Laplacian, i.e., on an analog of
+! the Leith viscosity (Lapl==second derivatives)
+! \nu=|3u_c-u_n1-u_n2-u_n3|*sqrt(S_c)/100. There is an additional term
+! in viscosity that is proportional to the velocity amplitude squared.
+! The coefficient has to be selected experimentally.
+SUBROUTINE visc_filt_bilapl(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+real(kind=8)  :: u1, v1, vi, len
+integer       :: ed, el(2), nz
+real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+!
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+ U_c=0.0_8
+ V_c=0.0_8
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     U_c(nz,el(1))=U_c(nz,el(1))-u1
+     U_c(nz,el(2))=U_c(nz,el(2))+u1
+     V_c(nz,el(1))=V_c(nz,el(1))-v1
+     V_c(nz,el(2))=V_c(nz,el(2))+v1
+    END DO 
+ END DO
+ 
+ Do ed=1,myDim_elem2D
+    len=sqrt(elem_area(ed))
+    Do nz=1,nlevels(ed)-1
+     ! vi has the sense of harmonic viscosity coef. because of 
+     ! division by area in the end 
+     u1=U_c(nz,ed)**2+V_c(nz,ed)**2
+     vi=max(gamma0, gamma1*max(sqrt(u1), gamma2*u1))*len*dt
+     U_c(nz,ed)=-U_c(nz,ed)*vi                             
+     V_c(nz,ed)=-V_c(nz,ed)*vi
+    END DO
+ end do
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+     el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+ deallocate(V_c,U_c)
+end subroutine visc_filt_bilapl
+! ===================================================================
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity differences, and is introduced symmetrically 
+! into both stages of biharmonic operator
+! On each edge, \nu=sqrt(|u_c1-u_c2|*sqrt(S_c1+S_c2)/100)
+! The effect is \nu^2
+! Quadratic in velocity term can be introduced if needed.
+SUBROUTINE visc_filt_bidiff(mesh)
+USE MOD_MESH
+USE o_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+IMPLICIT NONE
+real(kind=8)  :: u1, v1, vi, len
+integer       :: ed, el(2), nz
+real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+!
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+ U_c=0.0_8
+ V_c=0.0_8
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    len=sqrt(sum(elem_area(el)))
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     vi=u1*u1+v1*v1
+     vi=sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+     v1=v1*vi    
+     U_c(nz,el(1))=U_c(nz,el(1))-u1
+     U_c(nz,el(2))=U_c(nz,el(2))+u1
+     V_c(nz,el(1))=V_c(nz,el(1))-v1
+     V_c(nz,el(2))=V_c(nz,el(2))+v1
+    END DO 
+ END DO
+ 
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+     el=edge_tri(:,ed)
+     len=sqrt(sum(elem_area(el)))
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     vi=u1*u1+v1*v1
+     vi=-dt*sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+     u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO 
+ END DO
+ deallocate(V_c, U_c)
+end subroutine visc_filt_bidiff
+! ===================================================================
