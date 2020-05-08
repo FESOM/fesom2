@@ -58,12 +58,25 @@ subroutine update_atm_forcing(istep, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
+#if defined (__oifs) 
+            ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-#if defined (__oifs)
             exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+            end do
+            elseif (i.eq.2) then
+            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+            elseif (i.eq.3) then
+            exchange(:) = m_snow(:)                                 ! snow thickness
+            elseif (i.eq.4) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
+            elseif (i.eq.5) then
+            exchange(:) = ice_surf_temp(:)                          ! ice surface temperature
+            else	    
+            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
-            exchange(n)=tr_arr(1, n, 1)		                    ! sea surface temperature [°C]
-#endif
+            ! AWI-CM2 outgoing state vectors
+            do n=1,myDim_nod2D+eDim_nod2D
+            exchange(n)=tr_arr(1, n, 1)                             ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -71,12 +84,9 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
-#if defined (__oifs)
-            elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-#endif
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action)
       enddo

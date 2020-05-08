@@ -382,7 +382,8 @@ END DO
   end if
 
 #if defined (__oifs)
-  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', i_real4, mesh)
+  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',              'none',   ice_alb(:),                   1, 'm', i_real4, mesh)
+  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice surface temperature', 'none',   ice_surf_temp(:),             1, 'm', i_real4, mesh)
 #endif
     
     if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then

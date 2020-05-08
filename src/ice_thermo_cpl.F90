@@ -4,7 +4,7 @@ subroutine thermodynamics(mesh)
   !===================================================================
   !
   ! This subroutine computes thermodynamic changes of ice and snow
-  ! for coupled simulations of FESOM and ECHAM.
+  ! for coupled simulations of FESOM2.
   ! It replaces the original FESOM scheme for uncoupled simulations.
   ! Note that atmospheric fluxes already need to be available.
   !
@@ -129,10 +129,14 @@ subroutine thermodynamics(mesh)
 
      call ice_growth
 #if defined (__oifs)
+     !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
+     ! then send those to OpenIFS where they are used to calucate the 
+     ! energy fluxes ---!
+     t                   = ice_surf_temp(inod)
+     call ice_surftemp(h,hsn,a2ihf,t)
      call ice_albedo(hsn,t,alb)
-     call ice_surftemp(hice,alb,net_heat,t)
-     ice_alb(inod)	 = alb
-     ice_temp(inod)      = t+tmelt
+     ice_alb(inod)       = alb
+     ice_surf_temp(inod) = t
 #endif
 
 
@@ -421,7 +425,52 @@ contains
   end subroutine ice_growth
 
 
- subroutine ice_albedo (hsn,t,alb)
+
+
+ subroutine ice_surftemp(h,hsn,a2ihf,t)
+  ! INPUT:
+  ! a2ihf - Total atmo heat flux to ice
+  ! h  - Ice thickness
+  ! hsn   - Snow thickness
+  ! 
+  ! INPUT/OUTPUT:
+  ! t     - Ice surface temperature
+
+  use i_therm_param
+  implicit none
+
+  !---- atmospheric heat net flux into to ice (provided by OpenIFS)
+  real(kind=WP)  a2ihf
+  !---- ocean variables (provided by FESOM)
+  real(kind=WP)  h
+  real(kind=WP)  hsn
+  real(kind=WP)  t
+  !---- local variables
+  real(kind=WP)  snicecond
+  real(kind=WP)  zsniced
+  real(kind=WP)  zicefl
+  real(kind=WP)  hcapice
+  real(kind=WP)  zcpdt
+  real(kind=WP)  zcpdte
+  real(kind=WP)  zcprosn
+  !---- local parameters
+  real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+  real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
+
+
+  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
+  zsniced=MAX(h,hmin)+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
+  zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
+  zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
+  zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
+  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
+  t=min(ctfreez,t)                      ! Not warmer than freezing please!
+ end subroutine ice_surftemp
+
+
+ subroutine ice_albedo(hsn,t,alb)
   ! INPUT:
   ! hsn - snow thickness, used for albedo parameterization [m]
   ! t - temperature of snow/ice surface [C]
@@ -451,57 +500,6 @@ contains
      endif
   endif
  end subroutine ice_albedo
-
-
- subroutine ice_surftemp (hsn,t,alb)
-  ! INPUT:
-  ! A1 - Total atmospheric heat flux
-  ! t - Ice surface temperature (last step)
-  ! 
-  ! OUTPUT:
-  ! alb - snow albedo
-  use i_therm_param
-  implicit none
-
-  !---- atmospheric heat fluxes (provided by OpenIFS)
-  real(kind=WP)  :: a2ohf, a2ihf
-  !---- evaporation and sublimation (provided by OpenIFS)
-  real(kind=WP)  :: evap, subli
-  !---- precipitation and runoff (provided by OpenIFS)
-  real(kind=WP)  :: rain, snow, runo
-  !---- ocean variables (provided by FESOM)
-  real(kind=WP)  :: T_oc, S_oc, ustar
-  real(kind=WP)  hsn
-  real(kind=WP)  t
-  real(kind=WP)  alb
-
-  q1   = 11637800.0_WP
-  q2   = -5897.8_WP
-  imax = 5
-
-  d1=rhoair*cpair*Ch_i
-  d2=rhoair*Ce_i
-  d3=d2*clhi
-
-  ! total incoming atmospheric heat flux
-  A1=a2ihf
-  ! NEWTON-RHAPSON TO GET TEMPERATURE AT THE TOP OF THE ICE LAYER
-
-  do iter=1,imax
-
-     B=q1*inv_rhoair*exp(q2/(t+tmelt))		! (saturated) specific humidity over ice
-     A2=-d1*ug*t-d3*ug*B &
-          -emiss_ice*boltzmann*((t+tmelt)**4)	! sensible and latent heat,and outward radiation
-     A3=-d3*ug*B*q2/((t+tmelt)**2)		! gradient coefficient for the latent heat part
-     C=con/hice                     		! gradient coefficient for downward heat conductivity
-     A3=A3+C+d1*ug & 			! gradient coefficient for sensible heat and radiation 
-          +4.0_WP*emiss_ice*boltzmann*((t+tmelt)**3)    
-     C=C*(TFrez(S_oc)-t)       		! downward conductivity term
-     t=t+(A1+A2+C)/A3 		        ! NEW ICE TEMPERATURE AS THE SUM OF ALL COMPONENTS
-  done
-
-  t=min(0.0_WP,t)
-
 
 end subroutine thermodynamics
 #endif
