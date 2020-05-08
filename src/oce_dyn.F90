@@ -651,7 +651,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
      vi=u1*u1+v1*v1
      vi=sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
-     v1=v1*vi    
+     u1=u1*vi
+     v1=v1*vi
      U_c(nz,el(1))=U_c(nz,el(1))-u1
      U_c(nz,el(2))=U_c(nz,el(2))+u1
      V_c(nz,el(1))=V_c(nz,el(1))-v1
