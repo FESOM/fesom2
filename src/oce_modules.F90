@@ -20,21 +20,14 @@ real(kind=WP), parameter      :: small=1.0e-8 !small value
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
-real(kind=WP)                 :: A_hor=100.0_WP		! Horizontal harm. visc.    
-real(kind=WP)                 :: A_hor_max=1500.0_WP	! Maximum viscosity allowed (to limit Smag and Leith
-							! contributions when they are too large
-real(kind=WP)                 :: Leith_c=0.		! Leith viscosity. It needs vorticity, which is only computed for 
-							! the vector invariant form of momentum advection (mom_adv=4)
-real(kind=WP)                 :: tau_c=0.4		! Controls the strength of filters. Should be about 0.4
+real(kind=WP)                 :: gamma0=0.01! [m/s], gamma0*len*dt is the background viscosity
+real(kind=WP)                 :: gamma1=0.1!  [non dim.], or computation of the flow aware viscosity
+real(kind=WP)                 :: gamma2=10.!  [s/m],      is only used in easy backscatter option
+real(kind=WP)                 :: Div_c  =1.0_WP !modified Leith viscosity weight
+real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It needs vorticity!
+real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
-real(kind=WP)                 :: Div_c=0.5_WP
-real(kind=WP)                 :: Smag_c=0.0_WP  ! 0.2   ! (C/pi)^2
-real(kind=WP)                 :: Abh0=8.0e12    ! 
-logical                       :: laplacian=.false.
-logical                       :: biharmonic=.true.
 integer                       :: visc_option=5
-real(kind=WP)                 :: easy_bs_scale=35.
-real(kind=WP)                 :: easy_bs_return=1.5
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -151,8 +144,8 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
-                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
+ NAMELIST /oce_dyn/ C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+                    Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return, visc_option
