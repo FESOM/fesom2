@@ -480,13 +480,14 @@ contains
   use i_therm_param
   implicit none
 
+  real(kind=WP)  h
   real(kind=WP)  hsn    
   real(kind=WP)  t    
   real(kind=WP)  alb
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (h>0.0_WP)
+  if (h>0.0_WP) then
      if (t<0.0_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
            alb=albsn            
@@ -501,7 +502,7 @@ contains
         endif
      endif
    else
-      alb = 0.066_WP            !  ocean albedo
+      alb=0.066_WP            !  ocean albedo
    endif
  end subroutine ice_albedo
 
