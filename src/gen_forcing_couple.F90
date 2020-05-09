@@ -68,9 +68,9 @@ subroutine update_atm_forcing(istep, mesh)
             elseif (i.eq.3) then
             exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-            elseif (i.eq.5) then
             exchange(:) = ice_surf_temp(:)                          ! ice surface temperature
+            elseif (i.eq.5) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else

@@ -377,12 +377,17 @@ contains
 ! ... Define symbolic names for the transient fields send by the ocean
 !     These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
+    cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
+    cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
+    cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
+    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+#else
+    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
-#if defined (__oifs)
-    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
 #endif
 
 

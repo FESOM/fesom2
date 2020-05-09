@@ -134,7 +134,7 @@ subroutine thermodynamics(mesh)
      ! energy fluxes ---!
      t                   = ice_surf_temp(inod)
      call ice_surftemp(h,hsn,a2ihf,t)
-     call ice_albedo(hsn,t,alb)
+     call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
      ice_surf_temp(inod) = t
 #endif
@@ -470,7 +470,7 @@ contains
  end subroutine ice_surftemp
 
 
- subroutine ice_albedo(hsn,t,alb)
+ subroutine ice_albedo(h,hsn,t,alb)
   ! INPUT:
   ! hsn - snow thickness, used for albedo parameterization [m]
   ! t - temperature of snow/ice surface [C]
@@ -485,20 +485,24 @@ contains
   real(kind=WP)  alb
 
   ! set albedo
-  ! ice and snow, freezing and melting conditions are distinguished.
-  if (t<0.0_WP) then	        ! freezing condition    
-     if (hsn.gt.0.0_WP) then	!   snow cover present  
-        alb=albsn         	
-     else              		!   no snow cover       
-        alb=albi       	
+  ! ice and snow, freezing and melting conditions are distinguished
+  if (h>0.0_WP)
+     if (t<0.0_WP) then         ! freezing condition    
+        if (hsn.gt.0.0_WP) then !   snow cover present  
+           alb=albsn            
+        else                    !   no snow cover       
+           alb=albi             
+        endif
+     else                               ! melting condition     
+        if (hsn.gt.0.0_WP) then !   snow cover present  
+           alb=albsnm           
+        else                    !   no snow cover       
+           alb=albim            
+        endif
      endif
-  else			        ! melting condition     
-     if (hsn.gt.0.0_WP) then	!   snow cover present  
-        alb=albsnm	    	
-     else			!   no snow cover       
-        alb=albim		
-     endif
-  endif
+   else
+      alb = 0.066_WP            !  ocean albedo
+   endif
  end subroutine ice_albedo
 
 end subroutine thermodynamics
