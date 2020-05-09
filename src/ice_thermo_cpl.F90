@@ -134,10 +134,14 @@ subroutine thermodynamics(mesh)
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
      t                   = ice_surf_temp(inod)
-     call ice_surftemp(h/(min(A,Aimin)),hsn/(min(A,Aimin)),a2ihf,t)
+     if(A>Aimin) then
+        call ice_surftemp(max(h,0.05)/(max(A,Aimin)),hsn/(max(A,Aimin)),a2ihf,t)
+        ice_surf_temp(inod) = t
+     else
+        ice_surf_temp(inod) = 275.15_WP
+     endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
-     ice_surf_temp(inod) = t
 #endif
 
 
@@ -469,7 +473,6 @@ contains
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
   t=min(ctfreez,t)                      ! Not warmer than freezing please!
-
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
