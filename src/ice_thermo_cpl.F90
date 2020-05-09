@@ -133,7 +133,7 @@ subroutine thermodynamics(mesh)
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
      t                   = ice_surf_temp(inod)
-     call ice_surftemp(h,hsn,a2ihf,t)
+     call ice_surftemp(A,h,hsn,a2ihf,t)
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
      ice_surf_temp(inod) = t
@@ -427,9 +427,10 @@ contains
 
 
 
- subroutine ice_surftemp(h,hsn,a2ihf,t)
+ subroutine ice_surftemp(A,h,hsn,a2ihf,t)
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
+  ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
   ! 
@@ -442,8 +443,10 @@ contains
   !---- atmospheric heat net flux into to ice (provided by OpenIFS)
   real(kind=WP)  a2ihf
   !---- ocean variables (provided by FESOM)
+  real(kind=WP)  A
   real(kind=WP)  h
   real(kind=WP)  hsn
+  real(kind=WP)  heff
   real(kind=WP)  t
   !---- local variables
   real(kind=WP)  snicecond
@@ -456,15 +459,16 @@ contains
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
   real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
+  real(kind=WP), parameter :: Aimin = 0.001_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
 
+  heff = h + hsn*con/consn
+  heff = heff/max(A,Aimin)
 
-  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
-  zsniced=MAX(h,hmin)+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
-  zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  zicefl=con*ctfreez/heff               ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  zcpdte=zcpdt+zcprosn*hsn/max(A,Aimin)            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
   t=min(ctfreez,t)                      ! Not warmer than freezing please!
  end subroutine ice_surftemp
