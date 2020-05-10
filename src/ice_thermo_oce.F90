@@ -10,11 +10,27 @@ end where
 
 where(a_ice<0.1e-8_WP)
  a_ice=0.0_WP
+ m_ice=0.0_WP
+ m_snow=0.0_WP
+#if defined (__oifs)
+ ice_temp=273.15_WP
+#endif /* (__oifs) */
 end where
 
 where(m_ice<0.1e-8_WP)
  m_ice=0.0_WP
+ m_snow=0.0_WP
+ a_ice=0.0_WP 
+#if defined (__oifs)
+ ice_temp=273.15_WP
+#endif /* (__oifs) */
 end where
+
+#if defined (__oifs)
+where(ice_temp>273.15_WP)
+ ice_temp=273.15_WP
+end where
+#endif /* (__oifs) */
 
 end subroutine cut_off
 #if !defined (__oasis)
