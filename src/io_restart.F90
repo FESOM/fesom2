@@ -182,7 +182,7 @@ subroutine ini_ice_io(year, mesh)
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
   call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
-  call def_variable(iid, 'ice_surf_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_surf_temp);
+  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
 
 end subroutine ini_ice_io
 !

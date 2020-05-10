@@ -60,7 +60,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
@@ -69,11 +69,13 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
-  real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_surf_temp ! new fields for OIFS coupling
+  real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
   real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
 							!(for flux correction)
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
+
 #endif /* (__oasis) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array

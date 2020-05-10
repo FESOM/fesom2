@@ -363,6 +363,7 @@ CONTAINS
             end if
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
+                 (trim(flf%calendar).eq.'proleptic_gregorian') .or. &
                  (trim(flf%calendar).eq.'standard')) then
             if (include_fleapyear .eqv. .false.) then
                 print *, achar(27)//'[33m'
@@ -385,7 +386,17 @@ CONTAINS
             print *, achar(27)//'[31m'
             write(*,*) '____________________________________________________________'
             write(*,*) ' ERROR: I am not familiar with the found calendar option,'
-            write(*,*) '        dont know what to do. Talk to the FESOM2 developers!!!'
+            write(*,*) '        dont know what to do. Either talk to the FESOM2 developers'
+            write(*,*) '        or add the calendar option by your self in ...'
+            write(*,*) '        gen_surface_forcing.F90, line:364-367'
+            write(*,*) '                                                            '
+            write(*,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
+            write(*,*) '                (trim(flf%calendar).eq."standard")) then    '
+            write(*,*) '                                                            '
+            write(*,*) '        The time axis calendar attribute can be checked for '
+            write(*,*) '        example with ncdump -h forcing_file.nc '
             write(*,*) '____________________________________________________________'
             print *, achar(27)//'[0m'
             call par_ex(0)
@@ -1152,7 +1163,6 @@ CONTAINS
    END SUBROUTINE calendar_date
 
    SUBROUTINE sbc_end
-
       IMPLICIT NONE
       integer      :: fld_idx      
       do fld_idx = 1, i_totfl     
@@ -1162,9 +1172,6 @@ CONTAINS
       DEALLOCATE( coef_a, coef_b, atmdata, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
-
-
-
    END SUBROUTINE sbc_end
 
    SUBROUTINE check_nferr(iost,fname)
@@ -1177,7 +1184,7 @@ CONTAINS
          call par_ex
          stop
       endif
-   END SUBROUTINE
+   END SUBROUTINE check_nferr
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
@@ -2014,25 +2021,32 @@ CONTAINS
 
     !___________________________________________________________________________
     ! make inserted string all in lower case and kick out weired mystery characters
+    ! --> replaces 'space', '-' character with '_'
     function lowercase(string)
         implicit none
         character(len=:),allocatable :: lowercase, aux_string
         character(len=*)             :: string 
         character(len=48)            :: aux_string_end=''
         character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_-'
-        integer                      :: i, i1 ,pos_c, pos_s
+        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_'
+        character(len=2)             :: replace='- '
+        integer                      :: i, i1 ,pos_c, pos_s, pos_r
         i1 = 0
         aux_string = trim(string)
         do i=1,len_trim(aux_string)
             pos_c = index(cap,string(i:i))
             pos_s = index(small,string(i:i))
+            pos_r = index(replace,string(i:i))
             ! there is problem in the JRA55 calendar attribut string, at the end of
             ! that string there is a character which is not seeable, which is no letter 
             ! and also no whitespace and which can not be removed with trim() --> 
             ! to get rid of that lowercase will use only character that are 
             ! found in either cap or small otherwise the sring comparison fails 
-            if (pos_c .ne. 0 .and. pos_s .eq. 0) then
+            if (pos_r .ne. 0) then
+                ! replaces 'space', '-' character with '_'
+                i1=i1+1
+                aux_string_end(i1:i1)='_'
+            elseif (pos_c .ne. 0 .and. pos_s .eq. 0) then
                 i1=i1+1
                 aux_string_end(i1:i1)=small(pos_c:pos_c)
             elseif (pos_c .eq. 0 .and. pos_s .ne. 0) then
@@ -2041,6 +2055,7 @@ CONTAINS
             end if
         end do
         lowercase=trim(aux_string_end)
+        return
     end function lowercase 
 
 !-----------------------------------------------------------------------

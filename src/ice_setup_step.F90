@@ -132,9 +132,12 @@ e_size=myDim_elem2D+eDim_elem2D
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs)
-  allocate(ice_alb(n_size), ice_surf_temp(n_size))
+  allocate(ice_alb(n_size), ice_temp(n_size))
+  allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
   ice_alb=0.6_WP
-  ice_surf_temp=275.15_WP
+  ice_temp=275.15_WP
+  rhs_tempdiv=0._WP
+  rhs_temp=0._WP
 #endif /* (__oifs) */
   oce_heat_flux=0._WP
   ice_heat_flux=0._WP
@@ -147,6 +150,7 @@ subroutine ice_timestep(step, mesh)
 ! 
 ! Sea ice model step
 !
+use i_arrays
 use o_param
 use g_parsup
 use g_CONFIG
@@ -154,7 +158,7 @@ use i_PARAM, only: whichEVP
 use mod_mesh
 implicit none 
 type(t_mesh), intent(in)   , target :: mesh
-integer                    :: step 
+integer                    :: step,i
 REAL(kind=WP)              :: t0,t1, t2, t3
 t0=MPI_Wtime()
  ! ===== Dynamics
@@ -179,12 +183,22 @@ END SELECT
 ! call ice_fct_solve
 ! call cut_off
 ! new FCT routines from Sergey Danilov 08.05.2018
+#if defined (__oifs)
+ do i=1,myDim_nod2D+eDim_nod2D
+    ice_temp(i) = ice_temp(i)*a_ice(i)
+ end do
+#endif /* (__oifs) */
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
  call ice_TG_rhs_div(mesh)   
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
  call ice_fct_solve(mesh)
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
  call ice_update_for_div(mesh)
+#if defined (__oifs)
+ do i=1,myDim_nod2D+eDim_nod2D
+    if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
+ end do
+#endif /* (__oifs) */
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
  call cut_off
  t2=MPI_Wtime()
@@ -198,7 +212,7 @@ if(mod(step,logfile_outfreq)==0 .and. mype==0) then
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
 		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
-		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+ 		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
 		write(*,*) '   _______________________________'
 		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
 		write(*,*)

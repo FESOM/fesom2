@@ -133,12 +133,12 @@ subroutine thermodynamics(mesh)
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
-     t                   = ice_surf_temp(inod)
+     t                   = ice_temp(inod)
      if(A>Aimin) then
         call ice_surftemp(max(h,0.05)/(max(A,Aimin)),hsn/(max(A,Aimin)),a2ihf,t)
-        ice_surf_temp(inod) = t
+        ice_temp(inod) = t
      else
-        ice_surf_temp(inod) = 275.15_WP
+        ice_temp(inod) = 275.15_WP
      endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
