@@ -23,6 +23,8 @@ module forcing_provider_module
     
     call read_netcdf_timesteps(filepath, varname, t_index1, t_index1, values)
     
+    ! check if the outgoing array has the same shape as our data
+    call assert( all( shape(forcingdata1)==shape(values(:,:,1)) ), __LINE__ )
     forcingdata1 = values(:,:,1)
   end subroutine
   
@@ -61,6 +63,8 @@ module forcing_provider_module
     allocate(starts(dim_size))
     allocate(sizes(dim_size))
     ! assert timedim_index == 3 && dim_size == 3
+    call assert(timeindex_first <= timeindex_last, __LINE__)
+    call assert(timeindex_last <= dim_sizes(timedim_index), __LINE__)
     
     ! todo: make this work if we have more than 3 dimensions and also if timedim_index != 3
     ! todo: check if values is already allocated
@@ -77,4 +81,14 @@ module forcing_provider_module
     status = nf_close(fileid)
   end subroutine
   
+  
+  subroutine assert(val, line)
+    logical, intent(in) :: val
+    integer, intent(in) :: line
+    ! EO args
+    if(.NOT. val) then
+      print *, "error in line ",line
+      stop 1
+    end if
+  end subroutine
 end module
