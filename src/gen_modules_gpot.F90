@@ -23,7 +23,7 @@
 MODULE mo_tidal
       USE o_PARAM
       USE o_ARRAYS, only : ssh_gp
-      USE o_MESH,   only : geo_coord_nod2D
+      USE mod_mesh
       USE g_config, only : dt
       USE g_PARSUP
       USE g_clock
@@ -107,17 +107,18 @@ MODULE mo_tidal
 
       END SUBROUTINE eph
 
-      SUBROUTINE foreph
+      SUBROUTINE foreph(mesh)
 !     calculates the realtime gravitational potential of sun & moon
 !     output: ssh_gp (with Body Earth Tide effect)
 
       IMPLICIT NONE
-
+      type(t_mesh), intent(in) , target :: mesh
       REAL(WP) :: dres(3,2),crim3,rkomp,erdrad,rekts,dekls
       REAL(WP) :: cris3,rektm,deklm,deklm2,dekls2,sidm,sidmq
       REAL(WP) :: rkosp,codm,codmq,sids,sidsq,cods,codsq,sidm2
       REAL(WP) :: sids2,hamp,hasp
       INTEGER :: i,j
+#include  "associate_mesh.h"
 
       mmccdt = mmccdt + 1
 

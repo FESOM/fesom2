@@ -166,7 +166,7 @@ type(t_mesh), target, save      :: mesh
     end if
     do n=1, nsteps        
         if (use_global_tides) then
-           call foreph
+           call foreph(mesh)
         end if
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
