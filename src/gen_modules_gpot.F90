@@ -57,7 +57,7 @@ MODULE mo_tidal
       ! FIXME : replace eph by a some to code that directly calculates julian days and
       ! centuries as needed by siderial time and ephemerides
 
-      WRITE(*,*)'tidal: phase relative to 2000 :'    &
+      if (mype==0) WRITE(*,*)'tidal: phase relative to 2000 :'    &
       ,'year= ',lyear, 'month= ',lmonth, 'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
 
       END SUBROUTINE foreph_ini
