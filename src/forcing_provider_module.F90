@@ -108,6 +108,20 @@ module forcing_provider_module
   end function
   
   
+  function basepath_from_path(filepath, fileyear) result(r)
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: fileyear
+    ! EO args
+    integer number_of_yeardigits, suffix_size
+    character(:), allocatable :: r
+
+    number_of_yeardigits = int(log10(real(fileyear)))+1
+    suffix_size = len(FILENAMESUFFIX)
+    
+    r = filepath(1:len(filepath)-number_of_yeardigits-suffix_size)
+  end function
+  
+  
   subroutine assert(val, line)
     logical, intent(in) :: val
     integer, intent(in) :: line
