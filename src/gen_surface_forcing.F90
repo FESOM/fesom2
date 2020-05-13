@@ -34,16 +34,16 @@ MODULE g_sbf
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
    USE o_ARRAYS
-   USE o_MESH
+   USE MOD_MESH
    USE o_PARAM
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
-   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
+   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff
-   USE g_read_other_NetCDF, only: read_other_NetCDF
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -86,6 +86,8 @@ MODULE g_sbf
 
    character(10),      save   :: sss_data_source   ='CORE2'
    character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+
+   logical :: runoff_climatology =.false.
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -150,6 +152,7 @@ MODULE g_sbf
    type, public ::   flfi_type    !flux file informations
       character(len = 256)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
+      character(len = 34)                  :: calendar  ! variable name in the NetCDF file
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
@@ -186,6 +189,8 @@ CONTAINS
       integer                      :: nf_start(4)
       integer                      :: nf_edges(4)         
       integer                      :: ierror              ! return error code
+      character(len=20)            :: aux_calendar
+      integer                      :: aux_len
 
       !open file
       if (mype==0) then
@@ -288,8 +293,9 @@ CONTAINS
          deallocate(flf%nc_time)
            allocate(flf%nc_time(flf%nc_Ntime))
       end if
-   !read variables from file
-   ! coordinates
+    !____________________________________________________________________________   
+    !read variables from file
+    ! read lat
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlat
@@ -297,6 +303,8 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+    ! read lon  
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlon-2
@@ -306,16 +314,96 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-   ! time
+    !____________________________________________________________________________
+    ! read time axis from file
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
+         ! digg for calendar attribute in time axis variable
+         
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+      ! digg for calendar attribute in time axis variable
+      if (mype==0) then
+         iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
+         iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+         aux_calendar = aux_calendar(1:aux_len)
+         
+         if (iost .ne. NF_NOERR) then
+            flf%calendar='none'
+            write(*,*) ' --> could not find/read calendar attribute in the time axis'
+            write(*,*) '     of the forcing file (Is this right?). I assume there is'
+            write(*,*) '     none and proceed in CORE2 style without leap years!'
+         else
+            flf%calendar=lowercase(aux_calendar)
+            write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|' 
+         end if 
+         
+         ! check for calendar and include_fleapyear consistency
+         if ((trim(flf%calendar).eq.'none')   .or. &
+             (trim(flf%calendar).eq.'noleap') .or. &
+             (trim(flf%calendar).eq.'365_days')) then
+            if (include_fleapyear .eqv. .true.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
+                write(*,*) '          but setted include_fleapyear=.true.. CORE forcing '
+                write(*,*) '          does not contain any leap years or particular '
+                write(*,*) '          calender option (julian, gregorian). So if im right,'
+                write(*,*) '          please go to namelist.config and set '
+                write(*,*) '          include_fleapyear=.false. otherwise comment this '
+                write(*,*) '          message block in gen_surface_forcing.F90.'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if
+         elseif ((trim(flf%calendar).eq.'julian')    .or. &
+                 (trim(flf%calendar).eq.'gregorian') .or. &
+                 (trim(flf%calendar).eq.'proleptic_gregorian') .or. &
+                 (trim(flf%calendar).eq.'standard')) then
+            if (include_fleapyear .eqv. .false.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
+                write(*,*) '          NCEP or a similar forcing, Right?, but setted '
+                write(*,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
+                write(*,*) '          all fleapyears and use a specific calendar option '
+                write(*,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
+                write(*,*) '          work properly, when using these forcings '
+                write(*,*) '          include_fleapyear must be true. So if im right, please go'
+                write(*,*) '          to namelist.config and set include_fleapyear=.true. '
+                write(*,*) '          otherwise comment this message block in'
+                write(*,*) '          gen_surface_forcing.F90'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if 
+         else
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' ERROR: I am not familiar with the found calendar option,'
+            write(*,*) '        dont know what to do. Either talk to the FESOM2 developers'
+            write(*,*) '        or add the calendar option by your self in ...'
+            write(*,*) '        gen_surface_forcing.F90, line:364-367'
+            write(*,*) '                                                            '
+            write(*,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
+            write(*,*) '                (trim(flf%calendar).eq."standard")) then    '
+            write(*,*) '                                                            '
+            write(*,*) '        The time axis calendar attribute can be checked for '
+            write(*,*) '        example with ncdump -h forcing_file.nc '
+            write(*,*) '____________________________________________________________'
+            print *, achar(27)//'[0m'
+            call par_ex(0)
+         end if 
+      end if
+      
+    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
       if (nm_nc_tmid/=1) then
          if (flf%nc_Ntime > 1) then
@@ -327,9 +415,10 @@ CONTAINS
       end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-      !flip lat and data in case of lat from -90 to 90
-      !!!! WARNING this is temporal solution, needs some more checks
+    
+    !___________________________________________________________________________
+    !flip lat and data in case of lat from -90 to 90
+    !!!! WARNING this is temporal solution, needs some more checks
       flip_lat = 0
       if ( flf%nc_Nlat > 1 ) then
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
@@ -394,7 +483,7 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   SUBROUTINE nc_sbc_ini(rdate)
+   SUBROUTINE nc_sbc_ini(rdate, mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : initialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
@@ -412,7 +501,9 @@ CONTAINS
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
       type(flfi_type), pointer :: flf
+      type(t_mesh), intent(in)              , target :: mesh
 
+#include "associate_mesh.h"
 
 ! used for interpolate on elements
 !      ALLOCATE( bilin_indx_i(elem2D),bilin_indx_j(elem2D), &
@@ -471,13 +562,13 @@ CONTAINS
       end if
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
-         call getcoeffld(fld_idx, rdate)
+         call getcoeffld(fld_idx, rdate, mesh)
       end do
          ! interpolate in time
       call data_timeinterp(rdate)
    END SUBROUTINE nc_sbc_ini
 
-   SUBROUTINE getcoeffld(fld_idx, rdate)
+   SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -514,6 +605,9 @@ CONTAINS
       character(len=256), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
+      type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
@@ -700,10 +794,9 @@ CONTAINS
       end do !fld_idx
 !!$OMP END DO
 !!$OMP END PARALLEL
-
    END SUBROUTINE data_timeinterp
 
-   SUBROUTINE sbc_ini
+   SUBROUTINE sbc_ini(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_ini ***
       !!
@@ -719,6 +812,7 @@ CONTAINS
       integer            :: sbc_alloc                   !: allocation status
 
       real(wp)           :: tx, ty
+      type(t_mesh), intent(in)   , target :: mesh
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
@@ -726,7 +820,7 @@ CONTAINS
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
+                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -738,6 +832,7 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+      
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
@@ -850,14 +945,13 @@ CONTAINS
       emp          = 0.0_WP
       qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
-
-      call nc_sbc_ini(rdate)
+      call nc_sbc_ini(rdate, mesh)
       !==========================================================================
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false.) 
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -865,7 +959,7 @@ CONTAINS
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
 
-   SUBROUTINE sbc_do
+   SUBROUTINE sbc_do(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -878,12 +972,14 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation, force_newcoeff
+      logical      :: do_rotation, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-
-     
+      character(len=256)   :: filename
+      type(t_mesh), intent(in) , target :: mesh
+      
+#include  "associate_mesh.h"
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
@@ -909,7 +1005,7 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
-            call getcoeffld(fld_idx, rdate)
+            call getcoeffld(fld_idx, rdate, mesh)
             if (fld_idx==i_xwind) do_rotation=.true.
          endif
       end do
@@ -921,16 +1017,55 @@ CONTAINS
          end do
       end if
       
+      !==========================================================================
+
+      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+
+      ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if ((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP)) then
+            if (update_monthly_flag) then
                i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true.) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
             end if
          end if
       end if
+
+     ! runoff  
+     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+       
+       if(update_monthly_flag) then
+         if(runoff_climatology) then
+           !climatology monthly mean
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+           filename=trim(nm_runoff_file)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         else
+           !monthly data
+
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         end if
+       end if
+
+     end if
+
 
       ! interpolate in time
       call data_timeinterp(rdate)
@@ -1028,7 +1163,6 @@ CONTAINS
    END SUBROUTINE calendar_date
 
    SUBROUTINE sbc_end
-
       IMPLICIT NONE
       integer      :: fld_idx      
       do fld_idx = 1, i_totfl     
@@ -1038,9 +1172,6 @@ CONTAINS
       DEALLOCATE( coef_a, coef_b, atmdata, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
-
-
-
    END SUBROUTINE sbc_end
 
    SUBROUTINE check_nferr(iost,fname)
@@ -1053,7 +1184,7 @@ CONTAINS
          call par_ex
          stop
       endif
-   END SUBROUTINE
+   END SUBROUTINE check_nferr
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
@@ -1887,6 +2018,45 @@ CONTAINS
    return
    end function short_wave_radiation
 !EOC
+
+    !___________________________________________________________________________
+    ! make inserted string all in lower case and kick out weired mystery characters
+    ! --> replaces 'space', '-' character with '_'
+    function lowercase(string)
+        implicit none
+        character(len=:),allocatable :: lowercase, aux_string
+        character(len=*)             :: string 
+        character(len=48)            :: aux_string_end=''
+        character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_'
+        character(len=2)             :: replace='- '
+        integer                      :: i, i1 ,pos_c, pos_s, pos_r
+        i1 = 0
+        aux_string = trim(string)
+        do i=1,len_trim(aux_string)
+            pos_c = index(cap,string(i:i))
+            pos_s = index(small,string(i:i))
+            pos_r = index(replace,string(i:i))
+            ! there is problem in the JRA55 calendar attribut string, at the end of
+            ! that string there is a character which is not seeable, which is no letter 
+            ! and also no whitespace and which can not be removed with trim() --> 
+            ! to get rid of that lowercase will use only character that are 
+            ! found in either cap or small otherwise the sring comparison fails 
+            if (pos_r .ne. 0) then
+                ! replaces 'space', '-' character with '_'
+                i1=i1+1
+                aux_string_end(i1:i1)='_'
+            elseif (pos_c .ne. 0 .and. pos_s .eq. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=small(pos_c:pos_c)
+            elseif (pos_c .eq. 0 .and. pos_s .ne. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=aux_string(i:i)
+            end if
+        end do
+        lowercase=trim(aux_string_end)
+        return
+    end function lowercase 
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org

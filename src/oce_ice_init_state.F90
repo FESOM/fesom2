@@ -4,8 +4,8 @@
 ! for ocean and ice.
 ! ============================================================================ 
 ! ============================================================================
-subroutine initial_state_test
-  use o_MESH
+subroutine initial_state_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -13,8 +13,13 @@ subroutine initial_state_test
   implicit none
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: elevation, strat, wind, cooling, tperturb
-  real(kind=WP)                       :: lon, lat, a, dst  
-  real(kind=WP)                       :: minlat,maxlat,tt,rwidth 
+  real(kind=WP)                      :: lon, lat, a, dst  
+  real(kind=WP)                      :: minlat,maxlat,tt,rwidth 
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
+ 
+
 ! Now updated for the box mesh, it was originally designed for hex mesh.
 ! In that case, the southern boundary is 40, the northern 48.83, and 0:18 the
 ! longitudinal extent.
@@ -107,12 +112,11 @@ Tsurf=tr_arr(1,:,1)
 
   ! Fix for too low salinity
   where (tr_arr(:,:,2)<20.4) tr_arr(:,:,2)=20.4
-
 end subroutine initial_state_test
 ! ====================================================================
 
-subroutine initial_state_channel_test
-  use o_MESH
+subroutine initial_state_channel_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -122,7 +126,9 @@ subroutine initial_state_channel_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
 
   ! Default values
  stress_surf=0.0
@@ -150,7 +156,7 @@ subroutine initial_state_channel_test
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(15*rad))  
       ! 40 is the south boundary of the box
   END DO
@@ -202,7 +208,7 @@ subroutine initial_state_channel_test
   
    
    !Do n=1, elem2D
-   !call elem_center(n, lon,lat)
+   !call elem_center(n, lon, lat, mesh)
    !lat=lat-30.0*rad
    !UV(1,:,n)=-(20*rad/dst)*0.1*cos(pi*lat/dst)*sin(2*pi*lon/(20*rad))
    !UV(2,:,n)= 0.2*sin(pi*lat/dst)*cos(2*pi*lon/(20*rad))    
@@ -228,11 +234,10 @@ subroutine initial_state_channel_test
 	!end if
      end do
   end do 
- 
 end subroutine initial_state_channel_test
 ! ====================================================================
-subroutine initial_state_channel_narrow_test
-  use o_MESH
+subroutine initial_state_channel_narrow_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -242,7 +247,9 @@ subroutine initial_state_channel_narrow_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
 
   ! Default values
  stress_surf=0.0
@@ -270,7 +277,7 @@ subroutine initial_state_channel_narrow_test
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(10*rad))  
       ! 40 is the south boundary of the box
   END DO
@@ -325,7 +332,7 @@ return
   
    
    Do n=1, myDim_elem2D
-   call elem_center(n, lon,lat)
+   call elem_center(n, lon, lat, mesh)
    lat=lat-30.0*rad
    UV(1,:,n)=-0.1*(dst/10.0/rad)*cos(pi*lat/dst)*sin(2*pi*lon/(10*rad))
    UV(2,:,n)= 0.2*sin(pi*lat/dst)*cos(2*pi*lon/(10*rad))    
@@ -348,11 +355,10 @@ return
         tr_arr(nz,n,1)=tr_arr(nz,n,1)+1.0*cos(pi*dst/2.0/1.5/rad)       !exp(-(dst/(1.5*rad))**2)
      end do
   end do 
-
 end subroutine initial_state_channel_narrow_test
 ! ================================================================ 
-subroutine init_fields_na_test
-  use o_MESH
+subroutine init_fields_na_test(mesh)
+  use MOD_MESH
   use o_PARAM
   use o_ARRAYS
   use g_PARSUP
@@ -362,6 +368,10 @@ subroutine init_fields_na_test
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat,lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
+
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
@@ -453,8 +463,8 @@ subroutine init_fields_na_test
   end where
 end subroutine init_fields_na_test  
 ! ================================================================  
-subroutine init_fields_global_test
-  use o_MESH
+subroutine init_fields_global_test(mesh)
+  use MOD_MESH
   use o_PARAM
   use o_ARRAYS
   use g_PARSUP
@@ -464,6 +474,10 @@ subroutine init_fields_global_test
   real(kind=WP)                      :: maxlat, minlat, rwidth, lat, lon 
   logical                            :: c_status
   real(kind=WP)                      :: p0, ss, tt,pr
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
+
   ! ===================
   ! Fill the model fields with dummy values
   ! ===================
@@ -536,13 +550,12 @@ subroutine init_fields_global_test
      END DO
      end if
   end do
-  
 end subroutine init_fields_global_test
 ! ================================================================ 
 ! ====================================================================
 
-subroutine initial_state_channel_dima_test
-  use o_MESH
+subroutine initial_state_channel_dima_test(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -551,9 +564,11 @@ subroutine initial_state_channel_dima_test
   integer                            :: elem, n, nz, elnodes(3)
   integer                            :: strat, wind, elevation 
   real(kind=WP)                      :: lon, lat, a, dst 
-  
+  type(t_mesh), intent(in)           , target :: mesh
 
-  ! Default values
+#include "associate_mesh.h"
+
+! Default values
  stress_surf=0.0
  tr_arr(:,:,1)=20.0_WP
  Tsurf=tr_arr(1,:,1)
@@ -579,7 +594,7 @@ subroutine initial_state_channel_dima_test
  
   if (wind==1) then
    DO elem=1, myDim_elem2D
-     call elem_center(elem, lon, lat)
+     call elem_center(elem, lon, lat, mesh)
      stress_surf(1,elem)=-0.2 *cos(pi*(lat-30.0*rad)/(15*rad))  
       ! 40 is the south boundary of the box
   END DO
@@ -613,12 +628,12 @@ subroutine initial_state_channel_dima_test
   END DO
 end subroutine initial_state_channel_dima_test
 ! ====================================================================
-subroutine ice_init_fields_test
+subroutine ice_init_fields_test(mesh)
 !
 ! Simple initialization for a box model to test the dynamical part.
 ! No thermodinamics is initialized here 
 !
-use o_mesh
+use mod_mesh
 use i_arrays
 use i_param
 use o_param
@@ -628,8 +643,12 @@ use g_CONFIG
 use g_comm_auto
 
 IMPLICIT NONE
-real(kind=WP)  :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
-integer       :: n, elnodes(3)   
+real(kind=WP)              :: xmin, xmax, ymin, ymax, Lx, Ly, meanf
+integer                    :: n, elnodes(3)   
+type(t_mesh), intent(in)   , target :: mesh
+
+#include "associate_mesh.h"
+
    
   coriolis=1.4e-4  ! redefines Coriolis
   coriolis_node=1.4e-4  
@@ -669,14 +688,13 @@ integer       :: n, elnodes(3)
                     (coord_nod2d(1,n)-xmin)**2/Lx -&
 		    (coord_nod2d(1,n)-xmin))
    END DO
-  	    
 end subroutine ice_init_fields_test
 ! =============================================================================
-Subroutine ice_update_forcing_test(step)
+Subroutine ice_update_forcing_test(step, mesh)
 !
 ! Here only simple wind variability is introduced
 !
-use o_mesh
+use mod_mesh
 use i_arrays
 use i_param
 use o_param
@@ -685,8 +703,11 @@ use g_PARSUP
 use g_forcing_arrays
 USE g_CONFIG
 IMPLICIT NONE
-real(kind=WP)  :: xmin, xm, ym, ymin, Lx, Ly, td, cdwin
-integer       :: step, n, elnodes(3)    
+real(kind=WP)             :: xmin, xm, ym, ymin, Lx, Ly, td, cdwin
+integer                   :: step, n, elnodes(3)    
+type(t_mesh), intent(in)  , target :: mesh
+
+#include "associate_mesh.h"
 
    cdwin=0.00225_WP
    ! Set wind velocity (stationary in time):
@@ -709,14 +730,13 @@ integer       :: step, n, elnodes(3)
    
    stress_atmice_x = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*u_wind
    stress_atmice_y = rhoair*cdwin*sqrt(u_wind**2+v_wind**2)*v_wind
-   
 end subroutine ice_update_forcing_test
 !
 !==============================================================================
 ! Simple initialization for tests for GM with the real geometry
 ! ============================================================================ 
-subroutine ini_global_ocean
-  use o_MESH
+subroutine ini_global_ocean(mesh)
+  use MOD_MESH
   use o_ARRAYS
   use o_PARAM
   use g_PARSUP
@@ -725,6 +745,9 @@ subroutine ini_global_ocean
   implicit none
   integer                            :: n, nz
   real(kind=WP)                      :: minlat,maxlat, lon, lat, val
+  type(t_mesh), intent(in)           , target :: mesh
+
+#include "associate_mesh.h"
 
  tr_arr(:,:,1)=20.0_WP
  tr_arr(:,:,2)=34.0_WP
@@ -749,7 +772,7 @@ subroutine ini_global_ocean
      DO nz=1, nlevels_nod2D(n)-1 
         tr_arr(nz,n,1)=tr_arr(nz,n,1)-(lat-minlat)/(maxlat-minlat)*2.0_WP
      END DO
-  END DO   
+  END DO
 end subroutine ini_global_ocean
 ! ====================================================================
 !
@@ -760,7 +783,6 @@ subroutine zero_dynamics
    use g_parsup
    use o_PARAM, only: tracer_adv,num_tracers
    use o_arrays
-   use o_mesh
    use g_comm_auto
    use o_tracers
    use g_forcing_arrays

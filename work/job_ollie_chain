@@ -17,9 +17,14 @@ chain_n=3 # number chain cycles
 chain_s=1 # starting chain id
 
 # time frame of model simulation 
+# ___COREv2___
 year_s=1948
 year_e=2009
+# ___JRA55____
+#year_s=1958
+#year_e=2018
 
+prescribe_rlen=0 # run length in namelist.config --> if 0 value from namelist.config is taken 
 fedit=1
 
 #___HELP OUTPUT_________________________________________________________________
@@ -31,6 +36,7 @@ function usage {
     echo "  -ys     starting year of model simulation (default: 1948)"
     echo "  -ye     ending year of model simulation   (default: 2009)"
     echo "  -h      display help"
+    echo "  -rl     prescribe used run_length"
     echo "  -noedit no automatic editing of namelist.config"
     echo 
     echo " --> for changing the wall-clock-time interactively use    "
@@ -45,12 +51,13 @@ function usage {
 #___OVERRIDE DEFAULT INPUT BY COMMANDLINE INPUT_________________________________
 while [ "$1" != "" ]; do
     case $1 in
-        -cn | -chain_n )  shift ; chain_n=$1 ;;
-        -cs | -chain_s )  shift ; chain_s=$1 ;;
-        -ys | -year_s  )  shift ; year_s=$1  ;;
-        -ye | -year_e  )  shift ; year_e=$1  ;;
-        -noedit | --noedit ) fedit=0         ;;
-        -h  | --help   )  usage ; exit       ;;
+        -cn | -chain_n      )  shift ; chain_n=$1 ;;
+        -cs | -chain_s      )  shift ; chain_s=$1 ;;
+        -ys | -year_s       )  shift ; year_s=$1  ;;
+        -ye | -year_e       )  shift ; year_e=$1  ;;
+        -rl | --run_length  )  shift ; prescribe_rlen=$1  ;;
+        -noedit | --noedit  ) fedit=0         ;;
+        -h  | --help        )  usage ; exit       ;;
     esac
     shift
 done
@@ -87,6 +94,9 @@ echo -e "\033[1;33m --> max. number of chain cycles: $chain_n \033[0m"
 echo -e "\033[1;33m --> simulated time range: [ $year_s $year_e] \033[0m"
 echo -e "\033[1;33m --> slurm: wall-clock-time = $wcl \033[0m"
 echo -e "\033[1;33m --> slurm: ntask = $ntasks \033[0m"
+if [ $prescribe_rlen -ne 0 ]; then
+    echo -e "\033[1;33m -->change run_length = $prescribe_rlen \033[0m"
+fi
 
 #___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
 # extract resultpath from namelist.config
@@ -137,9 +147,21 @@ if [ -f "$dname_result_link/fesom.clock" ] ; then
         if [ $is_newsimul -eq 0 ] ; then
             year_d=$(( $year_e - $aux_yr_clock + 1 ))
             rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
-            if  [ $rlen -ne $year_d ] ; then 
-               sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
-           fi
+            # do not prescribe run length in job fle
+            if  [ $prescribe_rlen -eq 0 ] ; then 
+                if  [ $rlen -ne $year_d ] ; then 
+                    sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                    echo -e "\033[1;33m --> change run_length to: $year_d \033[0m"
+                fi
+            # prescribe run length in job fle    
+            else
+                aux_year_d=$prescribe_rlen
+                if  [ $year_d -lt $aux_year_d ] ; then aux_year_d=$year_d ; fi
+                if  [ $rlen -ne $year_d ] ; then 
+                    sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                    echo -e "\033[1;33m --> change run_length to: $aux_year_d \033[0m"
+                fi    
+            fi
        fi
     fi
 else
@@ -149,9 +171,21 @@ else
     if [ $fedit -eq 1 ] ; then
         year_d=$(( $year_e - $year_s + 1 ))
         rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
-        if  [ $rlen -ne $year_d ] ; then 
-            sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
-        fi  
+        # do not prescribe run length in job fle
+        if  [ $prescribe_rlen -eq 0 ] ; then
+            if  [ $rlen -ne $year_d ] ; then 
+                sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                echo -e "\033[1;33m --> change run_length to: $year_d \033[0m"
+            fi
+        # prescribe run length in job file       
+        else
+            aux_year_d=$prescribe_rlen
+            if  [ $year_d -lt $aux_year_d ] ; then aux_year_d=$year_d ; fi
+            if  [ $rlen -ne $year_d ] ; then 
+                sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                echo -e "\033[1;33m --> change run_length to: $aux_year_d \033[0m"
+            fi
+        fi
     fi
 fi
 
@@ -179,10 +213,10 @@ if [ $is_newsimul -eq 1 ] ; then
            namelist.cvmix ${dname_result}/.
         cp fesom.x ${dname_result}/.
 
-	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
-	if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
-	cp ../src/*.F90 ${dname_result}/src/.
-	
+    #___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
+    if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
+    cp ../src/*.F90 ${dname_result}/src/.
+    
         
     # --> make warm start 
     else
@@ -222,7 +256,8 @@ if [ $is_newsimul -eq 1 ] ; then
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
         # restart
-        sed -i " s/yearnew=1948/yearnew=$aux_yr/" namelist.config
+	aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        sed -i " s/yearnew=$aux/yearnew=$aux_yr/" namelist.config
         
         #_______________________________________________________________________
         # backup namelist.* & fesom.x in case they dont exist
@@ -233,9 +268,9 @@ if [ $is_newsimul -eq 1 ] ; then
         if [ ! -f "${dname_result}/fesom.x" ]; then 
             cp fesom.x ${dname_result}/. 
         fi
-	#___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
-	if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
-	cp ../src/*.F90 ${dname_result}/src/.
+    #___BACKUP SRC FILES INTO RESULT DIRECTORY______________________________
+    if [ ! -d "${dname_result}/src" ]; then mkdir "${dname_result}/src" ; fi
+        cp ../src/*.F90 ${dname_result}/src/.
     fi 
 fi
 
@@ -254,21 +289,26 @@ date
 scontrol show job $SLURM_JOB_ID
 
 #___SETUP JOBCHAIN______________________________________________________________
+# check if complete cycle is finished only than increase chain_id
+aux_yr_clock=$(<${dname_result_link}/fesom.clock) 
+aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
+
 # setup next chain job via dependence
-if [ ${chain_id} -lt ${chain_n} ] && [ ${err_srun} -eq 0 ]; then
-    # aftercorr:job_id --> A task of this job array can begin execution after 
-    # the corresponding task ID in the specified job has completed successfully 
-    # (ran to completion with an exit code of zero). 
-    echo -e "\033[33m --> setup next chain cycle \033[0m"
-    sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID $script_name \
-            -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e
+if [ ${err_srun} -eq 0 ]; then
+    if [ $aux_yr_clock -lt $year_e ] || [ ${chain_id} -lt ${chain_n} ]; then
+        # aftercorr:job_id --> A task of this job array can begin execution after 
+        # the corresponding task ID in the specified job has completed successfully 
+        # (ran to completion with an exit code of zero). 
+        echo -e "\033[33m --> setup next chain cycle \033[0m"
+        sbatch --time=$wcl --ntasks=$ntasks --job-name=${SLURM_JOB_NAME} --dependency=aftercorr:$SLURM_JOB_ID $script_name \
+               -cn $chain_n -cs $chain_s -ys $year_s -ye $year_e -rl $prescribe_rlen
+    fi
 fi
 
 #___CHECK FOR COMPLETNES________________________________________________________
 # check if complete cycle is finished only than increase chain_id
-aux_yr_clock=$(<${dname_result_link}/fesom.clock) 
-aux_yr_clock=$(echo ${aux_yr_clock} | cut -d" " -f 6)
 if [ $aux_yr_clock -gt $year_e ] && [ ${chain_id} -lt ${chain_n} ] ; then
     chain_id=$(( $chain_id + 1 ))
     echo $chain_id > file_chain_id
 fi
+

@@ -3,7 +3,7 @@ MODULE io_BLOWUP
 	use g_clock
 	use g_parsup
 	use g_comm_auto
-	use o_mesh
+        USE MOD_MESH
 	use o_arrays
 	use i_arrays
 	implicit none
@@ -62,9 +62,9 @@ MODULE io_BLOWUP
 	!_______________________________________________________________________________
 	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year)
+	subroutine ini_blowup_io(year, mesh)
 		implicit none
-	
+                type(t_mesh), intent(in) , target :: mesh
 		integer, intent(in)       :: year
 		integer                   :: ncid, j
 		integer                   :: varid
@@ -72,7 +72,9 @@ MODULE io_BLOWUP
 		character(500)            :: filename
 		character(500)            :: trname, units
 		character(4)              :: cyear
-		
+
+#include  "associate_mesh.h"
+
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
@@ -155,23 +157,22 @@ MODULE io_BLOWUP
 !!PS 		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
 		
 		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
-		
 	end subroutine ini_blowup_io
 !
 !
 !_______________________________________________________________________________
-	subroutine blowup(istep)
+	subroutine blowup(istep, mesh)
 		implicit none
-		
-		integer :: istep
+                type(t_mesh), intent(in) , target :: mesh		
+		integer                   :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew)
+		call ini_blowup_io(yearnew, mesh)
 		if(mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(mype==0) write(*,*)' --> call assoc_ids(bid)'
 		call assoc_ids(bid) ; call was_error(bid)  
 		if(mype==0) write(*,*)' --> call write_blowup(bid, istep)'
-		call write_blowup(bid, istep) ; call was_error(bid)
+		call write_blowup(bid, istep, mesh) ; call was_error(bid)
 	
 	end subroutine blowup
 !
@@ -206,7 +207,7 @@ MODULE io_BLOWUP
 		
 		att_text='time'
 		id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-		write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+		write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
 		id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 		
 		att_text='iteration_count'
@@ -336,13 +337,17 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine write_blowup(id, istep)
+	subroutine write_blowup(id, istep, mesh)
 		implicit none
 		type(nc_file),  intent(inout) :: id
 		integer,  intent(in)          :: istep
 		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
+        type(t_mesh), intent(in)     , target :: mesh
+
+#include  "associate_mesh.h"
+
 		! Serial output implemented so far
 		if (mype==0) then
 			c=1

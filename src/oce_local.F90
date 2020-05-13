@@ -1,10 +1,24 @@
+module com_global2local_interface
+  interface
+    subroutine com_global2local(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !=============================================================================
-SUBROUTINE com_global2local
+SUBROUTINE com_global2local(mesh)
 USE g_PARSUP
-USE o_MESH
+use MOD_MESH
 IMPLICIT NONE
+
+type(t_mesh), intent(in)           , target :: mesh
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
+
+#include "associate_mesh_ini.h"
+
 allocate(temp(max(nod2D, elem2D))) 
 ! =========
 ! nodes
@@ -102,19 +116,23 @@ allocate(temp(max(nod2D, elem2D)))
 deallocate(temp)
 END SUBROUTINE com_global2local       	  
 !=============================================================================
-SUBROUTINE save_dist_mesh
+SUBROUTINE save_dist_mesh(mesh)
   USE g_CONFIG
-  USE o_MESH
+  USE MOD_MESH
   USE o_ARRAYS
   USE g_PARSUP 
+  use com_global2local_interface
   IMPLICIT NONE
 
+  type(t_mesh), intent(in)           , target :: mesh
   Integer        n, m, q, q2, counter, fileID, nend, nini,ed(2)
   character*10   mype_string,npes_string
   character*200   file_name
   character*200   dist_mesh_dir
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
+
+#include  "associate_mesh_ini.h"
 
 !!$  allocate(temp(nod2D))  ! serves for mapping
 !!$  allocate(ncount(npes+1))
@@ -208,7 +226,7 @@ SUBROUTINE save_dist_mesh
   ! =========================  
   ! communication information
   ! ========================= 
-  call com_global2local   ! Do not call this subroutine earlier, global numbering is needed!
+  call com_global2local(mesh)   ! Do not call this subroutine earlier, global numbering is needed!
   file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out' 
   fileID=10+mype  
   open(fileID, file=file_name)
@@ -297,6 +315,4 @@ SUBROUTINE save_dist_mesh
      deallocate(ncount, temp)
      close(fileID)
   end if
-
-!!$  write(*,*) 'Distributed mesh is saved for rank ', mype
 END subroutine  save_dist_mesh

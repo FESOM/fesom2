@@ -1,24 +1,53 @@
+module oce_ale_fct_3d_adv_interfaces
+  interface
+    subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh    
+      integer       :: do_Xmoment
+      real(kind=WP) :: num_ord
+      real(kind=WP) :: ttfAB(mesh%nl-1,myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+    end subroutine
+
+    subroutine fct_LO_impl_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine fct_ale(ttf, iter_yn, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in)  , target :: mesh
+      real(kind=WP), intent(in) :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      logical, intent(in)       :: iter_yn
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
 ! Caller routine for FCT tracer advection 
-subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment)
+subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment, mesh)
     use o_ARRAYS
+    use MOD_MESH
     use o_MESH
     use o_PARAM
     use g_PARSUP
     use g_comm_auto
+    use oce_ale_fct_3d_adv_interfaces
     implicit none
+    type(t_mesh), intent(in) , target :: mesh
+    real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)            :: num_ord
+    integer                  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    integer                  :: i
 
-    real(kind=WP)  :: ttfAB(nl-1, myDim_nod2D+eDim_nod2D), ttf(nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP)  :: num_ord
-    integer        :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
-    integer        :: i
     ! 1st. first calculate Low and High order solution
-    call fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
+    call fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
         
     if (w_split) then
-        call fct_LO_impl_ale
+        call fct_LO_impl_ale(mesh)
         call exchange_nod(fct_LO)
     end if
 
@@ -28,19 +57,24 @@ subroutine adv_tracer_fct_ale(ttfAB, ttf, num_ord, do_Xmoment)
  
     ! 2nd. apply constrained bounds
     do i=1, fct_iter
-        call fct_ale(ttf, (fct_iter-i > 0))
+        call fct_ale(ttf, (fct_iter-i > 0), mesh)
     end do
 end subroutine adv_tracer_fct_ale
 !
 !
 !===============================================================================
-subroutine fct_init
-    use o_MESH
+subroutine fct_init(mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     implicit none
-    integer      :: my_size
+    integer                  :: my_size
+    type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(fct_LO(nl-1, my_size))        ! Low-order solution 
@@ -66,29 +100,31 @@ subroutine fct_init
     fct_minus=0.0_WP
     
     if (mype==0) write(*,*) 'FCT is initialized'
- 
 end subroutine fct_init
 !
 !
 !===============================================================================
-subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
-    use o_MESH
+subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment, mesh)
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
-    
+    type(t_mesh), intent(in) , target :: mesh    
     integer       :: el(2), enodes(2), n, nz, edge
     integer       :: n2, nl1, nl2,tr_num
     integer       :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
-    real(kind=WP) :: tvert(nl), tvert_e(nl), a, b, c, d, da, db, dg, vflux, Tupw1
+    real(kind=WP) :: tvert(mesh%nl), tvert_e(mesh%nl), a, b, c, d, da, db, dg, vflux, Tupw1
     real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
-    real(kind=WP) :: ttfAB(nl-1,myDim_nod2D+eDim_nod2D), ttf(nl-1,myDim_nod2D+eDim_nod2D)
-    
+    real(kind=WP) :: ttfAB(mesh%nl-1,myDim_nod2D+eDim_nod2D), ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+
+#include "associate_mesh.h"
+
     ! --------------------------------------------------------------------------
     ! It is assumed that velocity is at n+1/2, hence only tracer field 
     ! is AB2 interpolated to n+1/2. 
@@ -357,9 +393,9 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
         ! vert. flux at surface layer
         nz=1
         if (w_split) then
-            tvert_e(nz)=0.!-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
+            tvert_e(nz)=-Wvel_e(nz,n)*ttf(nz,n)*area(nz,n)
         end if
-        tvert(nz)  =0.!-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
+        tvert(nz)  =-Wvel(nz,n)  *ttf(nz,n)*area(nz,n)
         fct_adf_v(nz,n)=0.0_WP
         
         !_______________________________________________________________________
@@ -468,7 +504,7 @@ subroutine fct_ale_muscl_LH(ttfAB, ttf, num_ord, do_Xmoment)
     end do ! --> do n=1, myDim_nod2D
     
     !___________________________________________________________________________
-    call exchange_nod(fct_LO) 
+    call exchange_nod(fct_LO)
     ! Summary:   
     ! fct_LO contains full low-order solution
     ! fct_adf_h contains antidiffusive component of horizontal flux 
@@ -477,27 +513,32 @@ end subroutine fct_ale_muscl_LH
 !
 !
 !===============================================================================
-subroutine fct_ale(ttf, iter_yn)
+subroutine fct_ale(ttf, iter_yn, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
     ! LO ==Low-order  (first-order upwind)
     ! HO ==High-order (3rd/4th order gradient reconstruction method)
     ! Adds limited fluxes to the LO solution   
-    use o_MESH
+    use MOD_MESH
+    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
     implicit none
+    type(t_mesh), intent(in)  , target :: mesh
     integer                   :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
-    real(kind=WP)             :: flux, ae,tvert_max(nl-1),tvert_min(nl-1) 
-    real(kind=WP), intent(in) :: ttf(nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)             :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
+    real(kind=WP), intent(in) :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)             :: flux_eps=1e-16
     real(kind=WP)             :: bignumber=1e3
     integer                   :: vlimit=1
     logical, intent(in)       :: iter_yn !more iterations to be made with fct_ale?
+
+#include "associate_mesh.h"
+
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment 
@@ -788,8 +829,9 @@ end subroutine fct_ale
 !
 !===============================================================================
 ! implicit vertical advection with wvel_i to solve for fct_LO
-subroutine fct_LO_impl_ale
-    use o_MESH
+subroutine fct_LO_impl_ale(mesh)
+    use MOD_MESH
+    use O_MESH
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS
@@ -799,13 +841,15 @@ subroutine fct_LO_impl_ale
     use o_mixing_KPP_mod !for ghats _GO_        
     
     implicit none
-    
-    real(kind=WP)       :: a(nl), b(nl), c(nl), tr(nl)
-    real(kind=WP)       :: cp(nl), tp(nl)
+    type(t_mesh), intent(in) , target :: mesh    
+    real(kind=WP)       :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
+    real(kind=WP)       :: cp(mesh%nl), tp(mesh%nl)
     integer             :: nz, n, nzmax,tr_num
     real(kind=WP)       :: m, zinv, dt_inv, dz
     real(kind=WP)       :: c1, v_adv
-    
+
+#include "associate_mesh.h"
+
     dt_inv=1.0_WP/dt
     
     !___________________________________________________________________________
@@ -905,7 +949,7 @@ subroutine fct_LO_impl_ale
         do nz=1,nzmax-1
             fct_LO(nz,n)=fct_LO(nz,n)+tr(nz)
         end do
-    end do ! --> do n=1,myDim_nod2D   
+    end do ! --> do n=1,myDim_nod2D
 end subroutine fct_LO_impl_ale
 !
 !
