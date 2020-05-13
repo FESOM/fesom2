@@ -82,6 +82,32 @@ module forcing_provider_module
   end subroutine
   
   
+  function read_netcdf_timestep_size(filepath, varname) result(r)
+    character(len=*), intent(in) :: filepath
+    character(len=*), intent(in) :: varname
+    integer r
+    ! EO args
+    integer, parameter :: timedim_index = 3
+    include "netcdf.inc" ! old netcdf fortran interface required?
+    integer status
+    integer fileid
+    integer varid
+    integer dim_size
+    integer, allocatable, dimension(:) :: dimids
+   
+    ! assume netcdf variable like: float q(time, lat, lon)
+    status = nf_open(filepath,NF_NOWRITE,fileid)
+    status = nf_inq_varid(fileid, varname, varid)
+    status = nf_inq_varndims(fileid, varid, dim_size)
+    allocate(dimids(dim_size))
+    status = nf_inq_vardimid(fileid, varid, dimids)
+    
+    status = nf_inq_dimlen(fileid, dimids(timedim_index), r)
+           
+    status = nf_close(fileid)
+  end function
+  
+  
   subroutine assert(val, line)
     logical, intent(in) :: val
     integer, intent(in) :: line
