@@ -3,7 +3,7 @@ MODULE io_RESTART
   use g_clock
   use g_parsup
   use g_comm_auto
-  use o_mesh
+  use mod_mesh
   use o_arrays
   use i_arrays
   use g_cvmix_tke
@@ -41,7 +41,7 @@ MODULE io_RESTART
     integer :: rec, Tid, Iid
     integer :: ncid
     integer :: rec_count=0
-    integer :: error_status(200), error_count
+    integer :: error_status(250), error_count
     logical :: is_in_use=.false.
   end type nc_file
 !
@@ -74,7 +74,7 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year)
+subroutine ini_ocean_io(year, mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -84,6 +84,9 @@ subroutine ini_ocean_io(year)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -148,16 +151,19 @@ end subroutine ini_ocean_io
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year)
+subroutine ini_ice_io(year, mesh)
   implicit none
 
-  integer, intent(in)       :: year
+  integer,      intent(in)  :: year
   integer                   :: ncid, j
   integer                   :: varid
   character(500)            :: longname
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -180,7 +186,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read)
+subroutine restart(istep, l_write, l_read, mesh)
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
@@ -190,22 +196,23 @@ subroutine restart(istep, l_write, l_read)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
+  type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew)
-  if (use_ice) call ini_ice_io(yearnew)
+               call ini_ocean_io(yearnew, mesh)
+  if (use_ice) call ini_ice_io  (yearnew, mesh)
   else
-               call ini_ocean_io(yearold)
-  if (use_ice) call ini_ice_io(yearold)
+               call ini_ocean_io(yearold, mesh)
+  if (use_ice) call ini_ice_io  (yearold, mesh)
   end if
 
   if (l_read) then
-   call assoc_ids(oid);    call was_error(oid)
-   call read_restart(oid); call was_error(oid)
+   call assoc_ids(oid);          call was_error(oid)
+   call read_restart(oid, mesh); call was_error(oid)
    if (use_ice) then
-      call assoc_ids(iid);    call was_error(iid)
-      call read_restart(iid); call was_error(iid)
+      call assoc_ids(iid);          call was_error(iid)
+      call read_restart(iid, mesh); call was_error(iid)
    end if
   end if
 
@@ -237,11 +244,11 @@ subroutine restart(istep, l_write, l_read)
 
   ! write restart
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);            call was_error(oid)  
-  call write_restart(oid, istep); call was_error(oid)
+  call assoc_ids(oid);                  call was_error(oid)  
+  call write_restart(oid, istep, mesh); call was_error(oid)
   if (use_ice) then
-     call assoc_ids(iid);            call was_error(iid)  
-     call write_restart(iid, istep); call was_error(iid)
+     call assoc_ids(iid);                  call was_error(iid)  
+     call write_restart(iid, istep, mesh); call was_error(iid)
   end if
   
   ! actualize clock file to latest restart point
@@ -283,7 +290,7 @@ subroutine create_new_file(id)
 
   att_text='time'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   att_text='iteration_count'
@@ -413,13 +420,16 @@ end subroutine def_variable_2d
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine write_restart(id, istep)
+subroutine write_restart(id, istep, mesh)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
+  type(t_mesh), intent(in)     , target :: mesh
   real(kind=WP), allocatable    :: aux(:), laux(:)
   integer                       :: i, lev, size1, size2, shape
   integer                       :: c
+
+#include  "associate_mesh.h"
 
   ! Serial output implemented so far
   if (mype==0) then
@@ -481,7 +491,7 @@ end subroutine write_restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine read_restart(id, arg)
+subroutine read_restart(id, mesh, arg)
   implicit none
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
@@ -489,17 +499,33 @@ subroutine read_restart(id, arg)
   integer                          :: i, lev, size1, size2, shape
   integer                          :: rec2read, c
   real(kind=WP)                    :: rtime !timestamp of the record
+  logical                          :: file_exist=.False.
+  type(t_mesh), intent(in)        , target :: mesh
 
+#include  "associate_mesh.h"
 
   laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then
-     write(*,*) 'reading restart file ', trim(id%filename)
-     id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
-     id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
-     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
-
+     file_exist=.False.
+     inquire(file=id%filename,exist=file_exist) 
+     if (file_exist) then
+        write(*,*) '     reading restart file:  ', trim(id%filename)
+        id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
+        id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
+        id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
+     else
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: could not find restart_file:',trim(id%filename),'!'    
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex
+     end if 
+     
      if (.not. present(arg)) then
         rec2read=id%rec_count
      else

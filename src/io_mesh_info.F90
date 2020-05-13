@@ -1,6 +1,6 @@
 module io_mesh_info
 use g_PARSUP
-use o_MESH
+use MOD_MESH
 use g_config
 use g_comm_auto
 use o_ARRAYS
@@ -33,9 +33,9 @@ contains
 !-------------------------------------------------------------------------
 ! this routine stores most of metadata used in FESOM. Shall be called at the cold start once during the simulation. 
 ! info: fesom.mesh.diag.nc is 77MB for the CORE II mesh with 47 vertical levels
-subroutine write_mesh_info
+subroutine write_mesh_info(mesh)
 implicit none
-
+  type(t_mesh), intent(in)  , target :: mesh
   integer                    :: status, ncid, j
   integer                    :: nod_n_id, elem_n_id, edge_n_id, nod_part_id, elem_part_id
   integer                    :: nl_id, nl1_id
@@ -57,6 +57,8 @@ implicit none
   character(2000)            :: att_text, short_name
   integer                    :: vtype
   integer, pointer           :: pid
+
+#include "associate_mesh.h"
 
   
   call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -255,7 +257,6 @@ implicit none
   deallocate(rbuffer)
   
   call my_close(ncid)
-  
   
 end subroutine write_mesh_info
 !

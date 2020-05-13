@@ -1,10 +1,10 @@
-subroutine cal_shortwave_rad
+subroutine cal_shortwave_rad(mesh)
   ! This routine is inherited from FESOM 1.4 and adopted appropreately. It calculates 
   ! shortwave penetration into the ocean assuming the constant chlorophyll concentration.
   ! No penetration under the ice is applied. A decent way for ice region is to be discussed.
   ! This routine should be called after ice2oce coupling done if ice model is used.
   ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
-  USE o_MESH
+  USE MOD_MESH
   USE o_PARAM
   USE o_ARRAYS
   USE g_PARSUP
@@ -20,6 +20,9 @@ subroutine cal_shortwave_rad
   real(kind=WP):: swsurf, aux
   real(kind=WP):: c, c2, c3, c4, c5
   real(kind=WP):: v1, v2, sc1, sc2
+  type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
 
   sw_3d=0.0_WP
 

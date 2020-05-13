@@ -1,8 +1,17 @@
+module momentum_adv_scalar_interface
+  interface
+    subroutine momentum_adv_scalar(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs
-    use o_MESH
+subroutine compute_vel_rhs(mesh)
+    use MOD_MESH
     use o_ARRAYS
     use i_ARRAYS
     use i_therm_param
@@ -10,16 +19,22 @@ subroutine compute_vel_rhs
     use g_PARSUP
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
+    use g_forcing_arrays, only: press_air
     use g_comm_auto
+    use g_sbf, only: l_mslp
+    use momentum_adv_scalar_interface
     
     implicit none 
-    integer          :: elem, elnodes(3), nz 
-    real(kind=WP)    :: eta(3), ff, mm 
-    real(kind=WP)    :: Fx, Fy, pre(3)
-    logical, save    :: lfirst=.true.
-    real(kind=WP)    :: t1, t2, t3, t4
-    real(kind=WP)    :: p_ice(3)
-    integer          :: use_pice
+    type(t_mesh), intent(in) , target :: mesh   
+    integer                  :: elem, elnodes(3), nz 
+    real(kind=WP)            :: ff, mm 
+    real(kind=WP)            :: Fx, Fy, pre(3)
+    logical, save            :: lfirst=.true.
+    real(kind=WP)            :: t1, t2, t3, t4
+    real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
+    integer                  :: use_pice
+
+#include "associate_mesh.h"
 
     t1=MPI_Wtime()
     use_pice=0
@@ -38,11 +53,19 @@ subroutine compute_vel_rhs
         ! and the Coriolis force + metric terms
         elnodes=elem2D_nodes(:,elem)
         
-        !  eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
-        eta = g*eta_n(elnodes)   
+        !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
+        p_eta = g*eta_n(elnodes)   
         
         ff  = coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*gg
+        
+        !___________________________________________________________________________
+        ! contribution from sea level pressure
+        if (l_mslp) then
+            p_air = press_air(elnodes)/1000
+        else                   !|-> convert press_air from: Pa--> bar)
+            p_air = 0.0_WP
+        end if
         
         !___________________________________________________________________________
         ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
@@ -60,12 +83,12 @@ subroutine compute_vel_rhs
         ! apply pressure gradient force, as well as contributions from gradient of 
         ! the sea surface height as well as ice pressure in case of floating sea ice
         ! to velocity rhs
-        pre = -(eta+p_ice)!+atmospheric pressure etc.
-
+        pre = -(p_eta+p_ice+p_air)
+        
         if (use_global_tides) then
            pre=pre-ssh_gp(elnodes)
         end if
-
+        
         Fx  = sum(gradient_sca(1:3,elem)*pre)
         Fy  = sum(gradient_sca(4:6,elem)*pre)
         do nz=1,nlevels(elem)-1
@@ -86,7 +109,7 @@ subroutine compute_vel_rhs
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(1)
     elseif (mom_adv==2) then
-       call momentum_adv_scalar
+       call momentum_adv_scalar(mesh)
     end if
     t3=MPI_Wtime() 
 
@@ -120,21 +143,22 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
-subroutine momentum_adv_scalar
-USE o_MESH
+subroutine momentum_adv_scalar(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 use g_comm_auto
 IMPLICIT NONE
 
-integer        :: n, nz, el1, el2
-integer        :: nl1, nl2, nod(2), el, ed, k, nle
-real(kind=WP)  :: un1(1:nl-1), un2(1:nl-1)
-real(kind=WP)  :: wu(1:nl), wv(1:nl)
-real(kind=WP)  :: Unode_rhs(2,nl-1,myDim_nod2d+eDim_nod2D)
+type(t_mesh), intent(in) , target :: mesh
+integer                  :: n, nz, el1, el2
+integer                  :: nl1, nl2, nod(2), el, ed, k, nle
+real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
+real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
+real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
 
-
+#include "associate_mesh.h"
 
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
@@ -255,7 +279,6 @@ do el=1, myDim_elem2D
         + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
    
 end do
-
 end subroutine momentum_adv_scalar
 
 

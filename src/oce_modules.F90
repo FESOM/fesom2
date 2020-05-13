@@ -109,10 +109,28 @@ integer                       :: mom_adv=2
 
 logical                       :: open_b=.false.   ! Reserved    
 
-logical                       :: mo_on=.true. !.false. !Monin-Obukhov
-real(kind=WP) :: modiff=0.01                   !for PP, mixing coefficient within MO length
+!_______________________________________________________________________________
+!--> mixing enhancement than can be applied via subroutine mo_convect(mesh) 
+!    additionally to every mixing scheme i.e. KPP, PP, cvmix_KPP, cvmix_PP, cvmix_TKE
 
-  ! *** active tracer cutoff
+! Switch for Monin-Obukov TB04 mixing --> can be additionally applied for all mixing schemes
+! --> definetely recommented for KPP
+logical                       :: use_momix     = .true. !.false. !Monin-Obukhov -> TB04 mixing on/off
+real(kind=WP)                 :: momix_lat     = -50.0_WP ! latitudinal treshhold to apply mo_on <lat
+real(kind=WP)                 :: momix_kv      = 0.01   ! for PP/KPP, mixing coefficient within MO length
+
+! Switch for enhanced vertical mixing in case of instable stratification --> enhanced
+! convection 
+logical                       :: use_instabmix = .true.
+real(kind=WP)                 :: instabmix_kv  = 0.1
+
+! Switch for enhanced wind mixing --> nasty trick from pp mixing in FESOM1.4
+logical                       :: use_windmix   = .false.
+real(kind=WP)                 :: windmix_kv    = 1.e-3
+integer                       :: windmix_nl    = 2
+
+!_______________________________________________________________________________
+! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
 real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s to s_min
@@ -140,7 +158,11 @@ character(20)                  :: which_pgf='shchepetkin'
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return, visc_option
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-		    ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID
+            ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
+            use_momix, momix_lat, momix_kv, &
+            use_instabmix, instabmix_kv, &
+            use_windmix, windmix_kv, windmix_nl
+            
 END MODULE o_PARAM  
 !==========================================================
 
@@ -151,86 +173,6 @@ USE, intrinsic :: ISO_FORTRAN_ENV
 ! All variables used to keep the mesh structure +
 ! auxiliary variables involved in implementation 
 ! of open boundaries and advection schemes
-! 
-
-integer, parameter                         :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
-integer                                    ::   nod2D      ! the number of 2D nodes
-real(kind=WP)                              ::   ocean_area
-real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
-integer                                    ::   edge2D     ! the number of 2D edges
-integer                                    ::   edge2D_in  
-                                              ! the number of internal 2D edges
-integer                                    ::   elem2D     ! the number of 2D elements
-integer, allocatable, dimension(:,:)       ::   elem2D_nodes
-                                              ! elem2D_nodes(:,n) lists
-				              ! 3 nodes of element n   
-integer, allocatable, dimension(:,:)       ::   edges
-                                              ! edge(:,n) lists 2 nodes
-				              ! edge n
-integer, allocatable, dimension(:,:)       ::   edge_tri
-                                              ! edge_tri(:,n) lists 2 
-				              ! elements containing edge n
-				              ! The first one is to left 
-				              ! of the line directed
-				              ! to the second node
-integer, allocatable, dimension(:,:)       ::   elem_edges
-                                              ! elem_edges(:,n) are edges of 
-                                              ! element n.  
-real(kind=WP), allocatable, dimension(:)   ::   elem_area
-real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
-real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
-integer,allocatable,dimension(:,:)         ::   elem_neighbors
-integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
-real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
-integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
-real(kind=WP),allocatable,dimension(:)     ::   depth
-                                              ! depth(n) is the depths at 
-				              ! node n 
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec 
-                                              ! Coefficients of linear reconstruction
-					      ! of velocities on elements
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
-                                              ! Coefficients to compute
-					      ! gradient of scalars on elements
-INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-! Vertical structure             
-integer                                    :: nl
-real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
-integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
-real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
-real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
-
-
-  type sparse_matrix 
-     integer :: nza
-     integer :: dim
-     real(kind=WP), allocatable, dimension(:)      :: values
-     integer(int32), allocatable,   dimension(:) :: colind
-     integer(int32), allocatable,   dimension(:) :: rowptr
-     integer(int32), allocatable,   dimension(:) :: colind_loc
-     integer(int32), allocatable,   dimension(:) :: rowptr_loc
-  end type sparse_matrix
-! Elevation stiffness matrix
-type(sparse_matrix)                           :: ssh_stiff
-
-! Auxiliary arrays. They are not related to mesh structure, but are 
-! kept here because they are just used for temporary storage in computations
-
-! Open boundary:
-integer                                       :: ob_num  ! number of OB fragments
-
-TYPE ob_type
-    integer      :: len
-    integer, allocatable, dimension(:)       :: list
-END TYPE ob_type
-
-TYPE ob_rhs_type
-    integer      :: len
-    real(kind=WP), allocatable, dimension(:) :: list
-END TYPE ob_rhs_type
-
-type(ob_type), allocatable                    ::  ob_info(:)
-type(ob_rhs_type), allocatable                ::  ob_2rhs(:)
 !
 ! The fct part
 integer                                       :: fct_iter=1
@@ -247,11 +189,6 @@ integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
-
-#if defined (__oasis)
-  real(kind=WP), allocatable, dimension(:)      :: lump2d_south, lump2d_north  
-  integer, allocatable, dimension(:)           :: ind_south, ind_north    
-#endif  
 end module o_MESH
 !==========================================================
 

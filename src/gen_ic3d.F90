@@ -12,7 +12,7 @@ MODULE g_ic3d
    !!   do_ic3d   -- provides an initial 3D boundary conditions
    !!
    USE o_ARRAYS
-   USE o_MESH
+   USE MOD_MESH
    USE o_PARAM
    USE g_PARSUP
    USE g_comm_auto
@@ -215,15 +215,17 @@ CONTAINS
    END SUBROUTINE nc_readGrid
 
    
-   SUBROUTINE nc_ic3d_ini
+   SUBROUTINE nc_ic3d_ini(mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : inizialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
       IMPLICIT NONE
    
-      integer            :: i
-      integer            :: elnodes(3)
-      real(wp)           :: x, y       ! coordinates of elements
+      integer                  :: i
+      integer                  :: elnodes(3)
+      real(wp)                 :: x, y       ! coordinates of elements
+      type(t_mesh), intent(in), target :: mesh
+#include "associate_mesh.h"
       
       warn = 0
 
@@ -254,10 +256,9 @@ CONTAINS
                bilin_indx_j(i)=-1         
          end if
       end do
-                         
    END SUBROUTINE nc_ic3d_ini
 
-   SUBROUTINE getcoeffld
+   SUBROUTINE getcoeffld(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!              
@@ -282,6 +283,9 @@ CONTAINS
       real(wp), allocatable, dimension(:)      :: data1d      
       integer              :: elnodes(3)
       integer              :: ierror              ! return error code
+
+      type(t_mesh), intent(in), target :: mesh
+#include "associate_mesh.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP
@@ -373,7 +377,7 @@ CONTAINS
       DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
    
-   SUBROUTINE do_ic3d
+   SUBROUTINE do_ic3d(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE do_ic3d ***
       !!              
@@ -381,6 +385,8 @@ CONTAINS
       !!----------------------------------------------------------------------
       IMPLICIT NONE
       integer                       :: n
+      type(t_mesh), intent(in)     , target :: mesh
+
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
       ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
@@ -390,11 +396,11 @@ CONTAINS
       DO current_tracer=1, num_tracers
          if (tracer_ID(current_tracer)==idlist(n)) then
             ! read initial conditions for current tracer
-            call nc_ic3d_ini
+            call nc_ic3d_ini(mesh)
             ! get first coeficients for time inerpolation on model grid for all datas
-            call getcoeffld
+            call getcoeffld(mesh)
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tr_arr(:,:,current_tracer))            
+            call extrap_nod(tr_arr(:,:,current_tracer), mesh)
             exit
          elseif (current_tracer==num_tracers) then
             if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
@@ -416,7 +422,7 @@ CONTAINS
 
       if (t_insitu) then
          if (mype==0) write(*,*) "converting insitu temperature to potential..."
-         call insitu2pot
+         call insitu2pot(mesh)
       end if
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
    

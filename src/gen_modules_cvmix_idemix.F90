@@ -26,7 +26,7 @@ module g_cvmix_idemix
     ! module calls from FESOM
     use g_config , only: dt
     use o_param           
-    use o_mesh
+    use mod_mesh
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -50,6 +50,10 @@ module g_cvmix_idemix
     
     ! dissipation parameter (dimensionless)
     real(kind=WP) :: idemix_mu0   = 1.33333333
+
+    ! amount of surface forcing that is used
+    real(kind=WP) :: idemix_sforcusage = 0.2
+    
     
     integer       :: idemix_n_hor_iwe_prop_iter = 1
     
@@ -60,7 +64,7 @@ module g_cvmix_idemix
     character(200):: idemix_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
     
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, & 
-                            idemix_surforc_file, idemix_botforc_file
+                            idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
                             
                             
     
@@ -110,12 +114,15 @@ module g_cvmix_idemix
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_idemix
-        
-        character(len=100) :: nmlfile
-        logical            :: file_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_idemix(mesh)
+        implicit none
+        character(len=100)       :: nmlfile
+        logical                  :: file_exist=.False.
+        integer                  :: node_size
+
+        type(t_mesh), intent(in), target :: mesh
+
+#include "associate_mesh.h"     
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -213,9 +220,9 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true.) 
+            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
-            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * 0.2 
+            forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
             
         else
             if (mype==0) then
@@ -236,7 +243,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true.) 
+            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., mesh) 
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
             
@@ -255,22 +262,23 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
         call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
-        
     end subroutine init_cvmix_idemix
     !
     !
     !
     !===========================================================================
     ! calculate IDEMIX internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix
-    
+    subroutine calc_cvmix_idemix(mesh)
+        implicit none
+        type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, edge, node_size
         integer       :: nz, nln, nl1, nl2, nl12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
-        real(kind=WP) :: dz_trr(nl), dz_trr2(nl), bvfreq2(nl), vflux, dz_el, aux, cflfac
+        real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         logical       :: debug=.false.
-        
+
+#include "associate_mesh.h"   
         ! nils
         tstep_count = tstep_count + 1
           
@@ -595,6 +603,5 @@ module g_cvmix_idemix
                 end do
             end do
         end if 
-        
     end subroutine calc_cvmix_idemix
 end module g_cvmix_idemix

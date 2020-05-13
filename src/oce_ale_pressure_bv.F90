@@ -1,27 +1,87 @@
+module densityJM_components_interface
+  interface
+    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+      USE MOD_MESH
+      real(kind=WP), intent(IN)  :: t,s
+      real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rhopot
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_fullcell_interface
+  interface
+    subroutine pressure_force_4_linfs_fullcell(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_nemo_interface
+  interface
+    subroutine pressure_force_4_linfs_nemo(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_shchepetkin_interface
+  interface
+    subroutine pressure_force_4_linfs_shchepetkin(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_cubicspline_interface
+  interface
+    subroutine pressure_force_4_linfs_cubicspline(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_shchepetkin_interface
+  interface
+    subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_cubicspline_interface
+  interface
+    subroutine pressure_force_4_zxxxx_cubicspline(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
-subroutine pressure_bv
+subroutine pressure_bv(mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency 
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
     use g_config
     USE o_PARAM
-    USE o_MESH
+    USE MOD_MESH
     USE o_ARRAYS
     USE g_PARSUP
     use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
+    use densityJM_components_interface
     IMPLICIT NONE
-    
-    real(kind=WP)         :: dz_inv, bv,  a, rho_up, rho_dn, t, s
-    integer               :: node, nz, nl1, nzmax
-    real(kind=WP)         :: rhopot(nl), bulk_0(nl), bulk_pz(nl), bulk_pz2(nl), rho(nl), dbsfc1(nl), db_max
-    real(kind=WP)         :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
-    real(kind=WP)         :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
-    logical               :: flag1, flag2, mixing_kpp
-    
+    type(t_mesh), intent(in) , target :: mesh    
+    real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    integer                  :: node, nz, nl1, nzmax
+    real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
+    real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
+    real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
+    logical                  :: flag1, flag2, mixing_kpp
+#include "associate_mesh.h"
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
@@ -64,7 +124,7 @@ subroutine pressure_bv
             do nz=1, nl1
                 t=tr_arr(nz, node,1)
                 s=tr_arr(nz, node,2)
-                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
             enddo
             
             !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
@@ -184,25 +244,34 @@ end subroutine pressure_bv
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
-subroutine pressure_force_4_linfs
+subroutine pressure_force_4_linfs(mesh)
     use g_config
     use g_PARSUP
+    use mod_mesh
+    use pressure_force_4_linfs_fullcell_interface
+    use pressure_force_4_linfs_nemo_interface
+    use pressure_force_4_linfs_shchepetkin_interface
+    use pressure_force_4_linfs_cubicspline_interface
     implicit none
-    
+    type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell ) then
-        call pressure_force_4_linfs_fullcell
-        
+        call pressure_force_4_linfs_fullcell(mesh)
+        !if     (trim(which_pgf)=='fullcell_test') then
+        !    call pressure_force_4_linfs_fullcell_test
+        !else
+        !    call pressure_force_4_linfs_fullcell
+        !end if    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
         if     (trim(which_pgf)=='nemo') then
-            call pressure_force_4_linfs_nemo
+            call pressure_force_4_linfs_nemo(mesh)
         elseif (trim(which_pgf)=='shchepetkin') then
-            call pressure_force_4_linfs_shchepetkin
+            call pressure_force_4_linfs_shchepetkin(mesh)
         elseif (trim(which_pgf)=='cubicspline') then
-            call pressure_force_4_linfs_cubicspline    
+            call pressure_force_4_linfs_cubicspline(mesh)
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -219,15 +288,18 @@ end subroutine pressure_force_4_linfs
 !
 !===============================================================================
 ! calculate pressure gradient force for linfs in case full cells
-subroutine pressure_force_4_linfs_fullcell
+subroutine pressure_force_4_linfs_fullcell(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
     implicit none
     
-    integer             :: elem, elnodes(3), nle, nlz
+    integer                  :: elem, elnodes(3), nle, nlz
+    type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
     
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -253,6 +325,53 @@ end subroutine pressure_force_4_linfs_fullcell
 !
 !
 !===============================================================================
+! calculate pressure gradient force for linfs in case full cells
+!subroutine pressure_force_4_linfs_fullcell_test
+!    use o_PARAM
+!    use o_MESH
+!    use o_ARRAYS
+!    use g_PARSUP
+!    use g_config
+!    implicit none
+    
+!    integer             :: elem, elnodes(3), nle, nlz
+!    real(kind=WP)       :: int_dp_dx(2), drho_dx, aux_sum
+    
+    !___________________________________________________________________________
+    ! loop over triangular elemments
+!    do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        ! number of levels at elem
+!        nle=nlevels(elem)-1
+            
+        !_______________________________________________________________________
+        ! node indices of elem 
+!        elnodes = elem2D_nodes(:,elem)
+        
+!        int_dp_dx     = 0.0_WP
+!        do nlz=1,nle
+            !___________________________________________________________________
+            ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! --> in case linfs: dz_dx == 0.0
+            ! zonal gradients
+!            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+!            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+!            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+!            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            
+            ! meridional gradients
+!            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+!            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+!            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+!            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+            
+!        end do ! --> do nlz=1,nle-1
+!    end do !-->do elem=1, myDim_elem2D
+!end subroutine pressure_force_4_linfs_fullcell_test
+!
+!
+!
+!===============================================================================
 ! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine 
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo 
 ! st@locean-ipsl.umpc.fr calculate vertical center index for linear 
@@ -261,12 +380,13 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
-subroutine pressure_force_4_linfs_nemo
+subroutine pressure_force_4_linfs_nemo(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
+    use densityJM_components_interface
     implicit none
     
     logical             :: do_interpTS=.true.
@@ -275,7 +395,8 @@ subroutine pressure_force_4_linfs_nemo
     real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
-        
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -370,7 +491,7 @@ subroutine pressure_force_4_linfs_nemo
                 ! calculate density at element mid-depth bottom depth via 
                 ! equation of state from linear interpolated temperature and 
                 ! salinity
-                call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot)
+                call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
                 interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))-density_0
                 
@@ -409,9 +530,9 @@ end subroutine pressure_force_4_linfs_nemo
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_shchepetkin
+subroutine pressure_force_4_linfs_shchepetkin(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -420,7 +541,8 @@ subroutine pressure_force_4_linfs_shchepetkin
     integer             :: elem, elnodes(3), nle, nlz
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-    
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -521,9 +643,9 @@ end subroutine pressure_force_4_linfs_shchepetkin
 !===============================================================================
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_cubicspline
+subroutine pressure_force_4_linfs_cubicspline(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -536,7 +658,8 @@ subroutine pressure_force_4_linfs_cubicspline
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz 
-    
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -670,16 +793,19 @@ end subroutine pressure_force_4_linfs_cubicspline
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
-subroutine pressure_force_4_zxxxx
+subroutine pressure_force_4_zxxxx(mesh)
     use g_PARSUP
     use g_config
+    use mod_mesh
+    use pressure_force_4_zxxxx_shchepetkin_interface
+    use pressure_force_4_zxxxx_cubicspline_interface
     implicit none
-    
+    type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
     if (trim(which_pgf)=='shchepetkin') then
-        call pressure_force_4_zxxxx_shchepetkin
+        call pressure_force_4_zxxxx_shchepetkin(mesh)
     elseif (trim(which_pgf)=='cubicspline') then
-        call pressure_force_4_zxxxx_cubicspline  
+        call pressure_force_4_zxxxx_cubicspline(mesh)
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -700,9 +826,9 @@ end subroutine pressure_force_4_zxxxx
 ! interpolation.
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
-subroutine pressure_force_4_zxxxx_cubicspline
+subroutine pressure_force_4_zxxxx_cubicspline(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -714,7 +840,8 @@ subroutine pressure_force_4_zxxxx_cubicspline
     integer             :: s_ind(4)
     real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
     real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
-    
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -872,9 +999,9 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_zxxxx_shchepetkin
+subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
     use o_PARAM
-    use o_MESH
+    use MOD_MESH
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -883,7 +1010,8 @@ subroutine pressure_force_4_zxxxx_shchepetkin
     integer             :: elem, elnodes(3), nle, nlz, nln(3), ni, nlc, nlce
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
     real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-      
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1024,11 +1152,12 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 !
 !
 !===============================================================================
-SUBROUTINE densityJM_local(t, s, pz, rho_out)
-USE o_MESH
+SUBROUTINE densityJM_local(t, s, pz, rho_out, mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP, only: par_ex,pe_status
+use g_PARSUP !, only: par_ex,pe_status
+use densityJM_components_interface
 IMPLICIT NONE
 
   !
@@ -1044,22 +1173,23 @@ IMPLICIT NONE
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
   real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
+  type(t_mesh), intent(in)   , target :: mesh
+#include "associate_mesh.h"
   !compute secant bulk modulus
 
-  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
+  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
 
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2) 
 
   rho_out = bulk*rhopot / (bulk + 0.1_WP*pz) - density_0
-
 end subroutine densityJM_local
 		
 ! ===========================================================================
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-USE o_MESH
+SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP, only: par_ex,pe_status
+use g_PARSUP !, only: par_ex,pe_status
 IMPLICIT NONE
 
   !
@@ -1101,6 +1231,9 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bst4 = 5.38750e-9	
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
+  type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
 
   !compute secant bulk modulus
 
@@ -1120,7 +1253,6 @@ IMPLICIT NONE
                + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
                        + s* bss2)
-
 end subroutine densityJM_components
 ! ===================================================================
 function ptheta(s,t,p,pr)
@@ -1198,7 +1330,7 @@ end function atg
 !
 !----------------------------------------------------------------------------
 !
-subroutine sw_alpha_beta(TF1,SF1)
+subroutine sw_alpha_beta(TF1,SF1, mesh)
   ! DESCRIPTION:
   !   A function to calculate the thermal expansion coefficient
   !   and saline contraction coefficient. (elementwise)
@@ -1222,16 +1354,19 @@ subroutine sw_alpha_beta(TF1,SF1)
   !    sw_beta=0.72088e-3 psu^-1 @ S=40.0psu, ptmp=10.0C (ITS-90), p=4000db
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
-  use o_mesh
+  use mod_mesh
   use o_arrays
   use g_parsup
   use o_param
   implicit none
   !
+  type(t_mesh), intent(in) , target :: mesh
   integer        :: n, nz
   real(kind=WP)  :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
   real(kind=WP)  :: a_over_b    
-  real(kind=WP)  :: TF1(nl-1, myDim_nod2D+eDim_nod2D),SF1(nl-1, myDim_nod2D+eDim_nod2D)
+  real(kind=WP)  :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D),SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+
+#include "associate_mesh.h"
 
   do n = 1,myDim_nod2d
      do nz=1, nlevels_nod2D(n)-1
@@ -1272,12 +1407,12 @@ subroutine sw_alpha_beta(TF1,SF1)
      ! calculate alpha
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
- end do     
+ end do
 end subroutine sw_alpha_beta
 !
 !----------------------------------------------------------------------------
 !
-subroutine compute_sigma_xy(TF1,SF1)
+subroutine compute_sigma_xy(TF1,SF1, mesh)
   !--------------------------------------------------------------------
   ! DESCRIPTION:
   !   computes density gradient
@@ -1290,17 +1425,19 @@ subroutine compute_sigma_xy(TF1,SF1)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use o_mesh
+  use mod_mesh
   use o_param
   use o_arrays
   use g_parsup
   use g_comm_auto
   implicit none
   !
-  real(kind=WP), intent(IN)   :: TF1(nl-1, myDim_nod2D+eDim_nod2D), SF1(nl-1, myDim_nod2D+eDim_nod2D)
-  real(kind=WP)               :: tx(nl-1), ty(nl-1), sx(nl-1), sy(nl-1), vol(nl-1), testino(2)
+  type(t_mesh),  intent(in)   , target :: mesh
+  real(kind=WP), intent(IN)   :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D), SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+  real(kind=WP)               :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                     :: n, nz, elnodes(3),el, k, nl1
-  
+
+#include "associate_mesh.h"
   !
   DO n=1, myDim_nod2D
         nl1 = nlevels_nod2D(n)-1
@@ -1342,10 +1479,10 @@ subroutine compute_sigma_xy(TF1,SF1)
   call exchange_nod(sigma_xy)
 end subroutine compute_sigma_xy
 !===============================================================================
-subroutine compute_neutral_slope
+subroutine compute_neutral_slope(mesh)
     use o_ARRAYS
     use g_PARSUP
-    use o_MESH
+    use MOD_MESH
     use o_param
     use g_config
     use g_comm_auto
@@ -1354,7 +1491,9 @@ subroutine compute_neutral_slope
     integer         :: edge
     integer         :: n,nz,nl1,el(2),elnodes(3),enodes(2)
     real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
+    type(t_mesh), intent(in) , target :: mesh
 
+#include "associate_mesh.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
     S_cr=1.0e-2_WP
@@ -1383,8 +1522,8 @@ end subroutine compute_neutral_slope
 !===============================================================================
 !converts insitu temperature to a potential one
 !               tr_arr(:,:,1) will be modified!
-subroutine insitu2pot
-  use o_mesh
+subroutine insitu2pot(mesh)
+  use mod_mesh
   use o_param
   use o_arrays
   use g_config
@@ -1393,6 +1532,10 @@ subroutine insitu2pot
   real(kind=WP), external     :: ptheta
   real(kind=WP)               :: pp, pr, tt, ss
   integer                     :: n, nz
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+ 
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
   do n=1,myDim_nod2d+eDim_nod2D

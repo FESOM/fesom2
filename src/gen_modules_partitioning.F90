@@ -12,7 +12,7 @@ save
 #endif
 
  integer                                :: MPI_COMM_FESOM
- integer, parameter   :: MAX_LAENDERECK=8
+ integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
      integer                                       :: rPEnum ! the number of PE I receive info from 
@@ -147,15 +147,17 @@ subroutine par_ex(abort)       ! finalizes MPI
 
 end subroutine par_ex
 !=======================================================================
-subroutine set_par_support
-  use o_MESH
+subroutine set_par_support(mesh)
+  use MOD_MESH
   implicit none
 
-  integer   n, offset
-  integer :: i, max_nb, nb, nini, nend, nl1, n_val
-  integer, allocatable :: blocklen(:),     displace(:)
-  integer, allocatable :: blocklen_tmp(:), displace_tmp(:)
+  type(t_mesh), intent(in)         , target :: mesh
+  integer                          :: n, offset
+  integer                          :: i, max_nb, nb, nini, nend, nl1, n_val
+  integer, allocatable             :: blocklen(:),     displace(:)
+  integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
+#include "associate_mesh.h"  
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
@@ -167,7 +169,6 @@ subroutine set_par_support
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
-!!$      allocate(com_edge2D%req(          3*com_edge2D%rPEnum +      3*com_edge2D%sPEnum))
       allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum))
       allocate(com_elem2D%req(          3*com_elem2D%rPEnum +      3*com_elem2D%sPEnum))
       allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum + 3*com_elem2D_full%sPEnum))
@@ -175,63 +176,6 @@ subroutine set_par_support
 !================================================
 ! MPI DATATYPES
 !================================================
-      ! Build MPI Data types for halo exchange: Edges
-!!$      allocate(r_mpitype_edge2D(com_edge2D%rPEnum))  ! 2D
-!!$      allocate(s_mpitype_edge2D(com_edge2D%sPEnum))  
-
-      ! Upper limit for the length of the local interface between the neighbor PEs 
-!!$      max_nb = max(maxval(com_edge2D%rptr(2:com_edge2D%rPEnum+1) - com_edge2D%rptr(1:com_edge2D%rPEnum)), &
-!!$                   maxval(com_edge2D%sptr(2:com_edge2D%sPEnum+1) - com_edge2D%sptr(1:com_edge2D%sPEnum)))
-
-!!$      allocate(displace(max_nb),     blocklen(max_nb))
-!!$
-!!$      do n=1,com_edge2D%rPEnum
-!!$         nb = 1
-!!$         nini = com_edge2D%rptr(n)
-!!$         nend = com_edge2D%rptr(n+1) - 1
-!!$         displace(:) = 0
-!!$         displace(1) = com_edge2D%rlist(nini) -1  ! C counting, start at 0
-!!$         blocklen(:) = 1
-!!$         do i=nini+1, nend
-!!$            if (com_edge2D%rlist(i) /= com_edge2D%rlist(i-1) + 1) then  
-!!$               ! New block
-!!$               nb = nb+1
-!!$               displace(nb) = com_edge2D%rlist(i) -1
-!!$            else
-!!$               blocklen(nb) = blocklen(nb)+1
-!!$            endif
-!!$         enddo
-!!$         
-!!$         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, r_mpitype_edge2D(n), MPIerr)
-!!$
-!!$         call MPI_TYPE_COMMIT(r_mpitype_edge2D(n),   MPIerr) 
-!!$      enddo
-!!$
-!!$      do n=1,com_edge2D%sPEnum
-!!$         nb = 1
-!!$         nini = com_edge2D%sptr(n)
-!!$         nend = com_edge2D%sptr(n+1) - 1
-!!$         displace(:) = 0
-!!$         displace(1) = com_edge2D%slist(nini) -1  ! C counting, start at 0
-!!$         blocklen(:) = 1
-!!$         do i=nini+1, nend
-!!$            if (com_edge2D%slist(i) /= com_edge2D%slist(i-1) + 1) then  
-!!$               ! New block
-!!$               nb = nb+1
-!!$               displace(nb) = com_edge2D%slist(i) -1
-!!$            else
-!!$               blocklen(nb) = blocklen(nb)+1
-!!$            endif
-!!$         enddo
-!!$         
-!!$         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, s_mpitype_edge2D(n), MPIerr)
-!!$
-!!$         call MPI_TYPE_COMMIT(s_mpitype_edge2D(n),   MPIerr) 
-!!$
-!!$      enddo
-!!$
-!!$      deallocate(displace, blocklen)
-
 
       ! Build MPI Data types for halo exchange: Elements
       allocate(r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
@@ -526,9 +470,7 @@ subroutine set_par_support
    endif
 
    call init_gatherLists
-
-  if(mype==0) write(*,*) 'Communication arrays are set' 
-
+   if(mype==0) write(*,*) 'Communication arrays are set' 
 end subroutine set_par_support
 
 

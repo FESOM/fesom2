@@ -5,21 +5,23 @@
 !  fer_gamma2vel
 !  fer_compute_C_K ! this subroutine shall be a subject of future tuning (with respect to fer_k)
 !===========================================================================
-subroutine fer_solve_Gamma
-	USE o_MESH
+subroutine fer_solve_Gamma(mesh)
+	USE MOD_MESH
 	USE o_PARAM
 	USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, zbar_n, Z_n, hnode_new, zbar_n_bot
 	USE g_PARSUP
 	USE g_CONFIG
 	use g_comm_auto
 	IMPLICIT NONE
-	
-	integer                         :: nz, n, nzmax
+        type(t_mesh), intent(in)               , target :: mesh	
+	integer                                :: nz, n, nzmax
 	real(kind=WP)                          :: zinv1,zinv2, zinv, m, r
-	real(kind=WP)                          :: a(nl), b(nl), c(nl)
-	real(kind=WP)                          :: cp(nl), tp(2,nl)
+	real(kind=WP)                          :: a(mesh%nl), b(mesh%nl), c(mesh%nl)
+	real(kind=WP)                          :: cp(mesh%nl), tp(2,mesh%nl)
 	real(kind=WP), dimension(:,:), pointer :: tr
-	
+
+#include "associate_mesh.h"
+
 	DO n=1,myDim_nod2D
 		tr=>fer_gamma(:,:,n)
 ! 		!_____________________________________________________________________
@@ -91,11 +93,10 @@ subroutine fer_solve_Gamma
 	END DO   !!! cycle over nodes
 	
 	call exchange_nod(fer_gamma)
-	
 END subroutine fer_solve_Gamma
 !====================================================================
-subroutine fer_gamma2vel
-  USE o_MESH
+subroutine fer_gamma2vel(mesh)
+  USE MOD_MESH
   USE o_PARAM
   USE o_ARRAYS, ONLY: fer_gamma, fer_uv, helem
   USE g_PARSUP
@@ -103,9 +104,12 @@ subroutine fer_gamma2vel
   use g_comm_auto
   IMPLICIT NONE
 
-   integer                         :: nz, nzmax, el, elnod(3)
+   integer                                :: nz, nzmax, el, elnod(3)
    real(kind=WP)                          :: zinv
    real(kind=WP)                          :: onethird=1._WP/3._WP
+   type(t_mesh), intent(in)               , target :: mesh
+
+#include  "associate_mesh.h"
 
    DO el=1, myDim_elem2D
       elnod=elem2D_nodes(:,el)
@@ -123,21 +127,23 @@ end subroutine fer_gamma2vel
 !
 !
 !===============================================================================
-subroutine init_Redi_GM!fer_compute_C_K_Redi
-    USE o_MESH
+subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
+    USE MOD_MESH
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node, hnode_new, Z_3d_n
     USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: n, nz, nzmax
+    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux_zz(mesh%nl)
+    real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
+    real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
+    real(kind=WP)            :: zscaling(mesh%nl)
+    real(kind=WP)            :: bvref
 
-    integer          :: n, nz, nzmax
-    real(kind=WP)    :: reso, c1, rosb, scaling, rr_ratio, aux_zz(nl)
-    real(kind=WP)    :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
-    real(kind=WP)    :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
-    real(kind=WP)    :: zscaling(nl)
-    real(kind=WP)    :: bvref
+#include "associate_mesh.h"
 
 ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
 !******************************* F1(x,y) ***********************************************************

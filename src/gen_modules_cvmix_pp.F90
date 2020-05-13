@@ -24,7 +24,7 @@ module g_cvmix_pp
     ! module calls from FESOM
     use g_config
     use o_param           
-    use o_mesh
+    use MOD_MESH
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -46,19 +46,11 @@ module g_cvmix_pp
     
     ! single elements of fesom flavour PP mixing can be switched of
     logical            :: pp_use_AvbinKv     = .true. ! use term Kv=...+AvB/(1+5Ri)+...
-    logical            :: pp_use_monob       = .true. ! use mixing improvment of Timmermann and Beckmann, 2004
-    real(kind=WP)      :: pp_monob_Kv        = 0.01
     logical            :: pp_use_nonconstKvb = .true. ! use nonkonst Kvbckg of qiang 
-    logical            :: pp_use_instabmix   = .true. ! use enhanced mix. for instable stratif. 
-    real(kind=WP)      :: pp_instabmix_Av    = 0.1
-    real(kind=WP)      :: pp_instabmix_Kv    = 0.1
-    logical            :: pp_use_windmix     = .true. ! use enhanced mix. for upper 2 levels
-    real(kind=WP)      :: pp_windmix         = 0.001
     
     
-    namelist /param_pp/ pp_Av0, pp_alpha, pp_exp, pp_Avbckg, pp_Kvbckg, pp_use_monob, &
-                        pp_monob_Kv, pp_use_nonconstKvb, pp_use_windmix, pp_use_instabmix, &
-                        pp_use_fesompp
+    namelist /param_pp/ pp_Av0, pp_alpha, pp_exp, pp_Avbckg, pp_Kvbckg, &
+                        pp_use_nonconstKvb, pp_use_fesompp
     
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:,:) :: pp_Av, pp_Kv
@@ -72,11 +64,14 @@ module g_cvmix_pp
     !===========================================================================
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_pp
-        character(len=100) :: nmlfile
-        logical            :: nmlfile_exist=.False.
-        integer            :: node_size
-        
+    subroutine init_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in), target :: mesh        
+        character(len=100)       :: nmlfile
+        logical                  :: nmlfile_exist=.False.
+        integer                  :: node_size
+#include "associate_mesh.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -125,11 +120,7 @@ module g_cvmix_pp
             write(*,*) "     pp_Avbck           = ", pp_Avbckg
             write(*,*) "     pp_Kvbck           = ", pp_Kvbckg
             write(*,*) "     pp_use_fesompp     = ", pp_use_fesompp
-            write(*,*) "     pp_use_monob       = ", pp_use_monob
-            write(*,*) "     pp_monob_Kv        = ", pp_monob_Kv
             write(*,*) "     pp_use_nonconstKvb = ", pp_use_nonconstKvb
-            write(*,*) "     pp_use_windmix     = ", pp_use_windmix
-            write(*,*) "     pp_use_instabmix   = ", pp_use_instabmix
             write(*,*)
         end if
         
@@ -166,11 +157,13 @@ module g_cvmix_pp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp
-        
+    subroutine calc_cvmix_pp(mesh)
+        use MOD_MESH
+        implicit none
+        type(t_mesh), intent(in), target :: mesh                
         integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-        
+#include "associate_mesh.h"
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -222,97 +215,29 @@ module g_cvmix_pp
             ! needs to be tested if this is an advantage for FESOM2.0 or not 
             if (pp_use_fesompp .and. pp_use_AvbinKv .eqv. .false.) then
                  pp_Av(2:nln,node) = pp_Av(2:nln,node) + pp_Avbckg
-                 pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
             end if  
+            
+            !_______________________________________________________________________
+            ! calculate and add latitudinal and depth dependend background 
+            ! diffusivity of Q. Wang from FESOM1.4
+            if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
+                do nz = 2,nlevels_nod2D(node)-1
+                    call Kv0_background_qiang(Kvb,                       &
+                                                geo_coord_nod2D(2,node)/rad, &
+                                                abs(zbar_3d_n(nz,node))      &
+                                                )
+                    pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
+                end do
+            else
+                pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
+            end if 
             
             !___________________________________________________________________
             pp_Av(1,node)=0.0_WP
             pp_Kv(1,node)=0.0_WP
             
         end do !--> do node = 1,myDim_nod2D
-        
-        !_______________________________________________________________________
-        !   ||                                                            ||
-        !   ||   From here on FESOM related extension from the standard   ||
-        !  _||_  mixing scheme from Pacanowski and Philander 1981. They  _||_
-        !  \  /  all can be switched of by corresponding flags           \  /
-        !   \/                                                            \/ 
-        
-        !_______________________________________________________________________
-        ! add vertical mixing scheme of Timmermann and Beckmann, 2004,
-        ! "Parameterization of vertical mixing in the Weddell Sea!
-        ! Computes the mixing length derived from the Monin-Obukhov length
-        ! --> in FESOM1.4 refered as TB04 mixing scheme
-        if (pp_use_fesompp .and. pp_use_monob) then
-            do node = 1,node_size
-                !_______________________________________________________________
-                ! calcualte monin obukov length
-                call mo_length(water_flux(node),heat_flux(node), &         
-                               stress_atmoce_x(node),stress_atmoce_y(node), &    
-                               u_ice(node),v_ice(node),a_ice(node), &                             
-                               dt, pp_monob_mixl(node))
-                !_______________________________________________________________
-                ! increase vertical diffusion within monin obukov length to namelist
-                ! parameter pp_monob_Kv. pp_monob_Kv in moment set to 0.01 --> 
-                ! that means very strong vertical mixing within mixlength
-                do nz = 2,nlevels_nod2D(node)-1
-                    if(abs(zbar_3d_n(nz,node)) <= pp_monob_mixl(node)) then
-                        pp_Kv(nz,node) = pp_Kv(nz,node) + pp_monob_Kv
-                        pp_Av(nz,node) = pp_Av(nz,node) + pp_monob_Kv
-                    else 
-                        exit    
-                    end if 
-                end do 
-            end do    
-        end if 
-           
-        !_______________________________________________________________________
-        ! calculate and add latitudinal and depth dependend background 
-        ! diffusivity of Q. Wang from FESOM1.4
-        if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
-            do node = 1,node_size
-                do nz = 2,nlevels_nod2D(node)-1
-                    call Kv0_background_qiang(Kvb,                         &
-                                              geo_coord_nod2D(2,node)/rad, &
-                                              abs(zbar_3d_n(nz,node))      &
-                                              )
-                    pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
-                end do
-            end do
-        end if 
-        
-        !_______________________________________________________________________
-        ! enhance mixing in case of instable stratification  --> (N^2<0)
-        ! pp_instabmix_Kv=0.1_WP, pp_instabmix_Av=0.1_WP
-        if (pp_use_fesompp .and. pp_use_instabmix) then
-            do node = 1,node_size
-                do nz = 2,nlevels_nod2D(node)-1
-                    if (bvfreq(nz,node) < 0.0_WP) then 
-                        pp_Kv(nz,node)=max(pp_Kv(nz,node), pp_instabmix_Kv)
-                        pp_Av(nz,node)=max(pp_Av(nz,node), pp_instabmix_Av)
-                    end if 
-                end do
-            end do
-        end if
-        
-        !_______________________________________________________________________
-        ! add additional wind mixing for upper two layers --> otherwise PP mixing 
-        ! works insufficient --> solution here might be a bit nasty --> potential 
-        ! to improve
-        ! pp_windmix=1.e-3
-        if (pp_use_fesompp .and. pp_use_windmix) then
-            do node = 1,node_size
-                do nz = 2,nlevels_nod2D(node)-1
-                    if (nz <= windnl+1) then
-                        pp_Kv(nz,node)=max(pp_Kv(nz,node), pp_windmix)
-                        pp_Av(nz,node)=max(pp_Av(nz,node), pp_windmix)
-                    else
-                        exit
-                    end if 
-                end do
-            end do
-        end if
-        
+
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
         call exchange_nod(pp_Kv)
@@ -329,6 +254,5 @@ module g_cvmix_pp
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
-        
     end subroutine calc_cvmix_pp
 end module g_cvmix_pp

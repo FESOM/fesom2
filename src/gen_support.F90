@@ -2,7 +2,7 @@
 !1. smoothing FESOM fields using mass matrix
 !2. computing surface integrals of the FESOM fields
 module g_support
-  use o_mesh
+  USE MOD_MESH
   use g_parsup
   use g_comm_auto
   use o_ARRAYS
@@ -43,13 +43,15 @@ contains
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_nod2D(arr, N)
+subroutine smooth_nod2D(arr, N, mesh)
   IMPLICIT NONE
+  type(t_mesh), intent(in)                  , target :: mesh
   integer, intent(in)                        :: N
   real(KIND=WP), dimension(:), intent(inout) :: arr
   integer                                    :: node, elem, j, q, elnodes(3)
   real(kind=WP)                              :: vol
-  
+
+#include "associate_mesh.h"
   allocate(work_array(myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
      DO node=1, myDim_nod2D
@@ -73,15 +75,17 @@ end subroutine smooth_nod2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_nod3D(arr, N_smooth)
+subroutine smooth_nod3D(arr, N_smooth, mesh)
   IMPLICIT NONE
+  type(t_mesh), intent(in)      , target :: mesh
   integer, intent(in)            :: N_smooth
   real(KIND=WP), intent(inout)   :: arr(:,:)
 
   integer                        :: n, el, nz, j, q, num_el, nlev, nl_loc
-  real(kind=WP)                  :: vol(nl,myDim_nod2D)
+  real(kind=WP)                  :: vol(mesh%nl,myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
 
+#include "associate_mesh.h"
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
   
@@ -142,19 +146,19 @@ subroutine smooth_nod3D(arr, N_smooth)
   enddo
 
   deallocate(work_array)
-
 end subroutine smooth_nod3D
 
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_elem2D(arr, N)
+subroutine smooth_elem2D(arr, N, mesh)
     IMPLICIT NONE
+    type(t_mesh), intent(in)                  , target :: mesh
     integer, intent(in)                        :: N
     real(KIND=WP), dimension(:), intent(inout) :: arr
     integer                                    :: node, elem, j, q, elnodes(3)
     real(kind=WP)                              :: vol
-    
+#include "associate_mesh.h"    
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
         DO node=1, myDim_nod2D+eDim_nod2D
@@ -180,17 +184,18 @@ end subroutine smooth_elem2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_elem3D(arr, N)
+subroutine smooth_elem3D(arr, N, mesh)
   IMPLICIT NONE
+  type(t_mesh), intent(in)                    , target :: mesh
   integer, intent(in)                          :: N
   real(KIND=WP), dimension(:,:), intent(inout) :: arr
-  integer                                      :: node, elem, nl, nz, j, q, elnodes(3)
+  integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
   real(kind=WP)                                :: vol
-  
+#include "associate_mesh.h"  
   allocate(work_array(myDim_nod2D+eDim_nod2D))
-  nl=ubound(arr,1)
+  my_nl=ubound(arr,1)
   DO q=1, N !apply mass matrix N times to smooth the field
-     DO nz=1, nl
+     DO nz=1, my_nl
         DO node=1, myDim_nod2D+eDim_nod2D
            vol=0._WP
            work_array(node)=0._WP
@@ -217,18 +222,19 @@ end subroutine smooth_elem3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine integrate_nod_2D(data, int2D)
+subroutine integrate_nod_2D(data, int2D, mesh)
   use o_MESH
   use g_PARSUP
   use g_comm_auto
 
   IMPLICIT NONE
+  type(t_mesh),  intent(in)      , target :: mesh
   real(kind=WP), intent(in)       :: data(:)
   real(kind=WP), intent(inout)    :: int2D
 
   integer       :: row
   real(kind=WP) :: lval
-
+#include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
      lval=lval+data(row)*area(1,row)
@@ -241,17 +247,18 @@ end subroutine integrate_nod_2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine integrate_nod_3D(data, int3D)
-  use o_MESH
+subroutine integrate_nod_3D(data, int3D, mesh)
   use g_PARSUP
   use g_comm_auto
 
   IMPLICIT NONE
+  type(t_mesh),  intent(in)      , target :: mesh
   real(kind=WP), intent(in)       :: data(:,:)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
   real(kind=WP) :: lval
+#include "associate_mesh.h"
 
   lval=0.0_WP
   do row=1, myDim_nod2D
@@ -266,8 +273,9 @@ end subroutine integrate_nod_3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine extrap_nod3D(arr)
+subroutine extrap_nod3D(arr, mesh)
   IMPLICIT NONE
+  type(t_mesh),  intent(in)     , target :: mesh
   real(KIND=WP), intent(inout)   :: arr(:,:)
   integer                        :: n, nl1, nz, k, j, el, cnt, jj
   real(kind=WP), allocatable     :: work_array(:)
@@ -276,6 +284,7 @@ subroutine extrap_nod3D(arr)
   logical                        :: success
   real(kind=WP)                  :: loc_max, glob_max
 
+#include "associate_mesh.h"
 
   allocate(work_array(myDim_nod2D+eDim_nod2D))
   call exchange_nod(arr)

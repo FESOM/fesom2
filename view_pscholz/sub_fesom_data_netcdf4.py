@@ -1,11 +1,13 @@
 # Patrick Scholz, 23.01.2018
 import numpy as np
+import numpy.matlib
 import time
 import os
 from netCDF4 import Dataset, MFDataset
 from set_inputarray import *
 from sub_fesom_mesh import *
 import matplotlib.pyplot as plt
+import seawater as sw
 global inputarray
     
 #+_____________________________________________________________________________+
@@ -61,7 +63,29 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
                                   do_tmean=True,         \
                                   do_loadloop=False,     \
                                   do_rescale='auto',     \
+                                  do_interp_e2n=True,    \
+                                  do_vecrot=True,        \
                                   do_output=True):
+    #_______________________________________________________________________________
+    # plot depth
+    if data.var=='depth':
+        data.value 	= -mesh.nodes_2d_zg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Depth', 'm', 'wbgyr'
+        return data
+    #_______________________________________________________________________________
+    # plot triangle resolution interpolated to node
+    elif data.var=='triresol':
+        if len(mesh.nodes_2d_resol)==0: mesh.fesom_calc_triresol()
+        data.value 	= mesh.nodes_2d_resol
+        data.sname, data.lname, data.unit, data.cmap = 'triresol', 'Resolution', 'km', 'rygbw'
+        return data
+    #_______________________________________________________________________________
+    # plot triangle area interpolated to node
+    elif data.var=='triarea':
+        if len(mesh.nodes_2d_area)==0: mesh.fesom_calc_triarea()
+        data.value 	= mesh.nodes_2d_area
+        data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'cmocean.cm.balance'
+        return data
     
     #___________________________________________________________________________
     # number of years to average 
@@ -107,7 +131,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         
     #___________________________________________________________________________
     # do nessessary postprocesssing to rotate vectors, compute norm, set NaNs ...
-    data        = do_postprocess(mesh, data, do_rescale, do_output)
+    data        = do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output)
     
     #___________________________________________________________________________
     # add augmented periodic boundary
@@ -154,7 +178,7 @@ def do_multiyear_fname_list(data, which_files, do_output):
         
         #_______________________________________________________________________
         # build filename list for data variables
-        if any(x in data.var for x in ['norm','vec','ptemp','pdens']) or \
+        if any(x in data.var for x in ['norm','vec','ptemp','pdens','sigma']) or \
                     data.var in ['u','v','uice','vice'] :
             if   any(x in data.var for x in ['tuv']):
                 var_list = ['u', 'v', 'temp']
@@ -172,16 +196,36 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['uice', 'vice',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
-            
-            elif any(x in data.var for x in ['pdens','ptemp']):   
+            elif any(x in data.var for x in ['f_uwind','f_vwind','f_uvwind']):
+                var_list = ['f_uwind', 'f_vwind',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['uwind','vwind','uvwind']):
+                var_list = ['uwind', 'vwind',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['f_tx_sur','f_ty_sur','f_txy_sur']):
+                var_list = ['f_tx_sur', 'f_ty_sur',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['tx_sur','ty_sur','txy_sur']):
+                var_list = ['tx_sur', 'ty_sur',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['pdens','ptemp','sigma']):   
                 var_list = ['temp', 'salt',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
-            
-            else:
+            elif any(x in data.var for x in ['pgf_x','pgf_y','pgf_xy','pgf']):
+                var_list = ['pgf_x', 'pgf_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))    
+            elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            else:
+                print(' --> vector variable not defined')
             
         else:
             var_list = [data.var ,[],[]]
@@ -232,6 +276,7 @@ def do_filedims(fname_data,nyi,do_output):
 def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
                    nsi, ndi, do_tmean, do_output,):    
     if ndi!=0:
+        
         #_______________________________________________________________________
         # select time+depth range + compute time mean
         if do_tmean:
@@ -245,28 +290,42 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
         
         #_______________________________________________________________________
         # compute potential density & temperatur if selected
-        if any(x in data.var for x in ['pdens','ptemp']):
+        if any(x in data.var for x in ['pdens','ptemp','sigma']):
             dep   = np.matlib.repmat(mesh.zmid[sel_levidx],nsi,1)
-            lat   = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],nsi,1).transpose()
+            lat   = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],len(sel_levidx),1).transpose()
             press = sw.pres(dep,lat)
+            press_ref = 0
+            if   '0' in data.var : press_ref=0
+            elif '1' in data.var : press_ref=1000
+            elif '2' in data.var : press_ref=2000
+            elif '3' in data.var : press_ref=3000
+            elif '4' in data.var : press_ref=4000
+            elif '5' in data.var : press_ref=5000
+            if 'sigma' in data.var: data.lname = '$\sigma_{'+str(int(press_ref/1000))+'}$ '+data.lname
             del dep,lat
             if do_tmean:
-                if data.var=='ptemp': data.value = sw.ptmp(data.value2,data.value,press)
-                if data.var=='pdens': data.value = sw.pden(data.value2,data.value,press)-1000.025 
+                if 'ptemp' in data.var: data.value = sw.ptmp(data.value2,data.value,press,press_ref)
+                if any(x in data.var for x in ['pdens','sigma']): data.value = sw.pden(data.value2,data.value,press,press_ref)-1000.025 
             else:
                 for it in range(0,data.value.shape[0]):
-                    if data.var=='ptemp': data.value[it,:,:] = sw.ptmp(data.value2[it,:,:],data.value[it,:,:],press)
-                    if data.var=='pdens': data.value[it,:,:] = sw.pden(data.value2[it,:,:],data.value[it,:,:],press)-1000.025 
+                    if 'ptemp' in data.var: data.value[it,:,:] = sw.ptmp(data.value2[it,:,:],data.value[it,:,:],press,press_ref)
+                    if any(x in data.var for x in ['pdens','sigma']): data.value[it,:,:] = sw.pden(data.value2[it,:,:],data.value[it,:,:],press,press_ref)-1000.025 
             fname_list[1]=[]
             
         #_______________________________________________________________________    
         # compute depth mean + linear interpolation to selected depth levels
-        data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
-        if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
-        if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
+        if do_tmean:
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[0], sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[0], sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[0], sel_levidx,do_output)
+        else:
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[1], sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[1], sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[1], sel_levidx,do_output)
         
     # 2D data:
     else: 
+        
         if do_tmean:
             data.value = MFDataset(fname_list[0],'r').variables[var_list[0]][sel_timeidx,:].mean(axis=0)
             if len(fname_list[1]): data.value2 = MFDataset(fname_list[1],'r').variables[var_list[1]][sel_timeidx,:].mean(axis=0)
@@ -322,18 +381,26 @@ def do_load_dataloop(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, 
                 
         #_______________________________________________________________________
         # compute potential density & temperatur if selected
-        if any(x in data.var for x in ['pdens','ptemp']):
-            dep   = np.matlib.repmat(mesh.zmid[sel_levidx],nsi,1)
-            lat   = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],nsi,1).transpose()
-            press = sw.pres(dep,lat)
+        if any(x in data.var for x in ['pdens','ptemp','sigma']):
+            dep      = np.matlib.repmat(mesh.zmid[sel_levidx],nsi,1)
+            lat      = np.matlib.repmat(mesh.nodes_2d_yg[0:mesh.n2dn],nsi,1).transpose()
+            press    = sw.pres(dep,lat)
+            press_ref= 0
+            if   '0' in data.var : press_ref=0
+            elif '1' in data.var : press_ref=1000
+            elif '2' in data.var : press_ref=2000
+            elif '3' in data.var : press_ref=3000
+            elif '4' in data.var : press_ref=4000
+            elif '5' in data.var : press_ref=5000
+            if press_ref!=0: data.lname = '$\sigma_{'+str(int(press_ref/1000))+'}$ '+data.lname
             del dep,lat
             if do_tmean:
-                if data.var=='ptemp': data.value = sw.ptmp(data.value2,data.value,press)
-                if data.var=='pdens': data.value = sw.pden(data.value2,data.value,press)-1000.025 
+                if 'ptemp' in data.var: data.value = sw.ptmp(data.value2,data.value,press,press_ref)
+                if any(x in data.var for x in ['pdens','sigma']): data.value = sw.pden(data.value2,data.value,press,press_ref)-1000.025 
             else:
                 for it in range(0,data.value.shape[0]):
-                    if data.var=='ptemp': data.value[it,:,:] = sw.ptmp(data.value2[it,:,:],data.value[it,:,:],press)
-                    if data.var=='pdens': data.value[it,:,:] = sw.pden(data.value2[it,:,:],data.value[it,:,:],press)-1000.025 
+                    if 'ptemp' in data.var: data.value[it,:,:] = sw.ptmp(data.value2[it,:,:],data.value[it,:,:],press,press_ref)
+                    if any(x in data.var for x in ['pdens','sigma']): data.value[it,:,:] = sw.pden(data.value2[it,:,:],data.value[it,:,:],press,press_ref)-1000.025 
             fname_list[1]=[]
             
         #_______________________________________________________________________    
@@ -387,12 +454,13 @@ def do_fileattr(fname_data,data,var_list):
                 if attrname=='description' : data.lname = getattr(auxvariable, attrname)
                 if attrname=='units'       : data.unit  = '['+getattr(auxvariable, attrname)+']'
     if any(x in data.var for x in ['ptemp']): data.lname='potential temperature'
-    if any(x in data.var for x in ['pdens']): data.lname,data.unit='potential density','[kg/m^3]'
-    if any(x in data.var for x in ['tuv'  ]): data.lname='temperature advection'
-    if any(x in data.var for x in ['suv'  ]): data.lname='salt advection'  
+    if any(x in data.var for x in ['pdens','sigma']): data.lname,data.unit='potential density','[kg/m^3]'
+    if any(x in data.var for x in ['tuv'  ]): data.lname,data.unit='temperature advection', '[°C*m/s]'
+    if any(x in data.var for x in ['suv'  ]): data.lname,data.unit='salt advection', '[psu*m/s]'  
     if any(x in data.var for x in ['norm_uv'  ]): data.lname='norm of horizontal velocity'
     if any(x in data.var for x in ['norm_tuv','norm_suv']): data.lname='norm of horizontal '+data.lname
-    
+    if data.var == 'v' : data.lname='meridional velocity'
+    if data.var == 'u' : data.lname='zonal velocity'
     return(data)
 
 #___DO VERTICAL INTERPOLTION____________________________________________________
@@ -406,9 +474,17 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
         div      = np.zeros((nsi,)) 
         # valid_lay ... is interpolated layer valid [1.0 yes, 0.0 no ] 
         valid_lay= np.zeros((nsi,len(idepth))) 
+        
+        ndimax = mesh.nodes_2d_izg.max()-1
+        if ndi==mesh.nlev: ndimax = mesh.nodes_2d_izg.max()
+        
         for zi in range(0,len(idepth)):
-            if ndi!=mesh.nlev: auxidx = np.searchsorted(-mesh.zmid,idepth[zi])   
-            else:              auxidx = np.searchsorted(-mesh.zlev,idepth[zi])
+            if ndi!=mesh.nlev: 
+                auxidx = np.searchsorted(-mesh.zmid,idepth[zi])   
+            else: 
+                auxidx = np.searchsorted(-mesh.zlev,idepth[zi])
+            
+            if auxidx>ndimax: auxidx = ndimax
             if auxidx>0: auxidx = auxidx-1
             
             weight[zi,0], weight[zi,1] = sel_levidx.index(auxidx), sel_levidx.index(auxidx+1)
@@ -426,11 +502,13 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             div[isvalid] = div[isvalid]+1.0
             del isvalid    
             
-            if weight[zi,2]<0.0 or weight[zi,2]>1.0:
-                if do_output: print(' --> WARNING !!!   : no vert. extrap. supported! reset '+str(idepth[zi])+'m to nearest layer '+str(abs(depth[auxidx]))+'m')
+            if weight[zi,2]<0.0:
+                if do_output: print(' --> WARNING !!!   : no vert. extrap. supported! reset '+str(idepth[zi])+'m to nearest valid layer '+str(abs(depth[auxidx]))+'m')
                 weight[zi,2] = max([weight[zi,2],0.0])
-                weight[zi,2] = min([weight[zi,2],1.0])
-                
+            if weight[zi,2]>1.0:
+                if do_output: print(' --> WARNING !!!   : no vert. extrap. supported! reset '+str(idepth[zi])+'m to nearest valid layer '+str(abs(depth[auxidx+1]))+'m')
+                weight[zi,2] = min([weight[zi,2],1.0])    
+        
         #_______________________________________________________________________
         # compute depth interpolation
         if idata.ndim==2:
@@ -473,7 +551,7 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
 #___DO NECCESSARY POSTPROCESSING________________________________________________
 #
 #_______________________________________________________________________________
-def do_postprocess(mesh,data,do_rescale,do_output):
+def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
 
     # in case more than one variable has been loaded compute norm, vec, ...
     if any(x in data.var for x in ['tuv','suv']):
@@ -481,28 +559,34 @@ def do_postprocess(mesh,data,do_rescale,do_output):
         data.value3 = data.value3[mesh.elem0_2d_i].mean(axis=1)
         data.value, data.value2, data.value3 = data.value*data.value3, data.value2*data.value3, []
 
-    ## do vector rotation from ROT --> GEO in case of vector data        
-    if any(x in data.var for x in ['norm','vec']) or \
-       data.var in ['u','v','uice','vice']:
-        data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
-    
+    ## do vector rotation from ROT --> GEO in case of vector data   
+    if do_vecrot==True:
+        if any(x in data.var for x in ['norm','vec']) or \
+        data.var in ['u','v','uice','vice']:
+            data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
+        
     # compute norm of vector data
     if all(x in data.var for x in ['norm']):
         data.value, data.value2 = np.sqrt(data.value**2+data.value2**2),[]
     
     # only single velocity component is choosen
-    if data.var in ['u','uice']: data.value2 = []
+    if data.var in ['u','uice'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
     if data.var in ['v','vice']: data.value, data.value2  = data.value2, []
     
     # interpolate elemental values to nodes
-    if data.value.ndim==1 and data.value.shape[0]==mesh.n2de:
-        data.value = mesh.fesom_interp_e2n(np.array(data.value))
-    elif data.value.ndim>1 and (data.value.shape[0]==mesh.n2de or data.value.shape[1]==mesh.n2dea):
-        data.value = mesh.fesom_interp_e2n(np.array(data.value))
-        
+    if 'vec' not in data.var and do_interp_e2n==True:
+        if data.value.ndim==1 and data.value.shape[0]==mesh.n2de:
+            data.value = mesh.fesom_interp_e2n(np.array(data.value))
+            
+        elif data.value.ndim>1 and (data.value.shape[0]==mesh.n2de or data.value.shape[1]==mesh.n2dea):
+            data.value = mesh.fesom_interp_e2n(np.array(data.value))
+            
     # customise sea ice variables
     if data.var in ['a_ice']        : data.value = data.value * 100.0
-    if data.var in ['a_ice','m_ice']: data.value[data.value<=0.0]=np.nan
+    #if data.var in ['a_ice','m_ice']: data.value[data.value<=0.0]=np.nan
+    
+    # change sign of mixed layer depth from negativ to positve
+    if 'mld' in data.var.lower(): data.value = -data.value
     
     # cutoff exponentials --> add therefore string to unit parameter
     if do_rescale=='auto':
@@ -513,7 +597,7 @@ def do_postprocess(mesh,data,do_rescale,do_output):
             if any(x in data.var for x in ['vec']): data.value2 = data.value2/scal
             data.unit  = ' $ \cdot 10^{'+str(int(np.log10(scal)))+'} $'+data.unit
     elif do_rescale=='log10':
-        data.value = np.log10(data.value)
+        data.value[data.value!=0.0] = np.log10(data.value[data.value!=0.0])
         data.rescale='log10'
         if any(x in data.var for x in ['vec']): data.value2 = np.log10(data.value2)
         data.unit  = ' log10() '+data.unit
@@ -526,26 +610,38 @@ def do_postprocess(mesh,data,do_rescale,do_output):
 def do_pbnd_augmentation(mesh, data, nti, ndi, do_tmean):
     if len(data.depth)!=0 or ndi==0:
         if do_tmean or nti==1: 
-            if data.value.shape[0]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i]))
+            if data.value.shape[0]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i]))
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndn_2d_i]))
             if data.value.shape[0]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[mesh.pbndtri_2d_i]))
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndtri_2d_i]))
         else:
-            if data.value.shape[1]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i]),axis=1)
+            if data.value.shape[1]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i]),axis=1)
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndn_2d_i]),axis=1)
             if data.value.shape[1]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[:,mesh.pbndtri_2d_i]),axis=1)
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndtri_2d_i]),axis=1)
     else:
         if do_tmean or nti==1:
-            if data.value.shape[0]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i,:]))
+            if data.value.shape[0]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[mesh.pbndn_2d_i,:]))
+                if any(x in data.var for x in ['vec']):
+                    data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndn_2d_i,:]))
             if data.value.shape[0]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[mesh.pbndtri_2d_i,:]))
                 if any(x in data.var for x in ['vec']): 
                     data.value2 = np.concatenate((data.value2,data.value2[mesh.pbndtri_2d_i,:]))    
         else:
-            if data.value.shape[1]==mesh.n2dn: data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i,:]),axis=1)
+            if data.value.shape[1]==mesh.n2dn: 
+                data.value = np.concatenate((data.value,data.value[:,mesh.pbndn_2d_i,:]),axis=1)
+                if any(x in data.var for x in ['vec']): 
+                    data.value2 = np.concatenate((data.value2,data.value2[:,mesh.pbndn_2d_i,:]),axis=1)
             if data.value.shape[1]==mesh.n2de: 
                 data.value = np.concatenate((data.value,data.value[:,mesh.pbndtri_2d_i,:]), axis=1)
                 if any(x in data.var for x in ['vec']): 
@@ -569,7 +665,7 @@ def do_descriptstr(data,nyi,nmi,nti,ndi):
             str_time_1 = 'y: '+str(data.year[0])+'-'+str(data.year[1])
             
         # month info 
-        if nmi == 1 and nrec>=12:
+        if nmi == 1 and nti>=12:
             str_time_1 = str_time_1+' ['+mon_list2[np.array(data.month)-1][0]+']'
         elif nmi>1 and nmi<12 and nti>=12:
             str_mon=''
@@ -595,26 +691,42 @@ def do_select_levidx(mesh,data,ndi,do_output):
     sel_levidx = []
     if ndi!=0 : # deal with 3d data
         # select all depth layers
-        if len(data.depth) == 0 :     
+        if len(data.depth) == 0 :    
             sel_levidx = list(range(0,ndi))
         # select single depth level --> still need interpolation so two depth 
         # indices have to be selected   
         elif len(data.depth) == 1 :  
             # variable is on full depth levels
             if ndi==mesh.nlev:
+                #ndimax     = mesh.zlev.size-1
+                ndimax     = mesh.nodes_2d_izg.max()
                 auxidx     = np.searchsorted(-mesh.zlev,data.depth[0])
+                
             # variable is on mid-depth levels    
             else:
+                #ndimax     = mesh.zmid.size-1
+                ndimax     = mesh.nodes_2d_izg.max()-1
                 auxidx     = np.searchsorted(-mesh.zmid,data.depth[0])
-            if auxidx>=1 : sel_levidx = [auxidx-1,auxidx]
-            else         : sel_levidx = [auxidx,auxidx+1]    
+               
+            if   auxidx>ndimax : sel_levidx = [ndimax-1,ndimax]       
+            elif auxidx>=1     : sel_levidx = [auxidx-1,auxidx]
+            else               : sel_levidx = [auxidx,auxidx+1]    
+            
             del auxidx
         
         # select a range for depth levels that have to be interpolated
         elif len(data.depth) >= 2:
             sel_levidx=[]
+            
+            ndimax = mesh.nodes_2d_izg.max()-1
+            if ndi==mesh.nlev: ndimax = mesh.nodes_2d_izg.max()
+            
             for aux in data.depth:
-                auxidx     = np.searchsorted(-mesh.zmid,aux)
+                if ndi==mesh.nlev:
+                    auxidx     = np.searchsorted(-mesh.zlev,aux)
+                else:
+                    auxidx     = np.searchsorted(-mesh.zmid,aux)
+                if auxidx>ndimax and ndimax not in sel_levidx: sel_levidx.append(ndimax)    
                 if auxidx>=1 and auxidx-1 not in sel_levidx: sel_levidx.append(auxidx-1)
                 if (auxidx not in sel_levidx): sel_levidx.append(auxidx)
                 if (auxidx==0 and 1 not in sel_levidx): sel_levidx.append(auxidx+1)
@@ -690,6 +802,8 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
 #_______________________________________________________________________________
 def fesom_data_anom(data,data2):
     anom = fesom_data([])
+    
+    anom.which_obj = 'data'
     
     #____data run variables______________________
     if data.var!=data2.var:

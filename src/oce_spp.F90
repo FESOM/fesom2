@@ -8,10 +8,10 @@
 ! Ref: Duffy1997, Duffy1999, Nguyen2009
 ! Originaly coded by Qiang Wang in FESOM 1.4 
 !--------------------------------------------------------
-subroutine cal_rejected_salt
+subroutine cal_rejected_salt(mesh)
 use g_parsup
 use o_arrays
-use o_mesh
+use mod_mesh
 use g_comm_auto
 use o_tracers
 use g_forcing_arrays, only: thdgr
@@ -22,6 +22,9 @@ implicit none
 
 integer         :: row
 real(kind=WP)   :: aux
+type(t_mesh), intent(in), target :: mesh
+
+#include  "associate_mesh.h"
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
@@ -33,14 +36,15 @@ do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
       ice_rejected_salt(row)=0.0_WP
    end if
 end do
+
 end subroutine cal_rejected_salt
 !
 !----------------------------------------------------------------------------
 !
-subroutine app_rejected_salt
+subroutine app_rejected_salt(mesh)
   use g_parsup
   use o_arrays
-  use o_mesh
+  use mod_mesh
   use g_comm_auto
   use o_tracers
   implicit none
@@ -53,6 +57,10 @@ subroutine app_rejected_salt
   data drhodz_cri /0.01_WP/  !kg/m3/m  !NH   !Nguyen2011
   data n_distr /5/
   data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
+
+  type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
 
   do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
      if (ice_rejected_salt(row)<=0.0_WP) cycle
@@ -79,4 +87,5 @@ subroutine app_rejected_salt
         endif
       endif
   end do
+
 end subroutine app_rejected_salt

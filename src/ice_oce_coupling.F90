@@ -1,12 +1,12 @@
 !
 !======================================================================================
 !
-subroutine oce_fluxes_mom
+subroutine oce_fluxes_mom(mesh)
   ! transmits the relevant fields from the ice to the ocean model
   !
   use o_PARAM
   use o_ARRAYS
-  use o_MESH
+  use MOD_MESH
   use i_ARRAYS
   use g_PARSUP
   use i_PARAM
@@ -14,9 +14,12 @@ subroutine oce_fluxes_mom
   use g_comm_auto
   implicit none
   
-  integer                 :: n, elem, elnodes(3),n1
-  real(kind=WP)           :: aux, aux1
- 
+  integer                  :: n, elem, elnodes(3),n1
+  real(kind=WP)            :: aux, aux1
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+
  ! ==================
   ! momentum flux:
   ! ==================
@@ -41,21 +44,25 @@ end subroutine oce_fluxes_mom
 !
 !======================================================================================
 !
-subroutine ocean2ice
+subroutine ocean2ice(mesh)
   
   ! transmits the relevant fields from the ocean to the ice model
 
   use o_PARAM
   use o_ARRAYS
   use i_ARRAYS
-  use o_MESH
+  use MOD_MESH
   use g_PARSUP
   USE g_CONFIG
   use g_comm_auto
   implicit none
 
+  type(t_mesh), intent(in) , target :: mesh
   integer :: n, elem, k
   real(kind=WP) :: uw,vw
+
+#include  "associate_mesh.h"
+
   ! the arrays in the ice model are renamed
      
 if (ice_update) then
@@ -77,7 +84,7 @@ endif
        uw=0.0_WP
        vw=0.0_WP
        DO k=1, nod_in_elem2D_num(n)
-          elem=nod_in_elem2D(k,n)          
+          elem=nod_in_elem2D(k,n)
           uw = uw+ UV(1,1,elem)*elem_area(elem)
           vw = vw+ UV(2,1,elem)*elem_area(elem)
        END DO
@@ -97,8 +104,8 @@ end subroutine ocean2ice
 !
 !======================================================================================
 !
-subroutine oce_fluxes
-  use o_MESH,          only: ocean_area
+subroutine oce_fluxes(mesh)
+  use MOD_MESH
   USE g_CONFIG
   use o_ARRAYS
   use i_ARRAYS
@@ -110,9 +117,12 @@ subroutine oce_fluxes
   use i_therm_param
 
   implicit none
+  type(t_mesh), intent(in)   , target :: mesh
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
+
+#include  "associate_mesh.h"
 
   allocate(flux(myDim_nod2D+eDim_nod2D))
   ! ==================
@@ -180,7 +190,7 @@ subroutine oce_fluxes
        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
   end if     
   
-  call integrate_nod(flux, net)
+  call integrate_nod(flux, net, mesh)
   ! here the + sign must be used because we switched up the sign of the 
   ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
   ! have there original sign
@@ -188,16 +198,16 @@ subroutine oce_fluxes
 
   ! 2. virtual salt flux
   if (use_virt_salt) then ! is already zero otherwise
-     call integrate_nod(virtual_salt, net)
+     call integrate_nod(virtual_salt, net, mesh)
      virtual_salt=virtual_salt-net/ocean_area
   end if
 
   ! 3. restoring to SSS climatology
-  call integrate_nod(relax_salt, net)
+  call integrate_nod(relax_salt, net, mesh)
   relax_salt=relax_salt-net/ocean_area
 
   deallocate(flux)
-  if (use_sw_pene) call cal_shortwave_rad
+  if (use_sw_pene) call cal_shortwave_rad(mesh)
 end subroutine oce_fluxes
 !
 !======================================================================================

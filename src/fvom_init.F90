@@ -12,13 +12,16 @@
 !> Main driver routine for initialization
 program MAIN
   use o_PARAM
+  use MOD_MESH
   use o_MESH
   use g_PARSUP
   use g_CONFIG
   use g_rotate_grid
   implicit none
-  character(len=1000)   :: nmlfile  !> name of configuration namelist file
-  integer               :: start_t, interm_t, finish_t, rate_t
+  character(len=1000)         :: nmlfile  !> name of configuration namelist file
+  integer                     :: start_t, interm_t, finish_t, rate_t
+  type(t_mesh), target, save  :: mesh
+
   call system_clock(start_t, rate_t)
   interm_t = start_t
   
@@ -30,33 +33,32 @@ program MAIN
   close (20)
   cyclic_length=cyclic_length*rad 
   call set_mesh_transform_matrix  !(rotated grid) 
-!!$  call par_init
-  call read_mesh_ini
+  call read_mesh_ini(mesh)
   call system_clock(finish_t)
   print '("**** Reading initial mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
-  call test_tri_ini
-  call find_edges_ini
-  call find_elem_neighbors_ini
-  call find_levels
+  call test_tri_ini(mesh)
+  call find_edges_ini(mesh)
+  call find_elem_neighbors_ini(mesh)
+  call find_levels(mesh)
 
 ! NR Some arrays are not needed for partitioning, after setting up the grid
-  deallocate(coord_nod2D)
-  deallocate(edge_tri)
-  deallocate(zbar,Z,nlevels,depth)
+  deallocate(mesh%coord_nod2D)
+  deallocate(mesh%edge_tri)
+  deallocate(mesh%zbar,mesh%Z,mesh%nlevels,mesh%depth)
   call system_clock(finish_t)
   print '("**** Checking and initializing mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
 
-  call stiff_mat_ini
-  call set_par_support_ini
+  call stiff_mat_ini(mesh)
+  call set_par_support_ini(mesh)
   call system_clock(finish_t)
   print '("**** Partitioning time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
-  call communication_ini
+  call communication_ini(mesh)
   call system_clock(finish_t)
   print '("**** Storing partitioned mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
@@ -66,8 +68,8 @@ end program MAIN
 !=============================================================================
 !> @brief
 !> Reads mesh files 
-subroutine read_mesh_ini
-USE o_MESH
+subroutine read_mesh_ini(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE g_PARSUP
 use g_CONFIG
@@ -75,47 +77,51 @@ use g_rotate_grid
 !
 IMPLICIT NONE
 !
-INTEGER               :: nq
-INTEGER               :: n1,n2,n3
-INTEGER               :: n, nz, exit_flag
-REAL(kind=WP)         :: x1, x2
-INTEGER	              :: tag
-INTEGER, allocatable  :: elem_data(:)
-INTEGER               :: i_error
+type(t_mesh), intent(inout), target :: mesh
+INTEGER                             :: nq
+INTEGER                             :: n1,n2,n3
+INTEGER                             :: n, nz, exit_flag
+REAL(kind=WP)                       :: x1, x2
+INTEGER	                            :: tag
+INTEGER, allocatable                :: elem_data(:)
+INTEGER                             :: i_error
+#include "associate_mesh_ini.h"
 ! ===================
 ! Surface mesh
 ! ===================
   open (20,file=trim(meshpath)//'nod2d.out', status='old')
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
-  READ(20,*) nod2D
-  ALLOCATE(coord_nod2D(2,nod2D))
+  READ(20,*) mesh%nod2D
+  ALLOCATE(mesh%coord_nod2D(2,mesh%nod2D)) 
+  coord_nod2D => mesh%coord_nod2D !required after the allocation, otherwise the pointer remains undefined
     
-  do n=1,nod2D
+  do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
      if (force_rotation) then
         call g2r(x1*rad, x2*rad, x1, x2)
         x1=x1/rad
         x2=x2/rad
      end if      
-     coord_nod2D(1,nq)=x1*rad
-     coord_nod2D(2,nq)=x2*rad
+     mesh%coord_nod2D(1,nq)=x1*rad
+     mesh%coord_nod2D(2,nq)=x2*rad
   end do
   CLOSE(20) 
       
-  READ(21,*)  elem2D    
-  ALLOCATE(elem2D_nodes(4,elem2D))
-  ALLOCATE(elem_data(4*elem2D))
+  READ(21,*)  mesh%elem2D    
+  ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
+  elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
+  ALLOCATE(elem_data(4*mesh%elem2D))
   elem_data(:)=-1
   
   ! meshes with quads have 4 columns, but TsunAWI grids may be
   ! purely triangular, with 3 columns each. Test, how many
   ! columns there are!  
-  read(21,*,iostat=i_error) elem_data(1:4*elem2D)
+  read(21,*,iostat=i_error) elem_data(1:4*mesh%elem2D)
   if (i_error == 0) then      ! There is a fourth column => quad or mixed mesh (not working yet!)
-     elem2D_nodes = reshape(elem_data, shape(elem2D_nodes))
+     mesh%elem2D_nodes = reshape(elem_data, shape(mesh%elem2D_nodes))
   else     ! No fourth column => triangles only
-     elem2D_nodes(1:3,:) = reshape(elem_data, shape(elem2D_nodes(1:3,:)))
-     elem2D_nodes(4,:) = elem2D_nodes(1,:)
+     mesh%elem2D_nodes(1:3,:) = reshape(elem_data, shape(mesh%elem2D_nodes(1:3,:)))
+     mesh%elem2D_nodes(4,:)   = mesh%elem2D_nodes(1,:)
   end if
      
   deallocate(elem_data)
@@ -136,14 +142,16 @@ END SUBROUTINE read_mesh_ini
 !> @brief 
 !> Check the order of nodes in triangles; correct it if necessary to make
 !! it same sense (clockwise) 
-SUBROUTINE test_tri_ini
-USE o_MESH
+SUBROUTINE test_tri_ini(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
-real(kind=WP)   ::  a(2), b(2), c(2),  r
-integer         ::  n, nx, elnodes(3)
 
+real(kind=WP)                       ::  a(2), b(2), c(2),  r
+integer                             ::  n, nx, elnodes(3)
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
    
    DO n=1, elem2D
       elnodes=elem2D_nodes(1:3,n)
@@ -169,24 +177,25 @@ integer         ::  n, nx, elnodes(3)
 	  elem2D_nodes(1:3,n)=elnodes
       end if
    END DO
-
 END SUBROUTINE  test_tri_ini
 !=========================================================================
 !> @brief
 !> Finds edges. Creates 3 files: edgenum.out, edges.out, edge_tri.out
-SUBROUTINE find_edges_ini
+SUBROUTINE find_edges_ini(mesh)
+USE MOD_MESH
 USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:)
-!!$integer, allocatable, dimension(:,:)  :: auxne, auxnn
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
 integer                               :: elnodes(4), ed(2), flag, eledges(4)
 integer                               :: temp(100), node 
 real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 ! ====================
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
@@ -215,7 +224,7 @@ END DO                 ! neighbor elements are found
 ! connected by edges!
 allocate(aux1(nod2D))                   
 aux1=0
- 
+
 DO n=1, nod2D
     counter=0
     DO k=1, ne_num(n)
@@ -314,8 +323,12 @@ deallocate(aux1)
  end do
  edge2D=counter
 
- allocate(edges(2,edge2D), edge_tri(2, edge2D))
+ allocate(mesh%edges   (2, edge2D))
+ allocate(mesh%edge_tri(2, edge2D))
+ edges    => mesh%edges    !required after the allocation, otherwise the pointer remains undefined
+ edge_tri => mesh%edge_tri !required after the allocation, otherwise the pointer remains undefined
  counter_in=0 
+
  DO n=1,nod2D
     DO q=2,nn_num(n)
        node=nn_pos(q,n)
@@ -350,7 +363,7 @@ deallocate(aux1)
     END DO
  END DO
  edge2D_in=counter_in
- 
+
  ! Repeat to collect boundary edges:   
  counter=0
  DO n=1,nod2D
@@ -401,7 +414,7 @@ deallocate(aux1)
        edge_tri(1,n)=elem1
        edge_tri(2,n)=elem
     endif
-    call elem_center(edge_tri(1,n), xc(1), xc(2))
+    call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
     if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
@@ -430,7 +443,8 @@ deallocate(aux1)
  ! (e) We need an array inverse to edge_tri listing edges
  ! of a given triangle 
  ! ====================
- allocate(elem_edges(4,elem2D))
+ allocate(mesh%elem_edges(4,elem2D))
+ elem_edges => mesh%elem_edges !required after the allocation, otherwise the pointer remains undefined
  allocate(aux1(elem2D))
  aux1=0
  DO n=1, edge2D
@@ -496,9 +510,9 @@ END SUBROUTINE find_edges_ini
 !> Does some thresholding: if (depth>zbar(4)) x=zbar(4)
 !> Fixes rough topography, by converting some oceans cells to ground cell(reflected by changing levels arrays)
 !> Creates 2 files: elvls.out, nlvls.out
-subroutine find_levels
+subroutine find_levels(mesh)
 use g_config
-use o_mesh
+use mod_mesh
 use g_parsup
 implicit none
 INTEGER :: nodes(3), elems(3), eledges(3)
@@ -506,15 +520,21 @@ integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=
 real(kind=WP) :: x,dmean
 integer :: thers_lev=5
 character*200 :: file_name
-ALLOCATE(depth(nod2D))
-        
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+
+ALLOCATE(mesh%depth(nod2D))
+depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
 file_name=trim(meshpath)//'aux3d.out'
 open(fileID, file=file_name)
 read(fileID,*) nl          ! the number of levels 
-allocate(zbar(nl))         ! their standard depths
+allocate(mesh%zbar(nl))         ! their standard depths
+zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
 read(fileID,*) zbar
 if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
-allocate(Z(nl-1))
+allocate(mesh%Z(nl-1))
+Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
 Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
 Z=0.5_WP*Z
 DO n=1,nod2D
@@ -528,9 +548,10 @@ close(fileID)
 if(depth(2)>0) depth=-depth  ! depth is negative
 
 
-allocate(nlevels(elem2D))
-allocate(nlevels_nod2D(nod2D))
-
+allocate(mesh%nlevels(elem2D))
+nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
+allocate(mesh%nlevels_nod2D(nod2D))
+nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
 ! ===================
 ! Compute the number of levels
@@ -628,8 +649,8 @@ endif
 end subroutine find_levels
 !===================================================================
 
-subroutine edge_center(n1, n2, x, y)
-USE o_MESH
+subroutine edge_center(n1, n2, x, y, mesh)
+USE MOD_MESH
 USE g_CONFIG
 !
 ! Returns coordinates of edge center in x and y
@@ -637,6 +658,8 @@ USE g_CONFIG
 implicit none
 integer       :: n1, n2   ! nodes of the edge
 real(kind=WP) :: x, y, a(2), b(2)
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
 a=coord_nod2D(:,n1)
 b=coord_nod2D(:,n2)
@@ -646,15 +669,17 @@ x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
 end subroutine edge_center
 !====================================================================
-subroutine elem_center(elem, x, y)
+subroutine elem_center(elem, x, y, mesh)
 !
 ! Returns coordinates of elem center in x and y
 !
-USE o_MESH
+USE MOD_MESH
 USE g_CONFIG
 implicit none
 integer       :: elem, elnodes(3), k    
 real(kind=WP) :: x, y, ax(3), amin
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
    elnodes=elem2D_nodes(1:3,elem)
    ax=coord_nod2D(1, elnodes)
@@ -667,13 +692,17 @@ real(kind=WP) :: x, y, ax(3), amin
    
 end subroutine elem_center
 !=======================================================================
-SUBROUTINE find_elem_neighbors_ini
+SUBROUTINE find_elem_neighbors_ini(mesh)
 ! For each element three its element neighbors are found
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
-allocate(elem_neighbors(4,elem2D))
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+allocate(mesh%elem_neighbors(4,elem2D))
+elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
 elem_neighbors=0
 DO elem=1,elem2D
    
@@ -733,13 +762,15 @@ END DO
  ! To facilitate computations the neibourhood
  ! information is assembled
  ! =============	 
- allocate(nod_in_elem2D_num(nod2D))
+ allocate(mesh%nod_in_elem2D_num(nod2D))
+ nod_in_elem2D_num => mesh%nod_in_elem2D_num !required after the allocation, otherwise the pointer remains undefined
  nod_in_elem2D_num=0
  do n=1,elem2D
     elnodes=elem2D_nodes(1:3,n)
     nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
  end do
- allocate(nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ nod_in_elem2D => mesh%nod_in_elem2D
  nod_in_elem2D=0
  
  nod_in_elem2D_num=0
@@ -753,17 +784,20 @@ END DO
 END SUBROUTINE find_elem_neighbors_ini
 !===================================================================
 ! Stiffness matrix for the elevation
-subroutine stiff_mat_ini
-  use o_MESH
+subroutine stiff_mat_ini(mesh)
+  use MOD_MESH
   
   !
   implicit none
   integer                :: i, j, n, q, el, elem_nodes_max, nod(4)
   integer, allocatable   :: num_ne(:), ne(:,:)
   !
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ssh_stiff%dim = nod2D   
-  allocate(ssh_stiff%rowptr(nod2D+1))
+  allocate(mesh%ssh_stiff%rowptr(nod2D+1))
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
 
   allocate(num_ne(nod2D), ne(MAX_ADJACENT,nod2D))
   num_ne(:)           = 0
@@ -807,6 +841,9 @@ subroutine stiff_mat_ini
   end do
 
   allocate(ssh_stiff%colind(ssh_stiff%rowptr(nod2D+1)-1))  
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
+
+  !required after the allocation, otherwise the pointer remains undefined
   do n=1,nod2D
      ssh_stiff%colind(ssh_stiff%rowptr(n):ssh_stiff%rowptr(n+1)-1) = ne(1:num_ne(n),n)
   end do
@@ -817,8 +854,8 @@ end subroutine stiff_mat_ini
 
 !===================================================================
 ! Setup of communication arrays
-subroutine communication_ini
-  use o_MESH
+subroutine communication_ini(mesh)
+  use MOD_MESH
   USE g_CONFIG
   USE g_PARSUP
   use omp_lib
@@ -828,6 +865,8 @@ subroutine communication_ini
   character*10   :: npes_string
   character*200  :: dist_mesh_dir
   LOGICAL        :: L_EXISTS
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ! Create the distributed mesh subdirectory
   write(npes_string,"(I10)") npes
@@ -848,29 +887,29 @@ subroutine communication_ini
 !$OMP DO
   do n = 0, npes-1
      mype = n ! mype is threadprivate and must not be iterator
-     call communication_nodn
-     call communication_elemn
-
-     call save_dist_mesh         ! Write out communication file com_infoxxxxx.out
+     call communication_nodn(mesh)
+     call communication_elemn(mesh)
+     call save_dist_mesh(mesh)         ! Write out communication file com_infoxxxxx.out
   end do
 !$OMP END DO
 !$OMP END PARALLEL
 
-  deallocate(elem_neighbors)
-  deallocate(elem_edges)
+  deallocate(mesh%elem_neighbors)
+  deallocate(mesh%elem_edges)
   deallocate(part)
   write(*,*) 'Communication arrays have been set up'   
 end subroutine communication_ini
 !=================================================================
-subroutine set_par_support_ini
+subroutine set_par_support_ini(mesh)
   use g_PARSUP
   use iso_c_binding, only: idx_t=>C_INT32_T
-  use o_MESH
+  use MOD_MESH
   use g_config
   implicit none
 
   integer         :: n, j, k, nini, nend, ierr
   integer(idx_t)  :: np(10)
+  type(t_mesh), intent(inout), target :: mesh
 
   interface 
      subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
@@ -879,6 +918,7 @@ subroutine set_par_support_ini
        integer(idx_t), intent(out) :: part(*)
      end subroutine partit
   end interface
+#include "associate_mesh_ini.h"
 
   ! Construct partitioning vector
   if (n_levels<1 .OR. n_levels>10) then
@@ -904,23 +944,23 @@ subroutine set_par_support_ini
      stop
   end if
   
-  write(*,*) 'Calling partit'
+  write(*,*) 'Calling partit for npes=', np
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-  call check_partitioning
+  call check_partitioning(mesh)
 
   write(*,*) 'Partitioning is done.'
 
 ! The stiffness matrix is no longer needed. 
-  deallocate(ssh_stiff%rowptr)
-  deallocate(ssh_stiff%colind)
+  deallocate(mesh%ssh_stiff%rowptr)
+  deallocate(mesh%ssh_stiff%colind)
         
   !NR No longer needed - last use was as weight for partitioning
-  deallocate(nlevels_nod2D)
+  deallocate(mesh%nlevels_nod2D)
 end subroutine set_par_support_ini
 !=======================================================================
-subroutine check_partitioning
+subroutine check_partitioning(mesh)
 
   ! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
   !   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
@@ -933,7 +973,7 @@ subroutine check_partitioning
   ! This routine checks for isolated nodes and moves them to an adjacent partition,
   ! trying not to spoil the load balance.
 
-  use o_MESH
+  use MOD_MESH
   use g_PARSUP
   integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
   integer :: nod_per_partition(2,0:npes-1)
@@ -943,6 +983,8 @@ subroutine check_partitioning
 
   integer :: max_adjacent_nodes
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ! Check load balancing
   do i=0,npes-1
