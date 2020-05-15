@@ -135,7 +135,7 @@ subroutine thermodynamics(mesh)
      ! energy fluxes ---!
      t                   = ice_temp(inod)
      if(A>Aimin) then
-        call ice_surftemp(max(h,0.05)/(max(A,Aimin)),hsn/(max(A,Aimin)),a2ihf,t)
+        call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
         ice_temp(inod) = t
      else
         ice_temp(inod) = 275.15_WP
@@ -465,7 +465,7 @@ contains
 
 
   snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
-  zsniced=MAX(h,hmin)+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
+  zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
   zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]

@@ -222,7 +222,7 @@ contains
 
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
-    real(kind=WP), allocatable :: all_elem_area(:,:)    
+    real(kind=WP), allocatable :: all_area(:,:)    
 
 #include "associate_mesh.h"
 
@@ -304,11 +304,11 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_elem_area(number_of_all_points, 1))
+      ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
-      ALLOCATE(all_elem_area(1, 1))
+      ALLOCATE(all_area(1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -331,7 +331,7 @@ contains
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(elem_area, my_number_of_points, MPI_DOUBLE_PRECISION, all_elem_area,  &
+    CALL MPI_GATHERV(area, my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
@@ -358,7 +358,7 @@ contains
           DEALLOCATE(unstr_mask)
 
           print *, 'FESOM before write area'
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_elem_area)
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
 
        end if
       print *, 'FESOM before terminate_grids_writing'
