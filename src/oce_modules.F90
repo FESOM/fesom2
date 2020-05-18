@@ -145,7 +145,7 @@ character(20)                  :: which_pgf='shchepetkin'
 
 
  NAMELIST /oce_dyn/ C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
-                    Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
+                    scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option
