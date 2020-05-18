@@ -293,7 +293,10 @@ neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
 allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
-
+if (use_global_tides) then
+   allocate(ssh_gp(node_size))
+   ssh_gp=0.
+end if
 ! xy gradient of a neutral surface
 allocate(sigma_xy(2, nl-1, node_size))
 sigma_xy=0.0_WP

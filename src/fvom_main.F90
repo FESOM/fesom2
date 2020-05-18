@@ -21,6 +21,7 @@ use io_RESTART
 use io_MEANDATA
 use io_mesh_info
 use diagnostics
+use mo_tidal
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -160,7 +161,13 @@ type(t_mesh), target, save      :: mesh
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
     !___MODEL TIME STEPPING LOOP________________________________________________
+    if (use_global_tides) then
+       call foreph_ini(yearnew, month)
+    end if
     do n=1, nsteps        
+        if (use_global_tides) then
+           call foreph(mesh)
+        end if
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='
