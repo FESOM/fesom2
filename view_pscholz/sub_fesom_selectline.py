@@ -666,7 +666,7 @@ class fesom_line:
     #|                                                                         |
     #+_________________________________________________________________________+
     # interpolate line points on fesom data
-    def interp_lines_reg(self,radius_of_influence=100000, k=10, n_jobs=2 ):
+    def interp_lines_reg(self,radius_of_influence=100000, k=3, n_jobs=2 ):
         
         #_______________________________________________________________________
         bckp_value,bckp_value2,bckp_value3 = [],[],[]
@@ -767,6 +767,37 @@ class fesom_line:
             self.bottom.append([])
             self.bottom[ii]=bottom 
 
+    #+_________________________________________________________________________+
+    #|                                                                         |
+    #+_________________________________________________________________________+
+    # interpolate line points on fesom data
+    def interp_vert(self,levels):
+        data_out = np.zeros((len(self.line_interp_pm[0][0]),levels.size))
+        for di in range(0,len(levels)):
+            # find upper and lower layer indices
+            #idx_dwn = np.array(np.where( data.depth[di]<=abs(mesh.zlev))).squeeze()
+            idx_dwn = np.array(np.where( abs(levels[di])<=abs(self.zlev))).squeeze()
+            if len(idx_dwn)==0: idx_dwn=[len(self.zlev)-1]
+            idx_dwn = idx_dwn[0]
+            idx_up  = idx_dwn-1
+            if idx_up<0: idx_up=0
+            
+            # linear vertical interpolant
+            deltaz   = abs(self.zlev[idx_dwn])-abs(self.zlev[idx_up])
+            #deltaz_i = abs(mesh.zlev[idx_dwn])-data.depth[di]
+            deltaz_i = abs(self.zlev[idx_dwn])-abs(levels[di])
+            
+            # interpoalte verticaly and sum up
+            if deltaz_i==0:
+                auxval = self.value[0][:,idx_dwn]
+            else:
+                auxval = self.value[0][:,idx_dwn]-(self.value[0][:,idx_dwn]-self.value[0][:,idx_up])*deltaz_i/deltaz
+                
+            #aux_div[~np.isnan(auxval)]=aux_div[~np.isnan(auxval)]+1.0
+            #auxval[np.isnan(auxval)]=0.0
+            data_out[:,di] = auxval
+        self.value[0] = data_out
+        
     #+_________________________________________________________________________+
     #|                                                                         |
     #+_________________________________________________________________________+
@@ -871,7 +902,7 @@ class fesom_line:
     #|                                                                         |
     #+_________________________________________________________________________+
     # calculate fluxes through section
-    def data_anom(self, line, line2):
+    def data_anom(self, line2, line):
         self.descript     = line2.descript+'-'+line.descript
         if line.str_time!=line2.str_time:
             self.str_time = line2.str_time+'-'+line.str_time
@@ -1110,20 +1141,41 @@ class fesom_line:
                 cbar = plt.colorbar(hp,ax=[ax1],cax=cax,ticks=clevel,drawedges=do_drawedges,orientation='vertical')
                 cbar.set_label(self.lname+' '+self.unit+'\n'+self.str_time, size=fsize)
                 
-                cl = plt.getp(cbar.ax, 'ymajorticklabels')
-                plt.setp(cl, fontsize=fsize)
-                
-                # kickout some colormap labels if there are to many
-                ncbar_l=len(cbar.ax.get_yticklabels()[:])
+                ncl = 10
+                rotation = 0
+                if cbar.orientation=='vertical': tickl = cbar.ax.get_yticklabels()
+                else:                            tickl = cbar.ax.get_xticklabels()
+                ncbar_l=len(tickl[:])
                 idx_cref = np.where(clevel==cref)[0]
-                idx_cref = np.asscalar(idx_cref) 
-                nmax_cbar_l = 10
-                nstep = ncbar_l/nmax_cbar_l
+                idx_cref = np.asscalar(idx_cref)
+                nstep = ncbar_l/ncl
                 nstep = np.int(np.floor(nstep))
-                if nstep==0:nstep=1
-                plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
-                plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
-                plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
+                if nstep==0: nstep=1
+                idx = np.arange(0,len(tickl),1)
+                idxb = np.ones((len(tickl),), dtype=bool)                
+                idxb[idx_cref::nstep]  = False
+                idxb[idx_cref::-nstep] = False
+                idx = idx[idxb==True]
+                for jj in list(idx):
+                    tickl[jj]=''
+                if cbar.orientation=='vertical':cbar.ax.set_yticklabels(tickl,fontsize=fsize,rotation=rotation)
+                else:                           cbar.ax.set_xticklabels(tickl,fontsize=fsize,rotation=rotation)    
+    
+                
+                #cl = plt.getp(cbar.ax, 'ymajorticklabels')
+                #plt.setp(cl, fontsize=fsize)
+                
+                ## kickout some colormap labels if there are to many
+                #ncbar_l=len(cbar.ax.get_yticklabels()[:])
+                #idx_cref = np.where(clevel==cref)[0]
+                #idx_cref = np.asscalar(idx_cref) 
+                #nmax_cbar_l = 10
+                #nstep = ncbar_l/nmax_cbar_l
+                #nstep = np.int(np.floor(nstep))
+                #if nstep==0:nstep=1
+                #plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+                #plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+                #plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
             
             #___________________________________________________________________
             # bug fix workaround to proper draw secondary axes

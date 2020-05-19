@@ -1,3 +1,12 @@
+module momentum_adv_scalar_interface
+  interface
+    subroutine momentum_adv_scalar(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
@@ -10,16 +19,19 @@ subroutine compute_vel_rhs(mesh)
     use g_PARSUP
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
+    use g_forcing_arrays, only: press_air
     use g_comm_auto
+    use g_sbf, only: l_mslp
+    use momentum_adv_scalar_interface
     
     implicit none 
     type(t_mesh), intent(in) , target :: mesh   
     integer                  :: elem, elnodes(3), nz 
-    real(kind=WP)            :: eta(3), ff, mm 
+    real(kind=WP)            :: ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
     logical, save            :: lfirst=.true.
     real(kind=WP)            :: t1, t2, t3, t4
-    real(kind=WP)            :: p_ice(3)
+    real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
 
 #include "associate_mesh.h"
@@ -41,11 +53,19 @@ subroutine compute_vel_rhs(mesh)
         ! and the Coriolis force + metric terms
         elnodes=elem2D_nodes(:,elem)
         
-        !  eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
-        eta = g*eta_n(elnodes)   
+        !  p_eta=g*eta_n(elnodes)*(1-theta)        !! this place needs update (1-theta)!!!
+        p_eta = g*eta_n(elnodes)   
         
         ff  = coriolis(elem)*elem_area(elem)
         !mm=metric_factor(elem)*gg
+        
+        !___________________________________________________________________________
+        ! contribution from sea level pressure
+        if (l_mslp) then
+            p_air = press_air(elnodes)/1000
+        else                   !|-> convert press_air from: Pa--> bar)
+            p_air = 0.0_WP
+        end if
         
         !___________________________________________________________________________
         ! in case of ALE zlevel and zstar add pressure from ice to atmospheric pressure
@@ -63,7 +83,13 @@ subroutine compute_vel_rhs(mesh)
         ! apply pressure gradient force, as well as contributions from gradient of 
         ! the sea surface height as well as ice pressure in case of floating sea ice
         ! to velocity rhs
-        pre = -(eta+p_ice)!+atmospheric pressure etc.
+
+        pre = -(p_eta+p_ice+p_air)
+
+        if (use_global_tides) then
+           pre=pre-ssh_gp(elnodes)
+        end if
+
         Fx  = sum(gradient_sca(1:3,elem)*pre)
         Fy  = sum(gradient_sca(4:6,elem)*pre)
         do nz=1,nlevels(elem)-1

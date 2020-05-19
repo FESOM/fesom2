@@ -21,9 +21,13 @@ use io_RESTART
 use io_MEANDATA
 use io_mesh_info
 use diagnostics
+use mo_tidal
 
-! Icepack modules
+
+! Define icepack modules
+#if defined (__icepack)
 use icedrv_settings
+#endif
 
 #if defined (__oasis)
 use cpl_driver
@@ -64,7 +68,7 @@ type(t_icepack_settings), target, save :: icepack_settings
     ! load the mesh and fill in 
     ! auxiliary mesh arrays
     !=====================
-    call setup_model(icepack_settings)         ! Read Namelists, always before clock_init
+    call setup_model          ! Read Namelists, always before clock_init
     call clock_init           ! read the clock file 
     call get_run_steps(nsteps)
     call mesh_setup(mesh)
@@ -164,7 +168,13 @@ type(t_icepack_settings), target, save :: icepack_settings
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
     !___MODEL TIME STEPPING LOOP________________________________________________
+    if (use_global_tides) then
+       call foreph_ini(yearnew, month)
+    end if
     do n=1, nsteps        
+        if (use_global_tides) then
+           call foreph(mesh)
+        end if
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='

@@ -145,7 +145,7 @@ module g_cvmix_kpp
     ! Parameters to run shear-dependent LM94 scheme below the mixed layer
     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
     real(kind=WP)     :: kpp_Av0 = 5.0e-3 
-    real(kind=WP)     :: kpp_Kv0 = 5.0e-2 
+    real(kind=WP)     :: kpp_Kv0 = 5.0e-3 
     
     ! critical shear  Richardson number value, units: unitless (0.7 in LMD94)
     real(kind=WP)     :: kpp_Ri0 = 0.7
@@ -380,6 +380,7 @@ module g_cvmix_kpp
             !             - friction velocity (ustar) at surface (m/s)
             
             !___3D Quantities___________________________________________________
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call shear variables'//achar(27)//'[0m'
             if (kpp_use_fesomkpp) then
                 do nz=2, nln
                     !___________________________________________________________
@@ -400,8 +401,8 @@ module g_cvmix_kpp
                     ! buoyancy difference with respect to the surface --> computed in
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
-                    call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
+                    call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -413,6 +414,7 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! Calculate the surface layer depth, averaged surface layer 
                     ! quantities
+                    
                     sldepth = kpp_surf_layer_ext*max( max(-Z_3d_n(nz,node),-zbar_3d_n(2,node)),kpp_minOBLdepth )
                     nzsfc = nz
                     do nztmp = 1, nz
@@ -453,8 +455,8 @@ module g_cvmix_kpp
                     ! --> bring density of surface point adiabatically to the same 
                     !     depth level as the deep point --> than calculate bouyancy 
                     !     difference
-                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
+                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -477,6 +479,7 @@ module g_cvmix_kpp
             !___2D Quantities___________________________________________________
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call surface buyflux[0m'
             kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
                                      sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
@@ -502,6 +505,7 @@ module g_cvmix_kpp
             !     should be computed prior to the computation of KPP diffusivities
             !___________________________________________________________________
             ! --> PP parameterisation after Pacanowski and Philander 1981
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc internal mixing'//achar(27)//'[0m'
             if (kpp_internalmix .eq. 'PP') then
                 do nz = 2, nln
                     kpp_Av(nz,node) = kpp_pp_Av0     /(1.0_WP+kpp_pp_alpha*kpp_shearRi(nz))**kpp_pp_loc_exp + kpp_Avbckg
@@ -533,6 +537,7 @@ module g_cvmix_kpp
             ! 3) Set Background diffusivities either to const. background 
             ! diffusivity (kpp_Kvbckg) or non-const. background diffusivity 
             ! of Qiang from FESOM1.4
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc background diff'//achar(27)//'[0m'
             if (kpp_use_nonconstKvb) then
                 do nz = 2, nln
                     call Kv0_background_qiang( &
@@ -559,6 +564,7 @@ module g_cvmix_kpp
             ! and contribution from shortwave penetration 
             ! eq. A2c & A2d & A3b & A3d in Large et al. 1994
             ! --> avoid if condition in depth loop --> should be a tiny bit faster 
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc turbulent vel. scale'//achar(27)//'[0m'
             aux_surfbuoyflx_nl = 0.0_WP
             aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
@@ -614,6 +620,7 @@ module g_cvmix_kpp
             !     --> v_t = turbulent velocity shear, needs to be parameterized
             !     --> v_t = z * ws * N * v_tc
             !                             |-> v_tc = Cv * sqrt(0.2/Cs/epsilon) / kpp_vonKarman^2 / kpp_Rib_crit
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc bulk richards'//achar(27)//'[0m'
             kpp_bulkRi(1:nln+1) = cvmix_kpp_compute_bulk_Richardson(   &
                 zt_cntr         = Z_3d_n(     1:nln  ,node),  & ! (in) Depth of cell center (m)
                 delta_buoy_cntr = kpp_dbsurf( 1:nln),         & ! (in) Bulk buoyancy difference, Br-B(z) (1/s)
@@ -643,6 +650,7 @@ module g_cvmix_kpp
                 aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node) 
             end if 
             
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc obl depth'//achar(27)//'[0m'
             call cvmix_kpp_compute_OBL_depth(          &
                 Ri_bulk    = kpp_bulkRi(1:nln+1),      & ! (in) Bulk Richardson number dim=(ke+1)
                 zw_iface   = zbar_3d_n( 1:nln+1,node), & ! (in) Height of interfaces (m) dim=(ke+1)
@@ -744,6 +752,7 @@ module g_cvmix_kpp
             
             !___________________________________________________________________
             !  compute the turbulent diffusion coefficients
+            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc kpp coeff'//achar(27)//'[0m'
             call cvmix_coeffs_kpp(                     &
                 Mdiff_out = kpp_oblmixc(:,node,1),     & ! (inout) new_Mdiff: Total viscosity (m2/s)
                 Tdiff_out = kpp_oblmixc(:,node,2),     & ! (inout) new_Tdiff: Total heat diffusivity (m2/s)
@@ -821,6 +830,7 @@ module g_cvmix_kpp
         !_______________________________________________________________________
         ! 8) horizontal smoothing of the OBL mixing coefficient --> approach from
         ! original kpp parameterisation of FESOM1.4 & FESOM2.0
+        !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc smooth kpp_oblmixc'//achar(27)//'[0m'    
         if (kpp_use_smoothblmc .and. kpp_use_fesomkpp) then
             call exchange_nod(kpp_oblmixc(:,:,1))
             call exchange_nod(kpp_oblmixc(:,:,2))
@@ -841,6 +851,7 @@ module g_cvmix_kpp
         !_______________________________________________________________________
         ! 9) combine KPP OBL mixing coefficents with internal mixing coefficients
         ! --> ...min(kpp_oblmixc(nz,node,2),kpp_oblmixc(nz,node,3))... comes from MOM6
+        !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc combine OBL & internal mixing'//achar(27)//'[0m'    
         do node= 1, myDim_nod2D
             ! FESOM14 approach
             if (kpp_use_fesomkpp) then

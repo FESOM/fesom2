@@ -1,3 +1,20 @@
+module array_setup_interface
+  interface
+    subroutine array_setup(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module oce_initial_state_interface
+  interface
+    subroutine oce_initial_state(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! =================================================================
 subroutine ocean_setup(mesh)
 USE MOD_MESH
@@ -11,6 +28,8 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use array_setup_interface
+use oce_initial_state_interface
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
@@ -181,8 +200,8 @@ allocate(ssh_rhs(node_size))
 ! ================
 ! Monin-Obukhov
 ! ================
-if (use_ice .and. mo_on) allocate(mo(nl,node_size),mixlength(node_size))
-if (use_ice .and. mo_on) mixlength=0.
+if (use_ice .and. use_momix) allocate(mo(nl,node_size),mixlength(node_size))
+if (use_ice .and. use_momix) mixlength=0.
 ! ================
 ! Vertical velocity and pressure
 ! ================
@@ -274,7 +293,10 @@ neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
 allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
-
+if (use_global_tides) then
+   allocate(ssh_gp(node_size))
+   ssh_gp=0.
+end if
 ! xy gradient of a neutral surface
 allocate(sigma_xy(2, nl-1, node_size))
 sigma_xy=0.0_WP

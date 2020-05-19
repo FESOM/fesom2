@@ -1,3 +1,79 @@
+module diff_part_hor_redi_interface
+  interface
+    subroutine diff_part_hor_redi(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module adv_tracers_muscle_ale_interface
+  interface
+    subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh
+      integer                  :: do_Xmoment
+      real(kind=WP)            :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP)            :: num_ord
+    end subroutine
+  end interface
+end module
+module adv_tracers_vert_ppm_ale_interface
+  interface
+    subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh
+      integer                  :: do_Xmoment
+      real(kind=WP)            :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    end subroutine
+  end interface
+end module
+module adv_tracers_ale_interface
+  interface
+    subroutine adv_tracers_ale(tr_num, mesh)
+      use mod_mesh
+      integer :: tr_num
+      type(t_mesh), intent(in) , target :: mesh    
+    end subroutine
+  end interface
+end module
+module diff_ver_part_expl_ale_interface
+  interface
+    subroutine diff_ver_part_expl_ale(tr_num, mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in) , target :: mesh    
+      integer                  :: tr_num
+    end subroutine
+  end interface
+end module
+module diff_ver_part_redi_expl_interface
+  interface
+    subroutine diff_ver_part_redi_expl(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in) , target :: mesh    
+    end subroutine
+  end interface
+end module
+module diff_ver_part_impl_ale_interface
+  interface
+    subroutine diff_ver_part_impl_ale(tr_num, mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in) , target :: mesh
+      integer                  :: tr_num
+    end subroutine
+  end interface
+end module
+module diff_tracers_ale_interface
+  interface
+    subroutine diff_tracers_ale(tr_num, mesh)
+      use mod_mesh
+      integer, intent(in)      :: tr_num
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
@@ -10,6 +86,8 @@ subroutine solve_tracers_ale(mesh)
     use mod_mesh
     use g_comm_auto
     use o_tracers
+    use adv_tracers_ale_interface
+    use diff_tracers_ale_interface
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -93,6 +171,8 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use o_arrays
     use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
                            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
+    use adv_tracers_muscle_ale_interface
+    use adv_tracers_vert_ppm_ale_interface
     implicit none
     integer :: tr_num, node, nz
     type(t_mesh), intent(in) , target :: mesh    
@@ -737,6 +817,10 @@ subroutine diff_tracers_ale(tr_num, mesh)
     use g_PARSUP
     use o_arrays
     use o_tracers
+    use diff_part_hor_redi_interface
+    use diff_ver_part_expl_ale_interface
+    use diff_ver_part_redi_expl_interface
+    use diff_ver_part_impl_ale_interface
     implicit none
     
     integer, intent(in)      :: tr_num

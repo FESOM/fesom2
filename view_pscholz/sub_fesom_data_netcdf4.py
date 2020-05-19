@@ -64,6 +64,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
                                   do_loadloop=False,     \
                                   do_rescale='auto',     \
                                   do_interp_e2n=True,    \
+                                  do_vecrot=True,        \
                                   do_output=True):
     #_______________________________________________________________________________
     # plot depth
@@ -130,7 +131,7 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         
     #___________________________________________________________________________
     # do nessessary postprocesssing to rotate vectors, compute norm, set NaNs ...
-    data        = do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_output)
+    data        = do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output)
     
     #___________________________________________________________________________
     # add augmented periodic boundary
@@ -215,11 +216,16 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['temp', 'salt',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
-            
-            else:
+            elif any(x in data.var for x in ['pgf_x','pgf_y','pgf_xy','pgf']):
+                var_list = ['pgf_x', 'pgf_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))    
+            elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            else:
+                print(' --> vector variable not defined')
             
         else:
             var_list = [data.var ,[],[]]
@@ -545,7 +551,7 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
 #___DO NECCESSARY POSTPROCESSING________________________________________________
 #
 #_______________________________________________________________________________
-def do_postprocess(mesh,data,do_rescale,do_interp_e2n,do_output):
+def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
 
     # in case more than one variable has been loaded compute norm, vec, ...
     if any(x in data.var for x in ['tuv','suv']):
@@ -553,10 +559,11 @@ def do_postprocess(mesh,data,do_rescale,do_interp_e2n,do_output):
         data.value3 = data.value3[mesh.elem0_2d_i].mean(axis=1)
         data.value, data.value2, data.value3 = data.value*data.value3, data.value2*data.value3, []
 
-    ## do vector rotation from ROT --> GEO in case of vector data        
-    if any(x in data.var for x in ['norm','vec']) or \
-       data.var in ['u','v','uice','vice']:
-        data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
+    ## do vector rotation from ROT --> GEO in case of vector data   
+    if do_vecrot==True:
+        if any(x in data.var for x in ['norm','vec']) or \
+        data.var in ['u','v','uice','vice']:
+            data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
         
     # compute norm of vector data
     if all(x in data.var for x in ['norm']):
@@ -590,7 +597,7 @@ def do_postprocess(mesh,data,do_rescale,do_interp_e2n,do_output):
             if any(x in data.var for x in ['vec']): data.value2 = data.value2/scal
             data.unit  = ' $ \cdot 10^{'+str(int(np.log10(scal)))+'} $'+data.unit
     elif do_rescale=='log10':
-        data.value = np.log10(data.value)
+        data.value[data.value!=0.0] = np.log10(data.value[data.value!=0.0])
         data.rescale='log10'
         if any(x in data.var for x in ['vec']): data.value2 = np.log10(data.value2)
         data.unit  = ' log10() '+data.unit
@@ -795,6 +802,8 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
 #_______________________________________________________________________________
 def fesom_data_anom(data,data2):
     anom = fesom_data([])
+    
+    anom.which_obj = 'data'
     
     #____data run variables______________________
     if data.var!=data2.var:

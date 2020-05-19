@@ -1,3 +1,52 @@
+module oce_ale_interfaces
+  interface
+    subroutine init_bottom_elem_thickness(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine init_bottom_node_thickness(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine impl_vert_visc_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine update_stiff_mat_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine compute_ssh_rhs_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine solve_ssh_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine compute_hbar_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine vert_vel_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine update_thickness_ale(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! CONTENT:
 ! ------------
 !    subroutine ale_init
@@ -27,9 +76,10 @@ subroutine init_ale(mesh)
     USE o_ARRAYS
     USE g_config, only: which_ale
     USE g_forcing_param, only: use_virt_salt
+    use oce_ale_interfaces
     Implicit NONE
     
-    integer                  :: n, nzmax
+    integer                  :: n, nzmax, elnodes(3), elem
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___allocate________________________________________________________________
@@ -96,6 +146,15 @@ subroutine init_ale(mesh)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
+    
+!!PS     do elem=1, myDim_elem2D
+!!PS         nzmax=nlevels(elem)
+!!PS         elnodes=elem2D_nodes(:,elem) 
+!!PS         zbar_e_bot(elem) = sum(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS !!PS         zbar_e_bot(elem) = minval(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS !!PS         zbar_e_bot(elem) = maxval(zbar_3d_n(nzmax,elnodes))/3.0_WP
+!!PS         bottom_elem_thickness(elem)=zbar(nzmax-1)-zbar_e_bot(elem)
+!!PS     end do
 
 end subroutine init_ale
 !
@@ -955,7 +1014,7 @@ subroutine update_stiff_mat_ale(mesh)
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
     integer, allocatable                :: n_num(:)
-    type(t_mesh), intent(inout)         , target :: mesh
+    type(t_mesh), intent(in)         , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1062,7 +1121,7 @@ subroutine compute_ssh_rhs_ale(mesh)
     integer       :: ed, el(2), enodes(2),  nz,n
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
@@ -1626,12 +1685,12 @@ subroutine vert_vel_ale(mesh)
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)-1
                 !!PS if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
-                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.0_WP .and. CFL_z(nz,n)<=2.0_WP ) then
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.2_WP .and. CFL_z(nz,n)<=2.0_WP ) then
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
                 elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.0_WP) then          
-                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>1:'//achar(27)//'[0m',&
+                    print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
                     !!PS write(*,*) '***********************************************************'
@@ -1955,6 +2014,7 @@ subroutine oce_timestep_ale(n, mesh)
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+    use oce_ale_interfaces
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
@@ -2030,6 +2090,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(mesh)
+        call mo_convect(mesh)
         
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -2043,6 +2104,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(mesh)
+        call mo_convect(mesh)
         
     ! use CVMIX TKE (turbulent kinetic energy closure) parameterisation for 
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
@@ -2051,6 +2113,7 @@ subroutine oce_timestep_ale(n, mesh)
     else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(mesh)
+        call mo_convect(mesh)
         
     end if     
 

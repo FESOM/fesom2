@@ -293,8 +293,8 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   integer                       :: istart(2), icount(2)
   real(real64)                  :: ncdata(mesh%nod2D)
   real(real64),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
-  character(300), intent(in) 	:: file
-  character(15),  intent(in)    :: vari
+  character(*), intent(in) 	:: file
+  character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
 
 #include  "associate_mesh.h"

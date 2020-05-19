@@ -18,6 +18,7 @@ from colormap_c2c import colormap_c2c
 #|                                                                             |
 #+_____________________________________________________________________________+
 class clim_data(object):
+    which_obj                   = 'data'
     #____data run variables______________________
     var                         = ''
     path, fname, descript       = '', '', ''
@@ -44,57 +45,59 @@ class clim_data(object):
     #___INIT CLIM OBJECT_______________________________________________________#
     #
     #__________________________________________________________________________#
-    def __init__(self,path,fname,var='temp'):
-        self.path = path 
-        self.fname= fname
-        self.var  = var
-        
-        #__________________________________________________________________#
-        ncid  = Dataset(path+fname, 'r') 
-        
-        #__________________________________________________________________#
-        self.lon   = np.copy(ncid.variables['lon'][:])
-        self.lat   = np.copy(ncid.variables['lat'][:])
-        self.depth = np.copy(ncid.variables['depth'][:])
-        #______________________________________________________________________#
-        # load WOA 2005 data
-        if 'woa' in self.fname:
-            self.descript = 'WOA'
-            valueT= np.copy(ncid.variables['t00an1'][:,:,:,:]).squeeze()
-            valueS= np.copy(ncid.variables['s00an1'][:,:,:,:]).squeeze()
-        elif self.fname=='phc3.0_annual.nc':
-            self.descript = 'PHC3'
-            valueT= np.copy(ncid.variables['temp'][:,:,:]).squeeze()
-            valueS= np.copy(ncid.variables['salt'][:,:,:]).squeeze()    
-        ncid.close()
-        
-        #__________________________________________________________________#
-        # convert missing value to nan
-        valueT[np.abs(valueT)>=100]=np.nan
-        valueS[np.abs(valueS)>=100]=np.nan
-        
-        #__________________________________________________________________#
-        # shift coordinates from 0...360 --> -180...180
-        if self.lon.max()>180:
-            valueT, dum      = shiftgrid(180.0,valueT, self.lon,start=False,cyclic=359)
-            valueS, self.lon = shiftgrid(180.0,valueS, self.lon,start=False,cyclic=359)
-        
-        #__________________________________________________________________#
-        # calculate potential temperature
-        if var=='temp':
-            self.value = valueT
+    def __init__(self,path,fname,var=[]):
+        if len(path)!=0 or len(fname)!=0 or len(var)!=0:
+            self.path = path 
+            self.fname= fname
+            self.var  = var
             
-        elif var=='ptemp':
-            depth3d = np.zeros(valueS.shape)
-            for di in range(0,self.depth.size):
-                depth3d[di,:,:] = self.depth[di]
-            self.value = sw.ptmp(valueS, valueT, depth3d)
+            #__________________________________________________________________#
+            ncid  = Dataset(path+fname, 'r') 
             
-        elif var=='salt':
-            self.value = valueS
-        
-        else:
-            print(' --> this variable is not supported for this climatology')
+            #__________________________________________________________________#
+            self.lon   = np.copy(ncid.variables['lon'][:])
+            self.lat   = np.copy(ncid.variables['lat'][:])
+            self.depth = -np.abs(np.copy(ncid.variables['depth'][:]))
+            #______________________________________________________________________#
+            # load WOA 2005 data
+            if 'woa' in self.fname:
+                if '2005' in self.fname: self.descript = 'WOA05'
+                if '2018' in self.fname: self.descript = 'WOA18'
+                valueT= np.copy(ncid.variables['t00an1'][:,:,:,:]).squeeze()
+                valueS= np.copy(ncid.variables['s00an1'][:,:,:,:]).squeeze()
+            elif self.fname=='phc3.0_annual.nc':
+                self.descript = 'PHC3'
+                valueT= np.copy(ncid.variables['temp'][:,:,:]).squeeze()
+                valueS= np.copy(ncid.variables['salt'][:,:,:]).squeeze()    
+            ncid.close()
+            
+            #__________________________________________________________________#
+            # convert missing value to nan
+            valueT[np.abs(valueT)>=100]=np.nan
+            valueS[np.abs(valueS)>=100]=np.nan
+            
+            #__________________________________________________________________#
+            # shift coordinates from 0...360 --> -180...180
+            if self.lon.max()>180:
+                valueT, dum      = shiftgrid(180.0,valueT, self.lon,start=False,cyclic=359)
+                valueS, self.lon = shiftgrid(180.0,valueS, self.lon,start=False,cyclic=359)
+            
+            #__________________________________________________________________#
+            # calculate potential temperature
+            if var=='temp':
+                self.value = valueT
+                
+            elif var=='ptemp':
+                depth3d = np.zeros(valueS.shape)
+                for di in range(0,self.depth.size):
+                    depth3d[di,:,:] = self.depth[di]
+                self.value = sw.ptmp(valueS, valueT, depth3d)
+                
+            elif var=='salt':
+                self.value = valueS
+            
+            else:
+                print(' --> this variable is not supported for this climatology')
 #___INIT CLIM OBJECT_______________________________________________________#
 #
 #__________________________________________________________________________#
@@ -105,7 +108,7 @@ def clim_load_data(data):
     #__________________________________________________________________#
     data.lon   = np.copy(ncid.variables['lon'][:])
     data.lat   = np.copy(ncid.variables['lat'][:])
-    data.zlev  = np.copy(ncid.variables['depth'][:])
+    data.zlev  = -np.abs(np.copy(ncid.variables['depth'][:]))
     
     #______________________________________________________________________#
     # load WOA 2005 data
@@ -158,7 +161,7 @@ def clim_vinterp(data_in,levels):
     for di in range(0,len(levels)):
         # find upper and lower layer indices
         #idx_dwn = np.array(np.where( data.depth[di]<=abs(mesh.zlev))).squeeze()
-        idx_dwn = np.array(np.where( levels[di]<=abs(data_in.depth))).squeeze()
+        idx_dwn = np.array(np.where( abs(levels[di])<=abs(data_in.depth))).squeeze()
         idx_dwn = idx_dwn[0]
         idx_up  = idx_dwn-1
         if idx_up<0: idx_up=0
@@ -166,7 +169,7 @@ def clim_vinterp(data_in,levels):
         # linear vertical interpolant
         deltaz   = abs(data_in.depth[idx_dwn])-abs(data_in.depth[idx_up])
         #deltaz_i = abs(mesh.zlev[idx_dwn])-data.depth[di]
-        deltaz_i = abs(data_in.depth[idx_dwn])-levels[di]
+        deltaz_i = abs(data_in.depth[idx_dwn])-abs(levels[di])
         
         # interpoalte verticaly and sum up
         if deltaz_i==0:

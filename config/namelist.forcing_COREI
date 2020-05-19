@@ -25,15 +25,15 @@ landice_end_mon=10
 /
 
 &nam_sbc
-   nm_xwind_file = '/work/ollie/dsein/input/forcing/CORE2/u_10.'        ! name of file with winds, if nm_sbc=2
-   nm_ywind_file = '/work/ollie/dsein/input/forcing/CORE2/v_10.'        ! name of file with winds, if nm_sbc=2
-   nm_humi_file  = '/work/ollie/dsein/input/forcing/CORE2/q_10.'        ! name of file with humidity
-   nm_qsr_file   = '/work/ollie/dsein/input/forcing/CORE2/ncar_rad.'    ! name of file with solar heat
-   nm_qlw_file   = '/work/ollie/dsein/input/forcing/CORE2/ncar_rad.'    ! name of file with Long wave
-   nm_tair_file  = '/work/ollie/dsein/input/forcing/CORE2/t_10.'        ! name of file with 2m air temperature
-   nm_prec_file  = '/work/ollie/dsein/input/forcing/CORE2/ncar_precip.' ! name of file with total precipitation
-   nm_snow_file  = '/work/ollie/dsein/input/forcing/CORE2/ncar_precip.' ! name of file with snow  precipitation
-   nm_mslp_file  = '/work/ollie/dsein/input/forcing/CORE2/slp.'         ! air_pressure_at_sea_level
+   nm_xwind_file = '/work/ollie/clidyn/forcing/CORE1/u_10'        ! name of file with winds, if nm_sbc=2
+   nm_ywind_file = '/work/ollie/clidyn/forcing/CORE1/v_10'        ! name of file with winds, if nm_sbc=2
+   nm_humi_file  = '/work/ollie/clidyn/forcing/CORE1/q_10'        ! name of file with humidity
+   nm_qsr_file   = '/work/ollie/clidyn/forcing/CORE1/ncar_rad'    ! name of file with solar heat
+   nm_qlw_file   = '/work/ollie/clidyn/forcing/CORE1/ncar_rad'    ! name of file with Long wave
+   nm_tair_file  = '/work/ollie/clidyn/forcing/CORE1/t_10'        ! name of file with 2m air temperature
+   nm_prec_file  = '/work/ollie/clidyn/forcing/CORE1/ncar_precip' ! name of file with total precipitation
+   nm_snow_file  = '/work/ollie/clidyn/forcing/CORE1/ncar_precip' ! name of file with snow  precipitation
+   nm_mslp_file  = '/work/ollie/clidyn/forcing/CORE1/slp.'         ! air_pressure_at_sea_level
    nm_xwind_var  = 'U_10_MOD'   ! name of variable in file with wind
    nm_ywind_var  = 'V_10_MOD'   ! name of variable in file with wind
    nm_humi_var   = 'Q_10_MOD'   ! name of variable in file with humidity
@@ -48,12 +48,10 @@ landice_end_mon=10
    nm_nc_idd     = 1            ! initial day of time axis in netCDF
    nm_nc_freq    = 1            ! data points per day (i.e. 86400 if the time axis is in seconds)
    nm_nc_tmid    = 1            ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise (i.e. 1 in CORE1, CORE2; 0 in JRA55)
+   y_perpetual   = .true.
    l_xwind=.true., l_ywind=.true., l_humi=.true., l_qsr=.true., l_qlw=.true., l_tair=.true., l_prec=.true., l_mslp=.false., l_cloud=.false., l_snow=.true.
    nm_runoff_file     ='/work/ollie/dsein/input/forcing/CORE2/runoff.nc'
    runoff_data_source ='CORE2'	!Dai09, CORE2
-   !nm_runoff_file     ='/work/ollie/qwang/FESOM2_input/mesh/CORE2_finaltopo_mean/forcing_data_on_grid/runoff_clim.nc'
-   !runoff_data_source ='Dai09'  !Dai09, CORE2, JRA55
-   !runoff_climatology =.true.
    nm_sss_data_file   ='/work/ollie/dsein/input/forcing/CORE2/PHC2_salx.nc'
    sss_data_source    ='CORE2'
 /

@@ -1,0 +1,39 @@
+
+name: FESOM2 main test
+
+# Controls when the action will run. Triggers the workflow on push or pull request.
+
+on: [push, pull_request]
+
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  gfortran_ubuntu:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: koldunovn/fesom2_test:latest
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # NK: this changes working directory to fesom2
+    - uses: actions/checkout@v2
+    
+    - name: Compile model
+      run: |
+        bash -l configure.sh ubuntu
+    - name: Create test run
+      run: |
+        mkrun pi test_pi -m docker
+    - name: FESOM2 test run
+      run: |    
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new
+    - name: Check results
+      run: |
+        cd work_pi
+        fcheck .
+        
+    
+

@@ -56,7 +56,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
-  real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
+  real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
 
 #if defined (__oasis)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac

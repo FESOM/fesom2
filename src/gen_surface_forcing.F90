@@ -41,9 +41,9 @@ MODULE g_sbf
    USE g_support
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
-   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
+   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff
-   USE g_read_other_NetCDF, only: read_other_NetCDF
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -86,6 +86,8 @@ MODULE g_sbf
 
    character(10),      save   :: sss_data_source   ='CORE2'
    character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+
+   logical :: runoff_climatology =.false.
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
@@ -139,6 +141,7 @@ MODULE g_sbf
    integer, save :: nm_nc_idd   = 1       ! initial day of time axis in netCDF
    real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
    integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
+   logical, save :: y_perpetual=.false.
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
@@ -150,6 +153,7 @@ MODULE g_sbf
    type, public ::   flfi_type    !flux file informations
       character(len = 256)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
+      character(len = 34)                  :: calendar  ! variable name in the NetCDF file
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
@@ -186,6 +190,8 @@ CONTAINS
       integer                      :: nf_start(4)
       integer                      :: nf_edges(4)         
       integer                      :: ierror              ! return error code
+      character(len=20)            :: aux_calendar
+      integer                      :: aux_len
 
       !open file
       if (mype==0) then
@@ -198,30 +204,41 @@ CONTAINS
       ! get dimensions
       if (mype==0) then
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
+
       if (mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
-         if      (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         end if
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
+
       if (mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
          if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time", id_timed)
+                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -230,11 +247,14 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid,    "LAT",      id_lat)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lat",      id_lat)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "latitude", id_lat)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -247,24 +267,30 @@ CONTAINS
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lon",       id_lon)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,flf%file_name)
+
       if (mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "time", id_time)
          end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
-      
       ! get dimensions size
       if (mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,flf%file_name)
       if (mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
@@ -287,9 +313,10 @@ CONTAINS
       ! only the temporal axis is allowed to vary between the files
          deallocate(flf%nc_time)
            allocate(flf%nc_time(flf%nc_Ntime))
-      end if
-   !read variables from file
-   ! coordinates
+      end if  
+    !____________________________________________________________________________   
+    !read variables from file
+    ! read lat
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlat
@@ -297,6 +324,8 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+    ! read lon  
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlon-2
@@ -306,16 +335,95 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-   ! time
+    !____________________________________________________________________________
+    ! read time axis from file
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
+         ! digg for calendar attribute in time axis variable         
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+      ! digg for calendar attribute in time axis variable
+      if (mype==0) then
+         iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
+         iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+         aux_calendar = aux_calendar(1:aux_len)
+         
+         if (iost .ne. NF_NOERR) then
+            flf%calendar='none'
+            write(*,*) ' --> could not find/read calendar attribute in the time axis'
+            write(*,*) '     of the forcing file (Is this right?). I assume there is'
+            write(*,*) '     none and proceed in CORE2 style without leap years!'
+         else
+            flf%calendar=lowercase(aux_calendar)
+            write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|' 
+         end if 
+         
+         ! check for calendar and include_fleapyear consistency
+         if ((trim(flf%calendar).eq.'none')   .or. &
+             (trim(flf%calendar).eq.'noleap') .or. &
+             (trim(flf%calendar).eq.'365_days')) then
+            if (include_fleapyear .eqv. .true.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
+                write(*,*) '          but setted include_fleapyear=.true.. CORE forcing '
+                write(*,*) '          does not contain any leap years or particular '
+                write(*,*) '          calender option (julian, gregorian). So if im right,'
+                write(*,*) '          please go to namelist.config and set '
+                write(*,*) '          include_fleapyear=.false. otherwise comment this '
+                write(*,*) '          message block in gen_surface_forcing.F90.'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if
+         elseif ((trim(flf%calendar).eq.'julian')    .or. &
+                 (trim(flf%calendar).eq.'gregorian') .or. &
+                 (trim(flf%calendar).eq.'proleptic_gregorian') .or. &
+                 (trim(flf%calendar).eq.'standard')) then
+            if (include_fleapyear .eqv. .false.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
+                write(*,*) '          NCEP or a similar forcing, Right?, but setted '
+                write(*,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
+                write(*,*) '          all fleapyears and use a specific calendar option '
+                write(*,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
+                write(*,*) '          work properly, when using these forcings '
+                write(*,*) '          include_fleapyear must be true. So if im right, please go'
+                write(*,*) '          to namelist.config and set include_fleapyear=.true. '
+                write(*,*) '          otherwise comment this message block in'
+                write(*,*) '          gen_surface_forcing.F90'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if 
+         else
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' ERROR: I am not familiar with the found calendar option,'
+            write(*,*) '        dont know what to do. Either talk to the FESOM2 developers'
+            write(*,*) '        or add the calendar option by your self in ...'
+            write(*,*) '        gen_surface_forcing.F90, line:364-367'
+            write(*,*) '                                                            '
+            write(*,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
+            write(*,*) '                (trim(flf%calendar).eq."standard")) then    '
+            write(*,*) '                                                            '
+            write(*,*) '        The time axis calendar attribute can be checked for '
+            write(*,*) '        example with ncdump -h forcing_file.nc '
+            write(*,*) '____________________________________________________________'
+            print *, achar(27)//'[0m'
+            call par_ex(0)
+         end if 
+      end if
+      
+    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
       if (nm_nc_tmid/=1) then
          if (flf%nc_Ntime > 1) then
@@ -327,9 +435,10 @@ CONTAINS
       end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-      !flip lat and data in case of lat from -90 to 90
-      !!!! WARNING this is temporal solution, needs some more checks
+    
+    !___________________________________________________________________________
+    !flip lat and data in case of lat from -90 to 90
+    !!!! WARNING this is temporal solution, needs some more checks
       flip_lat = 0
       if ( flf%nc_Nlat > 1 ) then
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
@@ -356,20 +465,21 @@ CONTAINS
       character(len=4)            :: yyear
 
       write(yyear,"(I4)") yyyy
+      if (y_perpetual)    yyear = ''
 
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name,*) trim(nm_xwind_file),yyear,'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name,*) trim(nm_ywind_file),yyear,'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file),yyear,'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file),yyear,'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file),yyear,'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file),yyear,'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file),yyear,'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file),yyear,'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file),yyear,'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),yyear,'.nc'
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -729,9 +839,9 @@ CONTAINS
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
+                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
+                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -743,6 +853,7 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+      
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
       rdate = real(julday(yearnew,1,1))
       rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
@@ -882,10 +993,11 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation, force_newcoeff
+      logical      :: do_rotation, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
+      character(len=256)   :: filename
       type(t_mesh), intent(in) , target :: mesh
       
 #include  "associate_mesh.h"
@@ -926,9 +1038,15 @@ CONTAINS
          end do
       end if
       
+      !==========================================================================
+
+      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+
+      ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if ((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP)) then
+            if (update_monthly_flag) then
                i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
@@ -936,6 +1054,39 @@ CONTAINS
             end if
          end if
       end if
+
+     ! runoff  
+     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+       
+       if(update_monthly_flag) then
+         if(runoff_climatology) then
+           !climatology monthly mean
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+           filename=trim(nm_runoff_file)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         else
+           !monthly data
+
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         end if
+       end if
+
+     end if
+
 
       ! interpolate in time
       call data_timeinterp(rdate)
@@ -965,11 +1116,15 @@ CONTAINS
       integer, INTENT(IN) :: mm, dd, yyyy
       integer             :: julday
       ! In this routine julday returns the Julian Day Number that begins at noon of the calendar     
-      !    date specified by month mm , day dd , and year yyyy , all integer variables. Positive year
+      !    date specified by month mm, day dd , and year yyyy, all integer variables. Positive year
       !    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
       integer, PARAMETER  :: IGREG=15+31*(10+12*1582)
       ! Gregorian Calendar adopted Oct. 15, 1582.
       integer             :: ja,jm,jy
+      if (y_perpetual) then !to work with COREI forcing
+         julday=0
+         return
+      end if
       if (include_fleapyear) then
          jy = yyyy
          if (jy == 0) STOP 'julday: there is no year zero'
@@ -1033,7 +1188,6 @@ CONTAINS
    END SUBROUTINE calendar_date
 
    SUBROUTINE sbc_end
-
       IMPLICIT NONE
       integer      :: fld_idx      
       do fld_idx = 1, i_totfl     
@@ -1043,9 +1197,6 @@ CONTAINS
       DEALLOCATE( coef_a, coef_b, atmdata, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
-
-
-
    END SUBROUTINE sbc_end
 
    SUBROUTINE check_nferr(iost,fname)
@@ -1058,7 +1209,7 @@ CONTAINS
          call par_ex
          stop
       endif
-   END SUBROUTINE
+   END SUBROUTINE check_nferr
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
@@ -1892,6 +2043,45 @@ CONTAINS
    return
    end function short_wave_radiation
 !EOC
+
+    !___________________________________________________________________________
+    ! make inserted string all in lower case and kick out weired mystery characters
+    ! --> replaces 'space', '-' character with '_'
+    function lowercase(string)
+        implicit none
+        character(len=:),allocatable :: lowercase, aux_string
+        character(len=*)             :: string 
+        character(len=48)            :: aux_string_end=''
+        character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_'
+        character(len=2)             :: replace='- '
+        integer                      :: i, i1 ,pos_c, pos_s, pos_r
+        i1 = 0
+        aux_string = trim(string)
+        do i=1,len_trim(aux_string)
+            pos_c = index(cap,string(i:i))
+            pos_s = index(small,string(i:i))
+            pos_r = index(replace,string(i:i))
+            ! there is problem in the JRA55 calendar attribut string, at the end of
+            ! that string there is a character which is not seeable, which is no letter 
+            ! and also no whitespace and which can not be removed with trim() --> 
+            ! to get rid of that lowercase will use only character that are 
+            ! found in either cap or small otherwise the sring comparison fails 
+            if (pos_r .ne. 0) then
+                ! replaces 'space', '-' character with '_'
+                i1=i1+1
+                aux_string_end(i1:i1)='_'
+            elseif (pos_c .ne. 0 .and. pos_s .eq. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=small(pos_c:pos_c)
+            elseif (pos_c .eq. 0 .and. pos_s .ne. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=aux_string(i:i)
+            end if
+        end do
+        lowercase=trim(aux_string_end)
+        return
+    end function lowercase 
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
