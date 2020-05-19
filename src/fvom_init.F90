@@ -11,13 +11,66 @@
 !> @brief
 !> Main driver routine for initialization
 program MAIN
+
   use o_PARAM
   use MOD_MESH
   use o_MESH
   use g_PARSUP
   use g_CONFIG
   use g_rotate_grid
+  
   implicit none
+
+interface
+   subroutine read_mesh_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_ini
+end interface
+
+interface
+   subroutine test_tri_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine test_tri_ini
+end interface
+interface
+   subroutine find_edges_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_edges_ini
+end interface
+interface
+   subroutine find_elem_neighbors_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_elem_neighbors_ini
+end interface
+interface
+   subroutine find_levels(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels
+end interface
+interface
+   subroutine stiff_mat_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine stiff_mat_ini
+end interface
+interface
+   subroutine set_par_support_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine set_par_support_ini
+end interface
+interface
+   subroutine communication_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine communication_ini
+end interface
+
   character(len=1000)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
   type(t_mesh), target, save  :: mesh
@@ -188,6 +241,17 @@ USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
+
+interface
+   subroutine elem_center(elem, x, y, mesh)
+     USE MOD_MESH
+     USE g_CONFIG
+     integer, intent(in)        :: elem
+     real(kind=WP), intent(out) :: x, y
+     type(t_mesh), intent(in), target   :: mesh
+   end subroutine elem_center
+end interface
+
 integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:)
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
@@ -676,9 +740,11 @@ subroutine elem_center(elem, x, y, mesh)
 USE MOD_MESH
 USE g_CONFIG
 implicit none
-integer       :: elem, elnodes(3), k    
-real(kind=WP) :: x, y, ax(3), amin
-type(t_mesh), intent(inout), target :: mesh
+integer, intent(in)  :: elem
+integer              ::  elnodes(3), k    
+real(kind=WP), intent(out) :: x, y
+real(kind=WP)        ::  ax(3), amin
+type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh_ini.h"
 
    elnodes=elem2D_nodes(1:3,elem)
@@ -907,6 +973,13 @@ subroutine set_par_support_ini(mesh)
   use g_config
   implicit none
 
+interface 
+   subroutine check_partitioning(mesh)
+     use MOD_MESH
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine check_partitioning
+end interface
+
   integer         :: n, j, k, nini, nend, ierr
   integer(idx_t)  :: np(10)
   type(t_mesh), intent(inout), target :: mesh
@@ -1120,4 +1193,5 @@ subroutine check_partitioning(mesh)
        100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
 
 end subroutine check_partitioning
+
 

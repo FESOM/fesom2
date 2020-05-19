@@ -4,8 +4,7 @@
 LD = $(CC)
 
 # Optimization specs for compiler
-OPT = -O2 -DLINUX -DNDEBUG -DNDEBUG2 -DHAVE_EXECINFO_H -DHAVE_GETLINE 
-
+OPT = -O2 -DLINUX -DNDEBUG -DNDEBUG2 -DHAVE_EXECINFO_H -DHAVE_GETLINE -D_FILE_OFFSET_BITS=64
 # What archiving to use
 # Do not use option "r" - util.o comes twice from GKlib and libmetis!
 # Instead, the Makefiles makes sure to clean any old lib first.
