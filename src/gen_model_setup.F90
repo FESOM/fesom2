@@ -3,7 +3,7 @@
 subroutine setup_model(icepack_settings)
 
   ! Icepack modules
-  use icedrv_settings
+  use icedrv_init
 
   implicit none
 
@@ -34,7 +34,7 @@ subroutine read_namelist(icepack_settings)
 
   ! Icepack modules
   use icedrv_settings 
-  use icedrv_namelist, only: namelist_settings 
+  use icedrv_init, only: read_namelist_icepack 
 
   implicit none
  
@@ -120,7 +120,7 @@ subroutine read_namelist(icepack_settings)
   close (20)
 
   if (use_ice .and. use_icepack) then      !LZ
-     call namelist_settings(icepack_settings)
+     call read_namelist_icepack(icepack_settings)
   endif
 
   if(mype==0) write(*,*) 'Namelist files are read in'
