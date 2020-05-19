@@ -16,15 +16,15 @@
       !-----------------------------------------------------------------
 
       integer (kind=int_kind), parameter, public :: &
-         ice_stdin  =  5, & ! reserved unit for standard input
-         ice_stdout =  6, & ! reserved unit for standard output
-         ice_stderr =  6, & ! reserved unit for standard error
-         nu_nml     = 10, &            ! unit for namelist
-         nu_restart = 12, &            ! unit for restart file
-         nu_dump    = 13, &            ! unit for dump file
-         nu_forcing = 14, &            ! unit for forcing file
-         nu_open_clos = 15, &          ! unit for SHEBA forcing file
-         nu_diag      = ice_stdout, &  ! unit for diagnostic output
+         ice_stdin  =  5,   & ! reserved unit for standard input
+         ice_stdout =  88,   & ! reserved unit for standard output
+         ice_stderr =  87,   & ! reserved unit for standard error
+         nu_nml     = 10,   &  ! unit for namelist
+         nu_restart = 12,   &  ! unit for restart file
+         nu_dump    = 13,   &  ! unit for dump file
+         nu_forcing = 14,   &  ! unit for forcing file
+         nu_open_clos = 15, &  ! unit for SHEBA forcing file
+         nu_diag      = 86, &  ! unit for diagnostic output
          nu_diag_out  = 103
 
       !-----------------------------------------------------------------
@@ -61,8 +61,10 @@
          p25  = 0.25_dbl_kind, &
          p75  = 0.75_dbl_kind, &
          p333 = c1/c3, &
-         p666 = c2/c3, &
-         puny = 10.0e-11_dbl_kind
+         p666 = c2/c3
+
+      real (kind=dbl_kind), public :: puny=10.0e-11_dbl_kind 
+         
 
       !-----------------------------------------------------------------
       ! physical constants

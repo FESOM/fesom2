@@ -27,6 +27,7 @@ use mo_tidal
 ! Define icepack modules
 #if defined (__icepack)
 use icedrv_settings
+use icedrv_set,      only: set_icepack
 #endif
 
 #if defined (__oasis)
@@ -43,7 +44,11 @@ real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
-type(t_icepack_settings), target, save :: icepack_settings
+
+#if defined (__icepack)
+type(t_icepack_namelists),   target, save :: icepack_namelists
+type(t_icepack_domain_size), target, save :: icepack_domain_size
+#endif
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -74,6 +79,16 @@ type(t_icepack_settings), target, save :: icepack_settings
     call mesh_setup(mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined (__icepack)
+    !=====================
+    ! Setup icepack
+    !=====================
+    if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
+    call set_icepack(icepack_namelists, icepack_domain_size)
+    call set_grid_icepack(mesh, icepack_domain_size)
+    if (mype==0) write(*,*) 'Icepack: setup complete'
+#endif
     
     !=====================
     ! Allocate field variables 

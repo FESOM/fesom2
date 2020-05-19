@@ -1,12 +1,9 @@
 ! ==============================================================
-
 subroutine setup_model
   implicit none
   call read_namelist    ! should be before clock_init
 end subroutine setup_model
-
 ! ==============================================================
-
 subroutine read_namelist
   ! Reads namelist files and overwrites default parameters.
   !
@@ -19,12 +16,13 @@ subroutine read_namelist
   use g_forcing_param
   use g_parsup
   use g_config
-  use diagnostics,     only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
-                             ldiag_dMOC, ldiag_DVD, diag_list
-  use g_clock,         only: timenew, daynew, yearnew
-  use g_ic3d
+  use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
+                         ldiag_dMOC, ldiag_DVD, diag_list
+  use g_clock, only: timenew, daynew, yearnew
+  use g_ic3d 
   implicit none
 
+  character(len=100)   :: nmlfile
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file

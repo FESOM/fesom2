@@ -20,6 +20,7 @@
     trlvl     = 0           ! set to 1 for level and deformed ice tracers
     trpnd     = 0           ! set to 1 for melt pond tracers
     trbgcs    = 0           ! set to 1 for skeletal layer tracers (needs TRBGCZ = 0)
+    ndtd      = 1           ! dynamic time steps per thermodynamic time step
 /
 
 &grid_nml

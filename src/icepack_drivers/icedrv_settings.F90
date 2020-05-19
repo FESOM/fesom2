@@ -14,7 +14,35 @@
 
       implicit none
 
-      type t_icepack_settings
+      type t_icepack_domain_size
+
+          ! setting variables used by the model
+
+          integer (kind=int_kind)  :: nx                   ! number of grid cells and gost cells for each mesh partition
+          integer (kind=int_kind)  :: ncat                 ! number of categories in use
+          integer (kind=int_kind)  :: nfsd                 ! number of floe size categories in use
+          integer (kind=int_kind)  :: nilyr                ! number of ice layers per category in use
+          integer (kind=int_kind)  :: nslyr                ! number of snow layers per category in use
+          integer (kind=int_kind)  :: n_aero               ! number of aerosols in use
+          integer (kind=int_kind)  :: n_zaero              ! number of z aerosols in use
+          integer (kind=int_kind)  :: n_algae              ! number of algae in use
+          integer (kind=int_kind)  :: n_doc                ! number of DOC pools in use
+          integer (kind=int_kind)  :: n_dic                ! number of DIC pools in use
+          integer (kind=int_kind)  :: n_don                ! number of DON pools in use
+          integer (kind=int_kind)  :: n_fed                ! number of Fe pools in use dissolved Fe
+          integer (kind=int_kind)  :: n_fep                ! number of Fe pools in use particulate Fe
+          integer (kind=int_kind)  :: nblyr                ! number of bio/brine layers per category
+          integer (kind=int_kind)  :: n_bgc                ! nit, am, sil, dmspp, dmspd, dms, pon, humic
+          integer (kind=int_kind)  :: nltrcr               ! number of zbgc (includes zaero) and zsalinity tracers
+          integer (kind=int_kind)  :: max_nsw              ! number of tracers active in shortwave calculation
+          integer (kind=int_kind)  :: max_ntrcr            ! number of tracers in total
+          integer (kind=int_kind)  :: nfreq                ! number of wave frequencies ! HARDWIRED FOR NOW
+
+      end type t_icepack_domain_size
+
+!=======================================================================
+
+      type t_icepack_namelists
 
           ! env namelist
 
@@ -40,27 +68,6 @@
           integer (kind=int_kind)  :: trpnd                ! set to 1 for melt pond tracers
           integer (kind=int_kind)  :: trbgcs               ! set to 1 for skeletal layer tracers (needs TRBGCZ = 0)
 
-          ! setting variables used by the model
-
-          integer (kind=int_kind)  :: ncat                 ! number of categories in use
-          integer (kind=int_kind)  :: nfsd                 ! number of floe size categories in use
-          integer (kind=int_kind)  :: nilyr                ! number of ice layers per category in use
-          integer (kind=int_kind)  :: nslyr                ! number of snow layers per category in use
-          integer (kind=int_kind)  :: n_aero               ! number of aerosols in use
-          integer (kind=int_kind)  :: n_zaero              ! number of z aerosols in use
-          integer (kind=int_kind)  :: n_algae              ! number of algae in use
-          integer (kind=int_kind)  :: n_doc                ! number of DOC pools in use
-          integer (kind=int_kind)  :: n_dic                ! number of DIC pools in use
-          integer (kind=int_kind)  :: n_don                ! number of DON pools in use
-          integer (kind=int_kind)  :: n_fed                ! number of Fe pools in use dissolved Fe
-          integer (kind=int_kind)  :: n_fep                ! number of Fe pools in use particulate Fe
-          integer (kind=int_kind)  :: nblyr                ! number of bio/brine layers per category
-          integer (kind=int_kind)  :: n_bgc                ! nit, am, sil, dmspp, dmspd, dms, pon, humic
-          integer (kind=int_kind)  :: nltrcr               ! number of zbgc (includes zaero) and zsalinity tracers
-          integer (kind=int_kind)  :: max_nsw              ! number of tracers active in shortwave calculation
-          integer (kind=int_kind)  :: max_ntrcr            ! number of tracers in total
-          integer (kind=int_kind)  :: nfreq                ! number of wave frequencies ! HARDWIRED FOR NOW
-
           ! tracer namelist
         
           logical (kind=log_kind)  :: tr_iage
@@ -71,6 +78,10 @@
           logical (kind=log_kind)  :: tr_pond_lvl
           logical (kind=log_kind)  :: tr_aero
           logical (kind=log_kind)  :: tr_fsd
+         
+          ! grid namelist
+ 
+          integer (kind=int_kind)  :: kcatbound
 
           ! thermo namelist
 
@@ -89,7 +100,7 @@
           integer (kind=int_kind)  :: kstrength       
           integer (kind=int_kind)  :: krdg_partic     
           integer (kind=int_kind)  :: krdg_redist     
-          integer (kind=int_kind)  :: mu_rdg          
+          real (kind=dbl_kind)     :: mu_rdg          
           real (kind=dbl_kind)     :: Cf              
           
           ! shortwave namelist
@@ -114,10 +125,10 @@
           real (kind=dbl_kind)     :: hs0 
           real (kind=dbl_kind)     :: hs1
           real (kind=dbl_kind)     :: dpscale         
-          character (len=char_len) :: frzpnd         
           real (kind=dbl_kind)     :: rfracmin      
           real (kind=dbl_kind)     :: rfracmax     
           real (kind=dbl_kind)     :: pndaspect   
+          character (len=char_len) :: frzpnd         
 
           ! forcing namelist
 
@@ -134,9 +145,9 @@
           logical (kind=log_kind)  :: l_mpond_fresh   
           character (len=char_len) :: tfrz_option     
           logical (kind=log_kind)  :: oceanmixed_ice   
-          character (len=char_len) :: wave_spec_type   
+          character (len=char_len) :: wave_spec_type            
 
-      end type t_icepack_settings
+      end type t_icepack_namelists
 
 !=======================================================================    
 
