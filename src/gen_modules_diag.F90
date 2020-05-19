@@ -410,7 +410,7 @@ subroutine diag_densMOC(mode, mesh)
 !       ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
 	ie=std_dens_N
         do jj = std_dens_N,1,-1
-           if (std_dens(jj) < dmin) then
+           if (std_dens(jj) < dmax) then
               ie = jj
               exit
            endif
