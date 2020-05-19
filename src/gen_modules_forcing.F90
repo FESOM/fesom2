@@ -51,6 +51,7 @@ use o_param
   ! forcing arrays
   real(kind=WP), allocatable, dimension(:)         :: u_wind, v_wind 
   real(kind=WP), allocatable, dimension(:)         :: Tair, shum
+  real(kind=WP), allocatable, dimension(:)         :: Tair_mo, shum_mo !!PS
   real(kind=WP), allocatable, dimension(:,:)       :: u_wind_t, v_wind_t 
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave

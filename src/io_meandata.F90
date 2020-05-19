@@ -94,13 +94,14 @@ subroutine ini_mean_io(mesh)
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 102       ! unit to open namelist file
   integer                   :: iost
-  integer,dimension(12)     :: sel_forcvar=0
+  integer,dimension(14)     :: sel_forcvar=0
   ! sel_forcvar(1) = uwind   ! sel_forcvar(2) = vwind
   ! sel_forcvar(3) = tair    ! sel_forcvar(4) = shum
   ! sel_forcvar(5) = prec    ! sel_forcvar(6) = snow
   ! sel_forcvar(7) = evap    ! sel_forcvar(8) = swr
   ! sel_forcvar(9) = lwr     ! sel_forcvar(10)= runoff
   ! sel_forcvar(11) = tx_surf! sel_forcvar(12)= ty_surf
+  ! sel_forcvar(13) = tair_mo! sel_forcvar(14)= shum_mo
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -230,6 +231,12 @@ CASE ('uwind ')
 CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('tair_mo   ')
+    sel_forcvar(3) = 13
+    call def_stream(nod2D, myDim_nod2D, 'tair_mo',     'bulk formular surface air temperature',         '°C',     Tair_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('shum_mo   ')
+    sel_forcvar(4) = 14
+    call def_stream(nod2D, myDim_nod2D, 'shum_mo',     'bulk formular specific humidity',               '',       shum_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
     
 !___________________________________________________________________________________________________________________________________
@@ -497,6 +504,8 @@ END DO
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
         if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
         if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
+        if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'tair_mo','bulk formular surf. air temp.'  , '°C'   , Tair_mo          , 1, 'm', i_real4, mesh)
+        if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'shum_mo','bulk formular specific humidity', ''     , shum_mo(:)       , 1, 'm', i_real4, mesh)
     end if
     
     
