@@ -821,8 +821,6 @@
       module subroutine set_grid_icepack(mesh)
 
           use mod_mesh
-          use icedrv_domain_size,  only: nx
-          use g_parsup,            only: myDim_nod2D, eDim_nod2D 
 
           implicit none
          
@@ -842,19 +840,19 @@
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 
-          coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%coord_nod2D
+          coord_nod2D(1:2,1:nx) => mesh%coord_nod2D
     
           !-----------------------------------------------------------------
           ! create hemisphereic masks
           !-----------------------------------------------------------------
     
-          !lmask_n(:) = .false.
-          !lmask_s(:) = .false.
-          !
-          !do i = 1, nx
-          !   if (coord_nod2D(2,:) >= -puny) lmask_n(i) = .true. ! N. Hem.
-          !   if (coord_nod2D(2,:) <  -puny) lmask_s(i) = .true. ! S. Hem.
-          !enddo
+          lmask_n(:) = .false.
+          lmask_s(:) = .false.
+          
+          do i = 1, nx
+             if (coord_nod2D(2,i) >= -puny) lmask_n(i) = .true. ! N. Hem.
+             if (coord_nod2D(2,i) <  -puny) lmask_s(i) = .true. ! S. Hem.
+          enddo
 
       end subroutine set_grid_icepack
 

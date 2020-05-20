@@ -2,7 +2,7 @@
 !
 ! Module that contains the whole icepack implementation in fesom2
 !
-! author Lorenzo Zampieri ( lorenzo.zampieri@awi.de )
+! Author: Lorenzo Zampieri ( lorenzo.zampieri@awi.de )
 !
 !=======================================================================
 
@@ -14,10 +14,12 @@
           implicit none
 
           !=======================================================================    
-!--------- List here all the public variables to be seen outside icepack 
+!--------- List here all the public variables and 
+!--------- subroutines to be seen outside icepack 
           !=======================================================================
 
-          public :: set_icepack, set_grid_icepack
+          public :: set_icepack, set_grid_icepack, alloc_state, alloc_flux,      &
+                    alloc_flux_bgc, alloc_column
     
           !=======================================================================
 !--------- Everything else is private
@@ -415,6 +417,27 @@
           !=======================================================================
           ! 5. Column variables
           !=======================================================================
+
+          real (kind=dbl_kind), save, allocatable ::   & ! DIM nx
+             Cdn_atm(:)     , & ! atm drag coefficient
+             Cdn_ocn(:)     , & ! ocn drag coefficient
+                                ! form drag
+             hfreebd(:),      & ! freeboard (m)
+             hdraft(:),       & ! draft of ice + snow column (Stoessel1993)
+             hridge(:),       & ! ridge height
+             distrdg(:),      & ! distance between ridges
+             hkeel(:),        & ! keel depth
+             dkeel(:),        & ! distance between keels
+             lfloe(:),        & ! floe length
+             dfloe(:),        & ! distance between floes
+             Cdn_atm_skin(:), & ! neutral skin drag coefficient
+             Cdn_atm_floe(:), & ! neutral floe edge drag coefficient
+             Cdn_atm_pond(:), & ! neutral pond edge drag coefficient
+             Cdn_atm_rdg(:),  & ! neutral ridge drag coefficient
+             Cdn_ocn_skin(:), & ! skin drag coefficient
+             Cdn_ocn_floe(:), & ! floe edge drag coefficient
+             Cdn_ocn_keel(:), & ! keel drag coefficient
+             Cdn_atm_ratio(:)   ! ratio drag atm / neutral drag atm
     
           ! icepack_itd.F90
           real (kind=dbl_kind), save, allocatable :: & ! DIM 0:ncat ?
@@ -713,10 +736,25 @@
                   type(t_mesh), intent(in), target :: mesh
               end subroutine set_grid_icepack                  
 
-              ! Allocate variables
-              module subroutine allocate_icepack
+              ! Allocate state and grid variables 
+              module subroutine alloc_state()
                   implicit none
-              end subroutine allocate_icepack
+              end subroutine alloc_state
+
+              ! Allocate flux variables
+              module subroutine alloc_flux()
+                  implicit none
+              end subroutine alloc_flux
+
+              ! Allocate flux bgc variables
+              module subroutine alloc_flux_bgc()
+                  implicit none
+              end subroutine alloc_flux_bgc
+
+              ! Allocate column variables
+              module subroutine alloc_column()
+                  implicit none
+              end subroutine alloc_column
 
           end interface
 
