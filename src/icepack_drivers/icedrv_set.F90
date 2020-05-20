@@ -6,11 +6,8 @@
 !
 !=======================================================================
 
-      module icedrv_set
+      submodule (icedrv_main) icedrv_set
 
-      use icedrv_kinds
-      use icedrv_constants, only: nu_diag, ice_stdout, nu_diag_out, nu_nml
-      use icedrv_constants, only: c0, c1, c2, c3, p2, p5
       use icepack_intfc,    only: icepack_init_parameters
       use icepack_intfc,    only: icepack_init_fsd
       use icepack_intfc,    only: icepack_init_tracer_flags
@@ -24,16 +21,10 @@
       use icepack_intfc,    only: icepack_warnings_flush
       use icepack_intfc,    only: icepack_warnings_aborted
       use icedrv_system,    only: icedrv_system_abort 
-
-      implicit none
-
-      public         set_icepack, set_grid_icepack
-
-      private
       
       contains 
 
-      subroutine set_icepack
+      module subroutine set_icepack()
 
           use icedrv_domain_size   
           use g_parsup,            only: mype, myDim_nod2D, eDim_nod2D
@@ -827,7 +818,7 @@
 
 !=======================================================================
 
-      subroutine set_grid_icepack(mesh)
+      module subroutine set_grid_icepack(mesh)
 
           use mod_mesh
           use icedrv_domain_size,  only: nx
@@ -869,7 +860,7 @@
 
 !=======================================================================
 
-      end module icedrv_set
+      end submodule icedrv_set
 
 
 

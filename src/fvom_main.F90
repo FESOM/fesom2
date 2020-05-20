@@ -26,7 +26,7 @@ use mo_tidal
 
 ! Define icepack modules
 #if defined (__icepack)
-use icedrv_set,          only: set_icepack, set_grid_icepack
+use icedrv_main,          only: set_icepack, set_grid_icepack
 #endif
 
 #if defined (__oasis)
