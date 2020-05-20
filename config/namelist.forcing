@@ -7,6 +7,7 @@ Cd_atm_oce=1.0e-3  ! drag coefficient between atmosphere and water
 Ce_atm_ice=1.75e-3 ! exchange coeff. of latent heat over ice
 Ch_atm_ice=1.75e-3 ! exchange coeff. of sensible heat over ice
 Cd_atm_ice=1.2e-3  ! drag coefficient between atmosphere and ice 
+Swind     =0.0     ! parameterization for coupled current feedback
 /
 
 &forcing_bulk
