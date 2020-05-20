@@ -10,7 +10,7 @@
 
       use icedrv_kinds
       use icedrv_constants, only: nu_diag, ice_stdout, nu_diag_out, nu_nml
-      use icedrv_constants, only: c0, c1, c2, c3, p2, p5, puny
+      use icedrv_constants, only: c0, c1, c2, c3, p2, p5
       use icepack_intfc,    only: icepack_init_parameters
       use icepack_intfc,    only: icepack_init_fsd
       use icepack_intfc,    only: icepack_init_tracer_flags
@@ -26,38 +26,136 @@
       use icedrv_system,    only: icedrv_system_abort 
 
       implicit none
+
+      public         set_icepack, set_grid_icepack
+
       private
-      public :: set_icepack, set_grid_icepack
       
       contains 
 
-      subroutine set_icepack(icepack_namelists, icepack_domain_size)
+      subroutine set_icepack
 
-          use icedrv_settings
-          use g_parsup,         only: mype, myDim_nod2D, eDim_nod2D
+          use icedrv_domain_size   
+          use g_parsup,            only: mype, myDim_nod2D, eDim_nod2D
 
           implicit none
 
-          ! CHARACTER
+          ! local variables
+
           character(len=char_len)     :: nml_filename, diag_filename
           character(len=*), parameter :: subname = '(set_icepack)'
-          ! INTEGER
           integer (kind=int_kind)     :: nt_Tsfc, nt_sice, nt_qice, nt_qsno 
           integer (kind=int_kind)     :: nt_alvl, nt_vlvl, nt_apnd, nt_hpnd
           integer (kind=int_kind)     :: nt_ipnd, nt_aero, nt_fsd,  nt_FY 
           integer (kind=int_kind)     :: ntrcr,   nt_iage
-          integer  (kind=int_kind)    :: nml_error, diag_error    ! i/o error flag
-          integer  (kind=int_kind)    :: n                        ! loop index
-          ! REAL
-          real     (kind=real_kind)   :: rpcesm, rplvl, rptopo
-          ! LOGICAL
+          integer  (kind=int_kind)    :: nml_error, diag_error    
+          integer  (kind=int_kind)    :: n                      
+          real     (kind=dbl_kind)    :: rpcesm, rplvl, rptopo, puny
           logical  (kind=log_kind)    :: tr_pond, wave_spec
-          ! TYPE                         
-          type(t_icepack_namelists),   intent(inout), target :: icepack_namelists
-          type(t_icepack_domain_size), intent(inout), target :: icepack_domain_size
 
-#include "associate_icepack_namelists.h"
-#include "associate_icepack_domain_size.h"
+          ! env namelist
+
+          integer (kind=int_kind)  :: nicecat              ! number of ice thickness categories
+          integer (kind=int_kind)  :: nfsdcat              ! number of floe size categories
+          integer (kind=int_kind)  :: nicelyr              ! number of vertical layers in the ice
+          integer (kind=int_kind)  :: nsnwlyr              ! number of vertical layers in the snow
+          integer (kind=int_kind)  :: ntraero              ! number of aerosol tracers (up to max_aero in ice_domain_size.F90)
+          integer (kind=int_kind)  :: trzaero              ! number of z aerosol tracers (up to max_aero = 6)
+          integer (kind=int_kind)  :: tralg                ! number of algal tracers (up to max_algae = 3)
+          integer (kind=int_kind)  :: trdoc                ! number of dissolve organic carbon (up to max_doc = 3)
+          integer (kind=int_kind)  :: trdic                ! number of dissolve inorganic carbon (up to max_dic = 1)
+          integer (kind=int_kind)  :: trdon                ! number of dissolve organic nitrogen (up to max_don = 1)
+          integer (kind=int_kind)  :: trfed                ! number of dissolved iron tracers (up to max_fe  = 2)
+          integer (kind=int_kind)  :: trfep                ! number of particulate iron tracers (up to max_fe  = 2)
+          integer (kind=int_kind)  :: nbgclyr              ! number of zbgc layers
+          integer (kind=int_kind)  :: trbgcz               ! set to 1 for zbgc tracers (needs TRBGCS = 0 and TRBRI = 1)
+          integer (kind=int_kind)  :: trzs                 ! set to 1 for zsalinity tracer (needs TRBRI = 1)
+          integer (kind=int_kind)  :: trbri                ! set to 1 for brine height tracer
+          integer (kind=int_kind)  :: trage                ! set to 1 for ice age tracer
+          integer (kind=int_kind)  :: trfy                 ! set to 1 for first-year ice area tracer
+          integer (kind=int_kind)  :: trlvl                ! set to 1 for level and deformed ice tracers
+          integer (kind=int_kind)  :: trpnd                ! set to 1 for melt pond tracers
+          integer (kind=int_kind)  :: trbgcs               ! set to 1 for skeletal layer tracers (needs TRBGCZ = 0)
+
+          ! tracer namelist
+        
+          logical (kind=log_kind)  :: tr_iage
+          logical (kind=log_kind)  :: tr_FY
+          logical (kind=log_kind)  :: tr_lvl
+          logical (kind=log_kind)  :: tr_pond_cesm
+          logical (kind=log_kind)  :: tr_pond_topo
+          logical (kind=log_kind)  :: tr_pond_lvl
+          logical (kind=log_kind)  :: tr_aero
+          logical (kind=log_kind)  :: tr_fsd
+
+          ! grid namelist
+ 
+          integer (kind=int_kind)  :: kcatbound
+
+          ! thermo namelist
+
+          integer (kind=int_kind)  :: kitd
+          integer (kind=int_kind)  :: ktherm
+          character (len=char_len) :: conduct
+          real (kind=dbl_kind)     :: a_rapid_mode
+          real (kind=dbl_kind)     :: Rac_rapid_mode  
+          real (kind=dbl_kind)     :: aspect_rapid_mode 
+          real (kind=dbl_kind)     :: dSdt_slow_mode    
+          real (kind=dbl_kind)     :: phi_c_slow_mode   
+          real (kind=dbl_kind)     :: phi_i_mushy       
+
+          ! dynamics namelist
+          
+          integer (kind=int_kind)  :: kstrength       
+          integer (kind=int_kind)  :: krdg_partic     
+          integer (kind=int_kind)  :: krdg_redist     
+          real (kind=dbl_kind)     :: mu_rdg          
+          real (kind=dbl_kind)     :: Cf              
+          
+          ! shortwave namelist
+      
+          character (len=char_len) :: shortwave      
+          character (len=char_len) :: albedo_type    
+          real (kind=dbl_kind)     :: albicev        
+          real (kind=dbl_kind)     :: albicei         
+          real (kind=dbl_kind)     :: albsnowv        
+          real (kind=dbl_kind)     :: albsnowi      
+          real (kind=dbl_kind)     :: ahmax         
+          real (kind=dbl_kind)     :: R_ice         
+          real (kind=dbl_kind)     :: R_pnd         
+          real (kind=dbl_kind)     :: R_snw         
+          real (kind=dbl_kind)     :: dT_mlt        
+          real (kind=dbl_kind)     :: rsnw_mlt       
+          real (kind=dbl_kind)     :: kalg           
+
+          ! ponds namelist
+
+          real (kind=dbl_kind)     :: hp1 
+          real (kind=dbl_kind)     :: hs0 
+          real (kind=dbl_kind)     :: hs1
+          real (kind=dbl_kind)     :: dpscale         
+          real (kind=dbl_kind)     :: rfracmin      
+          real (kind=dbl_kind)     :: rfracmax     
+          real (kind=dbl_kind)     :: pndaspect   
+          character (len=char_len) :: frzpnd         
+
+          ! forcing namelist
+
+          logical (kind=log_kind)  :: formdrag        
+          character (len=char_len) :: atmbndy         
+          logical (kind=log_kind)  :: calc_strair     
+          logical (kind=log_kind)  :: calc_Tsfc       
+          logical (kind=log_kind)  :: highfreq        
+          integer (kind=int_kind)  :: natmiter        
+          real (kind=dbl_kind)     :: ustar_min      
+          real (kind=dbl_kind)     :: emissivity      
+          character (len=char_len) :: fbot_xfer_type  
+          logical (kind=log_kind)  :: update_ocn_f    
+          logical (kind=log_kind)  :: l_mpond_fresh   
+          character (len=char_len) :: tfrz_option     
+          logical (kind=log_kind)  :: oceanmixed_ice   
+          character (len=char_len) :: wave_spec_type
+
 
           !-----------------------------------------------------------------
           ! Namelist definition
@@ -729,34 +827,31 @@
 
 !=======================================================================
 
-      subroutine set_grid_icepack(mesh, icepack_domain_size)
+      subroutine set_grid_icepack(mesh)
 
           use mod_mesh
-          use icedrv_settings
-           
+          use icedrv_domain_size,  only: nx
+          use g_parsup,            only: myDim_nod2D, eDim_nod2D 
+
           implicit none
-             
-          ! INTEGER
-          integer                     :: i
-          !REAL
-          real (kind=dbl_kind)        :: pi, puny
-          ! CHARACTER
-          character(len=*), parameter :: subname='(init_grid_icepack)'
-          ! TYPES
-          type(t_icepack_domain_size), intent(in), target :: icepack_domain_size
-          type(t_mesh),                intent(in), target :: mesh
-
-#include "associate_icepack_domain_size.h"
-#include "../associate_mesh.h"       
-
+         
+          integer (kind=int_kind)                      :: i
+          real(kind=dbl_kind)                          :: puny
+          real(kind=dbl_kind), dimension(:,:), pointer :: coord_nod2D  
+          character(len=*), parameter                  :: subname = '(init_grid_icepack)'
+          type(t_mesh), intent(in), target             :: mesh
+                    
+                     
           !-----------------------------------------------------------------
           ! query Icepack values
           !-----------------------------------------------------------------
     
-          call icepack_query_parameters(pi_out=pi,puny_out=puny)
+          call icepack_query_parameters(puny_out=puny)
           call icepack_warnings_flush(nu_diag)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
+
+          coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%coord_nod2D
     
           !-----------------------------------------------------------------
           ! create hemisphereic masks
