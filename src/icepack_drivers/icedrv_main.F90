@@ -813,6 +813,11 @@
                   implicit none
               end subroutine init_fsd
 
+              ! Initialize state variables
+              module subroutine init_state_var()
+                  implicit none
+              end subroutine init_state_var
+
               ! Initialize all
               module subroutine init_icepack(mesh)
                   use mod_mesh

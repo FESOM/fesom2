@@ -198,48 +198,7 @@
           ! Set state variables
           !-----------------------------------------------------------------
 
-          !call set_state_var (nx,        &
-          !    Tair  (:),   sst  (:),     &
-          !    Tf    (:),                 &
-          !    salinz(:,:), Tmltz(:,:),   &
-          !    aicen (:,:), trcrn(:,:,:), &
-          !    vicen (:,:), vsnon(:,:))
-    
-          !-----------------------------------------------------------------
-          ! compute aggregate ice state and open water area
-          !-----------------------------------------------------------------
-    
-          do i = 1, nx
-             aice(i) = c0
-             vice(i) = c0
-             vsno(i) = c0
-             do it = 1, max_ntrcr
-                trcr(i,it) = c0
-             enddo
-    
-             call icepack_aggregate(ncat=ncat,                            &
-                                    trcrn=trcrn(i,1:ntrcr,:),             &
-                                    aicen=aicen(i,:),                     &
-                                    vicen=vicen(i,:),                     &
-                                    vsnon=vsnon(i,:),                     &
-                                    trcr=trcr (i,1:ntrcr),                &
-                                    aice=aice (i),                        &
-                                    vice=vice (i),                        &
-                                    vsno=vsno (i),                        &
-                                    aice0=aice0(i),                       &
-                                    ntrcr=ntrcr,                          &
-                                    trcr_depend=trcr_depend(1:ntrcr),     &
-                                    trcr_base=trcr_base    (1:ntrcr,:),   &
-                                    n_trcr_strata=n_trcr_strata(1:ntrcr), &
-                                    nt_strata=nt_strata    (1:ntrcr,:))
-    
-             aice_init(i) = aice(i)
-    
-          enddo
-    
-          call icepack_warnings_flush(nu_diag)
-          if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-              file=__FILE__, line=__LINE__)
+          call init_state_var        
     
       end subroutine init_state
 
@@ -956,10 +915,184 @@
           call init_shortwave    ! initialize radiative transfer using current swdn
           call init_flux_atm_ocn    ! initialize atmosphere, ocean fluxes
 
-      end subroutine
+      end subroutine init_icepack
+
+!=======================================================================
+
+      module subroutine init_state_var ()
+
+          use icepack_intfc,   only: icepack_init_fsd
+          use icepack_intfc,   only: icepack_aggregate
+
+          implicit none
+
+          ! local variables
+    
+          integer (kind=int_kind) :: &
+             i     , & ! horizontal indices
+             k     , & ! ice layer index
+             n     , & ! thickness category index
+             it        ! tracer index
+    
+          real (kind=dbl_kind) :: &
+             Tsfc, sum, hbar, &
+             rhos, Lfresh, puny
+    
+          real (kind=dbl_kind), dimension(ncat) :: &
+             ainit, hinit    ! initial area, thickness
+    
+          real (kind=dbl_kind), dimension(nilyr) :: &
+             qin             ! ice enthalpy (J/m3)
+    
+          real (kind=dbl_kind), dimension(nslyr) :: &
+             qsn             ! snow enthalpy (J/m3)
+    
+          real (kind=dbl_kind), parameter :: &
+             hsno_init = 0.25_dbl_kind   ! initial snow thickness (m)
+    
+          logical (kind=log_kind) :: tr_brine, tr_lvl, tr_fsd
+          integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno, nt_sice, nt_fsd
+          integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl, ntrcr
+    
+          character(len=char_len_long), parameter  :: ice_ic='default'
+          character(len=*),             parameter  :: subname='(set_state_var)'
+    
+          !-----------------------------------------------------------------
+          ! query Icepack values
+          !-----------------------------------------------------------------
+    
+          call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl,    &
+            tr_fsd_out=tr_fsd)
+          call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
+          call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice, &
+               nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_fsd_out=nt_fsd,            &
+               nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl)
+          call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh, puny_out=puny)
+          call icepack_warnings_flush(nu_diag)
+          if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname,     &
+             file=__FILE__,line= __LINE__)
+    
+          !-----------------------------------------------------------------
+          ! Initialize state variables.
+          ! If restarting, these values are overwritten.
+          !-----------------------------------------------------------------
+    
+          do n = 1, ncat
+             do i = 1, nx
+                aicen(i,n) = c0
+                vicen(i,n) = c0
+                vsnon(i,n) = c0
+                trcrn(i,nt_Tsfc,n) = Tf(i)  ! surface temperature
+                if (max_ntrcr >= 2) then
+                   do it = 2, max_ntrcr
+                      trcrn(i,it,n) = c0
+                   enddo
+                endif
+                if (tr_lvl)   trcrn(i,nt_alvl,n) = c1
+                if (tr_lvl)   trcrn(i,nt_vlvl,n) = c1
+                if (tr_brine) trcrn(i,nt_fbri,n) = c1
+                do k = 1, nilyr
+                   trcrn(i,nt_sice+k-1,n) = salinz(i,k)
+                enddo
+                do k = 1, nslyr
+                   trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
+                enddo
+             enddo
+             ainit(n) = c0
+             hinit(n) = c0
+          enddo
+
+          if (3 <= ncat) then
+              n = 3
+              ainit(n) = c1  ! assumes we are using the default ITD boundaries
+              hinit(n) = c2
+          else
+              ainit(ncat) = c1
+              hinit(ncat) = c2
+          endif
+
+          do i = 1, nx
+             if (sst(i) <= Tf(i)) then             
+                do n = 1, ncat
+                   ! ice volume, snow volume
+                   aicen(i,n) = ainit(n)
+                   vicen(i,n) = hinit(n) * ainit(n) ! m
+                   vsnon(i,n) = c0
+                   ! tracers
+                   call icepack_init_trcr(Tair     = T_air(i),     &
+                                          Tf       = Tf(i),       &
+                                          Sprofile = salinz(i,:), &
+                                          Tprofile = Tmltz(i,:),  &
+                                          Tsfc     = Tsfc,        &
+                                          nilyr=nilyr, nslyr=nslyr, &
+                                          qin=qin(:), qsn=qsn(:))
+          
+                   ! floe size distribution
+                   if (tr_fsd) call icepack_init_fsd(nfsd=nfsd, ice_ic=ice_ic, &
+                                            floe_rad_c=floe_rad_c,                &
+                                            floe_binwidth=floe_binwidth,          &
+                                            afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
+                   ! surface temperature
+                   trcrn(i,nt_Tsfc,n) = Tsfc ! deg C
+                   ! ice enthalpy, salinity
+                   do k = 1, nilyr
+                      trcrn(i,nt_qice+k-1,n) = qin(k)
+                      trcrn(i,nt_sice+k-1,n) = salinz(i,k)
+                   enddo
+                   ! snow enthalpy
+                   do k = 1, nslyr
+                      trcrn(i,nt_qsno+k-1,n) = qsn(k)
+                   enddo               ! nslyr
+                   ! brine fraction
+                   if (tr_brine) trcrn(i,nt_fbri,n) = c1
+                enddo                  ! ncat
+                call icepack_warnings_flush(nu_diag)
+                if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+                    file=__FILE__, line=__LINE__)
+             endif 
+          enddo
+
+          !-----------------------------------------------------------------
+          ! compute aggregate ice state and open water area
+          !-----------------------------------------------------------------
+    
+          do i = 1, nx
+             aice(i) = c0
+             vice(i) = c0
+             vsno(i) = c0
+             do it = 1, max_ntrcr
+                trcr(i,it) = c0
+             enddo
+    
+             call icepack_aggregate(ncat=ncat,                            &
+                                    trcrn=trcrn(i,1:ntrcr,:),             &
+                                    aicen=aicen(i,:),                     &
+                                    vicen=vicen(i,:),                     &
+                                    vsnon=vsnon(i,:),                     &
+                                    trcr=trcr (i,1:ntrcr),                &
+                                    aice=aice (i),                        &
+                                    vice=vice (i),                        &
+                                    vsno=vsno (i),                        &
+                                    aice0=aice0(i),                       &
+                                    ntrcr=ntrcr,                          &
+                                    trcr_depend=trcr_depend(1:ntrcr),     &
+                                    trcr_base=trcr_base    (1:ntrcr,:),   &
+                                    n_trcr_strata=n_trcr_strata(1:ntrcr), &
+                                    nt_strata=nt_strata    (1:ntrcr,:))
+    
+             aice_init(i) = aice(i)
+    
+          enddo
+    
+          call icepack_warnings_flush(nu_diag)
+          if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+              file=__FILE__, line=__LINE__)
+
+      end subroutine init_state_var
 
 !=======================================================================
 
       end submodule icedrv_init
+
 
 !=======================================================================
