@@ -9,11 +9,9 @@
       submodule (icedrv_main) icedrv_set
 
       use icepack_intfc,    only: icepack_init_parameters
-      use icepack_intfc,    only: icepack_init_fsd
       use icepack_intfc,    only: icepack_init_tracer_flags
       use icepack_intfc,    only: icepack_init_tracer_sizes
       use icepack_intfc,    only: icepack_init_tracer_indices
-      use icepack_intfc,    only: icepack_init_trcr
       use icepack_intfc,    only: icepack_query_parameters
       use icepack_intfc,    only: icepack_query_tracer_flags
       use icepack_intfc,    only: icepack_query_tracer_sizes
@@ -26,8 +24,9 @@
 
       module subroutine set_icepack()
 
-          use icedrv_domain_size   
-          use g_parsup,            only: mype, myDim_nod2D, eDim_nod2D
+          use g_parsup,            only: myDim_nod2D,  eDim_nod2D,  &
+                                         myDim_elem2D, eDim_elem2D, &
+                                         mpi_comm_fesom
 
           implicit none
 
@@ -39,7 +38,7 @@
           integer (kind=int_kind)     :: nt_alvl, nt_vlvl, nt_apnd, nt_hpnd
           integer (kind=int_kind)     :: nt_ipnd, nt_aero, nt_fsd,  nt_FY 
           integer (kind=int_kind)     :: ntrcr,   nt_iage
-          integer  (kind=int_kind)    :: nml_error, diag_error    
+          integer  (kind=int_kind)    :: nml_error, diag_error, mpi_error    
           integer  (kind=int_kind)    :: n                      
           real     (kind=dbl_kind)    :: rpcesm, rplvl, rptopo, puny
           logical  (kind=log_kind)    :: tr_pond, wave_spec
@@ -157,7 +156,8 @@
           namelist / env_nml /                                                &
              nicecat, nfsdcat, nicelyr, nsnwlyr, ntraero, trzaero, tralg,     &
              trdoc,   trdic,   trdon,   trfed,   trfep,   nbgclyr, trbgcz,    &
-             trzs,    trbri,   trage,   trfy,    trlvl,   trpnd,   trbgcs
+             trzs,    trbri,   trage,   trfy,    trlvl,   trpnd,   trbgcs,    &
+             ndtd
 
           namelist / grid_nml /                                               &
              kcatbound
@@ -178,9 +178,8 @@
              dT_mlt,         rsnw_mlt,        kalg
 
           namelist / ponds_nml /                                               &
-             hs0,            dpscale,         frzpnd,                          &
-             rfracmin,       rfracmax,        pndaspect,     hs1,              &
-             hp1
+             hs0,            dpscale,         frzpnd,        hp1,              &
+             rfracmin,       rfracmax,        pndaspect,     hs1
 
           namelist / tracer_nml /                                              &
              tr_iage,      tr_FY,        tr_lvl,       tr_pond_cesm,           &
@@ -218,6 +217,7 @@
           trlvl     = 0           ! set to 1 for level and deformed ice tracers
           trpnd     = 0           ! set to 1 for melt pond tracers
           trbgcs    = 0           ! set to 1 for skeletal layer tracers (needs
+          ndtd      = 1           ! dynamic time steps per thermodynamic time step
 
           !-----------------------------------------------------------------
           ! Read namelist env_nml
@@ -249,7 +249,8 @@
           ! Derived quantities used by the icepack model
           !-----------------------------------------------------------------
           
-          nx        = myDim_nod2D + eDim_nod2D
+          nx        = myDim_nod2D  + eDim_nod2D
+          nx_elem   = myDim_elem2D + eDim_elem2D
 
           ncat      = nicecat    ! number of categories
           nfsd      = nfsdcat    ! number of floe size categories
@@ -331,7 +332,6 @@
           ! other default values 
           !-----------------------------------------------------------------
 
-          ndtd = 1                    ! dynamic time steps per thermodynamic time step
           l_mpond_fresh = .false.     ! logical switch for including meltpond freshwater
                                       ! flux feedback to ocean model
           oceanmixed_ice  = .false.   ! if true, use internal ocean mixed layer
@@ -395,16 +395,14 @@
           ! set up diagnostics output and resolve conflicts
           !-----------------------------------------------------------------
     
-          if (mype == 0) write(*,*) 'Diagnostic output will be in files '
-          if (mype == 0) write(*,*) '    ','icepack.diagnostics'
-          if (mype == 0) write(*,*) '   Error output will be in files '
-          if (mype == 0) write(*,*) '       ','icepack.errors'
+          if (mype == 0) write(*,*) 'Diagnostic output will be in file '
+          if (mype == 0) write(*,*) '       icepack.diagnostics'
 
           diag_filename = 'icepack.diagnostics'
           open (nu_diag, file=diag_filename, status='unknown', iostat=diag_error)
           if (diag_error /= 0) then
              if (mype == 0) write(*,*) 'Error while opening diagnostic file'
-             call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
 
           if (mype == 0) write(nu_diag,*) '-----------------------------------'
@@ -416,7 +414,7 @@
              if (mype == 0) write (nu_diag,*) 'Remapping the ITD is not allowed for ncat=1.'
              if (mype == 0) write (nu_diag,*) 'Use kitd = 0 (delta function ITD) with kcatbound = 0'
              if (mype == 0) write (nu_diag,*) 'or for column configurations use kcatbound = -1'
-             call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (ncat /= 1 .and. kcatbound == -1) then
@@ -438,7 +436,7 @@
     
           if (rpcesm + rplvl + rptopo > c1 + puny) then
              if (mype == 0) write (nu_diag,*) 'WARNING: Must use only one melt pond scheme'
-             call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (tr_pond_lvl .and. .not. tr_lvl) then
@@ -470,7 +468,7 @@
              if (mype == 0) write (nu_diag,*) 'WARNING: aerosols activated but'
              if (mype == 0) write (nu_diag,*) 'WARNING: not allocated in tracer array.'
              if (mype == 0) write (nu_diag,*) 'WARNING: Activate in compilation script.'
-             call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
           if (tr_aero .and. trim(shortwave) /= 'dEdd') then
@@ -524,6 +522,7 @@
              if (mype == 0) write (nu_diag,*) 'WARNING: formdrag=T but tr_lvl=F'
              if (mype == 0) write (nu_diag,*) 'WARNING: Setting tr_lvl=T'
              tr_lvl = .true.
+             max_ntrcr = max_ntrcr + 2 ! tr_lvl brings two more tracers
           endif
           endif
     
@@ -563,7 +562,7 @@
              write(nu_diag,1030) ' shortwave                 = ', trim(shortwave)
              write(nu_diag,1000) ' -------------------------------'
              write(nu_diag,1000) ' BGC coupling is switched OFF '
-             write(nu_diag,1000) ' not implemented in this version'
+             write(nu_diag,1000) ' not implemented with FESOM2  '
              write(nu_diag,1000) ' -------------------------------'
 
              if (trim(shortwave) == 'dEdd') then
@@ -719,44 +718,48 @@
           endif
  
           if (ntrcr > max_ntrcr-1) then
-             write(nu_diag,*) 'max_ntrcr-1 < number of namelist tracers'
-             write(nu_diag,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
-             call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             if (mype == 0) write(nu_diag,*) 'max_ntrcr-1 < number of namelist tracers'
+             if (mype == 0) write(nu_diag,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
  
-          write(nu_diag,*) ' '
-          write(nu_diag,1020) 'max_ntrcr = ', max_ntrcr
-          write(nu_diag,1020) 'ntrcr = '    , ntrcr
-          write(nu_diag,*) ' '
-          write(nu_diag,1020) 'nt_sice = ', nt_sice
-          write(nu_diag,1020) 'nt_qice = ', nt_qice
-          write(nu_diag,1020) 'nt_qsno = ', nt_qsno
-          write(nu_diag,*)' '
-          write(nu_diag,1020) 'ncat    = ', ncat
-          write(nu_diag,1020) 'nilyr   = ', nilyr
-          write(nu_diag,1020) 'nslyr   = ', nslyr
-          write(nu_diag,1020) 'nblyr   = ', nblyr
-          write(nu_diag,1020) 'nfsd    = ', nfsd
-          write(nu_diag,1020) 'n_aero  = ', n_aero
+          if (mype == 0) then 
 
-          if (formdrag) then
-             if (nt_apnd==0) then
-                write(nu_diag,*)'ERROR: nt_apnd:',nt_apnd
-                call icedrv_system_abort(file=__FILE__,line=__LINE__)
-             elseif (nt_hpnd==0) then
-                write(nu_diag,*)'ERROR: nt_hpnd:',nt_hpnd
-                call icedrv_system_abort(file=__FILE__,line=__LINE__)
-             elseif (nt_ipnd==0) then
-                write(nu_diag,*)'ERROR: nt_ipnd:',nt_ipnd
-                call icedrv_system_abort(file=__FILE__,line=__LINE__)
-             elseif (nt_alvl==0) then
-                write(nu_diag,*)'ERROR: nt_alvl:',nt_alvl
-                call icedrv_system_abort(file=__FILE__,line=__LINE__)
-             elseif (nt_vlvl==0) then
-                write(nu_diag,*)'ERROR: nt_vlvl:',nt_vlvl
-                call icedrv_system_abort(file=__FILE__,line=__LINE__)
+             write(nu_diag,*) ' '
+             write(nu_diag,1020) 'max_ntrcr = ', max_ntrcr
+             write(nu_diag,1020) 'ntrcr = '    , ntrcr
+             write(nu_diag,*) ' '
+             write(nu_diag,1020) 'nt_sice = ', nt_sice
+             write(nu_diag,1020) 'nt_qice = ', nt_qice
+             write(nu_diag,1020) 'nt_qsno = ', nt_qsno
+             write(nu_diag,*)' '
+             write(nu_diag,1020) 'ncat    = ', ncat
+             write(nu_diag,1020) 'nilyr   = ', nilyr
+             write(nu_diag,1020) 'nslyr   = ', nslyr
+             write(nu_diag,1020) 'nblyr   = ', nblyr
+             write(nu_diag,1020) 'nfsd    = ', nfsd
+             write(nu_diag,1020) 'n_aero  = ', n_aero
+
+             if (formdrag) then
+                if (nt_apnd==0) then
+                   write(nu_diag,*)'ERROR: nt_apnd:',nt_apnd
+                   call icedrv_system_abort(file=__FILE__,line=__LINE__)
+                elseif (nt_hpnd==0) then
+                   write(nu_diag,*)'ERROR: nt_hpnd:',nt_hpnd
+                   call icedrv_system_abort(file=__FILE__,line=__LINE__)
+                elseif (nt_ipnd==0) then
+                   write(nu_diag,*)'ERROR: nt_ipnd:',nt_ipnd
+                   call icedrv_system_abort(file=__FILE__,line=__LINE__)
+                elseif (nt_alvl==0) then
+                   write(nu_diag,*)'ERROR: nt_alvl:',nt_alvl
+                   call icedrv_system_abort(file=__FILE__,line=__LINE__)
+                elseif (nt_vlvl==0) then
+                   write(nu_diag,*)'ERROR: nt_vlvl:',nt_vlvl
+                   call icedrv_system_abort(file=__FILE__,line=__LINE__)
+                endif
              endif
-          endif
+
+          endif ! mype == 0
 
  1000     format (a30,2x,f9.2)  ! a30 to align formatted, unformatted statements
  1005     format (a30,2x,f9.6)  ! float
@@ -814,6 +817,8 @@
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
 
+          call mpi_barrier(mpi_comm_fesom,mpi_error)
+
       end subroutine set_icepack
 
 !=======================================================================
@@ -840,8 +845,8 @@
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 
-          coord_nod2D(1:2,1:nx) => mesh%coord_nod2D
-    
+          coord_nod2D(1:2,1:nx) => mesh%coord_nod2D    
+
           !-----------------------------------------------------------------
           ! create hemisphereic masks
           !-----------------------------------------------------------------
@@ -853,6 +858,13 @@
              if (coord_nod2D(2,i) >= -puny) lmask_n(i) = .true. ! N. Hem.
              if (coord_nod2D(2,i) <  -puny) lmask_s(i) = .true. ! S. Hem.
           enddo
+
+          !-----------------------------------------------------------------
+          ! longitudes and latitudes
+          !-----------------------------------------------------------------
+
+          lon_val(:) = coord_nod2D(1,:)
+          lat_val(:) = coord_nod2D(2,:)
 
       end subroutine set_grid_icepack
 

@@ -26,7 +26,7 @@ use mo_tidal
 
 ! Define icepack modules
 #if defined (__icepack)
-use icedrv_main,          only: set_icepack, set_grid_icepack
+use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
 
 #if defined (__oasis)
@@ -81,7 +81,8 @@ type(t_mesh),             target, save :: mesh
     !=====================
     if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
     call set_icepack
-    call set_grid_icepack(mesh)
+    call alloc_icepack
+    call init_icepack(mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
     

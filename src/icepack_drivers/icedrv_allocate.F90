@@ -28,14 +28,17 @@
 
       call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
       call icepack_warnings_flush(nu_diag)
-      if (icepack_warnings_aborted())                                              & 
+      if (icepack_warnings_aborted()) & 
           call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)     
 
       allocate (           &
          lmask_n(nx)     , & ! N. Hemis mask 
          lmask_s(nx)     , & ! S. Hemis mask
+         lon_val(nx)     , &
+         lat_val(nx)     , &
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       allocate (          &
@@ -59,6 +62,7 @@
          trcrn     (nx,ntrcr,ncat) , & ! tracers: 1: surface temperature of ice/snow (C)
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       allocate (                &
@@ -68,6 +72,7 @@
          trcr_base(ntrcr,3)   , & ! = 0 or 1 depending on tracer dependency, (1) aice, (2) vice, (3) vsno
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       trcr_depend = 0
@@ -125,7 +130,7 @@
          vatm(nx)    , &
          wind(nx)    , & ! wind speed (m/s)
          potT(nx)    , & ! air potential temperature  (K)
-         T_air(nx)    , & ! air temperature  (K)
+         T_air(nx)   , & ! air temperature  (K)
          Qa(nx)      , & ! specific humidity (kg/kg)
          rhoa(nx)    , & ! air density (kg/m^3)
          swvdr(nx)   , & ! sw down, visible, direct  (W/m^2)
@@ -233,12 +238,15 @@
          rside(nx)    , & ! fraction of ice that melts laterally
          fsw(nx)      , & ! incoming shortwave radiation (W/m^2)
          cos_zen(nx)   , & ! cosine solar zenith angle, < 0 for sun below horizon
-         rdg_conv(nx) , & ! convergence term for ridging (1/s)
-         rdg_shear(nx), &   ! shear term for ridging (1/s)
+         rdg_conv(nx) , & ! convergence term for ridging on nodes (1/s)
+         rdg_shear(nx), & ! shear term for ridging on nodes (1/s)
+         rdg_conv_elem(nx_elem),  & ! convergence term for ridging on elements (1/s)
+         rdg_shear_elem(nx_elem), & ! shear term for ridging on elements (1/s)
          salinz(nx,nilyr+1)  , & ! initial salinity  profile (ppt)
          Tmltz(nx,nilyr+1)   , & ! initial melting temperature (C)
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
       
       end subroutine alloc_flux
@@ -292,6 +300,7 @@
          zaeros(nx,icepack_max_aero)     , & ! ocean aerosols (mmol/m^3)
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       end subroutine alloc_flux_bgc
@@ -418,9 +427,23 @@
          c_fsd_range(nfsd)      , &  ! fsd floe_rad bounds (m)
          stat=ierr)
 
+      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       end subroutine alloc_column
+
+! ------------------------------------------------------------------------------
+
+      module subroutine alloc_icepack
+
+      implicit none
+
+      call alloc_state
+      call alloc_flux
+      call alloc_flux_bgc
+      call alloc_column
+
+      end subroutine alloc_icepack
 
 ! ------------------------------------------------------------------------------
 

@@ -10,6 +10,7 @@
 
           use icedrv_kinds
           use icedrv_constants
+          use g_parsup,            only: mype
 
           implicit none
 
@@ -18,8 +19,7 @@
 !--------- subroutines to be seen outside icepack 
           !=======================================================================
 
-          public :: set_icepack, set_grid_icepack, alloc_state, alloc_flux,      &
-                    alloc_flux_bgc, alloc_column
+          public :: set_icepack, alloc_icepack, init_icepack 
     
           !=======================================================================
 !--------- Everything else is private
@@ -35,7 +35,8 @@
           ! 1. Setting variables used by the model
           !=======================================================================
 
-          integer (kind=int_kind), save  :: nx                   ! number of grid cells and gost cells for each mesh partition
+          integer (kind=int_kind), save  :: nx                   ! number of nodes and gost nodes for each mesh partition
+          integer (kind=int_kind), save  :: nx_elem              ! number of elements and gost elements for each mesh partition
           integer (kind=int_kind), save  :: ncat                 ! number of categories in use
           integer (kind=int_kind), save  :: nfsd                 ! number of floe size categories in use
           integer (kind=int_kind), save  :: nilyr                ! number of ice layers per category in use
@@ -327,10 +328,12 @@
              fswthru_ai(:)  ! shortwave penetrating to ocean (W/m^2)
     
           real (kind=dbl_kind), allocatable, save :: & ! DIM nx
-             rside(:)   , & ! fraction of ice that melts laterally
-             cos_zen(:)  , & ! cosine solar zenith angle, < 0 for sun below horizon
-             rdg_conv(:), & ! convergence term for ridging (1/s)
-             rdg_shear(:)   ! shear term for ridging (1/s)
+             rside(:),          & ! fraction of ice that melts laterally
+             cos_zen(:),         & ! cosine solar zenith angle, < 0 for sun below horizon
+             rdg_conv_elem(:),  & ! convergence term for ridging on elements (1/s)
+             rdg_shear_elem(:), & ! shear term for ridging on elements (1/s)
+             rdg_conv(:),       & ! convergence term for ridging on nodes (1/s)
+             rdg_shear(:)         ! shear term for ridging on nodes (1/s)
     
           real (kind=dbl_kind), allocatable, save :: & ! DIM nx,nilyr+1
              salinz(:,:)  , & ! initial salinity  profile (ppt)
@@ -682,6 +685,10 @@
              lmask_n(:), & ! northern hemisphere mask  
              lmask_s(:)    ! northern hemisphere mask        
 
+          real (kind=dbl_kind), allocatable, save :: & ! DIM nx
+             lon_val(:), & ! mesh nodes longitude
+             lat_val(:)    ! mesh nodes latitude
+
           !=======================================================================
           ! 7. Clock variables
           !=======================================================================
@@ -755,6 +762,63 @@
               module subroutine alloc_column()
                   implicit none
               end subroutine alloc_column
+
+              ! Allocate all
+              module subroutine alloc_icepack()
+                  implicit none
+              end subroutine alloc_icepack              
+
+              ! Initialize ice state 
+              module subroutine init_state()
+                  implicit none
+              end subroutine init_state
+
+              ! Initialize coupler flux
+              module subroutine init_coupler_flux()
+                  implicit none
+              end subroutine init_coupler_flux
+
+              ! Initialize fluxes to and from atm. and ocean
+              module subroutine init_flux_atm_ocn()
+                  implicit none
+              end subroutine init_flux_atm_ocn
+
+              ! Initialize thermodynamic history
+              module subroutine init_history_therm()
+                  implicit none
+              end subroutine init_history_therm
+
+              ! Initialize dynamic hystory
+              module subroutine init_history_dyn()
+                  implicit none
+              end subroutine init_history_dyn
+
+              ! Initialize bgc hystory
+              module subroutine init_history_bgc()
+                  implicit none
+              end subroutine init_history_bgc
+
+              ! Initialize vertical column
+              module subroutine init_thermo_vertical()
+                  implicit none
+              end subroutine init_thermo_vertical
+
+              ! Initialize shartwave radiation
+              module subroutine init_shortwave()
+                  implicit none
+              end subroutine init_shortwave
+
+              ! Initialize floe size distribution
+              module subroutine init_fsd()
+                  implicit none
+              end subroutine init_fsd
+
+              ! Initialize all
+              module subroutine init_icepack(mesh)
+                  use mod_mesh
+                  implicit none
+                  type(t_mesh), intent(in), target :: mesh
+              end subroutine init_icepack
 
           end interface
 
