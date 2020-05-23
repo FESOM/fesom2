@@ -194,7 +194,7 @@ module forcing_provider_module
     integer, intent(in) :: line
     ! EO args
     if(.NOT. val) then
-      print *, "error in line ",line
+      print *, "error in line ",line, __FILE__
       stop 1
     end if
   end subroutine
