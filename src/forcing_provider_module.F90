@@ -1,4 +1,5 @@
 module forcing_provider_module
+  use forcing_provider_netcdf_module
   implicit none
   public forcing_provider
   private
@@ -13,11 +14,11 @@ module forcing_provider_module
   
   type, private :: forcing_reader_type
     character(:), allocatable :: basepath
-    character(:), allocatable :: varname
     integer fileyear
     integer first_stored_timeindex, last_stored_timeindex
     real(4), allocatable :: stored_values(:,:,:)
     integer netcdf_timestep_size
+    type(netcdf_reader_handle) filehandle
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
@@ -37,7 +38,6 @@ module forcing_provider_module
     ! EO args
     type(forcing_reader_type), allocatable :: tmparr(:)
     character(:), allocatable :: basepath
-    integer i
     integer reader_time_index
     real(4), allocatable :: values(:,:,:)
     
@@ -53,15 +53,16 @@ module forcing_provider_module
       call move_alloc(tmparr, this%all_readers)      
     end if
     
-    if( len(this%all_readers(varindex)%varname) == 0 ) then ! reader has never been initialized
-      basepath=basepath_from_path(filepath, fileyear)
+    if( len(this%all_readers(varindex)%basepath) == 0 ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
+      basepath = basepath_from_path(filepath, fileyear)
       
       this%all_readers(varindex)%basepath = basepath
-      this%all_readers(varindex)%varname = varname
       this%all_readers(varindex)%fileyear = fileyear
       this%all_readers(varindex)%first_stored_timeindex = -1
       this%all_readers(varindex)%last_stored_timeindex = -1
-      this%all_readers(varindex)%netcdf_timestep_size = read_netcdf_timestep_size(filepath, varname)
+      call this%all_readers(varindex)%filehandle%initialize(filepath, varname) ! finalize() to close the file
+      this%all_readers(varindex)%netcdf_timestep_size = this%all_readers(varindex)%filehandle%timestep_size()
+
     end if
     
 !    assert(time_index >= reader%first_stored_timeindex) ! we do not go back in time
@@ -72,7 +73,7 @@ module forcing_provider_module
       if(this%all_readers(varindex)%last_stored_timeindex > this%all_readers(varindex)%netcdf_timestep_size) then
         this%all_readers(varindex)%last_stored_timeindex = this%all_readers(varindex)%netcdf_timestep_size
       end if
-      call read_netcdf_timesteps(filepath, varname, this%all_readers(varindex)%first_stored_timeindex, this%all_readers(varindex)%last_stored_timeindex, values)
+      call this%all_readers(varindex)%filehandle%read_netcdf_timesteps(this%all_readers(varindex)%first_stored_timeindex, this%all_readers(varindex)%last_stored_timeindex, values)
 
       call assert(allocated(values), __LINE__)
       if( allocated(this%all_readers(varindex)%stored_values) ) then
@@ -94,85 +95,6 @@ module forcing_provider_module
     call assert( all( shape(forcingdata)==shape(this%all_readers(varindex)%stored_values(:,:,reader_time_index)) ), __LINE__ )
     forcingdata = this%all_readers(varindex)%stored_values(:,:,reader_time_index)    
   end subroutine
-  
-  
-  subroutine read_netcdf_timesteps(filepath, varname, timeindex_first, timeindex_last, values)
-    character(len=*), intent(in) :: filepath
-    character(len=*), intent(in) :: varname
-    integer, intent(in) :: timeindex_first, timeindex_last
-    real(4), allocatable, intent(inout) :: values(:,:,:)
-    ! EO args
-    integer, parameter :: timedim_index = 3
-    include "netcdf.inc" ! old netcdf fortran interface required?
-    integer status
-    integer fileid
-    integer varid
-    integer dim_size
-    integer, allocatable, dimension(:) :: dimids
-    integer, allocatable, dimension(:) :: dim_sizes
-    integer i
-    integer, allocatable, dimension(:) :: starts, sizes
-   
-    ! assume netcdf variable like: float q(time, lat, lon)
-    status = nf_open(filepath,NF_NOWRITE,fileid)
-    status = nf_inq_varid(fileid, varname, varid)
-    status = nf_inq_varndims(fileid, varid, dim_size)
-    allocate(dimids(dim_size))
-    status = nf_inq_vardimid(fileid, varid, dimids)
-    
-    allocate(dim_sizes(dim_size))
-    do i=1, dim_size
-      status = nf_inq_dimlen(fileid, dimids(i), dim_sizes(i))
-    end do
-    
-    ! todo: check if variable datatype is single precision (f77 real)
-    
-    allocate(starts(dim_size))
-    allocate(sizes(dim_size))
-    ! assert timedim_index == 3 && dim_size == 3
-    call assert(timeindex_first <= timeindex_last, __LINE__)
-    call assert(timeindex_last <= dim_sizes(timedim_index), __LINE__)
-    
-    ! todo: make this work if we have more than 3 dimensions and also if timedim_index != 3
-    ! todo: check if values is already allocated
-    starts(1) = 1
-    starts(2) = 1
-    starts(3) = timeindex_first
-    sizes(1) = dim_sizes(1)
-    sizes(2) = dim_sizes(2)
-    sizes(3) = timeindex_last-timeindex_first+1
-    allocate(values(sizes(1),sizes(2),sizes(3)))
-    
-    status = nf_get_vara_real(fileid, varid, starts, sizes, values)    
-    status = nf_close(fileid)
-    ! manual deallocation not required, the runtime environment will deallocate the arrays when out of scope
-  end subroutine
-  
-  
-  function read_netcdf_timestep_size(filepath, varname) result(r)
-    character(len=*), intent(in) :: filepath
-    character(len=*), intent(in) :: varname
-    integer r
-    ! EO args
-    integer, parameter :: timedim_index = 3
-    include "netcdf.inc" ! old netcdf fortran interface required?
-    integer status
-    integer fileid
-    integer varid
-    integer dim_size
-    integer, allocatable, dimension(:) :: dimids
-   
-    ! assume netcdf variable like: float q(time, lat, lon)
-    status = nf_open(filepath,NF_NOWRITE,fileid)
-    status = nf_inq_varid(fileid, varname, varid)
-    status = nf_inq_varndims(fileid, varid, dim_size)
-    allocate(dimids(dim_size))
-    status = nf_inq_vardimid(fileid, varid, dimids)
-    
-    status = nf_inq_dimlen(fileid, dimids(timedim_index), r)
-           
-    status = nf_close(fileid)
-  end function
   
   
   function basepath_from_path(filepath, fileyear) result(r)
