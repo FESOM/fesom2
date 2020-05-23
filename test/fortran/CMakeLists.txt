@@ -8,7 +8,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
 find_package(PFUNIT REQUIRED)
 enable_testing()
 
-add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_module.f90)
+add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_module.F90 ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
    target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
@@ -19,7 +19,7 @@ target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRA
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_pfunit_ctest (${PROJECT_NAME}
-  TEST_SOURCES forcing_provider_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
+  TEST_SOURCES forcing_provider_module_tests.pf forcing_provider_netcdf_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
   LINK_LIBRARIES ${LIB_TARGET}
   )
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
