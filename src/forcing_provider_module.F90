@@ -33,7 +33,7 @@ module forcing_provider_module
     integer, intent(in) :: fileyear
     character(len=*), intent(in) :: varname
     integer, intent(in) :: time_index
-    real(8), intent(out) :: forcingdata(:,:)
+    real(4), intent(out) :: forcingdata(:,:)
     ! EO args
     type(forcing_reader_type), allocatable :: tmparr(:)
     character(:), allocatable :: basepath
@@ -50,17 +50,17 @@ module forcing_provider_module
       allocate( tmparr(varindex) )
       tmparr(1:size(this%all_readers)) = this%all_readers
       deallocate(this%all_readers)
-      call move_alloc(tmparr, this%all_readers)
+      call move_alloc(tmparr, this%all_readers)      
     end if
-
+    
     if( len(this%all_readers(varindex)%varname) == 0 ) then ! reader has never been initialized
       basepath=basepath_from_path(filepath, fileyear)
       
       this%all_readers(varindex)%basepath = basepath
       this%all_readers(varindex)%varname = varname
       this%all_readers(varindex)%fileyear = fileyear
-      this%all_readers(varindex)%first_stored_timeindex = 0
-      this%all_readers(varindex)%last_stored_timeindex = 0
+      this%all_readers(varindex)%first_stored_timeindex = -1
+      this%all_readers(varindex)%last_stored_timeindex = -1
       this%all_readers(varindex)%netcdf_timestep_size = read_netcdf_timestep_size(filepath, varname)
     end if
     
@@ -100,7 +100,7 @@ module forcing_provider_module
     character(len=*), intent(in) :: filepath
     character(len=*), intent(in) :: varname
     integer, intent(in) :: timeindex_first, timeindex_last
-    real(4), allocatable, intent(out) :: values(:,:,:)
+    real(4), allocatable, intent(inout) :: values(:,:,:)
     ! EO args
     integer, parameter :: timedim_index = 3
     include "netcdf.inc" ! old netcdf fortran interface required?
