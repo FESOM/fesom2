@@ -20,7 +20,7 @@ module forcing_provider_module
     integer netcdf_timestep_size
     type(netcdf_reader_handle) filehandle
     contains
-    procedure read_data_lookahead
+    procedure initialize_lookahead, read_data_lookahead
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
@@ -55,14 +55,7 @@ module forcing_provider_module
     end if
     
     if( len(this%all_readers(varindex)%basepath) == 0 ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
-      basepath = basepath_from_path(filepath, fileyear)
-      
-      this%all_readers(varindex)%basepath = basepath
-      this%all_readers(varindex)%fileyear = fileyear
-      this%all_readers(varindex)%first_stored_timeindex = -1
-      this%all_readers(varindex)%last_stored_timeindex = -1
-      call this%all_readers(varindex)%filehandle%initialize(filepath, varname) ! finalize() to close the file
-      this%all_readers(varindex)%netcdf_timestep_size = this%all_readers(varindex)%filehandle%timestep_size()
+      call this%all_readers(varindex)%initialize_lookahead(filepath, fileyear, varname)
     else if(fileyear /= this%all_readers(varindex)%fileyear) then
       print *,"can not change years", __LINE__, __FILE__
       stop 1
@@ -75,6 +68,22 @@ module forcing_provider_module
     call assert(allocated(this%all_readers(varindex)%stored_values), __LINE__)
     call assert( all( shape(forcingdata)==shape(this%all_readers(varindex)%stored_values(:,:,reader_time_index)) ), __LINE__ )
     forcingdata = this%all_readers(varindex)%stored_values(:,:,reader_time_index)    
+  end subroutine
+  
+  
+  subroutine initialize_lookahead(this, filepath, fileyear, varname)
+    class(forcing_lookahead_reader_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer fileyear
+    character(len=*), intent(in) :: varname
+    ! EO args
+          
+    this%basepath = basepath_from_path(filepath, fileyear)
+    this%fileyear = fileyear
+    this%first_stored_timeindex = -1
+    this%last_stored_timeindex = -1
+    call this%filehandle%initialize(filepath, varname) ! finalize() to close the file
+    this%netcdf_timestep_size = this%filehandle%timestep_size() 
   end subroutine
   
   
