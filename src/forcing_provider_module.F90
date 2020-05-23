@@ -62,7 +62,9 @@ module forcing_provider_module
       this%all_readers(varindex)%last_stored_timeindex = -1
       call this%all_readers(varindex)%filehandle%initialize(filepath, varname) ! finalize() to close the file
       this%all_readers(varindex)%netcdf_timestep_size = this%all_readers(varindex)%filehandle%timestep_size()
-
+    else if(fileyear /= this%all_readers(varindex)%fileyear) then
+      print *,"can not change years", __LINE__, __FILE__
+      stop 1
     end if
     
 !    assert(time_index >= reader%first_stored_timeindex) ! we do not go back in time
@@ -85,8 +87,7 @@ module forcing_provider_module
         allocate(this%all_readers(varindex)%stored_values(size(values, DIM=1),size(values, DIM=2),size(values, DIM=3)))
       end if
       this%all_readers(varindex)%stored_values = values
-      call assert(allocated(this%all_readers(varindex)%stored_values), __LINE__)
-
+      call assert(allocated(this%all_readers(varindex)%stored_values), __LINE__)    
     end if
   
     ! check if the outgoing array has the same shape as our data
