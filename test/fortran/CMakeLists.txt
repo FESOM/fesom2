@@ -8,7 +8,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
 find_package(PFUNIT REQUIRED)
 enable_testing()
 
-add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_module.F90 ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90)
+add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_module.F90 ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90 ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_lookahead_reader_module.F90)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
    target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
