@@ -337,6 +337,20 @@ CASE ('pgf_x     ')
 CASE ('pgf_y     ')    
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm/s^2', pgf_y(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 !___________________________________________________________________________________________________________________________________    
+
+#if defined (__oifs)
+CASE ('alb       ')
+  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',              'none',   ice_alb(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('ist       ')
+  call def_stream(nod2D, myDim_nod2D, 'ist',    'ice surface temperature', 'K',      ice_temp(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('qsi       ')
+  call def_stream(nod2D, myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('qso       ')
+  call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  oce_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+#endif
+!___________________________________________________________________________________________________________________________________
+
+
 CASE DEFAULT
     if (mype==0) write(*,*) 'stream ', io_list(i)%id, ' is not defined !'
 END SELECT
@@ -381,12 +395,6 @@ END DO
      if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D,   'ty_sur',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, mesh) ; sel_forcvar(12)=1
   end if
 
-#if defined (__oifs)
-  call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',              'none',   ice_alb(:),                   1, 'm', i_real4, mesh)
-  call def_stream(nod2D, myDim_nod2D, 'ist',    'ice surface temperature', 'K',      ice_temp(:),                  1, 'm', i_real4, mesh)
-  call def_stream(nod2D, myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice_heat_flux(:),             1, 'm', i_real4, mesh)
-  call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  oce_heat_flux(:),             1, 'm', i_real4, mesh)
-#endif
     
     if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         ! TKE diagnostic 
@@ -502,6 +510,7 @@ END DO
         if (sel_forcvar( 5)==0) call def_stream(nod2D , myDim_nod2D , 'prec'  , 'precicipation rain'             , 'm/s'  , prec_rain(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 6)==0) call def_stream(nod2D , myDim_nod2D , 'snow'  , 'precicipation snow'             , 'm/s'  , prec_snow(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 7)==0) call def_stream(nod2D , myDim_nod2D , 'evap'  , 'evaporation'                    , 'm/s'  , evaporation(:)   , 1, 'm', i_real4, mesh)
+        if (sel_forcvar( 7)==0) call def_stream(nod2D , myDim_nod2D , 'subl'  , 'sublimation'                    , 'm/s'  , sublimation(:)   , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 8)==0) call def_stream(nod2D , myDim_nod2D , 'swr'   , 'short wave radiation'           , 'W/m^2', shortwave(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 9)==0) call def_stream(nod2D , myDim_nod2D , 'lwr'   , 'long wave radiation'            , 'W/m^2', longwave(:)      , 1, 'm', i_real4, mesh)
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)

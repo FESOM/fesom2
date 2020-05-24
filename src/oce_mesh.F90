@@ -1298,7 +1298,6 @@ t0=MPI_Wtime()
        END DO
     END DO
  END DO
-write(*,*)(mesh%area)
  
  ! Only areas through which there is exchange are counted
 
