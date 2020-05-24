@@ -5,20 +5,37 @@ module forcing_lookahead_reader_module
   private
     
   type forcing_lookahead_reader_type
+    private
     character(:), allocatable :: basepath
-    integer fileyear
+    integer fileyear_
     integer first_stored_timeindex, last_stored_timeindex
     real(4), allocatable :: stored_values(:,:,:)
     integer netcdf_timestep_size
     type(netcdf_reader_handle) filehandle
     contains
-    procedure initialize_lookahead, yield_data_lookahead, read_data_lookahead
+    procedure, public :: initialize_lookahead, yield_data_lookahead, read_data_lookahead, is_initialized, fileyear
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
   integer, parameter :: PREFETCH_SIZE = 10
   
   contains
+  
+
+  function fileyear(this) result(x)
+    class(forcing_lookahead_reader_type), intent(in) :: this
+    integer x
+    ! EO args
+    x = this%fileyear_
+  end function
+  
+
+  function is_initialized(this) result(x)
+    class(forcing_lookahead_reader_type), intent(in) :: this
+    logical x
+    ! EO args
+    x = (len(this%basepath) /= 0)
+  end function
   
   
   subroutine initialize_lookahead(this, filepath, fileyear, varname)
@@ -29,7 +46,7 @@ module forcing_lookahead_reader_module
     ! EO args
           
     this%basepath = basepath_from_path(filepath, fileyear)
-    this%fileyear = fileyear
+    this%fileyear_ = fileyear
     this%first_stored_timeindex = -1
     this%last_stored_timeindex = -1
     call this%filehandle%initialize(filepath, varname) ! finalize() to close the file

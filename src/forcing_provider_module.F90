@@ -38,9 +38,9 @@ module forcing_provider_module
       call move_alloc(tmparr, this%all_readers)      
     end if
     
-    if( len(this%all_readers(varindex)%basepath) == 0 ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
+    if(.not. this%all_readers(varindex)%is_initialized() ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
       call this%all_readers(varindex)%initialize_lookahead(filepath, fileyear, varname)
-    else if(fileyear /= this%all_readers(varindex)%fileyear) then
+    else if(fileyear /= this%all_readers(varindex)%fileyear()) then
       print *,"can not change years", __LINE__, __FILE__
       stop 1
     end if
