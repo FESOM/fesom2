@@ -13,7 +13,8 @@ module forcing_lookahead_reader_module
     integer netcdf_timestep_size_
     type(netcdf_reader_handle) filehandle
     contains
-    procedure, public :: initialize_lookahead, yield_data_lookahead, read_data_lookahead, is_initialized, fileyear, netcdf_timestep_size
+    procedure, public :: initialize_lookahead, yield_data_lookahead, is_initialized, fileyear, netcdf_timestep_size
+    procedure, private :: read_data_lookahead
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
