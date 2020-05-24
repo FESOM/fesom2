@@ -10,10 +10,10 @@ module forcing_lookahead_reader_module
     integer fileyear_
     integer first_stored_timeindex, last_stored_timeindex
     real(4), allocatable :: stored_values(:,:,:)
-    integer netcdf_timestep_size
+    integer netcdf_timestep_size_
     type(netcdf_reader_handle) filehandle
     contains
-    procedure, public :: initialize_lookahead, yield_data_lookahead, read_data_lookahead, is_initialized, fileyear
+    procedure, public :: initialize_lookahead, yield_data_lookahead, read_data_lookahead, is_initialized, fileyear, netcdf_timestep_size
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
@@ -38,6 +38,13 @@ module forcing_lookahead_reader_module
   end function
   
   
+  function netcdf_timestep_size(this) result(t)
+    class(forcing_lookahead_reader_type), intent(in) :: this
+    integer t
+    t = this%netcdf_timestep_size_
+  end function
+  
+  
   subroutine initialize_lookahead(this, filepath, fileyear, varname)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     character(len=*), intent(in) :: filepath
@@ -50,7 +57,7 @@ module forcing_lookahead_reader_module
     this%first_stored_timeindex = -1
     this%last_stored_timeindex = -1
     call this%filehandle%initialize(filepath, varname) ! finalize() to close the file
-    this%netcdf_timestep_size = this%filehandle%timestep_size() 
+    this%netcdf_timestep_size_ = this%filehandle%timestep_size() 
   end subroutine
   
   
@@ -61,7 +68,7 @@ module forcing_lookahead_reader_module
     ! EO args
     integer reader_time_index
       
-    if(time_index <= this%netcdf_timestep_size) then
+    if(time_index <= this%netcdf_timestep_size_) then
       call this%read_data_lookahead(time_index)
     end if
   
@@ -84,8 +91,8 @@ module forcing_lookahead_reader_module
       
       this%first_stored_timeindex = time_index
       this%last_stored_timeindex = time_index+PREFETCH_SIZE
-      if(this%last_stored_timeindex > this%netcdf_timestep_size) then
-        this%last_stored_timeindex = this%netcdf_timestep_size
+      if(this%last_stored_timeindex > this%netcdf_timestep_size_) then
+        this%last_stored_timeindex = this%netcdf_timestep_size_
       end if
       call this%filehandle%read_netcdf_timesteps(this%first_stored_timeindex, this%last_stored_timeindex, values)
 
