@@ -39,13 +39,13 @@ module forcing_provider_module
     end if
     
     if(.not. this%all_readers(varindex)%is_initialized() ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
-      call this%all_readers(varindex)%initialize_lookahead(filepath, fileyear, varname)
+      call this%all_readers(varindex)%initialize(filepath, fileyear, varname)
     else if(fileyear /= this%all_readers(varindex)%fileyear()) then
       print *,"can not change years", __LINE__, __FILE__
       stop 1
     end if
 
-    call this%all_readers(varindex)%yield_data_lookahead(time_index, forcingdata)
+    call this%all_readers(varindex)%yield_data(time_index, forcingdata)
   end subroutine
     
   

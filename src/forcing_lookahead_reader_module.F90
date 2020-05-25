@@ -13,8 +13,8 @@ module forcing_lookahead_reader_module
     integer netcdf_timestep_size_
     type(netcdf_reader_handle) filehandle
     contains
-    procedure, public :: initialize_lookahead, yield_data_lookahead, is_initialized, fileyear, netcdf_timestep_size
-    procedure, private :: read_data_lookahead
+    procedure, public :: initialize, yield_data, is_initialized, fileyear, netcdf_timestep_size
+    procedure, private :: read_data
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
@@ -46,7 +46,7 @@ module forcing_lookahead_reader_module
   end function
   
   
-  subroutine initialize_lookahead(this, filepath, fileyear, varname)
+  subroutine initialize(this, filepath, fileyear, varname)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     character(len=*), intent(in) :: filepath
     integer fileyear
@@ -62,7 +62,7 @@ module forcing_lookahead_reader_module
   end subroutine
   
   
-  subroutine yield_data_lookahead(this, time_index, values)
+  subroutine yield_data(this, time_index, values)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     integer, intent(in) :: time_index
     real(4), intent(out) :: values(:,:)
@@ -70,7 +70,7 @@ module forcing_lookahead_reader_module
     integer reader_time_index
       
     if(time_index <= this%netcdf_timestep_size_) then
-      call this%read_data_lookahead(time_index)
+      call this%read_data(time_index)
     end if
   
     ! check if the outgoing array has the same shape as our data
@@ -81,7 +81,7 @@ module forcing_lookahead_reader_module
   end subroutine
 
 
-  subroutine read_data_lookahead(this, time_index)
+  subroutine read_data(this, time_index)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     integer, intent(in) :: time_index
     ! EO args
