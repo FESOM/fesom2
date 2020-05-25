@@ -230,6 +230,12 @@ CASE ('uwind ')
 CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!!PS CASE ('tair_mo   ')
+!!PS     sel_forcvar(3) = 13
+!!PS     call def_stream(nod2D, myDim_nod2D, 'tair_mo',     'bulk formular surface air temperature',         '°C',     Tair_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!!PS CASE ('shum_mo   ')
+!!PS     sel_forcvar(4) = 14
+!!PS     call def_stream(nod2D, myDim_nod2D, 'shum_mo',     'bulk formular specific humidity',               '',       shum_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
     
 !___________________________________________________________________________________________________________________________________
@@ -503,6 +509,17 @@ END DO
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
         if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
         if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'cd','wind drag coef. '             , '', cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'tair_mo','bulk formular surf. air temp.'  , '°C'   , Tair_mo(:)       , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'shum_mo','bulk formular specific humidity', ''     , shum_mo(:)       , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(15)==0) call def_stream(nod2D , myDim_nod2D , 'dv10',''  , 'm/2'   , dv10(:)          , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(16)==0) call def_stream(nod2D , myDim_nod2D , 'dv10_mo',''  , 'm/2'   , dv10_mo(:)    , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'mo_index','', ''     , mo_index(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt1','', ''     , auxt1(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt2','', ''     , auxt2(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt3','', ''     , auxt3(:)       , 1, 'm', i_real4, mesh)
     end if
     
     
