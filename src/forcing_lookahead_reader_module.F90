@@ -13,7 +13,7 @@ module forcing_lookahead_reader_module
     integer netcdf_timestep_size_
     type(netcdf_reader_handle) filehandle
     contains
-    procedure, public :: initialize, yield_data, is_initialized, fileyear, netcdf_timestep_size
+    procedure, public :: initialize, finalize, yield_data, is_initialized, fileyear, netcdf_timestep_size
     procedure, private :: read_data
   end type
 
@@ -59,6 +59,13 @@ module forcing_lookahead_reader_module
     this%last_stored_timeindex = -1
     call this%filehandle%initialize(filepath, varname) ! finalize() to close the file
     this%netcdf_timestep_size_ = this%filehandle%timestep_size() 
+  end subroutine
+
+
+  subroutine finalize(this)
+    class(forcing_lookahead_reader_type), intent(inout) :: this
+    ! EO args
+    call this%filehandle%finalize()
   end subroutine
   
   
