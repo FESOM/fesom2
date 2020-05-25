@@ -25,6 +25,7 @@ module forcing_provider_module
     real(4), intent(out) :: forcingdata(:,:)
     ! EO args
     type(forcing_lookahead_reader_type), allocatable :: tmparr(:)
+    type(forcing_lookahead_reader_type) new_reader
     
     ! init our all_readers array if not already done
     if(.not. allocated(this%all_readers)) then
@@ -41,8 +42,9 @@ module forcing_provider_module
     if(.not. this%all_readers(varindex)%is_initialized() ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
       call this%all_readers(varindex)%initialize(filepath, fileyear, varname)
     else if(fileyear /= this%all_readers(varindex)%fileyear()) then
-      print *,"can not change years", __LINE__, __FILE__
-      stop 1
+      call this%all_readers(varindex)%finalize()
+      this%all_readers(varindex) = new_reader
+      call this%all_readers(varindex)%initialize(filepath, fileyear, varname)
     end if
 
     call this%all_readers(varindex)%yield_data(time_index, forcingdata)
