@@ -46,7 +46,7 @@ subroutine stress_tensor_m(mesh)
 
   integer         :: elem, elnodes(3)
   real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)   :: eps1, eps2, pressure, delta
   real(kind=WP)   :: val3, meancos, usum, vsum, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
   type(t_mesh), intent(in)              , target :: mesh
@@ -72,25 +72,25 @@ subroutine stress_tensor_m(mesh)
           meancos=metric_factor(elem)
       !  
       ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
     
         r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
-        r3=pressure*eps12*vale
+        r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
         si2=sigma11(elem)-sigma22(elem)
 
@@ -261,7 +261,7 @@ subroutine EVPdynamics_m(mesh)
 !NR for stress_tensor_m
   integer         :: el, elnodes(3)
   real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
+  real(kind=WP)   :: eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
   real(kind=WP)   :: val3, meancos, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
 
@@ -399,17 +399,17 @@ subroutine EVPdynamics_m(mesh)
         meancos = val3*metric_factor(el)
         !  
         ! ====== Deformation rate tensor on element elem:
-        eps11 = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
-        eps22 = sum(dy(:)*v_ice_aux(elnodes))
-        eps12 = 0.5_WP*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
+        eps11(el) = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
+        eps22(el) = sum(dy(:)*v_ice_aux(elnodes))
+        eps12(el) = 0.5_WP*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
                          +sum(u_ice_aux(elnodes))*meancos )          !metrics 
         
         ! ======= Switch to eps1,eps2
-        eps1 = eps11 + eps22
-        eps2 = eps11 - eps22   
+        eps1 = eps11(el) + eps22(el)
+        eps2 = eps11(el) - eps22(el)   
         
         ! ====== moduli:
-        delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12**2))
+        delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12(el)**2))
         
         pressure = pressure_fac(el)/(delta+delta_min)
         
@@ -418,7 +418,7 @@ subroutine EVPdynamics_m(mesh)
 !        sigma11(el) = 0.5_WP*(si1+si2)
 !        sigma22(el) = 0.5_WP*(si1-si2)
 !NR directly insert si1, si2 cancels some operations and should increase accuracy
-        sigma12(el) = det1*sigma12(el) +       pressure*eps12*vale
+        sigma12(el) = det1*sigma12(el) +       pressure*eps12(el)*vale
         sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
         sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
 
@@ -518,7 +518,7 @@ subroutine find_alpha_field_a(mesh)
 
   integer                  :: elem, elnodes(3)
   real(kind=WP)            :: dx(3), dy(3), msum, asum
-  real(kind=WP)            :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)            :: eps1, eps2, pressure, delta
   real(kind=WP)            :: val3, meancos, usum, vsum, vale
   type(t_mesh), intent(in) , target :: mesh
 
@@ -541,18 +541,18 @@ subroutine find_alpha_field_a(mesh)
      meancos=metric_factor(elem)
      !  
      ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
          
      pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
@@ -581,7 +581,7 @@ subroutine stress_tensor_a(mesh)
 
   integer                   :: elem, elnodes(3)
   real(kind=WP)             :: dx(3), dy(3), msum, asum
-  real(kind=WP)             :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)             :: eps1, eps2, pressure, delta
   real(kind=WP)             :: val3, meancos, usum, vsum, vale
   real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
   type(t_mesh), intent(in)  , target :: mesh
@@ -608,25 +608,25 @@ subroutine stress_tensor_a(mesh)
      meancos=metric_factor(elem)
      !  
      ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
     
         r1=pressure*(eps1-delta) 
         r2=pressure*eps2*vale
-        r3=pressure*eps12*vale
+        r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
         si2=sigma11(elem)-sigma22(elem)
 
