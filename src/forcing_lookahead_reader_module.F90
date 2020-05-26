@@ -23,7 +23,7 @@ module forcing_lookahead_reader_module
   contains
   
 
-  function fileyear(this) result(x)
+  pure function fileyear(this) result(x)
     class(forcing_lookahead_reader_type), intent(in) :: this
     integer x
     ! EO args
@@ -31,7 +31,7 @@ module forcing_lookahead_reader_module
   end function
   
 
-  function is_initialized(this) result(x)
+  pure function is_initialized(this) result(x)
     class(forcing_lookahead_reader_type), intent(in) :: this
     logical x
     ! EO args
