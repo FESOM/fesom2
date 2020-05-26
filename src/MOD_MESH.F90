@@ -26,8 +26,8 @@ integer                                     :: elem2D       ! the number of 2D e
 integer, allocatable, dimension(:,:)        :: elem2D_nodes ! elem2D_nodes(:,n) lists; 3 nodes of element n   
 integer, allocatable, dimension(:,:)        :: edges        ! edge(:,n) lists 2 nodes; edge n
 integer, allocatable, dimension(:,:)        :: edge_tri     ! edge_tri(:,n) lists 2 
-				                           ! elements containing edge n: the first one is to left 
-                                                           ! of the line directed to the second node
+                                                            ! elements containing edge n: the first one is to left 
+                                                            ! of the line directed to the second node
 integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) are edges of element n.  
 real(kind=WP), allocatable, dimension(:)    :: elem_area
 real(kind=WP), allocatable, dimension(:,:)  :: edge_dxdy, edge_cross_dxdy
@@ -49,6 +49,12 @@ real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
 integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D
 real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
 real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
+
+!___mesh cavity arrays__________________________________________________________
+integer,       allocatable, dimension(:)    :: cavity_flag, cavity_lev_nod2D, cavity_lev_elem2D
+real(kind=WP), allocatable, dimension(:)    :: cavity_depth
+
+
 ! Elevation stiffness matrix
 type(sparse_matrix)                         :: ssh_stiff
 

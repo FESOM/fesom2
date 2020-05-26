@@ -24,6 +24,8 @@ real(kind=WP), dimension(:)  , pointer :: zbar, Z, elem_depth
 integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D
 real(kind=WP), dimension(:,:), pointer :: area, area_inv
 real(kind=WP), dimension(:)  , pointer :: mesh_resolution
+integer,       dimension(:)  , pointer :: cavity_flag, cavity_lev_nod2D, cavity_lev_elem2D
+real(kind=WP), dimension(:)  , pointer :: cavity_depth
 type(sparse_matrix)          , pointer :: ssh_stiff
 
 nod2D              => mesh%nod2D              
@@ -62,3 +64,7 @@ area               => mesh%area
 area_inv           => mesh%area_inv     
 mesh_resolution    => mesh%mesh_resolution    
 ssh_stiff          => mesh%ssh_stiff        
+cavity_flag        => mesh%cavity_flag  
+cavity_lev_nod2D   => mesh%cavity_lev_nod2D  
+cavity_lev_elem2D  => mesh%cavity_lev_elem2D  
+cavity_depth       => mesh%cavity_depth  

@@ -29,11 +29,14 @@ program MAIN
   open (20,file=nmlfile)
   read (20,NML=paths)         ! We need MeshPath
   read (20,NML=geometry)      ! We need cyclic_length and cartesian
+  read (20,NML=run_config)    ! We need use_cavity=true/false
   read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
   call set_mesh_transform_matrix  !(rotated grid) 
   call read_mesh_ini(mesh)
+  if (use_cavity) call read_mesh_cavity(mesh)
+  
   call system_clock(finish_t)
   print '("**** Reading initial mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
@@ -42,7 +45,8 @@ program MAIN
   call find_edges_ini(mesh)
   call find_elem_neighbors_ini(mesh)
   call find_levels(mesh)
-
+  if (use_cavity) call find_levels_cavity(mesh)
+    
 ! NR Some arrays are not needed for partitioning, after setting up the grid
   deallocate(mesh%coord_nod2D)
   deallocate(mesh%edge_tri)
@@ -138,6 +142,57 @@ write(*,*) '========================='
 write(*,*) 'Mesh is read'
 write(*,*) '========================='
 END SUBROUTINE read_mesh_ini
+!=============================================================================
+!> @brief
+!> Reads mesh files 
+subroutine read_mesh_cavity(mesh)
+    use mod_mesh
+    use o_PARAM
+    use g_PARSUP
+    use g_CONFIG
+    implicit none
+
+    type(t_mesh), intent(inout), target :: mesh
+    integer                             :: node
+    character(len=1000)                 :: fname
+    logical                             :: file_exist=.False.
+#include "associate_mesh_ini.h"
+    
+    !___________________________________________________________________________    
+    if (mype==0) then
+        write(*,*) '____________________________________________________________'
+        write(*,*) ' --> read cavity depth'
+    end if 
+  
+    !___________________________________________________________________________
+    ! read depth of cavity-ocean boundary
+    fname = trim(meshpath)//'cavity_depth.out'
+    file_exist=.False.
+    inquire(file=trim(fname),exist=file_exist) 
+    if (file_exist) then
+        open (21,file=fname, status='old')
+        allocate(mesh%cavity_depth(mesh%nod2D))
+        cavity_depth => mesh%cavity_depth 
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
+            write(*,*) '        --> stop partitioning here !'
+            write(*,*) '____________________________________________________________________'    
+        end if 
+        stop 
+    end if
+    
+    !___________________________________________________________________________
+    do node=1, mesh%nod2D
+        read(21,*) mesh%cavity_depth(node)
+    end do
+    
+    !___________________________________________________________________________
+    close(21)
+    
+end subroutine read_mesh_cavity
+
 !=======================================================================
 !> @brief 
 !> Check the order of nodes in triangles; correct it if necessary to make
@@ -559,14 +614,16 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
    DO n=1, elem2D
       nodes=elem2D_nodes(1:3,n)
       
+      !_________________________________________________________________________
       ! depth of element is  shallowest depth of sorounding vertices
-      !dmean=maxval(depth(nodes))
+      if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
+      ! depth of element is deepest depth of sorounding vertices    
+      elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+      ! DEFAULT: depth of element is  mean depth of sorounding vertices
+      elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+      end if 
       
-      ! depth of element is deepest depth of sorounding vertices
-      !dmean=minval(depth(nodes))
-      
-      ! depth of element is  mean depth of sorounding vertices
-      dmean=sum(depth(nodes))/3.0
+      !_________________________________________________________________________
       exit_flag=0
           DO nz=1,nl-1
                  if(Z(nz)<dmean) then
@@ -588,6 +645,10 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
           exit_flag=1
           count1=count1+1
           do n=1,elem2D
+            
+            ! merge: result = merge(truesource, falsesource, mask)
+            ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
+            ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
              q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
              !find ocean cell
              if (nlevels(n)>=nz) then
@@ -644,9 +705,172 @@ if (mype==0) then
    write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
    write(*,*) '========================='
 endif
-
-
 end subroutine find_levels
+
+
+!_______________________________________________________________________________
+! finds elemental and nodal levels of cavity-ocean boundary.
+! Creates 2 files: cavity_elvls.out, cavity_nlvls.out
+subroutine find_levels_cavity(mesh)
+    use mod_mesh
+    use g_config
+    use g_parsup
+    implicit none
+    integer        :: nodes(3), elems(3)
+    integer        :: elem, node, nz, j
+    integer        :: exit_flag, count_iter, count_neighb_open, nneighb, cavity_maxlev
+    real(kind=WP)  :: dmean
+    character*200  :: file_name
+    type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+    !___________________________________________________________________________
+    allocate(mesh%cavity_lev_elem2D(elem2D))
+    cavity_lev_elem2D => mesh%cavity_lev_elem2D 
+    allocate(mesh%cavity_lev_nod2D(nod2D))
+    cavity_lev_nod2D  => mesh%cavity_lev_nod2D 
+    allocate(mesh%cavity_flag(nod2D))
+    cavity_flag       => mesh%cavity_flag 
+    
+    !___________________________________________________________________________
+    ! Compute level position of ocean-cavity boundary
+    cavity_maxlev=0
+    do elem=1, elem2D
+        nodes=elem2D_nodes(1:3,elem)
+        !_______________________________________________________________________
+        ! depth of element is  shallowest depth of sorounding vertices
+        if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
+        ! depth of element is deepest depth of sorounding vertices    
+        elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
+        ! DEFAULT: depth of element is  mean depth of sorounding vertices
+        elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+        end if 
+        
+        !_______________________________________________________________________
+        ! vertical elem level index of cavity-ocean boundary
+        exit_flag=0
+        cavity_lev_elem2D(elem) = 1
+        do nz=1,nlevels(elem)-1
+            if(Z(nz)<dmean) then
+                exit_flag=1
+                cavity_lev_elem2D(elem)=nz
+                exit
+            end if
+        end do
+        if ((exit_flag==0).and.(dmean<0)) cavity_lev_elem2D(elem)=nlevels(elem)     
+        cavity_maxlev = max(cavity_maxlev,cavity_lev_elem2D(elem))
+    end do
+    
+    !___________________________________________________________________________
+    ! Eliminate cells that have three cavity boundary faces --> should not be 
+    ! possible in FESOM2.0
+    ! loop over all cavity levels
+    do nz=1,cavity_maxlev
+        exit_flag=0
+        count_iter=0
+        
+        !_______________________________________________________________________
+        ! iteration loop within each layer
+        do while((exit_flag==0).and.(count_iter<1000))
+            exit_flag=1
+            count_iter=count_iter+1
+            
+            !___________________________________________________________________
+            ! loop over triangles
+            do elem=1,elem2D
+                ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
+                nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+                !
+                !   ._____________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
+                !   |#############################|
+                !   |## CAVITY ####| . |#######|                    OCEAN
+                !   |###########|   /|\  |###| 
+                !   |#######|        |
+                !   |####|           +-- Not good can lead to isolated cells  
+                !
+                if (nz >= cavity_lev_elem2D(elem)) then
+                    count_neighb_open=0
+                    elems=elem_neighbors(1:3,elem)
+                    
+                    !___________________________________________________________
+                    ! loop over neighbouring triangles
+                    do j = 1, nneighb
+                        if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
+                            ! check for isolated cell
+                            if (cavity_lev_elem2D(elems(j))<=nz) then
+                                !count the open faces to neighboring cells 
+                                count_neighb_open=count_neighb_open+1
+                            endif
+                        end if 
+                    end do ! --> do i = 1, nneighb
+                    
+                    !___________________________________________________________
+                    ! check how many open faces to neighboring triangles the cell 
+                    ! has, if there are less than 2 its isolated (a cell should 
+                    ! have at least 2 valid neighbours)
+                    ! --> in this case shift cavity-ocean interface one level down
+                    if (count_neighb_open<2) then
+                        !if cell is "bad" convert to bottom cell
+                        cavity_lev_elem2D(elem)=nz+1
+                        !force recheck for all current ocean cells
+                        exit_flag=0
+                    endif ! --> if (count_neighb_open<2) then
+                    
+                end if ! --> if (nz >= cavity_lev_elem2D(elem)) then
+            end do ! --> do elem=1,elem2D
+        end do ! --> do while((exit_flag==0).and.(count_iter<1000))
+    end do ! --> do nz=1,cavity_maxlev 
+    
+    !___________________________________________________________________________
+    ! vertical vertice level index of cavity_ocean boundary
+    cavity_lev_nod2d = 1
+    do elem=1,elem2D
+        nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+        !_______________________________________________________________________
+        ! loop over neighbouring triangles
+        do j=1,nneighb
+            node=elem2D_nodes(j,elem)
+            if(cavity_lev_nod2d(node)<cavity_lev_elem2D(elem)) then
+                cavity_lev_nod2d(node)=cavity_lev_elem2D(elem)
+            end if
+        end do
+    end do
+    
+    !___________________________________________________________________________
+    ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
+    cavity_flag = 0
+    do node=1,nod2D
+        if (cavity_lev_nod2d(node)>1) cavity_flag(node)=1
+    end do
+
+    !___________________________________________________________________________
+    ! write out cavity mesh files for vertice and elemental position of 
+    ! vertical cavity-ocean boundary
+    if (mype==0) then
+        ! write out elemental cavity-ocean boundary level
+        file_name=trim(meshpath)//'cavity_elvls.out'
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) cavity_lev_elem2D(elem)
+        enddo
+        close(20)
+        
+        ! write out vertice cavity-ocean boundary level + yes/no cavity flag
+        file_name=trim(meshpath)//'cavity_nlvls.out'
+        open(20, file=file_name)
+        file_name=trim(meshpath)//'cavity_flag.out'
+        open(21, file=file_name)
+        do node=1,nod2D
+            write(20,*) cavity_lev_nod2d(node)
+            write(21,*) cavity_flag(node)
+        enddo
+        close(20)
+        close(21)
+    endif
+
+end subroutine find_levels_cavity
+
+
 !===================================================================
 
 subroutine edge_center(n1, n2, x, y, mesh)
