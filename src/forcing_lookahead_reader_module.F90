@@ -6,11 +6,10 @@ module forcing_lookahead_reader_module
     
   type forcing_lookahead_reader_type
     private
-    character(:), allocatable :: basepath
     integer fileyear_
-    integer first_stored_timeindex, last_stored_timeindex
+    integer :: first_stored_timeindex = -1, last_stored_timeindex = -1
     real(4), allocatable :: stored_values(:,:,:)
-    integer netcdf_timestep_size_
+    integer :: netcdf_timestep_size_ = -1
     type(netcdf_reader_handle) filehandle
     contains
     procedure, public :: initialize, finalize, yield_data, is_initialized, fileyear, netcdf_timestep_size, timeindex_hint, timeindex_in_cache_bounds
@@ -35,7 +34,7 @@ module forcing_lookahead_reader_module
     class(forcing_lookahead_reader_type), intent(in) :: this
     logical x
     ! EO args
-    x = (len(this%basepath) /= 0)
+    x = (this%netcdf_timestep_size_ /= -1)
   end function
   
   
@@ -53,10 +52,7 @@ module forcing_lookahead_reader_module
     character(len=*), intent(in) :: varname
     ! EO args
           
-    this%basepath = basepath_from_path(filepath, fileyear)
     this%fileyear_ = fileyear
-    this%first_stored_timeindex = -1
-    this%last_stored_timeindex = -1
     call this%filehandle%initialize(filepath, varname) ! finalize() to close the file
     this%netcdf_timestep_size_ = this%filehandle%timestep_size() 
   end subroutine
@@ -138,20 +134,6 @@ module forcing_lookahead_reader_module
     end if
 
   end subroutine
-  
-  
-  function basepath_from_path(filepath, fileyear) result(r)
-    character(len=*), intent(in) :: filepath
-    integer, intent(in) :: fileyear
-    ! EO args
-    integer number_of_yeardigits, suffix_size
-    character(:), allocatable :: r
-
-    number_of_yeardigits = int(log10(real(fileyear)))+1
-    suffix_size = len(FILENAMESUFFIX)
-    
-    r = filepath(1:len(filepath)-number_of_yeardigits-suffix_size)
-  end function
   
   
   subroutine assert(val, line)
