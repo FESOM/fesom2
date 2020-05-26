@@ -1,0 +1,83 @@
+! The namelist file for the finite-volume ocean model
+
+&oce_dyn
+state_equation=0       ! 1 - full equation of state, 0 - linear equation of state
+C_d=0.0025             ! Bottom drag, nondimensional
+gamma0=0.00            ! [m/s],   backgroung viscosity= gamma0*len, it should be as small as possible (keep it < 0.01 m/s).
+gamma1=0.002           ! [nodim], for computation of the flow aware viscosity
+gamma2=0.02            ! [s/m],   is only used in easy backscatter option
+Div_c=.5  	       ! the strength of the modified Leith viscosity, nondimensional, 0.3 -- 1.0
+Leith_c=.5	       ! the strength of the Leith viscosity
+visc_option=5          ! 1=Harmonic Leith parameterization;
+                       ! 2=Laplacian+Leith+biharmonic background
+                       ! 3=Biharmonic Leith parameterization
+                       ! 4=Biharmonic flow aware
+                       ! 5=Easy Backscatter
+                       ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
+                       ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
+easy_bs_return= 1.5     ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
+A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
+scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
+mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
+free_slip=.false.      ! Switch on free slip
+i_vert_visc=.true.    
+w_split=.false.
+w_exp_max=1.e-3
+SPP=.false.                 ! Salt Plume Parameterization
+Fer_GM=.false.              ! to swith on/off GM after Ferrari et al. 2010
+K_GM_max     = 3000.0       ! max. GM thickness diffusivity (m2/s)
+K_GM_min     = 2.0          ! max. GM thickness diffusivity (m2/s)
+K_GM_bvref   = 2            ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_rampmax = 40.0         ! Resol >K_GM_rampmax[km] GM on
+K_GM_rampmin = 30.0         ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
+
+scaling_Ferreira   =.true.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
+scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
+scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
+scaling_FESOM14    =.true.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+
+Redi  =.false.
+visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
+mix_scheme='PP'            ! vertical mixing scheme: KPP, PP 
+Ricr   = 0.3               ! critical bulk Richardson Number
+concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+/
+
+&oce_tra 
+use_momix     = .false.    ! switch on/off  !Monin-Obukhov -> TB04 mixing
+momix_lat     = -50.0      ! latitidinal treshhold for TB04, =90 --> global
+momix_kv      = 0.01       ! PP/KPP, mixing coefficient within MO length
+use_instabmix = .true.     ! enhance convection in case of instable stratification
+instabmix_kv  = 0.1
+use_windmix   = .false.     ! enhance mixing trough wind only for PP mixing (for stability)
+windmix_kv    = 1.e-3
+windmix_nl    = 2
+
+diff_sh_limit=5.0e-3            ! for KPP, max diff due to shear instability
+Kv0_const=.false.
+double_diffusion=.false.               ! for KPP,dd switch
+K_ver=1.0e-5
+K_hor=10.
+surf_relax_T=0.0
+surf_relax_S=0.0             ! 50m/300days 6.43e-07! m/s 10./(180.*86400.)
+balance_salt_water =.false.  ! balance virtual-salt or freshwater flux or not
+clim_relax=0.0	             ! 1/s, geometrical information has to be supplied
+ref_sss_local=.true.
+ref_sss=34.
+i_vert_diff=.true.  ! true
+tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
+! Implemented trassers (3d restoring):
+! 301 - Fram strait.
+! 302 - Bering Strait
+! 303 - BSO 
+num_tracers=2       !number of all tracers
+tracer_ID  =0,1     !their IDs (0 and 1 are reserved for temperature and salinity)
+/
+
+&oce_init3d                               ! initial conditions for tracers
+n_ic3d   = 2                              ! number of tracers to initialize
+idlist   = 1, 0                           ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
+filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'salt', 'temp'                 ! variables to read from specified files
+t_insitu = .true.                         ! if T is insitu it will be converted to potential after reading it
+/

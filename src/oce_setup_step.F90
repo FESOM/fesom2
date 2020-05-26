@@ -28,6 +28,7 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use Toy_Channel_Soufflet
 use array_setup_interface
 use oce_initial_state_interface
 IMPLICIT NONE
@@ -122,22 +123,17 @@ type(t_mesh), intent(in) , target :: mesh
 	! Initialize fields
 	! A user-defined routine has to be called here!
 	!=====================
-    if(toy_ocean) then  
-#ifdef NA_TEST
-        call init_fields_na_test(mesh)
-#else
-        call initial_state_test(mesh)
-#endif
-        !call initial_state_channel_test 
-        !call initial_state_channel_narrow_test
-        !call init_fields_na_test  
-        !call init_fields_global_test
+    if (toy_ocean) then  
+       SELECT CASE (TRIM(which_toy))
+         CASE ("soufflet") !forcing update for soufflet testcase
+           if (mod(mstep, soufflet_forc_update)==0) then
+              call initial_state_soufflet(mesh)
+              call compute_zonal_mean_ini(mesh)  
+              call compute_zonal_mean(mesh)
+           end if
+       END SELECT
     else
-#ifdef NA_TEST
-        call init_fields_na_test(mesh)
-#else
-        call oce_initial_state(mesh)   ! Use it if not running tests
-#endif
+       call oce_initial_state(mesh)   ! Use it if not running tests
     end if
 
     if (.not.r_restart) tr_arr_old=tr_arr
@@ -232,6 +228,7 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
@@ -355,6 +352,8 @@ end if
     Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
+    stress_atmoce_x=0.
+    stress_atmoce_y=0.
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
@@ -554,3 +553,27 @@ USE g_ic3d
   END DO
 end subroutine oce_initial_state
 !==========================================================================
+! Here we do things (if applicable) before the ocean timestep will be made
+! 
+SUBROUTINE before_oce_step(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE g_PARSUP
+USE g_config
+USE Toy_Channel_Soufflet
+implicit none
+integer                  :: i, k, counter, rcounter3, id
+character(len=10)        :: i_string, id_string
+type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+if (toy_ocean) then
+   SELECT CASE (TRIM(which_toy))
+     CASE ("soufflet") !forcing update for soufflet testcase
+       if (mod(mstep, soufflet_forc_update)==0) then
+          call compute_zonal_mean(mesh)
+       end if
+   END SELECT
+end if
+END SUBROUTINE before_oce_step
