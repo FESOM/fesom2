@@ -13,7 +13,7 @@ module forcing_lookahead_reader_module
     integer netcdf_timestep_size_
     type(netcdf_reader_handle) filehandle
     contains
-    procedure, public :: initialize, finalize, yield_data, is_initialized, fileyear, netcdf_timestep_size
+    procedure, public :: initialize, finalize, yield_data, is_initialized, fileyear, netcdf_timestep_size, timeindex_hint, timeindex_in_cache_bounds
     procedure, private :: read_data
   end type
 
@@ -69,6 +69,26 @@ module forcing_lookahead_reader_module
   end subroutine
   
   
+  pure function timeindex_in_cache_bounds(this, time_index) result(x)
+    class(forcing_lookahead_reader_type), intent(in) :: this
+    integer, intent(in) :: time_index
+    logical x
+    ! EO args
+    x = all([ this%first_stored_timeindex <= time_index, time_index <= this%last_stored_timeindex ])
+  end function
+
+  
+  subroutine timeindex_hint(this, time_index)
+    class(forcing_lookahead_reader_type), intent(inout) :: this
+    integer, intent(in) :: time_index
+    ! EO args
+      
+    if(time_index <= this%netcdf_timestep_size_) then
+      call this%read_data(time_index)
+    end if
+  end subroutine
+
+
   subroutine yield_data(this, time_index, values)
     class(forcing_lookahead_reader_type), intent(inout) :: this
     integer, intent(in) :: time_index
