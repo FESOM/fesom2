@@ -927,7 +927,16 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   real(kind=WP), intent(in), optional  :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)            , target :: mesh
+  type(t_mesh), intent(in), target     :: mesh
+
+  if ((ubound(data, dim = 1)<=0) .or. (ubound(data, dim = 2)<=0)) then
+     if (mype==0) then
+        write(*,*) 'WARNING: addind I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+        write(*,*) 'bounda are: [', UBOUND(data, DIM = 1), ' , ', UBOUND(data, DIM = 2),']'
+     end if
+     return
+  end if
+
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)
   end if
@@ -1004,7 +1013,15 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer, intent(in), optional        :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)            , target :: mesh
+  type(t_mesh), intent(in), target     :: mesh
+
+  if ((ubound(data, dim = 1) <= 0)) then
+     if (mype==0) then
+        write(*,*) 'WARNING: addind I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+        write(*,*) 'upper bound is: ', ubound(data, dim = 1)
+     end if
+     return
+  end if
 
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)
