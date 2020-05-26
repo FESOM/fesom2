@@ -18,7 +18,7 @@ module forcing_lookahead_reader_module
   end type
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
-  integer, parameter :: PREFETCH_SIZE = 10
+  integer, public, parameter :: PREFETCH_SIZE = 10
   
   contains
   
