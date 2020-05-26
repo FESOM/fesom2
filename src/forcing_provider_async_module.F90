@@ -37,6 +37,7 @@ module forcing_provider_async_module
     integer netcdf_timestep_size
     type(cpp_thread) thread
     contains
+    procedure initialize
     final destructor
   end type
   type(forcing_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
@@ -64,7 +65,7 @@ print *,"destructor forcing_reader_type ",this%varname, __LINE__
     real(4), intent(out) :: forcingdata(:,:)
     ! EO args
     type(forcing_reader_type), allocatable :: tmparr(:)
-    character(:), allocatable :: basepath
+    type(forcing_lookahead_reader_type) new_reader_a, new_reader_b
     
     ! init our all_readers array if not already done
 !     if(.not. allocated(all_readers)) then
@@ -85,21 +86,22 @@ if(size(all_readers) < varindex) stop __LINE__
     
     ! todo: this is probally not a save test, as the default value must not be 0
     if( len(all_readers(varindex)%varname) == 0 ) then ! reader has never been initialized
-      basepath=basepath_from_path(filepath, fileyear)
+      call all_readers(varindex)%initialize(varindex, filepath, fileyear, varname)
       
-      all_readers(varindex)%basepath = basepath
-      all_readers(varindex)%varname = varname
-      all_readers(varindex)%fileyear = fileyear
-
-      call all_readers(varindex)%reader_a%initialize(filepath, fileyear, varname)
-      call all_readers(varindex)%reader_b%initialize(filepath, fileyear, varname)
-            
-      all_readers(varindex)%netcdf_timestep_size = all_readers(varindex)%reader_a%netcdf_timestep_size()
-
-      all_readers(varindex)%reader_current => all_readers(varindex)%reader_a
-      all_readers(varindex)%reader_next => all_readers(varindex)%reader_b
+      ! attach thread for this forcing field to the c++ library
+      call all_readers(varindex)%thread%init(varindex, filepath, varname)
+    else if(fileyear /= all_readers(varindex)%fileyear) then
+      ! stop the thread, close our reader and create a new one
+      if(all_readers(varindex)%thread%timeindex == time_index) then
+        call all_readers(varindex)%thread%cpp_thread_end(varindex)
+      end if
       
-      call all_readers(varindex)%thread%init(varindex, filepath, varname)      
+      call all_readers(varindex)%reader_a%finalize()
+      call all_readers(varindex)%reader_b%finalize()
+      all_readers(varindex)%reader_a = new_reader_a
+      all_readers(varindex)%reader_b = new_reader_b
+
+      call all_readers(varindex)%initialize(varindex, filepath, fileyear, varname)
     end if
 
 call assert(allocated(all_readers), __LINE__)
@@ -140,7 +142,6 @@ call fortran_call(varindex)
     this%filepath = filepath
     this%varname = varname
     this%timeindex = -1
-    this%varname = varname
 
 #ifdef HGMODETHREADS
    call init_ccall(varindex)
@@ -174,6 +175,33 @@ call fortran_call(varindex)
     integer(c_int), intent(in), value :: index
     ! EO args
     call all_readers(index)%reader_next%timeindex_hint(all_readers(index)%thread%timeindex)
+  end subroutine
+
+
+  subroutine initialize(this, varindex, filepath, fileyear, varname)
+    class(forcing_reader_type), target, intent(inout) :: this
+    integer, intent(in) :: varindex
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: fileyear
+    character(len=*), intent(in) :: varname
+    ! EO args
+    character(:), allocatable :: basepath
+
+    basepath=basepath_from_path(filepath, fileyear)
+ 
+    this%basepath = basepath
+    this%varname = varname
+    this%fileyear = fileyear
+
+    call this%reader_a%initialize(filepath, fileyear, varname)
+    call this%reader_b%initialize(filepath, fileyear, varname)
+          
+    this%netcdf_timestep_size = this%reader_a%netcdf_timestep_size()
+
+    this%reader_current => this%reader_a
+    this%reader_next => this%reader_b
+    
+    ! todo: this%thread%init should be called here, but we can not call it multiple times for the same forcing field
   end subroutine
   
   
