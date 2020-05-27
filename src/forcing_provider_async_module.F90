@@ -1,5 +1,3 @@
-#define HGMODETHREADS
-
 module forcing_provider_async_module
   use iso_c_binding
   use forcing_lookahead_reader_module
@@ -111,12 +109,7 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
 
     ! join thread
     if(all_readers(varindex)%thread%timeindex == time_index) then
-#ifdef HGMODETHREADS
       call all_readers(varindex)%thread%cpp_thread_end(varindex)
-
-#else
-call fortran_call(varindex)
-#endif
     end if
 
     call all_readers(varindex)%reader_current%yield_data(time_index, forcingdata)
@@ -143,9 +136,7 @@ call fortran_call(varindex)
     this%varname = varname
     this%timeindex = -1
 
-#ifdef HGMODETHREADS
    call init_ccall(varindex)
-#endif
   end subroutine
 
 
@@ -155,9 +146,7 @@ call fortran_call(varindex)
     integer, intent(in) :: timeindex
     ! EO args
     this%timeindex = timeindex
-#ifdef HGMODETHREADS
-   call begin_ccall(varindex)    
-#endif
+    call begin_ccall(varindex)    
   end subroutine
 
 
@@ -165,9 +154,7 @@ call fortran_call(varindex)
     class(cpp_thread), intent(in) :: this
     integer, intent(in) :: varindex
     ! EO args  
-#ifdef HGMODETHREADS
-   call end_ccall(varindex)
-#endif
+    call end_ccall(varindex)
   end subroutine
 
 
