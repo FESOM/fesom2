@@ -1,6 +1,6 @@
 !=======================================================================
 !
-! This module initializes the icepack variables
+! This submodule initializes the icepack variables
 !
 ! Author: L. Zampieri ( lorenzo.zampieri@awi.de )
 !
@@ -242,7 +242,10 @@
           !-----------------------------------------------------------------
           ! fluxes received from atmosphere
           !-----------------------------------------------------------------
-          zlvl  (:) = c10                ! atm level height (m)
+          zlvl_t    = c10                ! atm level height for temperature (m)
+          zlvl_q    = c10                ! atm level height for humidity    (m)
+          zlvl_v    = c10                ! atm level height for wind        (m)
+        
           rhoa  (:) = 1.3_dbl_kind       ! air density (kg/m^3)
           uatm  (:) = c5                 ! wind velocity    (m/s)
           vatm  (:) = c5

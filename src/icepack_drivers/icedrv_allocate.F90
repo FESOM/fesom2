@@ -125,7 +125,6 @@
          vraftn(nx,ncat),    & ! rafting ice volume
          aredistn(nx,ncat),  & ! redistribution function: fraction of new ridge area
          vredistn(nx,ncat),  & ! redistribution function: fraction of new ridge volume
-         zlvl(nx)    , & ! atm level height (m)
          uatm(nx)    , & ! wind velocity components (m/s)
          vatm(nx)    , &
          wind(nx)    , & ! wind speed (m/s)

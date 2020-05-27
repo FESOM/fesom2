@@ -155,9 +155,13 @@
              vredistn(:,:)     ! redistribution function: fraction of new ridge volume
     
            ! in from atmosphere (if calc_Tsfc)
-    
+
+          real (kind=dbl_kind), save :: & 
+             zlvl_t     , &  ! atm level height for temperature (m)
+             zlvl_q     , &  ! atm level height for humidity    (m)
+             zlvl_v          ! atm level height for wind        (m)
+
           real (kind=dbl_kind), allocatable, save :: & ! DIM nx
-             zlvl(:)    , &  ! atm level height (m)
              uatm(:)    , &  ! wind velocity components (m/s)
              vatm(:)    , &
              wind(:)    , &  ! wind speed (m/s)
