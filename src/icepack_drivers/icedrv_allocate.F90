@@ -41,17 +41,19 @@
       if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
-      allocate (          &
-         aice      (nx) , & ! concentration of ice
-         vice      (nx) , & ! volume per unit area of ice (m)
-         vsno      (nx) , & ! volume per unit area of snow (m)
-         aice0     (nx) , & ! concentration of open water
-         uvel      (nx) , & ! x-component of velocity (m/s)
-         vvel      (nx) , & ! y-component of velocity (m/s)
-         divu      (nx) , & ! strain rate I component, velocity divergence (1/s)
-         shear     (nx) , & ! strain rate II component (1/s)
-         strength  (nx) , & ! ice strength (N/m)
-         aice_init (nx) , & ! initial concentration of ice, for diagnostics
+      allocate (               &
+         aice      (nx)      , & ! concentration of ice
+         vice      (nx)      , & ! volume per unit area of ice (m)
+         vsno      (nx)      , & ! volume per unit area of snow (m)
+         aice0     (nx)      , & ! concentration of open water
+         uvel      (nx)      , & ! x-component of velocity (m/s) on the nodes
+         vvel      (nx)      , & ! y-component of velocity (m/s) on the nodes
+         uvel_elem (nx_elem) , & ! x-component of velocity (m/s) on the elements
+         vvel_elem (nx_elem) , & ! y-component of velocity (m/s) on the elements
+         divu      (nx)      , & ! strain rate I component, velocity divergence (1/s)
+         shear     (nx)      , & ! strain rate II component (1/s)
+         strength  (nx)      , & ! ice strength (N/m)
+         aice_init (nx)      , & ! initial concentration of ice, for diagnostics
          aicen     (nx,ncat) , & ! concentration of ice
          vicen     (nx,ncat) , & ! volume per unit area of ice (m)
          vsnon     (nx,ncat) , & ! volume per unit area of snow (m)

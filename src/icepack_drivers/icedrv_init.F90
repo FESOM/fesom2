@@ -22,6 +22,7 @@
       use icepack_intfc,    only: icepack_write_tracer_flags
       use icepack_intfc,    only: icepack_write_tracer_indices
       use icepack_intfc,    only: icepack_write_tracer_sizes
+      use icepack_intfc,    only: icepack_init_wave
       use icedrv_system,    only: icedrv_system_abort
 
       contains
@@ -880,6 +881,46 @@
 
 !=======================================================================
 
+      subroutine init_wave_spec()
+
+      ! local variables
+      integer (kind=int_kind) :: &
+         k
+
+      real(kind=dbl_kind), dimension(nfreq) :: &
+         wave_spectrum_profile  ! wave spectrum
+
+       wave_spectrum(:,:) = c0
+
+      ! wave spectrum and frequencies
+      ! get hardwired frequency bin info and a dummy wave spectrum profile
+      call icepack_init_wave(nfreq=nfreq,                 &
+                             wave_spectrum_profile=wave_spectrum_profile, &
+                             wavefreq=wavefreq, dwavefreq=dwavefreq)
+
+      do k = 1, nfreq
+          wave_spectrum(:,k) = wave_spectrum_profile(k)
+      enddo
+
+      end subroutine init_wave_spec
+
+!=======================================================================
+
+      subroutine init_faero()
+
+      character(len=*), parameter :: subname='(faero_default)'
+
+      faero_atm(:,1) = 1.e-12_dbl_kind ! kg/m^2 s
+      faero_atm(:,2) = 1.e-13_dbl_kind
+      faero_atm(:,3) = 1.e-14_dbl_kind
+      faero_atm(:,4) = 1.e-14_dbl_kind
+      faero_atm(:,5) = 1.e-14_dbl_kind
+      faero_atm(:,6) = 1.e-14_dbl_kind
+
+      end subroutine faero_default
+
+!=======================================================================
+
       module subroutine init_icepack(mesh)
 
           use icepack_intfc, only: icepack_init_itd
@@ -950,8 +991,8 @@
           call init_state           ! initialize the ice state
           call init_history_therm   ! initialize thermo history variables
 
-          !if (tr_fsd .and. wave_spec) call get_wave_spec    ! wave spectrum in ice
-          !if (tr_aero .or. tr_zaero)  call faero_default    ! default aerosols values
+          if (tr_fsd .and. wave_spec) call init_wave_spec    ! wave spectrum in ice
+          if (tr_aero .or. tr_zaero)  call init_faero        ! default aerosols values
     
           call init_shortwave    ! initialize radiative transfer using current swdn
           call init_flux_atm_ocn    ! initialize atmosphere, ocean fluxes

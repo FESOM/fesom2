@@ -249,8 +249,10 @@
           ! Derived quantities used by the icepack model
           !-----------------------------------------------------------------
           
-          nx        = myDim_nod2D  + eDim_nod2D
-          nx_elem   = myDim_elem2D + eDim_elem2D
+          nx         = myDim_nod2D  + eDim_nod2D
+          nx_elem    = myDim_elem2D + eDim_elem2D
+          nx_nh      = myDim_nod2D
+          nx_elem_nh = myDim_elem2D
 
           ncat      = nicecat    ! number of categories
           nfsd      = nfsdcat    ! number of floe size categories
