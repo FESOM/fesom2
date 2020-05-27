@@ -124,7 +124,15 @@ subroutine pressure_bv(mesh)
             do nz=1, nl1
                 t=tr_arr(nz, node,1)
                 s=tr_arr(nz, node,2)
-                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                select case(state_equation)
+                    case(0)
+                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                    case(1)
+                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                    case default !unknown
+                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_ex(1)
+                end select
             enddo
             
             !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
@@ -140,12 +148,12 @@ subroutine pressure_bv(mesh)
             end if 
             
             do nz=1, nl1
-                rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
-                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
-                density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
+                rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz))         !!PS
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz)*real(state_equation))-density_0 !!PS
+                density_m_rho0_slev(nz,node) = rho(nz)                                     !!PS 
                 
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
-                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
+                rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_0
                 density_m_rho0(nz,node) = rho(nz)
                 
                 ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
@@ -153,7 +161,7 @@ subroutine pressure_bv(mesh)
                 !     depth level as the deep point --> than calculate bouyancy 
                 !     difference
                 rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
-                rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+                rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_0
                 dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
 !!PS                 dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
                 db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
@@ -196,8 +204,8 @@ subroutine pressure_bv(mesh)
             DO nz=2,nl1
                 bulk_up = bulk_0(nz-1) + zbar_3d_n(nz,node)*(bulk_pz(nz-1) + zbar_3d_n(nz,node)*bulk_pz2(nz-1)) 
                 bulk_dn = bulk_0(nz)   + zbar_3d_n(nz,node)*(bulk_pz(nz)   + zbar_3d_n(nz,node)*bulk_pz2(nz))
-                rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zbar_3d_n(nz,node))  
-                rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zbar_3d_n(nz,node))  
+                rho_up = bulk_up*rhopot(nz-1) / (bulk_up + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation))  
+                rho_dn = bulk_dn*rhopot(nz)   / (bulk_dn + 0.1_WP*zbar_3d_n(nz,node)*real(state_equation)) 
                 dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  
                 
                 !_______________________________________________________________
@@ -491,9 +499,17 @@ subroutine pressure_force_4_linfs_nemo(mesh)
                 ! calculate density at element mid-depth bottom depth via 
                 ! equation of state from linear interpolated temperature and 
                 ! salinity
-                call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+                select case(state_equation)
+                    case(0)
+                        call density_linear(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+                    case(1)
+                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+                    case default !unknown
+                        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                        call par_ex(1)
+                end select
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
-                interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))-density_0
+                interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle)*real(state_equation))-density_0
                 
             !end if 
                             
@@ -1547,5 +1563,29 @@ subroutine insitu2pot(mesh)
      end do	
   end do
 end subroutine insitu2pot
+!
+!
+!
+!===============================================================================
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, mesh)
+!coded by Margarita Smolentseva, 21.05.2020
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+use g_PARSUP !, only: par_ex,pe_status
+IMPLICIT NONE
 
+  real(kind=WP), intent(IN)  :: t,s
+  real(kind=WP), intent(OUT) :: rho_out                 
+  real(kind=WP)              :: rhopot, bulk
+  real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
+  type(t_mesh), intent(in)   , target :: mesh
+#include "associate_mesh.h"
+  !compute secant bulk modulus
+
+  bulk_0   = 1
+  bulk_pz  = 0
+  bulk_pz2 = 0
+  rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+end subroutine density_linear
 

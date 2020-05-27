@@ -16,6 +16,7 @@ real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
 real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
+integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
 
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
@@ -144,7 +145,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+ NAMELIST /oce_dyn/ state_equation, C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
@@ -197,6 +198,8 @@ real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
 real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable    :: CFL_z(:,:)
 real(kind=WP), allocatable    :: stress_surf(:,:)
+REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_x(:)
+REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_y(:)
 real(kind=WP), allocatable    :: T_rhs(:,:) 
 real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
 real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS

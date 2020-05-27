@@ -1998,9 +1998,7 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n, mesh)
-    use g_config, only: logfile_outfreq,rtime_oce,rtime_tot,rtime_oce_dyn, &
-                        rtime_oce_solvessh,rtime_oce_solvetra,rtime_oce_GMRedi,&
-                        rtime_oce_mixpres,rtime_oce_dynssh,which_ale,flag_debug
+    use g_config
     use MOD_MESH
     use o_ARRAYS
     use o_PARAM
@@ -2014,6 +2012,7 @@ subroutine oce_timestep_ale(n, mesh)
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+    use Toy_Channel_Soufflet
     use oce_ale_interfaces
     
     IMPLICIT NONE
@@ -2159,6 +2158,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
     call solve_ssh_ale(mesh)
+    if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(mesh)
     t3=MPI_Wtime() 
 
     ! estimate new horizontal velocity u^(n+1)

@@ -127,8 +127,7 @@ e_size=myDim_elem2D+eDim_elem2D
  allocate(fresh_wa_flux(n_size), net_heat_flux(n_size))
  fresh_wa_flux = 0.0_WP
  net_heat_flux = 0.0_WP
- allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
- allocate(stress_atmoce_x(n_size), stress_atmoce_y(n_size))    
+ allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))     
  allocate(elevation(n_size))           ! =ssh  of ocean        
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
