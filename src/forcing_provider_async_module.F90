@@ -26,7 +26,7 @@ module forcing_provider_async_module
   type(forcing_provider_type), save :: forcing_provider ! handle to singleton instance
 
   
-  type, private :: forcing_reader_type
+  type, private :: forcing_async_reader_type
     character(:), allocatable :: varname
     integer fileyear
     type(forcing_lookahead_reader_type) reader_a, reader_b
@@ -34,9 +34,9 @@ module forcing_provider_async_module
     integer :: netcdf_timestep_size = -1
     type(cpp_thread) thread
     contains
-    procedure initialize
+    procedure initialize_async_reader
   end type
-  type(forcing_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
+  type(forcing_async_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
 
   character(len=*), parameter :: FILENAMESUFFIX = ".nc"
   
@@ -53,7 +53,7 @@ module forcing_provider_async_module
     integer, intent(in) :: time_index
     real(4), intent(out) :: forcingdata(:,:)
     ! EO args
-    type(forcing_reader_type), allocatable :: tmparr(:)
+    type(forcing_async_reader_type), allocatable :: tmparr(:)
     type(forcing_lookahead_reader_type) new_reader_a, new_reader_b
     
     ! init our all_readers array if not already done
@@ -75,7 +75,7 @@ if(size(all_readers) < varindex) stop __LINE__
     
     if( all_readers(varindex)%netcdf_timestep_size == -1 ) then ! reader has never been initialized
       all_readers(varindex)%netcdf_timestep_size = 0
-      call all_readers(varindex)%initialize(varindex, filepath, fileyear, varname)
+      call all_readers(varindex)%initialize_async_reader(varindex, filepath, fileyear, varname)
       
       ! attach thread for this forcing field to the c++ library
       call all_readers(varindex)%thread%init(varindex, filepath, varname)
@@ -90,7 +90,7 @@ if(size(all_readers) < varindex) stop __LINE__
       all_readers(varindex)%reader_a = new_reader_a
       all_readers(varindex)%reader_b = new_reader_b
 
-      call all_readers(varindex)%initialize(varindex, filepath, fileyear, varname)
+      call all_readers(varindex)%initialize_async_reader(varindex, filepath, fileyear, varname)
     end if
 
 call assert(allocated(all_readers), __LINE__)
@@ -156,8 +156,8 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
   end subroutine
 
 
-  subroutine initialize(this, varindex, filepath, fileyear, varname)
-    class(forcing_reader_type), target, intent(inout) :: this
+  subroutine initialize_async_reader(this, varindex, filepath, fileyear, varname)
+    class(forcing_async_reader_type), target, intent(inout) :: this
     integer, intent(in) :: varindex
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear
