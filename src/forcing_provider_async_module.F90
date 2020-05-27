@@ -32,7 +32,7 @@ module forcing_provider_async_module
     integer fileyear
     type(forcing_lookahead_reader_type) reader_a, reader_b
     type(forcing_lookahead_reader_type), pointer :: reader_current , reader_next
-    integer netcdf_timestep_size
+    integer :: netcdf_timestep_size = -1
     type(cpp_thread) thread
     contains
     procedure initialize
@@ -82,8 +82,8 @@ if(.not. allocated(all_readers)) then
 end if
 if(size(all_readers) < varindex) stop __LINE__
     
-    ! todo: this is probally not a save test, as the default value must not be 0
-    if( len(all_readers(varindex)%varname) == 0 ) then ! reader has never been initialized
+    if( all_readers(varindex)%netcdf_timestep_size == -1 ) then ! reader has never been initialized
+      all_readers(varindex)%netcdf_timestep_size = 0
       call all_readers(varindex)%initialize(varindex, filepath, fileyear, varname)
       
       ! attach thread for this forcing field to the c++ library
