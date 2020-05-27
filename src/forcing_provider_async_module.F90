@@ -27,7 +27,6 @@ module forcing_provider_async_module
 
   
   type, private :: forcing_reader_type
-    character(:), allocatable :: basepath
     character(:), allocatable :: varname
     integer fileyear
     type(forcing_lookahead_reader_type) reader_a, reader_b
@@ -36,7 +35,6 @@ module forcing_provider_async_module
     type(cpp_thread) thread
     contains
     procedure initialize
-    final destructor
   end type
   type(forcing_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
 
@@ -44,13 +42,6 @@ module forcing_provider_async_module
   
   
   contains
-
-
-  subroutine destructor(this)
-    type(forcing_reader_type), intent(inout) :: this
-    ! EO args
-print *,"destructor forcing_reader_type ",this%varname, __LINE__
-  end subroutine
 
 
   subroutine get_forcingdata(this, varindex, filepath, fileyear, varname, time_index, forcingdata)
@@ -172,11 +163,7 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
     integer, intent(in) :: fileyear
     character(len=*), intent(in) :: varname
     ! EO args
-    character(:), allocatable :: basepath
-
-    basepath=basepath_from_path(filepath, fileyear)
  
-    this%basepath = basepath
     this%varname = varname
     this%fileyear = fileyear
 
@@ -190,20 +177,6 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
     
     ! todo: this%thread%init should be called here, but we can not call it multiple times for the same forcing field
   end subroutine
-  
-  
-  function basepath_from_path(filepath, fileyear) result(r)
-    character(len=*), intent(in) :: filepath
-    integer, intent(in) :: fileyear
-    ! EO args
-    integer number_of_yeardigits, suffix_size
-    character(:), allocatable :: r
-
-    number_of_yeardigits = int(log10(real(fileyear)))+1
-    suffix_size = len(FILENAMESUFFIX)
-    
-    r = filepath(1:len(filepath)-number_of_yeardigits-suffix_size)
-  end function
 
   
   subroutine assert(val, line)
