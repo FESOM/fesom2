@@ -43,19 +43,46 @@ real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec
 real(kind=WP), allocatable, dimension(:,:)  :: gradient_sca ! Coefficients to compute gradient of scalars
                                                            ! on elements
 INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-                                                           ! vertical structure             
+                                                           ! vertical structure     
+!
+!
+!___vertical mesh info__________________________________________________________                                                           
+! total number of layers
 integer                                     :: nl
+
+! initial layer, mid-depth layer and element depth
 real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
+
+! upper boudnary index of all vertical vertice/element loops, default==1 but when 
+! cavity is used becomes index of cavity-ocean boundary at vertices and elements
+integer,       allocatable, dimension(:)    :: ubndidx_n, ubndidx_e 
+
+! number of levels at elem and vertices considering bottom topography
 integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D
+
+!
+!
+!___horizontal mesh info________________________________________________________
 real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
 real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
 
-!___mesh cavity arrays__________________________________________________________
-integer,       allocatable, dimension(:)    :: cavity_flag, cavity_lev_nod2D, cavity_lev_elem2D
+!
+!
+!___cavity mesh info____________________________________________________________
+! level index of cavity-ocean boundary at vertices and elements
+! --> see: ubndidx_n, ubndidx_e (fvom_main) 
+! --> see: cavity_lev_elem2D, cavity_lev_nod2D (fvom_init) 
+integer,       allocatable, dimension(:)    :: cavity_lev_elem2D, cavity_lev_nod2D 
+
+! vertice/element yes=1/no=0 flag if cavity exists
+integer,       allocatable, dimension(:)    :: cavity_flag_n, cavity_flag_e
+
+! depth of cavity-ocean interface
 real(kind=WP), allocatable, dimension(:)    :: cavity_depth
 
-
-! Elevation stiffness matrix
+!
+!
+!___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
 !#if defined (__oasis)
