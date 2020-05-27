@@ -793,8 +793,8 @@ subroutine find_levels_cavity(mesh)
     cavity_lev_elem2D => mesh%cavity_lev_elem2D 
     allocate(mesh%cavity_lev_nod2D(nod2D))
     cavity_lev_nod2D  => mesh%cavity_lev_nod2D 
-    allocate(mesh%cavity_flag(nod2D))
-    cavity_flag       => mesh%cavity_flag 
+!!PS     allocate(mesh%cavity_flag_n(nod2D))
+!!PS     cavity_flag_n       => mesh%cavity_flag_n
     
     !___________________________________________________________________________
     ! Compute level position of ocean-cavity boundary
@@ -900,12 +900,12 @@ subroutine find_levels_cavity(mesh)
         end do
     end do
     
-    !___________________________________________________________________________
-    ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
-    cavity_flag = 0
-    do node=1,nod2D
-        if (cavity_lev_nod2d(node)>1) cavity_flag(node)=1
-    end do
+!!PS     !___________________________________________________________________________
+!!PS     ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
+!!PS     cavity_flag = 0
+!!PS     do node=1,nod2D
+!!PS         if (cavity_lev_nod2d(node)>1) cavity_flag(node)=1
+!!PS     end do
 
     !___________________________________________________________________________
     ! write out cavity mesh files for vertice and elemental position of 
@@ -922,14 +922,14 @@ subroutine find_levels_cavity(mesh)
         ! write out vertice cavity-ocean boundary level + yes/no cavity flag
         file_name=trim(meshpath)//'cavity_nlvls.out'
         open(20, file=file_name)
-        file_name=trim(meshpath)//'cavity_flag.out'
-        open(21, file=file_name)
+!!PS         file_name=trim(meshpath)//'cavity_flag.out'
+!!PS         open(21, file=file_name)
         do node=1,nod2D
             write(20,*) cavity_lev_nod2d(node)
-            write(21,*) cavity_flag(node)
+!!PS             write(21,*) cavity_flag(node)
         enddo
         close(20)
-        close(21)
+!!PS         close(21)
     endif
 
 end subroutine find_levels_cavity
