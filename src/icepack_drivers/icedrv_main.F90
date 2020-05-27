@@ -37,6 +37,8 @@
 
           integer (kind=int_kind), save  :: nx                   ! number of nodes and gost nodes for each mesh partition
           integer (kind=int_kind), save  :: nx_elem              ! number of elements and gost elements for each mesh partition
+          integer (kind=int_kind), save  :: nx_nh                ! number of nodes for each mesh partition (NO GOST CELLS)
+          integer (kind=int_kind), save  :: nx_elem_nh           ! number of elements for each mesh partition (NO GOST CELLS)
           integer (kind=int_kind), save  :: ncat                 ! number of categories in use
           integer (kind=int_kind), save  :: nfsd                 ! number of floe size categories in use
           integer (kind=int_kind), save  :: nilyr                ! number of ice layers per category in use
@@ -96,11 +98,13 @@
                                 ! argument 2:  (1) aice, (2) vice, (3) vsno
     
           real (kind=dbl_kind), allocatable, save :: &  ! DIM nx
-             uvel(:)     , & ! x-component of velocity (m/s)
-             vvel(:)     , & ! y-component of velocity (m/s)
-             divu(:)     , & ! strain rate I component, velocity divergence (1/s)
-             shear(:)    , & ! strain rate II component (1/s)
-             strength(:)     ! ice strength (N/m)
+             uvel(:)      , & ! x-component of velocity (m/s) on the nodes
+             vvel(:)      , & ! y-component of velocity (m/s) on the nodes
+             uvel_elem(:) , & ! x-component of velocity (m/s) on the elements
+             vvel_elem(:) , & ! y-component of velocity (m/s) on the elements
+             divu(:)      , & ! strain rate I component, velocity divergence (1/s)
+             shear(:)     , & ! strain rate II component (1/s)
+             strength(:)      ! ice strength (N/m)
     
           real (kind=dbl_kind), allocatable, save :: &   ! DIM nx
              aice_init(:)       ! initial concentration of ice, for diagnostics
@@ -821,6 +825,16 @@
               module subroutine init_state_var()
                   implicit none
               end subroutine init_state_var
+
+              ! Initialize wave spectrum
+              module subroutine init_wave_spec()
+                  implicit none
+              end subroutine init_wave_spec
+
+              ! Initialize constant aerosols values
+              module subroutine init_faero()
+                  implicit none
+              end subroutine init_faero
 
               ! Initialize all
               module subroutine init_icepack(mesh)
