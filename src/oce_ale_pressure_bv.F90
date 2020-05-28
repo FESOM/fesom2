@@ -8,6 +8,18 @@ module densityJM_components_interface
     end subroutine
   end interface
 end module
+
+module density_linear_interface
+  interface
+    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, mesh)
+      USE MOD_MESH
+      real(kind=WP), intent(IN)  :: t,s
+      real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rho_out
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+
 module pressure_force_4_linfs_fullcell_interface
   interface
     subroutine pressure_force_4_linfs_fullcell(mesh)
@@ -73,6 +85,7 @@ subroutine pressure_bv(mesh)
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     use densityJM_components_interface
+    use density_linear_interface
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh    
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
@@ -395,6 +408,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
     use g_PARSUP
     use g_config
     use densityJM_components_interface
+    use density_linear_interface
     implicit none
     
     logical             :: do_interpTS=.true.
