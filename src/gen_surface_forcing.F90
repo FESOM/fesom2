@@ -92,13 +92,7 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
-#define HGMODE .true.
-#ifdef HGMODE
    real(4), allocatable, dimension(:,:),     private, save, target     :: sbcdata1_,sbcdata2_
-#else
-   real(8), dimension(:,:),     private, save, pointer     :: sbcdata1,sbcdata2
-   real(8), allocatable, dimension(:,:),     private, save, target     :: sbcdata1_,sbcdata2_
-#endif
 !   real(wp), allocatable, save, dimension(:), public     :: qns_2   ! downward non solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: qsr_2   ! downward solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: emp_2   ! evaporation minus precipitation        [kg/m2/s]
@@ -167,12 +161,10 @@ MODULE g_sbf
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
-#ifdef HGMODE
       real(4), allocatable, dimension(:,:)     :: sbcdata_a
       integer sbcdata_a_t_index
       real(4), allocatable, dimension(:,:)     :: sbcdata_b
       integer sbcdata_b_t_index
-#endif
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -602,9 +594,7 @@ CONTAINS
    END SUBROUTINE nc_sbc_ini
 
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
-#ifdef HGMODE
       use forcing_provider_async_module
-#endif
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -642,19 +632,13 @@ CONTAINS
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
       type(t_mesh), intent(in) , target :: mesh
-#ifdef HGMODE
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
-#endif
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
 
 #include  "associate_mesh.h"
 
-#ifdef HGMODE
       rootrank = 0
-#else
-      rootrank = 0
-#endif
 
       ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
@@ -668,34 +652,14 @@ CONTAINS
       nc_lon   =>sbc_flfi(fld_idx)%nc_lon
       nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
-#ifdef HGMODE
-        if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
-          allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
-          sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
-          allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
-          sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
-        end if
+      if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
+        allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
+        allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
+      end if
 
-#else
-if(allocated(sbcdata1_)) stop __LINE__
-if(allocated(sbcdata2_)) stop __LINE__
-        ALLOCATE (sbcdata1_(nc_Nlon,nc_Nlat), &
-                  sbcdata2_(nc_Nlon,nc_Nlat), STAT=sbc_alloc )
-      if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'
-        sbcdata1 => sbcdata1_
-        sbcdata2 => sbcdata2_
-#endif
-
-#ifdef HGMODE
-        ! no initialization required, the whole array will be overwritten anyway
-!         sbcdata1(1,1:nc_Nlat) = 0.0_WP
-!         sbcdata1(nc_Nlon,1:nc_Nlat) = 0.0_WP
-!         sbcdata2(1, 1:nc_Nlat) = 0.0_WP
-!         sbcdata2(nc_Nlon, 1:nc_Nlat) = 0.0_WP
-#else
-      sbcdata1 = 0.0_WP
-      sbcdata2 = 0.0_WP
-#endif
+      ! no initialization of sbcdata required, the whole array will be overwritten anyway
 
       ! find time index in files
       now_date = rdate
@@ -724,59 +688,45 @@ if(allocated(sbcdata2_)) stop __LINE__
       end if
 
 
-#ifdef HGMODE        
-        if(yearold == yearnew) then ! todo: simplify if clause
-          if(sbc_flfi(fld_idx)%sbcdata_a_t_index == t_indx) then
-            sbcdata1_from_cache = .true.
-            sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
-            sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
-            sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
-          else if(sbc_flfi(fld_idx)%sbcdata_b_t_index == t_indx) then
-            sbcdata1_from_cache = .true.
-            sbcdata1 => sbc_flfi(fld_idx)%sbcdata_b
-          
-            sbcdata2 => sbc_flfi(fld_idx)%sbcdata_a ! 
-            sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx_p1
-          else
-            sbcdata1_from_cache = .false.
-            sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
-            sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
-
-            sbcdata2_from_cache = .false.
-            sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
-            sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
-          end if
+      ! determine if we can use the broadcast cache
+      if(yearold == yearnew) then ! todo: simplify if clause
+        if(sbc_flfi(fld_idx)%sbcdata_a_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+        else if(sbc_flfi(fld_idx)%sbcdata_b_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_b
+        
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_a ! 
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx_p1
         else
-            sbcdata1_from_cache = .false.
-            sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
-            sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
 
-            sbcdata2_from_cache = .false.
-            sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
-            sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
         end if
-        sbcdata2_from_cache = .false.         
-#endif
+      else
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+      end if
+      sbcdata2_from_cache = .false.         
 
       iost = 0
       !open file sbc_flfi
       if (mype==0) then
          !write(*,*) 'check: ', trim(file_name)
-#ifndef HGMODE
-         iost = nf_open(trim(file_name),NF_NOWRITE,ncid)
-#endif
       end if
 
-#ifndef HGMODE
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-      ! get variable id
-      if (mype==0) then
-          iost = nf_inq_varid(ncid, var_name, id_data)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-#endif
       !read data from file
       if (mype==rootrank) then
          nf_start(1)=1
@@ -785,67 +735,45 @@ if(allocated(sbcdata2_)) stop __LINE__
          nf_edges(2)=nc_Nlat
          nf_start(3)=t_indx
          nf_edges(3)=1
-#ifdef HGMODE
-           if(.not. sbcdata1_from_cache) then
-if(.not. associated(sbcdata1)) stop __LINE__
-             call forcing_provider%get_forcingdata(fld_idx, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
-           end if
-           iost = 0
-#else
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
-#endif
+         if(.not. sbcdata1_from_cache) then
+           call forcing_provider%get_forcingdata(fld_idx, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+         end if
+         iost = 0
       end if
-#ifndef HGMODE
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-#endif
+
       if(mype == rootrank) then
         if(.not. sbcdata1_from_cache) then
            sbcdata1(1, 1:nc_Nlat)       = sbcdata1(nc_Nlon-1, 1:nc_Nlat)
            sbcdata1(nc_Nlon,1:nc_Nlat) = sbcdata1(2, 1:nc_Nlat)
         end if
       end if
-#ifdef HGMODE      
-     if(sbcdata1_from_cache) then ! use the cache instead of bcast
-     else
+      if(sbcdata1_from_cache) then ! use the cache instead of bcast
+      else
         call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
-if(sbc_flfi(fld_idx)%sbcdata_a_t_index /= t_indx) stop __LINE__
      end if
-#else
-      call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, rootrank, MPI_COMM_FESOM, ierror)
-#endif
+
        ! read next time step in file (check for +1 done before)
       if (mype==rootrank) then
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
-#ifdef HGMODE
         if(.not. sbcdata2_from_cache) then
         call forcing_provider%get_forcingdata(fld_idx, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
       end if
       iost = 0
-#else
-      iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
-#endif
       end if
-#ifndef HGMODE
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost, file_name)
-#endif
+
       if (mype==rootrank) then
         if(.not. sbcdata2_from_cache) then
          sbcdata2(1, 1:nc_Nlat)       = sbcdata2(nc_Nlon-1, 1:nc_Nlat)
          sbcdata2(nc_Nlon, 1:nc_Nlat) = sbcdata2(2, 1:nc_Nlat)
         end if
       end if
-#ifdef HGMODE
      if(sbcdata2_from_cache) then ! use the cache instead of bcast
       !
      else
-        call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
-      end if
-#else
-      call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, rootrank, MPI_COMM_FESOM, ierror)
-#endif 
+       call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+     end if
+
 !      !flip data in case of lat from -90 to 90
 !      !!!! WARNING
 !      if ( flip_lat == 1 ) then
@@ -915,14 +843,6 @@ if(sbc_flfi(fld_idx)%sbcdata_a_t_index /= t_indx) stop __LINE__
       end do !ii
 !!$OMP END DO
 !!$OMP END PARALLEL
-#ifndef HGMODE
-      if (mype==0) then
-         iost = nf_close(ncid)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-        call check_nferr(iost, file_name)
-      DEALLOCATE( sbcdata2_, sbcdata1_ )
-#endif
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
