@@ -236,11 +236,12 @@
          fsalt_ai(nx),   & ! salt flux to ocean (kg/m^2/s)
          fhocn_ai(nx),   & ! net heat flux to ocean (W/m^2)
          fswthru_ai(nx), &  ! shortwave penetrating to ocean (W/m^2)
-         rside(nx)    , & ! fraction of ice that melts laterally
-         fsw(nx)      , & ! incoming shortwave radiation (W/m^2)
+         rside(nx)     , & ! fraction of ice that melts laterally
+         fside(nx)     , & ! lateral heat flux (W/m^2)
+         fsw(nx)       , & ! incoming shortwave radiation (W/m^2)
          cos_zen(nx)   , & ! cosine solar zenith angle, < 0 for sun below horizon
-         rdg_conv(nx) , & ! convergence term for ridging on nodes (1/s)
-         rdg_shear(nx), & ! shear term for ridging on nodes (1/s)
+         rdg_conv(nx)  , & ! convergence term for ridging on nodes (1/s)
+         rdg_shear(nx) , & ! shear term for ridging on nodes (1/s)
          rdg_conv_elem(nx_elem),  & ! convergence term for ridging on elements (1/s)
          rdg_shear_elem(nx_elem), & ! shear term for ridging on elements (1/s)
          salinz(nx,nilyr+1)  , & ! initial salinity  profile (ppt)

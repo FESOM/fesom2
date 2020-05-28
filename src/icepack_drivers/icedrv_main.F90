@@ -339,7 +339,8 @@
     
           real (kind=dbl_kind), allocatable, save :: & ! DIM nx
              rside(:),          & ! fraction of ice that melts laterally
-             cos_zen(:),         & ! cosine solar zenith angle, < 0 for sun below horizon
+             fside(:),          & ! lateral heat flux (W/m^2)
+             cos_zen(:),        & ! cosine solar zenith angle, < 0 for sun below horizon
              rdg_conv_elem(:),  & ! convergence term for ridging on elements (1/s)
              rdg_shear_elem(:), & ! shear term for ridging on elements (1/s)
              rdg_conv(:),       & ! convergence term for ridging on nodes (1/s)
@@ -886,63 +887,10 @@
                   type(t_mesh), intent(in), target :: mesh
               end subroutine init_advection_icepack
 
-              ! Ocean mixed layer
-
-              module subroutine ocn_mixed_layer_icepack(        &
-                                         alvdr_ocn, swvdr,      &
-                                         alidr_ocn, swidr,      &
-                                         alvdf_ocn, swvdf,      &
-                                         alidf_ocn, swidf,      &
-                                         sst,       flwout_ocn, &
-                                         fsens_ocn, shcoef,     &
-                                         flat_ocn,  lhcoef,     &
-                                         evap_ocn,  flw,        &
-                                         delt,      delq,       &
-                                         aice,      fhocn,      &
-                                         fswthru,   hmix,       &
-                                         Tf,        fresh,      &
-                                         frain,     fsnow,      &
-                                         fhocn_tot, fresh_tot,  &
-                                         frzmlt)
-
+              ! Driving subroutine for column physics
+              module subroutine step_icepack
                   implicit none
-
-                  real (kind=dbl_kind), intent(in) :: &
-                     alvdr_ocn , & ! visible, direct   (fraction)
-                     alidr_ocn , & ! near-ir, direct   (fraction)
-                     alvdf_ocn , & ! visible, diffuse  (fraction)
-                     alidf_ocn , & ! near-ir, diffuse  (fraction)
-                     swvdr     , & ! sw down, visible, direct  (W/m^2)
-                     swvdf     , & ! sw down, visible, diffuse (W/m^2)
-                     swidr     , & ! sw down, near IR, direct  (W/m^2)
-                     swidf     , & ! sw down, near IR, diffuse (W/m^2)
-                     flw       , & ! incoming longwave radiation (W/m^2)
-                     Tf        , & ! freezing temperature (C)
-                     hmix      , & ! mixed layer depth (m)
-                     delt      , & ! potential temperature difference   (K)
-                     delq      , & ! specific humidity difference   (kg/kg)
-                     shcoef    , & ! transfer coefficient for sensible heat
-                     lhcoef    , & ! transfer coefficient for latent heat
-                     fswthru   , & ! shortwave penetrating to ocean (W/m^2)
-                     aice      , & ! ice area fraction
-                     sst       , & ! sea surface temperature (C)
-                     frain     , & ! rainfall rate (kg/m^2/s)
-                     fsnow         ! snowfall rate (kg/m^2/s)
-        
-                  real (kind=dbl_kind), intent(inout) :: &
-                     flwout_ocn, & ! outgoing longwave radiation (W/m^2)
-                     fsens_ocn , & ! sensible heat flux (W/m^2)
-                     flat_ocn  , & ! latent heat flux   (W/m^2)
-                     evap_ocn  , & ! evaporative water flux (kg/m^2/s)
-                     fhocn     , & ! net heat flux to ocean (W/m^2)
-                     fresh     , & ! fresh water flux to ocean (kg/m^2/s)
-                     frzmlt        ! freezing/melting potential (W/m^2)
-        
-                  real (kind=dbl_kind), intent(out) :: &
-                     fhocn_tot , & ! net total heat flux to ocean (W/m^2)
-                     fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
-
-              end subroutine ocn_mixed_layer_icepack
+              end subroutine step_icepack
 
           end interface
 
