@@ -322,12 +322,14 @@
           ! fluxes sent to ocean
           !-----------------------------------------------------------------
     
-          strocnxT(:) = c0    ! ice-ocean stress, x-direction (T-cell)
-          strocnyT(:) = c0    ! ice-ocean stress, y-direction (T-cell)
-          fresh   (:) = c0
-          fsalt   (:) = c0
-          fhocn   (:) = c0
-          fswthru (:) = c0
+          strocnxT (:) = c0    ! ice-ocean stress, x-direction (T-cell)
+          strocnyT (:) = c0    ! ice-ocean stress, y-direction (T-cell)
+          fresh    (:) = c0
+          fresh_tot(:) = c0
+          fsalt    (:) = c0
+          fhocn    (:) = c0
+          fhocn_tot(:) = c0
+          fswthru  (:) = c0
           flux_bio(:,:) = c0 ! bgc
           fnit    (:) = c0
           fsil    (:) = c0
@@ -829,6 +831,8 @@
 
       module subroutine init_fsd()
 
+          implicit none
+
           wavefreq       (:)   = c0
           dwavefreq      (:)   = c0
           wave_sig_ht    (:)   = c0
@@ -843,43 +847,48 @@
 
 !=======================================================================
 
-      subroutine init_wave_spec()
+      module subroutine init_wave_spec()
 
-      ! local variables
-      integer (kind=int_kind) :: &
-         k
-
-      real(kind=dbl_kind), dimension(nfreq) :: &
-         wave_spectrum_profile  ! wave spectrum
-
-       wave_spectrum(:,:) = c0
-
-      ! wave spectrum and frequencies
-      ! get hardwired frequency bin info and a dummy wave spectrum profile
-      call icepack_init_wave(nfreq=nfreq,                 &
-                             wave_spectrum_profile=wave_spectrum_profile, &
-                             wavefreq=wavefreq, dwavefreq=dwavefreq)
-
-      do k = 1, nfreq
-          wave_spectrum(:,k) = wave_spectrum_profile(k)
-      enddo
+          implicit none
+    
+          ! local variables
+          character(len=*), parameter :: subname='(init_wave_spec)'
+    
+          integer (kind=int_kind) :: k
+    
+          real(kind=dbl_kind), dimension(nfreq) :: &
+             wave_spectrum_profile  ! wave spectrum
+    
+           wave_spectrum(:,:) = c0
+    
+          ! wave spectrum and frequencies
+          ! get hardwired frequency bin info and a dummy wave spectrum profile
+          call icepack_init_wave(nfreq=nfreq,                 &
+                                 wave_spectrum_profile=wave_spectrum_profile, &
+                                 wavefreq=wavefreq, dwavefreq=dwavefreq)
+    
+          do k = 1, nfreq
+              wave_spectrum(:,k) = wave_spectrum_profile(k)
+          enddo
 
       end subroutine init_wave_spec
 
 !=======================================================================
 
-      subroutine init_faero()
+      module subroutine init_faero()
 
-      character(len=*), parameter :: subname='(faero_default)'
-
-      faero_atm(:,1) = 1.e-12_dbl_kind ! kg/m^2 s
-      faero_atm(:,2) = 1.e-13_dbl_kind
-      faero_atm(:,3) = 1.e-14_dbl_kind
-      faero_atm(:,4) = 1.e-14_dbl_kind
-      faero_atm(:,5) = 1.e-14_dbl_kind
-      faero_atm(:,6) = 1.e-14_dbl_kind
-
-      end subroutine faero_default
+          implicit none
+    
+          character(len=*), parameter :: subname='(init_faero)'
+    
+          faero_atm(:,1) = 1.e-12_dbl_kind ! kg/m^2 s
+          faero_atm(:,2) = 1.e-13_dbl_kind
+          faero_atm(:,3) = 1.e-14_dbl_kind
+          faero_atm(:,4) = 1.e-14_dbl_kind
+          faero_atm(:,5) = 1.e-14_dbl_kind
+          faero_atm(:,6) = 1.e-14_dbl_kind
+    
+      end subroutine init_faero
 
 !=======================================================================
 

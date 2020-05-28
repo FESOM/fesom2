@@ -7,23 +7,29 @@
 !
 !=======================================================================
 
-module icedrv_advection
+submodule (icedrv_main) icedrv_advection
 
     use icedrv_kinds
     use icedrv_constants
     use icedrv_system,      only: icedrv_system_abort
+    use g_comm_auto,        only: exchange_nod
+    use icepack_intfc,      only: icepack_warnings_flush,         &
+                                  icepack_warnings_aborted,       &
+                                  icepack_query_tracer_indices,   &
+                                  icepack_query_tracer_flags,     &
+                                  icepack_query_parameters,       &
+                                  icepack_query_tracer_sizes
 
     implicit none
 
-    public :: fct_init_icepack, tracer_advection_icepack
+    real(kind=dbl_kind), allocatable, dimension(:)   :: &
+         d_tr,        trl,                              &
+         rhs_tr,      rhs_trdiv,                        &
+         icepplus,    icepminus,                        &
+         mass_matrix                   
 
-    private
-
-    real(kind=dbl_kind), allocatable, dimension(:) :: &
-         d_tr,        trl,                            &
-         rhs_tr,      rhs_trdiv,                      &
-         icepplus,    iceppminus,                     &
-         icefluxes,   mass_matrix                   
+    real(kind=dbl_kind), allocatable, dimension(:,:) :: &
+         icefluxes                   
 
     ! Variables needed for advection
 
@@ -32,7 +38,6 @@ module icedrv_advection
     subroutine tg_rhs_icepack(mesh, trc)
     
         use mod_mesh
-        use i_arrays
         use i_param
         use g_parsup
         use o_param
@@ -52,7 +57,7 @@ module icedrv_advection
         integer(kind=int_kind)           :: n,          q,     row,        &
                                             elem,       elnodes(3)
     
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
     
         ! Taylor-Galerkin (Lax-Wendroff) rhs
       
@@ -70,8 +75,8 @@ module icedrv_advection
            dx  = gradient_sca(1:3,elem)
            dy  = gradient_sca(4:6,elem)
            vol = elem_area(elem)
-           um  = sum(uvel_elem(elnodes))
-           vm  = sum(vvel_elem(elnodes))
+           um  = sum(uvel(elnodes))
+           vm  = sum(vvel(elnodes))
     
            ! Diffusivity
     
@@ -79,9 +84,9 @@ module icedrv_advection
            do n = 1, 3
               row = elnodes(n)
               do q = 1, 3
-                 entries(q) = vol*ice_dt*((dx(n)*(um+uvel_elem(elnodes(q))) +      &
-                              dy(n)*(vm+vvel_elem(elnodes(q))))/12.0_WP -          &
-                              diff*(dx(n)*dx(q)+ dy(n)*dy(q)) -                &
+                 entries(q) = vol*ice_dt*((dx(n)*(um+uvel(elnodes(q))) +      &
+                              dy(n)*(vm+vvel(elnodes(q))))/12.0_WP -          &
+                              diff*(dx(n)*dx(q)+ dy(n)*dy(q)) -               &
                               0.5_WP*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
               enddo
               rhs_tr(row)=rhs_tr(row)+sum(entries*trc(elnodes))
@@ -92,24 +97,23 @@ module icedrv_advection
     
     !=======================================================================
     
-    subroutine fct_init_icepack(mesh)
+    module subroutine init_advection_icepack(mesh)
     
         use o_param
         use o_mesh
-        use i_arrays
         use g_parsup
     
-        type(t_mesh), intent(in), target :: mesh
-          
         implicit none
       
+        type(t_mesh), intent(in), target :: mesh
+          
         ! Initialization of arrays necessary to implement FCT algorithm
         allocate(trl(nx))   ! low-order solutions
         allocate(d_tr(nx))  ! increments of high
                             ! order solutions
         allocate(icefluxes(nx_elem_nh, 3))
         allocate(icepplus(nx), icepminus(nx))
-        allocate(rhs_tr(n_nx),  rhs_trdiv(nx))
+        allocate(rhs_tr(nx),  rhs_trdiv(nx))
         allocate(mass_matrix(sum(nn_num(1:nx_nh))))
 
       
@@ -120,14 +124,14 @@ module icedrv_advection
         icefluxes(:,:) = c0
         icepplus(:)    = c0
         icepminus(:)   = c0
-        mass_matrix(:,:) = c0
+        mass_matrix(:) = c0
       
         ! Fill in  the mass matrix
         call fill_mass_matrix_icepack(mesh)
       
         if (mype==0) write(*,*) 'Icepack FCT is initialized'
     
-    end subroutine fct_init_icepack
+    end subroutine init_advection_icepack
     
     !=======================================================================
     
@@ -136,7 +140,6 @@ module icedrv_advection
         use mod_mesh
         use o_mesh
         use i_param
-        use i_arrays
         use g_parsup
       
         implicit none
@@ -148,7 +151,7 @@ module icedrv_advection
         integer(kind=int_kind)                 :: flag=0 ,iflag=0
         type(t_mesh), intent(in), target       :: mesh
       
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
       
         allocate(col_pos(nx))
           
@@ -212,10 +215,9 @@ module icedrv_advection
     
         use mod_mesh
         use o_mesh
-        use i_arrays
-        use i_parm
+        use i_param
         use g_parsup
-        use g_comm_auto
+  
       
         implicit none
       
@@ -224,7 +226,7 @@ module icedrv_advection
         type(t_mesh),        target,       intent(in)     :: mesh
         real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
     
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
       
         gamma = ice_gamma_fct       ! Added diffusivity parameter
                                     ! Adjust it to ensure posivity of solution
@@ -251,20 +253,19 @@ module icedrv_advection
     
         use mod_mesh
         use o_mesh
-        use i_arrays
-        use i_parm
+        use i_param
         use g_parsup
-        use g_comm_auto
+   
     
         implicit none
       
         integer(kind=int_kind)             :: n,i,clo,clo2,cn,location(100),row
-        real   (kind=double_kind)          :: rhs_new
+        real   (kind=dbl_kind)          :: rhs_new
         integer(kind=int_kind), parameter  :: num_iter_solve = 3
         type(t_mesh),        target,       intent(in)     :: mesh
         real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
       
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
       
         ! Taylor-Galerkin solution
        
@@ -308,11 +309,10 @@ module icedrv_advection
     
         use mod_mesh
         use o_mesh
-        use i_arrays
         use o_param
-        use i_parm
+        use i_param
         use g_parsup
-        use g_comm_auto
+   
     
         integer(kind=int_kind)                            :: icoef(3,3), n, q, elem, elnodes(3), row
         real   (kind=dbl_kind), allocatable, dimension(:) :: tmax, tmin
@@ -320,7 +320,7 @@ module icedrv_advection
         type(t_mesh),        target,       intent(in)     :: mesh  
         real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
     
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
       
         gamma = ice_gamma_fct        ! It should coinside with gamma in
                                      ! ts_solve_low_order
@@ -460,11 +460,10 @@ module icedrv_advection
     
         use mod_mesh
         use o_mesh
-        use i_arrays
         use o_param
-        use i_parm
+        use i_param
         use g_parsup
-        use g_comm_auto
+  
     
         implicit none
     
@@ -474,8 +473,7 @@ module icedrv_advection
         type(t_mesh),        target,       intent(in)     :: mesh
         real(kind=dbl_kind), dimension(:), intent(inout)  :: trc    
 
-    
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
     
         ! Computes the rhs in a Taylor-Galerkin way (with urrayspwind 
         ! type of correction for the advection operator).
@@ -496,26 +494,26 @@ module icedrv_advection
            dx  = gradient_sca(1:3,elem)
            dy  = gradient_sca(4:6,elem)
            vol = elem_area(elem)
-           um  = sum(uvel_elem(elnodes))
-           vm  = sum(vvel_elem(elnodes))
+           um  = sum(uvel(elnodes))
+           vm  = sum(vvel(elnodes))
       
            ! This is exact computation (no assumption of u=const 
            ! on elements used in the standard version)
-           c_1 = (um*um+sum(uvel_elem(elnodes)*uvel_elem(elnodes))) / 12.0_dbl_kind
-           c_2 = (vm*vm+sum(vvel_elem(elnodes)*vvel_elem(elnodes))) / 12.0_dbl_kind
-           c_3 = (um*vm+sum(vvel_elem(elnodes)*uvel_elem(elnodes))) / 12.0_dbl_kind
-           c_4 = sum(dx*uvel_elem(elnodes)+dy*vvel_elem(elnodes))
+           c_1 = (um*um+sum(uvel(elnodes)*uvel(elnodes))) / 12.0_dbl_kind
+           c_2 = (vm*vm+sum(vvel(elnodes)*vvel(elnodes))) / 12.0_dbl_kind
+           c_3 = (um*vm+sum(vvel(elnodes)*uvel(elnodes))) / 12.0_dbl_kind
+           c_4 = sum(dx*uvel(elnodes)+dy*vvel(elnodes))
       
            do n = 1, 3
               row = elnodes(n)
       
               do q = 1, 3
-                 entries(q)  = vol*ice_dt*((c1-p5*ice_dt*c_4)*(dx(n)*(um+uvel_elem(elnodes(q)))+ &
-                               dy(n)*(vm+vvel_elem(elnodes(q))))/12.0_dbl_kind                 - &
+                 entries(q)  = vol*ice_dt*((c1-p5*ice_dt*c_4)*(dx(n)*(um+uvel(elnodes(q)))+ &
+                               dy(n)*(vm+vvel(elnodes(q))))/12.0_dbl_kind                 - &
                                p5*ice_dt*(c_1*dx(n)*dx(q)+c_2*dy(n)*dy(q)+c_3*(dx(n)*dy(q)+dx(q)*dy(n))))
-                 entries2(q) = p5*ice_dt*(dx(n)*(um+uvel_elem(elnodes(q)))                     + &
-                               dy(n)*(vm+vvel_elem(elnodes(q)))-dx(q)*(um+uvel_elem(row))      - &
-                               dy(q)*(vm+vvel_elem(row)))
+                 entries2(q) = p5*ice_dt*(dx(n)*(um+uvel(elnodes(q)))                     + &
+                               dy(n)*(vm+vvel(elnodes(q)))-dx(q)*(um+uvel(row))      - &
+                               dy(q)*(vm+vvel(row)))
               enddo
               c_x = vol*ice_dt*c_4*(sum(trc(elnodes))+trc(elnodes(n))+sum(entries2*trc(elnodes))) / 12.0_dbl_kind
               rhs_tr(row)    = rhs_tr(row) + sum(entries * trc(elnodes)) + c_x
@@ -531,11 +529,10 @@ module icedrv_advection
     
         use mod_mesh
         use o_mesh
-        use i_arrays
         use o_param
-        use i_parm
+        use i_param
         use g_parsup
-        use g_comm_auto
+    
     
         implicit none
     
@@ -546,7 +543,7 @@ module icedrv_advection
         type(t_mesh),        target,       intent(in)     :: mesh
         real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
     
-    #include "associate_mesh.h"
+#include "../associate_mesh.h"
     
         ! Computes Taylor-Galerkin solution
         ! first approximation
@@ -581,11 +578,13 @@ module icedrv_advection
     !=======================================================================
     
     subroutine fct_solve_icepack(mesh, trc)
-          
+        
+        use mod_mesh     
+     
         implicit none
 
-        real(kind=dbl_kind), dimension(:), intent(inout) :: trc      
-        type(t_mesh),        target,       intent(in)    :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout) :: trc      
+        type(t_mesh),        target,        intent(in)    :: mesh
       
         ! Driving sequence
         call ice_TG_rhs_div(mesh, trc)
@@ -600,13 +599,132 @@ module icedrv_advection
 
     !=======================================================================
 
-    subroutine tracer_advection_icepack(mesh, trc)
+    module subroutine tracer_advection_icepack(mesh)
+
+        use mod_mesh
+        use icepack_intfc,        only: icepack_aggregate
+        use icepack_itd,          only: cleanup_itd
+        use g_config,             only: dt
 
         implicit none
-
-        real(kind=dbl_kind), dimension(:), intent(inout) :: trc
+      
+        ! NOTE: For remapping, hice and hsno are considered tracers.
+        !       ntrace is not equal to ntrcr!
+      
+        integer (kind=int_kind) :: ntrcr, ntrace, narr, nbtrcr, i,     &
+                                   nx,    nt,   nt1,    k
+        integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno,                          & 
+                                   nt_sice, nt_fbri, nt_iage, nt_FY, nt_alvl, nt_vlvl, &
+                                   nt_apnd, nt_hpnd, nt_ipnd, nt_bgc_Nit, nt_bgc_S
+        logical (kind=log_kind) :: tr_pond_topo, tr_pond_lvl, tr_pond_cesm,            &
+                                   tr_pond,      tr_aero,     tr_FY,                   &
+                                   tr_iage,      heat_capacity
+        real    (kind=dbl_kind) :: puny
+      
+        ! Tracer dependencies and additional arrays
+      
+        integer (kind=int_kind), dimension(:),    allocatable    ::    &
+                tracer_type    , & ! = 1, 2, or 3 (depends on 0, 1 or 2 other tracers)
+                depend             ! tracer dependencies (see below)
+      
+        logical (kind=log_kind), dimension (:),   allocatable   ::     &
+                has_dependents    ! true if a tracer has dependent tracers
+      
+        real (kind=dbl_kind),    dimension (:,:), allocatable ::       &
+               works
+      
         type(t_mesh),        target,       intent(in)    :: mesh
 
+        call icepack_query_parameters(heat_capacity_out=heat_capacity,    &
+                                      puny_out=puny)
+        call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
+        call icepack_query_tracer_flags(                                  &
+               tr_iage_out=tr_iage, tr_FY_out=tr_FY,                      &
+               tr_aero_out=tr_aero, tr_pond_out=tr_pond,                  &
+               tr_pond_cesm_out=tr_pond_cesm,                             &
+               tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
+        call icepack_query_tracer_indices(nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice, &
+               nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_fbri_out=nt_fbri,       &
+               nt_iage_out=nt_iage, nt_FY_out=nt_FY, nt_alvl_out=nt_alvl,           &
+               nt_vlvl_out=nt_vlvl, nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd,       &
+               nt_ipnd_out=nt_ipnd, nt_bgc_Nit_out=nt_bgc_Nit, nt_bgc_S_out=nt_bgc_S)
+      
+        narr   = 1 + ncat * (3 + ntrcr) ! max number of state variable arrays
+      
+        ! Allocate works array
+      
+        if (allocated(works)) deallocate(works)
+        allocate ( works(nx,narr) )
+      
+        call state_to_work (nx,                        &
+                            ntrcr,                     &
+                            narr,     trcr_depend,     &
+                            aicen,    trcrn,           &
+                            vicen,    vsnon,           &
+                            aice0,    works)
+      
+        ! Advect each tracer
+      
+        do nt = 1, narr    
+              call fct_solve_icepack ( mesh, works(:,nt) )
+        end do
+      
+        call work_to_state (nx,                        &
+                            ntrcr,                     &
+                            narr,     trcr_depend,     &
+                            aicen,    trcrn,           &
+                            vicen,    vsnon,           &
+                            aice0,    works)
+          
+        ! cut off icepack
+      
+        call cut_off_icepack (nx,                                        &
+                              ntrcr,               narr,                 &
+                              trcr_depend(:),      trcr_base(:,:),       &
+                              n_trcr_strata(:),    nt_strata(:,:),       &
+                              aicen(:,:),          trcrn (:,:,:),        &
+                              vicen(:,:),          vsnon (:,:),          &
+                              aice0(:))
+     
+        do i=1,nx
+           if (ncat > 1) then ! Do we really need this?
+     
+              call cleanup_itd  (dt,                     ntrcr,                &
+                                 nilyr,                  nslyr,                &
+                                 ncat,                   hin_max(:),           &
+                                 aicen(i,:),             trcrn(i,1:ntrcr,:),   &
+                                 vicen(i,:),             vsnon(i,:),           &
+                                 aice0(i),               aice(i),              &
+                                 n_aero,                                       &
+                                 nbtrcr,                 nblyr,                &
+                                 tr_aero,                                      &
+                                 tr_pond_topo,                                 &
+                                 heat_capacity,                                &
+                                 first_ice(i,:),                               &
+                                 trcr_depend(1:ntrcr),   trcr_base(1:ntrcr,:), &
+                                 n_trcr_strata(1:ntrcr), nt_strata(1:ntrcr,:), &
+                                 fpond(i),               fresh(i),             &
+                                 fsalt(i),               fhocn(i),             &
+                                 faero_ocn(i,:),         fzsal(i),             &
+                                 flux_bio(i,1:nbtrcr))
+      
+              call icepack_aggregate (ncat,                    &
+                                     aicen(i,:),               &
+                                     trcrn(i,1:ntrcr,:),       &
+                                     vicen(i,:),               &
+                                     vsnon(i,:),               &
+                                     aice (i),                 &
+                                     trcr (i,1:ntrcr),         &
+                                     vice (i),                 &
+                                     vsno (i),                 &
+                                     aice0(i),                 &
+                                     ntrcr,                    &
+                                     trcr_depend  (1:ntrcr),   &
+                                     trcr_base    (1:ntrcr,:), &
+                                     n_trcr_strata(1:ntrcr),   &
+                                     nt_strata    (1:ntrcr,:))
+           end if
+        end do
 
     end subroutine tracer_advection_icepack
 
@@ -619,206 +737,598 @@ module icedrv_advection
                               vicen,    vsnon,           &
                               aice0,    works)
 
-      use icedrv_main,        only: ncat, nslyr, nilyr, salinz
-      use icepack_intfc
-      use icedrv_system,      only: icedrv_system_abort
-      use icedrv_flux,        only: salinz
+        integer (kind=int_kind), intent(in) ::     &
+           nx      , & ! block dimensions
+           ntrcr   , & ! number of tracers in use
+           narr        ! number of 2D state variable arrays in works array
+  
+        integer (kind=int_kind), dimension (ntrcr), intent(in) ::     &
+           trcr_depend ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
+  
+        real (kind=dbl_kind), dimension (nx,ncat), intent(out) :: &
+           aicen   , & ! concentration of ice
+           vicen   , & ! volume per unit area of ice          (m)
+           vsnon       ! volume per unit area of snow         (m)
+  
+        real (kind=dbl_kind), dimension (nx,ntrcr,ncat), intent(out) ::     &
+           trcrn     ! ice tracers
+  
+        real (kind=dbl_kind), dimension (nx), intent(out) :: &
+           aice0     ! concentration of open water
+  
+        real (kind=dbl_kind), dimension(nx,narr), intent (inout) :: &
+           works     ! work array
+  
+        ! local variables
+  
+        integer (kind=int_kind) :: &
+           nt_alvl, nt_apnd, nt_fbri, nt_Tsfc, ktherm
+  
+        logical (kind=log_kind) :: &
+           tr_pond_cesm, tr_pond_lvl, tr_pond_topo, heat_capacity
+  
+        integer (kind=int_kind) ::      &
+           k, i, n, it   , & ! counting indices
+           narrays       , & ! counter for number of state variable arrays
+           nt_qsno       , &
+           nt_qice       , &
+           nt_sice
+  
+        real (kind=dbl_kind) :: &
+           rhos       , &
+           rhoi       , &
+           Lfresh     , &
+           Tsmelt
+  
+        real (kind=dbl_kind), dimension(ncat) :: &
+           tmp, exc
 
-      integer (kind=int_kind), intent(in) ::     &
-         nx      , & ! block dimensions
-         ntrcr   , & ! number of tracers in use
-         narr        ! number of 2D state variable arrays in works array
-
-      integer (kind=int_kind), dimension (ntrcr), intent(in) ::     &
-         trcr_depend ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
-
-      real (kind=dbl_kind), dimension (nx,ncat), intent(out) :: &
-         aicen   , & ! concentration of ice
-         vicen   , & ! volume per unit area of ice          (m)
-         vsnon       ! volume per unit area of snow         (m)
-
-      real (kind=dbl_kind), dimension (nx,ntrcr,ncat), intent(out) ::     &
-         trcrn     ! ice tracers
-
-      real (kind=dbl_kind), dimension (nx), intent(out) :: &
-         aice0     ! concentration of open water
-
-      real (kind=dbl_kind), dimension(nx,narr), intent (inout) :: &
-         works     ! work array
-
-      ! local variables
-
-      integer (kind=int_kind) :: &
-         nt_alvl, nt_apnd, nt_fbri, nt_Tsfc, ktherm
-
-      logical (kind=log_kind) :: &
-         tr_pond_cesm, tr_pond_lvl, tr_pond_topo, heat_capacity
-
-      integer (kind=int_kind) ::      &
-         k, i, n, it   , & ! counting indices
-         narrays       , & ! counter for number of state variable arrays
-         nt_qsno       , &
-         nt_qice       , &
-         nt_sice
-
-      real (kind=dbl_kind) :: &
-         rhos       , &
-         rhoi       , &
-         Lfresh     , &
-         Tsmelt
-
-      real (kind=dbl_kind), dimension(ncat) :: &
-         tmp, exc, puny
-
-      real (kind=dbl_kind), parameter :: &
-         small = 0.000001_dbl_kind
-
-      character(len=*), parameter :: subname = '(state_to_work)'
-
-      call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm,              &
-           tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
-      call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
-           nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno,                              &
-           nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_Tsfc_out=nt_Tsfc) 
-      call icepack_query_parameters(rhoi_out=rhoi,     rhos_out=rhoi,                   &
-                                    Lfresh_out=Lfresh, heat_capacity_out=heat_capacity, &
-                                    Tsmelt_out=Tsmelt, ktherm_out=ktherm,               &
-                                    puny_out=puny)
-      call icepack_warnings_flush(nu_diag)
-      if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-         file=__FILE__, line=__LINE__)
-
-      ! Open water fraction
-
-      trcrn(:,:,:) = c0
-      aicen(:,:)   = c0
-      vicen(:,:)   = c0
-      vsnon(:,:)   = c0
-
-      do i = 1, nx
-         if (works(i,1) <= puny) then
-             aice0(i) = c0
-         else if (works(i,1) >= c1) then
-             aice0(i) = c1
-         else
-             aice0(i) = works(i,1)
-         end if
-      enddo
-      narrays = 1
-
-      ! Sea ice area and volume per unit area of ice and snow
-
-      do n=1,ncat
-         do i = 1, nx
-            if (works(i,narrays+1) > c1) then
-                works(i,narrays+1) = c1
-            end if
-            if (works(i,narrays+1) <= small .or. works(i,narrays+2) <= small) then
-                works(i,narrays+1) = c0
-                works(i,narrays+2) = c0
-                works(i,narrays+3) = c0
-            end if
-            if (works(i,narrays+3) <= small) then
-               works(i,narrays+3) = c0
-            end if
-            aicen(i,n) = works(i,narrays+1)
-            vicen(i,n) = works(i,narrays+2)
-            vsnon(i,n) = works(i,narrays+3)
-         end do
-
-      narrays = narrays + 3 + ntrcr
-      end do
-
-      do i = 1, nx  ! For each grid cell
-         if (sum(aicen(i,:)) > c1) then
-            tmp(:) = c0
-            exc(:) = c0
-            do n = 1, ncat
-               if (aicen(i,n) > puny) tmp(n) = c1
-            end do
-            do n = 1, ncat
-                exc(n) = max(c0,(sum(aicen(i,:)) - c1))  &
-                         * aicen(i,n) / sum(aicen(i,:))
-            end do
-            do n = 1, ncat
-               aicen(i,n) = max(c0,aicen(i,n) - exc(n))
-               aice0      = max(c0,sum(aicen(i,:)))
-            end do
-         end if
-      end do
-
-      narrays = 1
-
-      do n=1, ncat
-
-         narrays = narrays + 3
-
-         do it = 1, ntrcr
-
-            if (trcr_depend(it) == 0) then
-               do i = 1, nx
-                  if (aicen(i,n) > c0) then
-                     if (it == nt_Tsfc) then
-                         trcrn(i,it,n) = min(c0,works(i,narrays+it)/aicen(i,n))
-                     else
-                         trcrn(i,it,n) = works(i,narrays+it) / aicen(i,n)
-                     end if
-                  end if
-               enddo
-            elseif (trcr_depend(it) == 1) then
-               do i = 1, nx
-                  if (vicen(i,n) > c0) then
-                      if (it >= nt_qice .and. it < nt_qice+nilyr) then
-                          trcrn(i,it,n) = min(c0,works(i,narrays+it)/vicen(i,n))
-                          if (.not. heat_capacity) trcrn(i,it,n) = -rhoi * Lfresh
-                      else if (it >= nt_sice .and. it < nt_sice+nilyr) then
-                          trcrn(i,it,n) = max(c0,works(i,narrays+it)/vicen(i,n))
-                      end if
-                  end if
-               enddo
-            elseif (trcr_depend(it) == 2) then
-               do i = 1, nx
-                   if (vsnon(i,n) > c0) then
-                       if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
-                           trcrn(i,it,n) = min(c0,works(i,narrays+it)/vsnon(i,n)) - rhos*Lfresh
-                           if (.not. heat_capacity) trcrn(i,it,n) = -rhos * Lfresh
+        real (kind=dbl_kind) :: puny
+  
+        real (kind=dbl_kind), parameter :: &
+           small = 0.000001_dbl_kind
+  
+        character(len=*), parameter :: subname = '(state_to_work)'
+  
+        call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm,              &
+             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
+        call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
+             nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno,                              &
+             nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_Tsfc_out=nt_Tsfc) 
+        call icepack_query_parameters(rhoi_out=rhoi,     rhos_out=rhoi,                   &
+                                      Lfresh_out=Lfresh, heat_capacity_out=heat_capacity, &
+                                      Tsmelt_out=Tsmelt, ktherm_out=ktherm,               &
+                                      puny_out=puny)
+        call icepack_warnings_flush(nu_diag)
+        if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+           file=__FILE__, line=__LINE__)
+  
+        ! Open water fraction
+  
+        trcrn(:,:,:) = c0
+        aicen(:,:)   = c0
+        vicen(:,:)   = c0
+        vsnon(:,:)   = c0
+  
+        do i = 1, nx
+           if (works(i,1) <= puny) then
+               aice0(i) = c0
+           else if (works(i,1) >= c1) then
+               aice0(i) = c1
+           else
+               aice0(i) = works(i,1)
+           end if
+        enddo
+        narrays = 1
+  
+        ! Sea ice area and volume per unit area of ice and snow
+  
+        do n=1,ncat
+           do i = 1, nx
+              if (works(i,narrays+1) > c1) then
+                  works(i,narrays+1) = c1
+              end if
+              if (works(i,narrays+1) <= small .or. works(i,narrays+2) <= small) then
+                  works(i,narrays+1) = c0
+                  works(i,narrays+2) = c0
+                  works(i,narrays+3) = c0
+              end if
+              if (works(i,narrays+3) <= small) then
+                 works(i,narrays+3) = c0
+              end if
+              aicen(i,n) = works(i,narrays+1)
+              vicen(i,n) = works(i,narrays+2)
+              vsnon(i,n) = works(i,narrays+3)
+           end do
+  
+        narrays = narrays + 3 + ntrcr
+        end do
+  
+        do i = 1, nx  ! For each grid cell
+           if (sum(aicen(i,:)) > c1) then
+              tmp(:) = c0
+              exc(:) = c0
+              do n = 1, ncat
+                 if (aicen(i,n) > puny) tmp(n) = c1
+              end do
+              do n = 1, ncat
+                  exc(n) = max(c0,(sum(aicen(i,:)) - c1))  &
+                           * aicen(i,n) / sum(aicen(i,:))
+              end do
+              do n = 1, ncat
+                 aicen(i,n) = max(c0,aicen(i,n) - exc(n))
+                 aice0      = max(c0,sum(aicen(i,:)))
+              end do
+           end if
+        end do
+  
+        narrays = 1
+  
+        do n=1, ncat
+  
+           narrays = narrays + 3
+  
+           do it = 1, ntrcr
+  
+              if (trcr_depend(it) == 0) then
+                 do i = 1, nx
+                    if (aicen(i,n) > c0) then
+                       if (it == nt_Tsfc) then
+                           trcrn(i,it,n) = min(c0,works(i,narrays+it)/aicen(i,n))
+                       else
+                           trcrn(i,it,n) = works(i,narrays+it) / aicen(i,n)
                        end if
-                   end if
-               enddo
-            ! Tracers not yet checked or implemented
-            !elseif (trcr_depend(it) == 2+nt_alvl) then
-            !   do i = 1, nx
-            !      works(i,narrays+it) = aicen(i,n) &
-            !                          * trcrn(i,nt_alvl,n) &
-            !                          * trcrn(i,it,n)
-            !   enddo
-            !elseif (trcr_depend(it) == 2+nt_apnd .and. &
-            !        tr_pond_cesm .or. tr_pond_topo) then
-            !   do i = 1, nx
-            !      works(i,narrays+it) = aicen(i,n) &
-            !                          * trcrn(i,nt_apnd,n) &
-            !                          * trcrn(i,it,n)
-            !   enddo
-            !elseif (trcr_depend(it) == 2+nt_apnd .and. &
-            !        tr_pond_lvl) then
-            !   do i = 1, nx
-            !      works(i,narrays+it) = aicen(i,n) &
-            !                          * trcrn(i,nt_alvl,n) &
-            !                          * trcrn(i,nt_apnd,n) &
-            !                          * trcrn(i,it,n)
-            !   enddo
-            !elseif (trcr_depend(it) == 2+nt_fbri) then
-            !   do i = 1, nx
-            !      works(i,narrays+it) = vicen(i,n) &
-            !                          * trcrn(i,nt_fbri,n) &
-            !                          * trcrn(i,it,n)
-            !   enddo
-            endif
-         enddo
+                    end if
+                 enddo
+              elseif (trcr_depend(it) == 1) then
+                 do i = 1, nx
+                    if (vicen(i,n) > c0) then
+                        if (it >= nt_qice .and. it < nt_qice+nilyr) then
+                            trcrn(i,it,n) = min(c0,works(i,narrays+it)/vicen(i,n))
+                            if (.not. heat_capacity) trcrn(i,it,n) = -rhoi * Lfresh
+                        else if (it >= nt_sice .and. it < nt_sice+nilyr) then
+                            trcrn(i,it,n) = max(c0,works(i,narrays+it)/vicen(i,n))
+                        end if
+                    end if
+                 enddo
+              elseif (trcr_depend(it) == 2) then
+                 do i = 1, nx
+                     if (vsnon(i,n) > c0) then
+                         if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
+                             trcrn(i,it,n) = min(c0,works(i,narrays+it)/vsnon(i,n)) - rhos*Lfresh
+                             if (.not. heat_capacity) trcrn(i,it,n) = -rhos * Lfresh
+                         end if
+                     end if
+                 enddo
+              ! Tracers not yet checked or implemented
+              !elseif (trcr_depend(it) == 2+nt_alvl) then
+              !   do i = 1, nx
+              !      works(i,narrays+it) = aicen(i,n) &
+              !                          * trcrn(i,nt_alvl,n) &
+              !                          * trcrn(i,it,n)
+              !   enddo
+              !elseif (trcr_depend(it) == 2+nt_apnd .and. &
+              !        tr_pond_cesm .or. tr_pond_topo) then
+              !   do i = 1, nx
+              !      works(i,narrays+it) = aicen(i,n) &
+              !                          * trcrn(i,nt_apnd,n) &
+              !                          * trcrn(i,it,n)
+              !   enddo
+              !elseif (trcr_depend(it) == 2+nt_apnd .and. &
+              !        tr_pond_lvl) then
+              !   do i = 1, nx
+              !      works(i,narrays+it) = aicen(i,n) &
+              !                          * trcrn(i,nt_alvl,n) &
+              !                          * trcrn(i,nt_apnd,n) &
+              !                          * trcrn(i,it,n)
+              !   enddo
+              !elseif (trcr_depend(it) == 2+nt_fbri) then
+              !   do i = 1, nx
+              !      works(i,narrays+it) = vicen(i,n) &
+              !                          * trcrn(i,nt_fbri,n) &
+              !                          * trcrn(i,it,n)
+              !   enddo
+              endif
+           enddo
+  
+           narrays = narrays + ntrcr
+  
+        enddo                     ! number of categories 
 
-         narrays = narrays + ntrcr
+        do i = 1, nx  ! For each grid cell
+           if (ktherm == 1) then ! For bl99 themodynamics
+                                 ! always ridefine salinity
+                                 ! after advection
+              do k = 1, nilyr
+                 trcrn(i,nt_sice+k-1,:) = salinz(i,k)
+              end do             ! nilyr
+            end if               ! ktherm==1
+        end do
 
-      enddo                     ! number of categories 
+    end subroutine work_to_state
+
+    !=======================================================================
+
+    subroutine state_to_work (nx,                        &
+                              ntrcr,                     &
+                              narr,     trcr_depend,     &
+                              aicen,    trcrn,           &
+                              vicen,    vsnon,           &
+                              aice0,    works)
+
+        integer (kind=int_kind), intent(in) ::     &
+           nx      , & ! block dimensions
+           ntrcr   , & ! number of tracers in use
+           narr        ! number of 2D state variable arrays in works array
+  
+        integer (kind=int_kind), dimension (ntrcr), intent(in) ::     &
+           trcr_depend ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
+  
+        real (kind=dbl_kind), dimension (nx,ncat), intent(in) :: &
+           aicen   , & ! concentration of ice
+           vicen   , & ! volume per unit area of ice          (m)
+           vsnon       ! volume per unit area of snow         (m)
+  
+        real (kind=dbl_kind), dimension (nx,ntrcr,ncat), intent(in) ::     &
+           trcrn     ! ice tracers
+  
+        real (kind=dbl_kind), dimension (nx), intent(in) :: &
+           aice0     ! concentration of open water
+  
+        real (kind=dbl_kind), dimension(nx,narr), intent (out) :: &
+           works     ! work array
+  
+        ! local variables
+  
+        integer (kind=int_kind) :: &
+           nt_alvl, nt_apnd, nt_fbri, nt_Tsfc
+  
+        logical (kind=log_kind) :: &
+           tr_pond_cesm, tr_pond_lvl, tr_pond_topo
+  
+        integer (kind=int_kind) ::      &
+           i, n, it   , & ! counting indices
+           narrays    , & ! counter for number of state variable arrays
+           nt_qsno
+  
+        real (kind=dbl_kind) :: &
+           rhos       , &
+           Lfresh
+  
+        character(len=*), parameter :: subname = '(state_to_work)'
+  
+        call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm, &
+             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
+        call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
+             nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno, nt_Tsfc_out=nt_Tsfc)
+        call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh)
+        call icepack_warnings_flush(nu_diag)
+        if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+           file=__FILE__, line=__LINE__)
+  
+        !-----------------------------------------------------------------
+        ! This array is used for performance (balance memory/cache vs
+        ! number of bound calls);  a different number of arrays may perform
+        ! better depending on the machine used, number of processors, etc.
+        ! --tested on SGI R2000, using 4 pes for the ice model under MPI
+        !-----------------------------------------------------------------
+  
+        do i = 1, nx
+           works(i,1) = aice0(i)
+        enddo
+        narrays = 1
+  
+        do n=1, ncat
+  
+           do i = 1, nx
+              works(i,narrays+1) = aicen(i,n)
+              works(i,narrays+2) = vicen(i,n)
+              works(i,narrays+3) = vsnon(i,n)
+           enddo                  ! i
+           narrays = narrays + 3
+  
+           do it = 1, ntrcr
+              if (trcr_depend(it) == 0) then
+                 do i = 1, nx
+                    works(i,narrays+it) = aicen(i,n)*trcrn(i,it,n)
+                 enddo
+              elseif (trcr_depend(it) == 1) then
+                 do i = 1, nx
+                    works(i,narrays+it) = vicen(i,n)*trcrn(i,it,n)
+                 enddo
+              elseif (trcr_depend(it) == 2) then
+                 do i = 1, nx
+                    if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
+                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) - rhos*Lfresh
+                    else
+                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n)
+                    end if
+                 enddo
+              elseif (trcr_depend(it) == 2+nt_alvl) then
+                 do i = 1, nx
+                    works(i,narrays+it) = aicen(i,n) &
+                                        * trcrn(i,nt_alvl,n) &
+                                        * trcrn(i,it,n)
+                 enddo
+              elseif (trcr_depend(it) == 2+nt_apnd .and. &
+                      tr_pond_cesm .or. tr_pond_topo) then
+                 do i = 1, nx
+                    works(i,narrays+it) = aicen(i,n) &
+                                        * trcrn(i,nt_apnd,n) &
+                                        * trcrn(i,it,n)
+                 enddo
+              elseif (trcr_depend(it) == 2+nt_apnd .and. &
+                      tr_pond_lvl) then
+                 do i = 1, nx
+                    works(i,narrays+it) = aicen(i,n) &
+                                        * trcrn(i,nt_alvl,n) &
+                                        * trcrn(i,nt_apnd,n) &
+                                        * trcrn(i,it,n)
+                 enddo
+              elseif (trcr_depend(it) == 2+nt_fbri) then
+                 do i = 1, nx
+                    works(i,narrays+it) = vicen(i,n) &
+                                        * trcrn(i,nt_fbri,n) &
+                                        * trcrn(i,it,n)
+                 enddo
+              endif
+           enddo
+           narrays = narrays + ntrcr
+  
+        enddo                     ! n
+  
+        if (narr /= narrays .and. mype == 0 ) write(nu_diag,*)      &
+            "Wrong number of arrays in transport bound call"
+
+    end subroutine state_to_work
+
+    !=======================================================================
+
+    subroutine cut_off_icepack (nx,                 &
+                                ntrcr,    narr,     &
+                                trcr_depend,        &
+                                trcr_base,          &
+                                n_trcr_strata,      &
+                                nt_strata,          &
+                                aicen,    trcrn,    &
+                                vicen,    vsnon,    &
+                                aice0)
+
+        use icepack_intfc,         only: icepack_compute_tracers
+        use icepack_intfc,         only: icepack_aggregate
+        use icepack_intfc,         only: icepack_init_trcr
+        use icepack_intfc,         only: icepack_sea_freezing_temperature
+        use icepack_therm_shared,  only: calculate_Tin_from_qin
+        use icepack_mushy_physics, only: icepack_mushy_temperature_mush
+  
+        integer (kind=int_kind), intent (in) ::                       &
+           nx                , & ! block dimensions
+           ntrcr             , & ! number of tracers in use
+           narr        ! number of 2D state variable arrays in works array
+  
+        integer (kind=int_kind), dimension (ntrcr), intent(in) :: &
+           trcr_depend, & ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
+           n_trcr_strata  ! number of underlying tracer layers
+  
+        real (kind=dbl_kind), dimension (ntrcr,3), intent(in) :: &
+           trcr_base      ! = 0 or 1 depending on tracer dependency
+                          ! argument 2:  (1) aice, (2) vice, (3) vsno
+  
+        integer (kind=int_kind), dimension (ntrcr,2), intent(in) :: &
+           nt_strata      ! indices of underlying tracer layers
+  
+        real (kind=dbl_kind), dimension (nx,ncat), intent(inout) :: &
+           aicen   , & ! concentration of ice
+           vicen   , & ! volume per unit area of ice          (m)
+           vsnon       ! volume per unit area of snow         (m)
+  
+        real (kind=dbl_kind), dimension (nx,ntrcr,ncat),intent(inout) :: &
+           trcrn     ! ice tracers
+  
+        real (kind=dbl_kind), dimension (nx), intent(out) :: &
+           aice0     ! concentration of open watera
+  
+        ! local variables
+  
+        real (kind=dbl_kind), dimension(nilyr) :: &
+           qin            , & ! ice enthalpy (J/m3)
+           zTin               ! initial ice temperature
+  
+        real (kind=dbl_kind), dimension(nslyr) :: &
+           qsn            , & ! snow enthalpy (J/m3)
+           zTsn               ! initial snow temperature
+        integer (kind=int_kind) ::      &
+           i, n, k, it    , & ! counting indices
+           narrays        , & ! counter for number of state variable arrays
+           icells         , & ! number of ocean/ice cells
+           ktherm
+  
+         real (kind=dbl_kind), dimension(ncat) :: &
+           aicecat
+  
+        real (kind=dbl_kind) ::         &
+           rhos,       Lfresh,          &
+           cp_ice,     small,           &
+           qrd_snow,   qrd_ice,         &
+           Tsfc,       exc,             &
+           depressT,   Tf_new,          &
+           T_air_C,    hice,            &
+           puny,       Tsmelt,          &
+           Tmin
+           
+  
+        logical (kind=log_kind) :: tr_brine, tr_lvl, flag_snow, flag_cold_ice, flag_warm_ice, &
+                                   heat_capacity
+        integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno, nt_sice
+        integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl
+  
+        character(len=*), parameter :: subname = '(cut_off_icepack)'
+  
+        call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl)
+        call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice, &
+          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice,                                  &
+          nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl)
+        call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh, cp_ice_out=cp_ice)
+        call icepack_query_parameters(depressT_out=depressT, puny_out=puny, &
+          Tsmelt_out=Tsmelt, ktherm_out=ktherm, heat_capacity_out=heat_capacity)
+        call icepack_warnings_flush(nu_diag)
+  
+        small = puny
+        Tmin  = -100.0_dbl_kind
+  
+        if (.not. heat_capacity) then ! for 0 layer thermodynamics
+           do n = 1, ncat
+              do i = 1, nx
+                 if (trcrn(i,nt_Tsfc,n) > Tf(i) .or. trcrn(i,nt_Tsfc,n)< Tmin) then
+                     trcrn(i,nt_Tsfc,n) = min(Tf(i), (T_air(i) + 273.15_dbl_kind))
+                 end if
+              end do
+           end do
+        end if
+  
+        if (heat_capacity) then    ! only for bl99 and mushy thermodynamics
+  
+        ! Here we should implement some conditions to check the tracers
+        ! when ice is present, particularly enthalpy, surface temperature
+        ! and salinity.
+  
+        ! Test advection
+  
+        do n = 1, ncat                      ! For each thickness cathegory
+             do i = 1, nx                   ! For each grid point
+  
+                  ! Forcing quantities at current time step
+                  T_air_C   = T_air(i) + 273.15_dbl_kind ! Convert from C to K
+  
+                  call icepack_init_trcr(T_air_C,     Tf(i),         &
+                                         salinz(i,:), Tmltz(i,:),    &
+                                         Tsfc,                       &
+                                         nilyr,        nslyr,        &
+                                         qin   (:),    qsn  (:))
+  
+                  ! Correct qin profile for melting temperatures
+  
+                  if (vicen(i,n) > small .and. aicen(i,n) > small) then
+  
+                      ! Condition on surface temperature
+                      if (trcrn(i,nt_Tsfc,n) > Tsmelt .or. trcrn(i,nt_Tsfc,n) < Tmin) then
+                          trcrn(i,nt_Tsfc,n) = Tsfc
+                      end if
+  
+                      ! Condition on ice enthalpy
+  
+                      flag_warm_ice = .false.
+                      flag_cold_ice = .false.
+                      flag_snow     = .false.
+  
+                      do k = 1, nilyr  ! Check for problems
+  
+                         if (ktherm == 2) then
+                             zTin(k) = icepack_mushy_temperature_mush(trcrn(i,nt_qice+k-1,n),trcrn(i,nt_sice+k-1,n))
+                         else
+                             zTin(k) = calculate_Tin_from_qin(trcrn(i,nt_qice+k-1,n),Tmltz(i,k))
+                         endif
+  
+                         if (zTin(k) <  Tmin      ) flag_cold_ice = .true.
+                         if (zTin(k) >= Tmltz(i,k)) flag_warm_ice = .true.
+  
+                      end do !nilyr
+  
+                      if (flag_cold_ice) then
+  
+                          trcrn(i,nt_Tsfc,n) = Tsfc
+  
+                          do k = 1, nilyr
+                               trcrn(i,nt_qice+k-1,n) = min(c0, qin(k))
+                          end do        ! nilyr
+  
+                          if (vsnon(i,n) > small) then ! Only if there is snow
+                                                       ! on top of the sea ice
+                              do k = 1, nslyr
+                                    trcrn(i,nt_qsno+k-1,n) = qsn(k)
+                              end do   
+                          else                        ! No snow 
+                              trcrn(i,nt_qsno:nt_qsno+nslyr-1,n) = c0
+                          end if
+  
+                      end if            ! flag cold ice
+  
+                      if (flag_warm_ice) then         ! This sea ice should have melted already 
+  
+                          aicen(i,n)   = c0
+                          vicen(i,n)   = c0
+                          vsnon(i,n)   = c0
+                          trcrn(i,:,n) = c0
+                          trcrn(i,nt_Tsfc,n) = Tf_new
+  
+                      end if
+  
+                      if (vsnon(i,n) > small) then
+  
+                          flag_snow = .false.
+  
+                          do k = 1, nslyr  
+                             if (trcrn(i,nt_qsno+k-1,n) >= -rhos*Lfresh) flag_snow = .true.
+                             zTsn(k) = (Lfresh + trcrn(i,nt_qsno+k-1,n)/rhos)/cp_ice
+                             if (zTsn(k) < Tmin) flag_snow = .true.
+                          end do 
+  
+                          if (flag_snow) then
+                              trcrn(i,nt_Tsfc,n) = Tsfc
+                              do k = 1, nslyr
+                                   trcrn(i,nt_qsno+k-1,n) = qsn(k)
+                              end do        ! nslyr
+                              do k = 1, nilyr
+                                   trcrn(i,nt_qice+k-1,n) = min(c0, qin(k))
+                              end do        ! nilyr
+                          end if            ! flag snow
+                      end if ! vsnon(i,n) > c0
+  
+                  else
+  
+                      aicen(i,n)   = c0
+                      vicen(i,n)   = c0
+                      vsnon(i,n)   = c0
+                      trcrn(i,:,n) = c0
+                      trcrn(i,nt_Tsfc,n) = Tf_new
+  
+                  end if
+  
+             end do   ! nx
+        end do        ! ncat
+  
+        do i = 1, nx
+           aice(i) = c0
+           vice(i) = c0
+           vsno(i) = c0
+           do it = 1, ntrcr
+              trcr(i,it) = c0
+           enddo
+           call icepack_aggregate (ncat,                    &
+                                  aicen(i,:),               &
+                                  trcrn(i,1:ntrcr,:),       &
+                                  vicen(i,:),               &
+                                  vsnon(i,:),               &
+                                  aice (i),                 &
+                                  trcr (i,1:ntrcr),         &
+                                  vice (i),                 &
+                                  vsno (i),                 &
+                                  aice0(i),                 &
+                                  ntrcr,                    &
+                                  trcr_depend  (1:ntrcr),   &
+                                  trcr_base    (1:ntrcr,:), &
+                                  n_trcr_strata(1:ntrcr),   &
+                                  nt_strata    (1:ntrcr,:))
+        end do
+  
+        end if ! heat_capacity
+  
+        call icepack_warnings_flush(nu_diag)
+        if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+            file=__FILE__, line=__LINE__)
+
+    end subroutine cut_off_icepack
+
+end submodule icedrv_advection
 
 
-end module icedrv_advection

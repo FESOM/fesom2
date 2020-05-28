@@ -100,8 +100,6 @@
           real (kind=dbl_kind), allocatable, save :: &  ! DIM nx
              uvel(:)      , & ! x-component of velocity (m/s) on the nodes
              vvel(:)      , & ! y-component of velocity (m/s) on the nodes
-             uvel_elem(:) , & ! x-component of velocity (m/s) on the elements
-             vvel_elem(:) , & ! y-component of velocity (m/s) on the elements
              divu(:)      , & ! strain rate I component, velocity divergence (1/s)
              shear(:)     , & ! strain rate II component (1/s)
              strength(:)      ! ice strength (N/m)
@@ -251,6 +249,10 @@
              fsalt(:)   , & ! salt flux to ocean (kg/m^2/s)
              fhocn(:)   , & ! net heat flux to ocean (W/m^2)
              fswthru(:)     ! shortwave penetrating to ocean (W/m^2)
+
+          real (kind=dbl_kind), allocatable, save :: & ! DIM nx
+             fresh_tot(:)   , & ! total fresh water flux to ocean (kg/m^2/s)
+             fhocn_tot(:)       ! total salt flux to ocean (kg/m^2/s)
     
            ! internal
     
@@ -842,6 +844,105 @@
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
               end subroutine init_icepack
+
+              ! Copy variables from fesom to icepack
+              module subroutine fesom_to_icepack(mesh)
+                  use mod_mesh
+                  implicit none
+                  type(t_mesh), intent(in), target :: mesh
+              end subroutine fesom_to_icepack
+
+              ! Copy variables from fesom to icepack
+              module subroutine icepack_to_fesom(                          &
+                                          nx_in,                           &
+                                          aice_out,  vice_out,  vsno_out,  &
+                                          fhocn_tot_out, fresh_tot_out,    &
+                                          strocnxT_out,  strocnyT_out)
+                  use mod_mesh
+                  implicit none        
+                  integer (kind=int_kind), intent(in) :: &
+                     nx_in      ! block dimensions        
+                  real (kind=dbl_kind), dimension(nx_in), intent(out), optional :: &
+                     aice_out, &
+                     vice_out, &
+                     vsno_out, &
+                     fhocn_tot_out, &
+                     fresh_tot_out, &
+                     strocnxT_out,  &
+                     strocnyT_out
+              end subroutine icepack_to_fesom
+
+              ! Trancers advection 
+              module subroutine tracer_advection_icepack(mesh)
+                  use mod_mesh
+                  implicit none
+                  type(t_mesh), intent(in), target :: mesh
+              end subroutine tracer_advection_icepack
+
+              ! Advection initialization
+              module subroutine init_advection_icepack(mesh)
+                  use mod_mesh
+                  implicit none
+                  type(t_mesh), intent(in), target :: mesh
+              end subroutine init_advection_icepack
+
+              ! Ocean mixed layer
+
+              module subroutine ocn_mixed_layer_icepack(        &
+                                         alvdr_ocn, swvdr,      &
+                                         alidr_ocn, swidr,      &
+                                         alvdf_ocn, swvdf,      &
+                                         alidf_ocn, swidf,      &
+                                         sst,       flwout_ocn, &
+                                         fsens_ocn, shcoef,     &
+                                         flat_ocn,  lhcoef,     &
+                                         evap_ocn,  flw,        &
+                                         delt,      delq,       &
+                                         aice,      fhocn,      &
+                                         fswthru,   hmix,       &
+                                         Tf,        fresh,      &
+                                         frain,     fsnow,      &
+                                         fhocn_tot, fresh_tot,  &
+                                         frzmlt)
+
+                  implicit none
+
+                  real (kind=dbl_kind), intent(in) :: &
+                     alvdr_ocn , & ! visible, direct   (fraction)
+                     alidr_ocn , & ! near-ir, direct   (fraction)
+                     alvdf_ocn , & ! visible, diffuse  (fraction)
+                     alidf_ocn , & ! near-ir, diffuse  (fraction)
+                     swvdr     , & ! sw down, visible, direct  (W/m^2)
+                     swvdf     , & ! sw down, visible, diffuse (W/m^2)
+                     swidr     , & ! sw down, near IR, direct  (W/m^2)
+                     swidf     , & ! sw down, near IR, diffuse (W/m^2)
+                     flw       , & ! incoming longwave radiation (W/m^2)
+                     Tf        , & ! freezing temperature (C)
+                     hmix      , & ! mixed layer depth (m)
+                     delt      , & ! potential temperature difference   (K)
+                     delq      , & ! specific humidity difference   (kg/kg)
+                     shcoef    , & ! transfer coefficient for sensible heat
+                     lhcoef    , & ! transfer coefficient for latent heat
+                     fswthru   , & ! shortwave penetrating to ocean (W/m^2)
+                     aice      , & ! ice area fraction
+                     sst       , & ! sea surface temperature (C)
+                     frain     , & ! rainfall rate (kg/m^2/s)
+                     fsnow         ! snowfall rate (kg/m^2/s)
+        
+                  real (kind=dbl_kind), intent(inout) :: &
+                     flwout_ocn, & ! outgoing longwave radiation (W/m^2)
+                     fsens_ocn , & ! sensible heat flux (W/m^2)
+                     flat_ocn  , & ! latent heat flux   (W/m^2)
+                     evap_ocn  , & ! evaporative water flux (kg/m^2/s)
+                     fhocn     , & ! net heat flux to ocean (W/m^2)
+                     fresh     , & ! fresh water flux to ocean (kg/m^2/s)
+                     frzmlt        ! freezing/melting potential (W/m^2)
+        
+                  real (kind=dbl_kind), intent(out) :: &
+                     fhocn_tot , & ! net total heat flux to ocean (W/m^2)
+                     fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
+
+              end subroutine ocn_mixed_layer_icepack
 
           end interface
 

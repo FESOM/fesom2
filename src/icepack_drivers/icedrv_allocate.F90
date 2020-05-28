@@ -48,8 +48,6 @@
          aice0     (nx)      , & ! concentration of open water
          uvel      (nx)      , & ! x-component of velocity (m/s) on the nodes
          vvel      (nx)      , & ! y-component of velocity (m/s) on the nodes
-         uvel_elem (nx_elem) , & ! x-component of velocity (m/s) on the elements
-         vvel_elem (nx_elem) , & ! y-component of velocity (m/s) on the elements
          divu      (nx)      , & ! strain rate I component, velocity divergence (1/s)
          shear     (nx)      , & ! strain rate II component (1/s)
          strength  (nx)      , & ! ice strength (N/m)
@@ -181,12 +179,14 @@
          alidr_init(nx), & ! near-ir, direct   (fraction)
          alvdf_init(nx), & ! visible, diffuse  (fraction)
          alidf_init(nx), & ! near-ir, diffuse  (fraction)
-         fpond(nx)   , & ! fresh water flux to ponds (kg/m^2/s)
-         fresh(nx)   , & ! fresh water flux to ocean (kg/m^2/s)
-         fsalt(nx)   , & ! salt flux to ocean (kg/m^2/s)
-         fhocn(nx)   , & ! net heat flux to ocean (W/m^2)
-         fswthru(nx) , & ! shortwave penetrating to ocean (W/m^2)
-         fswfac(nx)  , & ! for history
+         fpond(nx)     , & ! fresh water flux to ponds (kg/m^2/s)
+         fresh(nx)     , & ! fresh water flux to ocean (kg/m^2/s)
+         fresh_tot(nx) , & ! total fresh water flux to ocean (kg/m^2/s)
+         fsalt(nx)     , & ! salt flux to ocean (kg/m^2/s)
+         fhocn(nx)     , & ! net heat flux to ocean (W/m^2)
+         fhocn_tot(nx) , & ! total net heat flux to ocean (W/m^2)
+         fswthru(nx)   , & ! shortwave penetrating to ocean (W/m^2)
+         fswfac(nx)    , & ! for history
          scale_factor(nx), &  ! scaling factor for shortwave components
          meltsn(nx,ncat) , & ! snow melt in category n (m)
          melttn(nx,ncat) , & ! top melt in category n (m)
