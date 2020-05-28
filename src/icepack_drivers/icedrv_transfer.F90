@@ -29,9 +29,11 @@
           use g_comm_auto,      only: exchange_nod
           use icedrv_system,    only: icedrv_system_abort
           use g_config,         only: dt
+          use o_param,          only: mstep
           use mod_mesh
           use o_mesh
           use g_parsup
+          use g_clock
  
           implicit none
 
@@ -144,6 +146,27 @@
            enddo
 
            call exchange_nod(rdg_conv, rdg_shear)
+
+          ! Clock variables
+    
+          days_per_year = ndpyr
+          daymo         = num_day_in_month(fleapyear,:)
+          if (fleapyear==1) then
+             daycal     = daycal366
+          else
+             daycal     = daycal365
+          end if
+          istep1        = mstep
+          time          = mstep*dt
+          mday          = day_in_month
+          month_i       = month
+          nyr           = yearnew
+          sec           = timenew
+          yday          = real(ndpyr, kind=dbl_kind)
+          dayyr         = real(days_per_year, kind=dbl_kind)
+          secday        = real(sec, kind=dbl_kind)
+          calendar_type = 'Gregorian'
+          dt_dyn        = dt/real(ndtd,kind=dbl_kind) ! dynamics et al timestep
 
       end subroutine fesom_to_icepack
 
