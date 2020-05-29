@@ -161,6 +161,7 @@ MODULE g_sbf
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
+      integer read_forcing_rootrank
       real(4), allocatable, dimension(:,:)     :: sbcdata_a
       integer sbcdata_a_t_index
       real(4), allocatable, dimension(:,:)     :: sbcdata_b
@@ -595,6 +596,7 @@ CONTAINS
 
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
       use forcing_provider_async_module
+      use mpi_topology_module
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -638,8 +640,6 @@ CONTAINS
 
 #include  "associate_mesh.h"
 
-      rootrank = 0
-
       ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
@@ -657,7 +657,9 @@ CONTAINS
         sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
         allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
         sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
+        sbc_flfi(fld_idx)%read_forcing_rootrank = mpi_topology%next_host_head_rank(MPI_COMM_FESOM)
       end if
+      rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
 
       ! no initialization of sbcdata required, the whole array will be overwritten anyway
 
