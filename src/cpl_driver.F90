@@ -24,10 +24,11 @@ module cpl_driver
 
 #if defined (__oifs)
   integer, parameter         :: nsend = 5
+  integer, parameter         :: nrecv = 14
 #else
   integer, parameter         :: nsend = 4
-#endif
   integer, parameter         :: nrecv = 12
+#endif
   
   integer, dimension(nsend)  :: send_id
   integer, dimension(nrecv)  :: recv_id
@@ -396,6 +397,22 @@ contains
 ! ...  Define symbolic names for transient fields received by the ocean.
 !      These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
+    cpl_recv(1)  = 'taux_oce'
+    cpl_recv(2)  = 'tauy_oce'
+    cpl_recv(3)  = 'taux_ico'
+    cpl_recv(4)  = 'tauy_ico'    
+    cpl_recv(5)  = 'prec_oce'
+    cpl_recv(6)  = 'snow_oce'    
+    cpl_recv(7)  = 'evap_oce'
+    cpl_recv(8)  = 'subl_oce_nh'
+    cpl_recv(9)  = 'heat_oce'
+    cpl_recv(10) = 'heat_ico_nh'
+    cpl_recv(11) = 'heat_swo'    
+    cpl_recv(12) = 'hydr_oce'
+    cpl_recv(13) = 'subl_oce_sh'
+    cpl_recv(14) = 'heat_ico_sh'
+#else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
     cpl_recv(3)  = 'taux_ico'
@@ -408,6 +425,7 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+#endif
 
     if (mype .eq. 0) then 
        print *, 'FESOM after declaring the transient variables'

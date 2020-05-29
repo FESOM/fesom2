@@ -68,7 +68,7 @@ subroutine update_atm_forcing(istep, mesh)
             elseif (i.eq.3) then
             exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-            exchange(:) = ice_temp(:)                          ! ice surface temperature
+            exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
             exchange(:) = ice_alb(:)                                ! ice albedo
             else	    
@@ -180,10 +180,20 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)                   =  exchange(:)        ! runoff + calving
+	     runoff(:)            =  exchange(:)        ! runoff + calving
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
+#if defined (__oifs) 
+         elseif (i.eq.13) then
+             if (action) then
+	     sublimation(:)       = sublimation(:)+exchange(:)        ! Adding sh sublimation on top of nh
+             end if
+         elseif (i.eq.14) then
+             if (action) then
+	     ice_heat_flux(:)     = ice_heat_flux+exchange(:)         ! Adding sh heat-to-ice on top of nh
+             end if
+#endif
 	  end if  	  
 #ifdef VERBOSE
 	  if (mype==0) then
