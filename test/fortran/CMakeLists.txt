@@ -12,11 +12,6 @@ add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_m
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_lookahead_reader_module.F90
            )
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
-   target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
-elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
-   target_compile_options(${LIB_TARGET} PRIVATE -cpp -ffree-line-length-none)
-endif()
 target_include_directories(${LIB_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_LIST_DIR} ${NETCDF_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -27,12 +22,14 @@ add_pfunit_ctest (${PROJECT_NAME}
                forcing_lookahead_reader_module_tests.pf
   LINK_LIBRARIES ${LIB_TARGET}
   )
+
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
+     target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
    target_compile_options(${PROJECT_NAME} PRIVATE -fpp -fp-model precise)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
+     target_compile_options(${LIB_TARGET} PRIVATE -cpp -ffree-line-length-none)
    target_compile_options(${PROJECT_NAME} PRIVATE -cpp -ffree-line-length-none)
 endif()
-
 
 add_custom_command(
    TARGET ${PROJECT_NAME} POST_BUILD

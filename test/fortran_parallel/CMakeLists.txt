@@ -7,12 +7,6 @@ find_package(PFUNIT REQUIRED)
 enable_testing()
 
 add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/toposervice.F90)
-
-if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
-   target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
-elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
-   target_compile_options(${LIB_TARGET} PRIVATE -cpp -ffree-line-length-none)
-endif()
 target_include_directories(${LIB_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_LIST_DIR} ${NETCDF_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -22,10 +16,11 @@ add_pfunit_ctest (${PROJECT_NAME}
   LINK_LIBRARIES ${LIB_TARGET}
   MAX_PES 6
   )
+
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
+     target_compile_options(${LIB_TARGET} PRIVATE -fpp -fp-model precise)
    target_compile_options(${PROJECT_NAME} PRIVATE -fpp -fp-model precise)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU)
+     target_compile_options(${LIB_TARGET} PRIVATE -cpp -ffree-line-length-none)
    target_compile_options(${PROJECT_NAME} PRIVATE -cpp -ffree-line-length-none)
 endif()
-
-#target_compile_definitions(${PROJECT_NAME} PRIVATE USE_MPI)
