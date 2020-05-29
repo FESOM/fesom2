@@ -152,6 +152,11 @@ use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
 use mod_mesh
+
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack 
+#endif
+
 implicit none 
 type(t_mesh), intent(in)   , target :: mesh
 integer                    :: step 
@@ -171,7 +176,12 @@ SELECT CASE (whichEVP)
       call par_ex
       stop
 END SELECT
- t1=MPI_Wtime()     
+ t1=MPI_Wtime()
+
+#if defined (__icepack)
+    t2=MPI_Wtime()
+    call step_icepack(mesh) ! Advection and Thermodynamic Parts
+#else     
  ! ===== Advection part
 
 ! old FCT routines
@@ -191,6 +201,7 @@ END SELECT
  ! ===== Thermodynamic part
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
  call thermodynamics(mesh)
+#endif
  t3=MPI_Wtime()
  rtime_ice = rtime_ice + (t3-t0)
  rtime_tot = rtime_tot + (t3-t0)

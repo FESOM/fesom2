@@ -979,7 +979,7 @@ submodule (icedrv_main) icedrv_step
 
       subroutine coupling_prep(dt)
 
-      ! local variables
+          ! local variables
 
           implicit none
     
@@ -1101,10 +1101,11 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      module subroutine step_icepack()
+      module subroutine step_icepack(mesh)
 
           use g_config,               only: dt
-    
+          use mod_mesh    
+
           implicit none
     
           integer (kind=int_kind) :: &
@@ -1116,7 +1117,9 @@ submodule (icedrv_main) icedrv_step
          
           real (kind=dbl_kind) :: &
              offset          ! d(age)/dt time offset
-    
+
+          type(t_mesh), target, intent(in) :: mesh    
+
           character(len=*), parameter :: subname='(ice_step)'
     
     
@@ -1132,6 +1135,18 @@ submodule (icedrv_main) icedrv_step
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
+          !-----------------------------------------------------------------
+          ! copy variables from fesom2 (also ice velocities)
+          !-----------------------------------------------------------------
+
+          call fesom_to_icepack(mesh)
+
+          !-----------------------------------------------------------------
+          ! advect tracers
+          !-----------------------------------------------------------------
+
+          call tracer_advection_icepack(mesh)
+
           !-----------------------------------------------------------------
           ! initialize diagnostics
           !-----------------------------------------------------------------

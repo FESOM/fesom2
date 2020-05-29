@@ -74,17 +74,6 @@ type(t_mesh),             target, save :: mesh
     call mesh_setup(mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
-
-#if defined (__icepack)
-    !=====================
-    ! Setup icepack
-    !=====================
-    if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
-    call set_icepack
-    call alloc_icepack
-    call init_icepack(mesh)
-    if (mype==0) write(*,*) 'Icepack: setup complete'
-#endif
     
     !=====================
     ! Allocate field variables 
@@ -182,6 +171,18 @@ type(t_mesh),             target, save :: mesh
     if (use_global_tides) then
        call foreph_ini(yearnew, month)
     end if
+
+#if defined (__icepack)
+    !=====================
+    ! Setup icepack
+    !=====================
+    if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
+    call set_icepack
+    call alloc_icepack
+    call init_icepack(mesh)
+    if (mype==0) write(*,*) 'Icepack: setup complete'
+#endif
+
     do n=1, nsteps        
         if (use_global_tides) then
            call foreph(mesh)

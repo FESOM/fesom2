@@ -27,7 +27,7 @@
 
       contains
 
-      module subroutine init_state()
+      subroutine init_state()
  
           use icepack_intfc, only: icepack_aggregate
     
@@ -205,10 +205,11 @@
 
 !=======================================================================
 
-      module subroutine init_coupler_flux()
+      subroutine init_coupler_flux()
 
           use icepack_intfc, only: icepack_liquidus_temperature
-    
+
+          implicit none    
     
           real (kind=dbl_kind) :: fcondtopn_d(6), fsurfn_d(6)
           real (kind=dbl_kind) :: stefan_boltzmann, Tffresh
@@ -361,7 +362,9 @@
 
 !=======================================================================
 
-      module subroutine init_flux_atm_ocn()
+      subroutine init_flux_atm_ocn()
+
+          implicit none
 
           character(len=*), parameter :: subname='(init_flux_atm_ocn)'
     
@@ -397,6 +400,8 @@
 !=======================================================================
 
       module subroutine init_history_therm()
+
+          implicit none
 
           logical (kind=log_kind) :: formdrag, tr_iage
           integer (kind=int_kind) :: nt_iage
@@ -486,6 +491,8 @@
 
       module subroutine init_history_dyn()
 
+          implicit none
+
           logical (kind=log_kind) :: tr_iage
           integer (kind=int_kind) :: nt_iage
           character(len=*), parameter :: subname='(init_history_dyn)'
@@ -529,6 +536,8 @@
 
       module subroutine init_history_bgc()
 
+          implicit none
+
           character(len=*), parameter :: subname='(init_history_bgc)'
     
           PP_net        (:) = c0
@@ -561,9 +570,11 @@
 
 !=======================================================================
 
-      module subroutine init_thermo_vertical()
+      subroutine init_thermo_vertical()
  
           use icepack_intfc,        only: icepack_init_thermo
+
+          implicit none
 
           integer (kind=int_kind) :: &
              i,          &  ! horizontal indices
@@ -600,12 +611,15 @@
 
 !=======================================================================
 
-      module subroutine init_shortwave()
+      subroutine init_shortwave()
 
           use icepack_intfc,     only: icepack_step_radiation
           use icepack_intfc,     only: icepack_max_aero
           use icepack_intfc,     only: icepack_max_algae
           use icepack_intfc,     only: icepack_init_orbit
+          use g_config,          only: dt
+
+          implicit none
 
           integer (kind=int_kind) :: &
              i, k         , & ! horizontal indices
@@ -829,7 +843,7 @@
 
 !=======================================================================
 
-      module subroutine init_fsd()
+      subroutine init_fsd()
 
           implicit none
 
@@ -847,7 +861,7 @@
 
 !=======================================================================
 
-      module subroutine init_wave_spec()
+      subroutine init_wave_spec()
 
           implicit none
     
@@ -875,7 +889,7 @@
 
 !=======================================================================
 
-      module subroutine init_faero()
+      subroutine init_faero()
 
           implicit none
     
@@ -929,6 +943,7 @@
           endif
     
           call set_grid_icepack(mesh)
+          call init_advection_icepack(mesh)
           call init_coupler_flux                              ! initialize fluxes exchanged with coupler
           call init_thermo_vertical                           ! initialize vertical thermodynamics
           call icepack_init_itd(ncat=ncat, hin_max=hin_max)   ! initialize the ice thickness distribution
@@ -958,7 +973,8 @@
              endif
           endif
           call init_fsd
-    
+
+          call fesom_to_icepack(mesh)    
           call init_state           ! initialize the ice state
           call init_history_therm   ! initialize thermo history variables
 
@@ -972,7 +988,7 @@
 
 !=======================================================================
 
-      module subroutine init_state_var ()
+      subroutine init_state_var ()
 
           use icepack_intfc,   only: icepack_init_fsd
           use icepack_intfc,   only: icepack_aggregate

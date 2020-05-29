@@ -19,7 +19,8 @@
 !--------- subroutines to be seen outside icepack 
           !=======================================================================
 
-          public :: set_icepack, alloc_icepack, init_icepack 
+          public :: set_icepack, alloc_icepack, init_icepack, step_icepack, &
+                    icepack_to_fesom 
     
           !=======================================================================
 !--------- Everything else is private
@@ -754,45 +755,10 @@
                   type(t_mesh), intent(in), target :: mesh
               end subroutine set_grid_icepack                  
 
-              ! Allocate state and grid variables 
-              module subroutine alloc_state()
-                  implicit none
-              end subroutine alloc_state
-
-              ! Allocate flux variables
-              module subroutine alloc_flux()
-                  implicit none
-              end subroutine alloc_flux
-
-              ! Allocate flux bgc variables
-              module subroutine alloc_flux_bgc()
-                  implicit none
-              end subroutine alloc_flux_bgc
-
-              ! Allocate column variables
-              module subroutine alloc_column()
-                  implicit none
-              end subroutine alloc_column
-
               ! Allocate all
               module subroutine alloc_icepack()
                   implicit none
               end subroutine alloc_icepack              
-
-              ! Initialize ice state 
-              module subroutine init_state()
-                  implicit none
-              end subroutine init_state
-
-              ! Initialize coupler flux
-              module subroutine init_coupler_flux()
-                  implicit none
-              end subroutine init_coupler_flux
-
-              ! Initialize fluxes to and from atm. and ocean
-              module subroutine init_flux_atm_ocn()
-                  implicit none
-              end subroutine init_flux_atm_ocn
 
               ! Initialize thermodynamic history
               module subroutine init_history_therm()
@@ -808,36 +774,6 @@
               module subroutine init_history_bgc()
                   implicit none
               end subroutine init_history_bgc
-
-              ! Initialize vertical column
-              module subroutine init_thermo_vertical()
-                  implicit none
-              end subroutine init_thermo_vertical
-
-              ! Initialize shartwave radiation
-              module subroutine init_shortwave()
-                  implicit none
-              end subroutine init_shortwave
-
-              ! Initialize floe size distribution
-              module subroutine init_fsd()
-                  implicit none
-              end subroutine init_fsd
-
-              ! Initialize state variables
-              module subroutine init_state_var()
-                  implicit none
-              end subroutine init_state_var
-
-              ! Initialize wave spectrum
-              module subroutine init_wave_spec()
-                  implicit none
-              end subroutine init_wave_spec
-
-              ! Initialize constant aerosols values
-              module subroutine init_faero()
-                  implicit none
-              end subroutine init_faero
 
               ! Initialize all
               module subroutine init_icepack(mesh)
@@ -888,8 +824,10 @@
               end subroutine init_advection_icepack
 
               ! Driving subroutine for column physics
-              module subroutine step_icepack
+              module subroutine step_icepack(mesh)
+                  use mod_mesh
                   implicit none
+                  type(t_mesh), intent(in), target :: mesh
               end subroutine step_icepack
 
           end interface

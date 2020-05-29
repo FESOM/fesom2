@@ -5,7 +5,7 @@
 ! Author: Lorenzo Zampieri ( lorenzo.zampieri@awi.de )
 ! -------------------------------------------------------------
 
-      submodule (icedrv_main) allocate_icepack 
+  submodule (icedrv_main) allocate_icepack 
 
       use icepack_intfc,    only: icepack_max_nbtrcr, icepack_max_algae, icepack_max_aero
       use icepack_intfc,    only: icepack_nmodal1, icepack_nmodal2
@@ -19,7 +19,7 @@
 
       contains
 
-      module subroutine alloc_state
+      subroutine alloc_state
 
       implicit none
 
@@ -88,7 +88,7 @@
       ! Lorenzo Zampieri 02/2019
       ! ---------------------------------------------------------------
       
-      module subroutine alloc_flux
+      subroutine alloc_flux
 
       implicit none
 
@@ -259,7 +259,7 @@
       ! Lorenzo Zampieri 02/2019
       ! ---------------------------------------------------------------
 
-      module subroutine alloc_flux_bgc
+      subroutine alloc_flux_bgc
 
       implicit none
 
@@ -307,7 +307,7 @@
 
       end subroutine alloc_flux_bgc
 
-      module subroutine alloc_column
+      subroutine alloc_column
 
       implicit none
 
@@ -449,6 +449,6 @@
 
 ! ------------------------------------------------------------------------------
 
-      end submodule allocate_icepack
+  end submodule allocate_icepack
 
 ! ------------------------------------------------------------------------------
