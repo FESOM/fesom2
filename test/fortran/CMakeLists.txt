@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16.5)
 
-project(fesom2_tests Fortran)
+project(fesom2_fortran_tests Fortran)
 set(LIB_TARGET ${PROJECT_NAME}-lib)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
@@ -34,5 +34,5 @@ endif()
 add_custom_command(
    TARGET ${PROJECT_NAME} POST_BUILD
    COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/fixtures/
+          ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/
           ${CMAKE_CURRENT_BINARY_DIR}/fixtures/)

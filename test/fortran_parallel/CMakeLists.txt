@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16.5)
 
-project(fesom2_tests_parallel Fortran)
+project(fesom2_fortran_tests_parallel Fortran)
 set(LIB_TARGET ${PROJECT_NAME}-lib)
 
 find_package(PFUNIT REQUIRED)
