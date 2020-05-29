@@ -1,156 +1,154 @@
-@test(npes=[3])
-subroutine next_host_head_rank_ShouldAlwaysBeZeroForSoleHosts(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  integer next
-  integer i
-  
-  do i = 1, mpitest%getNumProcesses()
-    next = mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator())
-    @assertEqual(0, next)
-  end do
-end subroutine
-
-
-@test(npes=[3])
-subroutine testHeadIsDifferentForOnlyDifferentHosts(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  character(1), dimension(3) :: hostnames = ["a","b","c"]
-
-  call mpi_topology%set_hostname_strategy(hostname_mock)
-
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+module toposervice_tests
+    use mpi_topology_module
+    use pFUnit ! not FUnit
+    implicit none
 
 contains
 
-  subroutine hostname_mock(hostname)
-    implicit none
-    character(len=:), allocatable, intent(out) :: hostname
+
+  @test(npes=[3])
+  subroutine next_host_head_rank_ShouldAlwaysBeZeroForSoleHosts(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    integer next
+    integer i
   
-    allocate(character(32) :: hostname)
-    write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+    do i = 1, mpitest%getNumProcesses()
+      next = mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator())
+      @assertEqual(0, next)
+    end do
+ end subroutine
+
+
+  @test(npes=[3])
+  subroutine testHeadIsDifferentForOnlyDifferentHosts(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(3) :: hostnames = ["a","b","c"]
+
+    call mpi_topology%set_hostname_strategy(hostname_mock)
+
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+
+  contains
+
+    subroutine hostname_mock(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
+
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+    end subroutine
   end subroutine
-end subroutine
 
 
-@test(npes=[6])
-subroutine testHeadIsDifferentForSomeDifferentHosts(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+  @test(npes=[6])
+  subroutine testHeadIsDifferentForSomeDifferentHosts(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
 
-  call mpi_topology%set_hostname_strategy(hostname_mock2)
+    call mpi_topology%set_hostname_strategy(hostname_mock2)
 
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
 
-contains
+  contains
 
-  subroutine hostname_mock2(hostname)
-    implicit none
-    character(len=:), allocatable, intent(out) :: hostname
+    subroutine hostname_mock2(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
       
-    allocate(character(32) :: hostname)
-    write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
-   end subroutine
-end subroutine
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
 
 
-@test(npes=[6])
-subroutine testFirstHeadRankIsNextAfterReset(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+  @test(npes=[6])
+  subroutine testFirstHeadRankIsNextAfterReset(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
 
-  call mpi_topology%set_hostname_strategy(hostname_mock2)
+    call mpi_topology%set_hostname_strategy(hostname_mock2)
 
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  call mpi_topology%reset_host_head_rank
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    call mpi_topology%reset_host_head_rank
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
 
-contains
+  contains
 
-  subroutine hostname_mock2(hostname)
-    implicit none
-    character(len=:), allocatable, intent(out) :: hostname
+    subroutine hostname_mock2(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
       
-    allocate(character(32) :: hostname)
-    write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
-   end subroutine
-end subroutine
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
 
 
-@test(npes=[6])
-subroutine testHeadRanksIdenticalForThreeRounds(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
-  call mpi_topology%set_hostname_strategy(hostname_mock2)
+  @test(npes=[6])
+  subroutine testHeadRanksIdenticalForThreeRounds(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+    call mpi_topology%set_hostname_strategy(hostname_mock2)
 
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-  @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
 
-contains
+  contains
 
-  subroutine hostname_mock2(hostname)
-    implicit none
-    character(len=:), allocatable, intent(out) :: hostname
+    subroutine hostname_mock2(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
       
-    allocate(character(32) :: hostname)
-    write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
-   end subroutine
-end subroutine
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
 
 
-@test(npes=[6])
-subroutine test_am_i_host_head_rank(mpitest)
-  use mpi_topology_module
-  use pfunit_mod; implicit none
-  class(MpiTestMethod) mpitest
-  character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
-  logical amihead
+  @test(npes=[6])
+  subroutine test_am_i_host_head_rank(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+    logical amihead
   
-  call mpi_topology%set_hostname_strategy(hostname_mock2)
+    call mpi_topology%set_hostname_strategy(hostname_mock2)
 
-  amihead = mpi_topology%am_i_host_head_rank(mpitest%getMpiCommunicator())
+    amihead = mpi_topology%am_i_host_head_rank(mpitest%getMpiCommunicator())
   
-  if(mpitest%getProcessRank()==0) then
-    @assertTrue(amihead)
-  else if(mpitest%getProcessRank()==1) then
-    @assertFalse(amihead)
-  else if(mpitest%getProcessRank()==2) then
-    @assertTrue(amihead)
-  else if(mpitest%getProcessRank()==0) then
-    @assertTrue(amihead)
-  end if
+    if(mpitest%getProcessRank()==0) then
+      @assertTrue(amihead)
+    else if(mpitest%getProcessRank()==1) then
+      @assertFalse(amihead)
+    else if(mpitest%getProcessRank()==2) then
+      @assertTrue(amihead)
+    else if(mpitest%getProcessRank()==0) then
+      @assertTrue(amihead)
+    end if
 
-contains
+  contains
 
-  subroutine hostname_mock2(hostname)
-    implicit none
-    character(len=:), allocatable, intent(out) :: hostname
+    subroutine hostname_mock2(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
       
-    allocate(character(32) :: hostname)
-    write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
-   end subroutine
-end subroutine
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
+
+end module

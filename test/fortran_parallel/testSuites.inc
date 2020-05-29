@@ -1,1 +1,0 @@
-ADD_TEST_SUITE(toposervice_tests_suite)
