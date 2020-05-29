@@ -1,4 +1,4 @@
-module toposervice_tests
+module mpi_topology_module_tests
     use mpi_topology_module
     use pFUnit ! not FUnit
     implicit none

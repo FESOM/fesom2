@@ -6,13 +6,13 @@ set(LIB_TARGET ${PROJECT_NAME}-lib)
 find_package(PFUNIT REQUIRED)
 enable_testing()
 
-add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/toposervice.F90)
+add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/mpi_topology_module.F90)
 target_include_directories(${LIB_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_LIST_DIR} ${NETCDF_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_pfunit_ctest (${PROJECT_NAME}
-  TEST_SOURCES toposervice_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
+  TEST_SOURCES mpi_topology_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
   LINK_LIBRARIES ${LIB_TARGET}
   MAX_PES 6
   )
