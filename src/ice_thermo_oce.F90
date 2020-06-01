@@ -32,6 +32,12 @@ where(ice_temp>273.15_WP)
 end where
 #endif /* (__oifs) */
 
+#if defined (__oifs)
+where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP)
+ ice_temp=271.35_WP
+end where
+#endif /* (__oifs) */
+
 end subroutine cut_off
 #if !defined (__oasis)
 !===================================================================

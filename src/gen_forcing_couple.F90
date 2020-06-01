@@ -186,12 +186,8 @@ subroutine update_atm_forcing(istep, mesh)
              end if
 #if defined (__oifs) 
          elseif (i.eq.13) then
-             if (action) then
-	     sublimation(:)       = sublimation(:)+exchange(:)        ! Adding sh sublimation on top of nh
-             end if
-         elseif (i.eq.14) then
-             if (action) then
-	     ice_heat_flux(:)     = ice_heat_flux+exchange(:)         ! Adding sh heat-to-ice on top of nh
+             if (action) then          
+             ice_heat_flux(:) = ice_heat_flux(:)+exchange(:)
              end if
 #endif
 	  end if  	  

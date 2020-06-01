@@ -495,7 +495,7 @@ contains
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (h>0.0_WP) then
-     if (t<0.0_WP) then         ! freezing condition    
+     if (t<273.14_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       
