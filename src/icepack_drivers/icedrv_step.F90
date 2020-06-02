@@ -928,9 +928,7 @@ submodule (icedrv_main) icedrv_step
              evap_ocn  , & ! evaporative water flux (kg/m^2/s)
              fhocn     , & ! net heat flux to ocean (W/m^2)
              fresh     , & ! fresh water flux to ocean (kg/m^2/s)
-             frzmlt        ! freezing/melting potential (W/m^2)
-
-          real (kind=dbl_kind), intent(out) :: &
+             frzmlt    , & ! freezing/melting potential (W/m^2)
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
              fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
              

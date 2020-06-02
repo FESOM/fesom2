@@ -168,7 +168,8 @@ subroutine oce_fluxes(mesh)
                          fresh_tot_out=fresh_wa_flux,    &
                          fsalt_out=real_salt_flux,       &
                          dhi_dt_out=thdgrsn,             &
-                         dhs_dt_out=thdgr                )
+                         dhs_dt_out=thdgr,               &
+                         evap_ocn_out=evaporation        )
 
   heat_flux   = - net_heat_flux
   water_flux  = - (fresh_wa_flux/1000.0_WP) - runoff
@@ -209,7 +210,7 @@ subroutine oce_fluxes(mesh)
 
 #if defined (__icepack)
 
-  ! No global conservations 
+  ! No global conservations for the moment 
 
 #else
 

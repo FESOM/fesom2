@@ -804,7 +804,7 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out)
+                                          fsalt_out,     evap_ocn_out      )
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -819,7 +819,9 @@
                      strocnyT_out,  &
                      fsalt_out,     &
                      dhs_dt_out,    &
-                     dhi_dt_out
+                     dhi_dt_out,    &
+                     evap_ocn_out
+
               end subroutine icepack_to_fesom
 
               ! Trancers advection 
