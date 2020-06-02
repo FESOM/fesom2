@@ -27,7 +27,7 @@
       character(len=*), parameter :: subname='(alloc_state)'
 
       call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
-      call icepack_warnings_flush(nu_diag)
+      call icepack_warnings_flush(ice_stderr)
       if (icepack_warnings_aborted()) & 
           call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)     
 
@@ -38,7 +38,7 @@
          lat_val(nx)     , &
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       allocate (               &
@@ -62,7 +62,7 @@
          trcrn     (nx,max_ntrcr,ncat) , & ! tracers: 1: surface temperature of ice/snow (C)
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       allocate (                &
@@ -72,7 +72,7 @@
          trcr_base(max_ntrcr,3)   , & ! = 0 or 1 depending on tracer dependency, (1) aice, (2) vice, (3) vsno
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       trcr_depend = 0
@@ -250,7 +250,7 @@
          Tmltz(nx,nilyr+1)   , & ! initial melting temperature (C)
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
       
       end subroutine alloc_flux
@@ -304,7 +304,7 @@
          zaeros(nx,icepack_max_aero)     , & ! ocean aerosols (mmol/m^3)
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       end subroutine alloc_flux_bgc
@@ -322,7 +322,7 @@
       call icepack_query_tracer_sizes( max_nbtrcr_out=max_nbtrcr,       &
          max_algae_out=max_algae, max_aero_out=max_aero,                &
          nmodal1_out=nmodal1, nmodal2_out=nmodal2, max_don_out=max_don) 
-      call icepack_warnings_flush(nu_diag)
+      call icepack_warnings_flush(ice_stderr)
       if (icepack_warnings_aborted())                                   &
           call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
@@ -431,7 +431,7 @@
          c_fsd_range(nfsd)      , &  ! fsd floe_rad bounds (m)
          stat=ierr)
 
-      if (ierr/=0) write(*,*) 'Memory issue in task ', mype
+      if (ierr/=0) write(ice_stderr,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       end subroutine alloc_column

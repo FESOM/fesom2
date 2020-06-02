@@ -7,15 +7,15 @@
 
 submodule (icedrv_main) icedrv_step
 
-      use icedrv_constants, only: c0, nu_diag, c4
+      use icedrv_constants, only: c0, c4, nu_diag, ice_stderr
       use icedrv_kinds
-      use icedrv_system, only: icedrv_system_abort
-      use icepack_intfc, only: icepack_warnings_flush
-      use icepack_intfc, only: icepack_warnings_aborted
-      use icepack_intfc, only: icepack_query_tracer_flags
-      use icepack_intfc, only: icepack_query_tracer_indices
-      use icepack_intfc, only: icepack_query_tracer_sizes
-      use icepack_intfc, only: icepack_query_parameters
+      use icedrv_system,    only: icedrv_system_abort
+      use icepack_intfc,    only: icepack_warnings_flush
+      use icepack_intfc,    only: icepack_warnings_aborted
+      use icepack_intfc,    only: icepack_query_tracer_flags
+      use icepack_intfc,    only: icepack_query_tracer_indices
+      use icepack_intfc,    only: icepack_query_tracer_sizes
+      use icepack_intfc,    only: icepack_query_parameters
 
       implicit none
 
@@ -64,7 +64,7 @@ submodule (icedrv_main) icedrv_step
                           Sswabsn=Sswabsn(i,:,:), Iswabsn=Iswabsn(i,:,:))
  
           enddo               ! i
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 
@@ -118,13 +118,13 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_parameters(puny_out=puny)
           call icepack_query_parameters(calc_Tsfc_out=calc_Tsfc)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           call icepack_query_tracer_sizes( &
                ntrcr_out=ntrcr)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -132,7 +132,7 @@ submodule (icedrv_main) icedrv_step
                tr_iage_out=tr_iage, tr_FY_out=tr_FY, &
                tr_aero_out=tr_aero, tr_pond_out=tr_pond, tr_pond_cesm_out=tr_pond_cesm, &
                tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -142,7 +142,7 @@ submodule (icedrv_main) icedrv_step
                nt_iage_out=nt_iage, nt_FY_out=nt_FY, &
                nt_qice_out=nt_qice, nt_sice_out=nt_sice, &
                nt_aero_out=nt_aero, nt_qsno_out=nt_qsno)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -282,7 +282,7 @@ submodule (icedrv_main) icedrv_step
             endif ! tr_aero
             
           enddo ! i
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
       
@@ -322,7 +322,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -377,7 +377,7 @@ submodule (icedrv_main) icedrv_step
                           floe_binwidth=floe_binwidth(:))
     
           enddo                     ! i
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
          
@@ -419,21 +419,20 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           call icepack_query_tracer_indices(nt_iage_out=nt_iage)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           call icepack_query_tracer_flags(tr_iage_out=tr_iage)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
-          !$OMP PARALLEL DO PRIVATE(i)
           do i = 1, nx
     
           !-----------------------------------------------------------------
@@ -470,8 +469,8 @@ submodule (icedrv_main) icedrv_step
              endif
     
           enddo ! i
-          !$OMP END PARALLEL DO
-          call icepack_warnings_flush(nu_diag)
+   
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 
@@ -504,7 +503,7 @@ submodule (icedrv_main) icedrv_step
           character(len=*), parameter :: subname = '(step_dyn_wave)'
     
           call icepack_query_parameters(wave_spec_type_out=wave_spec_type)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
     
@@ -524,7 +523,7 @@ submodule (icedrv_main) icedrv_step
                             d_afsd_wave   = d_afsd_wave  (i,:))
           end do ! i
     
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
     
@@ -562,7 +561,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
  
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
  
@@ -603,7 +602,7 @@ submodule (icedrv_main) icedrv_step
   
           enddo 
   
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
  
@@ -657,7 +656,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes( &
                max_aero_out=max_aero, max_algae_out=max_algae)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
           allocate(nlt_zaero_sw(max_aero))
@@ -665,13 +664,13 @@ submodule (icedrv_main) icedrv_step
           allocate(nt_bgc_N(max_algae))
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_sw_out=nbtrcr_sw)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           call icepack_query_tracer_flags( &
                tr_brine_out=tr_brine, tr_bgc_N_out=tr_bgc_N, tr_zaero_out=tr_zaero)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -680,12 +679,12 @@ submodule (icedrv_main) icedrv_step
                nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd, nt_aero_out=nt_aero, &
                nlt_chl_sw_out=nlt_chl_sw, nlt_zaero_sw_out=nlt_zaero_sw, &
                nt_fbri_out=nt_fbri, nt_zaero_out=nt_zaero, nt_bgc_N_out=nt_bgc_N)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           call icepack_query_parameters(dEdd_algae_out=dEdd_algae, modal_aero_out=modal_aero)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -752,7 +751,7 @@ submodule (icedrv_main) icedrv_step
           endif
     
           enddo ! i
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
     
@@ -799,7 +798,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
              call icepack_query_parameters(albocn_out=albocn)
-             call icepack_warnings_flush(nu_diag)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__, line=__LINE__)
     
@@ -830,7 +829,7 @@ submodule (icedrv_main) icedrv_step
                                        Cdn_atm = Cdn_atm(i),     & 
                                        Cdn_atm_ratio_n = Cdn_atm_ratio(i))    
           enddo ! i
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
     
@@ -867,7 +866,7 @@ submodule (icedrv_main) icedrv_step
                                            sss=sss(i)          ) 
           enddo                    ! i
     
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 
@@ -1020,7 +1019,7 @@ submodule (icedrv_main) icedrv_step
     
              call icepack_query_parameters(puny_out=puny, rhofresh_out=rhofresh)
              call icepack_query_tracer_sizes(nbtrcr_out=nbtrcr)
-             call icepack_warnings_flush(nu_diag)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
     
@@ -1145,7 +1144,7 @@ submodule (icedrv_main) icedrv_step
           call icepack_query_parameters(solve_zsal_out=solve_zsal, calc_Tsfc_out=calc_Tsfc, &
                                         wave_spec_out=wave_spec)
           call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_fsd_out=tr_fsd)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -1225,6 +1224,10 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           call coupling_prep (dt)
+
+          !-----------------------------------------------------------------
+          ! tendencies needed by fesom
+          !-----------------------------------------------------------------
 
           dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
           dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt

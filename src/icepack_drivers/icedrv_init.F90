@@ -70,7 +70,7 @@
                nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl,                       &
                nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd,                       &
                nt_ipnd_out=nt_ipnd, nt_aero_out=nt_aero, nt_fsd_out=nt_fsd)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -228,7 +228,7 @@
     
           call icepack_query_parameters(stefan_boltzmann_out=stefan_boltzmann, &
             Tffresh_out=Tffresh, vonkar_out=vonkar, zref_out=zref, iceruf_out=iceruf)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -289,7 +289,7 @@
           do i = 1, nx
              Tf (i) = icepack_liquidus_temperature(sss(i)) ! freezing temp (C)
           enddo
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -419,7 +419,7 @@
           call icepack_query_parameters(dragio_out=dragio, &
                vonkar_out=vonkar, zref_out=zref, iceruf_out=iceruf)
     
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -503,7 +503,7 @@
     
           call icepack_query_tracer_flags(tr_iage_out=tr_iage)
           call icepack_query_tracer_indices(nt_iage_out=nt_iage)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
@@ -591,7 +591,7 @@
     
           call icepack_query_parameters(depressT_out=depressT)
           call icepack_init_thermo(nilyr=nilyr, sprofile=sprofile)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
     
@@ -665,7 +665,7 @@
                   nt_fbri_out=nt_fbri, nt_tsfc_out=nt_tsfc, &
                   nt_bgc_N_out=nt_bgc_N, nt_zaero_out=nt_zaero, &
                   nlt_chl_sw_out=nlt_chl_sw, nlt_zaero_sw_out=nlt_zaero_sw)
-             call icepack_warnings_flush(nu_diag)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
     
@@ -715,9 +715,9 @@
     
                    ! initialize orbital parameters
                    ! These come from the driver in the coupled model.
-                   call icepack_warnings_flush(nu_diag)
+                   call icepack_warnings_flush(ice_stderr)
                    call icepack_init_orbit()
-                   call icepack_warnings_flush(nu_diag)
+                   call icepack_warnings_flush(ice_stderr)
                    if (icepack_warnings_aborted()) &
                       call icedrv_system_abort(i, istep1, subname, __FILE__,__LINE__)
                 endif
@@ -772,7 +772,7 @@
                              l_print_point=l_print_point,                      &
                              initonly = .true.)
                 
-                call icepack_warnings_flush(nu_diag)
+                call icepack_warnings_flush(ice_stderr)
                 if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                    file=__FILE__, line=__LINE__)
     
@@ -930,16 +930,16 @@
           call icepack_query_tracer_flags(tr_aero_out=tr_aero)
           call icepack_query_tracer_flags(tr_zaero_out=tr_zaero)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
           ! generate some output
           if (mype==0) then
-             call icepack_write_tracer_flags(nu_diag)
-             call icepack_write_tracer_sizes(nu_diag)
-             call icepack_write_tracer_indices(nu_diag)
-             call icepack_warnings_flush(nu_diag)
+             call icepack_write_tracer_flags(ice_stderr)
+             call icepack_write_tracer_sizes(ice_stderr)
+             call icepack_write_tracer_indices(ice_stderr)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
           endif
@@ -949,7 +949,7 @@
           call init_coupler_flux                              ! initialize fluxes exchanged with coupler
           call init_thermo_vertical                           ! initialize vertical thermodynamics
           call icepack_init_itd(ncat=ncat, hin_max=hin_max)   ! initialize the ice thickness distribution
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
     
           if (icepack_warnings_aborted(subname)) then
              call icedrv_system_abort(file=__FILE__,line=__LINE__)
@@ -957,7 +957,7 @@
     
           if (mype==0) then  
              call icepack_init_itd_hist(ncat=ncat, hin_max=hin_max, c_hi_range=c_hi_range) ! output
-             call icepack_warnings_flush(nu_diag)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted(subname)) &
                 call icedrv_system_abort(file=__FILE__,line=__LINE__)
           end if
@@ -969,7 +969,7 @@
                 floe_rad_c=floe_rad_c,       &  ! fsd size bin centre in m (radius)
                 floe_binwidth=floe_binwidth, &  ! fsd size bin width in m (radius)
                 c_fsd_range=c_fsd_range)        ! string for history output
-             call icepack_warnings_flush(nu_diag)
+             call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted(subname)) then
                 call icedrv_system_abort(file=__FILE__,line=__LINE__)
              endif
@@ -1039,7 +1039,7 @@
                nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_fsd_out=nt_fsd,            &
                nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl)
           call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh, puny_out=puny)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname,     &
              file=__FILE__,line= __LINE__)
     
@@ -1117,7 +1117,7 @@
                    ! brine fraction
                    if (tr_brine) trcrn(i,nt_fbri,n) = c1
                 enddo                  ! ncat
-                call icepack_warnings_flush(nu_diag)
+                call icepack_warnings_flush(ice_stderr)
                 if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                     file=__FILE__, line=__LINE__)
              endif 
@@ -1155,7 +1155,7 @@
     
           enddo
     
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 

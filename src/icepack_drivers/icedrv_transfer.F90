@@ -110,7 +110,7 @@
           swidf = fsw*frcidf        ! near IR diffuse
 
           call icepack_query_parameters(calc_strair_out=calc_strair, cprho_out=cprho)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     

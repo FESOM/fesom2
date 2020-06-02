@@ -36,16 +36,16 @@
 
       character(len=*), parameter :: subname='(icedrv_system_abort)'
 
-      write(nu_diag,*) ' '
+      write(ice_stderr,*) ' '
 
-      call icepack_warnings_flush(nu_diag)
+      call icepack_warnings_flush(ice_stderr)
 
-      write(nu_diag,*) ' '
-      write(nu_diag,*) subname,' ABORTED: '
-      if (present(file))   write (nu_diag,*) subname,' called from', trim(file)
-      if (present(line))   write (nu_diag,*) subname,' line number', line
-      if (present(istep))  write (nu_diag,*) subname,' istep =',     istep
-      if (present(string)) write (nu_diag,*) subname,' string =',    trim(string)
+      write(ice_stderr,*) ' '
+      write(ice_stderr,*) subname,' ABORTED: '
+      if (present(file))   write (ice_stderr,*) subname,' called from', trim(file)
+      if (present(line))   write (ice_stderr,*) subname,' line number', line
+      if (present(istep))  write (ice_stderr,*) subname,' istep =',     istep
+      if (present(string)) write (ice_stderr,*) subname,' string =',    trim(string)
        
       ! Stop FESOM2
 

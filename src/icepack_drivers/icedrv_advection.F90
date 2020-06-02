@@ -799,7 +799,7 @@ submodule (icedrv_main) icedrv_advection
                                       Lfresh_out=Lfresh, heat_capacity_out=heat_capacity, &
                                       Tsmelt_out=Tsmelt, ktherm_out=ktherm,               &
                                       puny_out=puny)
-        call icepack_warnings_flush(nu_diag)
+        call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
            file=__FILE__, line=__LINE__)
   
@@ -1002,7 +1002,7 @@ submodule (icedrv_main) icedrv_advection
         call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
              nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno, nt_Tsfc_out=nt_Tsfc)
         call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh)
-        call icepack_warnings_flush(nu_diag)
+        call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
            file=__FILE__, line=__LINE__)
   
@@ -1077,7 +1077,7 @@ submodule (icedrv_main) icedrv_advection
   
         enddo                     ! n
   
-        if (narr /= narrays .and. mype == 0 ) write(nu_diag,*)      &
+        if (narr /= narrays .and. mype == 0 ) write(ice_stderr,*)      &
             "Wrong number of arrays in transport bound call"
 
     end subroutine state_to_work
@@ -1171,7 +1171,7 @@ submodule (icedrv_main) icedrv_advection
         call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh, cp_ice_out=cp_ice)
         call icepack_query_parameters(depressT_out=depressT, puny_out=puny, &
           Tsmelt_out=Tsmelt, ktherm_out=ktherm, heat_capacity_out=heat_capacity)
-        call icepack_warnings_flush(nu_diag)
+        call icepack_warnings_flush(ice_stderr)
   
         small = puny
         Tmin  = -100.0_dbl_kind
@@ -1323,7 +1323,7 @@ submodule (icedrv_main) icedrv_advection
   
         end if ! heat_capacity
   
-        call icepack_warnings_flush(nu_diag)
+        call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
             file=__FILE__, line=__LINE__)
 
