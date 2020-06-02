@@ -1112,7 +1112,7 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      module subroutine step_icepack(mesh)
+      module subroutine step_icepack(mesh, time_advec, time_therm)
 
           use g_config,               only: dt
           use mod_mesh    
@@ -1127,7 +1127,12 @@ submodule (icedrv_main) icedrv_step
              tr_fsd, wave_spec
          
           real (kind=dbl_kind) :: &
-             offset          ! d(age)/dt time offset
+             offset,              &   ! d(age)/dt time offset
+             t1, t2, t3
+
+          real (kind=dbl_kind), intent(out) :: &
+             time_therm,                       &
+             time_advec
 
           type(t_mesh), target, intent(in) :: mesh    
 
@@ -1146,6 +1151,12 @@ submodule (icedrv_main) icedrv_step
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
+          t1 = c0
+          t2 = c0
+          t3 = c0
+
+          !t1 = MPI_Wtime()
+
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
@@ -1157,6 +1168,8 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
 
           call tracer_advection_icepack(mesh)
+
+          !t2 = MPI_Wtime()
 
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
@@ -1229,6 +1242,15 @@ submodule (icedrv_main) icedrv_step
 
           dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
           dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
+
+          !t3 = MPI_Wtime()
+         
+          !-----------------------------------------------------------------
+          ! icepack timing
+          !-----------------------------------------------------------------  
+
+          time_advec = t2 - t1
+          time_therm = t3 - t2
 
       end subroutine step_icepack
 

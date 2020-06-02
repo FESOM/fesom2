@@ -936,9 +936,9 @@
     
           ! generate some output
           if (mype==0) then
-             call icepack_write_tracer_flags(ice_stderr)
-             call icepack_write_tracer_sizes(ice_stderr)
-             call icepack_write_tracer_indices(ice_stderr)
+             call icepack_write_tracer_flags(nu_diag)
+             call icepack_write_tracer_sizes(nu_diag)
+             call icepack_write_tracer_indices(nu_diag)
              call icepack_warnings_flush(ice_stderr)
              if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
                  file=__FILE__,line= __LINE__)
@@ -957,7 +957,7 @@
     
           if (mype==0) then  
              call icepack_init_itd_hist(ncat=ncat, hin_max=hin_max, c_hi_range=c_hi_range) ! output
-             call icepack_warnings_flush(ice_stderr)
+             call icepack_warnings_flush(nu_diag)
              if (icepack_warnings_aborted(subname)) &
                 call icedrv_system_abort(file=__FILE__,line=__LINE__)
           end if

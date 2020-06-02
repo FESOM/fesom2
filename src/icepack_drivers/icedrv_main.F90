@@ -839,10 +839,13 @@
               end subroutine init_advection_icepack
 
               ! Driving subroutine for column physics
-              module subroutine step_icepack(mesh)
+              module subroutine step_icepack(mesh, time_advec, time_therm)
                   use mod_mesh
                   implicit none
-                  type(t_mesh), intent(in), target :: mesh
+                  real (kind=dbl_kind), intent(out) :: &
+                     time_therm,                       &
+                     time_advec
+                  type(t_mesh), intent(in), target  :: mesh
               end subroutine step_icepack
 
           end interface

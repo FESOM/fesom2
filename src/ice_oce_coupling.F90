@@ -171,9 +171,13 @@ subroutine oce_fluxes(mesh)
                          dhs_dt_out=thdgr,               &
                          evap_ocn_out=evaporation        )
 
-  heat_flux   = - net_heat_flux
-  water_flux  = - (fresh_wa_flux/1000.0_WP) - runoff
+  heat_flux(:)   = - net_heat_flux(:)
+  water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
 
+  ! Evaporation 
+  evaporation(:) = - evaporation(:) / 1000.0_WP
+  ice_sublimation(:) = 0.0_WP
+ 
   call init_flux_atm_ocn()
 
 #else
@@ -208,12 +212,6 @@ subroutine oce_fluxes(mesh)
      relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(1,n,2))
   end do
 
-#if defined (__icepack)
-
-  ! No global conservations for the moment 
-
-#else
-
   ! enforce the total freshwater/salt flux be zero
   ! 1. water flux ! if (.not. use_virt_salt) can be used!
   ! we conserve only the fluxes from the database plus evaporation.
@@ -246,8 +244,6 @@ subroutine oce_fluxes(mesh)
      call integrate_nod(virtual_salt, net, mesh)
      virtual_salt=virtual_salt-net/ocean_area
   end if
-
-#endif
 
   ! 3. restoring to SSS climatology
   call integrate_nod(relax_salt, net, mesh)
