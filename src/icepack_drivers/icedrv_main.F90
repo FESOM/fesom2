@@ -20,7 +20,8 @@
           !=======================================================================
 
           public :: set_icepack, alloc_icepack, init_icepack, step_icepack, &
-                    icepack_to_fesom 
+                    icepack_to_fesom, rdg_conv_elem, rdg_shear_elem,        &
+                    init_flux_atm_ocn 
     
           !=======================================================================
 !--------- Everything else is private
@@ -143,7 +144,9 @@
              dardg2dt(:), & ! rate of area gain by new ridges (1/s)
              dvirdgdt(:), & ! rate of ice volume ridged (m/s)
              closing(:),  & ! rate of closing due to divergence/shear (1/s)
-             opening(:),  & ! rate of opening due to divergence/shear (1/s)    
+             opening(:),  & ! rate of opening due to divergence/shear (1/s)   
+             dhi_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
+             dhs_dt(:),   & ! snow volume tendency due to thermodynamics (m/s) 
              ! ridging diagnostics in categories
              dardg1ndt(:,:), & ! rate of area loss by ridging ice (1/s)
              dardg2ndt(:,:), & ! rate of area gain by new ridges (1/s)
@@ -205,7 +208,7 @@
              hmix(:)        ! mixed layer depth (m)
     
            ! out to atmosphere (if calc_Tsfc)
-           ! note Tsfc is in ice_state.F
+           ! note Tsfc is a tracer
     
           real (kind=dbl_kind), allocatable, save :: & ! DIM nx
              fsens(:)   , & ! sensible heat flux (W/m^2)
@@ -760,6 +763,11 @@
                   implicit none
               end subroutine alloc_icepack              
 
+              ! Initialize fluxes to atmosphere and ocean
+              module subroutine init_flux_atm_ocn()
+                  implicit none
+              end subroutine init_flux_atm_ocn
+
               ! Initialize thermodynamic history
               module subroutine init_history_therm()
                   implicit none
@@ -794,7 +802,9 @@
                                           nx_in,                           &
                                           aice_out,  vice_out,  vsno_out,  &
                                           fhocn_tot_out, fresh_tot_out,    &
-                                          strocnxT_out,  strocnyT_out)
+                                          strocnxT_out,  strocnyT_out,     &
+                                          dhs_dt_out,    dhi_dt_out,       &
+                                          fsalt_out)
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -806,7 +816,10 @@
                      fhocn_tot_out, &
                      fresh_tot_out, &
                      strocnxT_out,  &
-                     strocnyT_out
+                     strocnyT_out,  &
+                     fsalt_out,     &
+                     dhs_dt_out,    &
+                     dhi_dt_out
               end subroutine icepack_to_fesom
 
               ! Trancers advection 

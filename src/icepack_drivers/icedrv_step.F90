@@ -863,7 +863,8 @@ submodule (icedrv_main) icedrv_step
                                            Tf=Tf(i),                fresh=fresh(i),         &
                                            frain=frain(i),          fsnow=fsnow(i),         &
                                            fhocn_tot=fhocn_tot(i),  fresh_tot=fresh_tot(i), &
-                                           frzmlt=frzmlt(i) ) 
+                                           frzmlt=frzmlt(i),        fsalt=fsalt(i),         &
+                                           sss=sss(i)          ) 
           enddo                    ! i
     
           call icepack_warnings_flush(nu_diag)
@@ -889,9 +890,11 @@ submodule (icedrv_main) icedrv_step
                                          Tf,        fresh,      &
                                          frain,     fsnow,      &
                                          fhocn_tot, fresh_tot,  &
-                                         frzmlt)
+                                         frzmlt,    fsalt,      &
+                                         sss)
 
-          use i_therm_param, only: emiss_wat
+          use i_therm_param,    only: emiss_wat
+          use g_forcing_param,  only: use_virt_salt
 
           implicit none
 
@@ -914,8 +917,10 @@ submodule (icedrv_main) icedrv_step
              fswthru   , & ! shortwave penetrating to ocean (W/m^2)
              aice      , & ! ice area fraction
              sst       , & ! sea surface temperature (C)
+             sss       , & ! sea surface salinity
              frain     , & ! rainfall rate (kg/m^2/s)
-             fsnow         ! snowfall rate (kg/m^2/s)
+             fsnow     , & ! snowfall rate (kg/m^2/s)
+             fsalt         ! salt flux from ice to the ocean (kg/m^2/s) 
 
           real (kind=dbl_kind), intent(inout) :: &
              flwout_ocn, & ! outgoing longwave radiation (W/m^2)
@@ -929,6 +934,7 @@ submodule (icedrv_main) icedrv_step
           real (kind=dbl_kind), intent(out) :: &
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
              fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
+             
 
           real (kind=dbl_kind), parameter :: &
              frzmlt_max = c1000   ! max magnitude of frzmlt (W/m^2)
@@ -936,16 +942,19 @@ submodule (icedrv_main) icedrv_step
           real (kind=dbl_kind) :: &
              TsfK ,    &  ! surface temperature (K)
              swabs,    &  ! surface absorbed shortwave heat flux (W/m^2)
-             Tffresh,  &  ! 273.15
+             Tffresh,  &  ! 0 C in K
              Lfresh,   &   
-             Lvap,     &       
-             stefan_boltzmann
+             Lvap,     & 
+             lfs_corr, &  ! fresh water correction for linear free surface      
+             stefan_boltzmann, &
+             ice_ref_salinity
 
           character(len=*),parameter :: subname='(icepack_ocn_mixed_layer)'
 
           call icepack_query_parameters( Tffresh_out=Tffresh, Lfresh_out=Lfresh, &
                                          stefan_boltzmann_out=stefan_boltzmann,  &
-                                         Lvap_out=Lvap )
+                                         ice_ref_salinity_out=ice_ref_salinity,  &
+                                         Lvap_out=Lvap                           )
 
           ! shortwave radiative flux ! Visible is absorbed by clorophil
           ! afterwards
@@ -970,6 +979,11 @@ submodule (icedrv_main) icedrv_step
           fhocn_tot = fhocn + fswthru                                  &  ! these are *aice already
                     + (fsens_ocn + flat_ocn + flwout_ocn + flw + swabs &
                     + Lfresh*fsnow) * (c1-aice) + max(c0,frzmlt)*aice
+         
+          if (use_virt_salt) then
+             lfs_corr = fsalt/ice_ref_salinity/p001
+             fresh = fresh - lfs_corr * ice_ref_salinity / sss
+          endif
 
           fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
 
@@ -1148,6 +1162,13 @@ submodule (icedrv_main) icedrv_step
           call tracer_advection_icepack(mesh)
 
           !-----------------------------------------------------------------
+          ! tendencies needed by fesom
+          !-----------------------------------------------------------------
+
+          dhi_dt(:) = vice(:)
+          dhs_dt(:) = vsno(:)
+
+          !-----------------------------------------------------------------
           ! initialize diagnostics
           !-----------------------------------------------------------------
     
@@ -1204,6 +1225,9 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           call coupling_prep (dt)
+
+          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
+          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
 
       end subroutine step_icepack
 

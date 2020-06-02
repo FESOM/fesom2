@@ -612,7 +612,7 @@ submodule (icedrv_main) icedrv_advection
         !       ntrace is not equal to ntrcr!
       
         integer (kind=int_kind) :: ntrcr, ntrace, narr, nbtrcr, i,     &
-                                   nx,    nt,   nt1,    k
+                                   nt,   nt1,    k
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno,                          & 
                                    nt_sice, nt_fbri, nt_iage, nt_FY, nt_alvl, nt_vlvl, &
                                    nt_apnd, nt_hpnd, nt_ipnd, nt_bgc_Nit, nt_bgc_S
@@ -795,7 +795,7 @@ submodule (icedrv_main) icedrv_advection
         call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
              nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno,                              &
              nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_Tsfc_out=nt_Tsfc) 
-        call icepack_query_parameters(rhoi_out=rhoi,     rhos_out=rhoi,                   &
+        call icepack_query_parameters(rhoi_out=rhoi,     rhos_out=rhos,                   &
                                       Lfresh_out=Lfresh, heat_capacity_out=heat_capacity, &
                                       Tsmelt_out=Tsmelt, ktherm_out=ktherm,               &
                                       puny_out=puny)
@@ -1151,10 +1151,10 @@ submodule (icedrv_main) icedrv_advection
            cp_ice,     small,           &
            qrd_snow,   qrd_ice,         &
            Tsfc,       exc,             &
-           depressT,   Tf_new,          &
+           depressT,   Tmin,            &
            T_air_C,    hice,            &
-           puny,       Tsmelt,          &
-           Tmin
+           puny,       Tsmelt          
+           
            
   
         logical (kind=log_kind) :: tr_brine, tr_lvl, flag_snow, flag_cold_ice, flag_warm_ice, &
@@ -1259,7 +1259,7 @@ submodule (icedrv_main) icedrv_advection
                           vicen(i,n)   = c0
                           vsnon(i,n)   = c0
                           trcrn(i,:,n) = c0
-                          trcrn(i,nt_Tsfc,n) = Tf_new
+                          trcrn(i,nt_Tsfc,n) = Tf(i)
   
                       end if
   
@@ -1290,7 +1290,7 @@ submodule (icedrv_main) icedrv_advection
                       vicen(i,n)   = c0
                       vsnon(i,n)   = c0
                       trcrn(i,:,n) = c0
-                      trcrn(i,nt_Tsfc,n) = Tf_new
+                      trcrn(i,nt_Tsfc,n) = Tf(i)
   
                   end if
   

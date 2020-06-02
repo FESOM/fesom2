@@ -8,7 +8,7 @@
 
       use icedrv_kinds
       use g_parsup,         only: par_ex          
-      use icedrv_constants, only: nu_diag
+      use icedrv_constants, only: ice_stderr
       use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
 
       implicit none

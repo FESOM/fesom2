@@ -362,7 +362,7 @@
 
 !=======================================================================
 
-      subroutine init_flux_atm_ocn()
+      module subroutine init_flux_atm_ocn()
 
           implicit none
 
@@ -606,6 +606,8 @@
                 Tmltz (i,k) = -salinz(i,k)*depressT
              enddo ! k
           enddo    ! i
+
+          if (mype==0) write(*,*) maxval(salinz), minval(salinz)
 
       end subroutine init_thermo_vertical
 
@@ -1081,14 +1083,14 @@
           endif
 
           do i = 1, nx
-             if (sst(i) <= Tf(i)) then             
+             if (sst(i) <= Tf(i)) then             !
                 do n = 1, ncat
                    ! ice volume, snow volume
                    aicen(i,n) = ainit(n)
                    vicen(i,n) = hinit(n) * ainit(n) ! m
                    vsnon(i,n) = c0
                    ! tracers
-                   call icepack_init_trcr(Tair     = T_air(i),     &
+                   call icepack_init_trcr(Tair     = T_air(i),    &
                                           Tf       = Tf(i),       &
                                           Sprofile = salinz(i,:), &
                                           Tprofile = Tmltz(i,:),  &
@@ -1110,7 +1112,7 @@
                    enddo
                    ! snow enthalpy
                    do k = 1, nslyr
-                      trcrn(i,nt_qsno+k-1,n) = qsn(k)
+                      trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
                    enddo               ! nslyr
                    ! brine fraction
                    if (tr_brine) trcrn(i,nt_fbri,n) = c1

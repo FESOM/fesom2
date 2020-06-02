@@ -176,7 +176,9 @@
       module subroutine icepack_to_fesom( nx_in,                           &
                                           aice_out,  vice_out,  vsno_out,  &
                                           fhocn_tot_out, fresh_tot_out,    &
-                                          strocnxT_out,  strocnyT_out)
+                                          strocnxT_out,  strocnyT_out,     &
+                                          dhs_dt_out,    dhi_dt_out,       &
+                                          fsalt_out)
 
           implicit none
 
@@ -190,7 +192,10 @@
              fhocn_tot_out, &
              fresh_tot_out, &
              strocnxT_out,  &
-             strocnyT_out
+             strocnyT_out,  &
+             fsalt_out,     &
+             dhs_dt_out,    &
+             dhi_dt_out
 
           character(len=*),parameter :: subname='(icepack_to_fesom)'   
 
@@ -202,6 +207,9 @@
           if (present(fhocn_tot_out)         ) fhocn_tot_out    = fhocn_tot
           if (present(strocnxT_out)          ) strocnxT_out     = strocnxT
           if (present(strocnyT_out)          ) strocnyT_out     = strocnyT
+          if (present(dhi_dt_out)            ) dhi_dt_out       = dhi_dt
+          if (present(dhs_dt_out)            ) dhs_dt_out       = dhs_dt
+          if (present(fsalt_out)             ) fsalt_out        = fsalt
 
       end subroutine icepack_to_fesom
 

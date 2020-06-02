@@ -27,6 +27,7 @@
           use g_parsup,            only: myDim_nod2D,  eDim_nod2D,  &
                                          myDim_elem2D, eDim_elem2D, &
                                          mpi_comm_fesom
+          use i_param,             only: whichEVP
 
           implicit none
 
@@ -400,6 +401,13 @@
           if (mype == 0) write(*,*) 'Diagnostic output will be in file '
           if (mype == 0) write(*,*) '       icepack.diagnostics'
 
+          diag_filename = 'icepack.errors'
+          open (ice_stderr, file=diag_filename, status='unknown', iostat=diag_error)
+          if (diag_error /= 0) then
+             if (mype == 0) write(*,*) 'Error while opening error file'
+             if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
+          endif
+
           diag_filename = 'icepack.diagnostics'
           open (nu_diag, file=diag_filename, status='unknown', iostat=diag_error)
           if (diag_error /= 0) then
@@ -411,6 +419,15 @@
           if (mype == 0) write(nu_diag,*) '  ICEPACK model diagnostic output  '
           if (mype == 0) write(nu_diag,*) '-----------------------------------'
           if (mype == 0) write(nu_diag,*) ' '
+
+          if (whichEVP == 1 .or. whichEVP == 2) then
+             if (mype == 0) write (nu_diag,*) 'WARNING: whichEVP = 1 or 2'
+             if (mype == 0) write (nu_diag,*) 'Adaptive or Modified EVP formulations'
+             if (mype == 0) write (nu_diag,*) 'are not allowed when using Icepack (yet).'
+             if (mype == 0) write (nu_diag,*) 'Standard EVP will be used instead'
+             if (mype == 0) write (nu_diag,*) '         whichEVP = 0'
+             whichEVP = 0
+          endif
     
           if (ncat == 1 .and. kitd == 1) then
              if (mype == 0) write (nu_diag,*) 'Remapping the ITD is not allowed for ncat=1.'
@@ -516,7 +533,7 @@
           endif
     
           if (tr_pond_cesm) then
-             if (mype == 0) write (nu_diag,*) 'ERROR: formdrag=T but frzpnd=cesm'
+             if (mype == 0) write (ice_stderr,*) 'ERROR: formdrag=T but frzpnd=cesm'
              if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
     
@@ -720,8 +737,8 @@
           endif
  
           if (ntrcr > max_ntrcr-1) then
-             if (mype == 0) write(nu_diag,*) 'max_ntrcr-1 < number of namelist tracers'
-             if (mype == 0) write(nu_diag,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
+             if (mype == 0) write(ice_stderr,*) 'max_ntrcr-1 < number of namelist tracers'
+             if (mype == 0) write(ice_stderr,*) 'max_ntrcr-1 = ',max_ntrcr-1,' ntrcr = ',ntrcr
              if (mype == 0) call icedrv_system_abort(file=__FILE__,line=__LINE__)
           endif
  
@@ -744,19 +761,19 @@
 
              if (formdrag) then
                 if (nt_apnd==0) then
-                   write(nu_diag,*)'ERROR: nt_apnd:',nt_apnd
+                   write(ice_stderr,*)'ERROR: nt_apnd:',nt_apnd
                    call icedrv_system_abort(file=__FILE__,line=__LINE__)
                 elseif (nt_hpnd==0) then
-                   write(nu_diag,*)'ERROR: nt_hpnd:',nt_hpnd
+                   write(ice_stderr,*)'ERROR: nt_hpnd:',nt_hpnd
                    call icedrv_system_abort(file=__FILE__,line=__LINE__)
                 elseif (nt_ipnd==0) then
-                   write(nu_diag,*)'ERROR: nt_ipnd:',nt_ipnd
+                   write(ice_stderr,*)'ERROR: nt_ipnd:',nt_ipnd
                    call icedrv_system_abort(file=__FILE__,line=__LINE__)
                 elseif (nt_alvl==0) then
-                   write(nu_diag,*)'ERROR: nt_alvl:',nt_alvl
+                   write(ice_stderr,*)'ERROR: nt_alvl:',nt_alvl
                    call icedrv_system_abort(file=__FILE__,line=__LINE__)
                 elseif (nt_vlvl==0) then
-                   write(nu_diag,*)'ERROR: nt_vlvl:',nt_vlvl
+                   write(ice_stderr,*)'ERROR: nt_vlvl:',nt_vlvl
                    call icedrv_system_abort(file=__FILE__,line=__LINE__)
                 endif
              endif
@@ -815,7 +832,7 @@
                nt_apnd_in=nt_apnd, nt_hpnd_in=nt_hpnd, nt_ipnd_in=nt_ipnd, &
                nt_aero_in=nt_aero, nt_fsd_in=nt_fsd)
     
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
 
@@ -843,7 +860,7 @@
           !-----------------------------------------------------------------
     
           call icepack_query_parameters(puny_out=puny)
-          call icepack_warnings_flush(nu_diag)
+          call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
 

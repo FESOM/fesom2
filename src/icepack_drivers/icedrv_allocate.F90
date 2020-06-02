@@ -58,18 +58,18 @@
          aicen_init(nx,ncat) , & ! initial ice concentration, for linear ITD
          vicen_init(nx,ncat) , & ! initial ice volume (m), for linear ITD
          vsnon_init(nx,ncat) , & ! initial snow volume (m), for aerosol
-         trcr      (nx,ntrcr) , & ! ice tracers: 1: surface temperature of ice/snow (C)
-         trcrn     (nx,ntrcr,ncat) , & ! tracers: 1: surface temperature of ice/snow (C)
+         trcr      (nx,max_ntrcr) , & ! ice tracers: 1: surface temperature of ice/snow (C)
+         trcrn     (nx,max_ntrcr,ncat) , & ! tracers: 1: surface temperature of ice/snow (C)
          stat=ierr)
 
       if (ierr/=0) write(*,*) 'Memory issue in task ', mype
       if (ierr/=0) call icedrv_system_abort(file=__FILE__,line=__LINE__,string=subname)
 
       allocate (                &
-         trcr_depend(ntrcr)   , & !
-         n_trcr_strata(ntrcr) , & ! number of underlying tracer layers
-         nt_strata(ntrcr,2)   , & ! indices of underlying tracer layers
-         trcr_base(ntrcr,3)   , & ! = 0 or 1 depending on tracer dependency, (1) aice, (2) vice, (3) vsno
+         trcr_depend(max_ntrcr)   , & !
+         n_trcr_strata(max_ntrcr) , & ! number of underlying tracer layers
+         nt_strata(max_ntrcr,2)   , & ! indices of underlying tracer layers
+         trcr_base(max_ntrcr,3)   , & ! = 0 or 1 depending on tracer dependency, (1) aice, (2) vice, (3) vsno
          stat=ierr)
 
       if (ierr/=0) write(*,*) 'Memory issue in task ', mype
@@ -114,6 +114,8 @@
          dvirdgdt(nx), & ! rate of ice volume ridged (m/s)
          closing(nx) , & ! rate of closing due to divergence/shear (1/s)
          opening(nx) , & ! rate of opening due to divergence/shear (1/s)
+         dhi_dt(nx)  , & ! ice volume tendency due to thermodynamics (m/s)
+         dhs_dt(nx)  , & ! snow volume tendency due to thermodynamics (m/s)
          dardg1ndt(nx,ncat), & ! rate of area loss by ridging ice (1/s)
          dardg2ndt(nx,ncat), & ! rate of area gain by new ridges (1/s)
          dvirdgndt(nx,ncat), & ! rate of ice volume ridged (m/s)
