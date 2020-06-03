@@ -106,10 +106,12 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
     call all_readers(varindex)%reader_current%yield_data(time_index, forcingdata)
 
     ! todo: kick off the thread before we fill the forcingdata array
-    if(.not. all_readers(varindex)%reader_next%timeindex_in_cache_bounds(time_index+PREFETCH_SIZE)) then
-      if(all_readers(varindex)%netcdf_timestep_size >= time_index+PREFETCH_SIZE) then
-        ! prefetch the next timestep asynchronously
-        call all_readers(varindex)%thread%cpp_thread_begin(varindex, time_index+PREFETCH_SIZE)
+    if(all_readers(varindex)%thread%timeindex == -1) then ! we did not already kick off a thread
+      if(.not. all_readers(varindex)%reader_next%timeindex_in_cache_bounds(time_index+PREFETCH_SIZE)) then
+        if(all_readers(varindex)%netcdf_timestep_size >= time_index+PREFETCH_SIZE) then
+          ! prefetch the next timestep asynchronously
+          call all_readers(varindex)%thread%cpp_thread_begin(varindex, time_index+PREFETCH_SIZE)
+        end if
       end if
     end if
     
@@ -136,16 +138,18 @@ if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%rea
     integer, intent(in) :: varindex
     integer, intent(in) :: timeindex
     ! EO args
+    call assert(this%timeindex == -1, __LINE__)
     this%timeindex = timeindex
     call begin_ccall(varindex)    
   end subroutine
 
 
    subroutine cpp_thread_end(this, varindex)
-    class(cpp_thread), intent(in) :: this
+    class(cpp_thread), intent(inout) :: this
     integer, intent(in) :: varindex
     ! EO args  
     call end_ccall(varindex)
+    this%timeindex = -1
   end subroutine
 
 
