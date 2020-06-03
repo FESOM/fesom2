@@ -108,8 +108,6 @@ module forcing_lookahead_reader_module
     class(forcing_lookahead_reader_type), intent(inout) :: this
     integer, intent(in) :: time_index
     ! EO args
-    real(4), allocatable :: values(:,:,:)
-    integer alloc_status
     
 !    assert(time_index >= reader%first_stored_timeindex) ! we do not go back in time
     if(this%last_stored_timeindex < time_index) then
@@ -119,18 +117,7 @@ module forcing_lookahead_reader_module
       if(this%last_stored_timeindex > this%netcdf_timestep_size_) then
         this%last_stored_timeindex = this%netcdf_timestep_size_
       end if
-      call this%filehandle%read_netcdf_timesteps(this%first_stored_timeindex, this%last_stored_timeindex, values)
-
-      call assert(allocated(values), __LINE__)
-      if( allocated(this%stored_values) ) then
-        if(all(shape(values) /= shape(this%stored_values))) then
-          deallocate(this%stored_values)
-        end if
-      end if
-      if(.not. allocated(this%stored_values)) then
-        allocate(this%stored_values(size(values, DIM=1),size(values, DIM=2),size(values, DIM=3)), STAT=alloc_status) ! without requesting stat, we get an error here 'allocatable array is already allocated' with Intel Fortran 18.0.1.20171018
-      end if
-      this%stored_values = values
+      call this%filehandle%read_netcdf_timesteps(this%first_stored_timeindex, this%last_stored_timeindex, this%stored_values)
       call assert(allocated(this%stored_values), __LINE__)    
     end if
 
