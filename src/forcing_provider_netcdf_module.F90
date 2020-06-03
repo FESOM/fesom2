@@ -50,7 +50,6 @@ module forcing_provider_netcdf_module
     real(4), allocatable, intent(inout) :: values(:,:,:) ! must be inout or the allocation is screwed
     ! EO args
     include "netcdf.inc" ! old netcdf fortran interface required?
-    integer status
     integer, allocatable, dimension(:) :: starts, sizes
 
     call assert(allocated(this%varshape), __LINE__)
@@ -66,7 +65,6 @@ module forcing_provider_netcdf_module
     call assert(timeindex_last <= this%varshape(timedim_index), __LINE__)
     
     ! todo: make this work if we have more than 3 dimensions and also if TIMEDIM_INDEX != 3
-    ! todo: check if values is already allocated
     starts(1) = 1
     starts(2) = 1
     starts(3) = timeindex_first
@@ -79,7 +77,7 @@ module forcing_provider_netcdf_module
     if(.not. allocated(values)) allocate(values(sizes(1),sizes(2),sizes(3)))
     call assert(allocated(values), __LINE__)
     
-    status = nf_get_vara_real(this%fileid, this%varid, starts, sizes, values)    
+    call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
   end subroutine
 
 
@@ -90,7 +88,6 @@ module forcing_provider_netcdf_module
     ! EO args
     integer, parameter :: TIMEDIM_INDEX = 3
     include "netcdf.inc" ! old netcdf fortran interface required?
-    integer status
     integer, allocatable, dimension(:) :: starts, sizes
 
     call assert(allocated(this%varshape), __LINE__)
@@ -105,7 +102,6 @@ module forcing_provider_netcdf_module
     call assert(timeindex <= this%varshape(timedim_index), __LINE__)
     
     ! todo: make this work if we have more than 3 dimensions and also if TIMEDIM_INDEX != 3
-    ! todo: check if values is already allocated
     starts(1) = 1
     starts(2) = 1
     starts(3) = timeindex
@@ -118,7 +114,7 @@ module forcing_provider_netcdf_module
     if(.not. allocated(values)) allocate(values(sizes(1),sizes(2)))
     call assert(allocated(values), __LINE__)
     
-    status = nf_get_vara_real(this%fileid, this%varid, starts, sizes, values)    
+    call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
   end subroutine
     
 

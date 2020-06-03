@@ -1,5 +1,4 @@
 module forcing_provider_module
-! todo: remove all use statements here as they will be exported with this module
   use forcing_lookahead_reader_module
   implicit none
   public forcing_provider
@@ -39,9 +38,10 @@ module forcing_provider_module
       call move_alloc(tmparr, this%all_readers)      
     end if
     
-    if(.not. this%all_readers(varindex)%is_initialized() ) then ! reader has never been initialized ! todo: change this as it is probably compiler dependent
+    if(.not. this%all_readers(varindex)%is_initialized() ) then ! reader has never been initialized
       call this%all_readers(varindex)%initialize(filepath, fileyear, varname)
     else if(fileyear /= this%all_readers(varindex)%fileyear()) then
+      ! close our reader and create a new one
       call this%all_readers(varindex)%finalize()
       this%all_readers(varindex) = new_reader
       call this%all_readers(varindex)%initialize(filepath, fileyear, varname)
