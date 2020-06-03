@@ -8,10 +8,10 @@ module forcing_provider_netcdf_module
   type netcdf_reader_handle
     private
     character(:), allocatable :: filepath
-    character(:), allocatable, public :: varname ! make private
+    character(:), allocatable :: varname
     integer fileid
     integer varid
-    integer, allocatable, public :: varshape(:) ! todo: make reader function
+    integer, allocatable :: varshape(:)
     contains
     procedure, public :: initialize, finalize, read_netcdf_timesteps, read_netcdf_timestep_2d, timestep_size
     procedure open_netcdf_variable

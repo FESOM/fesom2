@@ -32,21 +32,13 @@ contains
 
 
   @test
-  subroutine test_can_read_shape_of_variable()
-    character(:), allocatable :: filepath
-    character(:), allocatable :: varname
+  subroutine test_can_read_timestep_size_of_variable()
     type(netcdf_reader_handle) handle
 
-    filepath = "fixtures/test.1948.nc"
-    varname = "q"
-
-    call handle%initialize(filepath, varname)
-   @assertEqual(3, size(handle%varshape))
-   @assertEqual(3, handle%varshape(1))
-   @assertEqual(4, handle%varshape(2))
-   @assertEqual(5, handle%varshape(3))
+    call handle%initialize("fixtures/test.1948.nc", "q")
+    @assertEqual(5, handle%timestep_size())
    
-   call handle%finalize()
+    call handle%finalize()
   end subroutine
 
 
