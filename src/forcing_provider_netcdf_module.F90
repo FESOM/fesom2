@@ -1,6 +1,5 @@
 module forcing_provider_netcdf_module
   implicit none
-  include "netcdf.inc" ! old netcdf fortran interface required?
   public netcdf_reader_handle
   private
 
@@ -126,6 +125,7 @@ module forcing_provider_netcdf_module
   subroutine open_netcdf_variable(this) !, fileid, varid, varshape)
     class(netcdf_reader_handle), intent(inout) :: this
     ! EO args
+    include "netcdf.inc" ! old netcdf fortran interface required?
     integer var_dim_size
     integer, allocatable, dimension(:) :: dimids
     integer i
@@ -148,6 +148,7 @@ module forcing_provider_netcdf_module
   subroutine finalize(this)
     class(netcdf_reader_handle), intent(inout) :: this
     ! EO args
+    include "netcdf.inc" ! old netcdf fortran interface required?
     if(allocated(this%varshape)) then
       call assert_nc( nf_close(this%fileid) , __LINE__)
     end if
@@ -158,6 +159,7 @@ module forcing_provider_netcdf_module
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
+    include "netcdf.inc" ! old netcdf fortran interface required?
     if(status /= NF_NOERR) then
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
