@@ -1167,7 +1167,7 @@ submodule (icedrv_main) icedrv_step
           ! advect tracers
           !-----------------------------------------------------------------
 
-          call tracer_advection_icepack(mesh)
+          !call tracer_advection_icepack(mesh)
 
           !t2 = MPI_Wtime()
 

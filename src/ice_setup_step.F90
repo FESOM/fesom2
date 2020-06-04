@@ -251,6 +251,7 @@ subroutine ice_initial_state(mesh)
   m_snow=0._WP
   if(mype==0) write(*,*) 'initialize the sea ice'
 
+#if defined (__icepack)
   do i=1,myDim_nod2D+eDim_nod2D                           
      if (tr_arr(1,i,1)< 0.0_WP) then
 	if (geo_coord_nod2D(2,i)>0._WP) then
@@ -266,4 +267,5 @@ subroutine ice_initial_state(mesh)
         v_ice(i) = 0.0_WP
      endif
   enddo
+#endif
 end subroutine ice_initial_state

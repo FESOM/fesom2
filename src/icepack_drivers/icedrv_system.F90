@@ -42,10 +42,10 @@
 
       write(ice_stderr,*) ' '
       write(ice_stderr,*) subname,' ABORTED: '
-      if (present(file))   write (ice_stderr,*) subname,' called from', trim(file)
-      if (present(line))   write (ice_stderr,*) subname,' line number', line
-      if (present(istep))  write (ice_stderr,*) subname,' istep =',     istep
-      if (present(string)) write (ice_stderr,*) subname,' string =',    trim(string)
+      if (present(file))   write (ice_stderr,*) subname,' called from ', trim(file)
+      if (present(line))   write (ice_stderr,*) subname,' line number',  line
+      if (present(istep))  write (ice_stderr,*) subname,' istep =',      istep
+      if (present(string)) write (ice_stderr,*) subname,' string =',     trim(string)
        
       ! Stop FESOM2
 

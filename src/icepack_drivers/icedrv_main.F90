@@ -19,9 +19,13 @@
 !--------- subroutines to be seen outside icepack 
           !=======================================================================
 
-          public :: set_icepack, alloc_icepack, init_icepack, step_icepack, &
+          public ::                                                         &
+                    ! Variables
+                    ncat,                                                   & 
+                    ! Subroutines
+                    set_icepack, alloc_icepack, init_icepack, step_icepack, &
                     icepack_to_fesom, rdg_conv_elem, rdg_shear_elem,        &
-                    init_flux_atm_ocn 
+                    init_flux_atm_ocn, init_io_icepack
     
           !=======================================================================
 !--------- Everything else is private
@@ -847,6 +851,12 @@
                      time_advec
                   type(t_mesh), intent(in), target  :: mesh
               end subroutine step_icepack
+
+              ! Initialize output
+              module subroutine init_io_icepack(mesh)
+                  implicit none
+                  type(t_mesh), intent(in), target :: mesh
+              end subroutine init_io_icepack
 
           end interface
 

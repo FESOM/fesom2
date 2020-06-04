@@ -199,7 +199,7 @@
           ! Set state variables
           !-----------------------------------------------------------------
 
-          call init_state_var        
+          call init_state_var()        
     
       end subroutine init_state
 
@@ -607,7 +607,8 @@
              enddo ! k
           enddo    ! i
 
-          if (mype==0) write(*,*) maxval(salinz), minval(salinz)
+          if (mype==0) write(nu_diag,*) 'Maximum and minimum sea ice salinity' 
+          if (mype==0) write(nu_diag,*) maxval(salinz), minval(salinz)
 
       end subroutine init_thermo_vertical
 
@@ -986,6 +987,10 @@
           call init_shortwave    ! initialize radiative transfer using current swdn
           call init_flux_atm_ocn    ! initialize atmosphere, ocean fluxes
 
+      if (mype==0) write(*,*) maxval(aicen), minval(aicen)
+      if (mype==0) write(*,*) maxval(vicen), minval(vicen)
+      if (mype==0) write(*,*) maxval(trcrn(:,2:5,:)), minval(trcrn(:,2:5,:))
+
       end subroutine init_icepack
 
 !=======================================================================
@@ -1073,55 +1078,57 @@
              hinit(n) = c0
           enddo
 
-          if (3 <= ncat) then
-              n = 3
-              ainit(n) = c1  ! assumes we are using the default ITD boundaries
-              hinit(n) = c2
-          else
-              ainit(ncat) = c1
-              hinit(ncat) = c2
-          endif
+          ! For the moment we start we no sea ice
 
-          do i = 1, nx
-             if (sst(i) <= Tf(i)) then             !
-                do n = 1, ncat
-                   ! ice volume, snow volume
-                   aicen(i,n) = ainit(n)
-                   vicen(i,n) = hinit(n) * ainit(n) ! m
-                   vsnon(i,n) = c0
-                   ! tracers
-                   call icepack_init_trcr(Tair     = T_air(i),    &
-                                          Tf       = Tf(i),       &
-                                          Sprofile = salinz(i,:), &
-                                          Tprofile = Tmltz(i,:),  &
-                                          Tsfc     = Tsfc,        &
-                                          nilyr=nilyr, nslyr=nslyr, &
-                                          qin=qin(:), qsn=qsn(:))
-          
-                   ! floe size distribution
-                   if (tr_fsd) call icepack_init_fsd(nfsd=nfsd, ice_ic=ice_ic, &
-                                            floe_rad_c=floe_rad_c,                &
-                                            floe_binwidth=floe_binwidth,          &
-                                            afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
-                   ! surface temperature
-                   trcrn(i,nt_Tsfc,n) = Tsfc ! deg C
-                   ! ice enthalpy, salinity
-                   do k = 1, nilyr
-                      trcrn(i,nt_qice+k-1,n) = qin(k)
-                      trcrn(i,nt_sice+k-1,n) = salinz(i,k)
-                   enddo
-                   ! snow enthalpy
-                   do k = 1, nslyr
-                      trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
-                   enddo               ! nslyr
-                   ! brine fraction
-                   if (tr_brine) trcrn(i,nt_fbri,n) = c1
-                enddo                  ! ncat
-                call icepack_warnings_flush(ice_stderr)
-                if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-                    file=__FILE__, line=__LINE__)
-             endif 
-          enddo
+!          if (3 <= ncat) then
+!              n = 3
+!              ainit(n) = c1  ! assumes we are using the default ITD boundaries
+!              hinit(n) = c2
+!          else
+!              ainit(ncat) = c1
+!              hinit(ncat) = c2
+!          endif
+!
+!          do i = 1, nx
+!             if (sst(i) <= Tf(i)) then             !
+!                do n = 1, ncat
+!                   ! ice volume, snow volume
+!                   aicen(i,n) = ainit(n)
+!                   vicen(i,n) = hinit(n) * ainit(n) ! m
+!                   vsnon(i,n) = c0
+!                   ! tracers
+!                   call icepack_init_trcr(Tair     = T_air(i),    &
+!                                          Tf       = Tf(i),       &
+!                                          Sprofile = salinz(i,:), &
+!                                          Tprofile = Tmltz(i,:),  &
+!                                          Tsfc     = Tsfc,        &
+!                                          nilyr=nilyr, nslyr=nslyr, &
+!                                          qin=qin(:), qsn=qsn(:))
+!          
+!                   ! floe size distribution
+!                   if (tr_fsd) call icepack_init_fsd(nfsd=nfsd, ice_ic=ice_ic, &
+!                                            floe_rad_c=floe_rad_c,                &
+!                                            floe_binwidth=floe_binwidth,          &
+!                                            afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
+!                   ! surface temperature
+!                   trcrn(i,nt_Tsfc,n) = Tsfc ! deg C
+!                   ! ice enthalpy, salinity
+!                   do k = 1, nilyr
+!                      trcrn(i,nt_qice+k-1,n) = qin(k)
+!                      trcrn(i,nt_sice+k-1,n) = salinz(i,k)
+!                   enddo
+!                   ! snow enthalpy
+!                   do k = 1, nslyr
+!                      trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
+!                   enddo               ! nslyr
+!                   ! brine fraction
+!                   if (tr_brine) trcrn(i,nt_fbri,n) = c1
+!                enddo                  ! ncat
+!                call icepack_warnings_flush(ice_stderr)
+!                if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+!                    file=__FILE__, line=__LINE__)
+!             endif 
+!          enddo
 
           !-----------------------------------------------------------------
           ! compute aggregate ice state and open water area

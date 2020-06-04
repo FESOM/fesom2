@@ -102,3 +102,25 @@
     Cf              = 17.
 /
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!                Icepack output namelist                    !!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+&nml_list_icepack
+io_list_icepack =  'aicen     ',1, 'd', 4, ! Sea ice concentration
+                   'vicen     ',1, 'd', 4, ! Volume per unit area of ice
+                   'vsnon     ',1, 'd', 4, ! Volume per unit area of snow
+                   'Tsfc      ',1, 'd', 4, ! Sea ice surf. temperature
+                   !'iage      ',1, 'm', 4, ! Sea ice age
+                   !'FY        ',1, 'm', 4, ! First year ice
+                   !'lvl       ',1, 'm', 4, ! Ridged sea ice area and volume
+                   !'pond_cesm ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'pond_topo ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'pond_lvl  ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'brine     ',1, 'm', 4, ! Volume fraction of ice with dynamic salt
+                   !'qicen     ',1, 'm', 4, ! Sea ice enthalpy
+                   !'sicen     ',1, 'm', 4, ! Sea ice salinity
+                   !'qsnon     ',1, 'm', 4, ! Snow enthalpy
+                   !'test_a_b  ',1, 'm', 4, ! Test advection
+                   !'test_a_a  ',1, 'm', 4, ! Test advection
+/

@@ -678,13 +678,13 @@ submodule (icedrv_main) icedrv_advection
           
         ! cut off icepack
       
-        call cut_off_icepack (nx,                                        &
-                              ntrcr,               narr,                 &
-                              trcr_depend(:),      trcr_base(:,:),       &
-                              n_trcr_strata(:),    nt_strata(:,:),       &
-                              aicen(:,:),          trcrn (:,:,:),        &
-                              vicen(:,:),          vsnon (:,:),          &
-                              aice0(:))
+!        call cut_off_icepack (nx,                                        &
+!                              ntrcr,               narr,                 &
+!                              trcr_depend(:),      trcr_base(:,:),       &
+!                              n_trcr_strata(:),    nt_strata(:,:),       &
+!                              aicen(:,:),          trcrn (:,:,:),        &
+!                              vicen(:,:),          vsnon (:,:),          &
+!                              aice0(:))
      
         do i=1,nx
            if (ncat > 1) then ! Do we really need this?

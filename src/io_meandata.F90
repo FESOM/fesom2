@@ -21,7 +21,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public :: def_stream3D, output
+  public :: def_stream2D, def_stream3D, output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -505,6 +505,11 @@ end subroutine ini_mean_io
 !--------------------------------------------------------------------------------------------
 !
 function get_dimname(n, mesh) result(s)
+
+#if defined (__icepack)
+  use icedrv_main,   only: ncat ! number of ice thickness cathegories
+#endif
+
   implicit none
   integer       :: n
   type(t_mesh) , target :: mesh
@@ -522,6 +527,10 @@ function get_dimname(n, mesh) result(s)
      s='nz1'
   elseif (n==std_dens_N) then
      s='ndens'
+#if defined (__icepack)
+  elseif (n==ncat) then
+     s='ncat'
+#endif
   else
      s='unknown'
      if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with zise of ', n
@@ -556,7 +565,7 @@ subroutine create_new_file(entry)
 
   att_text='time'
   entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   if (entry%accuracy == i_real8) then
@@ -644,7 +653,7 @@ subroutine write_mean(entry, mesh)
   real(real32),   allocatable   :: aux_r4(:)
   integer(int16), allocatable   :: aux_i2(:)
   type(t_mesh), intent(in)     , target :: mesh  
-  integer                       :: i, size1, size2
+  integer                       :: i, size1, size2, size_gen, size_lev, order
   integer                       :: c, lev
 
 #include  "associate_mesh.h"
@@ -699,39 +708,58 @@ subroutine write_mean(entry, mesh)
      elseif (entry%ndim==2) then
         size1=entry%glsize(1)
         size2=entry%glsize(2)
+        if (size1==nod2D .or. size1==elem2D) then
+            size_gen=size1
+            size_lev=size2
+            order=1
+        else if (size2==nod2D .or. size2==elem2D) then
+            size_gen=size2
+            size_lev=size1
+            order=2
+        end if
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==0) allocate(aux_r8(size2))
-           do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+           if (mype==0) allocate(aux_r8(size_gen))
+           do lev=1, size_lev
+              if (size_gen==nod2D  .and. order==1)  call gather_nod (entry%local_values_r8(1:entry%lcsize(2),lev),  aux_r8)
+              if (size_gen==elem2D .and. order==1)  call gather_elem(entry%local_values_r8(1:entry%lcsize(2),lev),  aux_r8)
+              if (size_gen==nod2D  .and. order==2)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              if (size_gen==elem2D .and. order==2)  call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
               if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1); c=c+1
+                 if (order==1) entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), aux_r8, 1); c=c+1
+                 if (order==2) entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), aux_r8, 1); c=c+1
               end if
            end do
            if (mype==0) deallocate(aux_r8)
-!___________writing real 4 byte real _________________________________________ 
-        elseif (entry%accuracy == i_real4) then
-           if (mype==0) allocate(aux_r4(size2))
-           do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+!___________writing 4 byte real_________________________________________
+        else if (entry%accuracy == i_real4) then
+           if (mype==0) allocate(aux_r4(size_gen))
+           do lev=1, size_lev
+              if (size_gen==nod2D  .and. order==1)  call gather_nod (entry%local_values_r4(1:entry%lcsize(2),lev),  aux_r4)
+              if (size_gen==elem2D .and. order==1)  call gather_elem(entry%local_values_r4(1:entry%lcsize(2),lev),  aux_r4)
+              if (size_gen==nod2D  .and. order==2)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)),  aux_r4)
+              if (size_gen==elem2D .and. order==2)  call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)),  aux_r4)
               if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1); c=c+1
+                 if (order==1) entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), aux_r4, 1); c=c+1
+                 if (order==2) entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), aux_r4, 1); c=c+1
               end if
            end do
            if (mype==0) deallocate(aux_r4)
-!___________writing real as 2 byte integer _________________________________________ 
-        elseif (entry%accuracy == i_int2) then
-           if (mype==0) allocate(aux_i2(size2))
-           do lev=1, size1           
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
+!___________writing real as 2 byte integer________________________________
+        else if (entry%accuracy == i_int2) then
+           if (mype==0) allocate(aux_i2(size_gen))
+           do lev=1, size_lev
+              if (size_gen==nod2D  .and. order==1)  call gather_nod (entry%local_values_i2(1:entry%lcsize(2),lev),  aux_i2)
+              if (size_gen==elem2D .and. order==1)  call gather_elem(entry%local_values_i2(1:entry%lcsize(2),lev),  aux_i2)
+              if (size_gen==nod2D  .and. order==2)  call gather_nod (entry%local_values_i2(lev,1:entry%lcsize(2)),  aux_i2)
+              if (size_gen==elem2D .and. order==2)  call gather_elem(entry%local_values_i2(lev,1:entry%lcsize(2)),  aux_i2)
               if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_i2, 1); c=c+1
+                 if (order==1) entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), aux_i2, 1); c=c+1
+                 if (order==2) entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), aux_i2, 1); c=c+1
               end if
            end do
            if (mype==0) deallocate(aux_i2)
+!___________else_________________________________________________________
         else
            if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
            call par_ex
@@ -803,6 +831,11 @@ end subroutine update_means
 !--------------------------------------------------------------------------------------------
 !
 subroutine output(istep, mesh)
+
+#if defined (__icepack)
+  use icedrv_main,    only: init_io_icepack
+#endif
+
   implicit none
 
   integer       :: istep
@@ -816,7 +849,12 @@ subroutine output(istep, mesh)
   type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
-  if (lfirst) call ini_mean_io(mesh)
+  if (lfirst) then
+     call ini_mean_io(mesh)
+#if defined (__icepack)
+     call init_io_icepack(mesh)
+#endif
+  end if
 
   call update_means
 
