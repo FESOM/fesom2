@@ -227,7 +227,8 @@ type(t_mesh),             target, save :: mesh
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(mesh) ! momentum only
             call oce_fluxes(mesh)
-        end if  
+        end if
+        call before_oce_step(mesh) ! prepare the things if required
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________

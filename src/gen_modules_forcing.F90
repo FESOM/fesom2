@@ -17,9 +17,10 @@ real(kind=WP)  :: Cd_atm_oce=1.0e-3  ! drag coeff. between atmosphere and water
 real(kind=WP)  :: Ce_atm_ice=1.75e-3 ! exch. coeff. of latent heat over ice
 real(kind=WP)  :: Ch_atm_ice=1.75e-3 ! exch. coeff. of sensible heat over ice
 real(kind=WP)  :: Cd_atm_ice=1.32e-3 ! drag coeff. between atmosphere and ice 
+real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feedback after Renault et al. 2019; varies from 0 (not parameterized) to 1 (no ocean contribution to wind stress)
 
   namelist /forcing_exchange_coeff/ Ce_atm_oce, Ch_atm_oce, Cd_atm_oce, &
-       Ce_atm_ice, Ch_atm_ice, Cd_atm_ice
+       Ce_atm_ice, Ch_atm_ice, Cd_atm_ice, Swind
 
 
   ! *** forcing source and type ***

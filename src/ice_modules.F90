@@ -65,7 +65,8 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
@@ -81,8 +82,6 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl

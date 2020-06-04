@@ -79,13 +79,14 @@ end module
 !===============================================================================
 ! Driving routine    Here with ALE changes!!!
 subroutine solve_tracers_ale(mesh)
-    use g_config, only: flag_debug
+    use g_config
     use g_parsup
     use o_PARAM, only: tracer_adv, num_tracers, SPP, Fer_GM
     use o_arrays
     use mod_mesh
     use g_comm_auto
     use o_tracers
+    use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
     
@@ -127,7 +128,7 @@ subroutine solve_tracers_ale(mesh)
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         call relax_to_clim(tr_num, mesh)
-        
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
