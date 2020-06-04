@@ -738,7 +738,7 @@ CONTAINS
          nf_start(3)=t_indx
          nf_edges(3)=1
          if(.not. sbcdata1_from_cache) then
-           call forcing_provider%get_forcingdata(fld_idx, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+           call forcing_provider%get_forcingdata(i_totfl, fld_idx, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
          end if
          iost = 0
       end if
@@ -759,7 +759,7 @@ CONTAINS
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
         if(.not. sbcdata2_from_cache) then
-        call forcing_provider%get_forcingdata(fld_idx, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
+        call forcing_provider%get_forcingdata(i_totfl, fld_idx, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
       end if
       iost = 0
       end if

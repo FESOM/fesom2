@@ -14,8 +14,9 @@ module forcing_provider_module
   
   contains
 
-  subroutine get_forcingdata(this, varindex, filepath, fileyear, varname, time_index, forcingdata)
+  subroutine get_forcingdata(this, varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
     class(forcing_provider_type), intent(inout) :: this
+    integer, intent(in) :: varcount ! not used here, but we want to have the same arguments as for the async forcing provider
     integer, intent(in) :: varindex ! todo: remove this arg and just use a hashmap for varname
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear

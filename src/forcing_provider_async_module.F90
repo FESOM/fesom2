@@ -44,8 +44,9 @@ module forcing_provider_async_module
   contains
 
 
-  subroutine get_forcingdata(this, varindex, filepath, fileyear, varname, time_index, forcingdata)
+  subroutine get_forcingdata(this, varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
     class(forcing_provider_type), intent(inout) :: this
+    integer, intent(in) :: varcount
     integer, intent(in) :: varindex ! todo: remove this arg and just use a hashmap for varname
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear
@@ -57,21 +58,13 @@ module forcing_provider_async_module
     type(forcing_lookahead_reader_type) new_reader_a, new_reader_b
     
     ! init our all_readers array if not already done
-!     if(.not. allocated(all_readers)) then
-!       allocate(all_readers(varindex))
-!     end if
-!         
-!     if(size(all_readers) < varindex) then
-!       allocate( tmparr(varindex) )
-!       tmparr(1:size(all_readers)) = all_readers
-!       deallocate(all_readers)
-!       call move_alloc(tmparr, all_readers)
-!     end if
-! somehow the move_alloc messes with our pointer assignments, workaround: alloc only once
-if(.not. allocated(all_readers)) then
-  allocate(all_readers(10)) ! todo: pass max size as argument? (n.b.: which is set via i_totfl)
-end if
-if(size(all_readers) < varindex) stop __LINE__
+    ! dynamically increasing this array did not work because somehow the move_alloc messes with our pointer assignments (maybe it would work with a manual deep-copy instead?)
+    ! as a workaround, we allocate the array once to a fixed size
+    if(.not. allocated(all_readers)) then
+      allocate(all_readers(varcount))
+    else
+      call assert(size(all_readers) == varcount, __LINE__)
+    end if
     
     if( all_readers(varindex)%netcdf_timestep_size == -1 ) then ! reader has never been initialized
       all_readers(varindex)%netcdf_timestep_size = 0
