@@ -47,8 +47,8 @@ submodule (icedrv_main) icedrv_advection
     
         ! Input - output
     
-        type(t_mesh),        target,       intent(in)     :: mesh
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
+        type(t_mesh),        target,        intent(in)     :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
         ! Local variables
     
@@ -223,8 +223,8 @@ submodule (icedrv_main) icedrv_advection
       
         integer(kind=int_kind)           :: row, clo, clo2, cn, location(100)
         real   (kind=dbl_kind)           :: gamma
-        type(t_mesh),        target,       intent(in)     :: mesh
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
+        type(t_mesh),        target,        intent(in)     :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
 #include "../associate_mesh.h"
       
@@ -262,8 +262,8 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)             :: n,i,clo,clo2,cn,location(100),row
         real   (kind=dbl_kind)          :: rhs_new
         integer(kind=int_kind), parameter  :: num_iter_solve = 3
-        type(t_mesh),        target,       intent(in)     :: mesh
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
+        type(t_mesh),        target,        intent(in)     :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
       
 #include "../associate_mesh.h"
       
@@ -317,8 +317,8 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)                            :: icoef(3,3), n, q, elem, elnodes(3), row
         real   (kind=dbl_kind), allocatable, dimension(:) :: tmax, tmin
         real   (kind=dbl_kind)                            :: vol, flux, ae, gamma
-        type(t_mesh),        target,       intent(in)     :: mesh  
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
+        type(t_mesh),        target,        intent(in)     :: mesh  
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
 #include "../associate_mesh.h"
       
@@ -470,8 +470,8 @@ submodule (icedrv_main) icedrv_advection
         real   (kind=dbl_kind)    :: diff, entries(3), um, vm, vol, dx(3), dy(3)
         integer(kind=int_kind)    :: n, q, row, elem, elnodes(3)
         real   (kind=dbl_kind)    :: c_1, c_2, c_3, c_4, c_x, entries2(3)
-        type(t_mesh),        target,       intent(in)     :: mesh
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc    
+        type(t_mesh),        target,        intent(in)     :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc    
 
 #include "../associate_mesh.h"
     
@@ -540,8 +540,8 @@ submodule (icedrv_main) icedrv_advection
                                              location(100), row
         real   (kind=dbl_kind)            :: rhs_new
         integer(kind=int_kind), parameter :: num_iter_solve=3
-        type(t_mesh),        target,       intent(in)     :: mesh
-        real(kind=dbl_kind), dimension(:), intent(inout)  :: trc
+        type(t_mesh),        target,        intent(in)     :: mesh
+        real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
 #include "../associate_mesh.h"
     
@@ -587,13 +587,13 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)    :: mesh
       
         ! Driving sequence
-        call ice_TG_rhs_div(mesh, trc)
+        call tg_rhs_div_icepack(mesh, trc)
         call solve_high_order_icepack(mesh, trc) ! uses arrays of low-order solutions as temp
                                                  ! storage. It should preceed the call of low
                                                  ! order solution.
         call solve_low_order_icepack(mesh, trc)
         call fem_fct_icepack(mesh, trc)
-        call ice_update_for_div(mesh, trc)
+        call update_for_div_icepack(mesh, trc)
 
     end subroutine fct_solve_icepack
 
@@ -655,13 +655,15 @@ submodule (icedrv_main) icedrv_advection
       
         if (allocated(works)) deallocate(works)
         allocate ( works(nx,narr) )
+
+        works(:,:) = c0
       
-        call state_to_work (nx,                        &
-                            ntrcr,                     &
-                            narr,     trcr_depend,     &
-                            aicen,    trcrn,           &
-                            vicen,    vsnon,           &
-                            aice0,    works)
+        call state_to_work (nx,                                &
+                            ntrcr,                             &
+                            narr,        trcr_depend(1:ntrcr), &
+                            aicen(:,:),  trcrn(:,1:ntrcr,:),   &
+                            vicen(:,:),  vsnon(:,:),           &
+                            aice0(:),    works(:,:)            )
       
         ! Advect each tracer
       
@@ -669,25 +671,25 @@ submodule (icedrv_main) icedrv_advection
               call fct_solve_icepack ( mesh, works(:,nt) )
         end do
       
-        call work_to_state (nx,                        &
-                            ntrcr,                     &
-                            narr,     trcr_depend,     &
-                            aicen,    trcrn,           &
-                            vicen,    vsnon,           &
-                            aice0,    works)
+        call work_to_state (nx,                                &
+                            ntrcr,                             &
+                            narr,        trcr_depend(1:ntrcr), &
+                            aicen(:,:),  trcrn(:,1:ntrcr,:),   &
+                            vicen(:,:),  vsnon(:,:),           &
+                            aice0(:),    works(:,:)            )
           
         ! cut off icepack
       
-!        call cut_off_icepack (nx,                                        &
-!                              ntrcr,               narr,                 &
-!                              trcr_depend(:),      trcr_base(:,:),       &
-!                              n_trcr_strata(:),    nt_strata(:,:),       &
-!                              aicen(:,:),          trcrn (:,:,:),        &
-!                              vicen(:,:),          vsnon (:,:),          &
-!                              aice0(:))
+        call cut_off_icepack (nx,                                            &
+                              ntrcr,                   narr,                 &
+                              trcr_depend(1:ntrcr),    trcr_base(1:ntrcr,:), &
+                              n_trcr_strata(1:ntrcr),  nt_strata(1:ntrcr,:), &
+                              aicen(:,:),              trcrn(:,1:ntrcr,:),   &
+                              vicen(:,:),              vsnon(:,:),           &
+                              aice0(:))
      
         do i=1,nx
-           if (ncat > 1) then ! Do we really need this?
+           if (ncat < 1) then ! Do we really need this?
      
               call cleanup_itd  (dt,                     ntrcr,                &
                                  nilyr,                  nslyr,                &
@@ -725,6 +727,8 @@ submodule (icedrv_main) icedrv_advection
                                      nt_strata    (1:ntrcr,:))
            end if
         end do
+
+        deallocate(works)
 
     end subroutine tracer_advection_icepack
 
@@ -802,13 +806,14 @@ submodule (icedrv_main) icedrv_advection
         call icepack_warnings_flush(ice_stderr)
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
            file=__FILE__, line=__LINE__)
-  
-        ! Open water fraction
-  
+   
         trcrn(:,:,:) = c0
         aicen(:,:)   = c0
         vicen(:,:)   = c0
         vsnon(:,:)   = c0
+        aice0(:)     = c0
+
+        ! Open water fraction
   
         do i = 1, nx
            if (works(i,1) <= puny) then
@@ -840,8 +845,7 @@ submodule (icedrv_main) icedrv_advection
               vicen(i,n) = works(i,narrays+2)
               vsnon(i,n) = works(i,narrays+3)
            end do
-  
-        narrays = narrays + 3 + ntrcr
+           narrays = narrays + 3 + ntrcr
         end do
   
         do i = 1, nx  ! For each grid cell
@@ -933,17 +937,20 @@ submodule (icedrv_main) icedrv_advection
   
            narrays = narrays + ntrcr
   
-        enddo                     ! number of categories 
+        enddo                 ! number of categories 
 
-        do i = 1, nx  ! For each grid cell
-           if (ktherm == 1) then ! For bl99 themodynamics
-                                 ! always ridefine salinity
-                                 ! after advection
+!        if (mype == 0) write(*,*) 'Tracer salinity: ', nt_sice, ' - ', (nt_sice + nilyr - 1)
+!        if (mype == 0) write(*,*) 'ktherm: ', ktherm
+
+        if (ktherm == 1) then ! For bl99 themodynamics
+                              ! always ridefine salinity
+                              ! after advection
+           do i = 1, nx       ! For each grid cell
               do k = 1, nilyr
                  trcrn(i,nt_sice+k-1,:) = salinz(i,k)
-              end do             ! nilyr
-            end if               ! ktherm==1
-        end do
+              end do          ! nilyr
+           end do
+        end if                ! ktherm==1
 
     end subroutine work_to_state
 
@@ -1006,13 +1013,6 @@ submodule (icedrv_main) icedrv_advection
         if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
            file=__FILE__, line=__LINE__)
   
-        !-----------------------------------------------------------------
-        ! This array is used for performance (balance memory/cache vs
-        ! number of bound calls);  a different number of arrays may perform
-        ! better depending on the machine used, number of processors, etc.
-        ! --tested on SGI R2000, using 4 pes for the ice model under MPI
-        !-----------------------------------------------------------------
-  
         do i = 1, nx
            works(i,1) = aice0(i)
         enddo
@@ -1039,7 +1039,7 @@ submodule (icedrv_main) icedrv_advection
               elseif (trcr_depend(it) == 2) then
                  do i = 1, nx
                     if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
-                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) - rhos*Lfresh
+                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) + rhos*Lfresh
                     else
                         works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n)
                     end if
@@ -1197,15 +1197,15 @@ submodule (icedrv_main) icedrv_advection
         do n = 1, ncat                      ! For each thickness cathegory
              do i = 1, nx                   ! For each grid point
   
-                  ! Forcing quantities at current time step
-                  T_air_C   = T_air(i) + 273.15_dbl_kind ! Convert from C to K
-  
-                  call icepack_init_trcr(T_air_C,     Tf(i),         &
+                  call icepack_init_trcr(T_air(i),    Tf(i),         &
                                          salinz(i,:), Tmltz(i,:),    &
                                          Tsfc,                       &
                                          nilyr,        nslyr,        &
                                          qin   (:),    qsn  (:))
-  
+                  call icepack_warnings_flush(ice_stderr)
+                  if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+                  file=__FILE__, line=__LINE__)  
+
                   ! Correct qin profile for melting temperatures
   
                   if (vicen(i,n) > small .and. aicen(i,n) > small) then

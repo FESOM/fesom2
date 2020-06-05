@@ -169,7 +169,7 @@ submodule (icedrv_main) icedrv_step
              enddo
     
           enddo ! i
-    
+
           do i = 1, nx
             if (tr_aero) then
               ! trcrn(nt_aero) has units kg/m^3
@@ -1167,7 +1167,7 @@ submodule (icedrv_main) icedrv_step
           ! advect tracers
           !-----------------------------------------------------------------
 
-          !call tracer_advection_icepack(mesh)
+          call tracer_advection_icepack(mesh)
 
           !t2 = MPI_Wtime()
 
