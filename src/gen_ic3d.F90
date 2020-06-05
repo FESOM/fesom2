@@ -308,6 +308,8 @@ CONTAINS
       !! ** Method  : 
       !! ** Action  : 
       !!----------------------------------------------------------------------
+
+      USE ieee_arithmetic
       IMPLICIT NONE      
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -359,9 +361,20 @@ CONTAINS
          iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
          ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
          ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
-         where (ncdata < -0.99_WP*dummy ) ! dummy values are only positive
-                ncdata = dummy
-         end where
+
+         ! replace nan by dummy value
+         do k=1,nc_Ndepth
+            do j=1,nc_Nlat
+               do i=1,nc_Nlon
+                  if (ieee_is_nan(ncdata(i,j,k))) then
+                     ncdata(i,j,k) = dummy
+                  elseif (ncdata(i,j,k) < -0.99_WP*dummy .or. ncdata(i,j,k) > dummy) then 
+                     ! and in case the input data has other conventions on missing values:
+                     ncdata(i,j,k) = dummy
+                  endif
+               end do
+            end do
+         end do
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
