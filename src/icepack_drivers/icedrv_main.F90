@@ -25,7 +25,7 @@
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
                     icepack_to_fesom, rdg_conv_elem, rdg_shear_elem,        &
-                    init_flux_atm_ocn, init_io_icepack
+                    init_flux_atm_ocn, init_io_icepack, init_restart_icepack
     
           !=======================================================================
 !--------- Everything else is private
@@ -857,6 +857,13 @@
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
               end subroutine init_io_icepack
+
+              ! Initialize restart
+              module subroutine init_restart_icepack(year, mesh)
+                  implicit none
+                  type(t_mesh), intent(in), target     :: mesh
+                  integer(kind=int_kind),  intent(in) :: year
+              end subroutine init_restart_icepack
 
           end interface
 
