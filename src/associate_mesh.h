@@ -64,35 +64,60 @@ nl                 => mesh%nl
 !!$mesh_resolution    => mesh%mesh_resolution    
 !!$ssh_stiff          => mesh%ssh_stiff          
 
-
-coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D        
-geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D    
-elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
-edges(1:2,1:myDim_edge2D+eDim_edge2D)                      => mesh%edges              
-edge_tri(1:2,1:myDim_edge2D+eDim_edge2D)                   => mesh%edge_tri           
-elem_edges(1:3,1:myDim_elem2D)                             => mesh%elem_edges         
-elem_area(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)         => mesh%elem_area          
-edge_dxdy(1:2,1:myDim_edge2D+eDim_edge2D)                  => mesh%edge_dxdy          
-edge_cross_dxdy(1:4,1:myDim_edge2D+eDim_edge2D)            => mesh%edge_cross_dxdy    
-elem_cos(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)          => mesh%elem_cos           
-metric_factor(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)     => mesh%metric_factor      
-elem_neighbors(1:3,1:myDim_elem2D)                         => mesh%elem_neighbors     
+if (allocated(mesh%coord_nod2D )) & 
+     coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D        
+if (allocated(mesh%geo_coord_nod2D)) &
+                   geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D    
+if (allocated(mesh%elem2D_nodes )) & 
+     elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
+if (allocated(mesh%edges )) & 
+     edges(1:2,1:myDim_edge2D+eDim_edge2D)                      => mesh%edges              
+if (allocated(mesh%edge_tri )) & 
+     edge_tri(1:2,1:myDim_edge2D+eDim_edge2D)                   => mesh%edge_tri           
+if (allocated(mesh%elem_edges )) & 
+     elem_edges(1:3,1:myDim_elem2D)                             => mesh%elem_edges         
+if (allocated(mesh%elem_area )) & 
+     elem_area(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)         => mesh%elem_area          
+if (allocated(mesh%edge_dxdy )) & 
+     edge_dxdy(1:2,1:myDim_edge2D+eDim_edge2D)                  => mesh%edge_dxdy          
+if (allocated(mesh%edge_cross_dxdy )) & 
+     edge_cross_dxdy(1:4,1:myDim_edge2D+eDim_edge2D)            => mesh%edge_cross_dxdy    
+if (allocated(mesh%elem_cos )) & 
+     elem_cos(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)          => mesh%elem_cos           
+if (allocated(mesh%metric_factor )) & 
+     metric_factor(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)     => mesh%metric_factor      
+if (allocated(mesh%elem_neighbors )) & 
+     elem_neighbors(1:3,1:myDim_elem2D)                         => mesh%elem_neighbors     
 nod_in_elem2D      => mesh%nod_in_elem2D   ! (maxval(rmax),myDim_nod2D+eDim_nod2D)    
 x_corners          => mesh%x_corners   ! (myDim_nod2D, maxval(rmax)) 
 y_corners          => mesh%y_corners   ! (myDim_nod2D, maxval(rmax))       
-nod_in_elem2D_num(1:myDim_nod2D+eDim_nod2D)                => mesh%nod_in_elem2D_num  
-depth(1:myDim_nod2D+eDim_nod2D)                            => mesh%depth              
-gradient_vec(1:6,1:myDim_elem2D)                           => mesh%gradient_vec       
-gradient_sca(1:6,1:myDim_elem2D)                           => mesh%gradient_sca       
-bc_index_nod2D(1:myDim_nod2D+eDim_nod2D)                   => mesh%bc_index_nod2D     
-zbar(1:mesh%nl)                                            => mesh%zbar               
-Z(1:mesh%nl-1)                                             => mesh%Z
+if (allocated(mesh%nod_in_elem2D_num )) & 
+     nod_in_elem2D_num(1:myDim_nod2D+eDim_nod2D)                => mesh%nod_in_elem2D_num  
+if (allocated(mesh%depth )) & 
+     depth(1:myDim_nod2D+eDim_nod2D)                            => mesh%depth              
+if (allocated(mesh%gradient_vec )) & 
+     gradient_vec(1:6,1:myDim_elem2D)                           => mesh%gradient_vec       
+if (allocated(mesh%gradient_sca )) & 
+     gradient_sca(1:6,1:myDim_elem2D)                           => mesh%gradient_sca       
+if (allocated(mesh%bc_index_nod2D )) & 
+     bc_index_nod2D(1:myDim_nod2D+eDim_nod2D)                   => mesh%bc_index_nod2D     
+if (allocated(mesh%zbar )) & 
+     zbar(1:mesh%nl)                                            => mesh%zbar               
+if (allocated(mesh%Z )) & 
+     Z(1:mesh%nl-1)                                             => mesh%Z
 elem_depth         => mesh%elem_depth      ! never used, not even allocated
-nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels            
-nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
-area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                     => mesh%area     
-area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                 => mesh%area_inv     
-mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution    
+if (allocated(mesh%nlevels )) & 
+     nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels            
+if (allocated(mesh%nlevels_nod2D )) & 
+     nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
+if (allocated(mesh%area )) & 
+     area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                     => mesh%area     
+if (allocated(mesh%area_inv )) & 
+     area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                 => mesh%area_inv     
+if (allocated(mesh%mesh_resolution )) & 
+     mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution    
 ssh_stiff                                                  => mesh%ssh_stiff
-lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north
-lump2d_south(1:myDim_nod2d)                                => mesh%lump2d_south
+if (allocated(mesh%lump2d_north )) & 
+     lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north
+if (allocated(mesh%lump2d_south )) & 
+     lump2d_south(1:myDim_nod2d)                                => mesh%lump2d_south
