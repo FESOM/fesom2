@@ -184,13 +184,7 @@ subroutine update_atm_forcing(istep, mesh)
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
-#if defined (__oifs) 
-         elseif (i.eq.13) then
-             if (action) then          
-             ice_heat_flux(:) = ice_heat_flux(:)+exchange(:)
-             end if
-#endif
-	  end if  	  
+	 end if  	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
