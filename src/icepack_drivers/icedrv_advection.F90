@@ -1132,6 +1132,7 @@ submodule (icedrv_main) icedrv_advection
   
         real (kind=dbl_kind), dimension(nilyr) :: &
            qin            , & ! ice enthalpy (J/m3)
+           qin_max        , & ! maximum ice enthalpy (J/m3)
            zTin               ! initial ice temperature
   
         real (kind=dbl_kind), dimension(nslyr) :: &
@@ -1148,12 +1149,13 @@ submodule (icedrv_main) icedrv_advection
   
         real (kind=dbl_kind) ::         &
            rhos,       Lfresh,          &
-           cp_ice,     small,           &
+           cp_ice,     cp_ocn,          &
            qrd_snow,   qrd_ice,         &
            Tsfc,       exc,             &
            depressT,   Tmin,            &
            T_air_C,    hice,            &
-           puny,       Tsmelt          
+           puny,       Tsmelt,          &
+           small,      rhoi          
            
            
   
@@ -1165,15 +1167,16 @@ submodule (icedrv_main) icedrv_advection
         character(len=*), parameter :: subname = '(cut_off_icepack)'
   
         call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl)
-        call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice, &
-          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice,                                  &
+        call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice,   &
+          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice,                                    &
           nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl)
-        call icepack_query_parameters(rhos_out=rhos, Lfresh_out=Lfresh, cp_ice_out=cp_ice)
+        call icepack_query_parameters(rhos_out=rhos, rhoi_out=rhoi, Lfresh_out=Lfresh, &
+                                      cp_ice_out=cp_ice, cp_ocn_out=cp_ocn)
         call icepack_query_parameters(depressT_out=depressT, puny_out=puny, &
           Tsmelt_out=Tsmelt, ktherm_out=ktherm, heat_capacity_out=heat_capacity)
         call icepack_warnings_flush(ice_stderr)
   
-        small = puny
+        small = puny        
         Tmin  = -100.0_dbl_kind
   
         if (.not. heat_capacity) then ! for 0 layer thermodynamics
@@ -1207,7 +1210,11 @@ submodule (icedrv_main) icedrv_advection
                   file=__FILE__, line=__LINE__)  
 
                   ! Correct qin profile for melting temperatures
-  
+
+                  ! Maximum ice enthalpy 
+
+                  qin_max(:) = rhoi * cp_ocn * (Tmltz(i,:) - puny)  
+
                   if (vicen(i,n) > small .and. aicen(i,n) > small) then
   
                       ! Condition on surface temperature
@@ -1239,7 +1246,7 @@ submodule (icedrv_main) icedrv_advection
                           trcrn(i,nt_Tsfc,n) = Tsfc
   
                           do k = 1, nilyr
-                               trcrn(i,nt_qice+k-1,n) = min(c0, qin(k))
+                               trcrn(i,nt_qice+k-1,n) = min(qin_max(k), qin(k))
                           end do        ! nilyr
   
                           if (vsnon(i,n) > small) then ! Only if there is snow
@@ -1278,9 +1285,9 @@ submodule (icedrv_main) icedrv_advection
                               do k = 1, nslyr
                                    trcrn(i,nt_qsno+k-1,n) = qsn(k)
                               end do        ! nslyr
-                              do k = 1, nilyr
-                                   trcrn(i,nt_qice+k-1,n) = min(c0, qin(k))
-                              end do        ! nilyr
+                              !do k = 1, nilyr
+                              !     trcrn(i,nt_qice+k-1,n) = min(qin_max(k), qin(k))
+                              !end do        ! nilyr
                           end if            ! flag snow
                       end if ! vsnon(i,n) > c0
   
