@@ -23,6 +23,8 @@ list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 # depends on the parms library
 add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
+add_subdirectory(forcing_provider_async)
+
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
 add_library(${PROJECT_NAME}_C ${sources_C})
@@ -66,6 +68,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTO
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} forcing_provider_async)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")
