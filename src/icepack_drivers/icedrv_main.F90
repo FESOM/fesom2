@@ -867,50 +867,15 @@
               end subroutine init_restart_icepack
 
               ! Cut off Icepack
-              module subroutine cut_off_icepack (nx,          &
-                                          ntrcr,    narr,     &
-                                          trcr_depend,        &
-                                          trcr_base,          &
-                                          n_trcr_strata,      &
-                                          nt_strata,          &
-                                          aicen,    trcrn,    &
-                                          vicen,    vsnon,    &
-                                          aice0)
-          
+              module subroutine cut_off_icepack
                   use icepack_intfc,         only: icepack_compute_tracers
                   use icepack_intfc,         only: icepack_aggregate
                   use icepack_intfc,         only: icepack_init_trcr
                   use icepack_intfc,         only: icepack_sea_freezing_temperature
                   use icepack_therm_shared,  only: calculate_Tin_from_qin
                   use icepack_mushy_physics, only: icepack_mushy_temperature_mush
-          
-                  integer (kind=int_kind), intent (in) ::                       &
-                     nx                , & ! block dimensions
-                     ntrcr             , & ! number of tracers in use
-                     narr        ! number of 2D state variable arrays in works array
-          
-                  integer (kind=int_kind), dimension (ntrcr), intent(in) :: &
-                     trcr_depend, & ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
-                     n_trcr_strata  ! number of underlying tracer layers
-          
-                  real (kind=dbl_kind), dimension (ntrcr,3), intent(in) :: &
-                     trcr_base      ! = 0 or 1 depending on tracer dependency
-                                    ! argument 2:  (1) aice, (2) vice, (3) vsno
-          
-                  integer (kind=int_kind), dimension (ntrcr,2), intent(in) :: &
-                     nt_strata      ! indices of underlying tracer layers
-          
-                  real (kind=dbl_kind), dimension (nx,ncat), intent(inout) :: &
-                     aicen   , & ! concentration of ice
-                     vicen   , & ! volume per unit area of ice          (m)
-                     vsnon       ! volume per unit area of snow         (m)
-          
-                  real (kind=dbl_kind), dimension (nx,ntrcr,ncat),intent(inout) :: &
-                     trcrn     ! ice tracers
-          
-                  real (kind=dbl_kind), dimension (nx), intent(out) :: &
-                     aice0     ! concentration of open watera
-               end subroutine cut_off_icepack
+                  implicit none
+              end subroutine cut_off_icepack
 
           end interface
 

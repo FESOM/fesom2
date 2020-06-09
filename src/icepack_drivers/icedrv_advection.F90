@@ -607,10 +607,7 @@ submodule (icedrv_main) icedrv_advection
         use g_config,             only: dt
 
         implicit none
-      
-        ! NOTE: For remapping, hice and hsno are considered tracers.
-        !       ntrace is not equal to ntrcr!
-      
+            
         integer (kind=int_kind) :: ntrcr, ntrace, narr, nbtrcr, i,     &
                                    nt,   nt1,    k
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno,                          & 
@@ -658,12 +655,7 @@ submodule (icedrv_main) icedrv_advection
 
         works(:,:) = c0
       
-        call state_to_work (nx,                                &
-                            ntrcr,                             &
-                            narr,        trcr_depend(1:ntrcr), &
-                            aicen(:,:),  trcrn(:,1:ntrcr,:),   &
-                            vicen(:,:),  vsnon(:,:),           &
-                            aice0(:),    works(:,:)            )
+        call state_to_work (ntrcr, narr, works(:,:))
       
         ! Advect each tracer
       
@@ -671,25 +663,14 @@ submodule (icedrv_main) icedrv_advection
               call fct_solve_icepack ( mesh, works(:,nt) )
         end do
       
-        call work_to_state (nx,                                &
-                            ntrcr,                             &
-                            narr,        trcr_depend(1:ntrcr), &
-                            aicen(:,:),  trcrn(:,1:ntrcr,:),   &
-                            vicen(:,:),  vsnon(:,:),           &
-                            aice0(:),    works(:,:)            )
+        call work_to_state (ntrcr, narr, works(:,:))
           
         ! cut off icepack
       
-        call cut_off_icepack (nx,                                            &
-                              ntrcr,                   narr,                 &
-                              trcr_depend(1:ntrcr),    trcr_base(1:ntrcr,:), &
-                              n_trcr_strata(1:ntrcr),  nt_strata(1:ntrcr,:), &
-                              aicen(:,:),              trcrn(:,1:ntrcr,:),   &
-                              vicen(:,:),              vsnon(:,:),           &
-                              aice0(:))
+        call cut_off_icepack
      
         do i=1,nx
-           if (ncat < 1) then ! Do we really need this?
+           if (ncat < 0) then ! Do we really need this?
      
               call cleanup_itd  (dt,                     ntrcr,                &
                                  nilyr,                  nslyr,                &
@@ -734,34 +715,12 @@ submodule (icedrv_main) icedrv_advection
 
     !=======================================================================
 
-    subroutine work_to_state (nx,                        &
-                              ntrcr,                     &
-                              narr,     trcr_depend,     &
-                              aicen,    trcrn,           &
-                              vicen,    vsnon,           &
-                              aice0,    works)
+    subroutine work_to_state (ntrcr, narr, works)
 
         use icepack_intfc,    only: icepack_compute_tracers
 
-        integer (kind=int_kind), intent(in) ::     &
-           nx      , & ! block dimensions
-           ntrcr   , & ! number of tracers in use
-           narr        ! number of 2D state variable arrays in works array
-  
-        integer (kind=int_kind), dimension (ntrcr), intent(in) ::     &
-           trcr_depend ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
-  
-        real (kind=dbl_kind), dimension (nx,ncat), intent(out) :: &
-           aicen   , & ! concentration of ice
-           vicen   , & ! volume per unit area of ice          (m)
-           vsnon       ! volume per unit area of snow         (m)
-  
-        real (kind=dbl_kind), dimension (nx,ntrcr,ncat), intent(out) ::     &
-           trcrn     ! ice tracers
-  
-        real (kind=dbl_kind), dimension (nx), intent(out) :: &
-           aice0     ! concentration of open water
-  
+        integer (kind=int_kind), intent(in) :: ntrcr, narr
+
         real (kind=dbl_kind), dimension(nx,narr), intent (inout) :: &
            works     ! work array
   
@@ -985,31 +944,9 @@ submodule (icedrv_main) icedrv_advection
 
     !=======================================================================
 
-    subroutine state_to_work (nx,                        &
-                              ntrcr,                     &
-                              narr,     trcr_depend,     &
-                              aicen,    trcrn,           &
-                              vicen,    vsnon,           &
-                              aice0,    works)
+    subroutine state_to_work (ntrcr, narr, works)
 
-        integer (kind=int_kind), intent(in) ::     &
-           nx      , & ! block dimensions
-           ntrcr   , & ! number of tracers in use
-           narr        ! number of 2D state variable arrays in works array
-  
-        integer (kind=int_kind), dimension (ntrcr), intent(in) ::     &
-           trcr_depend ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
-  
-        real (kind=dbl_kind), dimension (nx,ncat), intent(in) :: &
-           aicen   , & ! concentration of ice
-           vicen   , & ! volume per unit area of ice          (m)
-           vsnon       ! volume per unit area of snow         (m)
-  
-        real (kind=dbl_kind), dimension (nx,ntrcr,ncat), intent(in) ::     &
-           trcrn     ! ice tracers
-  
-        real (kind=dbl_kind), dimension (nx), intent(in) :: &
-           aice0     ! concentration of open water
+        integer (kind=int_kind), intent(in) :: ntrcr, narr
   
         real (kind=dbl_kind), dimension(nx,narr), intent (out) :: &
            works     ! work array
@@ -1068,7 +1005,7 @@ submodule (icedrv_main) icedrv_advection
               elseif (trcr_depend(it) == 2) then
                  do i = 1, nx
                     if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
-                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) ! + rhos*Lfresh
+                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) 
                     else
                         works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n)
                     end if
@@ -1113,15 +1050,7 @@ submodule (icedrv_main) icedrv_advection
 
     !=======================================================================
 
-    module subroutine cut_off_icepack (nx,          &
-                                ntrcr,    narr,     &
-                                trcr_depend,        &
-                                trcr_base,          &
-                                n_trcr_strata,      &
-                                nt_strata,          &
-                                aicen,    trcrn,    &
-                                vicen,    vsnon,    &
-                                aice0)
+    module subroutine cut_off_icepack
 
         use icepack_intfc,         only: icepack_compute_tracers
         use icepack_intfc,         only: icepack_aggregate
@@ -1129,33 +1058,6 @@ submodule (icedrv_main) icedrv_advection
         use icepack_intfc,         only: icepack_sea_freezing_temperature
         use icepack_therm_shared,  only: calculate_Tin_from_qin
         use icepack_mushy_physics, only: icepack_mushy_temperature_mush
-  
-        integer (kind=int_kind), intent (in) ::                       &
-           nx                , & ! block dimensions
-           ntrcr             , & ! number of tracers in use
-           narr        ! number of 2D state variable arrays in works array
-  
-        integer (kind=int_kind), dimension (ntrcr), intent(in) :: &
-           trcr_depend, & ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
-           n_trcr_strata  ! number of underlying tracer layers
-  
-        real (kind=dbl_kind), dimension (ntrcr,3), intent(in) :: &
-           trcr_base      ! = 0 or 1 depending on tracer dependency
-                          ! argument 2:  (1) aice, (2) vice, (3) vsno
-  
-        integer (kind=int_kind), dimension (ntrcr,2), intent(in) :: &
-           nt_strata      ! indices of underlying tracer layers
-  
-        real (kind=dbl_kind), dimension (nx,ncat), intent(inout) :: &
-           aicen   , & ! concentration of ice
-           vicen   , & ! volume per unit area of ice          (m)
-           vsnon       ! volume per unit area of snow         (m)
-  
-        real (kind=dbl_kind), dimension (nx,ntrcr,ncat),intent(inout) :: &
-           trcrn     ! ice tracers
-  
-        real (kind=dbl_kind), dimension (nx), intent(out) :: &
-           aice0     ! concentration of open watera
   
         ! local variables
   
@@ -1171,7 +1073,8 @@ submodule (icedrv_main) icedrv_advection
            i, n, k, it    , & ! counting indices
            narrays        , & ! counter for number of state variable arrays
            icells         , & ! number of ocean/ice cells
-           ktherm
+           ktherm         , &
+           ntrcr
   
          real (kind=dbl_kind), dimension(ncat) :: &
            aicecat
@@ -1184,7 +1087,8 @@ submodule (icedrv_main) icedrv_advection
            depressT,   Tmin,            &
            T_air_C,    hice,            &
            puny,       Tsmelt,          &
-           small,      rhoi          
+           small,      rhoi,            &
+           hpnd_max          
            
            
   
@@ -1196,6 +1100,7 @@ submodule (icedrv_main) icedrv_advection
   
         character(len=*), parameter :: subname = '(cut_off_icepack)'
   
+        call icepack_query_tracer_sizes(ntrcr_out=ntrcr)
         call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl,      &
           tr_pond_cesm_out=tr_pond_cesm, tr_pond_topo_out=tr_pond_topo,                &
           tr_pond_lvl_out=tr_pond_lvl, tr_FY_out=tr_FY, tr_iage_out=tr_iage            )
@@ -1317,9 +1222,6 @@ submodule (icedrv_main) icedrv_advection
                               do k = 1, nslyr
                                    trcrn(i,nt_qsno+k-1,n) = qsn(k)
                               enddo        ! nslyr
-                              !do k = 1, nilyr
-                              !     trcrn(i,nt_qice+k-1,n) = min(qin_max(k), qin(k))
-                              !end do        ! nilyr
                           endif            ! flag snow
                       endif ! vsnon(i,n) > c0
   
@@ -1341,6 +1243,7 @@ submodule (icedrv_main) icedrv_advection
         do n = 1, ncat
            do i = 1, nx
               if (aicen(i,n) > c0) then
+                 hpnd_max = 0.9_dbl_kind * vicen(i,n) / aicen(i,n)
                  ! Sea ice age
                  if (tr_iage) then
                      if (trcrn(i,nt_iage,n) < 0.000001_dbl_kind) trcrn(i,nt_iage,n) = c0
@@ -1356,26 +1259,27 @@ submodule (icedrv_main) icedrv_advection
                      elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
                          trcrn(i,nt_alvl,n) = c0
                      endif
-                     if (trcrn(i,nt_vlvl,n) < puny) trcrn(i,nt_vlvl,n) = c0
+                     if (trcrn(i,nt_vlvl,n) < 0.000001_dbl_kind .or. trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) trcrn(i,nt_vlvl,n) = c0
                  end if
                  ! CESM melt pond parameterization
                  if (tr_pond_cesm) then
-                     if (trcrn(i,nt_alvl,n) > c1) then
-                         trcrn(i,nt_alvl,n) = c1
-                     elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
-                         trcrn(i,nt_alvl,n) = c0
+                     if (trcrn(i,nt_apnd,n) > c1) then
+                         trcrn(i,nt_apnd,n) = c1
+                     elseif (trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) then
+                         trcrn(i,nt_apnd,n) = c0
                      endif
-                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                     if (trcrn(i,nt_hpnd,n) > hpnd_max) trcrn(i,nt_hpnd,n) = hpnd_max
                  end if
                  ! Topo and level melt pond parameterization
                  if (tr_pond_topo .or. tr_pond_lvl) then
-                     if (trcrn(i,nt_alvl,n) > c1) then
-                         trcrn(i,nt_alvl,n) = c1
-                     elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
-                         trcrn(i,nt_alvl,n) = c0
+                     if (trcrn(i,nt_apnd,n) > c1) then
+                         trcrn(i,nt_apnd,n) = c1
+                     elseif (trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) then
+                         trcrn(i,nt_apnd,n) = c0
                      endif
-                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
-                     if (trcrn(i,nt_ipnd,n) < 0.000001_dbl_kind) trcrn(i,nt_ipnd,n) = c0
+                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                     if (trcrn(i,nt_ipnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_ipnd,n) = c0
                  end if
                  ! Dynamic salt
                  if (tr_brine) then

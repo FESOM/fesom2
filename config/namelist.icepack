@@ -107,10 +107,25 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 &nml_list_icepack
-io_list_icepack =  'aicen     ',1, 'd', 4, ! Sea ice concentration
-                   'vicen     ',1, 'd', 4, ! Volume per unit area of ice
-                   'vsnon     ',1, 'd', 4, ! Volume per unit area of snow
-                   'Tsfc      ',1, 'd', 4, ! Sea ice surf. temperature
+io_list_icepack =  'aicen     ',1, 'm', 4, ! Sea ice concentration
+                   'vicen     ',1, 'm', 4, ! Volume per unit area of ice
+                   'vsnon     ',1, 'm', 4, ! Volume per unit area of snow
+                   !'Tsfcn     ',1, 'm', 4, ! Sea ice surf. temperature
+                   !'iagen     ',1, 'm', 4, ! Sea ice age
+                   !'FYn       ',1, 'm', 4, ! First year ice
+                   !'lvln      ',1, 'm', 4, ! Ridged sea ice area and volume
+                   !'pond_cesmn',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'pond_topon',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'pond_lvln ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
+                   !'brinen    ',1, 'm', 4, ! Volume fraction of ice with dynamic salt
+                   !'qicen     ',1, 'm', 4, ! Sea ice enthalpy
+                   !'sicen     ',1, 'm', 4, ! Sea ice salinity
+                   !'qsnon     ',1, 'm', 4, ! Snow enthalpy
+                   ! Average over thicknes classes
+                   !'aice      ',1, 'm', 4, ! Sea ice concentration
+                   !'vice      ',1, 'm', 4, ! Volume per unit area of ice
+                   !'vsno      ',1, 'm', 4, ! Volume per unit area of snow
+                   !'Tsfc      ',1, 'm', 4, ! Sea ice surf. temperature
                    !'iage      ',1, 'm', 4, ! Sea ice age
                    !'FY        ',1, 'm', 4, ! First year ice
                    !'lvl       ',1, 'm', 4, ! Ridged sea ice area and volume
@@ -118,9 +133,10 @@ io_list_icepack =  'aicen     ',1, 'd', 4, ! Sea ice concentration
                    !'pond_topo ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
                    !'pond_lvl  ',1, 'm', 4, ! Melt ponds area, volume and refrozen lid thickness
                    !'brine     ',1, 'm', 4, ! Volume fraction of ice with dynamic salt
-                   !'qicen     ',1, 'm', 4, ! Sea ice enthalpy
-                   !'sicen     ',1, 'm', 4, ! Sea ice salinity
-                   !'qsnon     ',1, 'm', 4, ! Snow enthalpy
-                   !'test_a_b  ',1, 'm', 4, ! Test advection
-                   !'test_a_a  ',1, 'm', 4, ! Test advection
+                   !'qice      ',1, 'm', 4, ! Sea ice enthalpy
+                   !'sice      ',1, 'm', 4, ! Sea ice salinity
+                   !'qsno      ',1, 'm', 4, ! Snow enthalpy
+                   ! Other variables
+                   !'uvel      ',1, 'm', 4, ! x-component of sea ice velocity
+                   !'vvel      ',1, 'm', 4, ! y-component of sea ice velocity                   
 /

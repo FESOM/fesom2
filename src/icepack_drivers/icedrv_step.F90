@@ -604,13 +604,7 @@ submodule (icedrv_main) icedrv_step
 
           enddo 
 
-          call cut_off_icepack (nx,                                            &
-                                ntrcr,                   narr,                 &
-                                trcr_depend(1:ntrcr),    trcr_base(1:ntrcr,:), &
-                                n_trcr_strata(1:ntrcr),  nt_strata(1:ntrcr,:), &
-                                aicen(:,:),              trcrn(:,1:ntrcr,:),   &
-                                vicen(:,:),              vsnon(:,:),           &
-                                aice0(:))
+          call cut_off_icepack
   
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
