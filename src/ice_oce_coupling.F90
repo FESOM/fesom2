@@ -156,9 +156,6 @@ subroutine oce_fluxes(mesh)
   !     
 
 #if defined (__icepack)
-  a_ice_old(:)  = a_ice(:)
-  m_ice_old(:)  = a_ice(:)
-  m_snow_old(:) = m_snow(:)
 
   call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
                          aice_out=a_ice,                 &

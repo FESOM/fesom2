@@ -741,6 +741,8 @@ submodule (icedrv_main) icedrv_advection
                               vicen,    vsnon,           &
                               aice0,    works)
 
+        use icepack_intfc,    only: icepack_compute_tracers
+
         integer (kind=int_kind), intent(in) ::     &
            nx      , & ! block dimensions
            ntrcr   , & ! number of tracers in use
@@ -769,7 +771,7 @@ submodule (icedrv_main) icedrv_advection
            nt_alvl, nt_apnd, nt_fbri, nt_Tsfc, ktherm
   
         logical (kind=log_kind) :: &
-           tr_pond_cesm, tr_pond_lvl, tr_pond_topo, heat_capacity
+           tr_lvl, tr_pond_cesm, tr_pond_lvl, tr_pond_topo, heat_capacity
   
         integer (kind=int_kind) ::      &
            k, i, n, it   , & ! counting indices
@@ -795,7 +797,8 @@ submodule (icedrv_main) icedrv_advection
         character(len=*), parameter :: subname = '(state_to_work)'
   
         call icepack_query_tracer_flags(tr_pond_cesm_out=tr_pond_cesm,              &
-             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo)
+             tr_pond_lvl_out=tr_pond_lvl, tr_pond_topo_out=tr_pond_topo,            &
+             tr_lvl_out=tr_lvl)
         call icepack_query_tracer_indices(nt_alvl_out=nt_alvl, nt_apnd_out=nt_apnd, &
              nt_fbri_out=nt_fbri, nt_qsno_out=nt_qsno,                              &
              nt_qice_out=nt_qice, nt_sice_out=nt_sice, nt_Tsfc_out=nt_Tsfc) 
@@ -867,77 +870,103 @@ submodule (icedrv_main) icedrv_advection
         end do
   
         narrays = 1
-  
+
         do n=1, ncat
-  
+
            narrays = narrays + 3
-  
-           do it = 1, ntrcr
-  
-              if (trcr_depend(it) == 0) then
-                 do i = 1, nx
-                    if (aicen(i,n) > c0) then
-                       if (it == nt_Tsfc) then
-                           trcrn(i,it,n) = min(c0,works(i,narrays+it)/aicen(i,n))
-                       else
-                           trcrn(i,it,n) = works(i,narrays+it) / aicen(i,n)
-                       end if
-                    end if
-                 enddo
-              elseif (trcr_depend(it) == 1) then
-                 do i = 1, nx
-                    if (vicen(i,n) > c0) then
-                        if (it >= nt_qice .and. it < nt_qice+nilyr) then
-                            trcrn(i,it,n) = min(c0,works(i,narrays+it)/vicen(i,n))
-                            if (.not. heat_capacity) trcrn(i,it,n) = -rhoi * Lfresh
-                        else if (it >= nt_sice .and. it < nt_sice+nilyr) then
-                            trcrn(i,it,n) = max(c0,works(i,narrays+it)/vicen(i,n))
-                        end if
-                    end if
-                 enddo
-              elseif (trcr_depend(it) == 2) then
-                 do i = 1, nx
-                     if (vsnon(i,n) > c0) then
-                         if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
-                             trcrn(i,it,n) = min(c0,works(i,narrays+it)/vsnon(i,n)) - rhos*Lfresh
-                             if (.not. heat_capacity) trcrn(i,it,n) = -rhos * Lfresh
-                         end if
-                     end if
-                 enddo
-              ! Tracers not yet checked or implemented
-              !elseif (trcr_depend(it) == 2+nt_alvl) then
-              !   do i = 1, nx
-              !      works(i,narrays+it) = aicen(i,n) &
-              !                          * trcrn(i,nt_alvl,n) &
-              !                          * trcrn(i,it,n)
-              !   enddo
-              !elseif (trcr_depend(it) == 2+nt_apnd .and. &
-              !        tr_pond_cesm .or. tr_pond_topo) then
-              !   do i = 1, nx
-              !      works(i,narrays+it) = aicen(i,n) &
-              !                          * trcrn(i,nt_apnd,n) &
-              !                          * trcrn(i,it,n)
-              !   enddo
-              !elseif (trcr_depend(it) == 2+nt_apnd .and. &
-              !        tr_pond_lvl) then
-              !   do i = 1, nx
-              !      works(i,narrays+it) = aicen(i,n) &
-              !                          * trcrn(i,nt_alvl,n) &
-              !                          * trcrn(i,nt_apnd,n) &
-              !                          * trcrn(i,it,n)
-              !   enddo
-              !elseif (trcr_depend(it) == 2+nt_fbri) then
-              !   do i = 1, nx
-              !      works(i,narrays+it) = vicen(i,n) &
-              !                          * trcrn(i,nt_fbri,n) &
-              !                          * trcrn(i,it,n)
-              !   enddo
-              endif
+
+           do i = 1, nx
+              call icepack_compute_tracers(ntrcr=ntrcr,trcr_depend=trcr_depend(:),    &
+                                           atrcrn = works(i,narrays+1:narrays+ntrcr), &
+                                           aicen  = aicen(i,n),                       &
+                                           vicen  = vicen(i,n),                       &
+                                           vsnon  = vsnon(i,n),                       &
+                                           trcr_base     = trcr_base(:,:),            &
+                                           n_trcr_strata = n_trcr_strata(:),          &
+                                           nt_strata     = nt_strata(:,:),            &
+                                           trcrn  = trcrn(i,:,n)) 
            enddo
-  
+           
            narrays = narrays + ntrcr
-  
-        enddo                 ! number of categories 
+        enddo
+ 
+!        do n=1, ncat
+!  
+!           narrays = narrays + 3
+!  
+!           do it = 1, ntrcr
+!  
+!              if (trcr_depend(it) == 0) then
+!                 do i = 1, nx
+!                    if (aicen(i,n) > c0) then
+!                       if (it == nt_Tsfc) then
+!                           trcrn(i,it,n) = min(c0,works(i,narrays+it)/aicen(i,n))
+!                       else if (it == nt_alvl .or. it == nt_apnd) then
+!                           trcrn(i,it,n) = max(c0,min(c1,works(i,narrays+it) / aicen(i,n)))
+!                       endif
+!                    end if
+!                 enddo
+!              elseif (trcr_depend(it) == 1) then
+!                 do i = 1, nx
+!                    if (vicen(i,n) > c0) then
+!                        if (it >= nt_qice .and. it < nt_qice+nilyr) then
+!                            trcrn(i,it,n) = min(c0,works(i,narrays+it)/vicen(i,n))
+!                            if (.not. heat_capacity) trcrn(i,it,n) = -rhoi * Lfresh
+!                        else if (it >= nt_sice .and. it < nt_sice+nilyr) then
+!                            trcrn(i,it,n) = max(c0,works(i,narrays+it)/vicen(i,n))
+!                        else
+!                            trcrn(i,it,n) = max(c0,works(i,narrays+it)/vicen(i,n))
+!                        end if
+!                    end if
+!                 enddo
+!              elseif (trcr_depend(it) == 2) then
+!                 do i = 1, nx
+!                     if (vsnon(i,n) > c0) then
+!                         if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
+!                             trcrn(i,it,n) = min(c0,works(i,narrays+it)/vsnon(i,n)) - rhos*Lfresh
+!                             if (.not. heat_capacity) trcrn(i,it,n) = -rhos * Lfresh
+!                         else
+!                             trcrn(i,it,n) = min(c0,works(i,narrays+it)/vsnon(i,n)) - rhos*Lfresh
+!                         end if
+!                     end if
+!                 enddo
+!              elseif (trcr_depend(it) == 2+nt_alvl) then
+!                 do i = 1, nx
+!                    if (trcrn(i,nt_alvl,n) > small) then
+!                       trcrn(i,it,n) = max( c0, works(i,narrays+it)  &
+!                                           / trcrn(i,nt_alvl,n) )     
+!                    endif
+!                 enddo
+!              elseif (trcr_depend(it) == 2+nt_apnd .and. &
+!                      tr_pond_cesm .or. tr_pond_topo) then
+!                 do i = 1, nx
+!                    if (trcrn(i,nt_apnd,n) > small) then
+!                       trcrn(i,it,n) = max( c0, works(i,narrays+it)  &
+!                                           / trcrn(i,nt_apnd,n) )      
+!                    endif
+!                 enddo
+!              elseif (trcr_depend(it) == 2+nt_apnd .and. &
+!                      tr_pond_lvl) then
+!                 do i = 1, nx
+!                    if (trcrn(i,nt_apnd,n) > small .and. trcrn(i,nt_alvl,n) > small) then
+!                       trcrn(i,it,n) = max( c0, works(i,narrays+it)  &
+!                                           / trcrn(i,nt_apnd,n)      &
+!                                           / trcrn(i,nt_alvl,n)      &
+!                                           / aicen(i,n) )
+!                    endif
+!                 enddo
+!              elseif (trcr_depend(it) == 2+nt_fbri) then
+!                 do i = 1, nx
+!                        works(i,narrays+it) = vicen(i,n) &
+!                                            / trcrn(i,nt_fbri,n) &
+!                                            / trcrn(i,it,n)
+!                 enddo
+!              endif
+!           enddo
+!  
+!           narrays = narrays + ntrcr
+!  
+!        enddo                 ! number of categories 
 
 !        if (mype == 0) write(*,*) 'Tracer salinity: ', nt_sice, ' - ', (nt_sice + nilyr - 1)
 !        if (mype == 0) write(*,*) 'ktherm: ', ktherm
@@ -1039,7 +1068,7 @@ submodule (icedrv_main) icedrv_advection
               elseif (trcr_depend(it) == 2) then
                  do i = 1, nx
                     if (it >= nt_qsno .and. it < nt_qsno+nslyr) then
-                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) + rhos*Lfresh
+                        works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n) ! + rhos*Lfresh
                     else
                         works(i,narrays+it) = vsnon(i,n)*trcrn(i,it,n)
                     end if
@@ -1084,7 +1113,7 @@ submodule (icedrv_main) icedrv_advection
 
     !=======================================================================
 
-    subroutine cut_off_icepack (nx,                 &
+    module subroutine cut_off_icepack (nx,          &
                                 ntrcr,    narr,     &
                                 trcr_depend,        &
                                 trcr_base,          &
@@ -1160,16 +1189,21 @@ submodule (icedrv_main) icedrv_advection
            
   
         logical (kind=log_kind) :: tr_brine, tr_lvl, flag_snow, flag_cold_ice, flag_warm_ice, &
+                                   tr_pond_cesm, tr_pond_topo, tr_pond_lvl, tr_FY, tr_iage,   &
                                    heat_capacity
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno, nt_sice
-        integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl
+        integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl, nt_apnd, nt_hpnd, nt_ipnd, nt_FY, nt_iage
   
         character(len=*), parameter :: subname = '(cut_off_icepack)'
   
-        call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl)
+        call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_lvl_out=tr_lvl,      &
+          tr_pond_cesm_out=tr_pond_cesm, tr_pond_topo_out=tr_pond_topo,                &
+          tr_pond_lvl_out=tr_pond_lvl, tr_FY_out=tr_FY, tr_iage_out=tr_iage            )
         call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc, nt_qice_out=nt_qice,   &
-          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice,                                    &
-          nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl)
+          nt_qsno_out=nt_qsno, nt_sice_out=nt_sice, nt_FY_out=nt_FY,                   &
+          nt_fbri_out=nt_fbri, nt_alvl_out=nt_alvl, nt_vlvl_out=nt_vlvl,               &         
+          nt_apnd_out=nt_apnd, nt_hpnd_out=nt_hpnd, nt_ipnd_out=nt_ipnd,               &
+          nt_iage_out=nt_iage                                                          )
         call icepack_query_parameters(rhos_out=rhos, rhoi_out=rhoi, Lfresh_out=Lfresh, &
                                       cp_ice_out=cp_ice, cp_ocn_out=cp_ocn)
         call icepack_query_parameters(depressT_out=depressT, puny_out=puny, &
@@ -1184,18 +1218,16 @@ submodule (icedrv_main) icedrv_advection
               do i = 1, nx
                  if (trcrn(i,nt_Tsfc,n) > Tf(i) .or. trcrn(i,nt_Tsfc,n)< Tmin) then
                      trcrn(i,nt_Tsfc,n) = min(Tf(i), (T_air(i) + 273.15_dbl_kind))
-                 end if
-              end do
-           end do
-        end if
+                 endif
+              enddo
+           enddo
+        endif
   
         if (heat_capacity) then    ! only for bl99 and mushy thermodynamics
   
         ! Here we should implement some conditions to check the tracers
         ! when ice is present, particularly enthalpy, surface temperature
         ! and salinity.
-  
-        ! Test advection
   
         do n = 1, ncat                      ! For each thickness cathegory
              do i = 1, nx                   ! For each grid point
@@ -1213,14 +1245,14 @@ submodule (icedrv_main) icedrv_advection
 
                   ! Maximum ice enthalpy 
 
-                  qin_max(:) = rhoi * cp_ocn * (Tmltz(i,:) - puny)  
+                  qin_max(:) = rhoi * cp_ocn * (Tmltz(i,:) - 0.1_dbl_kind)  
 
                   if (vicen(i,n) > small .and. aicen(i,n) > small) then
   
                       ! Condition on surface temperature
                       if (trcrn(i,nt_Tsfc,n) > Tsmelt .or. trcrn(i,nt_Tsfc,n) < Tmin) then
                           trcrn(i,nt_Tsfc,n) = Tsfc
-                      end if
+                      endif
   
                       ! Condition on ice enthalpy
   
@@ -1239,7 +1271,7 @@ submodule (icedrv_main) icedrv_advection
                          if (zTin(k) <  Tmin      ) flag_cold_ice = .true.
                          if (zTin(k) >= Tmltz(i,k)) flag_warm_ice = .true.
   
-                      end do !nilyr
+                      enddo !nilyr
   
                       if (flag_cold_ice) then
   
@@ -1247,16 +1279,16 @@ submodule (icedrv_main) icedrv_advection
   
                           do k = 1, nilyr
                                trcrn(i,nt_qice+k-1,n) = min(qin_max(k), qin(k))
-                          end do        ! nilyr
+                          enddo        ! nilyr
   
                           if (vsnon(i,n) > small) then ! Only if there is snow
                                                        ! on top of the sea ice
                               do k = 1, nslyr
                                     trcrn(i,nt_qsno+k-1,n) = qsn(k)
-                              end do   
+                              enddo   
                           else                        ! No snow 
                               trcrn(i,nt_qsno:nt_qsno+nslyr-1,n) = c0
-                          end if
+                          endif
   
                       end if            ! flag cold ice
   
@@ -1284,12 +1316,12 @@ submodule (icedrv_main) icedrv_advection
                               trcrn(i,nt_Tsfc,n) = Tsfc
                               do k = 1, nslyr
                                    trcrn(i,nt_qsno+k-1,n) = qsn(k)
-                              end do        ! nslyr
+                              enddo        ! nslyr
                               !do k = 1, nilyr
                               !     trcrn(i,nt_qice+k-1,n) = min(qin_max(k), qin(k))
                               !end do        ! nilyr
-                          end if            ! flag snow
-                      end if ! vsnon(i,n) > c0
+                          endif            ! flag snow
+                      endif ! vsnon(i,n) > c0
   
                   else
   
@@ -1299,11 +1331,60 @@ submodule (icedrv_main) icedrv_advection
                       trcrn(i,:,n) = c0
                       trcrn(i,nt_Tsfc,n) = Tf(i)
   
-                  end if
+                  endif
   
-             end do   ! nx
-        end do        ! ncat
-  
+             enddo   ! nx
+        enddo        ! ncat
+
+        ! Melt ponds and level ice cutoff
+
+        do n = 1, ncat
+           do i = 1, nx
+              if (aicen(i,n) > c0) then
+                 ! Sea ice age
+                 if (tr_iage) then
+                     if (trcrn(i,nt_iage,n) < 0.000001_dbl_kind) trcrn(i,nt_iage,n) = c0
+                 end if
+                 ! First year ice fraction
+                 if (tr_FY) then
+                     if (trcrn(i,nt_FY,n) < 0.000001_dbl_kind) trcrn(i,nt_FY,n) = c0
+                 end if
+                 ! Level ice
+                 if (tr_lvl) then
+                     if (trcrn(i,nt_alvl,n) > c1) then
+                         trcrn(i,nt_alvl,n) = c1
+                     elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
+                         trcrn(i,nt_alvl,n) = c0
+                     endif
+                     if (trcrn(i,nt_vlvl,n) < puny) trcrn(i,nt_vlvl,n) = c0
+                 end if
+                 ! CESM melt pond parameterization
+                 if (tr_pond_cesm) then
+                     if (trcrn(i,nt_alvl,n) > c1) then
+                         trcrn(i,nt_alvl,n) = c1
+                     elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
+                         trcrn(i,nt_alvl,n) = c0
+                     endif
+                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                 end if
+                 ! Topo and level melt pond parameterization
+                 if (tr_pond_topo .or. tr_pond_lvl) then
+                     if (trcrn(i,nt_alvl,n) > c1) then
+                         trcrn(i,nt_alvl,n) = c1
+                     elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
+                         trcrn(i,nt_alvl,n) = c0
+                     endif
+                     if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                     if (trcrn(i,nt_ipnd,n) < 0.000001_dbl_kind) trcrn(i,nt_ipnd,n) = c0
+                 end if
+                 ! Dynamic salt
+                 if (tr_brine) then
+                     if (trcrn(i,nt_fbri,n) < 0.000001_dbl_kind) trcrn(i,nt_fbri,n) = c0
+                 endif
+              endif
+           enddo
+        enddo
+
         do i = 1, nx
            aice(i) = c0
            vice(i) = c0

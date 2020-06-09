@@ -21,10 +21,10 @@
 
           public ::                                                         &
                     ! Variables
-                    ncat,                                                   & 
+                    ncat, rdg_conv_elem, rdg_shear_elem,                    & 
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
-                    icepack_to_fesom, rdg_conv_elem, rdg_shear_elem,        &
+                    icepack_to_fesom,                                       &
                     init_flux_atm_ocn, init_io_icepack, init_restart_icepack
     
           !=======================================================================
@@ -843,12 +843,13 @@
               end subroutine init_advection_icepack
 
               ! Driving subroutine for column physics
-              module subroutine step_icepack(mesh, time_advec, time_therm)
+              module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
                   use mod_mesh
                   implicit none
                   real (kind=dbl_kind), intent(out) :: &
                      time_therm,                       &
-                     time_advec
+                     time_advec,                       &
+                     time_evp
                   type(t_mesh), intent(in), target  :: mesh
               end subroutine step_icepack
 
@@ -864,6 +865,52 @@
                   type(t_mesh), intent(in), target     :: mesh
                   integer(kind=int_kind),  intent(in) :: year
               end subroutine init_restart_icepack
+
+              ! Cut off Icepack
+              module subroutine cut_off_icepack (nx,          &
+                                          ntrcr,    narr,     &
+                                          trcr_depend,        &
+                                          trcr_base,          &
+                                          n_trcr_strata,      &
+                                          nt_strata,          &
+                                          aicen,    trcrn,    &
+                                          vicen,    vsnon,    &
+                                          aice0)
+          
+                  use icepack_intfc,         only: icepack_compute_tracers
+                  use icepack_intfc,         only: icepack_aggregate
+                  use icepack_intfc,         only: icepack_init_trcr
+                  use icepack_intfc,         only: icepack_sea_freezing_temperature
+                  use icepack_therm_shared,  only: calculate_Tin_from_qin
+                  use icepack_mushy_physics, only: icepack_mushy_temperature_mush
+          
+                  integer (kind=int_kind), intent (in) ::                       &
+                     nx                , & ! block dimensions
+                     ntrcr             , & ! number of tracers in use
+                     narr        ! number of 2D state variable arrays in works array
+          
+                  integer (kind=int_kind), dimension (ntrcr), intent(in) :: &
+                     trcr_depend, & ! = 0 for aicen tracers, 1 for vicen, 2 for vsnon
+                     n_trcr_strata  ! number of underlying tracer layers
+          
+                  real (kind=dbl_kind), dimension (ntrcr,3), intent(in) :: &
+                     trcr_base      ! = 0 or 1 depending on tracer dependency
+                                    ! argument 2:  (1) aice, (2) vice, (3) vsno
+          
+                  integer (kind=int_kind), dimension (ntrcr,2), intent(in) :: &
+                     nt_strata      ! indices of underlying tracer layers
+          
+                  real (kind=dbl_kind), dimension (nx,ncat), intent(inout) :: &
+                     aicen   , & ! concentration of ice
+                     vicen   , & ! volume per unit area of ice          (m)
+                     vsnon       ! volume per unit area of snow         (m)
+          
+                  real (kind=dbl_kind), dimension (nx,ntrcr,ncat),intent(inout) :: &
+                     trcrn     ! ice tracers
+          
+                  real (kind=dbl_kind), dimension (nx), intent(out) :: &
+                     aice0     ! concentration of open watera
+               end subroutine cut_off_icepack
 
           end interface
 

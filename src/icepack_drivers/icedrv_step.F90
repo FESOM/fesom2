@@ -552,7 +552,8 @@ submodule (icedrv_main) icedrv_step
           integer (kind=int_kind) :: & 
              i,            & ! horizontal indices
              ntrcr,        & !
-             nbtrcr          !
+             nbtrcr,       & !
+             narr
     
           character(len=*), parameter :: subname='(step_dyn_ridge)'
 
@@ -568,7 +569,8 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
           ! Ridging
           !-----------------------------------------------------------------
-  
+
+          narr = 1 + ncat * (3 + ntrcr) ! max number of state variable arrays  
   
           do i = 1, nx
   
@@ -599,8 +601,16 @@ submodule (icedrv_main) icedrv_step
                            aice=aice(i),             fsalt=fsalt(i),           &
                            first_ice=first_ice(i,:), fzsal=fzsal(i),           &
                            flux_bio=flux_bio(i,1:nbtrcr))
-  
+
           enddo 
+
+          call cut_off_icepack (nx,                                            &
+                                ntrcr,                   narr,                 &
+                                trcr_depend(1:ntrcr),    trcr_base(1:ntrcr,:), &
+                                n_trcr_strata(1:ntrcr),  nt_strata(1:ntrcr,:), &
+                                aicen(:,:),              trcrn(:,1:ntrcr,:),   &
+                                vicen(:,:),              vsnon(:,:),           &
+                                aice0(:))
   
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -1112,7 +1122,7 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      module subroutine step_icepack(mesh, time_advec, time_therm)
+      module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
 
           use g_config,               only: dt
           use mod_mesh    
@@ -1132,7 +1142,8 @@ submodule (icedrv_main) icedrv_step
 
           real (kind=dbl_kind), intent(out) :: &
              time_therm,                       &
-             time_advec
+             time_advec,                       &
+             time_evp
 
           type(t_mesh), target, intent(in) :: mesh    
 
@@ -1151,25 +1162,17 @@ submodule (icedrv_main) icedrv_step
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
+          ! TODO: Add appropriate timing
+
           t1 = c0
           t2 = c0
           t3 = c0
-
-          !t1 = MPI_Wtime()
 
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
 
           call fesom_to_icepack(mesh)
-
-          !-----------------------------------------------------------------
-          ! advect tracers
-          !-----------------------------------------------------------------
-
-          call tracer_advection_icepack(mesh)
-
-          !t2 = MPI_Wtime()
 
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
@@ -1215,7 +1218,28 @@ submodule (icedrv_main) icedrv_step
     
           do k = 1, ndtd
     
+             !-----------------------------------------------------------------
+             ! EVP 
+             !-----------------------------------------------------------------
+
+             call EVPdynamics(mesh)
+
+             !-----------------------------------------------------------------
+             ! update ice velocities
+             !-----------------------------------------------------------------
+
+             call fesom_to_icepack(mesh)
+
+             !-----------------------------------------------------------------
+             ! advect tracers
+             !-----------------------------------------------------------------
+
+             call tracer_advection_icepack(mesh)
+
+             !-----------------------------------------------------------------
              ! ridging
+             !-----------------------------------------------------------------
+
              call step_dyn_ridge (dt_dyn, ndtd)
      
              ! clean up, update tendency diagnostics
@@ -1249,8 +1273,9 @@ submodule (icedrv_main) icedrv_step
           ! icepack timing
           !-----------------------------------------------------------------  
 
-          time_advec = t2 - t1
-          time_therm = t3 - t2
+          time_advec = c0
+          time_therm = c0
+          time_evp   = c0
 
       end subroutine step_icepack
 

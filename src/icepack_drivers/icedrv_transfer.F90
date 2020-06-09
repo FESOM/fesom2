@@ -131,18 +131,18 @@
 
            ! Compute convergence and shear on the nodes
 
-           do n = 1, nx_nh
+           do i = 1, nx_nh
               tvol = c0
               tx   = c0
               ty   = c0
-              do k = 1, nod_in_elem2D_num(n)
-                 elem = nod_in_elem2D(k,n)
+              do k = 1, nod_in_elem2D_num(i)
+                 elem = nod_in_elem2D(k,i)
                  tvol = tvol + elem_area(elem)
                  tx = tx + rdg_conv_elem(elem)  * elem_area(elem)
                  ty = ty + rdg_shear_elem(elem) * elem_area(elem)
               enddo
-              rdg_conv(n)  = tx / tvol
-              rdg_shear(n) = ty / tvol
+              rdg_conv(i)  = tx / tvol
+              rdg_shear(i) = ty / tvol
            enddo
 
            call exchange_nod(rdg_conv, rdg_shear)

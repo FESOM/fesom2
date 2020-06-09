@@ -22,7 +22,7 @@
 
           use mod_mesh
           use g_parsup
-          use io_meandata,      only: def_stream3D 
+          use io_meandata,      only: def_stream3D, def_stream2D 
 
           implicit none
 
@@ -123,14 +123,30 @@
         
           do i=1, io_listsize
              select case (trim(io_list_icepack(i)%id))
+             case ('aice0     ')
+                 call def_stream2D(nod2D,              nx_nh,          'aice0', 'open water fraction',       'none', aice0(:),   io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
              case ('aicen     ')
                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'aicen', 'sea ice concentration',     'none', aicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
              case ('vicen     ')
                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vicen', 'volume per unit area of ice',  'm', vicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              case ('vsnon     ')
                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vsnon', 'volume per unit area of snow', 'm', vsnon(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             case ('aice      ')
+                 call def_stream2D(nod2D,  nx_nh,  'aice', 'sea ice concentration',     'none', aice(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
+             case ('vice      ')
+                 call def_stream2D(nod2D,  nx_nh,  'vice', 'volume per unit area of ice',  'm', vice(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             case ('vsno      ')
+                 call def_stream2D(nod2D,  nx_nh,  'vsno', 'volume per unit area of snow', 'm', vsno(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             ! Sea ice velocity components
+             case ('uvel      ')
+                 call def_stream2D(nod2D,  nx_nh,  'uvel', 'x-component of ice velocity', 'm/s', uvel(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             case ('vvel      ')
+                 call def_stream2D(nod2D,  nx_nh,  'vvel', 'y-component of ice velocity', 'm/s', vvel(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             ! Sea ice or snow surface temperature
              case ('Tsfc      ')
-                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'Tsfc',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                 call def_stream2D(nod2D,  nx_nh,  'Tsfc', 'sea ice surf. temperature',  'degC', trcr(:,nt_Tsfc), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             case ('Tsfcn      ')
+                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'Tsfcn',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              ! If the following tracers are not defined they will not be outputed
              case ('iage      ')
                 if (tr_iage) then
@@ -187,6 +203,10 @@
                     units='J/m3'
                     call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/), trim(trname), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
                  end do
+             case ('rdg_conv  ')
+                 call def_stream2D(nod2D, nx_nh, 'rdg_conv',  'Convergence term for ridging', '1/s', rdg_conv(:),  io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+             case ('rdg_shear ')
+                 call def_stream2D(nod2D, nx_nh, 'rdg_shear', 'Shear term for ridging',       '1/s', rdg_shear(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              case default
                  if (mype==0) write(*,*) 'stream ', io_list_icepack(i)%id, ' is not defined !'
              end select

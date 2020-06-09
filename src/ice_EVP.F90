@@ -119,9 +119,9 @@ type(t_mesh), intent(in), target  :: mesh
         sigma11(el) = 0.5_WP*(si1+si2)
         sigma22(el) = 0.5_WP*(si1-si2)
 
-#if defined (__iceapck)
-        rdg_conv_elem(el)  = -min((eps11+eps22),0.0_WP)
-        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11+eps22))
+#if defined (__icepack)
+        rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
+        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
 #endif
 
      endif
@@ -372,7 +372,8 @@ USE g_comm_auto
 use ice_EVP_interfaces
 
 #if defined (__icepack)
-use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+  use icedrv_main,   only: icepack_to_fesom   
 #endif
 
 IMPLICIT NONE
@@ -398,6 +399,19 @@ REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
+
+! If Icepack is used, always update the tracers
+
+#if defined (__icepack)
+  a_ice_old(:)  = a_ice(:)
+  m_ice_old(:)  = a_ice(:)
+  m_snow_old(:) = m_snow(:)
+
+  call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                         aice_out=a_ice,                 &
+                         vice_out=m_ice,                 &
+                         vsno_out=m_snow)
+#endif
 
 rdt=ice_dt/(1.0*evp_rheol_steps)
 ax=cos(theta_io)
@@ -511,13 +525,13 @@ do n=1,myDim_nod2D
 !==============================================================
 ! And the ice stepping starts
 
+#if defined (__icepack)
+   rdg_conv_elem(:)  = 0.0_WP
+   rdg_shear_elem(:) = 0.0_WP
+#endif
+
 do shortstep=1, evp_rheol_steps 
 
-#if defined (__iceapck)
-   rdg_conv_elem  = 0.0_WP                                                                                                                                      |rdg_shear_elem = 0.0_WP
-   rdg_shear_elem = 0.0_WP
-#endif
- 
    call stress_tensor(ice_strength, mesh)
    call stress2rhs(inv_areamass,ice_strength, mesh) 
  
@@ -563,8 +577,8 @@ do shortstep=1, evp_rheol_steps
    call exchange_nod(U_ice,V_ice)
 END DO
 
-#if defined (__icepack)
-call exchange_nod(rdg_conv_elem,rdg_shear_elem)
-#endif
+!#if defined (__icepack)
+!call exchange_elem(rdg_conv_elem,rdg_shear_elem)
+!#endif
 
 end subroutine EVPdynamics

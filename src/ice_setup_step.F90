@@ -166,10 +166,15 @@ integer                    :: step
 REAL(kind=WP)              :: t0,t1, t2, t3
 
 #if defined (__icepack)
-real(kind=WP)              :: time_advec, time_therm
+real(kind=WP)              :: time_evp, time_advec, time_therm
 #endif
 
 t0=MPI_Wtime()
+
+#if defined (__icepack)
+    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
+#else     
+
  ! ===== Dynamics
 if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
 SELECT CASE (whichEVP)
@@ -186,9 +191,6 @@ SELECT CASE (whichEVP)
 END SELECT
  t1=MPI_Wtime()
 
-#if defined (__icepack)
-    call step_icepack(mesh, time_advec, time_therm) ! Advection and Thermodynamic Parts
-#else     
  ! ===== Advection part
 
 ! old FCT routines
@@ -214,11 +216,12 @@ END SELECT
  rtime_tot = rtime_tot + (t3-t0)
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
-		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
 #if defined (__icepack)
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
                 write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
                 write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
 #else
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
 		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
 		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
 #endif
