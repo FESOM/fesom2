@@ -150,7 +150,7 @@ type(t_mesh), intent(in) , target :: mesh
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-        write(*,*) 'maximum explicit W is set to: ', w_exp_max
+        write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
@@ -203,7 +203,7 @@ if (use_ice .and. use_momix) mixlength=0.
 ! ================
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
-allocate(CFL_z(nl-1, node_size)) ! vertical CFL criteria
+allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 ! ================
 ! Temperature and salinity
 ! ================
