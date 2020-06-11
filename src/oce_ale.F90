@@ -1708,11 +1708,11 @@ subroutine vert_vel_ale(mesh)
     end if
     
     !___________________________________________________________________________
-    ! Split implicit vertical velocity onto implicit and explicit components
+    ! Split implicit vertical velocity onto implicit and explicit components using CFL criteria:
     ! w_max_cfl constrains the allowed explicit w according to the CFL at this place
-    ! w=1 means   w_exp  is cut at at the maximum of allowed CFL
-    ! w=0 means   w_exp  is zero (everything computed implicitly)
-    ! w=inf menas w_impl is zero (everything computed explicitly)
+    ! w_max_cfl=1 means   w_exp  is cut at at the maximum of allowed CFL
+    ! w_max_cfl=0 means   w_exp  is zero (everything computed implicitly)
+    ! w_max_cfl=inf menas w_impl is zero (everything computed explicitly)
     ! a guess for optimal choice of w_max_cfl would be 0.95
     do n=1, myDim_nod2D+eDim_nod2D
        do nz=1,nlevels_nod2D(n)
