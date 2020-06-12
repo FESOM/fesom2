@@ -1,10 +1,10 @@
 ! Ice namelist
 &ice_dyn
 whichEVP=0
-Pstar=30000.0            
+Pstar=25000.0            
 delta_min=1.0e-11
 evp_rheol_steps=150
-Cd_oce_ice=0.0055
+Cd_oce_ice=0.0085
 ice_gamma_fct=0.5
 ice_diff=0.0
 theta_io=0.0                  !0.436
