@@ -55,16 +55,12 @@ MODULE io_RESTART
 ! id will keep the IDs of all required dimentions and variables
   type(nc_file), save       :: oid, iid
   integer,       save       :: globalstep=0
-#if defined (__icepack)
   type(nc_file), save       :: ip_id
-#endif
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
   PUBLIC :: restart, oid, iid
-#if defined (__icepack)
   PUBLIC :: ip_id, def_dim, def_variable_1d, def_variable_2d 
-#endif
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
