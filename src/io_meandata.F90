@@ -547,7 +547,7 @@ function get_dimname(n, mesh) result(s)
      s='ndens'
   else
      s='unknown'
-     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with zise of ', n
+     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', n
   end if
   end function
 !
