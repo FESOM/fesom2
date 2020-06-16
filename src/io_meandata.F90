@@ -569,10 +569,10 @@ subroutine create_new_file(entry)
   entry%error_status(c) = nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid); c=c+1
 
   do j=1, entry%ndim
-!___Create mesh related dimentions__________________________________________
+!___Create mesh related dimensions__________________________________________
      entry%error_status(c) = nf_def_dim(entry%ncid, entry%dimname(j), entry%glsize(j), entry%dimID(j)); c=c+1
   end do
-!___Create time related dimentions__________________________________________
+!___Create time related dimensions__________________________________________
   entry%error_status(c) = nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID);                     c=c+1
 !___Define the time and iteration variables_________________________________
   entry%error_status(c) = nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID); c=c+1
@@ -625,10 +625,10 @@ subroutine assoc_ids(entry)
   end if
 
   do j=1, entry%ndim
-!___Create mesh related dimentions__________________________________________
+!___Create mesh related dimensions__________________________________________
      entry%error_status(c) = nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)); c=c+1
   end do
-!___Associate time related dimentions_______________________________________
+!___Associate time related dimensions_______________________________________
   entry%error_status(c) = nf_inq_dimid (entry%ncid, 'time', entry%recID);          c=c+1
   entry%error_status(c) = nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
