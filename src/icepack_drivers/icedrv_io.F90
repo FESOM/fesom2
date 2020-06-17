@@ -232,7 +232,7 @@
                 if (tr_pond_lvl) then
                   call def_stream2D(nod2D,  nx_nh,  'apnd', 'melt pond area fraction',          'none', trcr(:,nt_apnd), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
                   call def_stream2D(nod2D,  nx_nh,  'hpnd', 'melt pond depth',                  'm',    trcr(:,nt_hpnd), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream2D(nod2D,  nx_nh,  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcr(:,nt_ipnd), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  !call def_stream2D(nod2D,  nx_nh,  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcr(:,nt_ipnd), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
                 end if
              case ('brine     ')
                 if (tr_brine) then

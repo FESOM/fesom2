@@ -1251,15 +1251,17 @@ submodule (icedrv_main) icedrv_advection
                  ! First year ice fraction
                  if (tr_FY) then
                      if (trcrn(i,nt_FY,n) < 0.000001_dbl_kind) trcrn(i,nt_FY,n) = c0
+                     if (trcrn(i,nt_FY,n) > c1) trcrn(i,nt_FY,n) = c1
                  end if
                  ! Level ice
                  if (tr_lvl) then
-                     if (trcrn(i,nt_alvl,n) > c1) then
-                         trcrn(i,nt_alvl,n) = c1
+                     if (trcrn(i,nt_alvl,n) > aicen(i,n)) then
+                         trcrn(i,nt_alvl,n) = aicen(i,n)
                      elseif (trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) then
                          trcrn(i,nt_alvl,n) = c0
                      endif
                      if (trcrn(i,nt_vlvl,n) < 0.000001_dbl_kind .or. trcrn(i,nt_alvl,n) < 0.000001_dbl_kind) trcrn(i,nt_vlvl,n) = c0
+                     if (trcrn(i,nt_vlvl,n) > vicen(i,n)) trcrn(i,nt_vlvl,n) = vicen(i,n)
                  end if
                  ! CESM melt pond parameterization
                  if (tr_pond_cesm) then
@@ -1279,6 +1281,7 @@ submodule (icedrv_main) icedrv_advection
                          trcrn(i,nt_apnd,n) = c0
                      endif
                      if (trcrn(i,nt_hpnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_hpnd,n) = c0
+                     if (trcrn(i,nt_hpnd,n) > hpnd_max) trcrn(i,nt_hpnd,n) = hpnd_max
                      if (trcrn(i,nt_ipnd,n) < 0.000001_dbl_kind .or. trcrn(i,nt_apnd,n) < 0.000001_dbl_kind) trcrn(i,nt_ipnd,n) = c0
                  end if
                  ! Dynamic salt
