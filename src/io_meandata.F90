@@ -21,7 +21,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public :: def_stream3D, output
+  public output
 !
 !--------------------------------------------------------------------------------------------
 !
