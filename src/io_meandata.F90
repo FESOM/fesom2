@@ -1,13 +1,6 @@
 module io_MEANDATA
 
-  use g_clock
-  use g_cvmix_tke
-  use g_cvmix_idemix
-  use g_cvmix_kpp
-  use g_cvmix_tidal
-  use diagnostics
-  use i_PARAM, only: whichEVP
-
+  use o_PARAM, only : WP
   use, intrinsic :: ISO_FORTRAN_ENV
 
   implicit none
@@ -30,7 +23,7 @@ module io_MEANDATA
     real(real32),  public, allocatable, dimension(:,:) :: local_values_r4
     integer(int16),  public, allocatable, dimension(:,:) :: local_values_i2
     integer                                            :: addcounter=0
-    real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:)
+    real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:) ! todo: use netcdf types, not WP
     real(real32)                                       :: min_value        ! lower and upper bound, used to compute scale_factor, add_offset 
     real(real32)                                       :: max_value        !      keep for check if real life values remain in this interval
     real(real32)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2:
@@ -82,6 +75,13 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
 subroutine ini_mean_io(mesh)
+  use g_cvmix_tke
+  use g_cvmix_idemix
+  use g_cvmix_kpp
+  use g_cvmix_tidal
+  use g_PARSUP
+  use diagnostics
+  use i_PARAM, only: whichEVP
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
@@ -460,6 +460,9 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 function mesh_dimname_from_dimsize(size, mesh) result(name)
+  use mod_mesh
+  use g_PARSUP
+  use diagnostics
   implicit none
   integer       :: size
   type(t_mesh) mesh
@@ -484,6 +487,8 @@ end function
 !--------------------------------------------------------------------------------------------
 !
 subroutine create_new_file(entry)
+  use g_clock
+  use g_PARSUP
   implicit none
   integer                       :: c, j
   character(2000)               :: att_text
@@ -534,6 +539,7 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine assoc_ids(entry)
+  use g_PARSUP
   implicit none
 
   type(Meandata), intent(inout) :: entry
@@ -591,6 +597,9 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine write_mean(entry, mesh)
+  use mod_mesh
+  use g_PARSUP
+  use g_comm_auto
   implicit none
   type(Meandata), intent(inout) :: entry
   real(real64)  , allocatable   :: aux_r8(:)
@@ -707,6 +716,7 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine update_means
+  use g_PARSUP
   implicit none
   type(Meandata), pointer :: entry
   integer                 :: n
@@ -756,6 +766,9 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine output(istep, mesh)
+  use g_clock
+  use mod_mesh
+  use g_PARSUP
   implicit none
 
   integer       :: istep
@@ -846,6 +859,8 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, minvalue, maxvalue)
+  use mod_mesh
+  use g_PARSUP
   implicit none
   integer                              :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
@@ -932,6 +947,8 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, minvalue, maxvalue)
+  use mod_mesh
+  use g_PARSUP
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -1019,6 +1036,7 @@ end subroutine
 !--------------------------------------------------------------------------------------------
 !
 subroutine was_error(entry)
+  use g_PARSUP
   implicit none
   type(Meandata), intent(inout) :: entry
   integer                       :: k, status, ierror
