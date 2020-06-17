@@ -463,7 +463,7 @@ END DO
     end if
     
     
-end subroutine ini_mean_io
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -539,7 +539,7 @@ subroutine create_new_file(entry)
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units);       c=c+1
   entry%error_status(c)=nf_close(entry%ncid); c=c+1
   entry%error_count=c-1
-end subroutine create_new_file
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -596,7 +596,7 @@ subroutine assoc_ids(entry)
   entry%error_status(c)=nf_close(entry%ncid); c=c+1
   entry%error_count=c-1
   write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
-end subroutine assoc_ids
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -712,7 +712,7 @@ subroutine write_mean(entry, mesh)
   if (mype==0) entry%error_status(1)=nf_close(entry%ncid);
   entry%error_count=1
   call was_error(entry)
-end subroutine write_mean
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -761,7 +761,7 @@ subroutine update_means
 
      entry%addcounter=entry%addcounter+1
   end do
-end subroutine update_means
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -852,7 +852,7 @@ subroutine output(istep, mesh)
      endif
   end do
   lfirst=.false.
-end subroutine output
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -938,7 +938,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
 
-end subroutine def_stream3D
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -1025,7 +1025,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
 
-end subroutine def_stream2D
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -1045,7 +1045,7 @@ subroutine was_error(entry)
         stop
      end if
   end do
-end subroutine was_error
+end subroutine
 
-end module io_MEANDATA
+end module
 
