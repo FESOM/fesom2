@@ -1,14 +1,6 @@
 module io_MEANDATA
 
-  use g_config
-  use mod_mesh
-  use g_parsup
   use g_clock
-  use g_comm_auto
-  use o_ARRAYS
-  use g_forcing_arrays
-  use i_ARRAYS
-  use o_mixing_KPP_mod
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
