@@ -1718,8 +1718,8 @@ subroutine vert_vel_ale(mesh)
        do nz=1,nlevels_nod2D(n)
           c1=1.0_WP
           c2=0.0_WP
-          if ( w_split .and. (CFL_z(nz, n) > w_max_cfl) .and. (w_max_cfl > 0.0_WP)) then
-             dd=(CFL_z(nz, n)-w_max_cfl)/w_max_cfl
+          if (w_split .and. (CFL_z(nz, n) > w_max_cfl)) then
+             dd=max((CFL_z(nz, n)-w_max_cfl), 0.0_WP)/max(w_max_cfl, 1.e-12)
              c1=1.0_WP/(1.0_WP+dd) !explicit part =1. if dd=0.
              c2=dd    /(1.0_WP+dd) !implicit part =1. if dd=inf
           end if
