@@ -261,14 +261,14 @@ subroutine ice_initial_state(mesh)
   do i=1,myDim_nod2D+eDim_nod2D                           
      if (tr_arr(1,i,1)< 0.0_WP) then
 	if (geo_coord_nod2D(2,i)>0._WP) then
-            m_ice(i) = 1.0_WP
-            m_snow(i)= 0.1_WP 
+            m_ice(i) = 0.0_WP
+            m_snow(i)= 0.0_WP 
         else
-            m_ice(i) = 2.0_WP
-            m_snow(i)= 0.5_WP 
+            m_ice(i) = 0.0_WP
+            m_snow(i)= 0.0_WP 
         end if
 
-        a_ice(i) = 0.9_WP
+        a_ice(i) = 0.0_WP
         u_ice(i) = 0.0_WP
         v_ice(i) = 0.0_WP
      endif
