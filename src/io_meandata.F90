@@ -607,7 +607,7 @@ subroutine write_mean(entry, mesh)
   real(real32),   allocatable   :: aux_r4(:)
   integer(int16), allocatable   :: aux_i2(:)
   type(t_mesh), intent(in)     , target :: mesh  
-  integer                       :: i, size1, size2
+  integer                       :: size1, size2
   integer                       :: c, lev
 
 #include  "associate_mesh.h"
@@ -770,7 +770,6 @@ subroutine output(istep, mesh)
 
   integer       :: istep
   logical, save :: lfirst=.true.
-  integer       :: mpierr
   integer       :: n
   logical       :: do_output
   type(Meandata), pointer :: entry
