@@ -467,25 +467,25 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-function get_dimname(n, mesh) result(s)
+function mesh_dimname_from_dimsize(size, mesh) result(name)
   implicit none
-  integer       :: n
+  integer       :: size
   type(t_mesh) mesh
-  character(50) :: s
+  character(50) :: name
 
-  if (n==mesh%nod2D) then
-    s='nod2'
-  elseif (n==mesh%elem2D) then
-    s='elem'
-  elseif (n==mesh%nl) then
-    s='nz'
-  elseif (n==mesh%nl-1) then
-    s='nz1'
-  elseif (n==std_dens_N) then
-    s='ndens'
+  if (size==mesh%nod2D) then
+    name='nod2'
+  elseif (size==mesh%elem2D) then
+    name='elem'
+  elseif (size==mesh%nl) then
+    name='nz'
+  elseif (size==mesh%nl-1) then
+    name='nz1'
+  elseif (size==std_dens_N) then
+    name='ndens'
   else
-    s='unknown'
-    if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', n
+    name='unknown'
+    if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
   end if
 end function
 !
@@ -926,8 +926,8 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%description = description
   entry%units = units
 
-  entry%dimname(1)=get_dimname(glsize(1), mesh)
-  entry%dimname(2)=get_dimname(glsize(2), mesh)
+  entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)
+  entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)
   entry%freq=freq
   entry%freq_unit=freq_unit
   ! clean_meanarrays
@@ -1014,7 +1014,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%description = description
   entry%units = units
 
-  entry%dimname(1)=get_dimname(glsize, mesh)
+  entry%dimname(1)=mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)='unknown'
   entry%freq=freq
   entry%freq_unit=freq_unit
