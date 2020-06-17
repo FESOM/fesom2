@@ -95,12 +95,6 @@ subroutine ini_mean_io(mesh)
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
   integer,dimension(12)     :: sel_forcvar=0
-  ! sel_forcvar(1) = uwind   ! sel_forcvar(2) = vwind
-  ! sel_forcvar(3) = tair    ! sel_forcvar(4) = shum
-  ! sel_forcvar(5) = prec    ! sel_forcvar(6) = snow
-  ! sel_forcvar(7) = evap    ! sel_forcvar(8) = swr
-  ! sel_forcvar(9) = lwr     ! sel_forcvar(10)= runoff
-  ! sel_forcvar(11) = tx_surf! sel_forcvar(12)= ty_surf
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -230,12 +224,6 @@ CASE ('uwind ')
 CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-!!PS CASE ('tair_mo   ')
-!!PS     sel_forcvar(3) = 13
-!!PS     call def_stream(nod2D, myDim_nod2D, 'tair_mo',     'bulk formular surface air temperature',         '°C',     Tair_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-!!PS CASE ('shum_mo   ')
-!!PS     sel_forcvar(4) = 14
-!!PS     call def_stream(nod2D, myDim_nod2D, 'shum_mo',     'bulk formular specific humidity',               '',       shum_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
     
 !___________________________________________________________________________________________________________________________________
@@ -421,34 +409,6 @@ END DO
         call def_stream(     nod2D  ,      myDim_nod2D  , 'tidal_forcbot', 'near tidal bottom forcing', 'W/m^2'    , tidal_forc_bottom_2D  , 100, 'y', i_real4, mesh)
     end if
     
-!!PS     if (trim(mix_scheme)=='cvmix_KPP') then
-!!PS         ! KPP diagnostics
-!!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Av'         , 'KPP viscosity'          , '', kpp_Av            , 1, 'm', i_real4, mesh)
-!!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_Kv'         , 'KPP diffusivty'         , '', kpp_Kv            , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(       nod2D  ,        myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp_ustar         , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(       nod2D  ,        myDim_nod2D  , 'kpp_nzobldepth' , 'KPP Index OBL depth    ', '', kpp_nzobldepth    , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl  ,nod2D/), (/nl  ,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp_bulkRi        , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl  ,nod2D/), (/nl  ,myDim_nod2D/), 'kpp_shearRi'    , 'KPP Shear Richardson Nr.','', kpp_shearRi       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_dbsurf2'    , 'KPP bouyancy difference', '', kpp_dbsurf             , 1, 'y', i_real4, mesh)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_ws_cntr'    , 'KPP ws cntr'            , '', kpp_ws_cntr       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/), 'kpp_dvsurf2'    , 'KPP kpp_dvsurf2'        , '', kpp_dvsurf2       , 1, 'm', i_real4, mesh)
-!!PS !!PS         call def_stream((/nl-1,nod2D/), (/nl-1,myDim_nod2D/),'kpp_surfbuoyflx3d' , 'KPP kpp_surfbuoyflx3d'        , '', kpp_surfbuoyflx3d       , 1, 'm', i_real4, mesh)
-!!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc1'   , 'KPP OBLMIX1'            , '', kpp_oblmixc(:,:,1), 1, 'm', i_real4, mesh)
-!!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc2'   , 'KPP OBLMIX2'            , '', kpp_oblmixc(:,:,2), 1, 'm', i_real4, mesh)
-!!PS !!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_oblmixc3'   , 'KPP OBLMIX3'            , '', kpp_oblmixc(:,:,3), 1, 'm', i_real4, mesh)
-!!PS     end if
-    
-!!PS         if (trim(mix_scheme)=='KPP') then
-!!PS         ! KPP diagnostics
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_obldepth'   , 'KPP OBL depth'          , '', kpp2_obldepth      , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_surfbuoyflx', 'KPP surf. bouyancy flx.', '', kpp2_surfbuoyflx   , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(     nod2D  ,      myDim_nod2D  , 'kpp_ustar'      , 'KPP surf. fric vel     ', '', kpp2_ustar         , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'kpp_bulkRi'     , 'KPP Bulk Richardson Nr.', '', kpp2_bulkRi        , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'kpp_ws_cntr' , 'KPP ws cntr'            , '', kpp2_ws_cntr       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'kpp_dvsurf2' , 'KPP kpp_dvsurf2'        , '', kpp2_dvsurf2       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'kpp_surfbuoyflx3d' , 'KPP kpp_surfbuoyflx3d', '', kpp2_surfbuoyflx3d       , 1, 'm', i_real4, mesh)
-!!PS     end if
-!!PS   call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/),'sw_3d' , 'penetrated SWR'        , '', sw_3d       , 1, 'm', i_real4, mesh)
   !___________________________________________________________________________________________________________________________________
   ! output Redi parameterisation
   if (Redi) then
@@ -460,26 +420,14 @@ END DO
   if (use_momix) then
      call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, mesh)
   end if
-  !___________________________________________________________________________________________________________________________________
-  !if (ldiag_solver) then
-  !   call def_stream(nod2D, myDim_nod2D, 'rhs_diag',  'SSH_STIFF*d_eta', 'none',      rhs_diag(1:myDim_nod2D),     1, 's', i_real4, mesh)
-  !   call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',   'ssh_rhs',         'none',      ssh_rhs (1:myDim_nod2D),     1, 's', i_real4, mesh)
-  !   call def_stream(nod2D, myDim_nod2D, 'ssh_rhs_old',   'ssh_rhs_old',         'none',      ssh_rhs_old(1:myDim_nod2D),     1, 's', i_real4, mesh)
-  !   call def_stream(nod2D, myDim_nod2D, 'd_eta',   'd_eta',         'm',      d_eta (1:myDim_nod2D),     1, 's', i_real4, mesh)
-  !end if
   
     !___________________________________________________________________________________________________________________________________
     if (ldiag_curl_vel3) then
         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, mesh)
-    !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u100',  'relative vorticity at 100m',  '1/s',   vorticity(12,1:myDim_nod2D), 1, 'd', i_real4, mesh)
-    !    call def_stream(nod2D,  myDim_nod2D,                      'curl_u280',  'relative vorticity at 280m',  '1/s',   vorticity(16,1:myDim_nod2D), 1, 'd', i_real4, mesh)
     end if
 
     !___________________________________________________________________________________________________________________________________
     if (whichEVP==1) then
-        !call def_stream(elem2D, myDim_elem2D, 'eps12', 'eps12', 'n/a', eps12,  1, 'd', i_real4, mesh)
-        !call def_stream(elem2D, myDim_elem2D, 'eps11', 'eps12', 'n/a', eps11,  1, 'd', i_real4, mesh)
-        !call def_stream(elem2D, myDim_elem2D, 'eps22', 'eps22', 'n/a', eps22,  1, 'd', i_real4, mesh)
     end if
     
     if (whichEVP==2) then
@@ -512,14 +460,6 @@ END DO
         call def_stream(nod2D , myDim_nod2D , 'cd','wind drag coef. '             , '', cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
-!!PS         if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'tair_mo','bulk formular surf. air temp.'  , '°C'   , Tair_mo(:)       , 1, 'm', i_real4, mesh)
-!!PS         if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'shum_mo','bulk formular specific humidity', ''     , shum_mo(:)       , 1, 'm', i_real4, mesh)
-!!PS         if (sel_forcvar(15)==0) call def_stream(nod2D , myDim_nod2D , 'dv10',''  , 'm/2'   , dv10(:)          , 1, 'm', i_real4, mesh)
-!!PS         if (sel_forcvar(16)==0) call def_stream(nod2D , myDim_nod2D , 'dv10_mo',''  , 'm/2'   , dv10_mo(:)    , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(nod2D , myDim_nod2D , 'mo_index','', ''     , mo_index(:)       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt1','', ''     , auxt1(:)       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt2','', ''     , auxt2(:)       , 1, 'm', i_real4, mesh)
-!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt3','', ''     , auxt3(:)       , 1, 'm', i_real4, mesh)
     end if
     
     
