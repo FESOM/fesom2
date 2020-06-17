@@ -91,7 +91,7 @@
     
           if (.not.heat_capacity) then
     
-             write (nu_diag,*) 'WARNING - Zero-layer thermodynamics'
+             !write (nu_diag,*) 'WARNING - Zero-layer thermodynamics'
     
              if (nilyr > 1) then
                 write (nu_diag,*) 'nilyr =', nilyr
