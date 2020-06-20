@@ -789,10 +789,10 @@ subroutine find_levels_cavity(mesh)
 #include "associate_mesh_ini.h"
 
     !___________________________________________________________________________
-    allocate(mesh%cavity_lev_elem2D(elem2D))
-    cavity_lev_elem2D => mesh%cavity_lev_elem2D 
-    allocate(mesh%cavity_lev_nod2D(nod2D))
-    cavity_lev_nod2D  => mesh%cavity_lev_nod2D 
+    allocate(mesh%ulevels(elem2D))
+    ulevels => mesh%ulevels 
+    allocate(mesh%ulevels_nod2D(nod2D))
+    ulevels_nod2D  => mesh%ulevels_nod2D 
 !!PS     allocate(mesh%cavity_flag_n(nod2D))
 !!PS     cavity_flag_n       => mesh%cavity_flag_n
     
@@ -813,16 +813,16 @@ subroutine find_levels_cavity(mesh)
         !_______________________________________________________________________
         ! vertical elem level index of cavity-ocean boundary
         exit_flag=0
-        cavity_lev_elem2D(elem) = 1
+        ulevels(elem) = 1
         do nz=1,nlevels(elem)-1
             if(Z(nz)<dmean) then
                 exit_flag=1
-                cavity_lev_elem2D(elem)=nz
+                ulevels(elem)=nz
                 exit
             end if
         end do
-        if ((exit_flag==0).and.(dmean<0)) cavity_lev_elem2D(elem)=nlevels(elem)     
-        cavity_maxlev = max(cavity_maxlev,cavity_lev_elem2D(elem))
+        if ((exit_flag==0).and.(dmean<0)) ulevels(elem)=nlevels(elem)     
+        cavity_maxlev = max(cavity_maxlev,ulevels(elem))
     end do
     
     !___________________________________________________________________________
@@ -852,7 +852,7 @@ subroutine find_levels_cavity(mesh)
                 !   |#######|        |
                 !   |####|           +-- Not good can lead to isolated cells  
                 !
-                if (nz >= cavity_lev_elem2D(elem)) then
+                if (nz >= ulevels(elem)) then
                     count_neighb_open=0
                     elems=elem_neighbors(1:3,elem)
                     
@@ -861,7 +861,7 @@ subroutine find_levels_cavity(mesh)
                     do j = 1, nneighb
                         if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
                             ! check for isolated cell
-                            if (cavity_lev_elem2D(elems(j))<=nz) then
+                            if (ulevels(elems(j))<=nz) then
                                 !count the open faces to neighboring cells 
                                 count_neighb_open=count_neighb_open+1
                             endif
@@ -875,36 +875,65 @@ subroutine find_levels_cavity(mesh)
                     ! --> in this case shift cavity-ocean interface one level down
                     if (count_neighb_open<2) then
                         !if cell is "bad" convert to bottom cell
-                        cavity_lev_elem2D(elem)=nz+1
+                        ulevels(elem)=nz+1
                         !force recheck for all current ocean cells
                         exit_flag=0
                     endif ! --> if (count_neighb_open<2) then
                     
-                end if ! --> if (nz >= cavity_lev_elem2D(elem)) then
+                end if ! --> if (nz >= ulevels(elem)) then
             end do ! --> do elem=1,elem2D
         end do ! --> do while((exit_flag==0).and.(count_iter<1000))
     end do ! --> do nz=1,cavity_maxlev 
     
     !___________________________________________________________________________
     ! vertical vertice level index of cavity_ocean boundary
-    cavity_lev_nod2d = 1
+    ulevels_nod2D = nl
     do elem=1,elem2D
         nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
         !_______________________________________________________________________
         ! loop over neighbouring triangles
         do j=1,nneighb
             node=elem2D_nodes(j,elem)
-            if(cavity_lev_nod2d(node)<cavity_lev_elem2D(elem)) then
-                cavity_lev_nod2d(node)=cavity_lev_elem2D(elem)
-            end if
+!!PS             if(ulevels_nod2D(node)<=ulevels(elem)) then
+!!PS                 ulevels_nod2D(node)=ulevels(elem)
+!!PS             end if
+            ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
+            
         end do
     end do
     
+    !___________________________________________________________________________
+    ! check ulevels if ulevels<nlevels everywhere !
+    do elem=1,elem2D
+        if (ulevels(elem)>=nlevels(elem)) then 
+            if (mype==0) write(*,*) ' ERROR: found element cavity depth deeper or equal bottom depth'
+            call par_ex(0)
+        end if 
+    end do
+    
+    !___________________________________________________________________________
+    ! check ulevels_nod2d if ulevels_nod2d<nlevels_nod2d everywhere !
+    do elem=1,nod2D
+        if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
+            if (mype==0) write(*,*) ' ERROR: found vertice cavity depth deeper or equal bottom depth'
+            call par_ex(0)
+        end if 
+    end do
+    
+    do elem=1,elem2D
+        if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
+            if (mype==0) then 
+                write(*,*) ' ERROR: found element cavity depth that is shallower than its valid maximum cavity vertice depths'
+                write(*,*) ' ule | uln = ',ulevels(elem),' | ',ulevels_nod2D(elem2D_nodes(:,elem))
+            end if     
+            call par_ex(0)
+        end if 
+    end do
 !!PS     !___________________________________________________________________________
 !!PS     ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
 !!PS     cavity_flag = 0
 !!PS     do node=1,nod2D
-!!PS         if (cavity_lev_nod2d(node)>1) cavity_flag(node)=1
+!!PS         if (ulevels_nod2D(node)>1) cavity_flag(node)=1
 !!PS     end do
 
     !___________________________________________________________________________
@@ -915,7 +944,7 @@ subroutine find_levels_cavity(mesh)
         file_name=trim(meshpath)//'cavity_elvls.out'
         open(20, file=file_name)
         do elem=1,elem2D
-            write(20,*) cavity_lev_elem2D(elem)
+            write(20,*) ulevels(elem)
         enddo
         close(20)
         
@@ -925,7 +954,7 @@ subroutine find_levels_cavity(mesh)
 !!PS         file_name=trim(meshpath)//'cavity_flag.out'
 !!PS         open(21, file=file_name)
         do node=1,nod2D
-            write(20,*) cavity_lev_nod2d(node)
+            write(20,*) ulevels_nod2D(node)
 !!PS             write(21,*) cavity_flag(node)
         enddo
         close(20)
