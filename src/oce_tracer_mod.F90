@@ -15,14 +15,17 @@ IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 integer                  :: elem,  elnodes(3)
-integer                  :: n, nz
+integer                  :: n, nz, nzmin, nzmax
 
 
 #include  "associate_mesh.h"
 
 DO elem=1, myDim_elem2D
    elnodes=elem2D_nodes(:,elem)
-   DO nz=1, nlevels(elem)-1   
+   nzmin = ulevels(elem)
+   nzmax = nlevels(elem)
+   !!PS DO nz=1, nlevels(elem)-1
+   DO nz=nzmin, nzmax-1   
       tr_xy(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
       tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
    END DO
@@ -66,29 +69,37 @@ call exchange_elem(tr_xy)
 END SUBROUTINE init_tracers_AB
 !========================================================================================
 SUBROUTINE relax_to_clim(tr_num, mesh)
-use g_config,only: dt
-USE g_PARSUP
-use o_arrays
-use o_PARAM, only: tracer_adv
-IMPLICIT NONE
+    use g_config,only: dt
+    USE g_PARSUP
+    use o_arrays
+    use o_PARAM, only: tracer_adv
+    IMPLICIT NONE
 
-type(t_mesh), intent(in) , target :: mesh
-integer                  :: tr_num,n,nz
+    type(t_mesh), intent(in) , target :: mesh
+    integer                  :: tr_num,n,nz, nzmin, nzmax
 
 #include  "associate_mesh.h"
 
-if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
-   DO n=1, myDim_nod2D
-      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
-            relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
-  END DO
-END if
-if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
-   DO n=1, myDim_nod2D
-      tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
-            relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
-   END DO
-END IF 
+    if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
+        DO n=1, myDim_nod2D
+            nzmin = ulevels_nod2D(n)    
+            nzmax = nlevels_nod2D(n)    
+            !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
+            !!PS         relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
+            tr_arr(nzmin:nzmax-1,n,tr_num)=tr_arr(nzmin:nzmax-1,n,tr_num)+&
+                    relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-tr_arr(nzmin:nzmax-1,n,tr_num))
+        END DO
+    END if
+    if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
+        DO n=1, myDim_nod2D
+            nzmin = ulevels_nod2D(n)    
+            nzmax = nlevels_nod2D(n)  
+            !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
+            !!PS         relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
+            tr_arr(nzmin:nzmax-1,n,tr_num)=tr_arr(nzmin:nzmax-1,n,tr_num)+&
+                    relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-tr_arr(nzmin:nzmax-1,n,tr_num))
+        END DO
+    END IF 
 END SUBROUTINE relax_to_clim
 END MODULE o_tracers
 !========================================================================================
@@ -103,17 +114,22 @@ IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 real(kind=WP)            :: dz
-integer                  :: n, nz, nlev
+integer                  :: n, nz, nzmin, nzmax
 
 #include  "associate_mesh.h"
 
 DO n=1, myDim_nod2D+eDim_nod2D
-   nlev=nlevels_nod2D(n)
-   DO nz=2,  nlev-1
+   !!PS nlev=nlevels_nod2D(n)
+   nzmax=nlevels_nod2D(n)
+   nzmin=ulevels_nod2D(n)
+   !!PS DO nz=2,  nlev-1
+   DO nz=nzmin+1,  nzmax-1
       dz=0.5_WP*(hnode_new(nz-1,n)+hnode_new(nz,n))
       tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
    END DO
-   tr_z(1,    n)=0.0_WP
-   tr_z(nlev, n)=0.0_WP
+   !!PS tr_z(1,    n)=0.0_WP
+   !!PS tr_z(nlev, n)=0.0_WP
+   tr_z(nzmin, n)=0.0_WP
+   tr_z(nzmax, n)=0.0_WP
 END DO
 END SUBROUTINE tracer_gradient_z

@@ -109,12 +109,16 @@ IMPLICIT NONE
       call read_mesh(mesh)
       call set_par_support(mesh)
       call find_levels(mesh)
+      
       if (use_cavity) call find_levels_cavity(mesh)
+        
       call test_tri(mesh)
       call load_edges(mesh)
       call find_neighbors(mesh)
+      call find_levels_min_e2n(mesh)
       call mesh_areas(mesh)
       call mesh_auxiliary_arrays(mesh)
+           
 END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
@@ -835,10 +839,10 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! initializes upper integration boundary index for all vertical vertice and 
     ! element loops, default = 1, but when cavity is used can be different 
-    allocate(mesh%ubndidx_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-    allocate(mesh%ubndidx_n(myDim_nod2D+eDim_nod2D))
-    mesh%ubndidx_e=1
-    mesh%ubndidx_n=1
+    allocate(mesh%ulevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    allocate(mesh%ulevels_nod2D(myDim_nod2D+eDim_nod2D))
+    mesh%ulevels=1
+    mesh%ulevels_nod2D=1
     
     !___________________________________________________________________________
     t1=MPI_Wtime()
@@ -872,15 +876,15 @@ subroutine find_levels_cavity(mesh)
     integer, allocatable, dimension(:)  :: ibuff
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
-
+    integer                             :: elem, elnodes(3), ule,  uln(3)
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
     
     t0=MPI_Wtime()
     !___________________________________________________________________________
     ! allocate arrays, reset pointers
-    allocate(mesh%cavity_flag_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-    allocate(mesh%cavity_flag_n(myDim_nod2D+eDim_nod2D))
+!!PS     allocate(mesh%cavity_flag_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+!!PS     allocate(mesh%cavity_flag_n(myDim_nod2D+eDim_nod2D))
     allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
     
     !___________________________________________________________________________
@@ -962,7 +966,7 @@ subroutine find_levels_cavity(mesh)
             ! belong to local cpu
             if (mapping(n)>0) then
                 mesh_check=mesh_check+1
-                mesh%ubndidx_e(mapping(n))=ibuff(n)
+                mesh%ulevels(mapping(n))=ibuff(n)
             end if
         end do
         
@@ -1048,7 +1052,7 @@ subroutine find_levels_cavity(mesh)
         do n=1, k      
             if (mapping(n)>0) then
                 mesh_check=mesh_check+1
-                mesh%ubndidx_n(mapping(n))=ibuff(n)
+                mesh%ulevels_nod2D(mapping(n))=ibuff(n)
             end if
         end do
     end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
@@ -1066,14 +1070,14 @@ subroutine find_levels_cavity(mesh)
     
     !___________________________________________________________________________
     ! Part III: computing cavity flag at nodes and elements
-    mesh%cavity_flag_e = 0
-    do n=1,myDim_elem2D+eDim_elem2D+eXDim_elem2D
-        if (mesh%ubndidx_e(n)>1) mesh%cavity_flag_e(n)=1
-    end do    
-    mesh%cavity_flag_n = 0
-    do n=1,myDim_nod2D+eDim_nod2D
-        if (mesh%ubndidx_n(n)>1) mesh%cavity_flag_n(n)=1
-    end do    
+!!PS     mesh%cavity_flag_e = 0
+!!PS     do n=1,myDim_elem2D+eDim_elem2D+eXDim_elem2D
+!!PS         if (mesh%ulevels(n)>1) mesh%cavity_flag_e(n)=1
+!!PS     end do    
+!!PS     mesh%cavity_flag_n = 0
+!!PS     do n=1,myDim_nod2D+eDim_nod2D
+!!PS         if (mesh%ulevels_nod2D(n)>1) mesh%cavity_flag_n(n)=1
+!!PS     end do    
 !!PS     if (mype==0)  then 
 !!PS         file_name=trim(meshpath)//'cavity_flag.out'
 !!PS         open(fileID, file=file_name)
@@ -1240,7 +1244,62 @@ subroutine find_levels_cavity(mesh)
         write(*,*) ' --> cavity info read in ', t1-t0, ' seconds'
     end if
     
+    !___________________________________________________________________________
+    ! check cavity info 
+    do elem=1,myDim_elem2d
+        elnodes = mesh%elem2D_nodes(:,elem)
+        ule = mesh%ulevels(elem)
+        uln = mesh%ulevels_nod2D(elnodes)
+        if (ule < maxval(uln)) then 
+            write(*,*) ' --> found cavity elem depth shallower than valid cavity node depth, mype=', mype
+        end if 
+    end do 
+    
 end subroutine find_levels_cavity
+!
+!
+!_______________________________________________________________________________
+! load cavity mesh files: cavity_depth, cavity_flag, cavity_nlvls.out and 
+! cavity_elvls.out that are created during the partitioning when namelist.config flag
+! use_cavity=.True.
+!_______________________________________________________________________________
+subroutine find_levels_min_e2n(mesh)
+    use MOD_MESH
+    use o_PARAM
+    use g_PARSUP
+    use g_config
+    use g_comm_auto
+    !
+    implicit none
+    !
+    type(t_mesh), intent(inout), target :: mesh
+    integer                             :: node, k
+    real(kind=WP)                       :: t0, t1
+    
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
+    
+    t0=MPI_Wtime()
+    !___________________________________________________________________________
+    allocate(mesh%nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%ulevels_nod2D_max(myDim_nod2D+eDim_nod2D))
+    do node=1, myDim_nod2d
+        k=mesh%nod_in_elem2D_num(node)
+        ! minimum depth in neigbouring elements around node n
+        mesh%nlevels_nod2D_min(node)=minval(mesh%nlevels(mesh%nod_in_elem2D(1:k,node)))
+        mesh%ulevels_nod2D_max(node)=maxval(mesh%ulevels(mesh%nod_in_elem2D(1:k,node)))
+    end do
+    call exchange_nod(mesh%nlevels_nod2D_min)
+    call exchange_nod(mesh%ulevels_nod2D_max)
+    
+    !___________________________________________________________________________
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> find min/max level e2n in', t1-t0, ' seconds'
+    end if
+    
+end subroutine find_levels_min_e2n
 !
 !
 !
@@ -1771,8 +1830,9 @@ t0=MPI_Wtime()
  DO n=1, myDim_nod2D
     DO j=1,mesh%nod_in_elem2D_num(n)
        elem=mesh%nod_in_elem2D(j,n)
-       DO nz=mesh%ubndidx_e(elem),mesh%nlevels(elem)-1
-       mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
+       !!PS DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
+       DO nz=1,mesh%nlevels(elem)-1
+        mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
        END DO
     END DO
  END DO
@@ -2234,7 +2294,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
 
    aux=0._WP
    do n=1, myDim_nod2D
-      do nz=mesh%ubndidx_n(n), mesh%nlevels_nod2D(n)-1
+      do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
          aux(nz)=aux(nz)+mesh%area(nz, n)
       end do
    end do
@@ -2245,7 +2305,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    do elem=1, myDim_elem2D
       elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=mesh%ubndidx_e(elem), mesh%nlevels(elem)         
+      do nz=mesh%ulevels(elem), mesh%nlevels(elem)         
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do

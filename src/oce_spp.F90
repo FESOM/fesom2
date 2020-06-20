@@ -49,7 +49,7 @@ subroutine app_rejected_salt(mesh)
   use o_tracers
   implicit none
 
-  integer         :: row, k, nod, nup, nlo, kml
+  integer         :: row, k, nod, nup, nlo, kml, nzmin, nzmax
   real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)
 
   integer         :: n_distr
@@ -67,21 +67,34 @@ subroutine app_rejected_salt(mesh)
      ! do not parameterize brine rejection in regions with low salinity
      ! 1. it leads to further decrease of SSS
      ! 2. in case of non zero salinity of ice (the well accepted value is 5psu) the SSS might become negative
-     if (tr_arr(1,row,2) < 10.0_WP) cycle
+     nzmin = ulevels_nod2D(row)
+     nzmax = nlevels_nod2D(row)
+     !!PS if (tr_arr(1,row,2) < 10.0_WP) cycle
+     if (tr_arr(nzmin,row,2) < 10.0_WP) cycle
      if (geo_coord_nod2D(2,row)>0.0_WP) then  !NH
         kml=1
-        spar(1)=0.0_WP
-        do k=1, nlevels_nod2D(row)
+        !!PS spar(1)=0.0_WP
+        spar(nzmin)=0.0_WP
+        
+        !!PS do k=1, nlevels_nod2D(row)
+        do k=nzmin, nzmax
            drhodz=bvfreq(k, row)*density_0/g
            if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-50.0_WP) exit
            kml=kml+1
            spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**n_distr
         end do
 
-        if (kml>1) then
-           tr_arr(1,row,2)=tr_arr(1,row,2)-ice_rejected_salt(row)/area(1,row)/hnode(1,row)
-           spar(2:kml)=spar(2:kml)/sum(spar(2:kml))
-           do k=2,kml
+        !!PS if (kml>1) then
+        !!PS    tr_arr(1,row,2)=tr_arr(1,row,2)-ice_rejected_salt(row)/area(1,row)/hnode(1,row)
+        !!PS    spar(2:kml)=spar(2:kml)/sum(spar(2:kml))
+        !!PS    do k=2,kml
+        !!PS       tr_arr(k,row,2)=tr_arr(k,row,2)+ice_rejected_salt(row)*spar(k)/area(k,row)/hnode(k,row)
+        !!PS    end do
+        !!PS endif
+        if (kml>nzmin) then
+           tr_arr(nzmin,row,2)=tr_arr(nzmin,row,2)-ice_rejected_salt(row)/area(1,row)/hnode(1,row)
+           spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
+           do k=nzmin+1,kml
               tr_arr(k,row,2)=tr_arr(k,row,2)+ice_rejected_salt(row)*spar(k)/area(k,row)/hnode(k,row)
            end do
         endif

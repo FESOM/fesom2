@@ -24,9 +24,11 @@ subroutine write_step_info(istep,outfreq, mesh)
 	integer								:: n, istep,outfreq
 	real(kind=WP)						:: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
 	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, &
-                                           min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2
+                                           min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2, &
+                                           min_vvel, min_vvel2, min_uvel, min_uvel2
 	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
                                            max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
+                                           max_vvel, max_vvel2, max_uvel, max_uvel2, &
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
@@ -99,6 +101,14 @@ subroutine write_step_info(istep,outfreq, mesh)
 		call MPI_AllREDUCE(loc , min_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(1,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(1,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(2,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(2,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(hnode(1,1:myDim_nod2D),MASK=(hnode(1,1:myDim_nod2D)/=0.0))
@@ -123,6 +133,14 @@ subroutine write_step_info(istep,outfreq, mesh)
 		call MPI_AllREDUCE(loc , max_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(1,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(1,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(2,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(2,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(hnode(1,1:myDim_nod2D),MASK=(hnode(1,1:myDim_nod2D)/=0.0))
@@ -169,6 +187,10 @@ subroutine write_step_info(istep,outfreq, mesh)
 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") ' 	      salt= ', min_salt ,' | ',max_salt ,' | ',int_salt
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 wvel(1,:)= ', min_wvel ,' | ',max_wvel ,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 uvel(1,:)= ', min_uvel ,' | ',max_uvel ,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 uvel(2,:)= ', min_uvel2,' | ',max_uvel2,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 vvel(1,:)= ', min_vvel ,' | ',max_vvel ,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 vvel(2,:)= ', min_vvel2,' | ',max_vvel2,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'

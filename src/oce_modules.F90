@@ -123,6 +123,10 @@ real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
 !_______________________________________________________________________________
+! use non-constant reference density if .false. density_ref=density_0
+logical                       :: use_density_ref   = .false.
+
+!_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
@@ -176,7 +180,7 @@ real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_v, fct_adf_v2    ! Anti
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num, nboundary_lay
+integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
 real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
 integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
@@ -283,6 +287,7 @@ real(kind=WP)                               :: is_nonlinfs
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
+real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 

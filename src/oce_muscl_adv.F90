@@ -71,7 +71,6 @@ subroutine muscl_adv_init(mesh)
     end do   
     
     !___________________________________________________________________________
-    allocate(nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
     allocate(nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer nboundary_lay(n)
     nboundary_lay=nl-1
     do n=1, myDim_edge2D
@@ -104,13 +103,17 @@ subroutine muscl_adv_init(mesh)
         end if
     end do
     
-    !___________________________________________________________________________
-    do n=1, myDim_nod2d
-        k=nod_in_elem2D_num(n)
-        ! minimum depth in neigbouring nodes around node n
-        nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
-    end do
-    call exchange_nod(nlevels_nod2D_min)
+!!PS     !___________________________________________________________________________
+!!PS     allocate(mesh%nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+!!PS     allocate(mesh%ulevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+!!PS     do n=1, myDim_nod2d
+!!PS         k=nod_in_elem2D_num(n)
+!!PS         ! minimum depth in neigbouring elements around node n
+!!PS         mesh%nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
+!!PS         mesh%ulevels_nod2D_max(n)=maxval(ulevels(nod_in_elem2D(1:k, n)))
+!!PS     end do
+!!PS     call exchange_nod(mesh%nlevels_nod2D_min)
+!!PS     call exchange_nod(mesh%ulevels_nod2D_min)
 
 end SUBROUTINE muscl_adv_init
 !=======================================================================
@@ -282,7 +285,7 @@ USE O_MESH
 USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
-integer                  :: n, nz, elem, k, edge, ednodes(2)
+integer                  :: n, nz, elem, k, edge, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
 type(t_mesh), intent(in) , target :: mesh
 
@@ -295,19 +298,12 @@ type(t_mesh), intent(in) , target :: mesh
 		!_______________________________________________________________________
 		! case when edge has upwind and downwind triangle on the surface
 		if((edge_up_dn_tri(1,edge).ne.0.0_WP).and.(edge_up_dn_tri(2,edge).ne.0.0_WP)) then
-			
-			!___________________________________________________________________
-			! loop over shared depth levels
-			DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-				! tracer gradx for upwind and downwind tri
-				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
-				! tracer grady for upwind and downwind tri
-				edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
-			END DO
+			nzmin = maxval(ulevels_nod2D_max(ednodes))
+			nzmax = minval(nlevels_nod2D_min(ednodes))
 			
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 1 (ednodes(1))
-			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+			DO nz=ulevels_nod2D(ednodes(1)), nzmin-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
@@ -316,7 +312,61 @@ type(t_mesh), intent(in) , target :: mesh
 				!     triangle gradients
 				DO k=1, nod_in_elem2D_num(ednodes(1))
 					elem=nod_in_elem2D(k,ednodes(1))
-					if(nlevels(elem)-1<nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(1,nz,edge)=tx/tvol
+				edge_up_dn_grad(3,nz,edge)=ty/tvol
+			END DO
+			
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 2 (ednodes(2))
+			DO nz=ulevels_nod2D(ednodes(2)),nzmin-1
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
+				! loop over number triangles that share the nodeedge points ednodes(2)
+				! --> calculate mean gradient at ednodes(2) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(2))
+					elem=nod_in_elem2D(k,ednodes(2))
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(2,nz,edge)=tx/tvol
+				edge_up_dn_grad(4,nz,edge)=ty/tvol
+			END DO
+			
+			!___________________________________________________________________
+			! loop over shared depth levels
+			!!PS DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
+			DO nz=nzmin, nzmax-1
+				! tracer gradx for upwind and downwind tri
+				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
+				! tracer grady for upwind and downwind tri
+				edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
+			END DO
+			
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 1 (ednodes(1))
+			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+			DO nz=nzmax, nlevels_nod2D(ednodes(1))-1
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
+				! loop over number triangles that share the nodeedge points ednodes(1)
+				! --> calculate mean gradient at ednodes(1) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(1))
+					elem=nod_in_elem2D(k,ednodes(1))
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -326,7 +376,8 @@ type(t_mesh), intent(in) , target :: mesh
 			END DO
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 2 (ednodes(2))
-			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+			DO nz=nzmax, nlevels_nod2D(ednodes(2))-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
@@ -335,7 +386,8 @@ type(t_mesh), intent(in) , target :: mesh
 				!     triangle gradients
 				DO k=1, nod_in_elem2D_num(ednodes(2))
 					elem=nod_in_elem2D(k,ednodes(2))
-					if(nlevels(elem)-1<nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -348,13 +400,17 @@ type(t_mesh), intent(in) , target :: mesh
 		! --> surface boundary edge
 		else
 			! Only linear reconstruction part
-			DO nz=1,nlevels_nod2D(ednodes(1))-1
+			nzmin = ulevels_nod2D(ednodes(1))
+			nzmax = nlevels_nod2D(ednodes(1))
+			!!PS DO nz=1,nlevels_nod2D(ednodes(1))-1
+			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(1))
 					elem=nod_in_elem2D(k,ednodes(1))
-					if(nlevels(elem)-1 < nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -362,13 +418,17 @@ type(t_mesh), intent(in) , target :: mesh
 				edge_up_dn_grad(1,nz,edge)=tx/tvol
 				edge_up_dn_grad(3,nz,edge)=ty/tvol
 			END DO
-			DO nz=1,nlevels_nod2D(ednodes(2))-1
+			nzmin = ulevels_nod2D(ednodes(2))
+			nzmax = nlevels_nod2D(ednodes(2))
+			!!PS DO nz=1,nlevels_nod2D(ednodes(2))-1
+			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(2))
 					elem=nod_in_elem2D(k,ednodes(2))
-					if(nlevels(elem)-1 < nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -394,7 +454,7 @@ use g_comm_auto
 IMPLICIT NONE
  type(t_mesh), intent(in) , target :: mesh
  integer      :: el(2), enodes(2), n, nz, edge
- integer      :: nl1, nl2,tr_num
+ integer      :: nl1, nl2,tr_num, ul1, ul2
  real(kind=WP):: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, flux=0.0 
  real(kind=WP):: tvert(mesh%nl), a, b, c, d, da, db, dg
  real(kind=WP):: Tx, Ty, Tmean, rdata=0.0
@@ -412,62 +472,65 @@ ttrhs=0.0_WP
    c1=0.0_WP
    c2=0.0_WP
    nl1=nlevels(el(1))-1
+   ul1=ulevels(el(1))
    deltaX1=edge_cross_dxdy(1,edge)
    deltaY1=edge_cross_dxdy(2,edge)
    nl2=0
+   ul2=0
    a=r_earth*elem_cos(el(1))
    if(el(2)>0) then
-   deltaX2=edge_cross_dxdy(3,edge)
-   deltaY2=edge_cross_dxdy(4,edge)
-   nl2=nlevels(el(2))-1
-   b=r_earth*elem_cos(el(2))
+    deltaX2=edge_cross_dxdy(3,edge)
+    deltaY2=edge_cross_dxdy(4,edge)
+    nl2=nlevels(el(2))-1
+    ul2=ulevels(el(2))
+    b=r_earth*elem_cos(el(2))
    end if     
    
    ! ============
    ! First segment
    ! ============
-   DO nz=1, nl1
-   ! ============
-   ! MUSCL type reconstruction
-   ! ============
-   if(UV(2,nz,el(1))*deltaX1- UV(1,nz,el(1))*deltaY1>0) then   
-      Tmean=ttfold(nz, enodes(2))- &
-      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
-      edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
-   else
-      Tmean=ttfold(nz, enodes(1))+ &
-      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
-      edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP    
-   end if
-   c1=UV(2,nz,el(1))*Tmean*deltaX1- UV(1,nz,el(1))*Tmean*deltaY1
-   ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1
-   ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c1
+   DO nz=ul1, nl1
+        ! ============
+        ! MUSCL type reconstruction
+        ! ============
+        if(UV(2,nz,el(1))*deltaX1- UV(1,nz,el(1))*deltaY1>0) then   
+            Tmean=ttfold(nz, enodes(2))- &
+            (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+            edge_dxdy(1,edge)*a*edge_up_dn_grad(2,nz,edge)+ &
+            edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
+        else
+            Tmean=ttfold(nz, enodes(1))+ &
+            (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+            edge_dxdy(1,edge)*a*edge_up_dn_grad(1,nz,edge)+ &
+            edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP    
+        end if
+        c1=UV(2,nz,el(1))*Tmean*deltaX1- UV(1,nz,el(1))*Tmean*deltaY1
+        ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c1
+        ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c1
    END DO
    ! ============
    ! Second segment
    ! ============
    if(el(2)>0)then
-   DO nz=1, nl2
-   ! ============
-   ! Linear upwind reconstruction
-   ! ============
-   if(UV(2,nz,el(2))*deltaX2- UV(1,nz,el(2))*deltaY2<0) then   
-      Tmean=ttfold(nz, enodes(2))- &
-      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
-      edge_dxdy(1,edge)*b*edge_up_dn_grad(2,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
-   else
-      Tmean=ttfold(nz, enodes(1))+ &
-      (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
-      edge_dxdy(1,edge)*b*edge_up_dn_grad(1,nz,edge)+ &
-      edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP     
-   end if
-   c2=-UV(2,nz,el(2))*Tmean*deltaX2+ UV(1,nz,el(2))*Tmean*deltaY2
-   ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c2
-   ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c2
-   END DO
+        DO nz=ul2, nl2
+        ! ============
+        ! Linear upwind reconstruction
+        ! ============
+        if(UV(2,nz,el(2))*deltaX2- UV(1,nz,el(2))*deltaY2<0) then   
+            Tmean=ttfold(nz, enodes(2))- &
+            (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+            edge_dxdy(1,edge)*b*edge_up_dn_grad(2,nz,edge)+ &
+            edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(4,nz,edge))/6.0_WP    
+        else
+            Tmean=ttfold(nz, enodes(1))+ &
+            (2.0_WP*(ttfold(nz, enodes(2))-ttfold(nz,enodes(1)))+ &
+            edge_dxdy(1,edge)*b*edge_up_dn_grad(1,nz,edge)+ &
+            edge_dxdy(2,edge)*r_earth*edge_up_dn_grad(3,nz,edge))/6.0_WP     
+        end if
+        c2=-UV(2,nz,el(2))*Tmean*deltaX2+ UV(1,nz,el(2))*Tmean*deltaY2
+        ttrhs(nz,enodes(1))=ttrhs(nz,enodes(1))+c2
+        ttrhs(nz,enodes(2))=ttrhs(nz,enodes(2))-c2
+        END DO
    end if
    
  END DO
@@ -477,56 +540,58 @@ ttrhs=0.0_WP
 ! ===================
  
  DO n=1, myDim_nod2D                  !! P (d) n=1, nod2D
-
+    ul1 = ulevels_nod2D(n)
+    nl1 = nlevels_nod2D(n)
   ! ===========
   ! Fluxes in the column
   ! ===========
  
-   tvert(1)= -Wvel(1,n)*ttfold(1,n)*area(1,n)
-		    
-  ! Bottom conditions	  
-   tvert(nlevels_nod2D(n))=0.0_WP	    
+    !!PS    tvert(1)= -Wvel(1,n)*ttfold(1,n)*area(1,n)
+    tvert(ul1)= -Wvel(ul1,n)*ttfold(ul1,n)*area(ul1,n)
+        
+    ! Bottom conditions	  
+    !!PS tvert(nlevels_nod2D(n))=0.0_WP
+    tvert(nl1)=0.0_WP
   
-   DO nz=2, nlevels_nod2D(n)-1
+    !!PS DO nz=2, nlevels_nod2D(n)-1
+    DO nz=ul1+1, nl1-1
       ! ============
       ! QUICK upwind (3rd order)
       ! ============
-      if(Wvel(nz,n)>0) then
-        if(nz==nlevels_nod2D(n)-1) then
-	  Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))  ! or replace this with 
-	                                             ! the first order 
-						     ! upwind  tttfold(nz,n)
-	else
-	a=Z(nz-1)-zbar(nz)
-	b=zbar(nz)-Z(nz)
-	c=zbar(nz)-Z(nz+1)
-	dg=a*b/(c+a)/(b-c)
-	db=-a*c/(b+a)/(b-c)
-	da=1.0_WP-dg-db
-	Tmean=ttfold(nz-1,n)*da+ttfold(nz,n)*db+ttfold(nz+1,n)*dg
-	end if
-      end if
-
-      if(Wvel(nz,n)<0) then
-        if(nz==2) then
-	  Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))        ! or ttfold(nz-1,n)
-	else  
-	a=zbar(nz)-Z(nz)
-	b=Z(nz-1)-zbar(nz)
-	c=Z(nz-2)-zbar(nz)
-	dg=a*b/(c+a)/(b-c)
-	db=-a*c/(b+a)/(b-c)
-	da=1.0_WP-dg-db
-	Tmean=ttfold(nz,n)*da+ttfold(nz-1,n)*db+ttfold(nz-2,n)*dg
-	end if
-      end if
-      tvert(nz)= -Tmean*Wvel(nz,n)*area(nz,n)
-   END DO
- 
-   DO nz=1,nlevels_nod2D(n)-1
-      ttrhs(nz,n)=(ttrhs(nz,n)+ &
-                    (tvert(nz)-tvert(nz+1))/(zbar(nz)-zbar(nz+1)))
-   END DO
+        if(Wvel(nz,n)>0) then
+            if(nz==nl1-1) then
+                Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))  ! or replace this with 
+                                                            ! the first order 
+                                                            ! upwind  tttfold(nz,n)
+            else
+                a=Z(nz-1)-zbar(nz)
+                b=zbar(nz)-Z(nz)
+                c=zbar(nz)-Z(nz+1)
+                dg=a*b/(c+a)/(b-c)
+                db=-a*c/(b+a)/(b-c)
+                da=1.0_WP-dg-db
+                Tmean=ttfold(nz-1,n)*da+ttfold(nz,n)*db+ttfold(nz+1,n)*dg
+            end if
+        end if
+        if(Wvel(nz,n)<0) then
+            if(nz==ul1+1) then
+                Tmean=0.5_WP*(ttfold(nz-1,n)+ttfold(nz,n))        ! or ttfold(nz-1,n)
+            else  
+                a=zbar(nz)-Z(nz)
+                b=Z(nz-1)-zbar(nz)
+                c=Z(nz-2)-zbar(nz)
+                dg=a*b/(c+a)/(b-c)
+                db=-a*c/(b+a)/(b-c)
+                da=1.0_WP-dg-db
+                Tmean=ttfold(nz,n)*da+ttfold(nz-1,n)*db+ttfold(nz-2,n)*dg
+            end if
+        end if
+        tvert(nz)= -Tmean*Wvel(nz,n)*area(nz,n)
+    END DO
+    DO nz=ul1,nl1-1
+        ttrhs(nz,n)=(ttrhs(nz,n)+ &
+                        (tvert(nz)-tvert(nz+1))/(zbar(nz)-zbar(nz+1)))
+    END DO
  END DO
 
 ! =================
@@ -536,7 +601,10 @@ ttrhs=0.0_WP
   
   DO n=1, myDim_nod2D+eDim_nod2D      !! P (h)  n=1, nod2D
                                       !! n=myList_nod2D(m)
-     DO nz=1,nlevels_nod2D(n)-1
+     ul1 = ulevels_nod2D(n)   
+     nl1 = nlevels_nod2D(n)   
+     !!PS DO nz=1,nlevels_nod2D(n)-1
+     DO nz=ul1,nl1-1
         dttf(nz,n)=dttf(nz,n)+ttrhs(nz,n)*dt/area(nz,n)
      END DO
   END DO

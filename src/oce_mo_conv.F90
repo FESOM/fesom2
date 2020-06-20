@@ -11,7 +11,7 @@ subroutine mo_convect(mesh)
     use g_comm_auto
     IMPLICIT NONE
 
-    integer                           :: node, elem, nz, elnodes(3)
+    integer                           :: node, elem, nz, elnodes(3), nzmin, nzmax
     type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
@@ -22,9 +22,14 @@ subroutine mo_convect(mesh)
     if (use_momix) then
         mo = 0._WP
         do node=1, myDim_nod2D+eDim_nod2D
+            nzmax = nlevels_nod2d(node)
+            nzmin = ulevels_nod2d(node)
             !___________________________________________________________________
             ! apply Monin Obukov only below certain latitude momix_lat
             if (geo_coord_nod2D(2,node)>momix_lat*rad) cycle
+            
+            ! apply Monin Obukov only when there is no cavity
+            if (nzmin>1) cycle
             
             !___________________________________________________________________
             ! calcualte monin obukhov length
@@ -37,7 +42,8 @@ subroutine mo_convect(mesh)
             ! increase vertical diffusion within monin obukov length to namelist
             ! parameter momix_kv. momix_kv in moment set to 0.01 --> that means 
             ! very strong vertical mixing within mixlength
-            do nz = 2,nlevels_nod2d(node)-1
+            !!PS do nz = 2,nlevels_nod2d(node)-1
+            do nz = nzmin+1,nzmax-1
                 if(abs(zbar_3d_n(nz,node)) <= mixlength(node)) then
                     ! write in vertice array to also apply to viscosity
                     mo(nz,node)=momix_kv    ! Potentialy bad place 
@@ -53,7 +59,10 @@ subroutine mo_convect(mesh)
     !___________________________________________________________________________
     ! apply mixing enhancements to vertical diffusivity
     do node=1, myDim_nod2D+eDim_nod2D
-        do nz=2, nlevels_nod2d(node)-1
+        nzmax = nlevels_nod2d(node)
+        nzmin = ulevels_nod2d(node)
+        !!PS do nz=2, nlevels_nod2d(node)-1
+        do nz=nzmin+1, nzmax-1
             ! force on convection if unstable 
             if (use_instabmix .and. bvfreq(nz, node) < 0._WP)  Kv(nz,node)=max(Kv(nz,node),instabmix_kv)
             !!PS if (bvfreq(nz, node) < 0._WP)  Kv(nz,node)=kv_conv ! fesom1.4 style
@@ -70,7 +79,10 @@ subroutine mo_convect(mesh)
     ! elem2D_nodes has no dimension until +eDim_elem2D
     do elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
-        do nz=2,nlevels(elem)-1
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
+        !!PS do nz=2,nlevels(elem)-1
+        do nz=nzmin+1,nzmax-1
             ! apply monin-obukov mixing to viscosity
             if (use_momix .and. sum(geo_coord_nod2D(2,elnodes))/3.0<=momix_lat*rad) Av(nz,elem)=Av(nz,elem)+sum(mo(nz,elnodes))/3.0_WP
             
