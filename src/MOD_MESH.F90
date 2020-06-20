@@ -55,10 +55,10 @@ real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
 
 ! upper boudnary index of all vertical vertice/element loops, default==1 but when 
 ! cavity is used becomes index of cavity-ocean boundary at vertices and elements
-integer,       allocatable, dimension(:)    :: ubndidx_n, ubndidx_e 
+integer,       allocatable, dimension(:)    :: ulevels, ulevels_nod2D, ulevels_nod2D_max
 
 ! number of levels at elem and vertices considering bottom topography
-integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D
+integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D, nlevels_nod2D_min
 
 !
 !
@@ -70,15 +70,16 @@ real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
 !
 !___cavity mesh info____________________________________________________________
 ! level index of cavity-ocean boundary at vertices and elements
-! --> see: ubndidx_n, ubndidx_e (fvom_main) 
-! --> see: cavity_lev_elem2D, cavity_lev_nod2D (fvom_init) 
-integer,       allocatable, dimension(:)    :: cavity_lev_elem2D, cavity_lev_nod2D 
+! --> see: ulevels, ulevels_nod2D (fvom_main) 
 
 ! vertice/element yes=1/no=0 flag if cavity exists
 integer,       allocatable, dimension(:)    :: cavity_flag_n, cavity_flag_e
 
 ! depth of cavity-ocean interface
 real(kind=WP), allocatable, dimension(:)    :: cavity_depth
+
+
+real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
 
 !
 !
