@@ -51,6 +51,10 @@ type(t_mesh), intent(in), target  :: mesh
      
 
   do el=1,myDim_elem2D
+     !__________________________________________________________________________
+     ! if element contains cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
+     if (ulevels(el) > 1) cycle
      
       ! ===== Check if there is ice on elem
 
@@ -138,7 +142,7 @@ real(kind=WP)   :: zeta, delta_inv, d1, d2
 
 type(t_mesh), intent(in)              , target :: mesh
 
-!! #include "associate_mesh.h"
+#include "associate_mesh.h"
 
   vale = 1.0_WP/(ellipse**2)
    
@@ -148,7 +152,10 @@ type(t_mesh), intent(in)              , target :: mesh
      
 
   do el=1,myDim_elem2D
-     
+     !__________________________________________________________________________
+     ! if element contains cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
+     if (ulevels(el) > 1) cycle
       ! ===== Check if there is ice on elem
 
      ! There is no ice in elem 
@@ -262,6 +269,11 @@ type(t_mesh), intent(in)              , target :: mesh
  END DO
  
  DO n=1, myDim_nod2D
+    !___________________________________________________________________________
+    ! if cavity node skip it 
+    if ( ulevels_nod2d(n) > 1 ) cycle
+    
+    !___________________________________________________________________________
     mass = area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)) 
     if(mass > 1.e-3_WP) then 
          U_rhs_ice(n) = U_rhs_ice(n) / mass
@@ -276,6 +288,12 @@ type(t_mesh), intent(in)              , target :: mesh
  !
  do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
+     !__________________________________________________________________________
+     ! if element contains cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes) > 1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
+     !__________________________________________________________________________
      uc=elem_area(elem)*g*sum(gradient_sca(1:3,elem)*elevation(elnodes))/3.0_WP
      vc=elem_area(elem)*g*sum(gradient_sca(4:6,elem)*elevation(elnodes))/3.0_WP
      U_rhs_ice(elnodes)=U_rhs_ice(elnodes) - uc/area(1,elnodes)
@@ -314,6 +332,12 @@ do el=1,myDim_elem2D
       ! ===== Skip if ice is absent
 
 !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
+   !____________________________________________________________________________
+   ! if element contains cavity node skip it 
+   !!OS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
+   if (ulevels(el) > 1) cycle
+   
+   !____________________________________________________________________________
    if (ice_strength(el) > 0._WP) then
 
 !$IVDEP       
@@ -335,6 +359,11 @@ do el=1,myDim_elem2D
  end do 
 
   DO n=1, myDim_nod2D
+     !__________________________________________________________________________
+     ! if cavity node skip it 
+     if (ulevels_nod2d(n)>1) cycle
+     
+     !__________________________________________________________________________
      if (inv_areamass(n) > 0._WP) then
         U_rhs_ice(n) = U_rhs_ice(n)*inv_areamass(n) + rhs_a(n)
         V_rhs_ice(n) = V_rhs_ice(n)*inv_areamass(n) + rhs_m(n)
@@ -389,7 +418,11 @@ ay=sin(theta_io)
     
 ! Precompute values that are never changed during the iteration
  do n=1,myDim_nod2D 
+    !___________________________________________________________________________
+    ! if cavity node skip it 
+    if (ulevels_nod2d(n)>1) cycle
 
+    !___________________________________________________________________________
     if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 1.e-3_WP) then
        inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n))) 
     else
@@ -417,6 +450,10 @@ if ( .not. trim(which_ALE)=='linfs') then
 	do el = 1,myDim_elem2D
 		
 		elnodes = elem2D_nodes(:,el)
+		!_______________________________________________________________________
+		! if element has any cavity node skip it 
+		!!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+		if (ulevels(el) > 1) cycle
 		
 		!_______________________________________________________________________
 		if (any(m_ice(elnodes)<=0._WP) .or. &
@@ -461,14 +498,21 @@ if ( .not. trim(which_ALE)=='linfs') then
 else
 	! for linear free surface
 	do el = 1,myDim_elem2D
-		if (any(m_ice(elem2D_nodes(:,el)) <= 0._WP) .or. &
-			any(a_ice(elem2D_nodes(:,el)) <=0._WP)) then
+        elnodes = elem2D_nodes(:,el)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(el) > 1) cycle
+        
+        !_______________________________________________________________________
+		if (any(m_ice(elnodes) <= 0._WP) .or. &
+			any(a_ice(elnodes) <=0._WP)) then
 		
 			! There is no ice in elem
 			ice_strength(el) = 0._WP
 		else
-			msum = sum(m_ice(elem2D_nodes(:,el)))/3.0_WP
-			asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
+			msum = sum(m_ice(elnodes))/3.0_WP
+			asum = sum(a_ice(elnodes))/3.0_WP
 			
 			! ===== Hunke and Dukowicz c*h*p*
 			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
@@ -477,16 +521,18 @@ else
 			! use rhs_m and rhs_a for storing the contribution from elevation:
 			aa = 9.81_WP*elem_area(el)/3.0_WP
 			
-			elevation_dx = sum(gradient_sca(1:3,el)*elevation(elem2D_nodes(:,el)))	    
-			elevation_dy = sum(gradient_sca(4:6,el)*elevation(elem2D_nodes(:,el)))
+			elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
+			elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
 			
-			rhs_a(elem2D_nodes(:,el)) = rhs_a(elem2D_nodes(:,el))-aa*elevation_dx
-			rhs_m(elem2D_nodes(:,el)) = rhs_m(elem2D_nodes(:,el))-aa*elevation_dy
+			rhs_a(elnodes) = rhs_a(elnodes)-aa*elevation_dx
+			rhs_m(elnodes) = rhs_m(elnodes)-aa*elevation_dy
 		end if
 	enddo
 endif ! --> if ( .not. trim(which_ALE)=='linfs') then
  
 do n=1,myDim_nod2D 
+    if (ulevels_nod2d(n)>1) cycle
+    !___________________________________________________________________________
     rhs_a(n) = rhs_a(n)/area(1,n)
     rhs_m(n) = rhs_m(n)/area(1,n)
  enddo
@@ -504,7 +550,12 @@ do shortstep=1, evp_rheol_steps
    V_ice_old = V_ice !PS
  
    do n=1,myDim_nod2D 
-    
+   
+      !_________________________________________________________________________
+      ! if cavity ndoe skip it 
+      if ( ulevels_nod2d(n)>1 ) cycle
+      
+      !_________________________________________________________________________
       if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
 
 

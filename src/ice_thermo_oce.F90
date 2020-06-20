@@ -82,6 +82,11 @@ subroutine thermodynamics(mesh)
   ! ================
 
   do i=1, myDim_nod2d+eDim_nod2D
+     !__________________________________________________________________________
+     ! if there is a cavity no sea ice thermodynamics is apllied
+     if(ulevels_nod2d(i)>1) cycle 
+     
+     !__________________________________________________________________________
      h       = m_ice(i)
      hsn     = m_snow(i)
      A       = a_ice(i)
@@ -361,6 +366,23 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   else
      fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
   end if
+  
+  if (fw/=fw) then
+    write(*,*) '--> found NaN in therm_ice, mype=',mype
+    write(*,*) ' fw         = ',fw
+    write(*,*) ' prec       = ',prec
+    write(*,*) ' evap       = ',evap
+    write(*,*) ' dhgrowth   = ',dhgrowth
+    write(*,*) ' rhoice     = ',rhoice
+    write(*,*) ' inv_rhowat = ',inv_rhowat
+    write(*,*) ' rsss       = ',rsss
+    write(*,*) ' Sice       = ',Sice
+    write(*,*) ' dhsngrowth = ',dhsngrowth
+    write(*,*) ' rhosno     = ',rhosno
+    write(*,*) ' inv_rhowat = ',inv_rhowat
+    write(*,*) ' (rsss-Sice)/rsss = ',(rsss-Sice)/rsss
+  end if 
+  
 
   ! Changes in compactnesses (equation 16 of Hibler 1979)
   rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
@@ -376,7 +398,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   iflice=h
   call flooding(h,hsn)     
   iflice=(h-iflice)/ice_dt
-
+  
   ! to maintain salt conservation for the current model version
   !(a way to avoid producing net salt from snow-type-ice) 
   if (.not. use_virt_salt) then
