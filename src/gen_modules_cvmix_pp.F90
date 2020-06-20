@@ -161,7 +161,7 @@ module g_cvmix_pp
         use MOD_MESH
         implicit none
         type(t_mesh), intent(in), target :: mesh                
-        integer       :: node, elem, nz, nln, elnodes(3), windnl=2, node_size
+        integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
 #include "associate_mesh.h"
         node_size = myDim_nod2D
@@ -170,10 +170,12 @@ module g_cvmix_pp
             !___________________________________________________________________
             ! number of above bottom levels at node
             nln = nlevels_nod2D(node)-1
+            nun = ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calculate Richardson number
-            do nz=2,nln
+            !!PS do nz=2,nln
+            do nz=nun+1,nln
                 dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
                 vshear2 = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
                           (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
@@ -214,14 +216,16 @@ module g_cvmix_pp
             ! This can make an already diffusive model even more diffusive --> it 
             ! needs to be tested if this is an advantage for FESOM2.0 or not 
             if (pp_use_fesompp .and. pp_use_AvbinKv .eqv. .false.) then
-                 pp_Av(2:nln,node) = pp_Av(2:nln,node) + pp_Avbckg
+                !!PS pp_Av(2:nln,node) = pp_Av(2:nln,node) + pp_Avbckg
+                pp_Av(nun+1:nln,node) = pp_Av(nun+1:nln,node) + pp_Avbckg
             end if  
             
             !_______________________________________________________________________
             ! calculate and add latitudinal and depth dependend background 
             ! diffusivity of Q. Wang from FESOM1.4
             if (pp_use_fesompp .and. pp_use_nonconstKvb) then   
-                do nz = 2,nlevels_nod2D(node)-1
+                !!PS do nz = 2,nlevels_nod2D(node)-1
+                do nz = nun+1,nlevels_nod2D(node)-1
                     call Kv0_background_qiang(Kvb,                       &
                                                 geo_coord_nod2D(2,node)/rad, &
                                                 abs(zbar_3d_n(nz,node))      &
@@ -229,12 +233,15 @@ module g_cvmix_pp
                     pp_Kv(nz,node) = pp_Kv(nz,node) + Kvb
                 end do
             else
-                pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
+                !!PS pp_Kv(2:nln,node) = pp_Kv(2:nln,node) + pp_Kvbckg
+                pp_Kv(nun+1:nln,node) = pp_Kv(nun+1:nln,node) + pp_Kvbckg
             end if 
             
             !___________________________________________________________________
-            pp_Av(1,node)=0.0_WP
-            pp_Kv(1,node)=0.0_WP
+            !!PS pp_Av(1,node)=0.0_WP
+            !!PS pp_Kv(1,node)=0.0_WP
+            pp_Av(nun,node)=0.0_WP
+            pp_Kv(nun,node)=0.0_WP
             
         end do !--> do node = 1,myDim_nod2D
 
@@ -250,7 +257,8 @@ module g_cvmix_pp
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            do nz=2,nlevels(elem)-1
+            !!PS do nz=2,nlevels(elem)-1
+            do nz=ulevels(elem)+1,nlevels(elem)-1
                 Av(nz,elem) = sum(pp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
