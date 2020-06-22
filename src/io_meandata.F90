@@ -10,7 +10,7 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  integer, parameter  :: i_real8=8, i_real4=4, i_int2=2
+  integer, parameter  :: i_real8=8, i_real4=4
 
 
   type Meandata
@@ -21,13 +21,8 @@ module io_MEANDATA
     integer                                            :: accuracy
     real(real64),  public, allocatable, dimension(:,:) :: local_values_r8
     real(real32),  public, allocatable, dimension(:,:) :: local_values_r4
-    integer(int16),  public, allocatable, dimension(:,:) :: local_values_i2
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:) ! todo: use netcdf types, not WP
-    real(real32)                                       :: min_value        ! lower and upper bound, used to compute scale_factor, add_offset 
-    real(real32)                                       :: max_value        !      keep for check if real life values remain in this interval
-    real(real32)                                       :: scale_factor=1.  ! for netcdf4 conversion real4 <-> int2:
-    real(real32)                                       :: add_offset=0.    !      real4_value = int2_value * scale_factor + add_offset
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -41,7 +36,7 @@ module io_MEANDATA
     character                                          :: freq_unit='m'
     integer                                            :: error_status(10000), error_count
     logical                                            :: is_in_use=.false.
-  end type
+  end type  
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -523,12 +518,6 @@ subroutine create_new_file(entry)
   elseif (entry%accuracy == i_real4) then
      entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_REAL, entry%ndim+1, &
                                       (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
-  elseif (entry%accuracy == i_int2) then
-     entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_SHORT, entry%ndim+1, &
-                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
-
-     entry%error_status(c) = nf_put_att_real(entry%ncid, entry%varID, 'scale_factor', NF_REAL, 1, entry%scale_factor); c=c+1
-     entry%error_status(c) = nf_put_att_real(entry%ncid, entry%varID, 'add_offset',   NF_REAL, 1, entry%add_offset);   c=c+1
   endif
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description); c=c+1
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units);       c=c+1
@@ -604,7 +593,6 @@ subroutine write_mean(entry, mesh)
   type(Meandata), intent(inout) :: entry
   real(real64)  , allocatable   :: aux_r8(:)
   real(real32),   allocatable   :: aux_r4(:)
-  integer(int16), allocatable   :: aux_i2(:)
   type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: size1, size2
   integer                       :: c, lev
@@ -641,15 +629,6 @@ subroutine write_mean(entry, mesh)
            end if
            if (mype==0) deallocate(aux_r4)
 
-!___________writing real as 2 byte integer _________________________________________ 
-        elseif (entry%accuracy == i_int2) then
-           if (mype==0) allocate(aux_i2(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_i2(1:entry%lcsize(1),1), aux_i2)
-           if (size1==elem2D) call gather_elem(entry%local_values_i2(1:entry%lcsize(1),1), aux_i2)
-           if (mype==0) then
-              entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_i2, 1); c=c+1
-           end if
-           if (mype==0) deallocate(aux_i2)
         else
            if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
            call par_ex
@@ -683,17 +662,6 @@ subroutine write_mean(entry, mesh)
               end if
            end do
            if (mype==0) deallocate(aux_r4)
-!___________writing real as 2 byte integer _________________________________________ 
-        elseif (entry%accuracy == i_int2) then
-           if (mype==0) allocate(aux_i2(size2))
-           do lev=1, size1           
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_i2(lev,1:entry%lcsize(2)), aux_i2)
-              if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_int2(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_i2, 1); c=c+1
-              end if
-           end do
-           if (mype==0) deallocate(aux_i2)
         else
            if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
            call par_ex
@@ -738,7 +706,7 @@ subroutine update_means
         end if
 
 !_____________ compute in 4 byte accuracy _________________________
-     elseif (entry%accuracy == i_real4 .or. entry%accuracy == i_int2) then
+     elseif (entry%accuracy == i_real4) then
         if (entry%ndim==1) then 
            entry%local_values_r4(1:entry%lcsize(1),1) = &
            entry%local_values_r4(1:entry%lcsize(1),1) + real(entry%ptr2(1:entry%lcsize(1)),real32)
@@ -777,7 +745,7 @@ subroutine output(istep, mesh)
   logical       :: do_output
   type(Meandata), pointer :: entry
   real(real64)  :: inv_addcounter_r8
-  real(real32)  :: inv_addcounter_r4, inv_scale_factor
+  real(real32)  :: inv_addcounter_r4
   type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
@@ -827,27 +795,6 @@ subroutine output(istep, mesh)
            call write_mean(entry, mesh)
            entry%local_values_r4 = 0. ! clean_meanarrays
 
-        elseif (entry%accuracy == i_int2) then
-           ! compute_means and compress to int2, use scale_factor and add_offset to maintain as much accuracy as possible
-           inv_addcounter_r4 = 1./real(entry%addcounter,real32)
-           inv_scale_factor  = 1./entry%scale_factor 
-           entry%local_values_i2 = nint( (entry%local_values_r4 * inv_addcounter_r4 - entry%add_offset)* inv_scale_factor,int16)
-  
-           ! write a warning if the values exceed the interval on which scale_factor and add_offset are based
-           if (minval(entry%local_values_r4) < entry%min_value) then
-              print *,'! WARNING ! Check output of ',trim(entry%name),' (MPI-task',mype,'):'
-              print *,'            The minimum',minval(entry%local_values_r4),'is smaller than'
-              print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
-              print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
-           endif
-           if (maxval(entry%local_values_r4) > entry%max_value) then
-              print *,'! WARNING ! Check output of ',trim(entry%name),' (MPI-task',mype,'):'
-              print *,'            The maximum',maxval(entry%local_values_r4),'is larger than'
-              print *,'            the range [',entry%min_value,',',entry%min_value,'] converted to int2.'
-              print *,'            Adjust the interval or choose real4 in ini_mean, io_meandata.F90'
-           endif
-           call write_mean(entry, mesh)
-           entry%local_values_r4 = 0. ! clean_meanarrays
         endif  ! accuracy
 
         entry%addcounter   = 0  ! clean_meanarrays
@@ -858,7 +805,7 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, minvalue, maxvalue)
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
   use mod_mesh
   use g_PARSUP
   implicit none
@@ -868,7 +815,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy
-  real(kind=WP), intent(in), optional  :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
@@ -902,28 +848,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      entry%local_values_r8 = 0. 
   elseif (accuracy == i_real4) then
      allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
-     entry%local_values_r4 = 0.  
-  elseif (accuracy == i_int2) then
-     allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
-     allocate(entry%local_values_i2(lcsize(1), lcsize(2)))
-     entry%local_values_r4 = 0. 
-     entry%local_values_i2 = 0 
-     if (present(minvalue) .and. present(maxvalue)) then
-        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,int32)
-        entry%add_offset   = 0.5*(maxvalue + minvalue)
-        entry%min_value    = minvalue
-        entry%max_value    = maxvalue
-     else
-        entry%scale_factor = 1.
-        entry%add_offset   = 0.
-        entry%min_value    = 0.
-        entry%max_value    = real(2**16-1,int32)
-        if (mype==0) then
-           print *,'Warning: netcdf-output of',name,'is set to short integer,'
-           print *,'but no interval [minvalue,maxvalue] is given, thus scale_factor=1., add_offset=0.'
-           print *,'This may result in a huge loss of accuracy!' 
-        endif
-     endif
+     entry%local_values_r4 = 0.
   endif ! accuracy
 
   entry%ndim=2
@@ -946,7 +871,7 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, minvalue, maxvalue)
+subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
   use mod_mesh
   use g_PARSUP
   implicit none
@@ -956,7 +881,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy
-  integer, intent(in), optional        :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
@@ -995,25 +919,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
      ! clean_meanarrays
      entry%local_values_r4 = 0.  
 
-  elseif (accuracy == i_int2) then
-     allocate(entry%local_values_r4(lcsize, 1))
-     allocate(entry%local_values_i2(lcsize, 1))
-     ! clean_meanarrays
-     entry%local_values_r4 = 0.  
-     entry%local_values_i2 = 0  
-
-     if (present(minvalue) .and. present(maxvalue)) then
-        entry%scale_factor = (maxvalue - minvalue) / real(2**16-1,real32)
-        entry%add_offset   = minvalue
-     else
-        entry%scale_factor = 1.
-        entry%add_offset   = 0.
-        if (mype==0) then
-           print *,'Warning: netcdf-output of',name,'is set to short integer,'
-           print *,'but no interval [minvalue,maxvalue] is given, thus scale_factor=1., add_offset=0.'
-           print *,'This may result in a huge loss of accuracy!' 
-        endif
-     endif
   endif
 
   entry%ndim=1
