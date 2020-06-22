@@ -20,8 +20,8 @@ scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
 mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
-w_split=.false.
-w_exp_max=1.e-3
+w_split=.true.
+w_max_cfl=1.0          ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) ! in older FESOM it used to be w_exp_max=1.e-3
 SPP=.false.                 ! Salt Plume Parameterization
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM_max     = 3000.0       ! max. GM thickness diffusivity (m2/s)
