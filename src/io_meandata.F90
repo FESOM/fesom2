@@ -34,7 +34,6 @@ module io_MEANDATA
     integer                                            :: dimID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
-    integer                                            :: error_status(10000), error_count
     logical                                            :: is_in_use=.false.
   end type  
 !
@@ -485,44 +484,41 @@ subroutine create_new_file(entry)
   use g_clock
   use g_PARSUP
   implicit none
-  integer                       :: c, j
+  integer                       :: j
   character(2000)               :: att_text
 
   type(Meandata), intent(inout) :: entry
   ! Serial output implemented so far
   if (mype/=0) return
-  c=1
-  entry%error_status=0
   ! create an ocean output file
   write(*,*) 'initializing I/O file for ', trim(entry%name)
 
-  entry%error_status(c) = nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid); c=c+1
+  call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
 
   do j=1, entry%ndim
 !___Create mesh related dimensions__________________________________________
-     entry%error_status(c) = nf_def_dim(entry%ncid, entry%dimname(j), entry%glsize(j), entry%dimID(j)); c=c+1
+     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(j), entry%glsize(j), entry%dimID(j)), __LINE__)
   end do
 !___Create time related dimensions__________________________________________
-  entry%error_status(c) = nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID);                     c=c+1
+  call assert_nf( nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID), __LINE__)
 !___Define the time and iteration variables_________________________________
-  entry%error_status(c) = nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID); c=c+1
+  call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
 
   att_text='time'
-  entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-  entry%error_status(c) = nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
+  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
 
   if (entry%accuracy == i_real8) then
-     entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_DOUBLE, entry%ndim+1, &
-                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
+     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), NF_DOUBLE, entry%ndim+1, &
+                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   elseif (entry%accuracy == i_real4) then
-     entry%error_status(c) = nf_def_var(entry%ncid, trim(entry%name), NF_REAL, entry%ndim+1, &
-                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID); c=c+1
+     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), NF_REAL, entry%ndim+1, &
+                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   endif
-  entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description); c=c+1
-  entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units);       c=c+1
-  entry%error_status(c)=nf_close(entry%ncid); c=c+1
-  entry%error_count=c-1
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
+  call assert_nf( nf_close(entry%ncid), __LINE__)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -532,36 +528,31 @@ subroutine assoc_ids(entry)
   implicit none
 
   type(Meandata), intent(inout) :: entry
-  integer                       :: c, j, k
+  integer                       :: j, k
   real(real64)                  :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
-  c=1
-  entry%error_status=0
   ! open existing netcdf file
   write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
-  entry%error_status(c) = nf_open(entry%filename, nf_nowrite, entry%ncid);
-
-  if (entry%error_status(c) .ne. nf_noerr) then
-     call create_new_file(entry) ! error status counter will be reset
-     c=entry%error_count+1
-     entry%error_status(c) = nf_open(entry%filename, nf_nowrite, entry%ncid); c=c+1
+  if (nf_open(entry%filename, nf_nowrite, entry%ncid) .ne. nf_noerr) then ! todo: nf_open is being abused to check if the file exists
+    call create_new_file(entry)
+    call assert_nf( nf_open(entry%filename, nf_nowrite, entry%ncid), __LINE__)
   end if
 
   do j=1, entry%ndim
 !___Create mesh related dimensions__________________________________________
-     entry%error_status(c) = nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)); c=c+1
+     call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
   end do
 !___Associate time related dimensions_______________________________________
-  entry%error_status(c) = nf_inq_dimid (entry%ncid, 'time', entry%recID);          c=c+1
-  entry%error_status(c) = nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count); c=c+1
+  call assert_nf( nf_inq_dimid (entry%ncid, 'time', entry%recID), __LINE__)
+  call assert_nf( nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count), __LINE__)
 !___Associate the time and iteration variables______________________________
-  entry%error_status(c) = nf_inq_varid(entry%ncid, 'time', entry%tID); c=c+1
+  call assert_nf( nf_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
 !___if the time rtime at the rec_count is larger than ctime we look for the closest record with the 
 ! timestamp less than ctime
   do k=entry%rec_count, 1, -1
-     entry%error_status(c)=nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1);
+     call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
      if (ctime > rtime) then
         entry%rec_count=k+1
 !       write(*,*) 'I/O '//trim(entry%name)//' : current record = ', entry%rec_count, '; ', entry%rec_count, ' records in the file;'
@@ -573,13 +564,11 @@ subroutine assoc_ids(entry)
         exit ! no appropriate rec_count detected
      end if
   end do
-  c=c+1 ! check will be made only for the last nf_get_vara_double
 
   entry%rec_count=max(entry%rec_count, 1)
 !___Associate physical variables____________________________________________
-  entry%error_status(c) = nf_inq_varid(entry%ncid, entry%name, entry%varID); c=c+1
-  entry%error_status(c)=nf_close(entry%ncid); c=c+1
-  entry%error_count=c-1
+  call assert_nf( nf_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
+  call assert_nf( nf_close(entry%ncid), __LINE__)
   write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
 end subroutine
 !
@@ -595,16 +584,15 @@ subroutine write_mean(entry, mesh)
   real(real32),   allocatable   :: aux_r4(:)
   type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: size1, size2
-  integer                       :: c, lev
+  integer                       :: lev
 
 #include  "associate_mesh.h"
 
   ! Serial output implemented so far
   if (mype==0) then
-     c=1
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-     entry%error_status(c)=nf_open(entry%filename, nf_write, entry%ncid); c=c+1
-     entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1); c=c+1
+     call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+     call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
   end if
 !_______writing 2D fields________________________________________________
      if (entry%ndim==1) then
@@ -615,7 +603,7 @@ subroutine write_mean(entry, mesh)
            if (size1==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
            if (size1==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
            if (mype==0) then
-              entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1); c=c+1
+              call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1), __LINE__)
            end if
            if (mype==0) deallocate(aux_r8)
         
@@ -625,7 +613,7 @@ subroutine write_mean(entry, mesh)
            if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
            if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
            if (mype==0) then
-              entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1); c=c+1
+              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
            end if
            if (mype==0) deallocate(aux_r4)
 
@@ -647,7 +635,7 @@ subroutine write_mean(entry, mesh)
               if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
               if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
               if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1); c=c+1
+                 call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
               end if
            end do
            if (mype==0) deallocate(aux_r8)
@@ -658,7 +646,7 @@ subroutine write_mean(entry, mesh)
               if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
               if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
               if (mype==0) then
-                 entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1); c=c+1
+                 call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
               end if
            end do
            if (mype==0) deallocate(aux_r4)
@@ -674,11 +662,7 @@ subroutine write_mean(entry, mesh)
            stop
      end if
 
-  if (mype==0) entry%error_count=c-1
-  call was_error(entry)
-  if (mype==0) entry%error_status(1)=nf_close(entry%ncid);
-  entry%error_count=1
-  call was_error(entry)
+  if (mype==0) call assert_nf(nf_close(entry%ncid), __LINE__)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -937,27 +921,18 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   io_NSTREAMS=io_NSTREAMS+1
 
 end subroutine
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine was_error(entry)
-  use g_PARSUP
-  implicit none
-  type(Meandata), intent(inout) :: entry
-  integer                       :: k, status, ierror
 
-  call MPI_BCast(entry%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(entry%error_status(1), entry%error_count, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
-  do k=1, entry%error_count
-     status=entry%error_status(k)
-     if (status .ne. nf_noerr) then
-        if (mype==0) call handle_err(status)
-        call par_ex
-        stop
-     end if
-  end do
-end subroutine
+  subroutine assert_nf(status, line)
+    integer, intent(in) :: status
+    integer, intent(in) :: line
+    ! EO args
+    include "netcdf.inc" ! old netcdf fortran interface required?
+    if(status /= NF_NOERR) then
+      print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+      stop 1
+    endif   
+  end subroutine
 
 end module
 
