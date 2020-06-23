@@ -28,7 +28,7 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 
 # create our binary (set its name to name of this project)
 add_executable(${PROJECT_NAME} ${sources_Fortran})
-target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243 -DUSE_ICEBERGS)
 if(${FESOM_COUPLED})
    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)

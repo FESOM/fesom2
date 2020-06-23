@@ -1,0 +1,120 @@
+module iceberg_params
+implicit none
+save
+  !integer,parameter :: ib_num               ! realistic dataset comprising 6912 icebergs
+  real,dimension(:), allocatable:: calving_day  !271.0 	!28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
+  
+  !days since beginning of year (since FESOM first started);
+  !2.5 starts an iceberg at 3rd day, 12.00, with respect to model start;
+  !For restarts, calving_day is subtracted by the number of modelled days (see iceberg_out subroutine)
+
+  ! ============= REALISTIC INITIAL ICEBERG DISTRIBUTION (SEP/OCT 1997 SNAPSHOT) IN NEAR-COASTAL STRIP AROUND ANTARCTICA  =================== !
+  !
+  !        from the article 'Near-coastal circum-Antarctic iceberg size distributions determined from Synthetic Aperture Radar images'
+  !        by Wesche and Dierking (2014).
+  real,dimension(:), allocatable:: height_ib
+
+  !read from file in init_icebergs
+  real,dimension(:), allocatable:: length_ib
+  real,dimension(:), allocatable:: width_ib
+  real,dimension(:), allocatable:: lon_deg
+  real,dimension(:), allocatable:: lat_deg
+  !in case (l_initial .AND. l_iniuser) = .true. ;
+  !initial zonal velocity (positive is to the east):
+  real,dimension(:), allocatable:: ini_u 
+
+  !initial meridional velocity (positive is to the north):
+  real,dimension(:), allocatable:: ini_v
+
+  ! ================================================================================================================= !
+  ! ========= Lichey & Hellmer values ========= !
+  real,dimension(:), allocatable:: Co
+  real,dimension(:), allocatable:: Ca
+  real,dimension(:), allocatable:: Ci
+  real,dimension(:), allocatable:: Cdo_skin     ! !Cd_oce_ice = 5.0e-3
+  real,dimension(:), allocatable:: Cda_skin     ! !similar to Keghouche (2009)
+  ! =========================================== !
+  logical,dimension(:), allocatable:: l_wave    ! (use wave radiation force?)
+  ! =========================================== !
+  real,dimension(:), allocatable:: conc_sill
+  real,dimension(:), allocatable:: P_sill
+  logical,dimension(:), allocatable:: l_freeze  ! (use freezing parametrization?)
+  ! =========================================== !
+  logical       :: l_melt = .true.              ! (use melting parametrization?)
+  logical       :: l_weeksmellor = .true.       ! (use weeks & mellor stability criterion?)
+  logical       :: l_allowgrounding = .true.    ! (are icebergs allowed to ground?)
+  real,dimension(:), allocatable:: draft_scale  ! (account for irregularities of draft
+  ! =========================================== !
+  logical       :: l_tides = .false.            ! (simulate sensitivity to tides? !!check for HLRN-III!!)
+  ! =========================================== !
+  logical       :: l_initial = .true.           ! (use initial iceberg velocities?)
+  logical       :: l_iniuser = .false.          ! (prescribe init. velo or let model decide?)
+  ! =========================================== !
+  real          :: smallestvol_icb = 10.0       ! (smallest iceberg volume in m^3?)	
+  real          :: maxspeed_icb = 3.0           ! (cap iceberg speed at ?? m/s?) !security value !not used
+  ! ========= For sensitivity studies ========= !
+  real,dimension(:), allocatable:: coriolis_scale   ! (scale the body forces, Coriolis and
+  real,dimension(:), allocatable:: surfslop_scale   !  surface slope, by those factors:
+  ! =========================================== !
+  real,dimension(:), allocatable:: rho_icb          !Silva et al., Martin
+  real,dimension(:), allocatable:: rho_h2o
+  real,dimension(:), allocatable:: rho_air
+  real,dimension(:), allocatable:: rho_ice          !910 RT, 945.0 bei Lichey, aus Lemke (1993)
+
+  character(100):: IcebergRestartPath='../icb/iceberg.restart'
+  character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
+  character(100):: buoys_xlon_file='../icb/LON.dat'     !buoy position in deg
+  character(100):: buoys_ylat_file='../icb/LAT.dat'     !buoy position in deg
+  character(100):: length_icb_file='../icb/LENGTH.dat' !iceberg length [m]
+  character(100):: width_icb_file='../icb/LENGTH.dat' !iceberg width [m]
+  !===== OUTPUT RELATED SETTINGS  =====
+  integer :: icb_outfreq = 120          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
+  logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
+  logical :: ascii_out = .false.        ! old ascii output (slow, more detailed); false: faster nc output
+  !===== NUMERICS (DONT HAVE TO BE CHANGED) =====
+  real :: steps_per_FESOM_step = 1      !deprecated
+  logical :: l_semiimplicit = .true.    !false: adams-bashforth for coriolis
+  real :: semiimplicit_coeff = 1.0      !1. fully implicit, 0.5 no damping
+  real :: AB_coeff = 1.53               !1.5 original AB (amplifying), 1.6 stabilized
+  !===== NOTHING MUST BE CHANGED BELOW THIS LINE =====
+  real,dimension(:), allocatable:: u_ib, v_ib
+  integer,dimension(:), allocatable:: iceberg_elem
+  logical,dimension(:), allocatable:: find_iceberg_elem
+  real,dimension(:), allocatable:: f_u_ib_old, f_v_ib_old
+  real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
+  real,dimension(:), allocatable:: fw_flux_ib, heat_flux_ib
+  !for communication
+  real,dimension(:), allocatable:: arr_block
+  !real,dimension(15*ib_num):: arr_block
+  integer,dimension(:), allocatable:: elem_block
+  real,dimension(:), allocatable:: vl_block
+  !real,dimension(4*ib_num):: vl_block
+
+  !array for output in netcdf
+  real,dimension(:,:), allocatable:: buoy_props
+  integer:: save_count_buoys
+  real:: prev_sec_in_year
+!****************************************************************************************************************************
+!****************************************************************************************************************************
+#ifdef use_cavity
+ contains
+ ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
+ logical function reject_elem(elem)
+ use o_mesh
+ implicit none
+ integer, intent(in) :: elem
+
+ reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+ end function reject_elem
+ 
+ ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
+ ! either "real" model boundary nodes or shelf nodes
+ integer function coastal_nodes(elem)
+ use o_mesh
+ implicit none
+ integer, intent(in) :: elem
+
+ coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+ end function coastal_nodes
+#endif
+end module iceberg_params
