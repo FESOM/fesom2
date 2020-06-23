@@ -23,7 +23,7 @@ module io_MEANDATA
     real(real64),  public, allocatable, dimension(:,:) :: local_values_r8
     real(real32),  public, allocatable, dimension(:,:) :: local_values_r4
     integer                                            :: addcounter=0
-    real(kind=WP), pointer                             :: ptr2(:), ptr3(:,:) ! todo: use netcdf types, not WP
+    real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -669,26 +669,15 @@ subroutine update_means
   do n=1, io_NSTREAMS
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
-     if (entry%accuracy == i_real8) then
-        if (entry%ndim==1) then 
-           entry%local_values_r8(1:entry%lcsize(1),1) = &
-           entry%local_values_r8(1:entry%lcsize(1),1) + entry%ptr2(1:entry%lcsize(1))
-        elseif (entry%ndim==2) then 
-           entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) = &
-           entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
-        end if
+    if (entry%accuracy == i_real8) then
+      entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) = &
+      entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
 
 !_____________ compute in 4 byte accuracy _________________________
-     elseif (entry%accuracy == i_real4) then
-        if (entry%ndim==1) then 
-           entry%local_values_r4(1:entry%lcsize(1),1) = &
-           entry%local_values_r4(1:entry%lcsize(1),1) + real(entry%ptr2(1:entry%lcsize(1)),real32)
-        elseif (entry%ndim==2) then 
-           entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) = &
-           entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) + &
+    elseif (entry%accuracy == i_real4) then
+      entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) = &
+      entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) + &
                  real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
-        end if
-
      else
 
            if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',trim(entry%name)
@@ -874,7 +863,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     call move_alloc(tmparr, io_stream)
   end if
   entry=>io_stream(size(io_stream))
-  entry%ptr2 => data
+  entry%ptr3(1:size(data),1:1) => data
   entry%accuracy = accuracy
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
