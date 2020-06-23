@@ -725,8 +725,6 @@ subroutine output(istep, mesh)
   integer       :: n
   logical       :: do_output
   type(Meandata), pointer :: entry
-  real(real64)  :: inv_addcounter_r8
-  real(real32)  :: inv_addcounter_r4
   type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
@@ -765,14 +763,12 @@ subroutine output(istep, mesh)
         entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         call assoc_ids(entry)
         if (entry%accuracy == i_real8) then
-           inv_addcounter_r8 = 1._WP/real(entry%addcounter,real64)
-           entry%local_values_r8 = entry%local_values_r8 * inv_addcounter_r8  ! compute_means
+           entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
            call write_mean(entry, mesh)
            entry%local_values_r8 = 0. ! clean_meanarrays
 
         elseif (entry%accuracy == i_real4) then
-           inv_addcounter_r4 = 1._WP/real(entry%addcounter,real32)
-           entry%local_values_r4 = entry%local_values_r4 * inv_addcounter_r4 ! compute_means
+           entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
            call write_mean(entry, mesh)
            entry%local_values_r4 = 0. ! clean_meanarrays
 
