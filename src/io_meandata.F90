@@ -2,6 +2,7 @@ module io_MEANDATA
 
   use o_PARAM, only : WP
   use, intrinsic :: ISO_FORTRAN_ENV
+  use io_data_strategy_module
 
   implicit none
 #include "netcdf.inc"
@@ -35,6 +36,7 @@ module io_MEANDATA
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
+    class(data_strategy_type), allocatable :: data_strategy
   end type  
 !
 !--------------------------------------------------------------------------------------------
@@ -509,13 +511,8 @@ subroutine create_new_file(entry)
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
 
-  if (entry%accuracy == i_real8) then
-     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), NF_DOUBLE, entry%ndim+1, &
-                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
-  elseif (entry%accuracy == i_real4) then
-     call assert_nf( nf_def_var(entry%ncid, trim(entry%name), NF_REAL, entry%ndim+1, &
-                                      (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
-  endif
+  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
+                                    (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
   call assert_nf( nf_close(entry%ncid), __LINE__)
@@ -828,9 +825,11 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%accuracy = accuracy
 
   if (accuracy == i_real8) then
+    allocate(data_strategy_nf_double_type :: entry%data_strategy)
      allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
      entry%local_values_r8 = 0. 
   elseif (accuracy == i_real4) then
+    allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
      entry%local_values_r4 = 0.
   endif ! accuracy
@@ -894,11 +893,13 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%ptr2 => data
   entry%accuracy = accuracy
   if (accuracy == i_real8) then
+    allocate(data_strategy_nf_double_type :: entry%data_strategy)
      allocate(entry%local_values_r8(lcsize, 1))
      ! clean_meanarrays
      entry%local_values_r8 = 0. 
 
   elseif (accuracy == i_real4) then
+    allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(lcsize, 1))
      ! clean_meanarrays
      entry%local_values_r4 = 0.  
