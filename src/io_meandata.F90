@@ -653,10 +653,6 @@ subroutine write_mean(entry, mesh)
            stop
            
         endif
-     else
-        if (mype==0) write(*,*) 'not supported shape of array in mean I/O file'
-           call par_ex
-           stop
      end if
 
   if (mype==0) call assert_nf(nf_close(entry%ncid), __LINE__)
@@ -680,10 +676,6 @@ subroutine update_means
         elseif (entry%ndim==2) then 
            entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) = &
            entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
-        else
-           if (mype==0) write(*,*) 'not supported size in update_means'
-           call par_ex
-           stop
         end if
 
 !_____________ compute in 4 byte accuracy _________________________
@@ -695,10 +687,6 @@ subroutine update_means
            entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) = &
            entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) + &
                  real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
-        else
-           if (mype==0) write(*,*) 'not supported size in update_means'
-           call par_ex
-           stop
         end if
 
      else
