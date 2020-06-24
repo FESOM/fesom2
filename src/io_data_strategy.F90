@@ -12,6 +12,7 @@ module io_data_strategy_module
   contains
     procedure(initialize), deferred, nopass :: initialize
     procedure(netcdf_type), deferred, nopass :: netcdf_type
+    procedure(add_values), deferred :: add_values
   end type
   interface
     subroutine initialize()
@@ -20,20 +21,33 @@ module io_data_strategy_module
     function netcdf_type()
       integer netcdf_type
     end function
+
+    subroutine add_values(this, values)
+      use o_PARAM, only : WP
+      import data_strategy_type
+      class(data_strategy_type) this
+      real(kind=WP), dimension(:,:) :: values
+    end subroutine
   end interface
 
 
   type, extends(data_strategy_type) :: data_strategy_nf_float_type
+    private
+    real(nf_float_precision), allocatable, dimension(:,:) :: local_values
   contains
     procedure, nopass :: initialize => initialize_float
     procedure, nopass :: netcdf_type => netcdf_type_float
+    procedure, pass :: add_values => add_values_float
   end type
 
 
   type, extends(data_strategy_type) :: data_strategy_nf_double_type
+    private
+    real(nf_double_precision), allocatable, dimension(:,:) :: local_values
   contains
     procedure, nopass :: initialize => initialize_double
     procedure, nopass :: netcdf_type => netcdf_type_double
+    procedure, pass :: add_values => add_values_double
   end type
 
 
@@ -61,5 +75,22 @@ contains
     netcdf_type_double = nf_double
   end function
 
+
+  subroutine add_values_float(this, values)
+    use o_PARAM, only : WP
+    class(data_strategy_nf_float_type) this
+    real(kind=WP), dimension(:,:) :: values
+    ! EO args
+    this%local_values = this%local_values + real(values) ! todo: check if casting the array to real here creates a copy of the array
+  end subroutine
+
+
+  subroutine add_values_double(this, values)
+    use o_PARAM, only : WP
+    class(data_strategy_nf_double_type) this
+    real(kind=WP), dimension(:,:) :: values
+    ! EO args
+    this%local_values = this%local_values + values
+  end subroutine
 
 end module
