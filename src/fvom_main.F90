@@ -147,6 +147,7 @@ type(t_mesh), target, save      :: mesh
     rtime_write_restart = 0._WP
     rtime_write_means   = 0._WP
     rtime_compute_diag  = 0._WP
+    rtime_read_forcing  = 0._WP
 
     if (mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
