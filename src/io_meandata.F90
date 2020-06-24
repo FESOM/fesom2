@@ -670,14 +670,11 @@ subroutine update_means
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
     if (entry%accuracy == i_real8) then
-      entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) = &
-      entry%local_values_r8(1:entry%lcsize(1),1:entry%lcsize(2)) + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
+      entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2))
 
 !_____________ compute in 4 byte accuracy _________________________
     elseif (entry%accuracy == i_real4) then
-      entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) = &
-      entry%local_values_r4(1:entry%lcsize(1),1:entry%lcsize(2)) + &
-                 real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
+      entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
      else
 
            if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',trim(entry%name)
