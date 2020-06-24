@@ -613,12 +613,6 @@ subroutine write_mean(entry, mesh)
               call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
            end if
            if (mype==0) deallocate(aux_r4)
-
-        else
-           if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
-           call par_ex
-           stop
-           
         endif
 
 !_______writing 3D fields________________________________________________
@@ -647,11 +641,6 @@ subroutine write_mean(entry, mesh)
               end if
            end do
            if (mype==0) deallocate(aux_r4)
-        else
-           if (mype==0) write(*,*) 'not supported output accuracy for mean I/O file.'
-           call par_ex
-           stop
-           
         endif
      end if
 
@@ -675,11 +664,6 @@ subroutine update_means
 !_____________ compute in 4 byte accuracy _________________________
     elseif (entry%accuracy == i_real4) then
       entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:entry%lcsize(1),1:entry%lcsize(2)),real32)
-     else
-
-           if (mype==0) write(*,*) 'not supported output accuracy in update_means:',entry%accuracy,'for',trim(entry%name)
-           call par_ex
-           stop
      endif
 
      entry%addcounter=entry%addcounter+1
@@ -802,6 +786,10 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
      entry%local_values_r4 = 0.
+  else
+     if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
+     call par_ex
+     stop
   endif ! accuracy
 
   entry%ndim=2
