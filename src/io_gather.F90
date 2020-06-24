@@ -7,60 +7,46 @@ module io_gather_module
 contains
 
 
-subroutine gather_nod2D(arr2D, arr2D_global)
+  subroutine gather_nod2D(arr2D, arr2D_global)
+    use g_PARSUP
+    use o_MESH
+    implicit none
+    integer      :: n
+    real(real64) ::  arr2D(:)
+    real(real64) ::  arr2D_global(:)
+    real(real64), allocatable :: recvbuf(:)
+    integer        :: req(npes-1)
+    integer        :: start, n2D
+  
+    if (npes> 1) then
+      call mpi_barrier(MPI_COMM_FESOM,MPIerr)
+      if ( mype == 0 ) then
+        if (npes>1) then
+    
+        allocate(recvbuf(ubound(arr2D_global,1)))
+          do  n = 1, npes-1
+            n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
+            start = remPtr_nod2D(n)
+            call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+          end do
 
-! Make nodal information available to master PE 
+          arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
 
-use g_PARSUP
-USE o_MESH
+          call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
 
-IMPLICIT NONE
-
-integer      :: n
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2D_global(:)
-real(real64), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
-
- if (npes> 1) then
-
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-
-! Consider MPI-datatypes to recv directly into arr2D_global!
-
-IF ( mype == 0 ) THEN
-   
-   if (npes>1) then
-      allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
-      enddo
-      
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
-   
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
-   
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
-      deallocate(recvbuf)
-   else
-
-      arr2D_global(:) = arr2D(:)
-     
-   endif
-
-ELSE
-   
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
-   
-ENDIF
-
-endif
-end subroutine
+          arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) = recvbuf(1 : remPtr_nod2D(npes)-1)
+          deallocate(recvbuf)
+    
+        else
+          arr2D_global(:) = arr2D(:)
+        end if
+      else
+  
+        call MPI_SEND( arr2D, myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+      end if
+    end if
+  
+  end subroutine
 
 
 subroutine gather_real4_nod2D(arr2D, arr2D_global)
