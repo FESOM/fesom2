@@ -7,27 +7,27 @@ module io_gather_module
 contains
 
 
-  subroutine gather_nod2D(arr2D, arr2D_global, rootrank)
+  subroutine gather_nod2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
     use o_MESH
     implicit none
     real(real64) ::  arr2D(:)
     real(real64) ::  arr2D_global(:)
-    integer, intent(in) :: rootrank ! rank of receiving process
+    integer, intent(in) :: root_rank ! rank of receiving process
     ! EO args
-    integer remoterank
+    integer remote_rank
     real(real64), allocatable :: recvbuf(:)
     integer        :: req(npes-1)
     integer        :: start, n2D
   
-    if ( mype == rootrank ) then
+    if ( mype == root_rank ) then
       if (npes>1) then
     
         allocate(recvbuf(size(arr2D_global)))
-        do  remoterank = 1, npes-1
-          n2D   = remPtr_nod2D(remoterank+1) - remPtr_nod2D(remoterank)
-          start = remPtr_nod2D(remoterank)
-          call mpi_irecv(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, remoterank, 2, MPI_COMM_FESOM, req(remoterank), MPIerr)
+        do  remote_rank = 0, npes-1
+          n2D   = remPtr_nod2D(remote_rank+1) - remPtr_nod2D(remote_rank)
+          start = remPtr_nod2D(remote_rank)
+          call mpi_irecv(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, remote_rank, 2, MPI_COMM_FESOM, req(remote_rank), MPIerr)
         end do
 
         arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
