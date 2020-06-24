@@ -90,7 +90,11 @@ contains
     MAXRANK = rank_count-1
     
     call hostname_strategy(hostname)
-    if(rank==0) allocate(character(len(hostname)) :: names(rank_count))
+    if(rank==0) then
+      allocate(character(len(hostname)) :: names(rank_count))
+    else
+      allocate(character(0) :: names(0))
+    end if
     call MPI_GATHER(hostname, len(hostname), MPI_CHAR, names, len(hostname), MPI_CHAR, 0, communicator, ierror)
     if(rank==0) then
         ranks_per_host = 1
@@ -101,8 +105,8 @@ contains
             exit
           end if
         end do    
-      deallocate(names)
     end if
+    deallocate(names)
 
     call MPI_BCAST(ranks_per_host, 1, MPI_INT, 0, communicator, ierror)
     STEP = ranks_per_host
