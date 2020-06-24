@@ -574,7 +574,7 @@ end subroutine
 subroutine write_mean(entry, mesh)
   use mod_mesh
   use g_PARSUP
-  use g_comm_auto
+  use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
   real(real64)  , allocatable   :: aux_r8(:)
@@ -597,8 +597,8 @@ subroutine write_mean(entry, mesh)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
            if (mype==0) allocate(aux_r8(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
-           if (size1==elem2D) call gather_elem(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
+           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
+           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
            if (mype==0) then
               call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1), __LINE__)
            end if
@@ -607,8 +607,8 @@ subroutine write_mean(entry, mesh)
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
            if (mype==0) allocate(aux_r4(size1))
-           if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
-           if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
+           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
+           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
            if (mype==0) then
               call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
            end if
@@ -623,8 +623,8 @@ subroutine write_mean(entry, mesh)
         if (entry%accuracy == i_real8) then
            if (mype==0) allocate(aux_r8(size2))
            do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
               if (mype==0) then
                  call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
               end if
@@ -634,8 +634,8 @@ subroutine write_mean(entry, mesh)
         elseif (entry%accuracy == i_real4) then
            if (mype==0) allocate(aux_r4(size2))
            do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+              if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+              if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
               if (mype==0) then
                  call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
               end if
