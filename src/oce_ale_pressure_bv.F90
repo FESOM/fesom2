@@ -86,7 +86,7 @@ subroutine pressure_bv(mesh)
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                  :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
-    real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf
+    real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
     real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     logical                  :: flag1, flag2, mixing_kpp
 #include "associate_mesh.h"
@@ -142,14 +142,12 @@ subroutine pressure_bv(mesh)
             t=tr_arr(nz, node,1)
             s=tr_arr(nz, node,2)
             call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
-            
-            
         enddo
         
         !NR split the loop here. The Intel compiler could not resolve that there is no dependency 
         !NR and did not vectorize the full loop. 
         !_______________________________________________________________________
-        ! calculate density
+        ! calculate density for MOC
         if (ldiag_dMOC) then
             !!PS do nz=1, nl1
             do nz=nzmin, nzmax-1
@@ -159,18 +157,17 @@ subroutine pressure_bv(mesh)
             end do
         end if 
             
+        !_______________________________________________________________________    
+        ! compute density for PGF 
         !!PS do nz=1, nl1
         do nz=nzmin, nzmax-1
-!!PS             rho(nz)= bulk_0(nz)   + Z(nz)*(bulk_pz(nz)   + Z(nz)*bulk_pz2(nz)) !!PS
-!!PS             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_0        !!PS
-!!PS             rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z(nz))-density_ref(nz,node)        !!PS
-!!PS             density_m_rho0_slev(nz,node) = rho(nz)                             !!PS 
-            
+            !___________________________________________________________________
             rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
             rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_ref(nz,node)
             density_m_rho0(nz,node) = rho(nz)
             
+            !___________________________________________________________________
             ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
             ! --> bring density of surface point adiabatically to the same 
             !     depth level as the deep point --> than calculate bouyancy 
@@ -178,11 +175,13 @@ subroutine pressure_bv(mesh)
             !!PS rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
             !!PS rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
             rho_surf=bulk_0(nzmin)   + Z_3d_n(nz,node)*(bulk_pz(nzmin)   + Z_3d_n(nz,node)*bulk_pz2(nzmin))
-            !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
             rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_ref(nzmin,node)
+            !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+            
             !!PS dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
+            !!PS dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
             dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_ref(nz,node))      ! this is also required when KPP is ON
-!!PS                dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
+            
             !!PS db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
             db_max=max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
         end do
@@ -197,14 +196,7 @@ subroutine pressure_bv(mesh)
         !___________________________________________________________________
         ! calculate pressure 
         if (trim(which_ale)=='linfs') then
-!!PS                hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
-            !!PS hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
-!!PS             if (nzmin>1) then
-!!PS                 ! pressure cavity boundary condition
-!!PS                 hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
-!!PS             else
-!!PS                 hpressure(nzmin, node)=0.5_WP*hnode(nzmin,node)*rho(nzmin)*g
-!!PS             end if  
+            !!PS hpressure(nzmin, node)=0.5_WP*hnode(nzmin,node)*rho(nzmin)*g
             hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
             !!PS DO nz=2, nl1
             DO nz=nzmin+1,nzmax-1
@@ -257,7 +249,6 @@ subroutine pressure_bv(mesh)
             !!PS !--> Why not like this ?
             !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn+density_ref(nz,node))
             
-                
             !_______________________________________________________________
             ! define MLD following Large et al. 1997
             ! MLD is the shallowest depth where the local buoyancy gradient matches the maximum buoyancy gradient 

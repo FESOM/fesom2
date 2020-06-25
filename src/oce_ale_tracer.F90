@@ -118,7 +118,7 @@ subroutine solve_tracers_ale(mesh)
         
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-!!PS         call adv_tracers_ale(tr_num, mesh)
+        call adv_tracers_ale(tr_num, mesh)
         
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -970,14 +970,14 @@ subroutine diff_tracers_ale(tr_num, mesh)
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n 
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
-!!PS     call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
+    call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicite 
-!!PS     if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num, mesh)
+    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tr_num, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
-!!PS     if (Redi) call diff_ver_part_redi_expl(mesh)
+    if (Redi) call diff_ver_part_redi_expl(mesh)
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -999,7 +999,6 @@ subroutine diff_tracers_ale(tr_num, mesh)
         ! equation has a 30% smaller nummerical drift
         !tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
-        
     end do
     
     !___________________________________________________________________________
@@ -1320,13 +1319,13 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
-!!PS         if (use_sw_pene .and. tr_num==1) then
-!!PS             !!PS do nz=1, nzmax-1
-!!PS             do nz=nzmin, nzmax-1
-!!PS                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-!!PS                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
-!!PS             end do
-!!PS         end if
+        if (use_sw_pene .and. tr_num==1) then
+            !!PS do nz=1, nzmax-1
+            do nz=nzmin, nzmax-1
+                zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
+                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
+            end do
+        end if
         
         !_______________________________________________________________________
         !  The first row contains also the boundary condition from heatflux, 
@@ -1340,9 +1339,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
-        !
         !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
-!!PS         tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num)) 
+        tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num)) 
         
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 

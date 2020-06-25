@@ -1257,6 +1257,16 @@ subroutine compute_ssh_rhs_ale(mesh)
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
+            if (c1/=c1) then
+                write(*,*) 'mype  = ',mype
+                write(*,*) 'el(1) = ',el(1)
+                write(*,*) 'nz,nzmin,nzmax     = ',nz,nzmin,nzmax
+                write(*,*) 'c1    = ',c1
+                write(*,*) 'alpha = ',alpha
+                write(*,*) 'UV(:,nz,el(1))     = ',UV(:,nz,el(1))
+                write(*,*) 'UV_rhs(:,nz,el(1)) = ',UV_rhs(:,nz,el(1))
+                write(*,*) 'helem(nz,el(1))    = ',helem(nz,el(1))
+            end if  
         end do
         
         !_______________________________________________________________________
@@ -1274,6 +1284,17 @@ subroutine compute_ssh_rhs_ale(mesh)
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+                             
+                if (c2/=c2) then
+                    write(*,*) 'mype  = ',mype
+                    write(*,*) 'el(2) = ',el(2)
+                    write(*,*) 'nz,nzmin,nzmax     = ',nz,nzmin,nzmax
+                    write(*,*) 'c2    = ',c2
+                    write(*,*) 'alpha = ',alpha
+                    write(*,*) 'UV(:,nz,el(2))     = ',UV(:,nz,el(2))
+                    write(*,*) 'UV_rhs(:,nz,el(2)) = ',UV_rhs(:,nz,el(2))
+                    write(*,*) 'helem(nz,el(2))    = ',helem(nz,el(2))
+                end if 
             end do
         end if
         
@@ -1522,14 +1543,6 @@ subroutine vert_vel_ale(mesh)
     ! |
     ! |
     ! +--> until here Wvel contains the thickness divergence div(u)
-    
-!!PS     if (mype==0) then 
-!!PS         write(*,*) ' Wvel(:,1) = ',Wvel(:,1)
-!!PS         write(*,*) 
-!!PS         write(*,*) ' UV(1,:,1) = ',UV(1,:,1)
-!!PS         write(*,*) ' UV(2,:,1) = ',UV(2,:,1)
-!!PS     end if
-!!PS     
     
     !___________________________________________________________________________
     ! cumulative summation of div(u_vec*h) vertically
@@ -2111,27 +2124,16 @@ DO elem=1,myDim_elem2D
         
         b(nz)=b(nz)-min(0._WP, wd)*zinv
         c(nz)=c(nz)-max(0._WP, wd)*zinv
-        
-!!PS         if ( (a(nz)/=a(nz)) .or. (b(nz)/=b(nz)) .or. (c(nz)/=c(nz)) ) then
-!!PS             write(*,*) '___check nz=nzmin+1, nzmax-2___________________________'
-!!PS             write(*,*) 'mype   =', mype
-!!PS             write(*,*) 'elem   =', elem
-!!PS             write(*,*) 'nz     =', nz
-!!PS             write(*,*) 'a(nz)       =', a(nz)
-!!PS             write(*,*) 'b(nz)       =', b(nz)
-!!PS             write(*,*) 'c(nz)       =', c(nz)
-!!PS             write(*,*) 'wu          =', wu
-!!PS             write(*,*) 'wd          =', wd
-!!PS             write(*,*) 'Av(nz,elem)  =', Av(nz,elem)
-!!PS             write(*,*) 'Av(nz+1,elem)=', Av(nz+1,elem)
-!!PS             write(*,*) 'zinv        =', zinv
-!!PS             write(*,*) 'zbar_n(nz)  =', zbar_n(nz)
-!!PS             write(*,*) 'zbar_n(nz+1)=', zbar_n(nz+1)
-!!PS             write(*,*) 'Z_n(nz-1)   =', Z_n(nz-1)
-!!PS             write(*,*) 'Z_n(nz)     =', Z_n(nz)
-!!PS             write(*,*) 'Z_n(nz+1)   =', Z_n(nz+1)
-!!PS         end if 
-        
+        if (a(nz)/=a(nz) .or. b(nz)/=b(nz) .or. c(nz)/=c(nz)) then 
+            write(*,*) ' --> found a,b,c is NaN'
+            write(*,*) 'mype=',mype
+            write(*,*) 'nz=',nz
+            write(*,*) 'a(nz), b(nz), c(nz)=',a(nz), b(nz), c(nz)
+            write(*,*) 'Av(nz,elem)=',Av(nz,elem)
+            write(*,*) 'Av(nz+1,elem)=',Av(nz+1,elem)
+            write(*,*) 'Z_n(nz-1:nz+1)=',Z_n(nz-1:nz+1)
+            write(*,*) 'zbar_n(nz:nz+1)=',zbar_n(nz:nz+1)
+        endif 
     end do
     ! The last row
     zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
@@ -2240,20 +2242,6 @@ DO elem=1,myDim_elem2D
     ! ===========================
     !!PS do nz=1,nzmax-1
     do nz=nzmin,nzmax-1
-!!PS         if ( (ur(nz) /= ur(nz)) .or. (vr(nz) /= vr(nz)) ) then
-!!PS             write(*,*) '___check___________________________________'
-!!PS             write(*,*) 'mype   =', mype
-!!PS             write(*,*) 'elem   =', elem
-!!PS             write(*,*) 'nz     =', nz
-!!PS             write(*,*) 'ur(nz) =', ur(nz)
-!!PS             write(*,*) 'vr(nz) =', vr(nz)
-!!PS             write(*,*) 'up(nz) =', up(nz)
-!!PS             write(*,*) 'vp(nz) =', vp(nz)
-!!PS             write(*,*) 'cp(nz) =', cp(nz)
-!!PS             write(*,*) 'a(nz)  =', a(nz)
-!!PS             write(*,*) 'b(nz)  =', b(nz)
-!!PS             write(*,*) 'c(nz)  =', c(nz)
-!!PS         end if 
         UV_rhs(1,nz,elem)=ur(nz)
         UV_rhs(2,nz,elem)=vr(nz)
     end do
@@ -2292,9 +2280,9 @@ subroutine oce_timestep_ale(n, mesh)
     t0=MPI_Wtime()
         
     
-    water_flux = 0.0_WP
-    heat_flux  = 0.0_WP
-    stress_surf= 0.0_WP
+!!PS     water_flux = 0.0_WP
+!!PS     heat_flux  = 0.0_WP
+!!PS     stress_surf= 0.0_WP
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -2400,12 +2388,8 @@ subroutine oce_timestep_ale(n, mesh)
     end if
     t1=MPI_Wtime()    
     !___________________________________________________________________________
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN in UV_rhs before call compute_vel_rhs(mesh), mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN in UV before call compute_vel_rhs(mesh), mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs before call compute_vel_rhs(mesh), mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV before call compute_vel_rhs(mesh), mype=',mype
-    
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
+    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 1'
     if(mom_adv/=3) then
         call compute_vel_rhs(mesh)
     else
@@ -2413,29 +2397,15 @@ subroutine oce_timestep_ale(n, mesh)
     end if
     
     !___________________________________________________________________________
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN UV_rhs before call viscosity_filter, mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN UV before call viscosity_filter, mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs before call viscosity_filter(mesh), mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV before call viscosity_filter(mesh), mype=',mype
-    
+    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 2'
     call viscosity_filter(visc_option, mesh)
-    
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN in UV_rhs after call viscosity_filter, mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN in UV after call viscosity_filter, mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs after call viscosity_filter(mesh), mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV after call viscosity_filter(mesh), mype=',mype
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
+    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 3'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
-    
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN in UV_rhs after call impl_vert_visc_ale, mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN in UV after call impl_vert_visc_ale, mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs after call impl_vert_visc_ale(mesh), mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV after call impl_vert_visc_ale(mesh), mype=',mype
-        
     t2=MPI_Wtime()
-    
+    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 4'
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
@@ -2447,51 +2417,15 @@ subroutine oce_timestep_ale(n, mesh)
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
     call compute_ssh_rhs_ale(mesh)
     
-!!PS     loc = maxval(ssh_rhs(1:myDim_nod2D))
-!!PS     call MPI_AllREDUCE(loc , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-!!PS     if (mype==0) write(*,*) '  --> global max ssh_rhs = ',glo
-!!PS     loc = minval(ssh_rhs(1:myDim_nod2D))
-!!PS     call MPI_AllREDUCE(loc , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-!!PS     if (mype==0) write(*,*) '  --> global min ssh_rhs = ',glo
-!!PS     loc = minval(abs(ssh_rhs(1:myDim_nod2D)))
-!!PS     call MPI_AllREDUCE(loc , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-!!PS     if (mype==0) write(*,*) '  --> global min |ssh_rhs| = ',glo
-    
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
     call solve_ssh_ale(mesh)
     t3=MPI_Wtime() 
-    
-!!PS     do node=1,myDim_nod2D
-!!PS         if (d_eta(node)/=d_eta(node) )then
-!!PS             write(*,*) '--> found d_eta NaN'
-!!PS             write(*,*) 'mype   =', mype
-!!PS             write(*,*) 'node   =', node
-!!PS             write(*,*) 'lon,lat=', geo_coord_nod2D(:,node)/rad
-!!PS             write(*,*) 'nzmin,nzmax', ulevels_nod2D(node), nlevels_nod2D(node)
-!!PS             write(*,*) 'd_eta(n)       =', d_eta(node)
-!!PS             write(*,*) 'ssh_rhs(n)     =', ssh_rhs(node)
-!!PS             write(*,*) 'ssh_rhs_old(n) =', ssh_rhs_old(node)
-!!PS             write(*,*) 'hbar(n) =', hbar(node)
-!!PS             write(*,*) 'hbar_old(n) =', hbar_old(node)
-!!PS         end if 
-!!PS     end do 
 
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
-    
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN in UV_rhs before call update_vel, mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN in UV before call update_vel, mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs before call update_vel, mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV before call update_vel, mype=',mype
-    
     call update_vel(mesh)
-    
-!!PS     if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> find NaN in UV_rhs after call update_vel, mype=',mype
-!!PS     if (any(UV/=UV)) write(*,*) ' --> find NaN in UV after call update_vel, mype=',mype
-!!PS     if (any(abs(UV_rhs)>1e15)) write(*,*) ' --> find Inf in UV_rhs after call update_vel, mype=',mype
-!!PS     if (any(abs(UV)>1e15)) write(*,*) ' --> find Inf in UV after call update_vel, mype=',mype
     
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
@@ -2523,22 +2457,26 @@ subroutine oce_timestep_ale(n, mesh)
         call fer_gamma2vel(mesh)
     end if
     t6=MPI_Wtime() 
+    
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
     t7=MPI_Wtime() 
+    
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-!!PS     call solve_tracers_ale(mesh)
+    call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
+    
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
+    
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq, mesh)

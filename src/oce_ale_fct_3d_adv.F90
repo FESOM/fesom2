@@ -681,6 +681,13 @@ subroutine fct_ale(ttf, iter_yn, mesh)
                 UV_rhs(2,nz,elem)= bignumber
             end do
         endif
+        if (nu1>1) then
+            !!PS do nz=nlevels(elem),nl-1
+            do nz=nu1,nu1-1
+                UV_rhs(1,nz,elem)=-bignumber
+                UV_rhs(2,nz,elem)= bignumber
+            end do
+        endif
     end do ! --> do elem=1, myDim_elem2D
     
     !___________________________________________________________________________
@@ -689,7 +696,6 @@ subroutine fct_ale(ttf, iter_yn, mesh)
     !            above and below, which leaves wide bounds because typically 
     !            vertical gradients are larger.  
     if(vlimit==1) then
-        !Horizontal
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
@@ -708,8 +714,10 @@ subroutine fct_ale(ttf, iter_yn, mesh)
             !___________________________________________________________________
             ! calc max,min increment of surface layer with respect to low order 
             ! solution 
-            fct_ttf_max(1,n)=tvert_max(1)-fct_LO(1,n)
-            fct_ttf_min(1,n)=tvert_min(1)-fct_LO(1,n)
+            !!PS fct_ttf_max(1,n)=tvert_max(1)-fct_LO(1,n)
+            !!PS fct_ttf_min(1,n)=tvert_min(1)-fct_LO(1,n)
+            fct_ttf_max(nu1,n)=tvert_max(nu1)-fct_LO(nu1,n)
+            fct_ttf_min(nu1,n)=tvert_min(nu1)-fct_LO(nu1,n)
             
             ! calc max,min increment from nz-1:nz+1 with respect to low order 
             ! solution at layer nz

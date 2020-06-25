@@ -358,9 +358,16 @@ contains
    
 ! boundary layer diffusivities
     CALL blmix_kpp(viscA, diffK, mesh)
-    
+    if (any(blmc/=blmc)) then 
+        write(*,*) ' --> found NaN blmc MARK 1'
+        call par_ex(0)
+    end if 
 ! enhance diffusivity at interface kbl - 1
     CALL enhance(viscA, diffK, mesh)
+    if (any(blmc/=blmc)) then 
+        write(*,*) ' --> found NaN blmc MARK 2'
+        call par_ex(0)
+    end if    
     
     if (smooth_blmc) then
        call exchange_nod(blmc(:,:,1))
@@ -373,6 +380,10 @@ contains
           call smooth_nod(blmc(:,:,j), 3, mesh)
        end do
     end if
+    if (any(blmc/=blmc)) then 
+        write(*,*) ' --> found NaN blmc MARK 3'
+        call par_ex(0)
+    end if     
     
 ! then combine blmc and viscA/diffK
 
@@ -976,10 +987,13 @@ contains
       ! level thickness
         !!PS dthick(2:nl1-1)=0.5_WP*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
         !!PS dthick(1)=dthick(2)
-        dthick(nu1+1:nl1-1)=0.5_WP*(ABS(zbar_3d_n(nu1+2:nl1,node))-ABS(zbar_3d_n(nu1:nl1-2,node)))
-        dthick(nu1)=dthick(nu1+1)
-        dthick(nl1)=dthick(nl1-1)
-
+        !!PS dthick(nu1+1:nl1-1)=0.5_WP*(ABS(zbar_3d_n(nu1+2:nl1,node))-ABS(zbar_3d_n(nu1:nl1-2,node)))
+        !!PS dthick(nu1)=dthick(nu1+1)
+        !!PS dthick(nl1)=dthick(nl1-1)
+        dthick(nu1+1:nl1-1)=0.5_WP*(hnode(nu1:nl1-2,node)+hnode(nu1+1:nl1-1,node) )
+        dthick(nu1)=hnode(nu1,node)*0.5_WP
+        dthick(nl1)=hnode(nl1-1,node)*0.5_WP
+        
         !!PS diff_col(1:nl1-1,1)=viscA(1:nl1-1,node)
         !!PS diff_col(1:nl1-1,2:3)=diffK(1:nl1-1,node,:)
         diff_col(nu1:nl1-1,1)=viscA(nu1:nl1-1,node)
@@ -996,7 +1010,7 @@ contains
         
         kn = INT(caseA(node)+epsln) *(kbl(node) -1) +   &
              (1-INT(caseA(node)+epsln)) * kbl(node)
-
+        kn   = min(kn,nl1-1)
         !!PS knm1 = MAX(kn-1,1)
         knm1 = MAX(kn-1,nu1)
         knp1 = MIN(kn+1,nl1)
@@ -1009,9 +1023,9 @@ contains
         delhat = ABS(Z(kn))-hbl(node)
         R      = 1.0_WP - delhat / dthick(kn)
 
-       dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
-       dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
-       viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+        dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
+        dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
+        viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
             R  * (dvdzdn + abs(dvdzdn)) )
         
         dvdzup = (diff_col(knm1,3) - diff_col(kn,3))/dthick(kn)
@@ -1021,6 +1035,7 @@ contains
 
         dvdzup = (diff_col(knm1,2) - diff_col(kn,2))/dthick(kn)
         dvdzdn = (diff_col(kn,2) - diff_col(knp1,2))/dthick(knp1)
+        
         diftp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
              R  * (dvdzdn + ABS(dvdzdn)) )
 
@@ -1041,7 +1056,7 @@ contains
         gat1t = difth /  (hbl(node) + epsln) / (ws + epsln)
         dat1t = -diftp / (ws+epsln) + f1 * difth 
         dat1t = min(dat1t, 0.0_WP) 
-
+        
         !!PS DO nz=2,nlevels_nod2d(node)-1
         DO nz=nu1+1,nl1-1
 

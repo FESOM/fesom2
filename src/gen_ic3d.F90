@@ -533,11 +533,11 @@ CONTAINS
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
       
       !_________________________________________________________________________
-      ! Homogenous temp salt initialisation
-      do n=1,myDim_nod2d + eDim_nod2D
-            tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1) = 16.0
-            tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2) = 35.0
-      end do 
+      ! Homogenous temp salt initialisation --> for testing and debuging
+!!PS       do n=1,myDim_nod2d + eDim_nod2D
+!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1) = 16.0
+!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2) = 35.0
+!!PS       end do 
         
       !_________________________________________________________________________
       ! check initial fields

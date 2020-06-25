@@ -126,6 +126,15 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
+        if (arr(nz,n)/=arr(nz,n)) then
+            write(*,*) ' --> found NaN in smoothing'
+            write(*,*) ' mype = ', mype
+            write(*,*) ' n    = ', n
+            write(*,*) ' nz,uln,nln      = ', nz,uln,nln
+            write(*,*) ' arr(nz,n)       = ', arr(nz,n)
+            write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
+            write(*,*) ' vol(nz,n)       = ', vol(nz,n)
+        endif 
      END DO
   end DO
   
@@ -156,6 +165,8 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
 ! combined: scale by patch volume + copy back to original field
      DO n=1, myDim_nod2D
         !!PS DO nz=1, min(nlev, nlevels_nod2d(n))
+        uln = ulevels_nod2d(n)
+        nln = min(nlev,nlevels_nod2d(n))
         DO nz=uln,nln
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
@@ -212,7 +223,6 @@ subroutine smooth_elem3D(arr, N, mesh)
 #include "associate_mesh.h"  
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     
-    !!PS Why we need ubound? Are we not always smoothing the entire 3d array 
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
@@ -310,56 +320,34 @@ subroutine extrap_nod3D(arr, mesh)
     logical                        :: success
     real(kind=WP)                  :: loc_max, glob_max
     integer                        :: loc_sum, glob_sum, glob_sum_old
-    integer                        :: iter1, iter2
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
     allocate(work_array(myDim_nod2D+eDim_nod2D))
-    
-    !___________________________________________________________________________
     call exchange_nod(arr)
     
-    !!PS loc_max=maxval(arr(1,:))
-!!PS     if (any(ulevels_nod2D>1)) then
-!!PS         loc_max = 0.0
-!!PS         do n= 1, myDim_nod2D
-!!PS             if (ulevels_nod2D(n)==1) loc_max = max(loc_max,arr(1,n))
-!!PS         end do
-!!PS     else
-        loc_max=maxval(arr(1,:))
-!!PS     end if 
+    !___________________________________________________________________________
+    loc_max=maxval(arr(1,:))
     glob_max=0._WP
     call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     glob_sum=-1
-    !___________________________________________________________________________
-!!PS     if (mype ==68) write(*,*) 'arr(1,:)=',arr(1,:) 
-!!PS     if (mype ==68) write(*,*) 'ulevels_nod2D=',ulevels_nod2D
-!!PS     if (mype ==68) write(*,*) 'ulevels=',ulevels
-    iter1=0
+
     !___________________________________________________________________________
     do while (glob_max>0.99_WP*dummy)  
-        iter1=iter1+1
         !_______________________________________________________________________
         ! extrapolate in horizontal direction
         do nz=1, nl-1
             work_array=arr(nz,:)
             success=.true.
-!!PS             if (all(ulevels_nod2d>nz)) success=.false.
             
             !___________________________________________________________________
             ! horizontal extrapolation 
-            iter2=0
             do while (success) ! --> do while runs as long as success==.true.
-                iter2 = iter2+1
                 success=.false.
                 
                 !_______________________________________________________________
                 ! loop over local vertices n 
                 do n=1, myDim_nod2D+eDim_nod2D
-                
-                    ! n is cavity doesn't need extrapolation 
-!!PS                     if (nz<ulevels_nod2D(n)) cycle 
-                    
                     ! found node n that has to be extrapolated
                     if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
                         cnt=0
@@ -371,13 +359,10 @@ subroutine extrap_nod3D(arr, mesh)
                             el=nod_in_elem2D(k, n)
                             
                             if (nz>nlevels(el)) cycle
-!!PS                             if (nz<ulevels(el)) cycle
-                            
                             enodes=elem2D_nodes(:, el)
                             !___________________________________________________
                             ! loop over vertices of adjacent element 
                             do j=1, 3
-!!PS                                 if (nz<ulevels_nod2D(enodes(j))) cycle
                                 if (enodes(j)==0) cycle
                                 if ((work_array(enodes(j))<0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j))>nz)) then
                                     val=val+work_array(enodes(j))
@@ -407,38 +392,8 @@ subroutine extrap_nod3D(arr, mesh)
         call exchange_nod(arr)
         
         !_______________________________________________________________________
-        !!PS loc_max=maxval(arr(1,:))
-!!PS         if (any(ulevels_nod2D>1)) then
-!!PS             loc_max = 0.0
-!!PS             loc_sum = 0.0
-!!PS             do n= 1, myDim_nod2D
-!!PS                 !!PS loc_max = max(loc_max,arr(ulevels_nod2D(n),n))
-!!PS                 !!PS loc_sum = loc_sum + sum(float(arr(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)>0.99_WP*dummy))
-!!PS !!PS                 if(ulevels_nod2D(n)==1 ) then
-!!PS                     loc_max = max(loc_max,arr(1,n))
-!!PS                     loc_sum = loc_sum + int(float(arr(1,n)>0.99_WP*dummy))
-!!PS !!PS                 end if     
-!!PS             end do
-!!PS         else
-            loc_max=maxval(arr(1,:))
-!!PS         end if 
+        loc_max=maxval(arr(1,:))
         call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
-!!PS         glob_sum_old=glob_sum
-!!PS         call MPI_AllREDUCE(loc_sum, glob_sum, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)   
-        
-!!PS         if ( (glob_sum_old>-1) .and. (glob_sum_old == glob_sum)) then
-!!PS             if (mype==0) then
-!!PS                 write(*,*)
-!!PS                 print *, achar(27)//'[33m'
-!!PS                 write(*,*) '____________________________________________________________________'
-!!PS                 write(*,*) ' ERROR: extrapolation of initialisation values does not converge,'
-!!PS                 write(*,*) '        do while extrapolation loops hangs!'
-!!PS                 write(*,*) '____________________________________________________________________'
-!!PS                 print *, achar(27)//'[0m'
-!!PS                 call par_ex(0)
-!!PS                 write(*,*)
-!!PS             endif 
-!!PS         end if     
         
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
     
