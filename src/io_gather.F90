@@ -35,8 +35,7 @@ contains
     end if
     call MPI_Bcast(remList_nod2D, size(remList_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
 
-    if(mype == 0) rank0Dim_nod2D = myDim_nod2D
-    call mpi_bcast(rank0Dim_nod2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    rank0Dim_nod2D = mesh%nod2D - remPtr_nod2D(npes) +1
 
     if(mype == 0) then
       allocate(rank0List_nod2D(0))
@@ -48,7 +47,6 @@ contains
 
     if( mype == root_rank ) then
       request_index = 1
-      rank0Dim_nod2D = mesh%nod2D - remPtr_nod2D(npes) +1
       do remote_rank = 0, npes-1
         if(remote_rank == root_rank) cycle
         if(remote_rank == 0) then
