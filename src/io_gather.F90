@@ -150,32 +150,30 @@ end subroutine gather_real4_nod2D
     integer        :: req(npes-1)
     integer        :: start, e2D
     
-    if (npes> 1) then
-      call mpi_barrier(MPI_COMM_FESOM,MPIerr)
+    call mpi_barrier(MPI_COMM_FESOM,MPIerr)
 
-      if ( mype == 0 ) then
-        if (npes>1) then
-          allocate(recvbuf(remPtr_elem2D(npes)))
-          do  n = 1, npes-1
-            e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-            start = remPtr_elem2D(n)
-            call mpi_irecv(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
-          end do
+    if ( mype == 0 ) then
+      if (npes>1) then
+        allocate(recvbuf(remPtr_elem2D(npes)))
+        do  n = 1, npes-1
+          e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
+          start = remPtr_elem2D(n)
+          call mpi_irecv(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+        end do
 
-          arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+        arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
 
-          call mpi_waitall(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+        call mpi_waitall(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
 
-          arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) = recvbuf(1 : remPtr_elem2D(npes)-1)
+        arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) = recvbuf(1 : remPtr_elem2D(npes)-1)
 
-          deallocate(recvbuf)
-        else
-          arr2D_global(:) = arr2D(:)
-        end if
-
+        deallocate(recvbuf)
       else
-        call mpi_send( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+        arr2D_global(:) = arr2D(:)
       end if
+
+    else
+      call mpi_send( arr2D, myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
     end if
 
   end subroutine
