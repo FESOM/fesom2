@@ -6,6 +6,10 @@ module io_gather_module
   logical, save :: nod2D_lists_initialized = .false.
   integer, save :: rank0Dim_nod2D
   integer, save, allocatable, dimension(:) :: rank0List_nod2D
+
+  logical, save :: elem2D_lists_initialized = .false.
+  integer, save :: rank0Dim_elem2D
+  integer, save, allocatable, dimension(:) :: rank0List_elem2D
   
 contains
 
@@ -40,6 +44,36 @@ contains
     nod2D_lists_initialized = .true.
   end subroutine
 
+
+  subroutine init_elem2D_lists()
+    use g_PARSUP
+    implicit none
+    ! EO args
+
+    ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
+    if(mype /= 0) then
+      if(.not. allocated(remPtr_elem2D)) allocate(remPtr_elem2D(npes))
+    end if
+    call MPI_Bcast(remPtr_elem2D, size(remPtr_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    if(mype /= 0) then
+      if(.not. allocated(remList_elem2D)) allocate(remList_elem2D(remPtr_elem2D(npes)))
+    end if
+    call MPI_Bcast(remList_elem2D, size(remList_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+
+    if(mype == 0) rank0Dim_elem2D = myDim_elem2D
+    call mpi_bcast(rank0Dim_elem2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+
+    if(mype == 0) then
+      allocate(rank0List_elem2D(0))
+      call mpi_bcast(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    else
+      allocate(rank0List_elem2D(rank0Dim_elem2D))
+      call mpi_bcast(rank0List_elem2D, size(rank0List_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+    end if
+
+    elem2D_lists_initialized = .true.
+  end subroutine
+  
 
   subroutine gather_nod2D(arr2D, arr2D_global, root_rank, mesh)
     use g_PARSUP
@@ -167,30 +201,8 @@ end subroutine gather_real4_nod2D
     real(real64), allocatable              :: recvbuf(:)
     integer                   :: req(npes-1)
     integer :: request_index
-    integer :: rank0Dim_elem2D
-    integer, allocatable, dimension(:) :: rank0List_elem2D
 
-    ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
-    if(mype /= 0) then
-      if(.not. allocated(remPtr_elem2D)) allocate(remPtr_elem2D(npes))
-    end if
-    call MPI_Bcast(remPtr_elem2D, size(remPtr_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-    if(mype /= 0) then
-      if(.not. allocated(remList_elem2D)) allocate(remList_elem2D(remPtr_elem2D(npes)))
-    end if
-    call MPI_Bcast(remList_elem2D, size(remList_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-
-    if(mype == 0) rank0Dim_elem2D = myDim_elem2D
-    call mpi_bcast(rank0Dim_elem2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-
-    if(mype == 0) then
-      allocate(rank0List_elem2D(0))
-      call mpi_bcast(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-    else
-      allocate(rank0List_elem2D(rank0Dim_elem2D))
-      call mpi_bcast(rank0List_elem2D, size(rank0List_elem2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-    end if
-
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
 
     if( mype == root_rank ) then
       allocate(recvbuf(remPtr_elem2D(npes)))
