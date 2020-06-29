@@ -3,27 +3,19 @@ module io_gather_module
   public gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
 
-
+  logical, save :: nod2D_lists_initialized = .false.
+  integer, save :: rank0Dim_nod2D
+  integer, save, allocatable, dimension(:) :: rank0List_nod2D
+  
 contains
 
 
-  subroutine gather_nod2D(arr2D, arr2D_global, root_rank, mesh)
+  subroutine init_nod2D_lists(mesh)
     use g_PARSUP
     use mod_mesh
     implicit none
     type(t_mesh), intent(in) :: mesh
-    real(real64), intent(in)  :: arr2D(myDim_nod2D+eDim_nod2D)
-    real(real64), intent(out) :: arr2D_global(mesh%nod2D)
-    integer, intent(in) :: root_rank ! rank of receiving process
     ! EO args
-    integer  ::  remote_rank = -1
-    integer :: remote_node_count = -1
-    real(real64)              :: sendbuf(myDim_nod2D)
-    real(real64)              :: recvbuf(mesh%nod2D) ! todo: alloc only for root_rank
-    integer                   :: req(npes-1)
-    integer :: request_index
-    integer :: rank0Dim_nod2D
-    integer, allocatable, dimension(:) :: rank0List_nod2D
 
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
     if(mype /= 0) then
@@ -44,6 +36,28 @@ contains
       allocate(rank0List_nod2D(rank0Dim_nod2D))
       call mpi_bcast(rank0List_nod2D, size(rank0List_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
     end if
+    
+    nod2D_lists_initialized = .true.
+  end subroutine
+
+
+  subroutine gather_nod2D(arr2D, arr2D_global, root_rank, mesh)
+    use g_PARSUP
+    use mod_mesh
+    implicit none
+    type(t_mesh), intent(in) :: mesh
+    real(real64), intent(in)  :: arr2D(myDim_nod2D+eDim_nod2D)
+    real(real64), intent(out) :: arr2D_global(mesh%nod2D)
+    integer, intent(in) :: root_rank ! rank of receiving process
+    ! EO args
+    integer  ::  remote_rank = -1
+    integer :: remote_node_count = -1
+    real(real64)              :: sendbuf(myDim_nod2D)
+    real(real64)              :: recvbuf(mesh%nod2D) ! todo: alloc only for root_rank
+    integer                   :: req(npes-1)
+    integer :: request_index
+
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists(mesh)
 
     if( mype == root_rank ) then
       request_index = 1
