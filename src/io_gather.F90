@@ -14,11 +14,9 @@ module io_gather_module
 contains
 
 
-  subroutine init_nod2D_lists(mesh)
+  subroutine init_nod2D_lists()
     use g_PARSUP
-    use mod_mesh
     implicit none
-    type(t_mesh), intent(in) :: mesh
     ! EO args
 
     ! todo: initialize with the other comm arrays, probably in "init_gatherLists" subroutine 
@@ -31,7 +29,8 @@ contains
     end if
     call MPI_Bcast(remList_nod2D, size(remList_nod2D), MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
 
-    rank0Dim_nod2D = mesh%nod2D - remPtr_nod2D(npes) +1
+    if(mype == 0) rank0Dim_nod2D = myDim_nod2D
+    call mpi_bcast(rank0Dim_nod2D, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
 
     if(mype == 0) then
       allocate(rank0List_nod2D(0))
@@ -80,19 +79,19 @@ contains
     use mod_mesh
     implicit none
     type(t_mesh), intent(in) :: mesh
-    real(real64), intent(in)  :: arr2D(myDim_nod2D+eDim_nod2D)
-    real(real64), intent(out) :: arr2D_global(mesh%nod2D)
+    real(real64), intent(in)  :: arr2D(:)
+    real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
     ! EO args
     integer  ::  remote_rank = -1
     integer :: remote_node_count = -1
-    real(real64)              :: sendbuf(myDim_nod2D)
-    real(real64)              :: recvbuf(mesh%nod2D) ! todo: alloc only for root_rank
+    real(real64), allocatable :: sendbuf(:)
+    real(real64), allocatable :: recvbuf(:) ! todo: alloc only for root_rank
     integer                   :: req(npes-1)
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists(mesh)
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
 
     include "io_gather_nod.inc"  
   end subroutine

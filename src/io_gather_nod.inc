@@ -1,6 +1,5 @@
-  
-
     if( mype == root_rank ) then
+      allocate(recvbuf(mesh%nod2D))
       request_index = 1
       do remote_rank = 0, npes-1
         if(remote_rank == root_rank) cycle
@@ -30,6 +29,7 @@
         end if
       end do
     else
+      allocate(sendbuf(myDim_nod2D))
       sendbuf(1:myDim_nod2D) = arr2D(1:myDim_nod2D)
       call mpi_send(sendbuf, myDim_nod2D, mpi_precision, root_rank, 2, MPI_COMM_FESOM, MPIerr)
     end if
