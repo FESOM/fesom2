@@ -90,43 +90,11 @@ contains
     real(real64)              :: recvbuf(mesh%nod2D) ! todo: alloc only for root_rank
     integer                   :: req(npes-1)
     integer :: request_index
+    integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
     if(.not. nod2D_lists_initialized) call init_nod2D_lists(mesh)
 
-    if( mype == root_rank ) then
-      request_index = 1
-      do remote_rank = 0, npes-1
-        if(remote_rank == root_rank) cycle
-        if(remote_rank == 0) then
-          remote_node_count = rank0Dim_nod2D
-        else
-          remote_node_count = remPtr_nod2D(remote_rank+1) - remPtr_nod2D(remote_rank)
-        endif
-
-        if(remote_rank == 0) then
-          call mpi_irecv(recvbuf(remPtr_nod2D(npes)), remote_node_count, MPI_DOUBLE_PRECISION, remote_rank, 2, MPI_COMM_FESOM, req(request_index), MPIerr)
-        else
-          call mpi_irecv(recvbuf(remPtr_nod2D(remote_rank)), remote_node_count, MPI_DOUBLE_PRECISION, remote_rank, 2, MPI_COMM_FESOM, req(request_index), MPIerr)
-        endif
-        request_index = request_index + 1
-      end do
-    
-      call mpi_waitall(size(req), req, MPI_STATUSES_IGNORE, MPIerr)    
-    
-      do remote_rank = 0, npes-1
-        if(remote_rank == root_rank) then
-          arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D) ! local data
-        else if(remote_rank == 0) then
-          arr2D_global(rank0List_nod2D(1:rank0Dim_nod2D)) = recvbuf(remPtr_nod2D(npes):remPtr_nod2D(npes)+rank0Dim_nod2D-1) ! rank 0 data
-        else
-          arr2D_global(remList_nod2D(remPtr_nod2D(remote_rank):remPtr_nod2D(remote_rank+1)-1)) = recvbuf(remPtr_nod2D(remote_rank):remPtr_nod2D(remote_rank+1)-1) ! data of any rank!=0
-        end if
-      end do
-    else
-      sendbuf(1:myDim_nod2D) = arr2D(1:myDim_nod2D)
-      call mpi_send(sendbuf, myDim_nod2D, MPI_DOUBLE_PRECISION, root_rank, 2, MPI_COMM_FESOM, MPIerr)
-    end if
-  
+    include "io_gather_nod.inc"  
   end subroutine
 
 
