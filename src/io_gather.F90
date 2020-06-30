@@ -97,60 +97,27 @@ contains
   end subroutine
 
 
-subroutine gather_real4_nod2D(arr2D, arr2D_global)
+  subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank, mesh)
+    use g_PARSUP
+    use mod_mesh
+    implicit none
+    type(t_mesh), intent(in) :: mesh
+    real(real32), intent(in)  :: arr2D(:)
+    real(real32), intent(out) :: arr2D_global(:)
+    integer, intent(in) :: root_rank ! rank of receiving process
+    ! EO args
+    integer  ::  remote_rank = -1
+    integer :: remote_node_count = -1
+    real(real32), allocatable :: sendbuf(:)
+    real(real32), allocatable :: recvbuf(:) ! todo: alloc only for root_rank
+    integer                   :: req(npes-1)
+    integer :: request_index
+    integer :: mpi_precision = MPI_REAL
 
-! Make nodal information available to master PE 
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
 
-use g_PARSUP
-USE o_MESH
-
-IMPLICIT NONE
-
-integer      :: n
-
-real(real32)  ::  arr2D(:)
-real(real32)  ::  arr2D_global(:)
-real(real32), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
-
- if (npes> 1) then
-
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-
-! Consider MPI-datatypes to recv directly into arr2D_global!
-
-IF ( mype == 0 ) THEN
-   
-   if (npes>1) then
-      allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
-      enddo
-      
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
-   
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
-   
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
-      deallocate(recvbuf)
-   else
-
-      arr2D_global(:) = arr2D(:)
-     
-   endif
-
-ELSE
-   
-   call MPI_SEND( arr2D, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
-   
-ENDIF
-
-endif
-end subroutine gather_real4_nod2D
+    include "io_gather_nod.inc"  
+  end subroutine
 
 
   subroutine gather_elem2D(arr2D, arr2D_global, root_rank, mesh)
@@ -176,64 +143,27 @@ end subroutine gather_real4_nod2D
   end subroutine
 
 
-subroutine gather_real4_elem2D(arr2D, arr2D_global)
+  subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank, mesh)
+    use g_PARSUP
+    use mod_mesh
+    implicit none
+    type(t_mesh), intent(in) :: mesh
+    real(real32), intent(in)  :: arr2D(:)
+    real(real32), intent(out) :: arr2D_global(:)
+    integer, intent(in) :: root_rank ! rank of receiving process
+    ! EO args
+    integer  ::  remote_rank = -1
+    integer :: remote_elem_count = -1
+    real(real32), allocatable              :: sendbuf(:)
+    real(real32), allocatable              :: recvbuf(:)
+    integer                   :: req(npes-1)
+    integer :: request_index
+    integer :: mpi_precision = MPI_REAL
 
-! Make element information available to master PE 
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
 
-use g_PARSUP
-USE o_MESH
-
-IMPLICIT NONE
-
-integer      :: n
-
-real(real32)  ::  arr2D(:)
-real(real32)  ::  arr2D_global(:)
-real(real32), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, e2D
-
-
- if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-
-! Consider MPI-datatypes to recv directly into arr2D_global!
-
-IF ( mype == 0 ) THEN
-   
-   if (npes>1) then
-
-      allocate(recvbuf(remPtr_elem2D(npes)))
-
-      do  n = 1, npes-1
-         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
-      enddo
-      
-      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
-   
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
-   
-      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
-
-      deallocate(recvbuf)
-
-   else
-
-      arr2D_global(:) = arr2D(:)
-     
-   endif
-
-ELSE
-   
-   call MPI_SEND( arr2D, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
-   
-ENDIF
-end if
-
-end subroutine gather_real4_elem2D
+    include "io_gather_elem.inc"
+  end subroutine
 
 end module
 
