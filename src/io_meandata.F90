@@ -13,6 +13,8 @@ module io_MEANDATA
 !
   integer, parameter  :: i_real8=8, i_real4=4
 
+  integer, parameter :: root_rank = 0
+
 
   type Meandata
     private
@@ -491,7 +493,7 @@ subroutine create_new_file(entry)
 
   type(Meandata), intent(inout) :: entry
   ! Serial output implemented so far
-  if (mype/=0) return
+  if (mype/=root_rank) return
   ! create an ocean output file
   write(*,*) 'initializing I/O file for ', trim(entry%name)
 
@@ -528,7 +530,7 @@ subroutine assoc_ids(entry)
   integer                       :: j, k
   real(real64)                  :: rtime !timestamp of the record
   ! Serial output implemented so far
-  if (mype/=0) return
+  if (mype/=root_rank) return
   ! open existing netcdf file
   write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
@@ -586,7 +588,7 @@ subroutine write_mean(entry, mesh)
 #include  "associate_mesh.h"
 
   ! Serial output implemented so far
-  if (mype==0) then
+  if (mype==root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
@@ -596,23 +598,23 @@ subroutine write_mean(entry, mesh)
         size1=entry%glsize(1)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==0) allocate(aux_r8(size1))
-           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
-           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8)
-           if (mype==0) then
+           if (mype==root_rank) allocate(aux_r8(size1))
+           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8, root_rank, mesh)
+           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1:entry%lcsize(1),1), aux_r8, root_rank, mesh)
+           if (mype==root_rank) then
               call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1), __LINE__)
            end if
-           if (mype==0) deallocate(aux_r8)
+           if (mype==root_rank) deallocate(aux_r8)
         
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
-           if (mype==0) allocate(aux_r4(size1))
-           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
-           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
-           if (mype==0) then
-              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
+           if (mype==root_rank) allocate(aux_r4(size1))
+           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4, root_rank, mesh)
+           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4, root_rank, mesh)
+           if (mype==root_rank) then
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
            end if
-           if (mype==0) deallocate(aux_r4)
+           if (mype==root_rank) deallocate(aux_r4)
         endif
 
 !_______writing 3D fields________________________________________________
@@ -621,30 +623,30 @@ subroutine write_mean(entry, mesh)
         size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==0) allocate(aux_r8(size2))
+           if (mype==root_rank) allocate(aux_r8(size2))
            do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
-              if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
-              if (mype==0) then
+             if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8, root_rank, mesh)
+             if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8, root_rank, mesh)
+              if (mype==root_rank) then
                  call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
               end if
            end do
-           if (mype==0) deallocate(aux_r8)
+           if (mype==root_rank) deallocate(aux_r8)
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
-           if (mype==0) allocate(aux_r4(size2))
+           if (mype==root_rank) allocate(aux_r4(size2))
            do lev=1, size1
-              if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
-              if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
-              if (mype==0) then
+             if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4, root_rank, mesh)
+             if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4, root_rank, mesh)
+              if (mype==root_rank) then
                  call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
               end if
            end do
-           if (mype==0) deallocate(aux_r4)
+           if (mype==root_rank) deallocate(aux_r4)
         endif
      end if
 
-  if (mype==0) call assert_nf(nf_close(entry%ncid), __LINE__)
+  if (mype==root_rank) call assert_nf(nf_close(entry%ncid), __LINE__)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
