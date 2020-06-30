@@ -41,7 +41,7 @@ elif [[  $LOGINHOST = ubuntu ]]; then
    STRATEGY="ubuntu"
 elif [[  $LOGINHOST = bsc ]]; then
    STRATEGY="bsc"
-elif [[  $LOGINHOST =~ ^juwels[0-9]+\.fz\-juelich\.de$ ]]; then
+elif [[  $LOGINHOST =~ ^juwels[0-9]+\.ib\.juwels\.fzj\.de$ ]]; then
    STRATEGY="juwels"
 else
    echo "can not determine environment for host: "$LOGINHOST
