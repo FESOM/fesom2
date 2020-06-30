@@ -600,6 +600,13 @@ subroutine create_new_file(entry)
      entry%error_status(c) = nf_put_att_real(entry%ncid, entry%varID, 'scale_factor', NF_REAL, 1, entry%scale_factor); c=c+1
      entry%error_status(c) = nf_put_att_real(entry%ncid, entry%varID, 'add_offset',   NF_REAL, 1, entry%add_offset);   c=c+1
   endif
+
+  if (entry%ndim==1) then
+     entry%error_status(c) = nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1/)); c=c+1
+  elseif (entry%ndim==2) then
+     entry%error_status(c) = nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1,  entry%glsize(1)/)); c=c+1
+  endif
+
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description); c=c+1
   entry%error_status(c)=nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units);       c=c+1
   entry%error_status(c)=nf_close(entry%ncid); c=c+1
