@@ -74,11 +74,10 @@ contains
   end subroutine
   
 
-  subroutine gather_nod2D(arr2D, arr2D_global, root_rank, mesh)
+  subroutine gather_nod2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
-    use mod_mesh
+    use, intrinsic :: iso_fortran_env, only: real64
     implicit none
-    type(t_mesh), intent(in) :: mesh
     real(real64), intent(in)  :: arr2D(:)
     real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
@@ -97,11 +96,10 @@ contains
   end subroutine
 
 
-  subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank, mesh)
+  subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
-    use mod_mesh
+    use, intrinsic :: iso_fortran_env, only: real32
     implicit none
-    type(t_mesh), intent(in) :: mesh
     real(real32), intent(in)  :: arr2D(:)
     real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
@@ -120,11 +118,10 @@ contains
   end subroutine
 
 
-  subroutine gather_elem2D(arr2D, arr2D_global, root_rank, mesh)
+  subroutine gather_elem2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
-    use mod_mesh
+    use, intrinsic :: iso_fortran_env, only: real64
     implicit none
-    type(t_mesh), intent(in) :: mesh
     real(real64), intent(in)  :: arr2D(:)
     real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
@@ -143,11 +140,10 @@ contains
   end subroutine
 
 
-  subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank, mesh)
+  subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
-    use mod_mesh
+    use, intrinsic :: iso_fortran_env, only: real32
     implicit none
-    type(t_mesh), intent(in) :: mesh
     real(real32), intent(in)  :: arr2D(:)
     real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process

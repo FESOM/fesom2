@@ -1,5 +1,5 @@
     if( mype == root_rank ) then
-      allocate(recvbuf(mesh%nod2D))
+      allocate(recvbuf(remPtr_nod2D(npes)+rank0Dim_nod2D))
       request_index = 1
       do remote_rank = 0, npes-1
         if(remote_rank == root_rank) cycle
