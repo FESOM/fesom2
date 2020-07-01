@@ -668,6 +668,7 @@ subroutine output(istep, mesh)
   logical       :: do_output
   type(Meandata), pointer :: entry
   type(t_mesh), intent(in) , target :: mesh
+  character(:), allocatable :: filepath
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io(mesh)
@@ -702,7 +703,10 @@ subroutine output(istep, mesh)
      endif
 
      if (do_output) then
-        entry%filename=trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+        filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+        if(filepath /= trim(entry%filename)) then
+          entry%filename = filepath
+        end if
         call assoc_ids(entry)
         if (entry%accuracy == i_real8) then
            entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
@@ -781,6 +785,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%name = name
   entry%description = description
   entry%units = units
+  entry%filename = ""
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)
@@ -852,6 +857,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%name = name
   entry%description = description
   entry%units = units
+  entry%filename = ""
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)='unknown'
