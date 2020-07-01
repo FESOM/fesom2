@@ -490,7 +490,7 @@ end subroutine compute_diagnostics
 subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     use o_arrays
     use g_PARSUP
-    
+    use oce_adv_tra_driver_interfaces    
     implicit none
     type(t_mesh), intent(in), target :: mesh
     integer, intent(in)      :: tr_num 
@@ -550,7 +550,7 @@ end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     use o_arrays
     use g_PARSUP
-    
+    use oce_adv_tra_driver_interfaces
     implicit none
     integer, intent(in)      :: tr_num 
     integer                  :: node, nz

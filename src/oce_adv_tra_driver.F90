@@ -37,7 +37,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
-    use oce_adv_tra_driver_interfaces
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
