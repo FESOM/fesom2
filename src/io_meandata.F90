@@ -541,7 +541,6 @@ subroutine assoc_ids(entry)
   end if
 
   do j=1, entry%ndim
-!___Create mesh related dimensions__________________________________________
      call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
   end do
 !___Associate time related dimensions_______________________________________
