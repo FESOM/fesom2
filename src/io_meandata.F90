@@ -594,58 +594,40 @@ subroutine write_mean(entry, mesh)
      call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
   end if
-!_______writing 2D fields________________________________________________
-     if (entry%ndim==1) then
-        size2=entry%glsize(2)
+! !_______writing 2D and 3D fields________________________________________________
+  size1=entry%glsize(1)
+  size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
-        if (entry%accuracy == i_real8) then
-           if (mype==root_rank) allocate(aux_r8(size2))
-           if (size2==nod2D)  call gather_nod2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
-           if (size2==elem2D) call gather_elem2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
-           if (mype==root_rank) then
-              call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r8, 1), __LINE__)
+  if (entry%accuracy == i_real8) then
+     if (mype==root_rank) allocate(aux_r8(size2))
+     do lev=1, size1
+       if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
+       if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
+        if (mype==root_rank) then
+           if (entry%ndim==1) then
+             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r8, 1), __LINE__)
+           elseif (entry%ndim==2) then
+             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
            end if
-           if (mype==root_rank) deallocate(aux_r8)
-        
+        end if
+     end do
+     if (mype==root_rank) deallocate(aux_r8)
 !___________writing real 4 byte real _________________________________________ 
-        elseif (entry%accuracy == i_real4) then
-           if (mype==root_rank) allocate(aux_r4(size2))
-           if (size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
-           if (size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
-           if (mype==root_rank) then
+  elseif (entry%accuracy == i_real4) then
+     if (mype==root_rank) allocate(aux_r4(size2))
+     do lev=1, size1
+       if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+       if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+        if (mype==root_rank) then
+           if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r4, 1), __LINE__)
+           elseif (entry%ndim==2) then
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
            end if
-           if (mype==root_rank) deallocate(aux_r4)
-        endif
-
-!_______writing 3D fields________________________________________________
-     elseif (entry%ndim==2) then
-        size1=entry%glsize(1)
-        size2=entry%glsize(2)
-!___________writing 8 byte real_________________________________________ 
-        if (entry%accuracy == i_real8) then
-           if (mype==root_rank) allocate(aux_r8(size2))
-           do lev=1, size1
-             if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
-             if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
-              if (mype==root_rank) then
-                 call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
-              end if
-           end do
-           if (mype==root_rank) deallocate(aux_r8)
-!___________writing real 4 byte real _________________________________________ 
-        elseif (entry%accuracy == i_real4) then
-           if (mype==root_rank) allocate(aux_r4(size2))
-           do lev=1, size1
-             if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
-             if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
-              if (mype==root_rank) then
-                 call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
-              end if
-           end do
-           if (mype==root_rank) deallocate(aux_r4)
-        endif
-     end if
+        end if
+     end do
+     if (mype==root_rank) deallocate(aux_r4)
+  endif
 
   if (mype==root_rank) call assert_nf(nf_close(entry%ncid), __LINE__)
 end subroutine
