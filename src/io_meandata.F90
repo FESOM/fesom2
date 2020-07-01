@@ -598,8 +598,8 @@ subroutine write_mean(entry, mesh)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
            if (mype==root_rank) allocate(aux_r8(size1))
-           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1:size(entry%local_values_r8,dim=1),1), aux_r8, root_rank)
-           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1:size(entry%local_values_r8,dim=1),1), aux_r8, root_rank)
+           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
+           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
            if (mype==root_rank) then
               call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1), __LINE__)
            end if
@@ -608,8 +608,8 @@ subroutine write_mean(entry, mesh)
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
            if (mype==root_rank) allocate(aux_r4(size1))
-           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1:size(entry%local_values_r4,dim=1),1), aux_r4, root_rank)
-           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1:size(entry%local_values_r4,dim=1),1), aux_r4, root_rank)
+           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
+           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
            if (mype==root_rank) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
            end if
@@ -848,17 +848,17 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     call move_alloc(tmparr, io_stream)
   end if
   entry=>io_stream(size(io_stream))
-  entry%ptr3(1:size(data),1:1) => data
+  entry%ptr3(1:1,1:size(data)) => data
   entry%accuracy = accuracy
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
-     allocate(entry%local_values_r8(lcsize, 1))
+     allocate(entry%local_values_r8(1, lcsize))
      ! clean_meanarrays
      entry%local_values_r8 = 0. 
 
   elseif (accuracy == i_real4) then
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
-     allocate(entry%local_values_r4(lcsize, 1))
+     allocate(entry%local_values_r4(1, lcsize))
      ! clean_meanarrays
      entry%local_values_r4 = 0.  
 
