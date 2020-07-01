@@ -487,7 +487,6 @@ subroutine create_new_file(entry)
   use g_clock
   use g_PARSUP
   implicit none
-  integer                       :: j
   character(2000)               :: att_text
 
   type(Meandata), intent(inout) :: entry
@@ -498,10 +497,13 @@ subroutine create_new_file(entry)
 
   call assert_nf( nf_create(entry%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), entry%ncid), __LINE__)
 
-  do j=1, entry%ndim
 !___Create mesh related dimensions__________________________________________
-     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(j), entry%glsize(j), entry%dimID(j)), __LINE__)
-  end do
+  if (entry%ndim==1) then
+     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
+  else if (entry%ndim==2) then
+     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
+  end if
 !___Create time related dimensions__________________________________________
   call assert_nf( nf_def_dim(entry%ncid, 'time', NF_UNLIMITED, entry%recID), __LINE__)
 !___Define the time and iteration variables_________________________________
@@ -594,24 +596,24 @@ subroutine write_mean(entry, mesh)
   end if
 !_______writing 2D fields________________________________________________
      if (entry%ndim==1) then
-        size1=entry%glsize(1)
+        size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
         if (entry%accuracy == i_real8) then
-           if (mype==root_rank) allocate(aux_r8(size1))
-           if (size1==nod2D)  call gather_nod2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
-           if (size1==elem2D) call gather_elem2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
+           if (mype==root_rank) allocate(aux_r8(size2))
+           if (size2==nod2D)  call gather_nod2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
+           if (size2==elem2D) call gather_elem2D(entry%local_values_r8(1,1:size(entry%local_values_r8,dim=1)), aux_r8, root_rank)
            if (mype==root_rank) then
-              call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1), __LINE__)
+              call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r8, 1), __LINE__)
            end if
            if (mype==root_rank) deallocate(aux_r8)
         
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
-           if (mype==root_rank) allocate(aux_r4(size1))
-           if (size1==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
-           if (size1==elem2D) call gather_real4_elem2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
+           if (mype==root_rank) allocate(aux_r4(size2))
+           if (size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
+           if (size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(1,1:size(entry%local_values_r4,dim=1)), aux_r4, root_rank)
            if (mype==root_rank) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r4, 1), __LINE__)
            end if
            if (mype==root_rank) deallocate(aux_r4)
         endif
@@ -865,7 +867,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   endif
 
   entry%ndim=1
-  entry%glsize=(/glsize, 1/)
+  entry%glsize=(/1, glsize/)
   entry%name = name
   entry%description = description
   entry%units = units
