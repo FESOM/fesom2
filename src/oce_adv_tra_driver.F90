@@ -1,0 +1,185 @@
+module oce_adv_tra_driver_interfaces
+  interface
+   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh),  intent(in), target :: mesh
+      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
+      real(kind=WP), intent(in)         :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+      real(kind=WP), intent(in)         :: ttf   (mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+
+    end subroutine
+
+    subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
+    !update the solution for vertical and horizontal flux contributions
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh),  intent(in), target :: mesh
+      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in)         :: flux_h(mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(in)         :: flux_v(mesh%nl,   myDim_nod2D)
+    end subroutine
+  end interface
+end module
+!
+!
+!===============================================================================
+subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
+    use MOD_MESH
+    use O_MESH
+    use o_ARRAYS
+    use o_PARAM
+    use g_PARSUP
+    use g_CONFIG
+    use g_comm_auto
+    use oce_adv_tra_driver_interfaces
+    use oce_adv_tra_hor_interfaces
+    use oce_adv_tra_ver_interfaces
+    use oce_adv_tra_fct_interfaces
+    implicit none
+    type(t_mesh),  intent(in), target :: mesh
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
+    real(kind=WP), intent(in)         :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
+    real(kind=WP), intent(in)         :: ttf  (mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+ 
+    integer       :: el(2), enodes(2), nz, n, e
+    integer       :: n2, nl1, nl2, tr_num
+    real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
+    real(kind=WP) :: qc, qu, qd
+    real(kind=WP) :: tvert(mesh%nl), tvert_e(mesh%nl), a, b, c, d, da, db, dg, vflux, Tupw1
+    real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
+    logical       :: do_zero_flux
+
+#include "associate_mesh.h"
+    if (trim(tra_adv_lim)=='FCT') then 
+    ! compute the low order upwind horizontal flux
+    ! init_zero=.true.  : zero the horizontal flux before computation
+    ! init_zero=.false. : input flux will be substracted
+    call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
+
+    ! update the LO solution for horizontal contribution
+    fct_LO=0.0_WP
+    do e=1, myDim_edge2D
+       enodes=edges(:,e)
+       el=edge_tri(:,e)        
+       nl1=nlevels(el(1))-1
+       nl2=0
+       if(el(2)>0) nl2=nlevels(el(2))-1
+       do  nz=1, max(nl1, nl2)
+           fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+           fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+       end do
+    end do
+
+    ! compute the low order upwind vertical flux (explicit part only)
+    ! zero the input/output flux before computation
+    call adv_tra_ver_upw1(ttf, wvel_e, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+
+    ! update the LO solution for vertical contribution
+    do n=1, myDim_nod2D
+       do  nz=1, nlevels_nod2D(n)-1
+           fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/area(nz,n))/hnode_new(nz,n)
+       end do
+    end do
+    
+    if (w_split) then !wvel/=wvel_e
+       ! update for implicit contribution (w_split option)
+       call adv_tra_vert_impl(fct_LO, wvel_i, mesh)
+       ! compute the low order upwind vertical flux (full vertical velocity)
+       ! zero the input/output flux before computation
+       call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+    end if
+
+    call exchange_nod(fct_LO)
+    end if
+
+    do_zero_flux=.true.
+    if (trim(tra_adv_lim)=='FCT') do_zero_flux=.false.
+   
+    SELECT CASE(trim(tra_adv_hor))
+        CASE('MUSCL')
+            ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
+            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, 1.0, adv_flux_hor, init_zero=do_zero_flux)
+        CASE DEFAULT !unknown
+            if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
+            call par_ex(1)
+    END SELECT
+
+   
+    SELECT CASE(trim(tra_adv_ver))
+        CASE('QR4C')
+            ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
+            call adv_tra_ver_qr4c (ttfAB, wvel, do_Xmoment, mesh, 1.0, adv_flux_ver, init_zero=do_zero_flux)
+        CASE('CDIFF')
+            call adv_tra_ver_cdiff(ttfAB, wvel, do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+        CASE('PPM')
+            call adv_tra_vert_ppm (ttfAB, wvel, do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+        CASE DEFAULT !unknown
+            if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
+            call par_ex(1)
+    END SELECT
+
+!if (mype==0) then
+!   write(*,*) 'check new 2:'
+!   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
+!   write(*,*) '2:', minval(adv_flux_hor), maxval(adv_flux_hor), sum(adv_flux_hor)
+!   write(*,*) '3:', minval(adv_flux_ver), maxval(adv_flux_ver), sum(adv_flux_ver)
+!end if
+    if (trim(tra_adv_lim)=='FCT') then 
+       call oce_tra_adv_update_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
+    else
+       call oce_tra_adv_update(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
+    end if
+end subroutine do_oce_adv_tra
+!===============================================================================
+subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
+    !update the solution for vertical and horizontal flux contributions
+    use MOD_MESH
+    use O_MESH
+    use o_ARRAYS
+    use o_PARAM
+    use g_PARSUP
+    use g_CONFIG
+    use g_comm_auto
+    implicit none
+    type(t_mesh),  intent(in), target :: mesh
+    real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: flux_h(mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(in)         :: flux_v(mesh%nl, myDim_nod2D)
+    integer                           :: n, nz, enodes(3), el(2), nl1, nl2, edge
+
+#include "associate_mesh.h"
+    !___________________________________________________________________________
+    ! c. Update the solution
+    ! Vertical
+   
+    do n=1, myDim_nod2d
+        do nz=1,nlevels_nod2D(n)-1  
+            dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
+        end do
+    end do
+    
+    ! Horizontal
+    do edge=1, myDim_edge2D
+        enodes(1:2)=edges(:,edge)
+        el=edge_tri(:,edge)
+        nl1=nlevels(el(1))-1
+        nl2=0
+        if(el(2)>0) nl2=nlevels(el(2))-1
+        do nz=1, max(nl1,nl2)
+            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/area(nz,enodes(1))
+            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
+        end do
+    end do
+end subroutine oce_tra_adv_update
+

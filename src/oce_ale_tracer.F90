@@ -81,7 +81,7 @@ end module
 subroutine solve_tracers_ale(mesh)
     use g_config
     use g_parsup
-    use o_PARAM, only: tracer_adv, num_tracers, SPP, Fer_GM
+    use o_PARAM, only: num_tracers, SPP, Fer_GM
     use o_arrays
     use mod_mesh
     use g_comm_auto
@@ -168,12 +168,12 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use g_config, only: flag_debug
     use g_parsup
     use mod_mesh
-    use o_PARAM, only: tracer_adv
     use o_arrays
     use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
                            compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
     use adv_tracers_muscle_ale_interface
     use adv_tracers_vert_ppm_ale_interface
+    use oce_adv_tra_driver_interfaces
     implicit none
     integer :: tr_num, node, nz
     type(t_mesh), intent(in) , target :: mesh    
@@ -197,32 +197,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    select case (tracer_adv)
-        case(1) !MUSCL
-            ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_muscle_ale'//achar(27)//'[0m'
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 1, mesh)
-            !                                                      |    | 
-            !             fraction of fourth-order contribution <--'    |
-            !                              1st tracer moment is used <--'
-            
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracers_vert_ppm_ale'//achar(27)//'[0m'
-            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 1, mesh)
-            !                                                 | 
-            !                    1st tracer moment is used <--'
-            
-        case(2) !MUSCL+FCT(3D)
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call adv_tracer_fct_ale'//achar(27)//'[0m'
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 1, mesh)
-            !                                                                     |    | 
-            !                            fraction of fourth-order contribution <--'    | 
-            !                                             1st tracer moment is used <--'
-            
-        case default !unknown
-            if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
-            call par_ex(1)
-    end select
-    
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, 1, del_ttf_advhoriz, del_ttf_advvert, mesh)   
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
@@ -767,7 +742,7 @@ end subroutine adv_tracers_vert_upw
 !
 !===============================================================================
 ! Vertical ALE advection with central difference reconstruction (2nd order)
-subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
+subroutine adv_tracers_vert_cdiff_ale(ttf,do_Xmoment, mesh)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -809,7 +784,7 @@ subroutine adv_tracers_vert_cdiff(ttf,do_Xmoment, mesh)
             del_ttf_advvert(nz,n)=del_ttf_advvert(nz,n) + (tvert(nz)-tvert(nz+1))*dt/area(nz,n) 
         end do         
     end do ! --> do n=1, myDim_nod2D
-end subroutine adv_tracers_vert_cdiff
+end subroutine adv_tracers_vert_cdiff_ale
 !
 !
 !===============================================================================
@@ -959,10 +934,11 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)            :: isredi=0._WP
-
+    logical                  :: do_wimpl=.true.
 #include "associate_mesh.h"
 
     !___________________________________________________________________________
+    if (trim(tra_adv_lim)=='FCT') do_wimpl=.false.
     
     if (Redi) isredi=1._WP
     dt_inv=1.0_WP/dt
@@ -1052,7 +1028,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! update from the vertical advection --> comes from splitting of vert 
         ! velocity into explicite and implicite contribution
-        if (tracer_adv/=2) then
+        if (do_wimpl) then
             v_adv=zinv*area(2,n)/area(1,n)
             b(1)=b(1)+Wvel_i(1, n)*zinv-min(0._WP, Wvel_i(2, n))*v_adv
             c(1)=c(1)-max(0._WP, Wvel_i(2, n))*v_adv
@@ -1082,7 +1058,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             zinv1=zinv2
             
             ! update from the vertical advection
-            if (tracer_adv/=2) then
+            if (do_wimpl) then
                 v_adv=zinv
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
@@ -1108,7 +1084,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         b(nz)=-a(nz)+hnode_new(nz,n)
         
         ! update from the vertical advection
-        if (tracer_adv/=2) then
+        if (do_wimpl) then
             v_adv=zinv
             a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
             b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
