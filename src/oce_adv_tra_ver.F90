@@ -318,7 +318,7 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
 	  Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
 	  Tmean =(W(nz,n)+abs(W(nz,n)))*(Tmean1**do_Xmoment)+(W(nz,n)-abs(W(nz,n)))*(Tmean2**do_Xmoment)
 !         flux(nz,n)=-0.5_WP*(num_ord*(Tmean1+Tmean2)*W(nz,n)+(1.0_WP-num_ord)*Tmean)*area(nz,n)-flux(nz,n)
-          flux(nz,n)=-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*Wvel(nz,n)
+          flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*W(nz,n))*area(nz,n)-flux(nz,n)
        end do
     end do
 end subroutine adv_tra_ver_qr4c
