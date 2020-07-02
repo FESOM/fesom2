@@ -38,6 +38,8 @@ module io_MEANDATA
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
     class(data_strategy_type), allocatable :: data_strategy
+  contains
+    final destructor
   end type  
 !
 !--------------------------------------------------------------------------------------------
@@ -71,6 +73,14 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
+
+  subroutine destructor(this)
+    type(Meandata), intent(inout) :: this
+    ! EO args
+    call assert_nf(nf_close(this%ncid), __LINE__)
+  end subroutine
+
+
 subroutine ini_mean_io(mesh)
   use g_cvmix_tke
   use g_cvmix_idemix
@@ -528,17 +538,9 @@ subroutine assoc_ids(entry)
   implicit none
 
   type(Meandata), intent(inout) :: entry
-  integer                       :: j, k
-  real(real64)                  :: rtime !timestamp of the record
-  ! Serial output implemented so far
-  if (mype/=root_rank) return
-  ! open existing netcdf file
-  write(*,*) 'associating mean I/O file ', trim(entry%filename)
+  integer                       :: j
 
-  if (nf_open(entry%filename, nf_nowrite, entry%ncid) .ne. nf_noerr) then ! todo: nf_open is being abused to check if the file exists
-    call create_new_file(entry)
-    call assert_nf( nf_open(entry%filename, nf_nowrite, entry%ncid), __LINE__)
-  end if
+  write(*,*) 'associating mean I/O file ', trim(entry%filename)
 
   do j=1, entry%ndim
      call assert_nf( nf_inq_dimid(entry%ncid, entry%dimname(j), entry%dimID(j)), __LINE__)
@@ -548,27 +550,8 @@ subroutine assoc_ids(entry)
   call assert_nf( nf_inq_dimlen(entry%ncid, entry%recID, entry%rec_count), __LINE__)
 !___Associate the time and iteration variables______________________________
   call assert_nf( nf_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
-!___if the time rtime at the rec_count is larger than ctime we look for the closest record with the 
-! timestamp less than ctime
-  do k=entry%rec_count, 1, -1
-     call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
-     if (ctime > rtime) then
-        entry%rec_count=k+1
-!       write(*,*) 'I/O '//trim(entry%name)//' : current record = ', entry%rec_count, '; ', entry%rec_count, ' records in the file;'
-        exit ! a proper rec_count detected, exit the loop
-     end if
-     if (k==1) then
-        write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
-        entry%rec_count=1
-        exit ! no appropriate rec_count detected
-     end if
-  end do
-
-  entry%rec_count=max(entry%rec_count, 1)
 !___Associate physical variables____________________________________________
   call assert_nf( nf_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
-  call assert_nf( nf_close(entry%ncid), __LINE__)
-  write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -590,7 +573,6 @@ subroutine write_mean(entry, mesh)
   ! Serial output implemented so far
   if (mype==root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-     call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
   end if
 ! !_______writing 2D and 3D fields________________________________________________
@@ -628,7 +610,6 @@ subroutine write_mean(entry, mesh)
      if (mype==root_rank) deallocate(aux_r4)
   endif
 
-  if (mype==root_rank) call assert_nf(nf_close(entry%ncid), __LINE__)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -664,11 +645,12 @@ subroutine output(istep, mesh)
 
   integer       :: istep
   logical, save :: lfirst=.true.
-  integer       :: n
+  integer       :: n, k
   logical       :: do_output
   type(Meandata), pointer :: entry
   type(t_mesh), intent(in) , target :: mesh
   character(:), allocatable :: filepath
+  real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) call ini_mean_io(mesh)
@@ -704,10 +686,32 @@ subroutine output(istep, mesh)
 
      if (do_output) then
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-        if(filepath /= trim(entry%filename)) then
-          entry%filename = filepath
+        if(mype == root_rank) then
+          if(filepath /= trim(entry%filename)) then
+            if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
+            entry%filename = filepath
+            call create_new_file(entry)
+            call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+            call assoc_ids(entry)
+          end if
+
+          !___if the time rtime at the rec_count is larger than ctime we look for the closest record with the timestamp less than ctime
+          do k=entry%rec_count, 1, -1
+             call assert_nf( nf_get_vara_double(entry%ncid, entry%tID, k, 1, rtime, 1), __LINE__)
+             if (ctime > rtime) then
+                entry%rec_count=k+1
+                exit ! a proper rec_count detected, exit the loop
+             end if
+             if (k==1) then
+                write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
+                entry%rec_count=1
+                exit ! no appropriate rec_count detected
+             end if
+          end do
+          entry%rec_count=max(entry%rec_count, 1)
+          write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
         end if
-        call assoc_ids(entry)
+
         if (entry%accuracy == i_real8) then
            entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
            call write_mean(entry, mesh)
