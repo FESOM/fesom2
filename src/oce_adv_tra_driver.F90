@@ -11,18 +11,24 @@ module oce_adv_tra_driver_interfaces
       real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-
     end subroutine
+  end interface
+end module
 
-    subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
+module oce_tra_adv_flux2dtracer_interface
+  interface
+    subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
     !update the solution for vertical and horizontal flux contributions
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: flux_h(mesh%nl-1, myDim_edge2D)
-      real(kind=WP), intent(in)         :: flux_v(mesh%nl,   myDim_nod2D)
+      real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(inout)      :: flux_v(mesh%nl,  myDim_nod2D)
+      logical,       optional           :: use_lo
+      real(kind=WP), optional           :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), optional           :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     end subroutine
   end interface
 end module
@@ -40,6 +46,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
+    use oce_tra_adv_flux2dtracer_interface
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -133,15 +140,15 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
 !   write(*,*) '2:', minval(adv_flux_hor), maxval(adv_flux_hor), sum(adv_flux_hor)
 !   write(*,*) '3:', minval(adv_flux_ver), maxval(adv_flux_ver), sum(adv_flux_ver)
 !end if
-    if (trim(tra_adv_lim)=='FCT') then 
-       call oce_tra_adv_update_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
+    if (trim(tra_adv_lim)=='FCT') then
+       call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
+       call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
     else
-       call oce_tra_adv_update(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
+       call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
 end subroutine do_oce_adv_tra
 !===============================================================================
-subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
-    !update the solution for vertical and horizontal flux contributions
+subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
     use MOD_MESH
     use O_MESH
     use o_ARRAYS
@@ -153,20 +160,33 @@ subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: flux_h(mesh%nl-1, myDim_edge2D)
-    real(kind=WP), intent(in)         :: flux_v(mesh%nl, myDim_nod2D)
-    integer                           :: n, nz, enodes(3), el(2), nl1, nl2, edge
-
+    real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(inout)      :: flux_v(mesh%nl,  myDim_nod2D)
+    logical,       optional           :: use_lo
+    real(kind=WP), optional           :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), optional           :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
-   
+
+    if (present(use_lo)) then
+       if (use_lo) then
+          do n=1, myDim_nod2d
+             do nz=1,nlevels_nod2D(n)-1  
+                dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+             end do
+           end do
+       end if
+    end if
+
     do n=1, myDim_nod2d
         do nz=1,nlevels_nod2D(n)-1  
             dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
         end do
     end do
+
     
     ! Horizontal
     do edge=1, myDim_edge2D
@@ -180,5 +200,4 @@ subroutine oce_tra_adv_update(dttf_h, dttf_v, flux_h, flux_v, mesh)
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
-end subroutine oce_tra_adv_update
-
+end subroutine oce_tra_adv_flux2dtracer

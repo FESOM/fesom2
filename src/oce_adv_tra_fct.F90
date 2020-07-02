@@ -6,7 +6,7 @@ module oce_adv_tra_fct_interfaces
       type(t_mesh), intent(in), target  :: mesh
     end subroutine
 
-    subroutine oce_tra_adv_update_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
+    subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -53,7 +53,7 @@ subroutine oce_adv_tra_fct_init(mesh)
     if (mype==0) write(*,*) 'FCT is initialized'
 end subroutine oce_adv_tra_fct_init
 !===============================================================================
-subroutine oce_tra_adv_update_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
+subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
@@ -304,29 +304,4 @@ subroutine oce_tra_adv_update_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
             adf_h(nz,edge)=ae*adf_h(nz,edge)
         end do
     end do
-    
-    !___________________________________________________________________________
-    ! c. Update the solution
-    ! Vertical
-    do n=1, myDim_nod2d
-        do nz=1,nlevels_nod2D(n)-1  
-            dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n) + &
-                                    (adf_v(nz,n)-adf_v(nz+1,n))*dt/area(nz,n)
-!!PS             del_ttf(nz,n)        =del_ttf(nz,n)        -ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n) + &
-!!PS                                     (adf_v(nz,n)-adf_v(nz+1,n))*dt/area(nz,n)
-        end do
-    end do
-    
-    ! Horizontal
-    do edge=1, myDim_edge2D
-        enodes(1:2)=edges(:,edge)
-        el=edge_tri(:,edge)
-        nl1=nlevels(el(1))-1
-        nl2=0
-        if(el(2)>0) nl2=nlevels(el(2))-1
-        do nz=1, max(nl1,nl2)
-            dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+adf_h(nz,edge)*dt/area(nz,enodes(1))
-            dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-adf_h(nz,edge)*dt/area(nz,enodes(2))
-        end do
-    end do
-end subroutine oce_tra_adv_update_fct
+end subroutine oce_tra_adv_fct
