@@ -1,7 +1,7 @@
 module io_MEANDATA
 
   use o_PARAM, only : WP
-  use, intrinsic :: ISO_FORTRAN_ENV
+  use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
 
   implicit none
@@ -21,8 +21,8 @@ module io_MEANDATA
     integer                                            :: ndim
     integer                                            :: glsize(2)
     integer                                            :: accuracy
-    real(real64),  public, allocatable, dimension(:,:) :: local_values_r8
-    real(real32),  public, allocatable, dimension(:,:) :: local_values_r4
+    real(real64), allocatable, dimension(:,:) :: local_values_r8
+    real(real32), allocatable, dimension(:,:) :: local_values_r4
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
