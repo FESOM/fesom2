@@ -310,9 +310,9 @@ subroutine create_new_file(id)
         !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
      id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
-     if (n==1) then
-        id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
-     elseif (n==2) then
+     !if (n==1) then
+     !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
+     if (n==2) then
         id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1, id%dim(1)%size/)); c=c+1 
      end if
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
@@ -459,9 +459,13 @@ subroutine write_restart(id, istep, mesh)
         t0=MPI_Wtime()
         if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
         if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
+        t1=MPI_Wtime()
         if (mype==0) then
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
+        t2=MPI_Wtime()
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
         if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
@@ -482,8 +486,8 @@ subroutine write_restart(id, istep, mesh)
               id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
            end if
            t2=MPI_Wtime()
-           if (mype==0 .and. size2==nod2D) write(*,*) 'nvar: ', i, 'lev: ', lev, 'gather_nod: ', t1-t0
-           if (mype==0 .and. size2==nod2D) write(*,*) 'nvar: ', i, 'lev: ', lev, 'nf_put_var: ', t2-t1
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
         end do
         deallocate(laux)
         if (mype==0) deallocate(aux)

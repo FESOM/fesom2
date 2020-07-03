@@ -593,8 +593,9 @@ subroutine create_new_file(entry)
   endif
 
   if (entry%ndim==1) then
-     entry%error_status(c) = nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1/)); c=c+1
+     entry%error_status(c) = nf_def_var_chunking(entry%ncid, entry%varID, NF_CONTIGUOUS, (/1/)); c=c+1
   elseif (entry%ndim==2) then
+     write(*,*) "size: ", entry%glsize(1)
      entry%error_status(c) = nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1,  entry%glsize(1)/)); c=c+1
   endif
 
@@ -672,13 +673,14 @@ subroutine write_mean(entry, mesh)
   type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: i, size1, size2
   integer                       :: c, lev
+  real(kind=WP)                 :: t0, t1, t2, t3
 
 #include  "associate_mesh.h"
 
   ! Serial output implemented so far
   if (mype==0) then
      c=1
-     write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+     write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count, '; bytes = ', entry%accuracy
      entry%error_status(c)=nf_open(entry%filename, nf_write, entry%ncid); c=c+1
      entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1); c=c+1
   end if
@@ -693,16 +695,22 @@ subroutine write_mean(entry, mesh)
            if (mype==0) then
               entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r8, 1); c=c+1
            end if
+
            if (mype==0) deallocate(aux_r8)
         
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
            if (mype==0) allocate(aux_r4(size1))
+           t0=MPI_Wtime()
            if (size1==nod2D)  call gather_nod (entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
            if (size1==elem2D) call gather_elem(entry%local_values_r4(1:entry%lcsize(1),1), aux_r4)
+           t1=MPI_Wtime()
            if (mype==0) then
               entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1); c=c+1
            end if
+           t2=MPI_Wtime()
+           if (mype==0) write(*,*) 'size: ', size1, 'gather_nod: ', t1-t0
+           if (mype==0) write(*,*) 'size: ', size1, 'nf_put_var: ', t2-t1
            if (mype==0) deallocate(aux_r4)
 
 !___________writing real as 2 byte integer _________________________________________ 
@@ -729,22 +737,32 @@ subroutine write_mean(entry, mesh)
         if (entry%accuracy == i_real8) then
            if (mype==0) allocate(aux_r8(size2))
            do lev=1, size1
+              t0=MPI_Wtime()
               if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
               if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r8(lev,1:entry%lcsize(2)),  aux_r8)
+              t1=MPI_Wtime()
               if (mype==0) then
                  entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1); c=c+1
               end if
+              t2=MPI_Wtime()
+              if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'gather_nod: ',t1-t0
+              if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'nf_put_var: ',t2-t1
            end do
            if (mype==0) deallocate(aux_r8)
 !___________writing real 4 byte real _________________________________________ 
         elseif (entry%accuracy == i_real4) then
            if (mype==0) allocate(aux_r4(size2))
            do lev=1, size1
+              t0=MPI_Wtime()
               if (size1==nod2D  .or. size2==nod2D)  call gather_nod (entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
               if (size1==elem2D .or. size2==elem2D) call gather_elem(entry%local_values_r4(lev,1:entry%lcsize(2)), aux_r4)
+              t1=MPI_Wtime()
               if (mype==0) then
                  entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1); c=c+1
               end if
+              t2=MPI_Wtime()
+              if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'gather_nod: ',t1-t0
+              if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'nf_put_var: ',t2-t1
            end do
            if (mype==0) deallocate(aux_r4)
 !___________writing real as 2 byte integer _________________________________________ 
