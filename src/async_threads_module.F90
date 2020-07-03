@@ -71,7 +71,7 @@ contains
   end subroutine
 
 
-  subroutine execute_fcall(thread_idx) bind (C, name="execute_fcall")
+  subroutine async_threads_execute_fcall(thread_idx) bind (C, name="async_threads_execute_fcall")
     use iso_c_binding
     integer(c_int), intent(in), value :: thread_idx
     ! EO args

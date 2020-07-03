@@ -7,7 +7,7 @@
 #include <sstream>
 
 extern "C" {
-    void fortran_call(const int index_id);
+    void async_threads_execute_fcall(const int index_id);
 }
 
 
@@ -24,7 +24,7 @@ namespace AWI
    void FortranCallback::executeCallback()
    {
       int idx = index_id;
-      fortran_call(idx);
+      async_threads_execute_fcall(idx);
    }
    
    
