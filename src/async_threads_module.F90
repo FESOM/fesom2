@@ -18,8 +18,8 @@ module async_threads_module
     integer :: run_arg = 0
   contains
     procedure initialize
-    procedure begin
-    procedure wait
+    procedure run
+    procedure join
   end type
 
 
@@ -52,17 +52,19 @@ contains
     this%idx = size(threads)
     this%run_ptr => thread_callback_procedure
     this%run_arg = procedure_argument
+    
+    call init_ccall(this%idx)
   end subroutine
 
 
-  subroutine begin(this)
+  subroutine run(this)
     class(thread_type) this
     ! EO args
     call begin_ccall(this%idx)
   end subroutine
 
 
-  subroutine wait(this)
+  subroutine join(this)
     class(thread_type) this
     ! EO args
     call end_ccall(this%idx)
