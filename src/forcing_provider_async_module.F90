@@ -9,7 +9,7 @@ module forcing_provider_async_module
   type forcing_provider_type
     private
     contains
-    procedure, public :: get_forcingdata
+    procedure, public, nopass :: get_forcingdata
   end type
   type(forcing_provider_type), save :: forcing_provider ! handle to singleton instance
 
@@ -27,15 +27,12 @@ module forcing_provider_async_module
     procedure initialize_async_reader
   end type
   type(forcing_async_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
-
-  character(len=*), parameter :: FILENAMESUFFIX = ".nc"
   
   
   contains
 
 
-  subroutine get_forcingdata(this, varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
-    class(forcing_provider_type), intent(inout) :: this
+  subroutine get_forcingdata(varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
     integer, intent(in) :: varcount
     integer, intent(in) :: varindex ! todo: remove this arg and just use a hashmap for varname
     character(len=*), intent(in) :: filepath
@@ -44,7 +41,6 @@ module forcing_provider_async_module
     integer, intent(in) :: time_index
     real(4), intent(out) :: forcingdata(:,:)
     ! EO args
-    type(forcing_async_reader_type), allocatable :: tmparr(:)
     type(forcing_lookahead_reader_type) new_reader_a, new_reader_b
     
     ! init our all_readers array if not already done
@@ -80,12 +76,8 @@ module forcing_provider_async_module
       call all_readers(varindex)%initialize_async_reader(filepath, fileyear, varname)
     end if
 
-! todo: remove these checks
-call assert(allocated(all_readers), __LINE__)
-call assert(size(all_readers)>=varindex, __LINE__)
-if(.not. associated(all_readers(varindex)%reader_current, all_readers(varindex)%reader_a)) stop __LINE__
-if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%reader_b)) stop __LINE__
-
+    call assert(size(all_readers)>=varindex, __LINE__)
+    
     ! join thread
     if(all_readers(varindex)%thread_timeindex == time_index) then
       call all_readers(varindex)%th%join()
