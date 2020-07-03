@@ -20,7 +20,7 @@ module forcing_provider_async_module
     type(forcing_lookahead_reader_type) reader_a, reader_b
     type(forcing_lookahead_reader_type), pointer :: reader_current , reader_next
     integer :: netcdf_timestep_size = -1
-    type(thread_type) th
+    type(thread_type) thread
     character(:), allocatable :: thread_filepath
     integer thread_timeindex
     contains
@@ -59,12 +59,12 @@ module forcing_provider_async_module
       ! attach thread for this forcing field to the c++ library
       all_readers(varindex)%thread_filepath = filepath
       all_readers(varindex)%thread_timeindex = -1
-      call all_readers(varindex)%th%initialize(thread_callback, varindex)
+      call all_readers(varindex)%thread%initialize(thread_callback, varindex)
       
     else if(fileyear /= all_readers(varindex)%fileyear) then
       ! stop the thread, close our reader and create a new one
       if(all_readers(varindex)%thread_timeindex == time_index) then
-        call all_readers(varindex)%th%join()
+        call all_readers(varindex)%thread%join()
         all_readers(varindex)%thread_timeindex = -1
       end if
       
@@ -80,7 +80,7 @@ module forcing_provider_async_module
     
     ! join thread
     if(all_readers(varindex)%thread_timeindex == time_index) then
-      call all_readers(varindex)%th%join()
+      call all_readers(varindex)%thread%join()
       all_readers(varindex)%thread_timeindex = -1
     end if
 
@@ -93,7 +93,7 @@ module forcing_provider_async_module
           ! prefetch the next timestep asynchronously
           call assert(all_readers(varindex)%thread_timeindex == -1, __LINE__)
           all_readers(varindex)%thread_timeindex = time_index+PREFETCH_SIZE
-          call all_readers(varindex)%th%run()
+          call all_readers(varindex)%thread%run()
         end if
       end if
     end if
