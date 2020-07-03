@@ -23,6 +23,7 @@ module io_MEANDATA
     integer                                            :: accuracy
     real(real64), allocatable, dimension(:,:) :: local_values_r8
     real(real32), allocatable, dimension(:,:) :: local_values_r4
+    real(real64), allocatable :: aux_r8(:)
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
@@ -38,6 +39,7 @@ module io_MEANDATA
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
     class(data_strategy_type), allocatable :: data_strategy
+    integer :: callback_level = 0
   contains
     final destructor
   end type  
@@ -556,17 +558,17 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine write_mean(entry, mesh)
+subroutine write_mean(entry, mesh, entry_index)
   use mod_mesh
   use g_PARSUP
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  real(real64)  , allocatable   :: aux_r8(:)
   real(real32),   allocatable   :: aux_r4(:)
   type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: size1, size2
   integer                       :: lev
+  integer, intent(in) :: entry_index
 
 #include  "associate_mesh.h"
 
@@ -580,19 +582,16 @@ subroutine write_mean(entry, mesh)
   size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
   if (entry%accuracy == i_real8) then
-     if (mype==root_rank) allocate(aux_r8(size2))
+     if (mype==root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
-       if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
-       if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)),  aux_r8, root_rank)
+       if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+       if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
         if (mype==root_rank) then
-           if (entry%ndim==1) then
-             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r8, 1), __LINE__)
-           elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1), __LINE__)
-           end if
+          entry%callback_level = lev
+          call write_netcdf_callback(entry_index)
         end if
      end do
-     if (mype==root_rank) deallocate(aux_r8)
+     if (mype==root_rank) deallocate(entry%aux_r8)
 !___________writing real 4 byte real _________________________________________ 
   elseif (entry%accuracy == i_real4) then
      if (mype==root_rank) allocate(aux_r4(size2))
@@ -610,6 +609,25 @@ subroutine write_mean(entry, mesh)
      if (mype==root_rank) deallocate(aux_r4)
   endif
 
+end subroutine
+
+
+subroutine write_netcdf_callback(entry_index)
+  integer, intent(in) :: entry_index
+  ! EO args
+  type(Meandata), pointer :: entry
+  integer size2
+  integer lev
+  
+  entry=>io_stream(entry_index)
+  size2 = entry%glsize(2)
+  lev = entry%callback_level
+
+  if (entry%ndim==1) then
+    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
+  elseif (entry%ndim==2) then
+    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+  end if
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -714,12 +732,12 @@ subroutine output(istep, mesh)
 
         if (entry%accuracy == i_real8) then
            entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
-           call write_mean(entry, mesh)
+           call write_mean(entry, mesh, n)
            entry%local_values_r8 = 0. ! clean_meanarrays
 
         elseif (entry%accuracy == i_real4) then
            entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
-           call write_mean(entry, mesh)
+           call write_mean(entry, mesh, n)
            entry%local_values_r4 = 0. ! clean_meanarrays
 
         endif  ! accuracy
