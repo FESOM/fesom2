@@ -30,7 +30,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    ! Initial date (e.g. 20170906), time, initial timestep and final time step
    INTEGER, INTENT(OUT) ::  inidate, initime, itini, itend
    ! Length of the time step
-   REAL(wp), INTENT(OUT) :: zstp
+   REAL(wpIFS), INTENT(OUT) :: zstp
 
    ! inherited from interface to NEMO, not used here:
    ! Coupling to waves only
@@ -72,7 +72,7 @@ SUBROUTINE nemogcmcoup_init( icomm, inidate, initime, itini, itend, zstp, &
    endif
 
    ! fesom timestep (as seen by IFS)
-   zstp = REAL(substeps,wp)*dt
+   zstp = REAL(substeps,wpIFS)*dt
    if(mype==0) then
    WRITE(0,*)'! FESOM timestep as seen by IFS is ', real(zstp,4), 'sec (',substeps,'xdt)'
    WRITE(0,*)'!======================================'
@@ -85,8 +85,10 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    &                             npoints, nlocmsk, ngloind )
 
    ! FESOM modules
-   USE g_PARSUP, only: mype, npes, myDim_nod2D, myDim_elem2D, myList_nod2D, myList_elem2D
-   USE o_MESH,   only: nod2D, elem2D
+   USE g_PARSUP, only: mype, npes, myDim_nod2D, eDim_nod2D, myDim_elem2D, eDim_elem2D, eXDim_elem2D, &
+							    myDim_edge2D, eDim_edge2D, myList_nod2D, myList_elem2D
+   USE MOD_MESH
+   !USE o_MESH,   only: nod2D, elem2D
 
    ! Initialize single executable coupling 
    USE parinter
@@ -106,6 +108,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    INTEGER :: iunit = 0
 
    ! Local variables
+   type(t_mesh), target, save :: mesh
 
    ! Namelist containing the file names of the weights
    CHARACTER(len=256) :: cdfile_gauss_to_T, cdfile_gauss_to_UV, &
@@ -136,6 +139,9 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    ! Misc variables
    INTEGER :: i,j,k,ierr
    LOGICAL :: lexists
+
+   ! associate the mesh
+#include "associate_mesh.h"
 
 
    ! here FESOM knows about the (total number of) MPI tasks
@@ -332,8 +338,11 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE o_ARRAYS, ONLY : tr_arr, UV
    USE i_arrays, ONLY : m_ice, a_ice, m_snow
    USE i_therm_param, ONLY : tmelt
-   USE g_PARSUP, only: myDim_nod2D, myDim_elem2D
-   USE o_MESH, only: elem2D_nodes, coord_nod2D
+   !USE o_PARAM, ONLY : WP
+   USE g_PARSUP, only: myDim_nod2D,eDim_nod2D, myDim_elem2D,eDim_elem2D,eXDim_elem2D
+   !USE o_MESH, only: elem2D_nodes, coord_nod2D
+   USE MOD_MESH
+
    USE g_rotate_grid, only: vector_r2g
    USE parinter
    USE scripremap
@@ -342,9 +351,13 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    IMPLICIT NONE
    
    ! Arguments
-   REAL(wp), DIMENSION(nopoints) :: pgsst, pgist, pgalb, pgifr, pghic, pghsn, pgucur, pgvcur
-   REAL(wp), DIMENSION(nopoints,3) :: pgistl
+   REAL(wpIFS), DIMENSION(nopoints) :: pgsst, pgist, pgalb, pgifr, pghic, pghsn, pgucur, pgvcur
+   REAL(wpIFS), DIMENSION(nopoints,3) :: pgistl
    LOGICAL :: licelvls
+
+   type(t_mesh), target, save :: mesh
+   real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
+   integer, dimension(:,:)      , pointer :: elem2D_nodes
 
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
@@ -352,13 +365,18 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: nopoints
 
    ! Local variables
-   REAL(wp), DIMENSION(myDim_nod2D)  :: zsend
-   REAL(wp), DIMENSION(myDim_elem2D) :: zsendU, zsendV
+   REAL(wpIFS), DIMENSION(myDim_nod2D)  :: zsend
+   REAL(wpIFS), DIMENSION(myDim_elem2D) :: zsendU, zsendV
    INTEGER			     :: elnodes(3)
-   REAL(wp)			     :: rlon, rlat	
+   REAL(wpIFS)			     :: rlon, rlat	
 
    ! Loop variables
    INTEGER :: n, elem, ierr
+
+   !#include "associate_mesh.h"
+   ! associate what is needed only
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D   
+   elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
 
 
    ! =================================================================== !
@@ -433,8 +451,8 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
       ! compute element midpoints
       elnodes=elem2D_nodes(:,elem)
-      rlon=sum(coord_nod2D(1,elnodes))/3.0_WP
-      rlat=sum(coord_nod2D(2,elnodes))/3.0_WP
+      rlon=sum(coord_nod2D(1,elnodes))/3.0_wpIFS
+      rlat=sum(coord_nod2D(2,elnodes))/3.0_wpIFS
 
       ! Rotate vectors to geographical coordinates (r2g)
       call vector_r2g(zsendU(elem), zsendV(elem), rlon, rlat, 0) ! 0-flag for rot. coord
@@ -523,12 +541,15 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! interpolation of the input gaussian grid data
    
    USE par_kind !in ifs_modules.F90
-   USE g_PARSUP, 	only: myDim_nod2D, myDim_elem2D, par_ex, eDim_nod2D
-   USE o_MESH, 		only: coord_nod2D !elem2D_nodes
+   USE g_PARSUP, 	only: myDim_nod2D, myDim_elem2D, par_ex, eDim_nod2D, eDim_elem2D, eXDim_elem2D, myDim_edge2D, eDim_edge2D
+   !USE o_MESH, 	only: coord_nod2D !elem2D_nodes
+   USE MOD_MESH
+   !USE o_PARAM, ONLY : WP, use wpIFS from par_kind (IFS)
    USE g_rotate_grid, 	only: vector_r2g, vector_g2r
    USE g_forcing_arrays, only: 	shortwave, prec_rain, prec_snow, runoff, & 
       			&	evap_no_ifrac, sublimation !'longwave' only stand-alone, 'evaporation' filled later
-   USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, stress_atmoce_x, stress_atmoce_y, oce_heat_flux, ice_heat_flux 
+   USE i_ARRAYS, 	only: stress_atmice_x, stress_atmice_y, oce_heat_flux, ice_heat_flux 
+   USE o_ARRAYS,        only: stress_atmoce_x, stress_atmoce_y
    USE g_comm_auto	! exchange_nod does the halo exchange
    
    ! all needed?
@@ -545,7 +566,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Fluxes on the Gaussian grid.
    INTEGER, INTENT(IN) :: npoints
-   REAL(wp), DIMENSION(npoints), INTENT(IN) :: &
+   REAL(wpIFS), DIMENSION(npoints), INTENT(IN) :: &
       & taux_oce, tauy_oce, taux_ice, tauy_ice, &
       & qs___oce, qs___ice, qns__oce, qns__ice, &
       & dqdt_ice, evap_tot, evap_ice, prcp_liq, prcp_sol, &
@@ -560,16 +581,22 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! QNS ice filter switch (requires tice_atm to be sent)
    LOGICAL, INTENT(IN) :: lqnsicefilt
 
+   type(t_mesh), target, save :: mesh
+
    ! Local variables
    INTEGER		:: n
-   REAL(wp), parameter 	:: rhofwt = 1000. ! density of freshwater
+   REAL(wpIFS), parameter 	:: rhofwt = 1000. ! density of freshwater
 
 
    ! Packed receive buffer
-   REAL(wp), DIMENSION(myDim_nod2D) :: zrecv
-   REAL(wp), DIMENSION(myDim_elem2D):: zrecvU, zrecvV
+   REAL(wpIFS), DIMENSION(myDim_nod2D) :: zrecv
+   REAL(wpIFS), DIMENSION(myDim_elem2D):: zrecvU, zrecvV
 
 
+   !#include "associate_mesh.h"
+   ! associate only the necessary things
+   real(kind=WP), dimension(:,:), pointer :: coord_nod2D
+   coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%coord_nod2D  
 
    ! =================================================================== !
    ! Sort out incoming arrays from the IFS and put them on the ocean grid
@@ -780,27 +807,27 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
 #ifdef FESOM_TODO
 
    ! Packed receive buffer
-   REAL(wp), DIMENSION((nlei-nldi+1)*(nlej-nldj+1)) :: zrecv
+   REAL(wpIFS), DIMENSION((nlei-nldi+1)*(nlej-nldj+1)) :: zrecv
    ! Unpacked fields on ORCA grids
-   REAL(wp), DIMENSION(jpi,jpj) :: zqs___oce, zqs___ice, zqns__oce, zqns__ice
-   REAL(wp), DIMENSION(jpi,jpj) :: zdqdt_ice, zevap_tot, zevap_ice, zprcp_liq, zprcp_sol
-   REAL(wp), DIMENSION(jpi,jpj) :: zrunoff, zocerunoff
-   REAL(wp), DIMENSION(jpi,jpj) :: ztmp, zicefr
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: zqs___oce, zqs___ice, zqns__oce, zqns__ice
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: zdqdt_ice, zevap_tot, zevap_ice, zprcp_liq, zprcp_sol
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: zrunoff, zocerunoff
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: ztmp, zicefr
    ! Arrays for rotation
-   REAL(wp), DIMENSION(jpi,jpj) :: zuu,zvu,zuv,zvv,zutau,zvtau 
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: zuu,zvu,zuv,zvv,zutau,zvtau 
    ! Lead fraction for both LIM2/LIM3
-   REAL(wp), DIMENSION(jpi,jpj) :: zfrld
+   REAL(wpIFS), DIMENSION(jpi,jpj) :: zfrld
    ! Mask for masking for I grid
-   REAL(wp) :: zmsksum
+   REAL(wpIFS) :: zmsksum
    ! For summing up LIM3 contributions to ice temperature
-   REAL(wp) :: zval,zweig
+   REAL(wpIFS) :: zval,zweig
 
    ! Loop variables
    INTEGER :: ji,jj,jk,jl
    ! netCDF debugging output variables
    CHARACTER(len=128) :: cdoutfile
    INTEGER :: inum
-   REAL(wp) :: zhook_handle ! Dr Hook handle
+   REAL(wpIFS) :: zhook_handle ! Dr Hook handle
 
    IF(lhook) CALL dr_hook('nemogcmcoup_lim2_update',0,zhook_handle)
    IF(nn_timing == 1) CALL timing_start('nemogcmcoup_lim2_update')
@@ -1039,7 +1066,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    zfrld(:,:) = frld(:,:)
    zicefr(:,:) = 1 - zfrld(:,:)
 #else
-   zicefr(:,:) = 0.0_wp
+   zicefr(:,:) = 0.0_wpIFS
    DO jl = 1, jpl
       zicefr(:,:) = zicefr(:,:) + a_i(:,:,jl)
    ENDDO
@@ -1113,7 +1140,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ENDDO
    CALL lbc_lnk(zsatmist, 'T', 1.0)
    
-   zsqns_ice_add(:,:) = 0.0_wp
+   zsqns_ice_add(:,:) = 0.0_wpIFS
 
    ! Use the dqns_ice filter
 
@@ -1142,7 +1169,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
       CALL lbc_lnk(ztmp, 'T', 1.0)
 #endif
 
-      WHERE ( zicefr(:,:) > .001_wp )
+      WHERE ( zicefr(:,:) > .001_wpIFS )
          zsqns_ice_add(:,:) = zsdqdns_ice(:,:) * ( ztmp(:,:) - zsatmist(:,:) )
       END WHERE
 
@@ -1443,7 +1470,7 @@ SUBROUTINE nemogcmcoup_step( istp, icdate, ictime )
    imo = ndastp / 100 - iye * 100
    ida = MOD( ndastp, 100 )
    CALL greg2jul( 0, 0, 0, ida, imo, iye, zjul )
-   zjul = zjul + ( nsec_day + 0.5_wp * rdttra(1) ) / 86400.0_wp
+   zjul = zjul + ( nsec_day + 0.5_wpIFS * rdttra(1) ) / 86400.0_wpIFS
    CALL jul2greg( iss, imm, ihh, ida, imo, iye, zjul )
    icdate = iye * 10000 + imo * 100 + ida
    ictime = ihh * 10000 + imm * 100 + iss

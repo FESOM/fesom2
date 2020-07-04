@@ -44,7 +44,7 @@ SUBROUTINE nemogcmcoup_mlflds_get( mype, npes, icomm, &
    IMPLICIT NONE
    
    ! Arguments
-   REAL(wp), DIMENSION(nopoints,nlev) :: pgt3d, pgs3d, pgu3d, pgv3d
+   REAL(wpIFS), DIMENSION(nopoints,nlev) :: pgt3d, pgs3d, pgu3d, pgv3d
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
    ! Number Gaussian grid points
@@ -79,7 +79,7 @@ SUBROUTINE nemogcmcoup_get( mype, npes, icomm, &
    ! Number Gaussian grid points
    INTEGER, INTENT(IN) :: nopoints
    ! Local arrays of sst, ice and currents
-   REAL(wp), DIMENSION(nopoints) :: pgsst, pgice, pgucur, pgvcur
+   REAL(wpIFS), DIMENSION(nopoints) :: pgsst, pgice, pgucur, pgvcur
 
    ! Local variables
 
@@ -103,7 +103,7 @@ SUBROUTINE nemogcmcoup_exflds_get( mype, npes, icomm, &
    IMPLICIT NONE
    
    ! Arguments
-   REAL(wp), DIMENSION(nopoints) :: pgssh, pgmld, pg20d, pgsss, &
+   REAL(wpIFS), DIMENSION(nopoints) :: pgssh, pgmld, pg20d, pgsss, &
       & pgtem300, pgsal300
    ! Message passing information
    INTEGER, INTENT(IN) :: mype, npes, icomm
@@ -159,10 +159,14 @@ SUBROUTINE nemogcmcoup_mlinit( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Grid information
    INTEGER, INTENT(INOUT) :: nlev, nopoints
-   REAL(wp), INTENT(OUT), DIMENSION(nlev) :: pdep
-   REAL(wp), INTENT(OUT), DIMENSION(nopoints,nlev) :: pmask
+   REAL(wpIFS), INTENT(OUT), DIMENSION(nlev) :: pdep
+   REAL(wpIFS), INTENT(OUT), DIMENSION(nopoints,nlev) :: pmask
 
    ! Local variables
+
+   ! dummy argument with explicit INTENT(OUT) declaration needs an explicit value
+   pdep=0.
+   pmask=0.
 
    WRITE(0,*)'nemogcmcoup_mlinit should not be called when coupling to fesom.'
    CALL abort
@@ -187,7 +191,7 @@ SUBROUTINE nemogcmcoup_update( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Fluxes on the Gaussian grid.
    INTEGER, INTENT(IN) :: npoints
-   REAL(wp), DIMENSION(npoints), intent(IN) :: &
+   REAL(wpIFS), DIMENSION(npoints), intent(IN) :: &
       & pgutau, pgvtau, pgqsr, pgqns, pgemp
    ! Current time step
    INTEGER, INTENT(in) :: kt
@@ -217,7 +221,7 @@ SUBROUTINE nemogcmcoup_update_add( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Input on the Gaussian grid.
    INTEGER, INTENT(IN) :: npoints
-   REAL(wp), DIMENSION(npoints), intent(IN) :: &
+   REAL(wpIFS), DIMENSION(npoints), intent(IN) :: &
       & pgsst, pgtsk
    ! Current time step
    INTEGER, INTENT(in) :: kt
@@ -280,7 +284,7 @@ SUBROUTINE nemogcmcoup_wam_get( mype, npes, icomm, &
    ! Number WAM grid points
    INTEGER, INTENT(IN) :: nopoints
    ! Local arrays of sst, ice cover, ice thickness and currents
-   REAL(wp), DIMENSION(nopoints) :: pwsst, pwicecov, pwicethk, pwucur, pwvcur
+   REAL(wpIFS), DIMENSION(nopoints) :: pwsst, pwicecov, pwicethk, pwucur, pwvcur
    LOGICAL :: licethk
 
    ! Local variables
@@ -310,7 +314,7 @@ SUBROUTINE nemogcmcoup_wam_update( mype, npes, icomm, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Data on the WAM grid.
    INTEGER, INTENT(IN) :: npoints
-   REAL(wp), DIMENSION(npoints), INTENT(IN) :: &
+   REAL(wpIFS), DIMENSION(npoints), INTENT(IN) :: &
       & pwswh, pwmwp, pwphioc, pwtauoc, pwstrn, pwustokes, pwvstokes
    ! Current time
    CHARACTER(len=14), INTENT(IN) :: cdtpro
@@ -342,7 +346,7 @@ SUBROUTINE nemogcmcoup_wam_update_stress( mype, npes, icomm, npoints, &
    INTEGER, INTENT(IN) :: mype,npes,icomm
    ! Data on the WAM grid.
    INTEGER, INTENT(IN) :: npoints
-   REAL(wp), DIMENSION(npoints), INTENT(IN) :: &
+   REAL(wpIFS), DIMENSION(npoints), INTENT(IN) :: &
       & pwutau, pwvtau, pwuv10n, pwphif
    ! Current time step
    CHARACTER(len=14), INTENT(IN) :: cdtpro

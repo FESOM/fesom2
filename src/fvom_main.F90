@@ -40,7 +40,7 @@ USE g_PARSUP, only: mype, par_init
 USE i_PARAM,  only: ice_ave_steps, whichEVP
 use i_ARRAYS, only: ice_steps_since_upd, ice_update
 use g_clock,  only: clock_init, clock_newyear
-use g_config, only: use_ice, r_restart, use_ALE
+use g_config ! , only: use_ice, r_restart, use_ALE
 use g_comm_auto
 use g_forcing_arrays
 use io_RESTART,   only: restart
@@ -188,7 +188,8 @@ end subroutine main_initialize
 subroutine main_timestepping(nsteps)
   ! Split main into three major parts
   !----------------------------------
-  USE o_MESH
+  !USE o_MESH
+  USE MOD_MESH
   USE o_ARRAYS
   USE o_PARAM
   USE g_PARSUP
@@ -196,7 +197,7 @@ subroutine main_timestepping(nsteps)
   use i_ARRAYS
   use g_clock
   use g_config
-  use g_forcing_index
+  !use g_forcing_index
   use g_comm_auto
   use g_forcing_arrays
   use io_RESTART
@@ -212,6 +213,7 @@ subroutine main_timestepping(nsteps)
   integer, INTENT(IN) :: nsteps 
   real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
   real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
+  type(t_mesh), target, save      :: mesh
 
     !=====================
     ! Time stepping
@@ -326,17 +328,20 @@ subroutine main_finalize
   ! Split main into three major parts
   !----------------------------------
 
-  USE g_PARSUP, only: mype, par_ex
+  USE g_PARSUP, only: mype, npes, par_ex, MPI_COMM_FESOM, MPIERR, MPI_Wtime
   use g_clock, only: clock_finish
+  USE o_PARAM, only: WP
 
   IMPLICIT NONE
+
+  real(kind=WP)     :: t0, t1
 
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
     if (mype==0) then
        t1 = MPI_Wtime()
-       runtime_alltimesteps = real(t1-t0,real32)
+       !runtime_alltimesteps = real(t1-t0,real32)
        write(*,*) 'FESOM Run is finished, updating clock'
     endif
     
@@ -387,7 +392,7 @@ subroutine main_finalize
     !    write(*,*) '    Runtime for all timesteps : ',runtime_alltimesteps,' sec'
         write(*,*) '============================================'
         write(*,*)
-    end if    
+    !end if    
 !   call clock_finish  # why comment in master?
     call clock_finish  
 #if !defined (__ifsinterface)

@@ -32,8 +32,9 @@ module g_config
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
   integer                :: restart_length=1
   character              :: restart_length_unit='m'
+  logical		 :: ignore_timecheck=.false. !ignore time consistency check? (restart&clock)
   
-  namelist /restart_log/   restart_length, restart_length_unit, logfile_outfreq
+  namelist /restart_log/   restart_length, restart_length_unit, logfile_outfreq, ignore_timecheck
 
   ! *** ale_def ***
   character(20)          :: which_ALE='linfs' ! 'zlevel', 'zstar', 'zstar-weighted', 'ztilde'
