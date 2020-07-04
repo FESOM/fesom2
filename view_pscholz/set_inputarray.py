@@ -15,10 +15,8 @@ def set_inputarray():
 	#inputarray['data_dir1'		 ] = '/media/pscholz/data_ext_2/DATA_FESOM2.0/linfs/withoutPC-2/'    
 	
 	#____FESOM MESH INFO________________________________________________________
-	inputarray['mesh_id'		 ] = 'COREv2'
-	#inputarray['mesh_dir'		 ] = '/data_big/mesh/mesh_CORE2_final_fvom/'
-	#inputarray['mesh_dir'		 ] = '/media/pscholz/data_ext_bckp/data_big/data_big/mesh/mesh_CORE2_final_fvom/'
-	inputarray['mesh_dir'		 ] = '/scratch/users/pscholz/AWI_DATA/mesh_fesom2.0/mesh_CORE2_final_fvom/'
+# 	inputarray['mesh_id'],inputarray['mesh_dir'] = 'COREv2','/work/ollie/pscholz/mesh_fesom2.0/mesh_CORE2_dsidorenko_meanval/'
+	inputarray['mesh_id'],inputarray['mesh_dir'] = 'COREv2','/work/ollie/pscholz/mesh_fesom2.0/core2_meanz/'
 	
 	# Euler-Angle:for poles at (phi,theta)=(-40,75)
 	inputarray['mesh_alpha'	 	 ] = np.float( 50.0)

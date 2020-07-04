@@ -15,7 +15,11 @@
 ! ========================================================================
 
 module g_comm
-implicit none
+
+  use, intrinsic :: ISO_FORTRAN_ENV
+
+  implicit none
+
 contains
 
 #ifdef DEBUG
@@ -112,7 +116,7 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod_array2D(:)
+ real(real64), intent(inout)  :: nod_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_begin(nod_array2D)  
@@ -129,7 +133,7 @@ subroutine exchange_nod2D_begin(nod_array2D)
 
   ! General version of the communication routine for 2D nodal fields
 
-  real*8, intent(inout)  :: nod_array2D(:)
+  real(real64), intent(inout)  :: nod_array2D(:)
 
   integer  :: n, sn, rn
 
@@ -166,8 +170,8 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)  
@@ -184,8 +188,8 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
 
  integer  :: n, sn, rn
 
@@ -229,9 +233,9 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
- real*8, intent(inout)  :: nod3_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod3_array2D(:)
 
  if (npes > 1) then
     call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)  
@@ -248,9 +252,9 @@ IMPLICIT NONE
 
 ! General version of the communication routine for 2D nodal fields
  
- real*8, intent(inout)  :: nod1_array2D(:)
- real*8, intent(inout)  :: nod2_array2D(:)
- real*8, intent(inout)  :: nod3_array2D(:)
+ real(real64), intent(inout)  :: nod1_array2D(:)
+ real(real64), intent(inout)  :: nod2_array2D(:)
+ real(real64), intent(inout)  :: nod3_array2D(:)
 
 
  integer  :: n, sn, rn
@@ -299,7 +303,7 @@ subroutine exchange_nod3D(nod_array3D)
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -316,7 +320,7 @@ USE g_PARSUP
 IMPLICIT NONE
 
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -329,7 +333,7 @@ real(kind=WP), intent(inout) :: nod_array3D(:,:)
 
     nl1=ubound(nod_array3D,1)
 
-    if ((nl1<nl-1) .or. (nl1>nl)) then
+    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -364,8 +368,8 @@ subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D)
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
-real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+real(real64), intent(inout) :: nod1_array3D(:,:) 
+real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -382,8 +386,8 @@ USE g_PARSUP
 IMPLICIT NONE
 
 
-real(kind=WP), intent(inout) :: nod1_array3D(:,:) 
-real(kind=WP), intent(inout) :: nod2_array3D(:,:) 
+real(real64), intent(inout) :: nod1_array3D(:,:) 
+real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -396,7 +400,7 @@ real(kind=WP), intent(inout) :: nod2_array3D(:,:)
 
     nl1 = ubound(nod1_array3D,1)
 
-    if ((nl1<nl-1) .or. (nl1>nl)) then
+    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -405,7 +409,7 @@ real(kind=WP), intent(inout) :: nod2_array3D(:,:)
     endif
 
     nl2 = ubound(nod2_array3D,1)
-    if ((nl2<nl-1) .or. (nl2>nl)) then
+    if ((nl2<ubound(r_mpitype_nod3D, 2)-1) .or. (nl2>ubound(r_mpitype_nod3D, 2))) then
        if (mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -444,7 +448,7 @@ USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:,:) 
  
 if (npes>1) then
    call exchange_nod3D_n_begin(nod_array3D)
@@ -460,7 +464,7 @@ USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
-real(kind=WP), intent(inout) :: nod_array3D(:,:,:) 
+real(real64), intent(inout) :: nod_array3D(:,:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
  
@@ -472,13 +476,13 @@ if (npes>1) then
   nl1= ubound(nod_array3D,2)
   n_val = ubound(nod_array3D,1)
 
-  if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 3)) then
+  if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
 
      ! This routine also works for swapped dimensions nod_array3D(nl1,n_val, nod2D_size) 
-     nl1= ubound(nod_array3D,1)
+     nl1   = ubound(nod_array3D,1)
      n_val = ubound(nod_array3D,2)
 
-     if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 3)) then
+     if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
         if (mype==0) then
            print *,'Subroutine exchange_nod3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
@@ -556,7 +560,7 @@ END SUBROUTINE exchange_elem_end
 !!$ INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
 !!$ integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
 !!$ integer  :: nz, nh, nc
-!!$ real(kind=WP) :: edge_array3D(nl-1,edge2D) 
+!!$ real(real64) :: edge_array3D(nl-1,edge2D) 
 !!$  
 !!$  sn=com_edge2D%sPEnum
 !!$  rn=com_edge2D%rPEnum
@@ -620,7 +624,7 @@ END SUBROUTINE exchange_elem_end
 !!$
 !!$! General version of the communication routine for 2D edge fields
 !!$! This routine is not split, it is used only once during setup. 
-!!$ real*8, intent(inout)  :: edge_array2D(:)
+!!$ real(real64), intent(inout)  :: edge_array2D(:)
 !!$
 !!$ integer  :: n, sn, rn
 !!$
@@ -648,7 +652,7 @@ subroutine exchange_elem3D(elem_array3D)
 USE g_PARSUP 
 IMPLICIT NONE
 
- real(kind=WP), intent(inout) :: elem_array3D(:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:) 
 
  call exchange_elem3D_begin(elem_array3D)
  call exchange_elem_end
@@ -663,7 +667,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
 
-real(kind=WP), intent(inout) :: elem_array3D(:,:) 
+real(real64), intent(inout) :: elem_array3D(:,:) 
 integer  :: n, sn, rn, nl1
 
 if (npes> 1) then
@@ -677,7 +681,7 @@ if (npes> 1) then
       sn=com_elem2D%sPEnum
       rn=com_elem2D%rPEnum
 
-      if (nl1==nl .or. nl1==nl-1) then
+      if (nl1==ubound(r_mpitype_elem3D, 2) .or. nl1==ubound(r_mpitype_elem3D, 2)-1) then
 
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
@@ -729,7 +733,7 @@ if (npes> 1) then
       sn=com_elem2D_full%sPEnum
       rn=com_elem2D_full%rPEnum
 
-      if (nl1==nl .or. nl1==nl-1) then
+      if (nl1==ubound(r_mpitype_elem3D_full, 2) .or. nl1==ubound(r_mpitype_elem3D_full, 2)-1) then
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
          call check_mpi_comm(rn, sn, r_mpitype_elem3D_full(:,nl1,1), &
@@ -790,7 +794,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:,:) 
 
  if (npes> 1) then
     call exchange_elem3D_n_begin(elem_array3D)
@@ -806,20 +810,20 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array3D(:,:,:) 
+ real(real64), intent(inout) :: elem_array3D(:,:,:) 
  integer  :: n, sn, rn, n_val, nl1
 
  if (npes> 1) then
  nl1   = ubound(elem_array3D,2)
  n_val = ubound(elem_array3D,1)
  
-  if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 4)) then
+  if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
 
      ! This routine also works for swapped dimensions elem_array3D(nl1,n_val, elem2D_size) 
      nl1= ubound(elem_array3D,1)
      n_val = ubound(elem_array3D,2)
 
-     if ((nl1<nl-1) .or. (nl1>nl) .or. (n_val > 4)) then
+     if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
         if (mype==0) then
            print *,'Subroutine exchange_elem3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
@@ -891,7 +895,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array2D(:) 
+ real(real64), intent(inout) :: elem_array2D(:) 
 
  if (npes> 1) then
     call exchange_elem2D_begin(elem_array2D)
@@ -908,7 +912,7 @@ IMPLICIT NONE
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
  
- real(kind=WP), intent(inout) :: elem_array2D(:) 
+ real(real64), intent(inout) :: elem_array2D(:) 
  integer  :: n, sn, rn
 
  if (npes> 1) then
@@ -1040,9 +1044,9 @@ IMPLICIT NONE
 INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(kind=WP) ::  arr3D(:,:)
-real(kind=WP) ::  arr3Dglobal(:,:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3Dglobal(:,:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: node_size
 
 node_size=myDim_nod2D+eDim_nod2D
@@ -1101,12 +1105,12 @@ use g_PARSUP
 USE o_MESH
 IMPLICIT NONE
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
 
 integer                                  ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
+real(real64), ALLOCATABLE, DIMENSION(:)  ::  sendbuf
 integer       :: node_size
 
 node_size=myDim_nod2D+eDim_nod2D
@@ -1154,9 +1158,9 @@ IMPLICIT NONE
 INTEGER      :: nz, counter,nl1
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(kind=WP) ::  arr3D(:,:)
-real(kind=WP) ::  arr3Dglobal(:,:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3Dglobal(:,:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 integer       :: elem_size
 
 elem_size=myDim_elem2D+eDim_elem2D
@@ -1219,9 +1223,9 @@ IMPLICIT NONE
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
-real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
+real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf
 integer       :: elem_size
 
 elem_size=myDim_elem2D+eDim_elem2D
@@ -1276,9 +1280,9 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=WP)  ::  arr3D(:,:)
-real(kind=WP)  ::  arr3D_global(:,:)
-real(kind=WP), allocatable :: recvbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3D_global(:,:)
+real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D
 
@@ -1292,7 +1296,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -1321,6 +1325,130 @@ ENDIF
 
 end if
 end subroutine gather_nod3D
+!
+!============================================================================
+!
+subroutine gather_real4_nod3D(arr3D, arr3D_global)
+
+! Make nodal information available to master PE 
+!
+! Use only with 3D arrays stored in (vertical, horizontal) way
+
+use g_PARSUP
+USE o_MESH
+
+
+IMPLICIT NONE
+
+INTEGER      :: nl1
+integer      :: n
+
+real(real32)  ::  arr3D(:,:)
+real(real32)  ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+integer        :: req(npes-1)
+integer        :: start, n3D
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nl1=ubound(arr3D,1)
+
+! Consider MPI-datatypes to recv directly into arr3D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
+
+      do  n = 1, npes-1
+         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr3D_global(:,:) = arr3D(:,:)
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+end if
+end subroutine gather_real4_nod3D
+!=======================================================
+
+subroutine gather_int2_nod3D(arr3D, arr3D_global)
+
+! Make nodal information available to master PE 
+!
+! Use only with 3D arrays stored in (vertical, horizontal) way
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+INTEGER      :: nl1
+integer      :: n
+
+integer(int16) ::  arr3D(:,:)
+integer(int16) ::  arr3D_global(:,:)
+integer(int16), allocatable :: recvbuf(:,:)
+integer        :: req(npes-1)
+integer        :: start, n3D
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nl1=ubound(arr3D,1)
+
+! Consider MPI-datatypes to recv directly into arr3D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+      allocate(recvbuf(nl1,ubound(arr3D_global,2)))
+
+      do  n = 1, npes-1
+         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr3D_global(:,:) = arr3D(:,:)
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+end if
+end subroutine gather_int2_nod3D
 !==============================================
 subroutine gather_nod2D(arr2D, arr2D_global)
 
@@ -1333,9 +1461,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=WP)  ::  arr2D(:)
-real(kind=WP)  ::  arr2D_global(:)
-real(kind=WP)  :: recvbuf(nod2D)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2D_global(:)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1348,7 +1476,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1361,7 +1489,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1377,6 +1505,117 @@ ENDIF
 endif
 end subroutine gather_nod2D
 !==============================================
+subroutine gather_real4_nod2D(arr2D, arr2D_global)
+
+! Make nodal information available to master PE 
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+integer      :: n
+
+real(real32)  ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32), allocatable :: recvbuf(:)
+integer        :: req(npes-1)
+integer        :: start, n2D
+
+ if (npes> 1) then
+
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+! Consider MPI-datatypes to recv directly into arr2D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+      allocate(recvbuf(ubound(arr2D_global,1)))
+      do  n = 1, npes-1
+         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      deallocate(recvbuf)
+   else
+
+      arr2D_global(:) = arr2D(:)
+     
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr2D, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+endif
+end subroutine gather_real4_nod2D
+
+!==============================================
+subroutine gather_int2_nod2D(arr2D, arr2D_global)
+
+! Make nodal information available to master PE 
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+integer      :: n
+
+integer(int16) ::  arr2D(:)
+integer(int16) ::  arr2D_global(:)
+integer(int16), allocatable :: recvbuf(:)
+integer        :: req(npes-1)
+integer        :: start, n2D
+
+ if (npes> 1) then
+
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+! Consider MPI-datatypes to recv directly into arr2D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+      allocate(recvbuf(ubound(arr2D_global,1)))
+      do  n = 1, npes-1
+         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      deallocate(recvbuf)
+   else
+
+      arr2D_global(:) = arr2D(:)
+     
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr2D, myDim_nod2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+endif
+end subroutine gather_int2_nod2D
+
 !============================================================================
 subroutine gather_elem3D(arr3D, arr3D_global)
 
@@ -1393,9 +1632,9 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=WP)  ::  arr3D(:,:)
-real(kind=WP)  ::  arr3D_global(:,:)
-real(kind=WP), allocatable :: recvbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real64) ::  arr3D_global(:,:)
+real(real64), allocatable :: recvbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D, ende, err_alloc
 integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
@@ -1443,6 +1682,145 @@ ENDIF
 
 endif
 end subroutine gather_elem3D
+
+!===================================================================
+
+subroutine gather_real4_elem3D(arr3D, arr3D_global)
+
+! Make element information available to master PE 
+!
+! Use only with 3D arrays stored in (vertical, horizontal) way
+
+use g_PARSUP
+USE o_MESH
+
+
+IMPLICIT NONE
+
+INTEGER        :: nl1
+integer        :: n
+
+real(real32)   ::  arr3D(:,:)
+real(real32)   ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+integer        :: req(npes-1)
+integer        :: start, e3D, ende, err_alloc
+integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nl1=ubound(arr3D,1)
+
+! Consider MPI-datatypes to recv directly into arr3D_global
+! (Carefull with duplicate interface elements, coming from two
+!  PEs at once!)
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+! 
+      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+
+      do  n = 1, npes-1
+         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+   
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                        = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr3D_global(:,:) = arr3D(:,:)
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+endif
+end subroutine gather_real4_elem3D
+
+
+!===================================================================
+
+subroutine gather_int2_elem3D(arr3D, arr3D_global)
+
+! Make element information available to master PE 
+!
+! Use only with 3D arrays stored in (vertical, horizontal) way
+
+use g_PARSUP
+USE o_MESH
+
+
+IMPLICIT NONE
+
+INTEGER      :: nl1
+integer      :: n
+
+integer(int16) ::  arr3D(:,:)
+integer(int16) ::  arr3D_global(:,:)
+integer(int16), allocatable :: recvbuf(:,:)
+integer        :: req(npes-1)
+integer        :: start, e3D, ende, err_alloc
+integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nl1=ubound(arr3D,1)
+
+! Consider MPI-datatypes to recv directly into arr3D_global
+! (Carefull with duplicate interface elements, coming from two
+!  PEs at once!)
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+! 
+      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+
+      do  n = 1, npes-1
+         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+   
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                        = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr3D_global(:,:) = arr3D(:,:)
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+
+endif
+end subroutine gather_int2_elem3D
+
+
 !==============================================
 subroutine gather_elem2D(arr2D, arr2D_global)
 
@@ -1455,9 +1833,9 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=WP)  ::  arr2D(:)
-real(kind=WP)  ::  arr2D_global(:)
-real(kind=WP), allocatable :: recvbuf(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2D_global(:)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, e2D
 
@@ -1503,8 +1881,129 @@ end if
 
 end subroutine gather_elem2D
 
+!==============================================
+subroutine gather_real4_elem2D(arr2D, arr2D_global)
+
+! Make element information available to master PE 
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+integer      :: n
+
+real(real32)  ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32), allocatable :: recvbuf(:)
+integer        :: req(npes-1)
+integer        :: start, e2D
+
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+! Consider MPI-datatypes to recv directly into arr2D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+
+      allocate(recvbuf(remPtr_elem2D(npes)))
+
+      do  n = 1, npes-1
+         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+
+      arr2D_global(:) = arr2D(:)
+     
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr2D, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+end if
+
+end subroutine gather_real4_elem2D
+
+!==============================================
+subroutine gather_int2_elem2D(arr2D, arr2D_global)
+
+! Make element information available to master PE 
+
+use g_PARSUP
+USE o_MESH
+
+IMPLICIT NONE
+
+integer      :: n
+
+integer(int16) ::  arr2D(:)
+integer(int16) ::  arr2D_global(:)
+integer(int16), allocatable :: recvbuf(:)
+integer        :: req(npes-1)
+integer        :: start, e2D
+
+
+ if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+! Consider MPI-datatypes to recv directly into arr2D_global!
+
+IF ( mype == 0 ) THEN
+   
+   if (npes>1) then
+
+      allocate(recvbuf(remPtr_elem2D(npes)))
+
+      do  n = 1, npes-1
+         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+      
+      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+   
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+   
+      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+
+      arr2D_global(:) = arr2D(:)
+     
+   endif
+
+ELSE
+   
+   call MPI_SEND( arr2D, myDim_elem2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   
+ENDIF
+end if
+
+end subroutine gather_int2_elem2D
+
+
 !============================================================================
-subroutine gather_real4_nod3D(arr3D, arr3D_global)
+subroutine gather_real8to4_nod3D(arr3D, arr3D_global)
 
 ! Make nodal information available to master PE 
 !
@@ -1519,10 +2018,10 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=WP)  ::  arr3D(:,:)
-real(kind=4)   ::  arr3D_global(:,:)
-real(kind=4), allocatable :: recvbuf(:,:)
-real(kind=4), allocatable :: sendbuf(:,:)
+real(real64)  ::  arr3D(:,:)
+real(real32)   ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, n3D, ierr
 
@@ -1536,8 +2035,7 @@ nl1=ubound(arr3D,1)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-      allocate(recvbuf(nl1,nod2D))
-!      if (ierr/=0) print *,'allocate knall auf pe=0 in nod3D_real4',ierr
+      allocate(recvbuf(nl1, ubound(arr3D_global,2)))
 
       do  n = 1, npes-1
          n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
@@ -1570,9 +2068,9 @@ ENDIF
 
 end if
 
-end subroutine gather_real4_nod3D
+end subroutine gather_real8to4_nod3D
 !==============================================
-subroutine gather_real4_nod2D(arr2D, arr2D_global)
+subroutine gather_real8to4_nod2D(arr2D, arr2D_global)
 
 ! Make nodal information available to master PE 
 
@@ -1583,9 +2081,10 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=WP)  ::  arr2D(:)
-real(kind=4)   ::  arr2D_global(:)
-real(kind=4)   :: recvbuf(nod2D), sendbuf(myDim_nod2D)
+real(real64)  ::  arr2D(:)
+real(real32)   :: arr2D_global(:)
+real(real32)   :: sendbuf(myDim_nod2D)
+real(real64), allocatable :: recvbuf(:)
 integer        :: req(npes-1)
 integer        :: start, n2D
 
@@ -1596,7 +2095,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global,1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1609,7 +2108,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1617,17 +2116,17 @@ IF ( mype == 0 ) THEN
    endif
 
 ELSE
-   sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),4)
+   sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),real32)
 
    call MPI_SEND(sendbuf, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
 end if
-end subroutine gather_real4_nod2D
+end subroutine gather_real8to4_nod2D
 !==============================================
 !============================================================================
-subroutine gather_real4_elem3D(arr3D, arr3D_global)
+subroutine gather_real8to4_elem3D(arr3D, arr3D_global)
 
 ! Make element information available to master PE 
 !
@@ -1642,10 +2141,10 @@ IMPLICIT NONE
 INTEGER      :: nl1
 integer      :: n
 
-real(kind=WP)  ::  arr3D(:,:)
-real(kind=4)  ::  arr3D_global(:,:)
-real(kind=4), allocatable :: recvbuf(:,:)
-real(kind=4), allocatable :: sendbuf(:,:)
+real(real64) ::  arr3D(:,:)
+real(real32)  ::  arr3D_global(:,:)
+real(real32), allocatable :: recvbuf(:,:)
+real(real32), allocatable :: sendbuf(:,:)
 integer        :: req(npes-1)
 integer        :: start, e3D
 
@@ -1689,9 +2188,9 @@ ELSE
 ENDIF
 
 end if
-end subroutine gather_real4_elem3D
+end subroutine gather_real8to4_elem3D
 !==============================================
-subroutine gather_real4_elem2D(arr2D, arr2D_global)
+subroutine gather_real8to4_elem2D(arr2D, arr2D_global)
 
 ! Make element information available to master PE 
 
@@ -1702,10 +2201,10 @@ IMPLICIT NONE
 
 integer      :: n
 
-real(kind=WP)  ::  arr2D(:)
-real(kind=4)  ::  arr2D_global(:)
-real(kind=4), allocatable :: recvbuf(:)
-real(kind=4)  :: sendbuf(myDim_elem2D)
+real(real64) ::  arr2D(:)
+real(real32)  ::  arr2D_global(:)
+real(real32), allocatable :: recvbuf(:)
+real(real32)  :: sendbuf(myDim_elem2D)
 integer        :: req(npes-1)
 integer        :: start, e2D
 
@@ -1743,13 +2242,13 @@ IF ( mype == 0 ) THEN
 
 ELSE
    
-   sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),4)
+   sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),real32)
    call MPI_SEND(sendbuf, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
    
 ENDIF
 
 end if
-end subroutine gather_real4_elem2D
+end subroutine gather_real8to4_elem2D
 !==============================================
 subroutine gather_elem2D_i(arr2D, arr2D_global)
 ! Make element information available to master PE 
@@ -1795,12 +2294,12 @@ USE o_MESH
 
 IMPLICIT NONE
 
-integer  :: n
-integer  :: arr2D(:)
-integer  :: arr2D_global(:)
-integer  :: recvbuf(nod2D)
-integer  :: req(npes-1)
-integer  :: start, n2D
+integer              :: n
+integer              :: arr2D(:)
+integer              :: arr2D_global(:)
+integer, allocatable :: recvbuf(:)
+integer              :: req(npes-1)
+integer              :: start, n2D
 
 if (npes> 1) then
 
@@ -1811,7 +2310,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 IF ( mype == 0 ) THEN
    
    if (npes>1) then
-
+      allocate(recvbuf(ubound(arr2D_global, 1)))
       do  n = 1, npes-1
          n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
          start = remPtr_nod2D(n)
@@ -1824,7 +2323,7 @@ IF ( mype == 0 ) THEN
    
       arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
                        = recvbuf(1 : remPtr_nod2D(npes)-1)
-
+      deallocate(recvbuf)
    else
 
       arr2D_global(:) = arr2D(:)
@@ -1847,12 +2346,12 @@ use g_PARSUP
 USE o_MESH
 IMPLICIT NONE
 
-real(kind=WP) ::  arr2D(:)
-real(kind=WP) ::  arr2Dglobal(:)
+real(real64) ::  arr2D(:)
+real(real64) ::  arr2Dglobal(:)
 
 integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf
-REAL(kind=WP), ALLOCATABLE, DIMENSION(:) ::  rbuf
+REAL(real64), ALLOCATABLE, DIMENSION(:) ::  rbuf
 
 IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
@@ -1983,6 +2482,10 @@ interface gather_nod
       module procedure gather_nod2D
       module procedure gather_real4_nod3D
       module procedure gather_real4_nod2D
+      module procedure gather_int2_nod3D
+      module procedure gather_int2_nod2D
+      module procedure gather_real8to4_nod3D
+      module procedure gather_real8to4_nod2D
       module procedure gather_nod2D_i
 end interface gather_nod
 
@@ -1991,6 +2494,10 @@ interface gather_elem
       module procedure gather_elem2D
       module procedure gather_real4_elem3D
       module procedure gather_real4_elem2D
+      module procedure gather_int2_elem3D
+      module procedure gather_int2_elem2D
+      module procedure gather_real8to4_elem3D
+      module procedure gather_real8to4_elem2D
       module procedure gather_elem2D_i
 end interface gather_elem
 

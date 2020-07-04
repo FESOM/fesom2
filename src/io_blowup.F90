@@ -3,7 +3,7 @@ MODULE io_BLOWUP
 	use g_clock
 	use g_parsup
 	use g_comm_auto
-	use o_mesh
+        USE MOD_MESH
 	use o_arrays
 	use i_arrays
 	implicit none
@@ -62,9 +62,9 @@ MODULE io_BLOWUP
 	!_______________________________________________________________________________
 	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year)
+	subroutine ini_blowup_io(year, mesh)
 		implicit none
-	
+                type(t_mesh), intent(in) , target :: mesh
 		integer, intent(in)       :: year
 		integer                   :: ncid, j
 		integer                   :: varid
@@ -72,7 +72,9 @@ MODULE io_BLOWUP
 		character(500)            :: filename
 		character(500)            :: trname, units
 		character(4)              :: cyear
-		
+
+#include  "associate_mesh.h"
+
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
 		! create an ocean restart file; serial output implemented so far
@@ -89,11 +91,11 @@ MODULE io_BLOWUP
 		!===========================================================================
 		!___Define the netCDF variables for 2D fields_______________________________
 		!___SSH_____________________________________________________________________
-		call def_variable(bid, 'ssh'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
-		call def_variable(bid, 'deta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
+		call def_variable(bid, 'eta_n'		, (/nod2D/)			, 'sea surface elevation', 'm', eta_n);
+		call def_variable(bid, 'd_eta'		, (/nod2D/)			, 'change in ssh from solver', 'm', d_eta);
 		!___ALE related fields______________________________________________________
 		call def_variable(bid, 'hbar'		, (/nod2D/)			, 'ALE surface elevation hbar_n+0.5', 'm', hbar);
-		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
+!!PS 		call def_variable(bid, 'hbar_old'	, (/nod2D/)			, 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
 		call def_variable(bid, 'ssh_rhs'	, (/nod2D/)			, 'RHS for the elevation', '?', ssh_rhs);
 		call def_variable(bid, 'ssh_rhs_old', (/nod2D/)			, 'RHS for the elevation', '?', ssh_rhs_old);
 		!___Define the netCDF variables for 3D fields_______________________________
@@ -109,9 +111,9 @@ MODULE io_BLOWUP
 		call def_variable(bid, 'zbar_e_bot' , (/elem2d/)		, 'elem bottom depth', 'm', zbar_e_bot);
 		call def_variable(bid, 'bottom_node_thickness' , (/nod2D/)			, 'node bottom thickness', 'm', bottom_node_thickness);
 		call def_variable(bid, 'bottom_elem_thickness' , (/elem2d/)		, 'elem bottom thickness', 'm', bottom_elem_thickness);
-		call def_variable(bid, 'pgf_x'	, (/nl-1, elem2D/)	, 'zonal pressure gradient force', '???', pgf_x(:,:));
-		call def_variable(bid, 'pgf_y'	, (/nl-1, elem2D/)	, 'meridional pressure gradient force', '???', pgf_y(:,:));
-		call def_variable(bid, 'density_m_rho0'	, (/nl-1, nod2D/)	, 'density minus rho0', '???', density_m_rho0(:,:));
+!!PS 		call def_variable(bid, 'pgf_x'	, (/nl-1, elem2D/)	, 'zonal pressure gradient force', '???', pgf_x(:,:));
+!!PS 		call def_variable(bid, 'pgf_y'	, (/nl-1, elem2D/)	, 'meridional pressure gradient force', '???', pgf_y(:,:));
+!!PS 		call def_variable(bid, 'density_m_rho0'	, (/nl-1, nod2D/)	, 'density minus rho0', '???', density_m_rho0(:,:));
 		
 		do j=1,num_tracers
 			SELECT CASE (j) 
@@ -139,37 +141,38 @@ MODULE io_BLOWUP
 		
 		!_____________________________________________________________________________
 		! write snapshot ice variables to blowup file
-		call def_variable(bid, 'area'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
-		call def_variable(bid, 'hice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
-		call def_variable(bid, 'hsnow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
-		call def_variable(bid, 'uice'		, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice);
-		call def_variable(bid, 'vice'		, (/nod2D/)			, 'meridional velocity', 'm', v_ice);
- 		call def_variable(bid, 'area_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
- 		call def_variable(bid, 'hice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
- 		call def_variable(bid, 'hsnow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
-		call def_variable(bid, 'uice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
- 		call def_variable(bid, 'vice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
+		call def_variable(bid, 'a_ice'		, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice);
+		call def_variable(bid, 'm_ice'		, (/nod2D/)			, 'effective ice thickness',    'm', m_ice);
+		call def_variable(bid, 'm_snow'		, (/nod2D/)			, 'effective snow thickness',   'm', m_snow);
+		call def_variable(bid, 'u_ice'		, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice);
+		call def_variable(bid, 'v_ice'		, (/nod2D/)			, 'meridional velocity', 'm', v_ice);
+!!PS  		call def_variable(bid, 'a_ice_old'	, (/nod2D/)			, 'ice concentration [0 to 1]', '%', a_ice_old); !PS
+!!PS  		call def_variable(bid, 'm_ice_old'	, (/nod2D/)			, 'effective ice thickness',    'm', m_ice_old); !PS
+!!PS  		call def_variable(bid, 'm_snow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
+!!PS 		call def_variable(bid, 'u_ice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
+!!PS  		call def_variable(bid, 'v_ice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
  		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',    '?', heat_flux); !PS
- 		call def_variable(bid, 'heat_flux_old', (/nod2D/)		, 'heat flux old',    '?', heat_flux_old); !PS
+!!PS  		call def_variable(bid, 'heat_flux_old', (/nod2D/)		, 'heat flux old',    '?', heat_flux_old); !PS
 		call def_variable(bid, 'water_flux'	, (/nod2D/)			, 'water flux ',    '?', water_flux); !PS
-		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
+!!PS 		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
 		
+		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
 	end subroutine ini_blowup_io
 !
 !
 !_______________________________________________________________________________
-	subroutine blowup(istep)
+	subroutine blowup(istep, mesh)
 		implicit none
-		
-		integer :: istep
+                type(t_mesh), intent(in) , target :: mesh		
+		integer                   :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew)
+		call ini_blowup_io(yearnew, mesh)
 		if(mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(mype==0) write(*,*)' --> call assoc_ids(bid)'
 		call assoc_ids(bid) ; call was_error(bid)  
 		if(mype==0) write(*,*)' --> call write_blowup(bid, istep)'
-		call write_blowup(bid, istep) ; call was_error(bid)
+		call write_blowup(bid, istep, mesh) ; call was_error(bid)
 	
 	end subroutine blowup
 !
@@ -268,7 +271,7 @@ MODULE io_BLOWUP
 		character(len=*), intent(in)           :: name
 		integer, intent(in)                    :: dims(1)
 		character(len=*), intent(in), optional :: units, longname
-		real(kind=8),target,     intent(inout)        :: data(:)
+		real(kind=WP),target,     intent(inout)        :: data(:)
 		integer                                :: c
 		type(nc_vars), allocatable, dimension(:) :: temp
 		
@@ -304,7 +307,7 @@ MODULE io_BLOWUP
 		character(len=*), intent(in)           :: name
 		integer, intent(in)                    :: dims(2)
 		character(len=*), intent(in), optional :: units, longname
-		real(kind=8),target,     intent(inout) :: data(:,:)
+		real(kind=WP),target,     intent(inout) :: data(:,:)
 		integer                                :: c
 		type(nc_vars), allocatable, dimension(:) :: temp
 		
@@ -334,13 +337,17 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine write_blowup(id, istep)
+	subroutine write_blowup(id, istep, mesh)
 		implicit none
 		type(nc_file),  intent(inout) :: id
 		integer,  intent(in)          :: istep
-		real(kind=8), allocatable     :: aux1(:), aux2(:,:) 
+		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
+        type(t_mesh), intent(in)     , target :: mesh
+
+#include  "associate_mesh.h"
+
 		! Serial output implemented so far
 		if (mype==0) then
 			c=1
@@ -396,7 +403,7 @@ MODULE io_BLOWUP
 		type(nc_file),  intent(inout) :: id
 		character(500)                :: longname
 		integer                       :: c, j, k
-		real(kind=8)                  :: rtime !timestamp of the record
+		real(kind=WP)                 :: rtime !timestamp of the record
 		! Serial output implemented so far
 		if (mype/=0) return
 		c=1

@@ -184,7 +184,7 @@ void partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *part
 /*     free(wgt_2d3d); */
     break;
   default:
-    printf("Wring weighting option for partitioning\n");
+    printf("Wrong weighting option for partitioning\n");
     exit(1);
   }
    

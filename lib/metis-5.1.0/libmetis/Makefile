@@ -1,3 +1,4 @@
+include ../../../Makefile.in
 include ../Makefile.in
 
 

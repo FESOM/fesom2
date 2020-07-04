@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=fesom2.0
 #SBATCH -p compute2,compute
+#SBATCH --ntasks-per-node=36
 #SBATCH --ntasks=7560
 #SBATCH --time=00:30:00
 #SBATCH -o slurm-out.out

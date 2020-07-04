@@ -12,18 +12,21 @@ save
 #endif
 
  integer              :: MPI_COMM_FESOM
- integer, parameter   :: MAX_LAENDERECK=8
+ integer, parameter   :: MAX_LAENDERECK=16
+ integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
+
   type com_struct
-     integer    :: rPEnum                    ! the number of PE I receive info from 
-     integer, dimension(:), allocatable :: rPE   ! their list
-     integer, dimension(:), allocatable :: rptr  ! allocatables to the list of nodes
-     integer, dimension(:), allocatable :: rlist ! the list of nodes
-     integer    :: sPEnum                    ! send part 
-     integer, dimension(:), allocatable :: sPE
-     integer, dimension(:), allocatable :: sptr
-     integer, dimension(:), allocatable :: slist
-     integer, dimension(:), allocatable :: req  ! request for MPI_Wait
-     integer    :: nreq  ! number of requests for MPI_Wait (to combine halo exchange of several fields)
+     integer                                       :: rPEnum ! the number of PE I receive info from 
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: rPE    ! their list
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS+1) :: rptr   ! allocatables to the list of nodes
+     integer, dimension(:), allocatable            :: rlist  ! the list of nodes
+     integer                                       :: sPEnum ! send part 
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sPE
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sptr
+     integer, dimension(:), allocatable            :: slist
+     integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
+     integer                                       :: nreq   ! number of requests for MPI_Wait
+                                                             ! (to combine halo exchange of several fields)
   end type com_struct
 
   type(com_struct)   :: com_nod2D
@@ -100,6 +103,8 @@ subroutine par_init    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(abort)       ! finalizes MPI
+#ifndef __oifs
+!For standalone and coupled ECHAM runs
 #if defined (__oasis)
   use mod_prism 
 #endif
@@ -108,7 +113,7 @@ subroutine par_ex(abort)       ! finalizes MPI
 
 #ifndef __oasis
   if (present(abort)) then
-     write(*,*) 'Run finished unexpectedly!'
+     if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT( MPI_COMM_FESOM, 1 )
   else
      call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
@@ -116,268 +121,44 @@ subroutine par_ex(abort)       ! finalizes MPI
   endif
 #else
   if (.not. present(abort)) then
-     print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
+     if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
      call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
   end if
   call prism_terminate_proto(MPIerr)
-  print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
+  if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
   call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
-  print *, 'FESOM calls MPI_Finalize'
+  
+  if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(MPIerr)
 #endif
-  print *, 'fesom should stop with exit status = 0'
+  if (mype==0) print *, 'fesom should stop with exit status = 0'
+#endif
+#if defined (__oifs)
+!OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
+  implicit none
+  integer,optional :: abort
+  if (present(abort)) then
+	if (mype==0) write(*,*) 'Run finished unexpectedly!'
+	call MPI_ABORT( MPI_COMM_FESOM, 1 )
+  else
+	call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
+	call  MPI_Finalize(MPIerr)
+  endif
+#endif
+
 end subroutine par_ex
-!=================================================================
-subroutine set_par_support_ini
-
-  use iso_c_binding, only: idx_t=>C_INT32_T
-  use o_MESH
-  use g_config
+!=======================================================================
+subroutine set_par_support(mesh)
+  use MOD_MESH
   implicit none
 
-  integer   n, j, k, nini, nend, ierr
-  integer(idx_t)   :: np(10)
+  type(t_mesh), intent(in)         , target :: mesh
+  integer                          :: n, offset
+  integer                          :: i, max_nb, nb, nini, nend, nl1, n_val
+  integer, allocatable             :: blocklen(:),     displace(:)
+  integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-  interface 
-     subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
-       use iso_c_binding, only: idx_t=>C_INT32_T
-       integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*), np(*)
-       integer(idx_t), intent(out) :: part(*)
-     end subroutine partit
-  end interface
-
-  ! Construct partitioning vector
-  if (n_levels<1 .OR. n_levels>10) then
-     print *,'Number of hierarchic partition levels is out of range [1-10]! Aborting...'
-     call MPI_ABORT( MPI_COMM_FESOM, 1 )
-  end if
-
-  np(:) = n_part(:)               ! Number of partitions on each hierarchy level
-  if (n_part(1) == 0) then        ! Backward compatibility case: Take the number of 
-     np(1) = npes                 ! partitions from the number of MPI processes
-     n_levels = 1
-  end if
-  if (n_levels < 10) then         ! 0 is an indicator of the last hierarchy level
-     np(n_levels+1) = 0 
-  end if
-
-  allocate(part(nod2D))
-  part=0
-
-  npes = PRODUCT(np(1:n_levels))
-  if(npes<2) then
-     print *,'Total number of parallel partitions is less than one! Aborting...'
-     stop
-  end if
-  
-  write(*,*) 'Calling partit'
-  call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-       nlevels_nod2D, np, part)
-
-  call check_partitioning
-
-  write(*,*) 'Partitioning is done.'
-
-! The stiffness matrix is no longer needed. 
-  deallocate(ssh_stiff%rowptr)
-  deallocate(ssh_stiff%colind)
-        
-  !NR No longer needed - last use was as weight for partitioning
-  deallocate(nlevels_nod2D)
-end subroutine set_par_support_ini
-
-!=======================================================================
-
-subroutine check_partitioning
-
-! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
-!   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
-!   * lower maximum of weights per partition (better load balancing)
-!   * lower memory demand
-!
-! BUT: there might be outliers, single nodes connected to their partition by
-!      only one edge or even completely isolated. This spoils everything :-(
-!
-! This routine checks for isolated nodes and moves them to an adjacent partition,
-! trying not to spoil the load balance.
-
-  use o_MESH
-  integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
-  integer :: nod_per_partition(2,0:npes-1)
-  integer :: max_nod_per_part(2), min_nod_per_part(2)
-  integer :: average_nod_per_part(2), node_neighb_part(100)
-  logical :: already_counted, found_part
-  
-  integer :: max_adjacent_nodes
-  integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
-
-! call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
-!             nlevels_nod2D, npes, part)
-
-! Check load balancing
-  do i=0,npes-1
-     nod_per_partition(1,i) = count(part(:) == i)
-     nod_per_partition(2,i) = sum(nlevels_nod2D,part(:) == i)
-  enddo
-
-  min_nod_per_part(1) = minval( nod_per_partition(1,:))
-  min_nod_per_part(2) = minval( nod_per_partition(2,:))
-
-  max_nod_per_part(1) = maxval( nod_per_partition(1,:))
-  max_nod_per_part(2) = maxval( nod_per_partition(2,:))
-
-  average_nod_per_part(1) = nod2D / npes
-  average_nod_per_part(2) = sum(nlevels_nod2D(:)) / npes
-  
-! Now check for isolated nodes (connect by one or even no edge to other
-! nodes of its partition) and repair, if possible
-
-  max_adjacent_nodes = maxval(ssh_stiff%rowptr(2:nod2D+1) - ssh_stiff%rowptr(1:nod2D))
-  allocate(ne_part(max_adjacent_nodes), ne_part_num(max_adjacent_nodes), &
-       ne_part_load(2,max_adjacent_nodes))
-
-  isolated_nodes_check: do n_iter = 1, 10
-     print *,' '
-     print *,'Check for isolated nodes, new iteration ========'
-     n_iso = 0
-     do n=1,nod2D
-        is = ssh_stiff%rowptr(n)
-        ie = ssh_stiff%rowptr(n+1) -1
-
-        node_neighb_part(1:ie-is) = part(ssh_stiff%colind(is:ie))
-        if (count(node_neighb_part(1:ie-is) == part(n)) <= 1) then
-
-           n_iso = n_iso+1
-           print *,'Isolated node',n, 'in partition', part(n)
-           print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
-
-        ! count the adjacent nodes of the other PEs
-        
-           np=1
-           ne_part(1) = node_neighb_part(1)
-           ne_part_num(1) = 1
-           ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
-           ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
-           
-           do i=1,ie-is
-              if (node_neighb_part(i)==part(n)) cycle
-              already_counted = .false.
-              do k=1,np
-                 if (node_neighb_part(i) == ne_part(k)) then
-                    ne_part_num(k) = ne_part_num(k) + 1
-                    already_counted = .true.
-                    exit
-                 endif
-              enddo
-              if (.not. already_counted) then
-                 np = np+1
-                 ne_part(np) = node_neighb_part(i)
-                 ne_part_num(np) = 1
-                 ne_part_load(1,np) = nod_per_partition(1,ne_part(np)) + 1
-                 ne_part_load(2,np) = nod_per_partition(2,ne_part(np)) + nlevels_nod2D(n)
-              endif
-           enddo
-        
-        ! Now, check for two things: The load balance, and if 
-        ! there is more than one node of that partition.
-        ! Otherwise, it would become isolated again.
-
-        ! Best choice would be the partition with most adjacent nodes (edgecut!)
-        ! Choose, if it does not decrease the load balance. 
-        !        (There might be two partitions with the same number of adjacent
-        !         nodes. Don't care about this here)
-
-           kmax = maxloc(ne_part_num(1:np),1)
-
-           if (ne_part_num(kmax) <= 1) then
-              print *,'Sorry, no chance to solve an isolated node problem'
-              exit isolated_nodes_check
-           endif
-
-           if  (ne_part_load(1,kmax) <= max_nod_per_part(1) .and. &
-                ne_part_load(2,kmax) <= max_nod_per_part(2) ) then
-              k = kmax
-           else
-           ! Don't make it too compicated. Reject partitions that have only one
-           ! adjacent node. Take the next not violating the load balance.
-              found_part = .false.
-              do k=1,np
-                 if (ne_part_num(k)==1 .or. k==kmax) cycle
-                 
-                 if  (ne_part_load(1,k) <= max_nod_per_part(1) .and. &
-                      ne_part_load(2,k) <= max_nod_per_part(2) ) then
-                    
-                    found_part = .true.
-                    exit
-                 endif
-              enddo
-
-              if (.not. found_part) then
-              ! Ok, don't think to much. Simply go for minimized edge cut.
-                 k = kmax
-              endif
-           endif
-        
-! Adjust the load balancing
-        
-           nod_per_partition(1,ne_part(k)) = nod_per_partition(1,ne_part(k)) + 1 
-           nod_per_partition(2,ne_part(k)) = nod_per_partition(2,ne_part(k)) + nlevels_nod2D(n)
-           nod_per_partition(1,part(n))    = nod_per_partition(1,part(n)) - 1
-           nod_per_partition(2,part(n))    = nod_per_partition(2,part(n)) - nlevels_nod2D(n)
-
-! And, finally, move nod n to other partition        
-           part(n) = ne_part(k)
-           print *,'Node',n,'is moved to part',part(n)
-        endif
-  enddo  
-  
-  if (n_iso==0) then
-     print *,'No isolated nodes found'
-     exit isolated_nodes_check 
-  endif
-  ! Check for isolated nodes again
-end do isolated_nodes_check
-
-  deallocate(ne_part, ne_part_num, ne_part_load)
-
-  if (n_iso > 0) then
-     print *,'++++++++++++++++++++++++++++++++++++++++++++'
-     print *,'+  WARNING: PARTITIONING LOOKS REALLY BAD  +'
-     print *,'+  It was not possible to remove all       +'
-     print *,'+  isolated nodes. Consider to rerun with  +'
-     print *,'+  new metis random seed (see Makefile.in) +'
-     print *,'++++++++++++++++++++++++++++++++++++++++++++'
-  endif
-
-  print *,'=== LOAD BALANCING ==='
-  print *,'2D nodes: min, aver, max per part',min_nod_per_part(1), &
-          average_nod_per_part(1),max_nod_per_part(1)
-
-  write(*,"('2D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
-          100.*real(min_nod_per_part(1)) / real(average_nod_per_part(1)), &
-          100.*real(max_nod_per_part(1)) / real(average_nod_per_part(1))
-
-  print *,'3D nodes: Min, aver, max per part',min_nod_per_part(2), &
-          average_nod_per_part(2),max_nod_per_part(2)
-  write(*,"('3D nodes: percent min, aver, max ',f8.3,'%, 100%, ',f8.3,'%')") &
-          100.*real(min_nod_per_part(2)) / real(average_nod_per_part(2)), &
-          100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
-
-
-
-
-end subroutine check_partitioning
-!=======================================================================
-
-subroutine set_par_support
-  use o_MESH
-  implicit none
-
-  integer   n, offset
-  integer :: i, max_nb, nb, nini, nend, nl1, n_val
-  integer, allocatable :: blocklen(:),     displace(:)
-  integer, allocatable :: blocklen_tmp(:), displace_tmp(:)
-
+#include "associate_mesh.h"  
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
@@ -389,7 +170,6 @@ subroutine set_par_support
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
-!!$      allocate(com_edge2D%req(          3*com_edge2D%rPEnum +      3*com_edge2D%sPEnum))
       allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum))
       allocate(com_elem2D%req(          3*com_elem2D%rPEnum +      3*com_elem2D%sPEnum))
       allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum + 3*com_elem2D_full%sPEnum))
@@ -397,63 +177,6 @@ subroutine set_par_support
 !================================================
 ! MPI DATATYPES
 !================================================
-      ! Build MPI Data types for halo exchange: Edges
-!!$      allocate(r_mpitype_edge2D(com_edge2D%rPEnum))  ! 2D
-!!$      allocate(s_mpitype_edge2D(com_edge2D%sPEnum))  
-
-      ! Upper limit for the length of the local interface between the neighbor PEs 
-!!$      max_nb = max(maxval(com_edge2D%rptr(2:com_edge2D%rPEnum+1) - com_edge2D%rptr(1:com_edge2D%rPEnum)), &
-!!$                   maxval(com_edge2D%sptr(2:com_edge2D%sPEnum+1) - com_edge2D%sptr(1:com_edge2D%sPEnum)))
-
-!!$      allocate(displace(max_nb),     blocklen(max_nb))
-!!$
-!!$      do n=1,com_edge2D%rPEnum
-!!$         nb = 1
-!!$         nini = com_edge2D%rptr(n)
-!!$         nend = com_edge2D%rptr(n+1) - 1
-!!$         displace(:) = 0
-!!$         displace(1) = com_edge2D%rlist(nini) -1  ! C counting, start at 0
-!!$         blocklen(:) = 1
-!!$         do i=nini+1, nend
-!!$            if (com_edge2D%rlist(i) /= com_edge2D%rlist(i-1) + 1) then  
-!!$               ! New block
-!!$               nb = nb+1
-!!$               displace(nb) = com_edge2D%rlist(i) -1
-!!$            else
-!!$               blocklen(nb) = blocklen(nb)+1
-!!$            endif
-!!$         enddo
-!!$         
-!!$         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, r_mpitype_edge2D(n), MPIerr)
-!!$
-!!$         call MPI_TYPE_COMMIT(r_mpitype_edge2D(n),   MPIerr) 
-!!$      enddo
-!!$
-!!$      do n=1,com_edge2D%sPEnum
-!!$         nb = 1
-!!$         nini = com_edge2D%sptr(n)
-!!$         nend = com_edge2D%sptr(n+1) - 1
-!!$         displace(:) = 0
-!!$         displace(1) = com_edge2D%slist(nini) -1  ! C counting, start at 0
-!!$         blocklen(:) = 1
-!!$         do i=nini+1, nend
-!!$            if (com_edge2D%slist(i) /= com_edge2D%slist(i-1) + 1) then  
-!!$               ! New block
-!!$               nb = nb+1
-!!$               displace(nb) = com_edge2D%slist(i) -1
-!!$            else
-!!$               blocklen(nb) = blocklen(nb)+1
-!!$            endif
-!!$         enddo
-!!$         
-!!$         call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, s_mpitype_edge2D(n), MPIerr)
-!!$
-!!$         call MPI_TYPE_COMMIT(s_mpitype_edge2D(n),   MPIerr) 
-!!$
-!!$      enddo
-!!$
-!!$      deallocate(displace, blocklen)
-
 
       ! Build MPI Data types for halo exchange: Elements
       allocate(r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
@@ -748,9 +471,7 @@ subroutine set_par_support
    endif
 
    call init_gatherLists
-
-  if(mype==0) write(*,*) 'Communication arrays are set' 
-
+   if(mype==0) write(*,*) 'Communication arrays are set' 
 end subroutine set_par_support
 
 

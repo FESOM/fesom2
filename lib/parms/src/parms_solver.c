@@ -168,6 +168,12 @@ int parms_SolverSetType(parms_Solver self, SOLVERTYPE stype)
 	gmres_create(self);
   else if(stype == SOLBICGS)
         bicgstab_create(self);
+  else if(stype == SOLPBICGS)
+        pbicgstab_create(self);
+  else if(stype == SOLPBICGS_RAS)
+        pbicgstabras_create(self);
+  else if(stype == SOLBICGS_RAS)
+        bicgstabras_create(self);
   else if(stype == SOLCG)
         cg_create(self);
   else{

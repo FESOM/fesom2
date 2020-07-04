@@ -14,23 +14,21 @@ real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
+real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
+integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
 
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
-real(kind=WP)                 :: A_hor=100.0_WP		! Horizontal harm. visc.    
-real(kind=WP)                 :: A_hor_max=1500.0_WP	! Maximum viscosity allowed (to limit Smag and Leith
-							! contributions when they are too large
-real(kind=WP)                 :: Leith_c=0.		! Leith viscosity. It needs vorticity, which is only computed for 
-							! the vector invariant form of momentum advection (mom_adv=4)
-real(kind=WP)                 :: tau_c=0.4		! Controls the strength of filters. Should be about 0.4
+real(kind=WP)                 :: gamma0=0.01! [m/s], gamma0*len*dt is the background viscosity
+real(kind=WP)                 :: gamma1=0.1!  [non dim.], or computation of the flow aware viscosity
+real(kind=WP)                 :: gamma2=10.!  [s/m],      is only used in easy backscatter option
+real(kind=WP)                 :: Div_c  =1.0_WP !modified Leith viscosity weight
+real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It needs vorticity!
+real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
-real(kind=WP)                 :: Div_c=0.5_WP
-real(kind=WP)                 :: Smag_c=0.0_WP  ! 0.2   ! (C/pi)^2
-real(kind=WP)                 :: Abh0=8.0e12    ! 
-logical                       :: laplacian=.false.
-logical                       :: biharmonic=.true.
+integer                       :: visc_option=5
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -43,24 +41,30 @@ real(kind=WP)                 :: clim_decay, clim_growth
 logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
-real(kind=WP)                 :: K_GM=1000.
-logical			      :: scaling_Ferreira   =.true.
-logical			      :: scaling_Rossby     =.false.
-logical			      :: scaling_resolution =.true.
-logical			      :: scaling_FESOM14    =.false.
-logical			      :: Redi               =.false.  !flag for Redi scheme
+real(kind=WP)                 :: K_GM_max = 3000.
+real(kind=WP)                 :: K_GM_min = 2.0
+integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay, 2...mean over mixlay
+real(kind=WP)                 :: K_GM_resscalorder = 2.0 
+real(kind=WP)                 :: K_GM_rampmax = 40.0 ! Resol >K_GM_rampmax[km] GM full
+real(kind=WP)                 :: K_GM_rampmin = 30.0 ! Resol <K_GM_rampmin[km] GM off
+logical                       :: scaling_Ferreira   =.true.
+logical                       :: scaling_Rossby     =.false. 
+logical                       :: scaling_resolution =.true.
+logical                       :: scaling_FESOM14    =.false.
+logical                       :: Redi               =.false.  !flag for Redi scheme
 
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude 
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
- character(5)                 :: mix_scheme='KPP'	   !'KPP','PP'
+character(25)                 :: mix_scheme     ='KPP'	   !'KPP','PP'
+integer                       :: mix_scheme_nmb = 1       ! choosen in oce_setup_step --> replace string by int comparison
 real(KIND=WP)                 :: Ricr   = 0.3_WP  ! critical bulk Richardson Number
 real(KIND=WP)                 :: concv  = 1.6_WP  ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 
-logical                       :: hbl_diag =.false.   ! writen boundary layer depth
-
+logical                       :: hbl_diag =.false.        ! writen boundary layer depth
+logical                       :: use_global_tides=.false. ! tidal potential will be computed and used in the SSH gradient computation
 ! Time stepping                               
 ! real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
@@ -70,13 +74,25 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
 integer                       :: tracer_adv=1
-
 logical                       :: w_split  =.false.
-real(kind=WP)                 :: w_exp_max=1.e-5_WP
+real(kind=WP)                 :: w_max_cfl=1.e-5_WP
 
-				! 1 MUSCL
-				! 2 MUSCL-FCT
+logical                       :: SPP=.false.
+
+TYPE tracer_source3d_type
+    integer                             :: locID
+    integer                             :: ID
+    integer, allocatable, dimension(:)  :: ind2
+END TYPE tracer_source3d_type
+
 integer	                       :: num_tracers=2
+integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
+                                                                                 ! 0=temp, 1=salt etc.
+type(tracer_source3d_type), &
+    allocatable, dimension(:)  :: ptracers_restore
+integer                        :: ptracers_restore_total=0
+
+
 ! Momentum
 logical                       :: free_slip=.false.
                                 ! false=no slip 
@@ -87,10 +103,28 @@ integer                       :: mom_adv=2
 
 logical                       :: open_b=.false.   ! Reserved    
 
-logical                       :: mo_on=.false. !Monin-Obukhov
-real*8 :: modiff=0.01                   !for PP, mixing coefficient within MO length
+!_______________________________________________________________________________
+!--> mixing enhancement than can be applied via subroutine mo_convect(mesh) 
+!    additionally to every mixing scheme i.e. KPP, PP, cvmix_KPP, cvmix_PP, cvmix_TKE
 
-  ! *** active tracer cutoff
+! Switch for Monin-Obukov TB04 mixing --> can be additionally applied for all mixing schemes
+! --> definetely recommented for KPP
+logical                       :: use_momix     = .true. !.false. !Monin-Obukhov -> TB04 mixing on/off
+real(kind=WP)                 :: momix_lat     = -50.0_WP ! latitudinal treshhold to apply mo_on <lat
+real(kind=WP)                 :: momix_kv      = 0.01   ! for PP/KPP, mixing coefficient within MO length
+
+! Switch for enhanced vertical mixing in case of instable stratification --> enhanced
+! convection 
+logical                       :: use_instabmix = .true.
+real(kind=WP)                 :: instabmix_kv  = 0.1
+
+! Switch for enhanced wind mixing --> nasty trick from pp mixing in FESOM1.4
+logical                       :: use_windmix   = .false.
+real(kind=WP)                 :: windmix_kv    = 1.e-3
+integer                       :: windmix_nl    = 2
+
+!_______________________________________________________________________________
+! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
 real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s to s_min
@@ -98,105 +132,41 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
   namelist /tracer_cutoff/ limit_salinity, salinity_min, coeff_limit_salinity
 
 ! *** others ***
- integer                       :: num_tracer
- real*8                        :: time_sum=0.0 ! for runtime estimate
+ real(kind=WP)                        :: time_sum=0.0 ! for runtime estimate
+
+!___________________________________________
+! Pressure Gradient Force  calculation (pgf) 
+! calculation of pgf either: 
+! only linfs:
+! > 'nemo'         ... like NEMO (interpolate to elemental depth, inter-/extrapolation)
+! linfs, zlevel, zstar:
+! > 'shchepetkin'  ... based on density jacobian
+! > 'cubicspline'  ... like in FESOM1.4
+character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
-                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, &
-                    Fer_GM, K_GM, scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, Redi, visc_sh_limit, mix_scheme, Ricr, concv
+ NAMELIST /oce_dyn/ state_equation, C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+                    scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
+                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
+                    scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option
+
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-		    ref_sss_local, ref_sss, i_vert_diff, &
-		    tracer_adv
+            ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
+            use_momix, momix_lat, momix_kv, &
+            use_instabmix, instabmix_kv, &
+            use_windmix, windmix_kv, windmix_nl
+            
 END MODULE o_PARAM  
 !==========================================================
 
 !==========================================================
 MODULE o_MESH
 USE o_PARAM
+USE, intrinsic :: ISO_FORTRAN_ENV
 ! All variables used to keep the mesh structure +
 ! auxiliary variables involved in implementation 
 ! of open boundaries and advection schemes
-! 
-
-integer, parameter                         :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
-integer                                    ::   nod2D      ! the number of 2D nodes
-real(kind=WP)                              ::   ocean_area
-real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
-integer                                    ::   edge2D     ! the number of 2D edges
-integer                                    ::   edge2D_in  
-                                              ! the number of internal 2D edges
-integer                                    ::   elem2D     ! the number of 2D elements
-integer, allocatable, dimension(:,:)       ::   elem2D_nodes
-                                              ! elem2D_nodes(:,n) lists
-				              ! 3 nodes of element n   
-integer, allocatable, dimension(:,:)       ::   edges
-                                              ! edge(:,n) lists 2 nodes
-				              ! edge n
-integer, allocatable, dimension(:,:)       ::   edge_tri
-                                              ! edge_tri(:,n) lists 2 
-				              ! elements containing edge n
-				              ! The first one is to left 
-				              ! of the line directed
-				              ! to the second node
-integer, allocatable, dimension(:,:)       ::   elem_edges
-                                              ! elem_edges(:,n) are edges of 
-                                              ! element n.  
-real(kind=WP), allocatable, dimension(:)   ::   elem_area
-real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
-real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
-integer,allocatable,dimension(:,:)         ::   elem_neighbors
-integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
-real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
-integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
-real(kind=WP),allocatable,dimension(:)     ::   depth
-                                              ! depth(n) is the depths at 
-				              ! node n 
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec 
-                                              ! Coefficients of linear reconstruction
-					      ! of velocities on elements
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
-                                              ! Coefficients to compute
-					      ! gradient of scalars on elements
-INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-! Vertical structure             
-integer                                    :: nl
-real(kind=8), allocatable, dimension(:)    :: zbar, Z,elem_depth
-integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
-real(kind=8), allocatable, dimension(:,:)  :: area, area_inv
-real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
-
-
-  type sparse_matrix 
-     integer :: nza
-     integer :: dim
-     real(kind=8), allocatable, dimension(:)      :: values
-     integer(KIND=4), allocatable,   dimension(:) :: colind
-     integer(KIND=4), allocatable,   dimension(:) :: rowptr
-     integer(KIND=4), allocatable,   dimension(:) :: colind_loc
-     integer(KIND=4), allocatable,   dimension(:) :: rowptr_loc
-  end type sparse_matrix
-! Elevation stiffness matrix
-type(sparse_matrix)                           :: ssh_stiff
-
-! Auxiliary arrays. They are not related to mesh structure, but are 
-! kept here because they are just used for temporary storage in computations
-
-! Open boundary:
-integer                                       :: ob_num  ! number of OB fragments
-
-TYPE ob_type
-    integer      :: len
-    integer, allocatable, dimension(:)       :: list
-END TYPE ob_type
-
-TYPE ob_rhs_type
-    integer      :: len
-    real(kind=WP), allocatable, dimension(:) :: list
-END TYPE ob_rhs_type
-
-type(ob_type), allocatable                    ::  ob_info(:)
-type(ob_rhs_type), allocatable                ::  ob_2rhs(:)
 !
 ! The fct part
 integer                                       :: fct_iter=1
@@ -213,11 +183,6 @@ integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
-
-#if defined (__oasis)
-  real(kind=8), allocatable, dimension(:)      :: lump2d_south, lump2d_north  
-  integer, allocatable, dimension(:)           :: ind_south, ind_north    
-#endif  
 end module o_MESH
 !==========================================================
 
@@ -233,12 +198,15 @@ real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
 real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable    :: CFL_z(:,:)
 real(kind=WP), allocatable    :: stress_surf(:,:)
+REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_x(:)
+REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_y(:)
 real(kind=WP), allocatable    :: T_rhs(:,:) 
 real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
 real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable    :: S_rhs(:,:)
 real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable    :: del_ttf(:,:)
+real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
@@ -252,14 +220,13 @@ real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
-
+real(kind=WP), allocatable    :: ssh_gp(:)
 ! Passive and age tracers
- character(4), allocatable    :: prog_tracer_name(:)
 real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      
-real(kind=8), allocatable :: ttrhs(:,:)
-real(kind=8), allocatable :: tr_xy(:,:,:)
-real(kind=8), allocatable :: tr_z(:,:)
+real(kind=WP), allocatable :: ttrhs(:,:)
+real(kind=WP), allocatable :: tr_xy(:,:,:)
+real(kind=WP), allocatable :: tr_z(:,:)
 
 ! Auxiliary arrays for vector-invariant form of momentum advection
 real(kind=WP), allocatable,dimension(:,:)   :: vorticity
@@ -279,7 +246,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
-real(kind=WP), allocatable :: Ki(:)
+real(kind=WP), allocatable :: Ki(:,:)
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
@@ -318,14 +285,29 @@ real(kind=WP)                               :: is_nonlinfs
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
+real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
+
+!_______________________________________________________________________________
+!!PS ! dummy arrays
+!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+!!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
+
 !_______________________________________________________________________________
 !Monin-Obukhov correction
-real*8,allocatable :: mo(:,:),mixlength(:)
+real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
-real*8,allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
+real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP), allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
-real(kind=WP), target, allocatable    :: fer_c(:), fer_K(:), fer_gamma(:,:,:)
+real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
+
+real(kind=WP),         allocatable    :: ice_rejected_salt(:)
+
+!_______________________________________________________________________________
+! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
+real(kind=WP), allocatable    :: tr_dvd_horiz(:,:,:),tr_dvd_vert(:,:,:)
+
 END MODULE o_ARRAYS
 !==========================================================

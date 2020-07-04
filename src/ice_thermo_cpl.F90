@@ -1,5 +1,5 @@
 #if defined (__oasis) || defined (__ifsinterface)
-subroutine thermodynamics
+subroutine thermodynamics(mesh)
 
   !===================================================================
   !
@@ -45,7 +45,7 @@ subroutine thermodynamics
 #endif
 
   use o_param
-  use o_mesh
+  use mod_mesh
   use i_therm_param
   use i_param
   use i_arrays
@@ -59,24 +59,28 @@ subroutine thermodynamics
 
   integer :: inod
   !---- prognostic variables (updated in `ice_growth')
-  real*8  :: A, h, hsn, alb, t
+  real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
-  real*8  :: a2ohf, a2ihf
+  real(kind=WP)  :: a2ohf, a2ihf
   !---- evaporation and sublimation (provided by ECHAM)
-  real*8  :: evap, subli
+  real(kind=WP)  :: evap, subli
   !---- precipitation and runoff (provided by ECHAM)
-  real*8  :: rain, snow, runo
+  real(kind=WP)  :: rain, snow, runo
   !---- ocean variables (provided by FESOM)
-  real*8  :: T_oc, S_oc, ustar
+  real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
-  real*8  :: rsss
+  real(kind=WP)  :: rsss
   !---- output variables (computed in `ice_growth')
-  real*8  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
+  real(kind=WP)  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
 
   !---- geographical coordinates
-  real*8  :: geolon, geolat
+  real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
-  real*8  :: h0min = 0.50, h0max = 1.5
+  real(kind=WP)  :: h0min = 0.50, h0max = 1.5
+  type(t_mesh), intent(in)   , target :: mesh  
+
+#include  "associate_mesh.h"
+
 
   rsss = ref_sss
 
@@ -107,10 +111,10 @@ subroutine thermodynamics
      S_oc    = S_oc_array(inod)
      if (ref_sss_local) rsss = S_oc
 
-     ehf     = 0.
-     fw      = 0.
+     ehf     = 0._WP
+     fw      = 0._WP
 #ifdef use_fullfreesurf
-     rsf     = 0.
+     rsf     = 0._WP
 #endif
 
      !---- different lead closing parameter for NH and SH
@@ -157,49 +161,49 @@ contains
     implicit none
 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
-    real*8  :: dsnow, dslat, dhice, dhiow, dcice, dciow
+    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
 
     !---- heat fluxes (positive upward, negative downward)
-    real*8  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
-    real*8  :: ahf, ohf
+    real(kind=WP)  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
+    real(kind=WP)  :: ahf, ohf
 
     !---- atmospheric freshwater fluxes (precipitation minus evaporation)
-    real*8  :: PmEice, PmEocn
+    real(kind=WP)  :: PmEice, PmEocn
 
     !---- local variables and dummys
-    real*8  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+    real(kind=WP)  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
     !---- cut-off ice thickness hmin=0.05 is set in `i_therm_parms'
     !---- and is questionable in terms of conservation of energy.
-    real*8, parameter :: hcutoff = 1.e-6
+    real(kind=WP), parameter :: hcutoff = 1.e-6
 
     !---- minimum ice concentration (Aimin) and ice thickness (himin)
-    real*8, parameter :: Aimin = 0.001, himin = 0.005
+    real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 
     !---- an arbitrary big value, but note that bigval*hcutoff should
     !---- be greater than one (= maximum ice concentration)
-    real*8, parameter :: bigval = 1.e10
+    real(kind=WP), parameter :: bigval = 1.e10
 
     !---- heat transfer rate (gamma_t = h_ml/tau0, where h_ml is the
     !---- mixed layer depth and tau0 is a damping time constant for a
     !---- delayed adaptation of the mixed layer temperature. We assume
     !---- this rate to be 10 meters per day. NOTE: tau0 should be
     !---- significantly greater than the time step dt
-    real*8, parameter :: gamma_t = 10./86400.
+    real(kind=WP), parameter :: gamma_t = 10./86400.
 
     !---- density of freshwater [kg/m**3].
-    real*8, parameter :: rhofwt = 1000.
+    real(kind=WP), parameter :: rhofwt = 1000.
 
     !---- freezing temperature of freshwater [deg C]
-    real*8, parameter :: Tfrez0 = 0.
+    real(kind=WP), parameter :: Tfrez0 = 0.
 
     !---- freezing temperature of sea-water [deg C]
-    real*8  :: Tfrezs
+    real(kind=WP)  :: Tfrezs
 
     !---- compute freezing temperature of sea-water from salinity
-    TFrezs = -0.0575*S_oc + 1.7105e-3*sqrt(S_oc**3) - 2.155e-4*(S_oc**2)
+    TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)
 
     !---- effective thermodynamic thickness of the snow/ice layer
     heff = h + hsn*con/consn
@@ -224,8 +228,8 @@ contains
 
     !---- total atmospheric and oceanic heat fluxes
     !---- average over grid cell [W/m**2]
-    ahf = A*Qatmice + (1.-A)*Qatmocn
-    ohf = A*Qocnice + (1.-A)*Qocnatm
+    ahf = A*Qatmice + (1._WP-A)*Qatmocn
+    ohf = A*Qocnice + (1._WP-A)*Qocnatm
 
     !---- convert heat fluxes [W/m**2] into growth per time step dt [m]
     Qicecon = Qicecon*dt/cl
@@ -239,7 +243,7 @@ contains
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
     PmEice = A*snow + A*subli
-    PmEocn = rain + runo + (1.-A)*snow + (1.-A)*evap
+    PmEocn = rain + runo + (1._WP-A)*snow + (1._WP-A)*evap
 
     !---- convert freshwater fluxes [m/s] into growth per time step dt [m]
     PmEice = PmEice*dt
@@ -251,9 +255,9 @@ contains
     !---- residual freshwater flux over ice
     if (hsn.lt.0) then
        PmEice = hsn*rhosno/rhofwt
-       hsn = 0.
+       hsn = 0._WP
     else
-       PmEice = 0.
+       PmEice = 0._WP
     endif
 
     !---- subtract sublimation from ice thickness (PmEice <= 0)
@@ -262,14 +266,14 @@ contains
     !---- residual freshwater flux over ice
     if (h.lt.0) then
        PmEice = h*rhoice/rhofwt
-       h = 0.
+       h = 0._WP
     else
-       PmEice = 0.
+       PmEice = 0._WP
     endif
 
     !---- add residual freshwater flux over ice to freshwater flux over ocean
     PmEocn = PmEocn + PmEice
-    PmEice = 0.
+    PmEice = 0._WP
 
     !---- store snow and ice thickness after snowfall and sublimation
     hsnold = hsn
@@ -278,7 +282,7 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-    dsnow = A*min(Qatmice-Qicecon,0.)
+    dsnow = A*min(Qatmice-Qicecon,0._WP)
     dsnow = max(dsnow*rhoice/rhosno,-hsn)
 
     !---- update snow thickness after atmospheric snow melt
@@ -291,12 +295,12 @@ contains
     dhice = dhice - dsnow*rhosno/rhoice
 
     !---- ice growth rate over open water (dhiow >= 0)
-    dhiow = (1.-A)*max(Qatmocn-Qocnatm,0.)
+    dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
 
-    if (htmp.lt.0.) then
+    if (htmp.lt.0._WP) then
        !---- all ice melts; now try to melt snow if still present,
        !---- but do not melt more snow than available
        hsntmp = max(htmp*rhoice/rhosno,-hsn)
@@ -305,28 +309,28 @@ contains
        hsn = hsn + hsntmp
 
        !---- new ice thickness
-       h = 0.
+       h = 0._WP
     else
        h = htmp
     endif
 
     !---- avoid very small ice thicknesses
-    if (h.lt.hcutoff) h = 0.
+    if (h.lt.hcutoff) h = 0._WP
 
     !---- ice thickness before any thermodynamic change
     !---- (for h=0 use cut-off ice thickness to avoid division by zero)
     htmp = max(hold,hcutoff)
 
     !---- ice concentration change by melting of ice (dhice <= 0)
-    dcice = 0.5*A*min(dhice,0.)/htmp
+    dcice = 0.5_WP*A*min(dhice,0._WP)/htmp
 
     !---- lateral snow melt if lateral ice melt exceeds snow melt
     !---- due to atmospheric forcing ( dcice*hsn/A - dsnow < 0 )
-    if (A.le.0.) then
+    if (A.le.0._WP) then
        dslat = -hsn
     else
        hsntmp = hsnold/max(A,Aimin)
-       dslat = min(dcice*hsntmp-dsnow,0.)
+       dslat = min(dcice*hsntmp-dsnow,0._WP)
        dslat = max(dslat,-hsn)
     endif
 
@@ -343,14 +347,14 @@ contains
     !---- alternative lead closing parameter when h0max is negative.
     !---- h0min is then interpreted as 'Phi_F' according to the ice
     !---- model by Mellor and Kantha (1989)
-    if (h0max.le.0.) then
+    if (h0max.le.0._WP) then
        htmp = hold/max(A,Aimin)
        h0cur = max(htmp,himin)/h0min
     endif
 
     !---- ice concentration change by freezing in open leads (dhiow >= 0)
     !---- NOTE: dhiow already represents an areal fraction
-    dciow = max(dhiow,0.)/h0cur
+    dciow = max(dhiow,0._WP)/h0cur
 
     !---- new ice concentration
     A = A + dcice + dciow
@@ -359,7 +363,7 @@ contains
     A = min(A,h*bigval)
 
     !---- restrict ice concentration to values between zero and one
-    A = max(0.,min(1.,A))
+    A = max(0._WP,min(1._WP,A))
 
     !---- change in snow and ice thickness due to thermodynamic effects [m/s]
     dhsngrowth = (hsn-hsnold)/dt
@@ -422,24 +426,16 @@ contains
   use i_therm_param
   implicit none
 
-  real*8  hsn    
-  real*8  t    
-  real*8  alb             ! Albedo of sea ice
+  real(kind=WP)  hsn    
+  real(kind=WP)  t    
+  real(kind=WP)  alb             ! Albedo of sea ice
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished.
-  if (t<0.0) then	        ! freezing condition    
-     if (hsn.gt.0.0) then	!   snow cover present  
-        alb=albsn         	
-     else              		!   no snow cover       
-        alb=albi       	
-     endif
-  else			        ! melting condition     
-     if (hsn.gt.0.0) then	!   snow cover present  
-        alb=albsnm	    	
-     else			!   no snow cover       
-        alb=albim		
-     endif
+  if (hsn.gt.0.0) then	!   snow cover present  
+     alb=albsn         	
+  else              		!   no snow cover       
+     alb=albi       	
   endif
  end subroutine ice_albedo
 

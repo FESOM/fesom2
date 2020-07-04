@@ -32,15 +32,15 @@ MODULE i_PARAM
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
-  real(kind=8)              :: alpha_evp=250, beta_evp=250
-  real(kind=8)              :: c_aevp=0.15_8 ! 0.1--0.2, but should be adjusted experimentally   
+  real(kind=WP)             :: alpha_evp=250, beta_evp=250
+  real(kind=WP)             :: c_aevp=0.15 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
   real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice      
 
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
-  real*8    :: ice_dt !ice step=ice_ave_steps*oce_step
+  real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
 END MODULE i_PARAM
@@ -65,13 +65,15 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
+
 #if defined (__oasis) || defined (__ifsinterface)
-  real(kind=8),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
-  real(kind=8),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
-  real(kind=8),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
+  real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
+  real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
+  real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
 							!(for flux correction)
 #endif /* (__oasis) || (__ifsinterface) */
@@ -81,8 +83,6 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl

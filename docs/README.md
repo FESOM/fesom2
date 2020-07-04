@@ -160,10 +160,68 @@ squeue -u yourusername
 
 Results of the model run should appear in the `results` directory that you have specified in the `namelist.config`. After the run is finished the `fesom.clock`file (or if you change your `runid`, `runid.clock`)  will be updated with information about the time of your run's end, that allows running the next time portion of the model experiment by just resubmitting the job with `sbatch job_ollie`. 
 
-Todo
-----
 
-#### fesom.clock explained
-#### recomendations on model spin up
+The clock file
+----------------
+
+The clock file is usually located in your output directory (e.g. `results`) and controls the time. 
+At the start of a new experiment that we want to be initialized from climatology (a so-called cold start),
+the `fesom.clock` file would usually look like this
+```
+0 1 1948
+0 1 1948
+```
+In this example, 1948 is the first available year of the atmospheric `CORE2` forcing. The two identical
+lines tell the model that this is the start of the experiment and that there is no restart file to be read.
+
+Let's assume that we run the model with a timestep of 30 minutes (= 1800 seconds) for a full year (1948).
+After the run is successfully finished, the clock file will then automatically be updated and look like this:
+```
+84600.0 365 1948
+0.0     1   1949
+```
+where the first row is the second last time step of the model, and the second row gives the time where the simulation
+is to be continued. The first row indicates that the model ran for 365 days (in 1948) and 84600 seconds, which is `1 day - 1 FESOM timestep`
+in seconds. In the next job, FESOM2 will look for restart files for the year 1948 and continue the simulation at the 1st of January in 1949.
+
+Since 1948 is a leap year (366 days), this is an exceptional case and the `fesom.clock` file after two full years
+(1948--1949) would look like this:
+```
+84600.0 364 1949
+0.0     1   1950
+```
+Note that dependent on the forcing data set (using a different calendar), a year could only have 360 days.
+
+Tricking FESOM2 into accepting existing restart files
+----------------
+
+The simple time management of FESOM allows to easily trick FESOM to accept existing restart files. Let's assume that you have performed a full `CORE2` cycle until the year 2009 and you want
+to perform a second cycle, restarting from the last year of the first cycle. This can be done by (copying and)
+renaming the last year into:
+```bash
+mv fesom.2009.ice.nc fesom.1947.ice.nc
+mv fesom.2009.oce.nc fesom.1947.oce.nc
+```
+By changing the clock file into
+```
+84600.0 364 1947
+0.0     1   1948
+```
+the model will then restart from the last year of the first cycle, but using CORE2 forcing from 1948 onwards.
+
+Model spinup / Cold start at higher resolutions
+----------------
+
+Cold starting the model at high mesh resolutions with standard values for timestep and viscosity will lead to instabilities that cause the model to crash. If no restart files are available and a spinup has to be performed, the following changes should be made for the first month long simulation and then taken back gradually over the next 6-8 months:
+In config.namelist set:
+```
+step_per_day=720 
+```
+In namelist.oce set:
+```
+Div_c=5
+Leith_c=.5
+```
+After one month change one of the parameters to more standard values. Increase the timestep gradually. Very highly resolved meshes may require an inital timestep of one instead of two minutes.
 
 

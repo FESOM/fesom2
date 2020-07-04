@@ -1,3 +1,28 @@
+module ice_fct_interfaces
+  interface
+    subroutine ice_mass_matrix_fill(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+
+    subroutine ice_solve_high_order(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+
+    subroutine ice_solve_low_order(mesh)
+      use MOD_MESH
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+    
+    subroutine ice_fem_fct(tr_array_id, mesh)
+      use MOD_MESH
+      integer   :: tr_array_id
+      type(t_mesh), intent(in)              , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! 
 ! This file collect subroutines implementing FE-FCT
 ! advection scheme by Loehner et al.
@@ -11,21 +36,25 @@
 ! The code is adapted from  FESOM
 !
 ! =====================================================================
-subroutine ice_TG_rhs
-  use o_MESH
+subroutine ice_TG_rhs(mesh)
+  use MOD_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=8)     :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-   integer          :: n, q, row, elem, elnodes(3)
+  real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+  integer         :: n, q, row, elem, elnodes(3)
+  type(t_mesh), intent(in)              , target :: mesh
+
+#include "associate_mesh.h"
+
  ! Taylor-Galerkin (Lax-Wendroff) rhs
   DO row=1, myDim_nod2D
-     rhs_m(row)=0.
-     rhs_a(row)=0.
-     rhs_ms(row)=0.          
+     rhs_m(row)=0._WP
+     rhs_a(row)=0._WP
+     rhs_ms(row)=0._WP        
   END DO
   ! Velocities at nodes
   do elem=1,myDim_elem2D          !assembling rhs over elements
@@ -51,7 +80,7 @@ subroutine ice_TG_rhs
 		   entries(q)= vol*ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
 					dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
 			       diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-			       0.5*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)    
+			       0.5_WP*ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)    
 			       
 			       
 			       
@@ -61,18 +90,23 @@ subroutine ice_TG_rhs
 		rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
 		rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
 	     END DO
-	  end do  
+	  end do
 end subroutine ice_TG_rhs   
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_init
+subroutine ice_fct_init(mesh)
   use o_PARAM
-  use o_MESH
+  use MOD_MESH
   use i_ARRAYS
   use g_PARSUP
+  use ice_fct_interfaces
   implicit none
   integer   :: n_size
+  type(t_mesh), intent(in)              , target :: mesh
+
+#include "associate_mesh.h"
+
   
   n_size=myDim_nod2D+eDim_nod2D
   
@@ -87,28 +121,31 @@ subroutine ice_fct_init
   m_snowl=0.0_WP
   
   ! Fill in  the mass matrix    
-  call ice_mass_matrix_fill
+  call ice_mass_matrix_fill(mesh)
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_solve
+subroutine ice_fct_solve(mesh)
+  use MOD_MESH
+  use ice_fct_interfaces
   implicit none
+  type(t_mesh), intent(in)              , target :: mesh
   ! Driving routine
-  call ice_solve_high_order   ! uses arrays of low-order solutions as temp
+  call ice_solve_high_order(mesh)   ! uses arrays of low-order solutions as temp
                               ! storage. It should preceed the call of low
 			      ! order solution.  
-  call ice_solve_low_order
+  call ice_solve_low_order(mesh)
 
-  call ice_fem_fct(1)    ! m_ice
-  call ice_fem_fct(2)    ! a_ice
-  call ice_fem_fct(3)    ! m_snow
+  call ice_fem_fct(1, mesh)    ! m_ice
+  call ice_fem_fct(2, mesh)    ! a_ice
+  call ice_fem_fct(3, mesh)    ! m_snow
 end subroutine ice_fct_solve
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_solve_low_order
+subroutine ice_solve_low_order(mesh)
  
  !============================
  ! Low-order solution
@@ -121,6 +158,7 @@ subroutine ice_solve_low_order
  ! matrices acting on the field from the previous time step. The consistent 
  ! mass matrix on the lhs is replaced with the lumped one.   
  
+  use MOD_MESH
   use o_MESH
   use i_ARRAYS
   use i_PARAM
@@ -129,7 +167,10 @@ subroutine ice_solve_low_order
   implicit none
   integer       :: row, clo, clo2, cn, location(100)
   real(kind=WP) :: gamma
-  
+  type(t_mesh), intent(in)              , target :: mesh
+
+#include "associate_mesh.h"
+
   gamma=ice_gamma_fct       ! Added diffusivity parameter
                             ! Adjust it to ensure posivity of solution    
  
@@ -155,19 +196,22 @@ end subroutine ice_solve_low_order
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_solve_high_order
+subroutine ice_solve_high_order(mesh)
 
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_ARRAYS
   use g_PARSUP
   use o_PARAM
   use g_comm_auto
   implicit none
   !
-  integer                                 :: n,i,clo,clo2,cn,location(100),row
-  real(kind=8)                            :: rhs_new
-  integer                                 :: num_iter_solve=3
+  integer                              :: n,i,clo,clo2,cn,location(100),row
+  real(kind=WP)                        :: rhs_new
+  integer                              :: num_iter_solve=3
+  type(t_mesh), intent(in)              , target :: mesh
 
+#include "associate_mesh.h"
   ! Does Taylor-Galerkin solution
   !
   !the first approximation
@@ -200,12 +244,11 @@ subroutine ice_solve_high_order
      call exchange_nod(dm_ice, da_ice, dm_snow)
 
   end do
- 
 end subroutine ice_solve_high_order
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fem_fct(tr_array_id)
+subroutine ice_fem_fct(tr_array_id, mesh)
 ! Flux corrected transport algorithm for tracer advection
 !
 ! It is based on Loehner et al. (Finite-element flux-corrected 
@@ -214,7 +257,8 @@ subroutine ice_fem_fct(tr_array_id)
 ! Turek. (kuzmin@math.uni-dortmund.de) 
 !
 
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_arrays
   use i_param
   use o_PARAM
@@ -226,7 +270,9 @@ subroutine ice_fem_fct(tr_array_id)
   integer   :: icoef(3,3),n,q, elem,elnodes(3),row
   real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
   real(kind=WP)   :: vol, flux, ae, gamma
-  
+  type(t_mesh), intent(in)              , target :: mesh
+
+#include "associate_mesh.h"
   
   gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
@@ -322,8 +368,8 @@ subroutine ice_fem_fct(tr_array_id)
  ! Sums of positive/negative fluxes to node row
  !=========================
  
-	 icepplus=0.
-	 icepminus=0.
+	 icepplus=0._WP
+	 icepminus=0._WP
 	 do elem=1, myDim_elem2D
 	    elnodes=elem2D_nodes(:,elem)
 	    do q=1,3
@@ -343,16 +389,16 @@ subroutine ice_fem_fct(tr_array_id)
 	 do n=1,myDim_nod2D
 	 flux=icepplus(n)
 	 if (abs(flux)>0) then
-	 icepplus(n)=min(1.0,tmax(n)/flux)
+	 icepplus(n)=min(1.0_WP,tmax(n)/flux)
 	 else
-	 icepplus(n)=0.
+	 icepplus(n)=0._WP
 	 end if
 	 
 	 flux=icepminus(n)
 	 if (abs(flux)>0) then
-	 icepminus(n)=min(1.0,tmin(n)/flux)
+	 icepminus(n)=min(1.0_WP,tmin(n)/flux)
 	 else
-	 icepminus(n)=0.
+	 icepminus(n)=0._WP
 	 end if
 	 end do
   ! pminus and pplus are to be known to neighbouting PE
@@ -363,12 +409,12 @@ subroutine ice_fem_fct(tr_array_id)
   !========================	 
 	 do elem=1, myDim_elem2D
 	    elnodes=elem2D_nodes(:,elem)
-	    ae=1.0
+	    ae=1.0_WP
 	    do q=1,3
 	    n=elnodes(q)  
 	    flux=icefluxes(elem,q)
-	    if(flux>=0.) ae=min(ae,icepplus(n))
-	    if(flux<0.) ae=min(ae,icepminus(n))
+	    if(flux>=0._WP) ae=min(ae,icepplus(n))
+	    if(flux<0._WP) ae=min(ae,icepminus(n))
 	    end do
 	    icefluxes(elem,:)=ae*icefluxes(elem,:)
 	 end do   
@@ -421,9 +467,10 @@ subroutine ice_fem_fct(tr_array_id)
 end subroutine ice_fem_fct
 !
 !=======================================================================
-SUBROUTINE ice_mass_matrix_fill
+SUBROUTINE ice_mass_matrix_fill(mesh)
 ! Used in ice_fct inherited from FESOM
-  use o_MESH
+  use MOD_MESH
+  use O_MESH
   use i_PARAM
   use i_ARRAYS
   use g_PARSUP
@@ -433,12 +480,15 @@ SUBROUTINE ice_mass_matrix_fill
 
   integer                             :: elem, elnodes(3), q, offset, col, ipos 
   integer, allocatable                :: col_pos(:)
-  real(kind=8)                        :: aa
+  real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
+  type(t_mesh), intent(in)              , target :: mesh
+
+#include "associate_mesh.h"
   !
   ! a)
   allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
-  mass_matrix =0.0
+  mass_matrix =0.0_WP
   allocate(col_pos(myDim_nod2D+eDim_nod2D))
   
   DO elem=1,myDim_elem2D
@@ -467,7 +517,7 @@ SUBROUTINE ice_mass_matrix_fill
    offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
    n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
    aa=sum(mass_matrix(offset:n))  
-   if(abs(area(1,q)-aa)>.1) then
+   if(abs(area(1,q)-aa)>.1_WP) then
      iflag=q
      flag=1
    endif
@@ -481,34 +531,37 @@ SUBROUTINE ice_mass_matrix_fill
     write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
    endif
   deallocate(col_pos)
-      
 END SUBROUTINE ice_mass_matrix_fill
 !
 !=========================================================
 !
-subroutine ice_TG_rhs_div
-  use o_MESH
+subroutine ice_TG_rhs_div(mesh)
+  use MOD_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
-   real(kind=8)     :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
-   integer          :: n, q, row, elem, elnodes(3)
-   real(kind=8)     :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+  real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
+  integer                  :: n, q, row, elem, elnodes(3)
+  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+  type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
  ! In this version I tr to split divergent term off, so that FCT works without it.
 
   DO row=1, myDim_nod2D
                   !! row=myList_nod2D(m)
-     rhs_m(row)=0.
-     rhs_a(row)=0.
-     rhs_ms(row)=0.
-     rhs_mdiv(row)=0.0
-     rhs_adiv(row)=0.0
-     rhs_msdiv(row)=0.0          
+     rhs_m(row)=0.0_WP
+     rhs_a(row)=0.0_WP
+     rhs_ms(row)=0.0_WP
+     rhs_mdiv(row)=0.0_WP
+     rhs_adiv(row)=0.0_WP
+     rhs_msdiv(row)=0.0_WP        
   END DO
   do elem=1,myDim_elem2D          !assembling rhs over elements
                   !! elem=myList_elem2D(m)
@@ -521,24 +574,24 @@ subroutine ice_TG_rhs_div
      vm=sum(v_ice(elnodes))
       ! this is exact computation (no assumption of u=const on elements used 
       ! in the standard version)
-     c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_8 
-     c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_8
-     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_8
+     c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_WP 
+     c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_WP
+     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_WP
      c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
        DO n=1,3
         row=elnodes(n)
 	DO q = 1,3 
-	   entries(q)= vol*ice_dt*((1.0_8-0.5*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
-	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_8 - &
-                       0.5*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
+	   entries(q)= vol*ice_dt*((1.0_WP-0.5_WP*ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
+	                        dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
+                       0.5_WP*ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
                        !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
-           entries2(q)=0.5*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
+           entries2(q)=0.5_WP*ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
 	                        dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
                                 dy(q)*(vm+v_ice(row)))  
         END DO
-        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_8
-	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_8
-	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_8
+        cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
+	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
+	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
         rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
         rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
         rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
@@ -547,13 +600,14 @@ subroutine ice_TG_rhs_div
         rhs_msdiv(row)=rhs_msdiv(row)-cx3
 
      END DO
-  end do   
+  end do
 end subroutine ice_TG_rhs_div 
 !
 !=========================================================
 !
-subroutine ice_update_for_div
-  use o_MESH
+subroutine ice_update_for_div(mesh)
+  use MOD_MESH
+  use O_MESH
   use i_Arrays
   use i_PARAM
   use g_PARSUP
@@ -563,9 +617,12 @@ subroutine ice_update_for_div
   implicit none
   !
   integer                                 :: n,i,clo,clo2,cn,location(100),row
-  real(kind=8)                            :: rhs_new
+  real(kind=WP)                           :: rhs_new
   integer                                 :: num_iter_solve=3
- 
+  type(t_mesh), intent(in)                , target :: mesh
+
+#include "associate_mesh.h"
+
   ! Does Taylor-Galerkin solution
   !
   !the first approximation

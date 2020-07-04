@@ -5,7 +5,18 @@
 ######################################################
 # Include architecture-specific definitions
 
-include Makefile.in
+include ../Makefile.in
+
+# Definition of metis include and library
+METIS_DIR = ../lib/metis-5.1.0
+LIB_METIS = -L$(METIS_DIR)/lib -lmetis
+METIS_INC = -I$(METIS_DIR)/include
+
+# Definition of pARMS include and library
+PARMS_DIR = ../lib/parms
+PARMS_INC = -I$(PARMS_DIR)/include -I$(PARMS_DIR)/src/include
+LIB_PARMS = -L$(PARMS_DIR)/lib -lparms
+CPP_SOL   = -DPARMS
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
@@ -18,6 +29,7 @@ OBJ_INI =  fvom_init.o \
 # objects
 
 MODULES = oce_modules.o \
+          MOD_MESH.o \
           ice_modules.o \
           gen_modules_config.o \
           gen_modules_partitioning.o \
@@ -32,12 +44,26 @@ MODULES = oce_modules.o \
           psolve.o \
           oce_ale_mixing_pp.o \
           oce_tracer_mod.o \
-	  fort_part.o \
-          gen_input.o \
+          cvmix_kinds_and_types.o \
+          cvmix_utils.o \
+          cvmix_put_get.o \
+          cvmix_tke.o \
+	  cvmix_idemix.o \
+          gen_modules_cvmix_idemix.o \
+          gen_modules_cvmix_tke.o \
+          cvmix_math.o \
+          cvmix_kpp.o \
+          gen_modules_cvmix_kpp.o \
+          cvmix_tidal.o \
+          gen_modules_cvmix_tidal.o \
+          cvmix_shear.o \
+          gen_modules_cvmix_pp.o \
           io_meandata.o \
           io_restart.o \
           io_blowup.o \
-          io_mesh_info.o
+          io_mesh_info.o \
+          gen_ic3d.o \
+          gen_surface_forcing.o
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\
@@ -66,8 +92,9 @@ OBJECTS=  fvom_main.o 		\
           gen_forcing_couple.o 	\
           gen_interpolation.o 	\
           gen_events.o 		\
-          write_step_info.o
-
+          write_step_info.o     \
+          oce_mo_conv.o         \
+          oce_spp.o  
 
 
 # oce_pressure_bv.o \
@@ -75,7 +102,7 @@ OBJECTS=  fvom_main.o 		\
 # Name of executables
 
 EXE     = fesom.x
-EXE_INI = fvom_ini.x
+EXE_INI = fesom_ini.x
 
 # TARGETS
 
@@ -83,34 +110,28 @@ default: run
 
 run:  $(MODULES) $(OBJECTS)
 	@echo "======= Building FESOM =========="
-	$(LD) $(OPT) -o $(EXE) $(FOS_INC) $(MODULES) $(OBJECTS) \
-	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(LIB_METIS) $(NCLIB) 
-	cp -pf $(EXE) ../bin/.
+	$(LD) $(OPT) -o $(EXE) $(MODULES) $(OBJECTS) \
+	 $(MPI_LIB) $(LIB_LAP) $(LIB_PARMS) $(NC_LIB) 
+#	cp -pf $(EXE) ../bin/.
 
 run_ini: CPP_DEFS+=-DFVOM_INIT
 run_ini: cleanomod $(MOD_INI) $(OBJ_INI)
-	@echo "======= Building FESOM paritioning program =========="
+	@echo "======= Building FESOM partioning program =========="
 	$(LD)  $(OPT) -o $(EXE_INI)  $(MOD_INI) $(OBJ_INI) \
-	$(MPI_LIB) $(LIB_METIS) $(NCLIB)
+	$(MPI_LIB) $(LIB_METIS) $(NC_LIB)
 	cp -pf $(EXE_INI) ../bin/.
 
 .SUFFIXES: .c .F90 .o 
 
 .c.o :
-	$(CC) $(COPT) $(METIS_DEFS) $(CPP_DEFS) $(PARMS_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INCLUDE) -c $*.c	
+	$(MPICC) $(COPT) $(CPP_SOL) $(METIS_DEFS) $(PARMS_DEFS) $(CPP_DEFS) $(METIS_INC) $(PARMS_INC) $(MPI_INC) -c $*.c	
 
-#.F90.o :
-#	@echo $@
-#	$(CPP) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) < $*.F90 > $*.f90
-#	$(FC) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
-#	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.f90
 .F90.o :
 	@echo $@
-	$(FC) $(CPP_DEFS) $(CPP_SOL) $(PETSC_INC) $(PARMS_INC) $(PETSCCONF_INC) $(FOS_INC) $(MPI_INC) $(NCINC) $(LIBS_SLV) $(OPT) $(CPP_SOL) $(CPP_DEFS) $(OASIS3_INC) $(FOS_INC)\
-	$(PARMS_INC) $(MPI_INCLUDE) $(NCINC)  -c $*.F90
+	$(MPIFC) $(CPP_DEFS) $(CPP_SOL) $(NC_INC) $(OPT) $(OASIS3_INC) $(PARMS_INC) $(MPI_INC)  -c $*.F90
 
 clean :
-	rm -f *.o *.mod *~ *.f90 fvom.x fvom_ini.x
+	rm -f *.o *.mod *~ *.f90 $(EXE) $(EXE_INI)
 
 cleanomod:
 	rm -f *.o *.mod

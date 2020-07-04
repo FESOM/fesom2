@@ -1,15 +1,27 @@
+module relative_vorticity_interface
+  interface
+    subroutine relative_vorticity(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! Vector invariant momentum advection:
 ! (curl u+f)\times u+grad(u^2/2)+w du/dz
 !
 ! ===================================================================
-subroutine relative_vorticity
+subroutine relative_vorticity(mesh)
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
   use g_comm_auto
 IMPLICIT NONE
 integer        :: n, nz, el(2), enodes(2), nl1, nl2, edge
 real(kind=WP)  :: deltaX1, deltaY1, deltaX2, deltaY2, c1
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
 DO n=1,myDim_nod2D
                                  !! n=myList_nod2D(m)
@@ -59,24 +71,27 @@ DO n=1,myDim_nod2D
 END DO      
  call exchange_nod(vorticity)
 ! Now it the relative vorticity known on neighbors too
-
 end subroutine relative_vorticity
 ! ==========================================================================
-subroutine compute_vel_rhs_vinv !vector invariant
+subroutine compute_vel_rhs_vinv(mesh) !vector invariant
 USE o_PARAM
 USE o_ARRAYS
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
 USE g_CONFIG
-  use g_comm_auto
+use g_comm_auto
+use relative_vorticity_interface
 IMPLICIT NONE
+type(t_mesh), intent(in) , target :: mesh
 integer           :: n, n1, nz, elem, elnodes(3), nl1, j
 real(kind=WP)     :: a, b, c, da, db, dc, dg, ff(3), gg, eta(3), pre(3), Fx, Fy,w
-real(kind=WP)     :: uvert(nl,2), umean, vmean, friction
+real(kind=WP)     :: uvert(mesh%nl,2), umean, vmean, friction
 logical, save     :: lfirst=.true.
-real(kind=WP)     :: KE_node(nl-1,myDim_nod2D+eDim_nod2D)
-real(kind=WP)     :: dZ_inv(2:nl-1), dzbar_inv(nl-1), elem_area_inv
+real(kind=WP)     :: KE_node(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+real(kind=WP)     :: dZ_inv(2:mesh%nl-1), dzbar_inv(mesh%nl-1), elem_area_inv
 real(kind=WP)     :: density0_inv = 1./density_0
+
+#include "associate_mesh.h"
 
 uvert=0.0_WP 
 
@@ -85,7 +100,7 @@ uvert=0.0_WP
 ! ======================
  
 
-KE_node(:,:)=0d0 
+KE_node(:,:)=0.0_WP 
 
 DO elem=1, myDim_elem2D
                             !! elem=myList_elem2D(m)
@@ -93,7 +108,7 @@ DO elem=1, myDim_elem2D
    DO j=1,3                !NR interchange loops => nz-loop vectorizes
       DO nz=1,nlevels(elem)-1 
          KE_node(nz,elnodes(j)) = KE_node(nz,elnodes(j))+(UV(1,nz,elem)*UV(1,nz,elem) &
-              +UV(2,nz,elem)*UV(2,nz,elem))*elem_area(elem)  !NR/6.0_8 below
+              +UV(2,nz,elem)*UV(2,nz,elem))*elem_area(elem)  !NR/6.0_WP below
       END DO
    END DO
 END DO
@@ -110,7 +125,7 @@ DO n=1,myDim_edge2D
                             !! n=myList_edge2D(m)
    if(myList_edge2D(n) > edge2D_in) then
       elnodes(1:2)=edges(:,n)
-      KE_node(:,elnodes(1:2))=0.0
+      KE_node(:,elnodes(1:2))=0.0_WP
    endif
 end DO   
  
@@ -123,12 +138,12 @@ end DO
  Do elem=1, myDim_elem2D          !! P (a)
                                   !! elem=myList_elem2D(m)
     DO nz=1,nl-1 
-       UV_rhs(1,nz,elem)=-(0.5+epsilon)*UV_rhsAB(1,nz,elem)   
-       UV_rhs(2,nz,elem)=-(0.5+epsilon)*UV_rhsAB(2,nz,elem)
+       UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
+       UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
     END DO
  END DO 
 
- call relative_vorticity 
+ call relative_vorticity(mesh)
 ! ====================
 ! Sea level and pressure contribution   -\nabla(g\eta +hpressure/rho_0+V^2/2)
 ! and the Coriolis force (elemental part)
@@ -154,8 +169,8 @@ DO elem=1,  myDim_elem2D          !! P (b)  elem=1,elem2D
       Fx = sum(gradient_sca(1:3,elem)*pre)
       Fy = sum(gradient_sca(4:6,elem)*pre)
    
-      da = UV(2,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_8
-      db =-UV(1,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_8
+      da = UV(2,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_WP
+      db =-UV(1,nz,elem)*sum(ff+vorticity(nz,elnodes))/3.0_WP
 
       UV_rhsAB(1,nz,elem)=(da+Fx)*gg
       UV_rhsAB(2,nz,elem)=(db+Fy)*gg
@@ -170,10 +185,10 @@ END DO
 
 !NR precompute
 DO nz=2,nl-1
-   dZ_inv(nz) = 1./(Z(nz-1)-Z(nz))
+   dZ_inv(nz) = 1.0_WP/(Z(nz-1)-Z(nz))
 ENDDO
 DO nz=1,nl-1
-   dzbar_inv(nz) = 1./(zbar(nz)-zbar(nz+1))
+   dzbar_inv(nz) = 1.0_WP/(zbar(nz)-zbar(nz+1))
 END DO
 
 !DO elem=1, myDim_elem2D                  
@@ -185,14 +200,14 @@ END DO
 !  uvert(nl1+1,1:2)=0d0
 !
 !  DO nz=2, nl1
-!     w=sum(Wvel(nz,elnodes))/3.0_8
-!     umean=0.5_8*(UV(1,nz-1,elem)+UV(1,nz,elem))
-!     vmean=0.5_8*(UV(2,nz-1,elem)+UV(2,nz,elem))
+!     w=sum(Wvel(nz,elnodes))/3.0_WP
+!     umean=0.5_WP*(UV(1,nz-1,elem)+UV(1,nz,elem))
+!     vmean=0.5_WP*(UV(2,nz-1,elem)+UV(2,nz,elem))
 !     uvert(nz,1)=-umean*w
 !     uvert(nz,2)=-vmean*w
 !  END DO
 !  DO nz=1,nl1
-!     da=sum(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/3.0_8
+!     da=sum(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/3.0_WP
 !     UV_rhsAB(1,nz,elem) = UV_rhsAB(1,nz,elem) + (uvert(nz,1)-uvert(nz+1,1)+&
 !          da*UV(1,nz,elem))*elem_area(elem)*dzbar_inv(nz) !/(zbar(nz)-zbar(nz+1))
 !     UV_rhsAB(2,nz,elem)=UV_rhsAB(2,nz,elem)+(uvert(nz,2)-uvert(nz+1,2)+&
@@ -207,21 +222,21 @@ DO elem=1, myDim_elem2D
   elnodes=elem2D_nodes(:,elem)
   nl1=nlevels(elem)-1
 
-!  w=sum(Wvel(2, elnodes))/3.0_8
-!  w=min(abs(w), 0.0001)*sign(1.0_8, w)
-  uvert(1,1)=w*(UV(1,1,elem)-UV(1,2,elem))*dZ_inv(2)*0.5_8
-  uvert(1,2)=w*(UV(2,1,elem)-UV(2,2,elem))*dZ_inv(2)*0.5_8
+!  w=sum(Wvel(2, elnodes))/3.0_WP
+!  w=min(abs(w), 0.0001)*sign(1.0_WP, w)
+  uvert(1,1)=w*(UV(1,1,elem)-UV(1,2,elem))*dZ_inv(2)*0.5_WP
+  uvert(1,2)=w*(UV(2,1,elem)-UV(2,2,elem))*dZ_inv(2)*0.5_WP
 
-!  w=sum(Wvel(nl1, elnodes))/3.0_8
-!  w=min(abs(w), 0.0001)*sign(1.0_8, w)
-  uvert(nl1,1)=w*(UV(1,nl1-1,elem)-UV(1,nl1,elem))*dZ_inv(nl1)*0.5_8
-  uvert(nl1,2)=w*(UV(2,nl1-1,elem)-UV(2,nl1,elem))*dZ_inv(nl1)*0.5_8
+!  w=sum(Wvel(nl1, elnodes))/3.0_WP
+!  w=min(abs(w), 0.0001)*sign(1.0_WP, w)
+  uvert(nl1,1)=w*(UV(1,nl1-1,elem)-UV(1,nl1,elem))*dZ_inv(nl1)*0.5_WP
+  uvert(nl1,2)=w*(UV(2,nl1-1,elem)-UV(2,nl1,elem))*dZ_inv(nl1)*0.5_WP
 
 
   DO nz=2, nl1-1
-!     w=sum(Wvel(nz,elnodes)+Wvel(nz+1,elnodes))/6.0_8
-!     w=min(abs(w), 0.0001)*sign(1.0_8, w)
-     if (w >= 0.) then
+!     w=sum(Wvel(nz,elnodes)+Wvel(nz+1,elnodes))/6.0_WP
+!     w=min(abs(w), 0.0001)*sign(1.0_WP, w)
+     if (w >= 0.0_WP) then
         uvert(nz,1)=w*(UV(1,nz,elem)-UV(1,nz+1,elem))*dZ_inv(nz+1)
         uvert(nz,2)=w*(UV(2,nz,elem)-UV(2,nz+1,elem))*dZ_inv(nz+1)
      else
@@ -237,9 +252,9 @@ END DO
 ! =======================
 ! Update the rhs   
 ! =======================
-gg=(1.5_8+epsilon)
+gg=(1.5_WP+epsilon)
 if(lfirst.and.(.not.r_restart)) then
-   gg=1.0
+   gg=1.0_WP
    lfirst=.false.
 end if
 
@@ -252,5 +267,4 @@ DO elem=1, myDim_elem2D                    !! P(e) elem=1, elem2D
    END DO
 END DO
 ! U_rhs contains all contributions to velocity from old time steps   
-
 end subroutine compute_vel_rhs_vinv

@@ -23,7 +23,7 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 6
+  integer, parameter         :: nsend = 5
 #else
   integer, parameter         :: nsend = 4
 #endif
@@ -62,19 +62,16 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=8), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
-  real(kind=8), allocatable, dimension(:,:)      :: cplsnd
+  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
-  real                       :: time_send(2), time_recv(2)
-
-
-  real                       :: date_incr
+  real(kind=WP)              :: time_send(2), time_recv(2)
 
   integer, dimension(1,3)    :: iextent    
   integer, dimension(1,3)    :: ioffset   
 
  !
-  real(kind=8), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
+  real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
 
   !
   ! Routine accessibility
@@ -160,19 +157,19 @@ contains
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_define_unstr
+  subroutine cpl_oasis3mct_define_unstr(mesh)
    
 #ifdef __oifs
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
 #else
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
 #endif
-    use o_mesh
+    use mod_mesh
     use g_rotate_grid
-    
+    use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-
+    type(t_mesh), intent(in), target :: mesh
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
     ! exchange between FESOM, ECHAM6 and OASIS3-MCT.
@@ -215,16 +212,19 @@ contains
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=8)               :: this_x_coord     ! longitude coordinates
-    real(kind=8)               :: this_y_coord     ! latitude coordinates
+    real(kind=WP)              :: this_x_coord          ! longitude coordinates
+    real(kind=WP)              :: this_y_coord          ! latitude coordinates
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
-    real(kind=8), allocatable :: my_x_coords(:)     ! longitude coordinates
-    real(kind=8), allocatable :: my_y_coords(:)     ! latitude  coordinates
+    real(kind=WP), allocatable :: my_x_coords(:)     ! longitude coordinates
+    real(kind=WP), allocatable :: my_y_coords(:)     ! latitude  coordinates
 
-    real(kind=8), allocatable :: all_x_coords(:, :)     ! longitude coordinates
-    real(kind=8), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
+    real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_elem_area(:,:)    
+
+#include "associate_mesh.h"
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -304,10 +304,11 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-
+      ALLOCATE(all_elem_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
+      ALLOCATE(all_elem_area(1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -321,18 +322,24 @@ contains
     CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
     CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
-      print *, 'FESOM after 2nd GatherV'
+    if (mype .eq. 0) then 
+      print *, 'FESOM before 3rd GatherV'
+    endif
+    CALL MPI_GATHERV(elem_area, my_number_of_points, MPI_DOUBLE_PRECISION, all_elem_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    if (mype .eq. 0) then 
+      print *, 'FESOM after 3rd GatherV'
     endif
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
 
@@ -340,13 +347,19 @@ contains
       print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
-       print *, 'FESOM before write grid'
+
+          print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
-       print *, 'FESOM before write mask'
+          print *, 'FESOM before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
+
+          print *, 'FESOM before write area'
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_elem_area)
+
        end if
       print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
@@ -369,8 +382,7 @@ contains
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
 #if defined (__oifs)
-    cpl_send( 5)='ste_feom' ! 5. sea ice temperature [K]           ->
-    cpl_send( 6)='sia_feom' ! 6. sea ice albedo [%-100]            ->
+    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
 #endif
 
 
@@ -489,13 +501,13 @@ contains
     !
     integer, intent( IN )          :: ind       ! variable Id
     logical, intent( OUT )         :: action    !
-    real(kind=8), intent(IN)       :: data_array(myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(IN)       :: data_array(myDim_nod2D+eDim_nod2D)
     !
     ! Local declarations
     !
     integer                :: info
     !
-    real (kind=8)          :: t1, t2, t3
+    real (kind=WP)          :: t1, t2, t3
     !
     !--------------------------------------------------------------------
     !
@@ -551,14 +563,14 @@ contains
     !
     integer, intent( IN )  :: ind       ! variable Id
     logical, intent( OUT ) :: action    ! 
-    real(kind=8), intent( OUT )    :: data_array(:)
+    real(kind=WP), intent( OUT )    :: data_array(:)
     !
     ! Local declarations
     !
     integer                :: info
     integer                :: j
     integer, save          :: ncount = 0
-    real (kind=8)          :: t1, t2, t3        
+    real (kind=WP)         :: t1, t2, t3        
     !
     !--------------------------------------------------------------------
     !    
