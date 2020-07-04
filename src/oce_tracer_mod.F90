@@ -2,6 +2,16 @@
 MODULE o_tracers
 USE MOD_MESH
 IMPLICIT NONE
+
+interface
+  subroutine tracer_gradient_z(ttf, mesh)
+    use g_PARSUP, only: myDim_nod2D, eDim_nod2D
+    use mod_mesh
+    type(t_mesh), intent(in)  , target :: mesh
+    real(kind=WP)                      :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+  end subroutine
+end interface
+
 CONTAINS
 !=======================================================================
 SUBROUTINE tracer_gradient_elements(ttf, mesh)
