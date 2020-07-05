@@ -204,6 +204,7 @@ subroutine main_timestepping(nsteps)
   use io_MEANDATA
   use io_mesh_info
   use diagnostics
+  use mo_tidal
 #if defined (__oasis)
   use cpl_driver
 #endif
