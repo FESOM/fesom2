@@ -1,6 +1,6 @@
 module oce_adv_tra_driver_interfaces
   interface
-   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, mesh)
+   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -13,6 +13,7 @@ module oce_adv_tra_driver_interfaces
       real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in)         :: opth, optv
     end subroutine
   end interface
 end module
@@ -37,7 +38,7 @@ end module
 !
 !
 !===============================================================================
-subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, mesh)
+subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
     use MOD_MESH
     use O_MESH
     use o_ARRAYS
@@ -60,6 +61,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     real(kind=WP), intent(in)         :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: opth, optv
     real(kind=WP), pointer, dimension (:,:) :: pwvel
  
     integer       :: el(2), enodes(2), nz, n, e
@@ -119,9 +121,9 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     SELECT CASE(trim(tra_adv_hor))
         CASE('MUSCL')
             ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
-            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, .5,  adv_flux_hor, init_zero=do_zero_flux)
+            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
         CASE('UPW1')
-             call adv_tra_hor_upw1(ttfAB, uv,   do_Xmoment, mesh,      adv_flux_hor, init_zero=do_zero_flux)
+             call adv_tra_hor_upw1(ttfAB, uv,   do_Xmoment, mesh,        adv_flux_hor, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
@@ -136,13 +138,13 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
-            call adv_tra_ver_qr4c (ttfAB, pwvel,   do_Xmoment, mesh, .5,  adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_qr4c (ttfAB, pwvel,   do_Xmoment, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
         CASE('CDIFF')
-            call adv_tra_ver_cdiff(ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_cdiff(ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('UPW1')
-	    call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+	    call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)

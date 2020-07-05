@@ -517,7 +517,7 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     ! numerically induced mixing in ocean models ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, mesh)   
+    call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -563,7 +563,7 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     ! numerically induced mixing in ocean models ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 2, del_ttf_advhoriz, del_ttf_advvert, mesh)   
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 2, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D

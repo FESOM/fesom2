@@ -197,7 +197,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, mesh)   
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection

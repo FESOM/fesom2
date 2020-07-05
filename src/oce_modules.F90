@@ -74,6 +74,7 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
 character(20)                 :: tra_adv_ver, tra_adv_hor, tra_adv_lim
+real(kind=WP)                 :: tra_adv_ph, tra_adv_pv
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_max_cfl=1.e-5_WP
 
@@ -152,7 +153,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, num_tracers, tracer_ID, &
+            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl
