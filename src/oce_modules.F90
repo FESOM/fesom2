@@ -190,22 +190,22 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
-real(kind=WP), allocatable    :: UV(:,:,:)
-real(kind=WP), allocatable    :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
-real(kind=WP), allocatable    :: eta_n(:), d_eta(:)
-real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
-real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
-real(kind=WP), allocatable    :: CFL_z(:,:)
-real(kind=WP), allocatable    :: stress_surf(:,:)
-REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_x(:)
-REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_y(:)
-real(kind=WP), allocatable    :: T_rhs(:,:) 
-real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
-real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
-real(kind=WP), allocatable    :: S_rhs(:,:)
-real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
-real(kind=WP), allocatable    :: del_ttf(:,:)
-real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
+real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
+real(kind=WP), allocatable         :: UV(:,:,:)
+real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
+real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
+real(kind=WP), allocatable         :: CFL_z(:,:)
+real(kind=WP), allocatable         :: stress_surf(:,:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
+real(kind=WP), allocatable         :: T_rhs(:,:) 
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
+real(kind=WP), allocatable         :: S_rhs(:,:)
+real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+real(kind=WP), allocatable         :: del_ttf(:,:)
+real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)

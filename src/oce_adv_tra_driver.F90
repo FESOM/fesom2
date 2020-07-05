@@ -1,11 +1,13 @@
 module oce_adv_tra_driver_interfaces
   interface
-   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
+   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, mesh)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-      real(kind=WP), intent(in)         :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
       integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)         :: ttf   (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -35,7 +37,7 @@ end module
 !
 !
 !===============================================================================
-subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
+subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, mesh)
     use MOD_MESH
     use O_MESH
     use o_ARRAYS
@@ -50,12 +52,15 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-    real(kind=WP), intent(in)         :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
     integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: ttf  (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), pointer, dimension (:,:) :: pwvel
  
     integer       :: el(2), enodes(2), nz, n, e
     integer       :: n2, nl1, nl2, tr_num
@@ -88,7 +93,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
 
     ! compute the low order upwind vertical flux (explicit part only)
     ! zero the input/output flux before computation
-    call adv_tra_ver_upw1(ttf, wvel_e, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+    call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
 
     ! update the LO solution for vertical contribution
     do n=1, myDim_nod2D
@@ -99,7 +104,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
     
     if (w_split) then !wvel/=wvel_e
        ! update for implicit contribution (w_split option)
-       call adv_tra_vert_impl(fct_LO, wvel_i, mesh)
+       call adv_tra_vert_impl(fct_LO, wi, mesh)
        ! compute the low order upwind vertical flux (full vertical velocity)
        ! zero the input/output flux before computation
        call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
@@ -114,34 +119,44 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, do_Xmoment, dttf_h, dttf_v, mesh)
     SELECT CASE(trim(tra_adv_hor))
         CASE('MUSCL')
             ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
-            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, 1.0, adv_flux_hor, init_zero=do_zero_flux)
+            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, .5,  adv_flux_hor, init_zero=do_zero_flux)
+        CASE('UPW1')
+             call adv_tra_hor_upw1(ttfAB, uv,   do_Xmoment, mesh,      adv_flux_hor, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
-
    
+    if (trim(tra_adv_lim)=='FCT') then
+       pwvel=>w
+    else
+       pwvel=>we
+    end if
+ 
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
-            call adv_tra_ver_qr4c (ttfAB, wvel, do_Xmoment, mesh, 1.0, adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_qr4c (ttfAB, pwvel,   do_Xmoment, mesh, .5,  adv_flux_ver, init_zero=do_zero_flux)
         CASE('CDIFF')
-            call adv_tra_ver_cdiff(ttfAB, wvel, do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_cdiff(ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm (ttfAB, wvel, do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
+        CASE('UPW1')
+	    call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,      adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
     END SELECT
-
 !if (mype==0) then
-!   write(*,*) 'check new 2:'
+!   write(*,*) 'check new:'
 !   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
 !   write(*,*) '2:', minval(adv_flux_hor), maxval(adv_flux_hor), sum(adv_flux_hor)
 !   write(*,*) '3:', minval(adv_flux_ver), maxval(adv_flux_ver), sum(adv_flux_ver)
 !end if
     if (trim(tra_adv_lim)=='FCT') then
+!if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
+!if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
     else
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
@@ -170,7 +185,6 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
-
     if (present(use_lo)) then
        if (use_lo) then
           do n=1, myDim_nod2d
