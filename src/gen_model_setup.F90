@@ -6,8 +6,7 @@ subroutine setup_model
 #else
   call read_namelist    ! should be before clock_init
 #endif
-  call define_prog_tracer
-
+  ! call define_prog_tracer
 end subroutine setup_model
 ! ==============================================================
 #ifdef __ifsinterface
