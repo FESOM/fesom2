@@ -1592,7 +1592,7 @@ IMPLICIT NONE
   real(kind=WP), intent(IN)  :: t,s
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
-  real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
+  real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2
   type(t_mesh), intent(in)   , target :: mesh
 #include "associate_mesh.h"
   !compute secant bulk modulus
