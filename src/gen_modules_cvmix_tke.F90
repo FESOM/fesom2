@@ -119,6 +119,11 @@ module g_cvmix_tke
     subroutine init_cvmix_tke(mesh)
         implicit none
         character(len=100)       :: nmlfile
+#ifdef __ifsinterface
+  	integer, parameter :: iunit = 21
+#else
+  	integer, parameter :: iunit = 20
+#endif
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
         type(t_mesh), intent(in), target :: mesh
@@ -197,9 +202,9 @@ module g_cvmix_tke
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_tke)
-            close(20)
+            open(iunit,file=trim(nmlfile))
+                read(iunit,nml=param_tke)
+            close(iunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if

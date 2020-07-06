@@ -69,6 +69,11 @@ module g_cvmix_pp
         implicit none
         type(t_mesh), intent(in), target :: mesh        
         character(len=100)       :: nmlfile
+#ifdef __ifsinterface
+  	integer, parameter :: iunit = 21
+#else
+  	integer, parameter :: iunit = 20
+#endif
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
 #include "associate_mesh.h"
@@ -97,9 +102,9 @@ module g_cvmix_pp
         ! check if cvmix namelist file exists if not use default values 
         inquire(file=trim(nmlfile),exist=nmlfile_exist) 
         if (nmlfile_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_pp)
-            close(20)
+            open(iunit,file=trim(nmlfile))
+                read(iunit,nml=param_pp)
+            close(iunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'
         end if

@@ -71,6 +71,11 @@ module g_cvmix_tidal
     subroutine init_cvmix_tidal(mesh)
         
         character(len=100)       :: nmlfile
+#ifdef __ifsinterface
+  	integer, parameter :: iunit = 21
+#else
+  	integer, parameter :: iunit = 20
+#endif
         logical                  :: file_exist=.False.
         integer                  :: node_size
         type(t_mesh), intent(in), target :: mesh
@@ -100,9 +105,9 @@ module g_cvmix_tidal
         file_exist=.False.
         inquire(file=trim(nmlfile),exist=file_exist) 
         if (file_exist) then
-            open(20,file=trim(nmlfile))
-                read(20,nml=param_tidal)
-            close(20)
+            open(iunit,file=trim(nmlfile))
+                read(iunit,nml=param_tidal)
+            close(iunit)
         else
             write(*,*) '     could not find namelist.cvmix, will use default values !'    
         end if    
