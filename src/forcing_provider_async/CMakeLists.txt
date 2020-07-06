@@ -14,4 +14,8 @@ target_include_directories(${PROJECT_NAME}
 	INTERFACE ${CMAKE_CURRENT_LIST_DIR}
 	PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
 )
-target_compile_options(${PROJECT_NAME} PRIVATE -std=c++11)
+if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
+   target_compile_options(${PROJECT_NAME} PRIVATE -hstd=c++11)
+else()
+   target_compile_options(${PROJECT_NAME} PRIVATE -std=c++11)
+endif()
