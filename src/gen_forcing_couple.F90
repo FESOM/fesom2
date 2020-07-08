@@ -214,7 +214,11 @@ subroutine update_atm_forcing(istep, mesh)
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
-  do i=1,myDim_nod2d+eDim_nod2d     
+  do i=1,myDim_nod2d+eDim_nod2d   
+     !__________________________________________________________________________
+     if (ulevels_nod2d(i)>1) cycle
+     
+     !__________________________________________________________________________
      dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
      dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair

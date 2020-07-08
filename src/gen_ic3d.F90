@@ -504,9 +504,9 @@ CONTAINS
 
       !_________________________________________________________________________
       ! set remaining dummy values from bottom topography to 0.0_WP
-      !!PS where (tr_arr > 0.9_WP*dummy)
-      !!PS       tr_arr=0.0_WP
-      !!PS end where
+      where (tr_arr > 0.9_WP*dummy)
+            tr_arr=0.0_WP
+      end where
       
       !_________________________________________________________________________
       ! eliminate values within cavity that result from the extrapolation of 
@@ -546,27 +546,27 @@ CONTAINS
       locSmax = locTmax
       locSmin = locTmin
       do n=1,myDim_nod2d
-        if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)>0.99_WP*dummy)) then
-            write(*,*) '____________________________________________________________'
-            write(*,*) ' --> check init fields SALT >0.99_WP*dummy'
-            write(*,*) 'mype =',mype
-            write(*,*) 'n    =',n
-            write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
-            write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
-            write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
-            write(*,*) 'tr_arr(unl:lnl,n,2) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)
-            write(*,*) 'tr_arr(  1:lnl,n,2) =',tr_arr(1:mesh%nlevels_nod2D(n)-1,n,2)
-        end if 
-        if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)>0.99_WP*dummy)) then
-            write(*,*) '____________________________________________________________'
-            write(*,*) ' --> check init fields TEMP >0.99_WP*dummy'
-            write(*,*) 'mype =',mype
-            write(*,*) 'n    =',n
-            write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
-            write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
-            write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
-            write(*,*) 'tr_arr(:,n,1) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)
-        end if 
+!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)>0.99_WP*dummy)) then
+!!PS             write(*,*) '____________________________________________________________'
+!!PS             write(*,*) ' --> check init fields SALT >0.99_WP*dummy'
+!!PS             write(*,*) 'mype =',mype
+!!PS             write(*,*) 'n    =',n
+!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
+!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
+!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
+!!PS             write(*,*) 'tr_arr(unl:lnl,n,2) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)
+!!PS             write(*,*) 'tr_arr(  1:lnl,n,2) =',tr_arr(1:mesh%nlevels_nod2D(n)-1,n,2)
+!!PS         end if 
+!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)>0.99_WP*dummy)) then
+!!PS             write(*,*) '____________________________________________________________'
+!!PS             write(*,*) ' --> check init fields TEMP >0.99_WP*dummy'
+!!PS             write(*,*) 'mype =',mype
+!!PS             write(*,*) 'n    =',n
+!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
+!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
+!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
+!!PS             write(*,*) 'tr_arr(:,n,1) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)
+!!PS         end if 
         locTmax = max(locTmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
         locTmin = min(locTmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
         locSmax = max(locSmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
