@@ -40,6 +40,14 @@ module pressure_force_4_linfs_cubicspline_interface
     end subroutine
   end interface
 end module
+module pressure_force_4_linfs_cavity_interface
+  interface
+    subroutine pressure_force_4_linfs_cavity(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
 module pressure_force_4_zxxxx_shchepetkin_interface
   interface
     subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
@@ -137,6 +145,13 @@ subroutine pressure_bv(mesh)
         
         !_______________________________________________________________________
         ! apply equation of state
+!!PS         if (nzmin>1) then 
+!!PS             do nz=1, nzmin-1
+!!PS                 t=tr_arr(nzmin, node,1)
+!!PS                 s=tr_arr(nzmin, node,2)
+!!PS                 call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+!!PS             enddo
+!!PS         endif 
         !!PS do nz=1, nl1
         do nz=nzmin, nzmax-1
             t=tr_arr(nz, node,1)
@@ -172,11 +187,9 @@ subroutine pressure_bv(mesh)
             ! --> bring density of surface point adiabatically to the same 
             !     depth level as the deep point --> than calculate bouyancy 
             !     difference
-            !!PS rho_surf=bulk_0(1)   + Z_3d_n(nz,node)*(bulk_pz(1)   + Z_3d_n(nz,node)*bulk_pz2(1))
-            !!PS rho_surf=rho_surf*rhopot(1)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
             rho_surf=bulk_0(nzmin)   + Z_3d_n(nz,node)*(bulk_pz(nzmin)   + Z_3d_n(nz,node)*bulk_pz2(nzmin))
-            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_ref(nzmin,node)
             !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_ref(nzmin,node)
             
             !!PS dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
             !!PS dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
@@ -192,12 +205,51 @@ subroutine pressure_bv(mesh)
             !!PS dbsfc(1:nl, node )=dbsfc1(1:nl)
             dbsfc(nzmin:nzmax, node )=dbsfc1(nzmin:nzmax)
         end if
-            
+        
+        !_______________________________________________________________________
+        ! fill density levels that are occupied by the cavity with the density 
+        ! that corresponds to a water mass that has the same temperature and salinity 
+        ! like at the cavity-ocean interface --> compute water mass density that
+        ! is replaced by the cavity
+        if (nzmin>1) then 
+            t=tr_arr(nzmin, node,1)
+            s=tr_arr(nzmin, node,2)
+            do nz=1, nzmin-1
+                !_______________________________________________________________
+                call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                
+                !_______________________________________________________________
+                rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
+                rho(nz)= rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_ref(nz,node)
+                density_m_rho0(nz,node) = rho(nz)
+            enddo
+        end if 
+        
         !___________________________________________________________________
         ! calculate pressure 
         if (trim(which_ale)=='linfs') then
             !!PS hpressure(nzmin, node)=0.5_WP*hnode(nzmin,node)*rho(nzmin)*g
-            hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+!!PS             hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+            
+            if (nzmin>1) then ! cavity case 
+                
+                ! --> this as a upper pressure boundary condition incase of a 
+                ! homogenous ocean, with no fluxes and boundary condition creates
+                ! no pressure gradient errors 
+                hpressure(nzmin, node)=0.5_WP*(zbar_3d_n(1,node)-zbar_3d_n(2,node))*rho(1)*g
+                do nz=2,nzmin
+                    a=0.5_WP*g*(rho(nz-1)*(zbar_3d_n(nz-1,node)-zbar_3d_n(nz,node))+rho(nz)*(zbar_3d_n(nz,node)-zbar_3d_n(nz+1,node)))
+                    hpressure(nzmin, node)=hpressure(nzmin, node)+a                
+                end do
+                
+                !  --> this as a upper pressure boundary condition incase of a 
+                ! homogenous ocean, with no fluxes and boundary condition creates
+                ! pgf errors 
+                !!PS hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+            else
+                hpressure(nzmin, node)=-Z_3d_n(nzmin,node)*rho(nzmin)*g
+            end if 
+            
             !!PS DO nz=2, nl1
             DO nz=nzmin+1,nzmax-1
                 ! why 0.5 ... integrate g*rho*dz vertically, integrate half layer 
@@ -296,17 +348,26 @@ subroutine pressure_force_4_linfs(mesh)
     use pressure_force_4_linfs_nemo_interface
     use pressure_force_4_linfs_shchepetkin_interface
     use pressure_force_4_linfs_cubicspline_interface
+    use pressure_force_4_linfs_cavity_interface
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
-    if ( .not. use_partial_cell ) then
+    if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
+    !!PS if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
         call pressure_force_4_linfs_fullcell(mesh)
         !if     (trim(which_pgf)=='fullcell_test') then
         !    call pressure_force_4_linfs_fullcell_test
         !else
         !    call pressure_force_4_linfs_fullcell
-        !end if    
+        !end if   
+    elseif (use_cavity .and. use_cavity_partial_cell ) then
+!!PS         if (mype==0)then 
+!!PS             print *, achar(27)//'[33m'
+!!PS             write(*,*) ' --> use call pressure_force_4_linfs_cavity'
+!!PS             print *, achar(27)//'[0m'
+!!PS         end if 
+        call pressure_force_4_linfs_cavity(mesh)    
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
@@ -486,6 +547,7 @@ subroutine pressure_force_4_linfs_nemo(mesh)
         !_______________________________________________________________________
         ! nln...number of mid-depth levels at node
         nln     = nlevels_nod2d(elnodes)-1
+        uln     = ulevels_nod2d(elnodes)
         !!PS uln     = ulevels_nod2d(elnodes)
         
         !_______________________________________________________________________
@@ -513,8 +575,11 @@ subroutine pressure_force_4_linfs_nemo(mesh)
             ! calculate vertical center index for linear interpolation, densities 
             ! are interpolated to shallowest nodal mid depth level that contribute
             ! to element --> advantage no extrapolation neccessary
-            nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,& 
-                            Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
+            !!PS nlc   = minloc( Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,& 
+            !!PS                 Z_3d_n(1:nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
+            !!PS                 )+1
+            nlc   = minloc( Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes)),1,& 
+                            Z_3d_n(uln(ni):nln(ni),elnodes(ni))-maxval(Z_3d_n(nle,elnodes))>0.0_WP &  ! mask for index selection
                             )+1
             nlc   = min(nlc,nln(ni)) 
             dZn   = Z_3d_n(nlc,elnodes(ni))    -Z_3d_n(nlc-1,elnodes(ni))
@@ -591,8 +656,8 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
     implicit none
     
     integer             :: elem, elnodes(3), nle, ule, nlz
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
-    real(kind=WP)       :: dx10, dx20, dx21, df10, df21
+    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
+    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -605,6 +670,19 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         
         ! node indices of elem 
         elnodes = elem2D_nodes(:,elem)
+        
+        !_______________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        ! nle...number of mid-depth levels at elem
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+        end do
+        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
         
         !_______________________________________________________________________
         ! Calculate pressure gradient force (PGF) based on "Shchepetkin 
@@ -623,10 +701,74 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         
         
         !_______________________________________________________________________
-        ! calculate pressure gradient for surface layer until one layer above bottom
+        ! calculate pressure gradient for surface layer
         int_dp_dx     = 0.0_WP
-        !!PS do nlz=1,nle-1
-        do nlz=ule,nle-1
+        nlz=ule
+        if (ule==1) then 
+            !___________________________________________________________________
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+                
+            !___________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+        else
+            !___________________________________________________________________
+            ! vertical gradient --> with average density and average 
+            ! mid-depth level on element
+            !       x0        x1               x2
+            !  -----o---------o----------------o-------
+            !       f0        f1               f2
+            ! --> use Newtonsche interpolation polynom of second order to calculate 
+            ! central difference quotient for not equidestant distributed values
+            ! f(x) = a0 + a1*(x-x0) + a2*(x-x0)*(x-x1)
+            !  | |
+            !  | +--> derivative : f'(x) = a1 + a2*[(x-x1)+(x-x0)]
+            !  |
+            !  +--> determine Coefficients a0, a1, a2 for f(x)=f1,f2,f3
+            !  |
+            !  +--> a0 = f0 , 
+            !       a1 = (f1-f0)/(x1-x0) , 
+            !       a2 = ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1)*(x1-x0))
+            ! f0' = a1 + a2*(x0-x1) + a2*(x0-x0)
+            ! f0' = a1 - a2*(x1-x0) + a2*(x0-x0)
+            ! f0' = (f1-f0)/(x1-x0) - ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1))
+            dx10            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
+            dx21            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz+1,elnodes)
+            dx20            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz  ,elnodes)
+            df10            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
+            df21            = density_m_rho0(nlz+2,elnodes)-density_m_rho0(nlz+1,elnodes)
+            drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                                *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz+1,elnodes)) + &
+                                  ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz  ,elnodes)))
+            
+            !___________________________________________________________________
+            ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            
+            !___________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
+            pgf_y(nlz,elem) = int_dp_dx(2) +aux_sum*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) +aux_sum
+        end if 
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer +1 until one layer above bottom
+        do nlz=ule+1,nle-1
             !___________________________________________________________________
             ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! --> in case linfs: dz_dx == 0.0
@@ -656,7 +798,7 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         ! central difference quotient for not equidestant distributed values
         ! f(x) = a0 + a1*(x-x0) + a2*(x-x0)*(x-x1)
         !  | |
-        !  | +--> derivative : f'(x) = a1 + a2*(x-x1)*(x-x0)
+        !  | +--> derivative : f'(x) = a1 + a2*[(x-x1)+(x-x0)]
         !  |
         !  +--> determine Coefficients a0, a1, a2 for f(x)=f1,f2,f3
         !  |
@@ -667,27 +809,29 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         ! f2' = a1 + a2*(x2-x1) + a2*(x2-x0)
         ! f2' = (f1-f0)/(x1-x0) + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x1-x0))
         !       + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x1)*(x1-x0)) + 
-        dx10            = (sum(Z_3d_n(nlz-1,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
-        dx21            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
-        dx20            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
-        df10            = (sum(density_m_rho0(nlz-1,elnodes))/3.0_WP-sum(density_m_rho0(nlz-2,elnodes))/3.0_WP)
-        df21            = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)
-        drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx10) + (dx10*df21-dx21*df10)/(dx21*dx10)
-        
+        dx10         = Z_3d_n(nlz-1,elnodes)-Z_3d_n(nlz-2,elnodes)
+        dx21         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
+        dx20         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-2,elnodes)
+        df10         = density_m_rho0(nlz-1,elnodes)-density_m_rho0(nlz-2,elnodes)
+        df21         = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
+        drho_dz      = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                       *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) + &
+                         ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-2,elnodes))) 
+                         
+        !_______________________________________________________________________
         ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal gradients
         drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
-        int_dp_dx(1)    = int_dp_dx(1) + aux_sum
         
+        !_______________________________________________________________________
         ! meridional gradients
         drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
-        int_dp_dx(2)    = int_dp_dx(2) + aux_sum
         
     end do ! --> do elem=1, myDim_elem2D
 end subroutine pressure_force_4_linfs_shchepetkin
@@ -743,10 +887,55 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
         uln=ulevels_nod2D(elnodes)
         
         !_______________________________________________________________________
-        ! calculate pressure gradient for surface layer until one layer above bottom
+        ! calculate pressure gradient for surface layer
         int_dp_dx     = 0.0_WP
+        nlz=ule
+        
+        if (ule==1) then ! in case no cavity
+            !___________________________________________________________________
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + auxp
+            
+            !___________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + auxp
+            
+        else! in case of cavity (includes pressure bnd condition under cavity)
+            !___________________________________________________________________
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            
+            ! cavity-ocean interface pressure boundary condition 
+            auxp            = drho_dx*-zbar_e_srf(elem)*g/density_0
+            int_dp_dx(1)    = int_dp_dx(1) + auxp
+            
+            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_x(nlz,elem) = int_dp_dx(1) + auxp*0.5_WP
+            int_dp_dx(1)    = int_dp_dx(1) + auxp
+                
+            !___________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            
+            ! cavity-ocean interface pressure boundary condition 
+            auxp            = drho_dx*-zbar_e_srf(elem)*g/density_0
+            int_dp_dx(2)    = int_dp_dx(2) + auxp
+            
+            auxp            = drho_dx*helem(nlz,elem)*g/density_0
+            pgf_y(nlz,elem) = int_dp_dx(2) + auxp*0.5_WP
+            int_dp_dx(2)    = int_dp_dx(2) + auxp
+        endif 
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer+1 until one layer above bottom
         !!PS do nlz=1,nle-1
-        do nlz=ule,nle-1
+        do nlz=ule+1,nle-1
             !___________________________________________________________________
             ! - g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! --> in case linfs: dz_dx == 0.0
@@ -845,6 +1034,160 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
         
     end do ! --> do elem=1, myDim_elem2D
 end subroutine pressure_force_4_linfs_cubicspline
+!
+!
+!
+!===============================================================================
+! calculate pressure gradient force for linfs in case cavities are used with 
+! surface partial cells or bottom partial cells
+subroutine pressure_force_4_linfs_cavity(mesh)
+    use o_PARAM
+    use MOD_MESH
+    use o_ARRAYS
+    use g_PARSUP
+    use g_config
+    implicit none
+    
+    integer                  :: elem, elnodes(3), nle, ule,  nlz
+    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
+    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
+    type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+    
+    !___________________________________________________________________________
+    ! loop over triangular elemments
+    do elem=1, myDim_elem2D
+        !_______________________________________________________________________
+        ! number of levels at elem
+        nle=nlevels(elem)-1
+        ule=ulevels(elem)
+            
+        !_______________________________________________________________________
+        ! node indices of elem 
+        elnodes = elem2D_nodes(:,elem)
+        
+        !_______________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        ! nle...number of mid-depth levels at elem
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+        end do
+        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer 
+        nlz=ule
+        if (ule==1) then 
+            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+        else
+            !___________________________________________________________________
+            ! compute vertical density gradient 
+            !       x0        x1               x2
+            !  -----o---------o----------------o-------
+            !       f0        f1               f2
+            ! --> use Newtonsche interpolation polynom of second order to calculate 
+            ! central difference quotient for not equidestant distributed values
+            ! f(x) = a0 + a1*(x-x0) + a2*(x-x0)*(x-x1)
+            !  | |
+            !  | +--> derivative : f'(x) = a1 + a2*[(x-x1)+(x-x0)]
+            !  |
+            !  +--> determine Coefficients a0, a1, a2 for f(x)=f1,f2,f3
+            !  |
+            !  +--> a0 = f0 , 
+            !       a1 = (f1-f0)/(x1-x0) , 
+            !       a2 = ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1)*(x1-x0))
+            ! f0' = a1 + a2*(x0-x1) + a2*(x0-x0)
+            ! f0' = a1 - a2*(x1-x0) + a2*(x0-x0)
+            ! f0' = (f1-f0)/(x1-x0) - ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1))
+            dx10            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
+            dx21            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz+1,elnodes)
+            dx20            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz  ,elnodes)
+            df10            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
+            df21            = density_m_rho0(nlz+2,elnodes)-density_m_rho0(nlz+1,elnodes)
+            drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                                *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz+1,elnodes)) + &
+                                  ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz  ,elnodes)))
+            
+            !_______________________________________________________________________
+            ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
+            pgf_x(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(1)    = aux_sum
+             
+            !_______________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
+            pgf_y(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(2)    = aux_sum
+        end if 
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for the ocean bulk based on pressure
+        do nlz=ule+1,nle-1
+            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+        end do 
+        
+        !_______________________________________________________________________
+        ! calculate pressure gradient for the ocean bottom
+        nlz=nle
+        if (.not. use_partial_cell) then 
+            pgf_x(nlz,elem) = sum(gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
+            pgf_y(nlz,elem) = sum(gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+        else
+            !___________________________________________________________________
+            ! (1) compute pgf_xy onto zbar_n(nle-1) --> needed for vertical 
+            ! integration of bottom density gradient from zbar_n(nle-1) until Z_n(nle)
+            int_dp_dx(1) = sum(gradient_sca(1:3,elem)*(hpressure(nlz-1,elnodes) & 
+                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes)))/density_0)
+            int_dp_dx(2) = sum(gradient_sca(4:6,elem)*(hpressure(nlz-1,elnodes) & 
+                           + 0.5_WP*g*(density_m_rho0(nlz-1,elnodes)*hnode(nlz-1,elnodes)))/density_0)
+                           
+            !___________________________________________________________________
+            ! vertical gradient --> with average density and average mid-depth level 
+            ! on element
+            ! f2' = a1 + a2*(x2-x1) + a2*(x2-x0)
+            ! f2' = (f1-f0)/(x1-x0) + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x1-x0))
+            !       + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x1)*(x1-x0)) + 
+            dx10         = Z_3d_n(nlz-1,elnodes)-Z_3d_n(nlz-2,elnodes)
+            dx21         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
+            dx20         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-2,elnodes)
+            df10         = density_m_rho0(nlz-1,elnodes)-density_m_rho0(nlz-2,elnodes)
+            df21         = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
+            drho_dz      = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                          *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) + &
+                            ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-2,elnodes))) 
+            
+            !___________________________________________________________________
+            ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
+            ! zonal gradients
+            drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
+            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
+            
+            !_______________________________________________________________________
+            ! meridional gradients
+            drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
+            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
+        end if 
+        
+    end do !-->do elem=1, myDim_elem2D
+end subroutine pressure_force_4_linfs_cavity
 !
 !
 !
@@ -966,9 +1309,11 @@ subroutine pressure_force_4_zxxxx_cubicspline(mesh)
                 !_______________________________________________________________
                 ! calculate derivatives in a way to get monotonic profile
                 ! distinguish between surface, bottom and bulg
-                if      (nlc==1) then ! surface case
+                !!PS if      (nlc==1) then ! surface case
+                if      (nlc==uln(ni)) then ! surface case
                     !___________________________________________________________
-                    s_ind(1)=1
+!!PS                     s_ind(1)=1
+                    s_ind(1)=uln(ni)
                     
                     !___________________________________________________________
                     s_z    = Z_3d_n(s_ind,node)
@@ -1071,8 +1416,8 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
     implicit none
     
     integer             :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, aux_sum
-    real(kind=WP)       :: dx10, dx20, dx21, df10, df21
+    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
+    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -1085,6 +1430,19 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         
         ! node indices of elem 
         elnodes      = elem2D_nodes(:,elem) 
+        
+        !_______________________________________________________________________
+        ! calculate mid depth element level --> Z_e
+        ! nle...number of mid-depth levels at elem
+        zbar_n       = 0.0_WP
+        Z_n          = 0.0_WP
+        zbar_n(nle+1)= zbar_e_bot(elem)
+        Z_n(nle)     = zbar_n(nle+1) + helem(nle,elem)*0.5_WP
+        do nlz=nle,ule+1,-1
+            zbar_n(nlz) = zbar_n(nlz+1) + helem(nlz,elem)
+            Z_n(nlz-1)  = zbar_n(nlz)   + helem(nlz-1,elem)*0.5_WP
+        end do
+        zbar_n(ule) = zbar_n(ule+1) + helem(ule,elem)
         
         !_______________________________________________________________________
         ! Calculate pressure gradient force (PGF) based on "Shchepetkin 
@@ -1102,10 +1460,6 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         ! --> g*rho(eta)/rho_0*deta/dx
         
         !_______________________________________________________________________
-        ! calculate pressure gradient for surface layer 
-        !!PS nlz=1
-        nlz=ule
-        
         ! vertical gradient --> with average density and average 
         ! mid-depth level on element
         !       x0        x1               x2
@@ -1115,7 +1469,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         ! central difference quotient for not equidestant distributed values
         ! f(x) = a0 + a1*(x-x0) + a2*(x-x0)*(x-x1)
         !  | |
-        !  | +--> derivative : f'(x) = a1 + a2*(x-x1)*(x-x0)
+        !  | +--> derivative : f'(x) = a1 + a2*[(x-x1)+(x-x0)]
         !  |
         !  +--> determine Coefficients a0, a1, a2 for f(x)=f1,f2,f3
         !  |
@@ -1123,30 +1477,39 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         !       a1 = (f1-f0)/(x1-x0) , 
         !       a2 = ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1)*(x1-x0))
         
-        ! f0' = a1 - a2*(x1-x0)
-        ! f0' = (f1-f0)/(x1-x0) - ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1))
-        dx10            = (sum(Z_3d_n(nlz+1,elnodes))/3.0_WP-sum(Z_3d_n(nlz  ,elnodes))/3.0_WP)
-        dx21            = (sum(Z_3d_n(nlz+2,elnodes))/3.0_WP-sum(Z_3d_n(nlz+1,elnodes))/3.0_WP)
-        dx20            = (sum(Z_3d_n(nlz+2,elnodes))/3.0_WP-sum(Z_3d_n(nlz  ,elnodes))/3.0_WP)
-        df10            = (sum(density_m_rho0(nlz+1,elnodes))/3.0_WP-sum(density_m_rho0(nlz  ,elnodes))/3.0_WP)
-        df21            = (sum(density_m_rho0(nlz+2,elnodes))/3.0_WP-sum(density_m_rho0(nlz+1,elnodes))/3.0_WP)
-        drho_dz         = df10/dx10 - (dx10*df21-dx21*df10)/(dx20*dx21)
+        !_______________________________________________________________________
+        ! calculate pressure gradient for surface layer 
+        nlz=ule
         
+        ! f0' = a1 + a2*(x0-x1) + a2*(x0-x0)
+        ! f0' = a1 - a2*(x1-x0) + a2*(x0-x0)
+        ! f0' = (f1-f0)/(x1-x0) - ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1))
+        dx10            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
+        dx21            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz+1,elnodes)
+        dx20            = Z_3d_n(nlz+2,elnodes)-Z_3d_n(nlz  ,elnodes)
+        df10            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
+        df21            = density_m_rho0(nlz+2,elnodes)-density_m_rho0(nlz+1,elnodes)
+        drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                            *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz+1,elnodes)) + &
+                              ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz  ,elnodes)))
+        
+        !_______________________________________________________________________
         ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal gradients
         drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0               
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
         pgf_x(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(1)    = aux_sum
         
+        !_______________________________________________________________________
         ! meridional gradients
         drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0             
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
         pgf_y(nlz,elem) = aux_sum*0.5_WP
         int_dp_dx(2)    = aux_sum
-        
+            
         !_______________________________________________________________________
         ! calculate pressure gradient for subsurface layer until one layer above 
         ! the bottom 
@@ -1155,30 +1518,33 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
             !___________________________________________________________________
             ! vertical gradient --> with average density and average mid-depth 
             ! level on element
-            ! f1' = a1 + a2*(x1-x0)
+            ! f1' = a1 + a2*(x1-x0) + a2*(x1-x1)
             ! f1' = (f1-f0)/(x1-x0) + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x2-x1))
-            dx10            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
-            dx21            = (sum(Z_3d_n(nlz+1,elnodes))/3.0_WP-sum(Z_3d_n(nlz  ,elnodes))/3.0_WP)
-            dx20            = (sum(Z_3d_n(nlz+1,elnodes))/3.0_WP-sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
-            df10            = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)
-            df21            = (sum(density_m_rho0(nlz+1,elnodes))/3.0_WP-sum(density_m_rho0(nlz  ,elnodes))/3.0_WP)
-            drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21)
+            dx10            = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
+            dx21            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz  ,elnodes)
+            dx20            = Z_3d_n(nlz+1,elnodes)-Z_3d_n(nlz-1,elnodes)
+            df10            = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
+            df21            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
+            drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                              *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz,elnodes)) + &
+                                ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes)))
             
+            !___________________________________________________________________
             ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
             ! zonal gradients
             drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
             dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0               
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
             int_dp_dx(1)    = int_dp_dx(1) + aux_sum
             
+            !___________________________________________________________________
             ! meridional gradients
             drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
             dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0             
+            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
             int_dp_dx(2)    = int_dp_dx(2) + aux_sum
-            
         end do ! --> do nlz=2,nle-1
         
         !_______________________________________________________________________
@@ -1190,28 +1556,31 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         ! f2' = a1 + a2*(x2-x1) + a2*(x2-x0)
         ! f2' = (f1-f0)/(x1-x0) + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x1-x0))
         !       + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x1)*(x1-x0)) + 
-        dx10            = (sum(Z_3d_n(nlz-1,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
-        dx21            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
-        dx20            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
-        df10            = (sum(density_m_rho0(nlz-1,elnodes))/3.0_WP-sum(density_m_rho0(nlz-2,elnodes))/3.0_WP)
-        df21            = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)
-        drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx10) + (dx10*df21-dx21*df10)/(dx21*dx10)
+        dx10         = Z_3d_n(nlz-1,elnodes)-Z_3d_n(nlz-2,elnodes)
+        dx21         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
+        dx20         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-2,elnodes)
+        df10         = density_m_rho0(nlz-1,elnodes)-density_m_rho0(nlz-2,elnodes)
+        df21         = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
+        drho_dz      = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
+                       *(((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-1,elnodes)) + &
+                         ((/1.0,1.0,1.0/)*Z_n(nlz)-Z_3d_n(nlz-2,elnodes))) 
         
+        !_______________________________________________________________________
         ! -->...-g/rho*int_z^eta( drho/dx|_s - drho/dz'*dz'/dx|_s )*dz'
         ! zonal gradients
         drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0               
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
         int_dp_dx(1)    = int_dp_dx(1) + aux_sum
         
+        !_______________________________________________________________________
         ! meridional gradients
         drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
         dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
-        aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0             
+        aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         int_dp_dx(2)    = int_dp_dx(2) + aux_sum
-        
     end do ! --> do elem=1, myDim_elem2D
 end subroutine pressure_force_4_zxxxx_shchepetkin
 !
@@ -1655,13 +2024,12 @@ subroutine init_ref_density(mesh)
     !___________________________________________________________________________
     S=34.  
     T=2.0 
-!!PS     S=35.  
-!!PS     T=16.0 
     
     !___________________________________________________________________________
     density_ref = 0.0_WP
     do node=1,myDim_nod2d+eDim_nod2d
-        nzmin = ulevels_nod2d(node)
+!!PS         nzmin = ulevels_nod2d(node)
+        nzmin = 1
         nzmax = nlevels_nod2d(node)-1
         auxz=min(0.0,Z_3d_n(nzmin,node))
         
@@ -1679,4 +2047,5 @@ subroutine init_ref_density(mesh)
     end do
     if(mype==0) write(*,*) ' --> compute reference density'
 end subroutine init_ref_density
+
 
