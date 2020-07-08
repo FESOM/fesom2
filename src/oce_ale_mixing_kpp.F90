@@ -336,7 +336,7 @@ contains
 
   DO node=1, myDim_nod2D !+eDim_nod2D
      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
-
+    
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
      !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
      !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
@@ -358,16 +358,9 @@ contains
    
 ! boundary layer diffusivities
     CALL blmix_kpp(viscA, diffK, mesh)
-    if (any(blmc/=blmc)) then 
-        write(*,*) ' --> found NaN blmc MARK 1'
-        call par_ex(0)
-    end if 
+
 ! enhance diffusivity at interface kbl - 1
     CALL enhance(viscA, diffK, mesh)
-    if (any(blmc/=blmc)) then 
-        write(*,*) ' --> found NaN blmc MARK 2'
-        call par_ex(0)
-    end if    
     
     if (smooth_blmc) then
        call exchange_nod(blmc(:,:,1))
@@ -380,10 +373,6 @@ contains
           call smooth_nod(blmc(:,:,j), 3, mesh)
        end do
     end if
-    if (any(blmc/=blmc)) then 
-        write(*,*) ' --> found NaN blmc MARK 3'
-        call par_ex(0)
-    end if     
     
 ! then combine blmc and viscA/diffK
 
@@ -1028,6 +1017,7 @@ contains
         viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
             R  * (dvdzdn + abs(dvdzdn)) )
         
+        
         dvdzup = (diff_col(knm1,3) - diff_col(kn,3))/dthick(kn)
         dvdzdn = (diff_col(kn,3) - diff_col(knp1,3))/dthick(knp1)     
         difsp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
@@ -1093,7 +1083,7 @@ contains
            blmc(nz,node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm) 
            blmc(nz,node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt) 
            blmc(nz,node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs) 
-
+        
 !      *******************************************************************
 !       Nonlocal transport term = ghats * <ws>o (eqn. 20)
 !      *******************************************************************
