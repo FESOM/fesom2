@@ -672,103 +672,147 @@ nlevels => mesh%nlevels             !required after the allocation, otherwise th
 allocate(mesh%nlevels_nod2D(nod2D))
 nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
-! ===================
-! Compute the number of levels
-! ===================
-   DO n=1, elem2D
-      nodes=elem2D_nodes(1:3,n)
-      
-      !_________________________________________________________________________
-      ! depth of element is  shallowest depth of sorounding vertices
-      if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
-      ! depth of element is deepest depth of sorounding vertices    
-      elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
-      ! DEFAULT: depth of element is  mean depth of sorounding vertices
-      elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
-      end if 
-      
-      !_________________________________________________________________________
-      exit_flag=0
-          DO nz=1,nl-1
-                 if(Z(nz)<dmean) then
-                        exit_flag=1
-                    nlevels(n)=nz
-                    exit
-                 end if
-          END DO
-          if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
-          if(dmean>=0) nlevels(n)=thers_lev
-          if(nlevels(n)<thers_lev) nlevels(n)=thers_lev
-    END DO
+    !___________________________________________________________________________
+    ! Compute the initial number number of elementa levels, based on the vertice
+    ! depth information 
+    do n=1, elem2D
+        nodes=elem2D_nodes(1:3,n)
+        
+        !_________________________________________________________________________
+        ! depth of element is  shallowest depth of sorounding vertices
+        if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
+        ! depth of element is deepest depth of sorounding vertices    
+        elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+        ! DEFAULT: depth of element is  mean depth of sorounding vertices
+        elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+        end if 
+        
+        !_________________________________________________________________________
+        exit_flag=0
+        do nz=1,nl-1
+            if(Z(nz)<dmean) then
+                exit_flag=1
+                nlevels(n)=nz
+                exit
+            end if
+        end do
+        if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
+        if(dmean>=0) nlevels(n)=thers_lev
+        
+        ! set minimum number of levels to --> thers_lev=5
+        if(nlevels(n)<thers_lev) nlevels(n)=thers_lev
+    end do ! --> do n=1, elem2D
 
-
+    !___________________________________________________________________________
+    ! check for isolated cells (cells with at least two boundary faces or three 
+    ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
+    ! of cells 
     do nz=4,nl
-       exit_flag=0
-       count1=0
-       do while((exit_flag==0).and.(count1<1000))
-          exit_flag=1
-          count1=count1+1
-          do n=1,elem2D
+        exit_flag=0
+        count1=0
+        
+        !_______________________________________________________________________
+        ! iteration loop within each layer
+        do while((exit_flag==0).and.(count1<1000))
+            exit_flag=1
+            count1=count1+1
             
-            ! merge: result = merge(truesource, falsesource, mask)
-            ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
-            ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
-             q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
-             !find ocean cell
-             if (nlevels(n)>=nz) then
-                count2=0
-                elems=elem_neighbors(1:3,n)
-                do i=1,q
-                   if (elems(i)>1) then
-                      if (nlevels(elems(i))>=nz) then
-                         !count neighbours
-                         count2=count2+1
-                      endif
-                   endif
-                enddo
-                if (count2<2) then
-                   !if cell is "bad" convert to bottom cell
-                   nlevels(n)=nz-1
-                   !force recheck for all current ocean cells
-                   exit_flag=0
-                endif
-             endif
-          enddo
-       enddo
-    enddo
+            !___________________________________________________________________
+            ! loop over triangles
+            do n=1,elem2D
+                ! merge: result = merge(truesource, falsesource, mask)
+                ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
+                ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
+                q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+                !                       
+                !                         +---isolated bottom cell
+                !   ._______________      |          _______________________.
+                !   |###|###|###|###|___  |      ___|###|###|###|###|###|###|
+                !   |###|###|###|###|###| |  ___|###|###|###|###|###|###|###|
+                !   |###|###|###|###|###| | |###|###|###|###|  BOTTOM   |###|
+                !   |###|###|###|###|###|_v_|###|###|###|###|###|###|###|###|
+                !   |###|###|###|###|###|###|###|###|###|###|###|###|###|###|
+                !
+                if (nlevels(n)>=nz) then
+                    count2=0
+                    elems=elem_neighbors(1:3,n)
+                    
+                    !___________________________________________________________
+                    ! loop over neighbouring triangles
+                    do i=1,q
+                        if (elems(i)>1) then
+                            if (nlevels(elems(i))>=nz) then
+                                !count neighbours
+                                count2=count2+1
+                            endif
+                        endif
+                    enddo
+                    
+                    !___________________________________________________________
+                    ! check how many open faces to neighboring triangles the cell 
+                    ! has, if there are less than 2 its isolated (a cell should 
+                    ! have at least 2 valid neighbours)
+                    if (count2<2) then
+                        ! if cell is "isolated", and the one levels shallower bottom 
+                        ! cell would be shallower than the minimum vertical level 
+                        ! treshhold (thers_lev). --> in this make sorrounding elements 
+                        ! one level deeper to reconnect the isolated cell
+                        if (nz-1<thers_lev) then 
+                            do i=1,q
+                                if (elems(i)>1) nlevels(elems(i)) = max(nlevels(elems(i)),nz)
+                            end do    
+                        !if cell is "isolated" convert to one level shallower bottom cell
+                        else
+                            nlevels(n)=nz-1
+                        end if  
+                        !force recheck for all current ocean cells
+                        exit_flag=0
+                        
+                    end if
+                end if ! --> if (nlevels(n)>=nz) then
+            end do ! --> do n=1,elem2D
+        end do ! --> do while((exit_flag==0).and.(count1<1000))
+    end do ! --> do nz=4,nl
 
-  nlevels_nod2D=0
-  DO n=1,elem2D
-     q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
-     DO j=1,q
-        node=elem2D_nodes(j,n)
-        if(nlevels_nod2D(node)<nlevels(n)) then
-           nlevels_nod2D(node)=nlevels(n)
-        end if
-     END DO
-  END DO
+    !___________________________________________________________________________
+    ! vertical vertice level index of ocean bottom boundary
+    nlevels_nod2D=0
+    do n=1,elem2D
+        q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+        do j=1,q
+            node=elem2D_nodes(j,n)
+            if(nlevels_nod2D(node)<nlevels(n)) then
+            nlevels_nod2D(node)=nlevels(n)
+            end if
+        end do
+    end do
 
-if (mype==0) then
-   file_name=trim(meshpath)//'elvls.out'
-   open(fileID, file=file_name)
-   do n=1,elem2D
-      write(fileID,*) nlevels(n)
-   enddo
-   close(fileID)
-
-   file_name=trim(meshpath)//'nlvls.out'
-   open(fileID, file=file_name)
-   do n=1,nod2D
-      write(fileID,*) nlevels_nod2D(n)
-   enddo
-   close(fileID)
-
-   write(*,*) '========================='
-   write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-   write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-   write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
-   write(*,*) '========================='
-endif
+    !___________________________________________________________________________
+    ! write vertical level indices into file
+    if (mype==0) then
+        !_______________________________________________________________________
+        file_name=trim(meshpath)//'elvls.out'
+        open(fileID, file=file_name)
+        do n=1,elem2D
+            write(fileID,*) nlevels(n)
+        end do
+        close(fileID)
+        
+        !_______________________________________________________________________
+        file_name=trim(meshpath)//'nlvls.out'
+        open(fileID, file=file_name)
+        do n=1,nod2D
+            write(fileID,*) nlevels_nod2D(n)
+        end do
+        close(fileID)
+        
+        !_______________________________________________________________________
+        write(*,*) '========================='
+        write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
+        write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+        write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
+        write(*,*) '========================='
+    endif
 end subroutine find_levels
 
 
@@ -815,7 +859,8 @@ subroutine find_levels_cavity(mesh)
         exit_flag=0
         ulevels(elem) = 1
         do nz=1,nlevels(elem)-1
-            if(Z(nz)<dmean) then
+            !!PS if(Z(nz)<dmean) then
+            if(Z(nz)<dmean .or. nlevels(elem)-nz<=3) then
                 exit_flag=1
                 ulevels(elem)=nz
                 exit
@@ -826,7 +871,7 @@ subroutine find_levels_cavity(mesh)
     end do
     
     !___________________________________________________________________________
-    ! Eliminate cells that have three cavity boundary faces --> should not be 
+    ! Eliminate cells that have two cavity boundary faces --> should not be 
     ! possible in FESOM2.0
     ! loop over all cavity levels
     do nz=1,cavity_maxlev
@@ -845,12 +890,12 @@ subroutine find_levels_cavity(mesh)
                 ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
                 nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
                 !
-                !   ._____________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
-                !   |#############################|
-                !   |## CAVITY ####| . |#######|                    OCEAN
-                !   |###########|   /|\  |###| 
-                !   |#######|        |
-                !   |####|           +-- Not good can lead to isolated cells  
+                !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
+                !   |###|###|###|###|###|###|###|
+                !   |#  CAVITY  |###| . |###|###|                    OCEAN
+                !   |###|###|###|    /|\|###| 
+                !   |###|###|         |
+                !   |###|             +-- Not good can lead to isolated cells  
                 !
                 if (nz >= ulevels(elem)) then
                     count_neighb_open=0
@@ -874,8 +919,19 @@ subroutine find_levels_cavity(mesh)
                     ! have at least 2 valid neighbours)
                     ! --> in this case shift cavity-ocean interface one level down
                     if (count_neighb_open<2) then
-                        !if cell is "bad" convert to bottom cell
-                        ulevels(elem)=nz+1
+                        ! if cell is isolated convert it to a deeper ocean levels
+                        ! except when this levels would remain less than 3 valid 
+                        ! bottom levels --> in case make the levels of all sorounding
+                        ! one level shallower
+                        if (nlevels(elem)-(nz+1)<=3) then 
+                            do j = 1, nneighb
+                                if (elems(j)>0 .and. ulevels(elems(j))>1 ) ulevels(elems(j)) = min(ulevels(elems(j)),nz)
+                            end do   
+                        else
+                            ulevels(elem)=nz+1
+                            
+                        end if     
+                        
                         !force recheck for all current ocean cells
                         exit_flag=0
                     endif ! --> if (count_neighb_open<2) then
@@ -909,6 +965,12 @@ subroutine find_levels_cavity(mesh)
             if (mype==0) write(*,*) ' ERROR: found element cavity depth deeper or equal bottom depth'
             call par_ex(0)
         end if 
+        if (nlevels(elem)-ulevels(elem)<3) then 
+            write(*,*) ' ERROR: found less than three valid element ocean layers'
+            write(*,*) '    ulevels,nlevels = ',ulevels(elem), nlevels(elem)
+            write(*,*) '    ulevels(neighb) = ',ulevels(elem_neighbors(1:3,elem))
+            write(*,*) '    nlevels(neighb) = ',nlevels(elem_neighbors(1:3,elem))
+        end if 
     end do
     
     !___________________________________________________________________________
@@ -917,7 +979,10 @@ subroutine find_levels_cavity(mesh)
         if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
             if (mype==0) write(*,*) ' ERROR: found vertice cavity depth deeper or equal bottom depth'
             call par_ex(0)
-        end if 
+        end if
+        if (nlevels_nod2D(elem)-ulevels_nod2D(elem)<3) then 
+            if (mype==0) write(*,*) ' ERROR: found less than three valid vertice ocean layers'
+        end if
     end do
     
     do elem=1,elem2D
