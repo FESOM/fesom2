@@ -78,10 +78,11 @@ module g_config
   logical                       :: use_ice=.false.  
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
+  logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
   logical                       :: flag_debug=.false.
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, toy_ocean, flag_debug
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, use_cavity_partial_cell, toy_ocean, flag_debug
   
   ! *** others ***
   real(kind=WP)            	:: dt
