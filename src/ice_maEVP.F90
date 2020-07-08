@@ -432,7 +432,10 @@ subroutine EVPdynamics_m(mesh)
   !===================================================================
  
    do el=1,myDim_elem2D
-
+     !__________________________________________________________________________
+     if (ulevels(el)>1) cycle
+     
+     !__________________________________________________________________________
      if(ice_el(el)) then
      
         elnodes=elem2D_nodes(:,el)
@@ -499,6 +502,10 @@ subroutine EVPdynamics_m(mesh)
   end do
   
   do i=1, myDim_nod2d 
+     !__________________________________________________________________________
+     if (ulevels_nod2D(i)>1) cycle
+     
+     !__________________________________________________________________________
      if (ice_nod(i)) then                   ! Skip if ice is absent              
 
         u_rhs_ice(i) = u_rhs_ice(i)*mass(i) + rhs_a(i)
@@ -638,15 +645,16 @@ subroutine stress_tensor_a(mesh)
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
+     !__________________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
+     !__________________________________________________________________________
      det2=1.0_WP/(1.0_WP+alpha_evp_array(elem))     ! Take alpha from array
      det1=alpha_evp_array(elem)*det2
   
      elnodes=elem2D_nodes(:,elem)
-     
-     !_______________________________________________________________________
-     ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
-     if (ulevels(elem) > 1) cycle
      
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS

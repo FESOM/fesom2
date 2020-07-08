@@ -56,7 +56,7 @@ type(t_mesh), intent(in), target  :: mesh
      !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
      if (ulevels(el) > 1) cycle
      
-      ! ===== Check if there is ice on elem
+     ! ===== Check if there is ice on elem
 
      ! There is no ice in elem 
      ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE     
@@ -287,13 +287,12 @@ type(t_mesh), intent(in)              , target :: mesh
  ! elevation gradient contribution      
  !
  do elem=1,myDim_elem2D
-     elnodes=elem2D_nodes(:,elem)
      !__________________________________________________________________________
      ! if element contains cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes) > 1) ) cycle
      if (ulevels(elem) > 1) cycle
      
      !__________________________________________________________________________
+     elnodes=elem2D_nodes(:,elem)
      uc=elem_area(elem)*g*sum(gradient_sca(1:3,elem)*elevation(elnodes))/3.0_WP
      vc=elem_area(elem)*g*sum(gradient_sca(4:6,elem)*elevation(elnodes))/3.0_WP
      U_rhs_ice(elnodes)=U_rhs_ice(elnodes) - uc/area(1,elnodes)

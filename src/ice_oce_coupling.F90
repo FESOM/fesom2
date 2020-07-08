@@ -23,28 +23,30 @@ subroutine oce_fluxes_mom(mesh)
     ! ==================
     ! momentum flux:
     ! ==================
-    !_____________________________________________________________________________
+    !___________________________________________________________________________
     do n=1,myDim_nod2D+eDim_nod2D   
-        !___________________________________________________________________________
+        !_______________________________________________________________________
         ! if cavity node skip it 
         if (ulevels_nod2d(n)>1) cycle
         
+        !_______________________________________________________________________
         if(a_ice(n)>0.001_WP) then
-        aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
-        stress_iceoce_x(n) = aux * (u_ice(n)-u_w(n))
-        stress_iceoce_y(n) = aux * (v_ice(n)-v_w(n))
+            aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
+            stress_iceoce_x(n) = aux * (u_ice(n)-u_w(n))
+            stress_iceoce_y(n) = aux * (v_ice(n)-v_w(n))
         else
-        stress_iceoce_x(n)=0.0_WP
-        stress_iceoce_y(n)=0.0_WP
+            stress_iceoce_x(n)=0.0_WP
+            stress_iceoce_y(n)=0.0_WP
         end if
     end do
     
-    !_____________________________________________________________________________
+    !___________________________________________________________________________
     DO elem=1,myDim_elem2D
-        !___________________________________________________________________________
+        !_______________________________________________________________________
         ! if cavity element skip it 
         if (ulevels(elem)>1) cycle
         
+        !_______________________________________________________________________
         elnodes=elem2D_nodes(:,elem)
         stress_surf(1,elem)=sum(stress_iceoce_x(elnodes)*a_ice(elnodes) + &
                                 stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
@@ -52,7 +54,7 @@ subroutine oce_fluxes_mom(mesh)
                                 stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
     END DO
     
-    !_____________________________________________________________________________
+    !___________________________________________________________________________
     if (use_cavity) call cavity_momentum_fluxes(mesh)
   
 end subroutine oce_fluxes_mom
@@ -82,25 +84,26 @@ subroutine ocean2ice(mesh)
         
     if (ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
-            !!PS T_oc_array(n)=tr_arr(1,n,1)
-            !!PS S_oc_array(n)=tr_arr(1,n,2)
-            T_oc_array(n)=tr_arr(ulevels_nod2D(n),n,1)
-            S_oc_array(n)=tr_arr(ulevels_nod2D(n),n,2)  
+            if (ulevels_nod2D(n)>1) cycle 
+            T_oc_array(n)=tr_arr(1,n,1)
+            S_oc_array(n)=tr_arr(1,n,2)
+            elevation(n)= hbar(n)
         end do
         elevation(:)= hbar(:)
     else
-        do n=1, myDim_nod2d+eDim_nod2d    
-            !!PS T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
-            !!PS S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
-            T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(ulevels_nod2D(n),n,1))/real(ice_steps_since_upd+1,WP)
-            S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(ulevels_nod2D(n),n,2))/real(ice_steps_since_upd+1,WP)
+        do n=1, myDim_nod2d+eDim_nod2d
+            if (ulevels_nod2D(n)>1) cycle 
+            T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
+            S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
+            elevation(n)= (elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP)
         !NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
         !NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
         end do
-        elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
+!!PS         elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
     end if
     
     do n=1, myDim_nod2d  
+        if (ulevels_nod2D(n)>1) cycle 
         uw=0.0_WP
         vw=0.0_WP
         do k=1, nod_in_elem2D_num(n)
