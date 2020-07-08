@@ -109,7 +109,7 @@ MODULE g_sbf
 
 
    ! namelists
-   integer, save  :: nm_sbc_unit     = 101       ! unit to open namelist file
+   integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
    integer, save  :: nm_sbc       = 1        ! data  1= constant, 2=from file
