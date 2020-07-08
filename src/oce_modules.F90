@@ -278,6 +278,10 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 
+! new depth of cavity-ocean interface at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
 ! --> multiplication factor for surface boundary condition in 
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
