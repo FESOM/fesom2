@@ -1811,7 +1811,8 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
      
      t1 = TF1(nz,n)*1.00024_WP
      s1 = SF1(nz,n)
-     p1 = abs(Z(nz)) 
+!!PS      p1 = abs(Z(nz)) 
+     p1 = abs(Z_3d_n(nz,n)) 
      
      t1_2 = t1*t1
      t1_3 = t1_2*t1
@@ -1994,7 +1995,15 @@ subroutine insitu2pot(mesh)
      do nz=nzmin, nzmax-1    
         tt=tr_arr(nz,n,1)
         ss=tr_arr(nz,n,2)
+        
+        !!PS ___________________________________________________________________
+        !!PS using here Z_3d_n at the beginning makes the model very instable after 
+        !!PS the initialisation when using partial cell, requires smaller time step
+        !!PS when using partial cell --> i would stick here with Z --> since we 
+        !!PS anyway do a spinup and it its only used at initialisation time
+        !!PS pp=abs(Z_3d_n(nz,n))
         pp=abs(Z(nz))
+        
         tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
      end do
   end do
