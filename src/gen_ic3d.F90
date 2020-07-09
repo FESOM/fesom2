@@ -509,21 +509,20 @@ CONTAINS
       end where
       
       !_________________________________________________________________________
+      ! convert temperature from Kelvin --> °C
+      where (tr_arr(:,:,1) > 100._WP)
+         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
+      end where
+      
+      !_________________________________________________________________________
       ! eliminate values within cavity that result from the extrapolation of 
       ! initialisation
       do n=1,myDim_nod2d + eDim_nod2D
             ! ensure cavity is zero
             if (use_cavity) tr_arr(1:mesh%ulevels_nod2D(n)-1,n,:)=0.0_WP
             ! ensure bottom is zero
-            tr_arr(mesh%nlevels_nod2D(n):mesh%nl-1,n,:)=0.0_WP
-            
+            tr_arr(mesh%nlevels_nod2D(n):mesh%nl-1,n,:)=0.0_WP            
       end do 
-      
-      !_________________________________________________________________________
-      ! convert temperature from Kelvin --> °C
-      where (tr_arr(:,:,1) > 100._WP)
-         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
-      end where
       
       !_________________________________________________________________________
       if (t_insitu) then
