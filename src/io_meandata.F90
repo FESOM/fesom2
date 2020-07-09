@@ -93,7 +93,7 @@ subroutine ini_mean_io(mesh)
   implicit none
 
   integer                   :: i, j
-  integer, save             :: nm_io_unit  = 102       ! unit to open namelist file
+  integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
   integer,dimension(12)     :: sel_forcvar=0
   ! sel_forcvar(1) = uwind   ! sel_forcvar(2) = vwind

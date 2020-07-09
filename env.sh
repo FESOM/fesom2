@@ -47,6 +47,8 @@ elif [[  $LOGINHOST = bsc ]]; then
    STRATEGY="bsc"
 elif [[  $LOGINHOST =~ ^juwels[0-9]+\.fz\-juelich\.de$ ]]; then
    STRATEGY="juwels"
+elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
+   STRATEGY="ecaccess.ecmwf.int"
 else
    echo "can not determine environment for host: "$LOGINHOST
    [ $BEING_EXECUTED = true ] && exit 1

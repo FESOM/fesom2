@@ -146,7 +146,7 @@ SUBROUTINE save_dist_mesh(mesh)
 
 !!$  if(mype==0) then
 !!$     file_name=trim(dist_mesh_dir)//'rpart.out'  
-!!$     fileID=103+mype  
+!!$     fileID=103+mype  !skip unit range 100--102 
 !!$     open(fileID, file=file_name)
 !!$     ncount=0;
 !!$     DO n=1, nod2D

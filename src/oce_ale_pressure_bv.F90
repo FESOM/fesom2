@@ -109,7 +109,7 @@ subroutine pressure_bv(mesh)
     enddo
     
     !___________________________________________________________________________
-    if(a<0.) then
+    if(a<0.0_WP) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
