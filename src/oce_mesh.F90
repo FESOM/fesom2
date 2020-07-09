@@ -74,6 +74,11 @@ module mesh_auxiliary_arrays_interface
     end subroutine
   end interface
 end module
+! bring mesh into main_timestepping()
+module g_init2timestepping
+  USE MOD_MESH, only: t_mesh
+  type(t_mesh), target, save :: meshinmod
+end module g_init2timestepping
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
