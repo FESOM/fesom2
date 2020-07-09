@@ -1589,8 +1589,14 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
 def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto',fac=0):
     cref = cmin + (cmax-cmin)/2
     if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1+fac)) 
-    if varname in ['u','v','w','ssh','fw','fh'] or \
+    if varname in ['u','v','w','fw','fh'] or \
        any(x in varname for x in ['vec','anom','dvd']):
        if not do_rescale=='log10': cref=0.0
+    if varname in ['shh']: 
+        if (cmin<0 and cmax<0) or (cmin>0 and cmax>0):
+            cref = cmin+(cmax-cmin)/2
+            cref = np.around(cref,0)
+        else :
+            cref = 0.0
     if varname in ['Kv']: cref = np.around(cref,0)
     return(cref)    
