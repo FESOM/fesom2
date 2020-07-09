@@ -34,6 +34,7 @@ subroutine main_initialize(nsteps)
 ! Split main into three major parts
 !----------------------------------
 USE MOD_MESH
+USE g_init2timestepping, only: meshinmod
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP, only: mype, par_init
@@ -177,8 +178,10 @@ type(t_mesh), target, save      :: mesh
         write(*,*) '============================================' 
     endif
 
-end subroutine main_initialize
+    ! save mesh for timestepping routine
+    meshinmod=mesh
 
+end subroutine main_initialize
 
 
 !=============================================================================!
@@ -190,6 +193,7 @@ subroutine main_timestepping(nsteps)
   !----------------------------------
   !USE o_MESH
   USE MOD_MESH
+  USE g_init2timestepping, only: meshinmod
   USE o_ARRAYS
   USE o_PARAM
   USE g_PARSUP
@@ -214,8 +218,9 @@ subroutine main_timestepping(nsteps)
   integer, INTENT(IN) :: nsteps 
   real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
   real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
-  type(t_mesh), target, save      :: mesh
+  type(t_mesh), target :: mesh
 
+    mesh = meshinmod
     !=====================
     ! Time stepping
     !=====================
