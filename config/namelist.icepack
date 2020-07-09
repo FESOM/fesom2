@@ -48,6 +48,7 @@
     dSdt_slow_mode    = -5.0e-8
     phi_c_slow_mode   =    0.05
     phi_i_mushy       =    0.85
+    ksno              = 0.3
 /
 
 &shortwave_nml
@@ -57,6 +58,7 @@
     albicei         = 0.36
     albsnowv        = 0.98
     albsnowi        = 0.70
+    albocn          = 0.1
     ahmax           = 0.3
     R_ice           = 0.
     R_pnd           = 0.

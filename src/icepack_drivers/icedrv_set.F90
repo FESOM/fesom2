@@ -28,6 +28,8 @@
                                          myDim_elem2D, eDim_elem2D, &
                                          mpi_comm_fesom
           use i_param,             only: whichEVP
+          use i_param,             only: cd_oce_ice   
+          use i_therm_param,       only: albw
 
           implicit none
 
@@ -111,6 +113,7 @@
           real (kind=dbl_kind)     :: albicei         
           real (kind=dbl_kind)     :: albsnowv        
           real (kind=dbl_kind)     :: albsnowi      
+          real (kind=dbl_kind)     :: albocn      
           real (kind=dbl_kind)     :: ahmax         
           real (kind=dbl_kind)     :: R_ice         
           real (kind=dbl_kind)     :: R_pnd         
@@ -118,6 +121,7 @@
           real (kind=dbl_kind)     :: dT_mlt        
           real (kind=dbl_kind)     :: rsnw_mlt       
           real (kind=dbl_kind)     :: kalg           
+          real (kind=dbl_kind)     :: ksno           
 
           ! ponds namelist
 
@@ -140,6 +144,7 @@
           integer (kind=int_kind)  :: natmiter        
           real (kind=dbl_kind)     :: ustar_min      
           real (kind=dbl_kind)     :: emissivity      
+          real (kind=dbl_kind)     :: dragio      
           character (len=char_len) :: fbot_xfer_type  
           logical (kind=log_kind)  :: update_ocn_f    
           logical (kind=log_kind)  :: l_mpond_fresh   
@@ -166,14 +171,14 @@
           namelist / thermo_nml /                                             &
              kitd,           ktherm,          conduct,                        &
              a_rapid_mode,   Rac_rapid_mode,  aspect_rapid_mode,              &
-             dSdt_slow_mode, phi_c_slow_mode, phi_i_mushy
+             dSdt_slow_mode, phi_c_slow_mode, phi_i_mushy, ksno
 
           namelist / dynamics_nml /                                            &
              kstrength,      krdg_partic,    krdg_redist,    mu_rdg,           &
              Cf
 
           namelist / shortwave_nml /                                           &
-             shortwave,      albedo_type,                                      &
+             shortwave,      albedo_type,     albocn,                          &
              albicev,        albicei,         albsnowv,      albsnowi,         &
              ahmax,          R_ice,           R_pnd,         R_snw,            &   
              dT_mlt,         rsnw_mlt,        kalg
@@ -191,7 +196,7 @@
              update_ocn_f,    l_mpond_fresh,   ustar_min,                      &
              fbot_xfer_type,  oceanmixed_ice,  emissivity,                     &
              formdrag,        highfreq,        natmiter,                       &
-             tfrz_option,     wave_spec_type
+             tfrz_option,     wave_spec_type,  dragio
 
           !-----------------------------------------------------------------
           ! env namelist - STANDARD VALUES
@@ -326,7 +331,8 @@
                 phi_i_mushy_out=phi_i_mushy,                                     &
                 tfrz_option_out=tfrz_option, kalg_out=kalg,                      &
                 fbot_xfer_type_out=fbot_xfer_type, puny_out=puny,                &
-                wave_spec_type_out=wave_spec_type)
+                wave_spec_type_out=wave_spec_type, dragio_out=dragio,            &
+                ksno_out=ksno, albocn_out=albocn                                 )
           call icepack_warnings_flush(nu_diag)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__, line=__LINE__)
@@ -599,6 +605,7 @@
                 write(nu_diag,1000) ' albicei                   = ', albicei
                 write(nu_diag,1000) ' albsnowv                  = ', albsnowv
                 write(nu_diag,1000) ' albsnowi                  = ', albsnowi
+                write(nu_diag,1000) ' albocn                    = ', albocn
                 write(nu_diag,1000) ' ahmax                     = ', ahmax
              endif    
 
@@ -622,6 +629,7 @@
              end if
              
              write(nu_diag,1005) ' emissivity                   = ', emissivity
+             write(nu_diag,1005) ' ksno                         = ', ksno
 
              if (ktherm == 2) then
                 write(nu_diag,1005) ' a_rapid_mode              = ', a_rapid_mode
@@ -640,6 +648,7 @@
              write(nu_diag,1010) ' calc_Tsfc                 = ', calc_Tsfc    
              write(nu_diag,1010) ' update_ocn_f              = ', update_ocn_f
              write(nu_diag,1010) ' wave_spec                 = ', wave_spec
+             write(nu_diag,1030) ' dragio                    = ', dragio
 
              if (wave_spec) then
                 write(nu_diag,*)    ' wave_spec_type            = ', wave_spec_type
@@ -791,6 +800,9 @@
           !-----------------------------------------------------------------
           ! set Icepack values
           !-----------------------------------------------------------------
+
+          cd_oce_ice = dragio
+          albw       = albocn
     
           call icepack_init_parameters(ustar_min_in=ustar_min, Cf_in=Cf, &
                albicev_in=albicev, albicei_in=albicei, &
@@ -816,7 +828,8 @@
                phi_i_mushy_in=phi_i_mushy, &
                tfrz_option_in=tfrz_option, kalg_in=kalg, &
                fbot_xfer_type_in=fbot_xfer_type, &
-               wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec)
+               wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
+               ksno_in=ksno, dragio_in=dragio, albocn_in=albocn)
           call icepack_init_tracer_sizes(ntrcr_in=ntrcr, &
                ncat_in=ncat, nilyr_in=nilyr, nslyr_in=nslyr, nblyr_in=nblyr, &
                nfsd_in=nfsd, n_aero_in=n_aero)

@@ -9,6 +9,7 @@ ice_gamma_fct=0.5
 ice_diff=0.0
 theta_io=0.0                  !0.436
 ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
+c_pressure=20
 /
 
 &ice_therm
@@ -21,4 +22,5 @@ albsnm=0.77
 albi=0.7
 albim=0.68
 albw=0.1
+consn=0.3
 /
