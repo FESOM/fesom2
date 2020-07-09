@@ -165,6 +165,12 @@ subroutine solve_tracers_ale(mesh)
         where (tr_arr(nzmin:nzmax,node,2) < 3._WP )
             tr_arr(nzmin:nzmax,node,2)=3._WP
         end where
+        
+!!PS         if (nzmin>15 .and. mype==0) then 
+!!PS             write(*,*) ' tr_arr(:,node,1) = ',tr_arr(:,node,1)
+!!PS             write(*,*)
+!!PS             write(*,*) ' tr_arr(:,node,2) = ',tr_arr(:,node,2)
+!!PS         end if 
     end do
 end subroutine solve_tracers_ale
 !
@@ -1087,7 +1093,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     use g_PARSUP
     use g_CONFIG
     use g_forcing_arrays
-        use o_mixing_KPP_mod !for ghats _GO_        
+    use o_mixing_KPP_mod !for ghats _GO_        
         
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -1340,7 +1346,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !                            v   (+)                        v   (+) 
         !                            
         !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num)) 
+        tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),mesh) 
         
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 
@@ -1624,13 +1630,15 @@ end subroutine diff_part_hor_redi
 !===============================================================================
 ! this function returns a boundary conditions for a specified thacer ID and surface node
 ! ID = 0 and 1 are reserved for temperature and salinity
-FUNCTION bc_surface(n, id)
+FUNCTION bc_surface(n, id, mesh)
+  use MOD_MESH
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_PARSUP, only: mype, par_ex
   USE g_config
   implicit none
-
+  
+  type(t_mesh), intent(in) , target :: mesh  
   REAL(kind=WP)     :: bc_surface
   integer           :: n, id
   character(len=10) :: id_string
@@ -1639,7 +1647,7 @@ FUNCTION bc_surface(n, id)
   !  --> is_nonlinfs=0.0 for linfs
   SELECT CASE (id)
     CASE (0)
-        bc_surface=-dt*(heat_flux(n)/vcpw + tr_arr(1,n,1)*water_flux(n)*is_nonlinfs)
+        bc_surface=-dt*(heat_flux(n)/vcpw + tr_arr(mesh%ulevels_nod2D(n),n,1)*water_flux(n)*is_nonlinfs)
     CASE (1)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice

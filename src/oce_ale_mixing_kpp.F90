@@ -1009,7 +1009,8 @@ contains
 !       eqn. (18)
 !      *******************************************************************
 
-        delhat = ABS(Z(kn))-hbl(node)
+!!PS         delhat = ABS(Z(kn))-hbl(node)
+        delhat = ABS(Z_3d_n(kn,node))-hbl(node)
         R      = 1.0_WP - delhat / dthick(kn)
 
         dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
@@ -1056,7 +1057,8 @@ contains
 !       Compute turbulent velocity scales on the interfaces
 !      *******************************************************************
 
-           sig   = ABS(Z(nz)) / (hbl(node)+epsln)
+!!PS            sig   = ABS(Z(nz)) / (hbl(node)+epsln)
+           sig   = ABS(Z_3d_n(nz,node)) / (hbl(node)+epsln)
            sigma = stable(node) * sig                          &
                 + (1.0_WP - stable(node)) * AMIN1(sig, epsilon_kpp)
            zehat= vonk * sigma * hbl(node) * bfsfc(node)
