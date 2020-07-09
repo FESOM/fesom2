@@ -387,6 +387,7 @@ CONTAINS
       IMPLICIT NONE
       integer                       :: n
       type(t_mesh), intent(in)     , target :: mesh
+#include "associate_mesh.h"
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
