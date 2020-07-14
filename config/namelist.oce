@@ -6,14 +6,15 @@ gamma0=0.0             ! [m/s],   backgroung viscosity= gamma0*len, it should be
 gamma1=0.0285          ! [nodim], for computation of the flow aware viscosity
 gamma2=0.285           ! [s/m],   is only used in easy backscatter option
 Div_c=.5  	       ! the strength of the modified Leith viscosity, nondimensional, 0.3 -- 1.0
-visc_option=6          ! 1=Harmonic Leith parameterization;
+Leith_c=.5             ! the strength of the Leith viscosity
+visc_option=5          ! 1=Harmonic Leith parameterization;
                        ! 2=Laplacian+Leith+biharmonic background
                        ! 3=Biharmonic Leith parameterization
                        ! 4=Biharmonic flow aware
                        ! 5=Easy Backscatter
                        ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
                        ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
-easy_bs_return= 1.0    ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
+easy_bs_return= 1.5    ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
 A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
 mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
