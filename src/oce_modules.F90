@@ -152,7 +152,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, use_density_ref
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
             ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
