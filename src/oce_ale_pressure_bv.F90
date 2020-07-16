@@ -189,11 +189,11 @@ subroutine pressure_bv(mesh)
             !     difference
             rho_surf=bulk_0(nzmin)   + Z_3d_n(nz,node)*(bulk_pz(nzmin)   + Z_3d_n(nz,node)*bulk_pz2(nzmin))
             !!PS rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_0
-            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node))-density_ref(nzmin,node)
+            rho_surf=rho_surf*rhopot(nzmin)/(rho_surf+0.1_WP*Z_3d_n(nz,node)) !-density_ref(nzmin,node)
             
             !!PS dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_0)      ! this is also required when KPP is ON
             !!PS dbsfc1(nz) = -g * density_0_r * ( rho_surf - rho(nz) )
-            dbsfc1(nz) = -g * ( rho_surf - rho(nz) ) / (rho(nz)+density_ref(nz,node))      ! this is also required when KPP is ON
+            dbsfc1(nz) = -g * ( rho_surf - (rho(nz)+density_ref(nz,node)) ) / (rho(nz)+density_ref(nz,node))      ! this is also required when KPP is ON
             
             !!PS db_max=max(dbsfc1(nz)/abs(Z_3d_n(1,node)-Z_3d_n(max(nz, 2),node)), db_max)
             db_max=max(dbsfc1(nz)/abs(Z_3d_n(nzmin,node)-Z_3d_n(max(nz, nzmin+1),node)), db_max)
@@ -295,11 +295,11 @@ subroutine pressure_bv(mesh)
             ! initial point --> does oscillation with frequency N. 
             ! N^2<0 stratification is unstable vertical elongated parcel is 
             ! accelerated away from initial point 
-            !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
-            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_ref(nz,node)
+            bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+!!PS             bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_ref(nz,node)
             
             !!PS !--> Why not like this ?
-            !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn+density_ref(nz,node))
+            !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn)
             
             !_______________________________________________________________
             ! define MLD following Large et al. 1997
