@@ -249,7 +249,7 @@ contains
      real(KIND=WP)              :: smftu, smftv, aux, vol
      real(KIND=WP)              :: dens_up, minmix
      real(KIND=WP)              :: u_loc, v_loc
-     real(kind=WP)              :: tsurf, ssurf, t, s
+!!PS      real(kind=WP)              :: tsurf, ssurf, t, s
      real(kind=WP)              :: usurf, vsurf
      real(kind=WP)              :: rhopot, bulk, pz
      real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
@@ -290,8 +290,8 @@ contains
 ! Surface temperature and salinity
      !!PS tsurf = tr_arr(1,node,1)   
      !!PS ssurf = tr_arr(1,node,2)
-     tsurf = tr_arr(nzmin,node,1)   
-     ssurf = tr_arr(nzmin,node,2)
+!!PS      tsurf = tr_arr(nzmin,node,1)   
+!!PS      ssurf = tr_arr(nzmin,node,2)
 ! Surface velocity
      !!PS usurf = Unode(1,1,node)   
      !!PS vsurf = Unode(2,1,node)
@@ -335,6 +335,7 @@ contains
 !      *******************************************************************
 
   DO node=1, myDim_nod2D !+eDim_nod2D
+     nzmin = ulevels_nod2D(node)
      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
     
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
@@ -399,6 +400,7 @@ contains
 
 ! OVER ELEMENTS 
   call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
+  minmix=3.0e-3_WP
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
      nzmin = ulevels(elem)
@@ -408,16 +410,23 @@ contains
         viscAE(nz,elem) = SUM(viscA(nz,elnodes))/3.0_WP    ! (elementwise)                
      END DO
      viscAE( nlevels(elem), elem ) = viscAE( nlevels(elem)-1, elem )
+     
+     ! Set the mixing coeff. in the first layer above some limiting value
+    ! this is very helpful to avoid huge surface velocity when vertical
+    ! viscosity is very small derived from the KPP scheme.
+    ! I strongly recommend this trick, at least in the current FESOM version.    
+    if (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
+    
   END DO    
 
-! Set the mixing coeff. in the first layer above some limiting value
-! this is very helpful to avoid huge surface velocity when vertical
-! viscosity is very small derived from the KPP scheme.
-! I strongly recommend this trick, at least in the current FESOM version.    
-  minmix=3.0e-3_WP
-  WHERE(viscAE(nzmin,:) < minmix) 
-     viscAE(nzmin,:) = minmix
-  END WHERE
+!!PS ! Set the mixing coeff. in the first layer above some limiting value
+!!PS ! this is very helpful to avoid huge surface velocity when vertical
+!!PS ! viscosity is very small derived from the KPP scheme.
+!!PS ! I strongly recommend this trick, at least in the current FESOM version.    
+!!PS   minmix=3.0e-3_WP
+!!PS   WHERE(viscAE(nzmin,:) < minmix) 
+!!PS      viscAE(nzmin,:) = minmix
+!!PS   END WHERE
     
 ! non-local contribution will be added to oce_tracer_mod directly
   END SUBROUTINE oce_mixing_kpp
@@ -620,7 +629,6 @@ contains
                                                                     ( sw_3d(kbl(node), node) - sw_3d(kbl(node)-1, node) ) &
                                                                     * ( hbl(node) + zbar_3d_n( kbl(node)-1,node) ) &
                                                                     / ( zbar_3d_n( kbl(node)-1,node) - zbar_3d_n(kbl(node),node) ) ) )
-           if ((bfsfc(node)/=bfsfc(node))) write(*,*) ' --> found NaN in bfsc (C)'
            stable(node)=0.5_WP + SIGN(0.5_WP, bfsfc(node))
            bfsfc(node) =bfsfc(node) + stable(node) * epsln 
         END IF
