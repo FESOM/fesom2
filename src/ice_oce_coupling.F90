@@ -76,7 +76,7 @@ subroutine ocean2ice(mesh)
 
     type(t_mesh), intent(in) , target :: mesh
     integer :: n, elem, k
-    real(kind=WP) :: uw,vw
+    real(kind=WP) :: uw, vw, vol
 
 #include  "associate_mesh.h"
 
@@ -85,45 +85,49 @@ subroutine ocean2ice(mesh)
     if (ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 
-            T_oc_array(n)=tr_arr(1,n,1)
-            S_oc_array(n)=tr_arr(1,n,2)
-            elevation(n)= hbar(n)
+            T_oc_array(n) = tr_arr(1,n,1)
+            S_oc_array(n) = tr_arr(1,n,2)
+            elevation(n)  = hbar(n)
         end do
-        elevation(:)= hbar(:)
     else
         do n=1, myDim_nod2d+eDim_nod2d
             if (ulevels_nod2D(n)>1) cycle 
-            T_oc_array(n)=(T_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
-            S_oc_array(n)=(S_oc_array(n)*real(ice_steps_since_upd)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
-            elevation(n)= (elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP)
+            T_oc_array(n) = (T_oc_array(n)*real(ice_steps_since_upd,WP)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
+            S_oc_array(n) = (S_oc_array(n)*real(ice_steps_since_upd,WP)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
+            elevation(n)  = (elevation(n) *real(ice_steps_since_upd,WP)+      hbar(n))/real(ice_steps_since_upd+1,WP)
         !NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
         !NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
         end do
 !!PS         elevation(:)= (elevation(:)*real(ice_steps_since_upd)+hbar(:))/real(ice_steps_since_upd+1,WP)
     end if
     
+    u_w = 0.0_WP
+    v_w = 0.0_WP
     do n=1, myDim_nod2d  
         if (ulevels_nod2D(n)>1) cycle 
-        uw=0.0_WP
-        vw=0.0_WP
+        uw  = 0.0_WP
+        vw  = 0.0_WP
+        vol = 0.0_WP
         do k=1, nod_in_elem2D_num(n)
             elem=nod_in_elem2D(k,n)
+            if (ulevels(elem)>1) cycle
             !uw = uw+ UV(1,1,elem)*elem_area(elem)
             !vw = vw+ UV(2,1,elem)*elem_area(elem)
-            uw = uw+ UV(1,ulevels(elem),elem)*elem_area(elem)
-            vw = vw+ UV(2,ulevels(elem),elem)*elem_area(elem)
+            vol = vol + elem_area(elem)
+            uw  = uw+ UV(1,1,elem)*elem_area(elem)
+            vw  = vw+ UV(2,1,elem)*elem_area(elem)
         end do
         !!PS uw = uw/area(1,n)/3.0_WP	  
         !!PS vw = vw/area(1,n)/3.0_WP
-        uw = uw/area(ulevels(elem),n)/3.0_WP	  
-        vw = vw/area(ulevels(elem),n)/3.0_WP	 
+        uw = uw/vol
+        vw = vw/vol
         
         if (ice_update) then
             u_w(n)=uw
             v_w(n)=vw
         else
-            u_w(n)=(u_w(n)*real(ice_steps_since_upd)+uw)/real(ice_steps_since_upd+1,WP)
-            v_w(n)=(v_w(n)*real(ice_steps_since_upd)+vw)/real(ice_steps_since_upd+1,WP)
+            u_w(n)=(u_w(n)*real(ice_steps_since_upd,WP)+uw)/real(ice_steps_since_upd+1,WP)
+            v_w(n)=(v_w(n)*real(ice_steps_since_upd,WP)+vw)/real(ice_steps_since_upd+1,WP)
         endif
     end do
     call exchange_nod(u_w, v_w)
@@ -152,6 +156,8 @@ subroutine oce_fluxes(mesh)
 #include  "associate_mesh.h"
     
     allocate(flux(myDim_nod2D+eDim_nod2D))
+    flux = 0.0_WP
+    
     ! ==================
     ! heat and freshwater
     ! ==================
@@ -167,13 +173,9 @@ subroutine oce_fluxes(mesh)
     !     
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
-    if (any(water_flux/=water_flux)) write(*,*) ' --> found NaN in water_flux (A)'
-    
-    
     
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
-    if (any(water_flux/=water_flux)) write(*,*) ' --> found NaN in water_flux (B)'
     
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
@@ -263,7 +265,6 @@ subroutine oce_fluxes(mesh)
     ! have there original sign
     water_flux=water_flux+net/ocean_area 
     
-    if (any(water_flux/=water_flux)) write(*,*) ' --> found NaN in water_flux (C)'
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)
     

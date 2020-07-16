@@ -372,6 +372,8 @@ do el=1,myDim_elem2D
      endif
   END DO 
 end subroutine stress2rhs
+!
+!
 !===================================================================
 subroutine EVPdynamics(mesh)
 ! EVP implementation. Does subcycling and boundary conditions.  
@@ -416,6 +418,10 @@ ax=cos(theta_io)
 ay=sin(theta_io)
     
 ! Precompute values that are never changed during the iteration
+ inv_areamass =0.0_WP
+ inv_mass     =0.0_WP
+ rhs_a        =0.0_WP
+ rhs_m        =0.0_WP
  do n=1,myDim_nod2D 
     !___________________________________________________________________________
     ! if cavity node skip it 
@@ -446,6 +452,7 @@ use_pice=0
 if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
 if ( .not. trim(which_ALE)=='linfs') then
 	! for full free surface include pressure from ice mass
+	ice_strength=0.0_WP
 	do el = 1,myDim_elem2D
 		
 		elnodes = elem2D_nodes(:,el)
@@ -496,6 +503,7 @@ if ( .not. trim(which_ALE)=='linfs') then
 	enddo
 else
 	! for linear free surface
+	ice_strength=0.0_WP
 	do el = 1,myDim_elem2D
         elnodes = elem2D_nodes(:,el)
         !_______________________________________________________________________
@@ -539,7 +547,6 @@ do n=1,myDim_nod2D
 
 !==============================================================
 ! And the ice stepping starts
-
 do shortstep=1, evp_rheol_steps 
  
    call stress_tensor(ice_strength, mesh)
@@ -547,7 +554,6 @@ do shortstep=1, evp_rheol_steps
  
    U_ice_old = U_ice !PS
    V_ice_old = V_ice !PS
- 
    do n=1,myDim_nod2D 
    
       !_________________________________________________________________________

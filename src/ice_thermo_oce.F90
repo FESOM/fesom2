@@ -70,8 +70,10 @@ subroutine thermodynamics(mesh)
   ! Friction velocity 
   ! ================
   allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
+    ustar_aux=0.0_WP
     DO i=1, myDim_nod2D
        ustar=0.0_WP
+       if(ulevels_nod2d(i)>1) cycle 
        ustar=((u_ice(i)-u_w(i))**2+ &
               (v_ice(i)-v_w(i))**2)
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
@@ -367,23 +369,6 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
      fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
   end if
   
-  if (fw/=fw) then
-    write(*,*) '--> found NaN in therm_ice, mype=',mype
-    write(*,*) ' fw         = ',fw
-    write(*,*) ' prec       = ',prec
-    write(*,*) ' evap       = ',evap
-    write(*,*) ' dhgrowth   = ',dhgrowth
-    write(*,*) ' rhoice     = ',rhoice
-    write(*,*) ' inv_rhowat = ',inv_rhowat
-    write(*,*) ' rsss       = ',rsss
-    write(*,*) ' Sice       = ',Sice
-    write(*,*) ' dhsngrowth = ',dhsngrowth
-    write(*,*) ' rhosno     = ',rhosno
-    write(*,*) ' inv_rhowat = ',inv_rhowat
-    write(*,*) ' (rsss-Sice)/rsss = ',(rsss-Sice)/rsss
-  end if 
-  
-
   ! Changes in compactnesses (equation 16 of Hibler 1979)
   rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
   rA= rhow - o2ihf*ice_dt/cl !Qiang: it was -(T_oc-TFrez(S_oc))*H_ML*cc/cl, changed in June 2010

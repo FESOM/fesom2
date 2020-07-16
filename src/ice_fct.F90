@@ -113,13 +113,21 @@ subroutine ice_fct_init(mesh)
   
   ! Initialization of arrays necessary to implement FCT algorithm
   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
-  allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
-                                                             ! order solutions
-  allocate(icefluxes(myDim_elem2D,3))
-  allocate(icepplus(n_size), icepminus(n_size))
   m_icel=0.0_WP
   a_icel=0.0_WP 
   m_snowl=0.0_WP
+  
+  allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
+  dm_ice = 0.0_WP                                            ! order solutions
+  da_ice = 0.0_WP
+  dm_snow = 0.0_WP
+  
+  allocate(icefluxes(myDim_elem2D,3))
+  icefluxes = 0.0_WP
+  
+  allocate(icepplus(n_size), icepminus(n_size))
+  icepplus = 0.0_WP
+  icepminus= 0.0_WP
   
   ! Fill in  the mass matrix    
   call ice_mass_matrix_fill(mesh)
@@ -304,6 +312,8 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     ! each of its 3 nodes
     
     allocate(tmax(myDim_nod2D), tmin(myDim_nod2D))
+    tmax = 0.0_WP
+    tmin = 0.0_WP
     
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
     icoef=1
@@ -470,15 +480,16 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     !==========================
     if(tr_array_id==1) then
         do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
             m_ice(n)=m_icel(n)
         end do      
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
             !___________________________________________________________________
             ! if cavity cycle over
             !PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
+            elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
@@ -488,15 +499,16 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     
     if(tr_array_id==2) then
         do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
             a_ice(n)=a_icel(n)
         end do      
         do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
             !___________________________________________________________________
             ! if cavity cycle over
             !!PS if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
+            elnodes=elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)  
                 a_ice(n)=a_ice(n)+icefluxes(elem,q)
@@ -506,6 +518,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     
     if(tr_array_id==3) then
         do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
             m_snow(n)=m_snowl(n)
         end do      
         do elem=1, myDim_elem2D
