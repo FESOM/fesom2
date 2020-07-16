@@ -123,7 +123,7 @@ end subroutine compute_nrst_pnt2cavline
 subroutine cavity_heat_water_fluxes_3eq(mesh)
     use MOD_MESH
     use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n, Unode, density_m_rho0
+    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n, Unode, density_m_rho0,density_ref
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     use g_PARSUP
     implicit none
@@ -217,7 +217,7 @@ subroutine cavity_heat_water_fluxes_3eq(mesh)
         ! rhow = rho !fcn_density returns full in-situ density now!
         ! in previous FESOM version, which has density anomaly from fcn_density, 
         ! so used density_0+rho was rhow= rho0+rho(i,j,N) in BRIOS
-        rhow = density_m_rho0(nzmin,node) + density_0
+        rhow = density_m_rho0(nzmin,node) + density_ref(nzmin,node)
         rhor = rhoi/rhow
         
         ep1  = cpw*gat
