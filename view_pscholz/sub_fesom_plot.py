@@ -15,7 +15,7 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False, 
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False,do_cavity=True, 
                       which_orient='vertical', nmax_cbar_l=8 ):
     if do_output==True:
         print('')
@@ -283,7 +283,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     vmin=clevel[0],vmax=clevel[-1])
         
         if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.15)
-    
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
@@ -346,6 +345,19 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     elif inputarray['which_mask'] == 'etopo':
         map.etopo()
         fesom_plot_lmask(map,mesh,ax,'none')
+    
+    #___________________________________________________________________________
+    if (data.use_cavity and do_cavity):
+        cav_aux = np.abs(mesh.nodes_2d_cg)
+        cav_levels=np.concatenate((np.array([1.0]),np.arange(50.0,1100.0,150.0)))
+        cav_lwidth=np.linspace(1.5,0.5,cav_levels.size)
+        cav_mx,cav_my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+        cav_cmap = cm.get_cmap(name='YlGnBu_r')
+        ax.tricontour(cav_mx,cav_my,mesh.elem_2d_i,cav_aux,
+                levels=cav_levels,
+                linewidths=cav_lwidth,
+                antialiased=True,
+                cmap=cav_cmap)
     
     #___________________________________________________________________________
     # arange colorbar position and labels

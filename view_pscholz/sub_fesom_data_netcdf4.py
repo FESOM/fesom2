@@ -42,6 +42,7 @@ class fesom_data(object):
     rescale                     = []
     which_mean                  = 'monthly'
     anom                        = False
+    use_cavity                  = False
     
     #___INIT DATA OBJECT________________________________________________________
     #
@@ -54,6 +55,7 @@ class fesom_data(object):
             self.proj_lon    = inputarray['proj_lon']
             self.proj_lat    = inputarray['proj_lat']
             self.which_plot  = inputarray['which_plot']
+            self.use_cavity  = inputarray['use_cavity']
     
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
@@ -85,6 +87,11 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         if len(mesh.nodes_2d_area)==0: mesh.fesom_calc_triarea()
         data.value 	= mesh.nodes_2d_area
         data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'cmocean.cm.balance'
+        return data
+    
+    elif data.var=='cavity_depth':
+        data.value 	= -mesh.nodes_2d_cg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
         return data
     
     #___________________________________________________________________________
@@ -490,13 +497,28 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             weight[zi,0], weight[zi,1] = sel_levidx.index(auxidx), sel_levidx.index(auxidx+1)
             if ndi!=mesh.nlev: 
                 depth = mesh.zmid
+                #_______________________________________________________________
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=auxidx+1
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=auxidx+1
+                #_______________________________________________________________
+                # case of cavity
+                if (mesh.use_cavity):
+                    if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=auxidx,isvalid)
+                    elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=auxidx,isvalid)
+                #_______________________________________________________________
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             else             :
                 depth = mesh.zlev
+                #_______________________________________________________________
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=auxidx+1
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=auxidx+1
+                #_______________________________________________________________
+                # case of cavity
+                if (mesh.use_cavity):
+                    if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=auxidx,isvalid)
+                    elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=auxidx,isvalid)
+                    
+                #_______________________________________________________________
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             weight[zi,2] = (idepth[zi]+depth[auxidx])/(depth[auxidx]-depth[auxidx+1])    
             div[isvalid] = div[isvalid]+1.0
@@ -890,6 +912,7 @@ def fesom_data_copy(data):
     copy.anom                           = data.anom  
     copy.value2                         = data.value2
     copy.which_mean                     = data.which_mean
+    copy.use_cavity                     = data.use_cavity
     
     #___________________________________________________________________________
     return(copy)
