@@ -62,8 +62,8 @@ subroutine cal_shortwave_rad(mesh)
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
-     nzmax=(nlevels(n2))
-     nzmin=(ulevels(n2))
+     nzmax=(nlevels_nod2D(n2))
+     nzmin=(ulevels_nod2D(n2))
      !!PS sw_3d(1, n2)=swsurf
      sw_3d(nzmin, n2)=swsurf
      !!PS do k=2, nzmax
