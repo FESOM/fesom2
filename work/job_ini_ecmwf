@@ -1,0 +1,45 @@
+#!/bin/bash
+#PBS -S /usr/bin/ksh
+#PBS -N fesom2-ini
+##PBS -q np
+#PBS -q dp
+#PBS -l EC_total_tasks=1
+
+# optionally, specifiy that no OpenMP is used
+#PBS -l EC_threads_per_task=1
+
+#PBS -l EC_hyperthreading=1
+#PBS -l EC_user_defined_priority=99
+###PBS -l walltime=00:17:00
+#PBS -l walltime=00:20:00
+
+##PBS -j oe #join out and err
+#PBD -n
+#PBS -o /scratch/rd/natr/run_dyamond/pbs.out
+#PBS -e /scratch/rd/natr/run_dyamond/pbs.err
+
+#PBS -m abe
+#PBS -M thomas.rackow@awi.de
+	
+#queue	suitable for	target	processors min/max			processors per node	memory limit	wall-clock	
+#np	parallel	MOM+CN	1/72			not shared	72			120 GB		48 hours
+
+path=`pwd`
+echo Initial path: $path
+
+cd /scratch/rd/natr/run_dyamond_ini
+
+# debug
+set -x
+
+ln -s $HOME/fesom2/bin/fesom_ini.x . 		#../bin/fesom.x .		# cp -n ../bin/fesom.x
+cp -n /scratch/rd/natr/run_dyamond/namelist.config  .	#../config/namelist.config  .
+cp -n /scratch/rd/natr/run_dyamond/namelist.forcing .	#../config/namelist.forcing .
+cp -n /scratch/rd/natr/run_dyamond/namelist.oce     .	#../config/namelist.oce     .
+cp -n /scratch/rd/natr/run_dyamond/namelist.ice     .	#../config/namelist.ice     .
+
+date
+#echo tasks_per_node, total_tasks, HT: $EC_tasks_per_node $EC_total_tasks $EC_hyperthreads
+#aprun -N $EC_tasks_per_node -n $EC_total_tasks -j $EC_hyperthreads ./fvom_ini.x > "fesom2_ini.out"
+aprun -N $EC_tasks_per_node -n $EC_total_tasks ./fesom_ini.x > "fesom_ini.out"
+date
