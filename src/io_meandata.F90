@@ -144,7 +144,11 @@ CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('vve_5     ')
     call def_stream(nod2D, myDim_nod2D, 'vve_5',    'vertical velocity at 5th level', 'm/s',    Wvel(5,:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-    
+CASE ('szonal_cur')
+    call def_stream(elem2D, myDim_elem2D,'curr_u',  'surface zonal current',          'm/s', UV(1,1,1:myDim_elem2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('smerid_cur')
+    call def_stream(elem2D, myDim_elem2D,'curr_v',  'surface meridional current',     'm/s', UV(2,1,1:myDim_elem2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)  
+
 !___________________________________________________________________________________________________________________________________
 ! output sea ice 
 CASE ('uice      ')
