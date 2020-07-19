@@ -89,6 +89,7 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
 							    myDim_edge2D, eDim_edge2D, myList_nod2D, myList_elem2D
    USE MOD_MESH
    !USE o_MESH,   only: nod2D, elem2D
+   USE g_init2timestepping, only: meshinmod
 
    ! Initialize single executable coupling 
    USE parinter
@@ -108,7 +109,9 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    INTEGER :: iunit = 0
 
    ! Local variables
-   type(t_mesh), target, save :: mesh
+   type(t_mesh), target :: mesh
+   integer    , pointer :: nod2D 
+   integer    , pointer :: elem2D   
 
    ! Namelist containing the file names of the weights
    CHARACTER(len=256) :: cdfile_gauss_to_T, cdfile_gauss_to_UV, &
@@ -140,8 +143,11 @@ SUBROUTINE nemogcmcoup_coupinit( mypeIN, npesIN, icomm, &
    INTEGER :: i,j,k,ierr
    LOGICAL :: lexists
 
-   ! associate the mesh
-#include "associate_mesh.h"
+   ! associate the mesh, only what is needed here
+   ! #include "associate_mesh.h"
+   mesh = meshinmod
+   nod2D              => mesh%nod2D              
+   elem2D             => mesh%elem2D  
 
 
    ! here FESOM knows about the (total number of) MPI tasks
@@ -342,6 +348,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    USE g_PARSUP, only: myDim_nod2D,eDim_nod2D, myDim_elem2D,eDim_elem2D,eXDim_elem2D
    !USE o_MESH, only: elem2D_nodes, coord_nod2D
    USE MOD_MESH
+   USE g_init2timestepping, only: meshinmod
 
    USE g_rotate_grid, only: vector_r2g
    USE parinter
@@ -355,7 +362,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
    REAL(wpIFS), DIMENSION(nopoints,3) :: pgistl
    LOGICAL :: licelvls
 
-   type(t_mesh), target, save :: mesh
+   type(t_mesh), target :: mesh
    real(kind=wpIFS), dimension(:,:), pointer :: coord_nod2D
    integer, dimension(:,:)      , pointer :: elem2D_nodes
 
@@ -375,6 +382,7 @@ SUBROUTINE nemogcmcoup_lim2_get( mype, npes, icomm, &
 
    !#include "associate_mesh.h"
    ! associate what is needed only
+   mesh = meshinmod
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D   
    elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
 
@@ -544,6 +552,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    USE g_PARSUP, 	only: myDim_nod2D, myDim_elem2D, par_ex, eDim_nod2D, eDim_elem2D, eXDim_elem2D, myDim_edge2D, eDim_edge2D
    !USE o_MESH, 	only: coord_nod2D !elem2D_nodes
    USE MOD_MESH
+   USE g_init2timestepping, only: meshinmod
    !USE o_PARAM, ONLY : WP, use wpIFS from par_kind (IFS)
    USE g_rotate_grid, 	only: vector_r2g, vector_g2r
    USE g_forcing_arrays, only: 	shortwave, prec_rain, prec_snow, runoff, & 
@@ -581,7 +590,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    ! QNS ice filter switch (requires tice_atm to be sent)
    LOGICAL, INTENT(IN) :: lqnsicefilt
 
-   type(t_mesh), target, save :: mesh
+   type(t_mesh), target :: mesh
 
    ! Local variables
    INTEGER		:: n
@@ -596,6 +605,7 @@ SUBROUTINE nemogcmcoup_lim2_update( mype, npes, icomm, &
    !#include "associate_mesh.h"
    ! associate only the necessary things
    real(kind=WP), dimension(:,:), pointer :: coord_nod2D
+   mesh = meshinmod
    coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%coord_nod2D  
 
    ! =================================================================== !
