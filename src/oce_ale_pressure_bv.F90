@@ -109,7 +109,7 @@ subroutine pressure_bv(mesh)
     enddo
     
     !___________________________________________________________________________
-    if(a<0.) then
+    if(a<0.0_WP) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
@@ -1592,7 +1592,7 @@ IMPLICIT NONE
   real(kind=WP), intent(IN)  :: t,s
   real(kind=WP), intent(OUT) :: rho_out                 
   real(kind=WP)              :: rhopot, bulk
-  real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
+  real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2
   type(t_mesh), intent(in)   , target :: mesh
 #include "associate_mesh.h"
   !compute secant bulk modulus
