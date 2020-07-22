@@ -147,7 +147,6 @@ subroutine FEM_eval_old(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
@@ -313,7 +312,6 @@ subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
@@ -794,7 +792,6 @@ SUBROUTINE processor_distr
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
@@ -837,7 +834,6 @@ SUBROUTINE tides_distr
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   

@@ -31,7 +31,6 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
 
@@ -107,7 +106,6 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb

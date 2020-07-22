@@ -16,6 +16,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  use i_arrays		!for u_ice , v_ice
  use o_arrays		!for coriolis_param_elem2D, Tsurf, Ssurf
  use o_param		!for dt
+ use o_mesh
  use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
  
  implicit none
@@ -54,7 +55,9 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  real			:: T_ave_ib, S_ave_ib, T_keel_ib, S_keel_ib
  character,  intent(IN)	:: file3*80
  real, intent(IN)	:: rho_icb
+ 
 
+ integer, dimension(3)  :: tmp_arr
  
  !OCEAN VELOCITIES: 
  ! - (uo_ib, vo_ib)		: integrated mean velocity at location of iceberg
@@ -81,8 +84,12 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  
  
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
- hi_ib3    = m_ice(elem2D_nodes(:,iceberg_elem))
- conci_ib3 = a_ice(elem2D_nodes(:,iceberg_elem)) 
+ 
+ ! LA debug
+ tmp_arr=elem2D_nodes(:,iceberg_elem)
+ 
+ hi_ib3    = m_ice(tmp_arr)
+ conci_ib3 = a_ice(tmp_arr) 
  call FEM_3eval(hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  
@@ -91,7 +98,8 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
                     height_ib, length_ib, width_ib, hi_ib)
 	
 			 
- fcoriolis = coriolis_param_elem2D(iceberg_elem) * coriolis_scale(ib)
+ !fcoriolis = coriolis_param_elem2D(iceberg_elem) * coriolis_scale(ib)
+ fcoriolis = coriolis(iceberg_elem) * coriolis_scale(ib)
   
   
  call iceberg_acceleration( ib, au_ib, av_ib, Ao, Aa, Ai, Ad, 		&
@@ -298,7 +306,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  real, dimension(8)	:: accs_u_out, accs_v_out
  real, dimension(4)	:: vels_u_out, vels_v_out
  real 			:: oneminus_AB !, test1, test2
- integer 		:: icbID, i
+ integer 		:: icbID, i, istep
  
  
  icbID = mype+10
@@ -347,7 +355,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  
  !additional surface slope due to tides
  if(l_tides) then
-   slope_tides_u = -g * sum( opbnd_z_tide(elem2D_nodes(:,iceberg_elem)) * bafux_2D(:,iceberg_elem) )
+   slope_tides_u = 0.0  !-g * sum( opbnd_z_tide(elem2D_nodes(:,iceberg_elem)) * bafux_2D(:,iceberg_elem) )
  else
    slope_tides_u = 0.0
  end if
@@ -386,7 +394,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  
  !additional surface slope due to tides
  if(l_tides) then
-   slope_tides_v = -g * sum( opbnd_z_tide(elem2D_nodes(:,iceberg_elem)) * bafuy_2D(:,iceberg_elem) )	
+   slope_tides_v = 0.0  !-g * sum( opbnd_z_tide(elem2D_nodes(:,iceberg_elem)) * bafuy_2D(:,iceberg_elem) )	
  else
    slope_tides_v = 0.0
  end if
@@ -589,7 +597,6 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
@@ -707,8 +714,8 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
       ! save the current deepest values; will be overwritten most of the time in lines 707 to 713.
       uo_keel(m)=UV(1,k,n2)
       vo_keel(m)=UV(2,k,n2)
-      T_keel(m)=tracer(n_low,1)
-      S_keel(m)=tracer(n_low,2)
+      T_keel(m)=tr_arr(k,n2,1)
+      S_keel(m)=tr_arr(k,n2,2)
     end if
 
    end do innerloop
@@ -852,7 +859,6 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
@@ -1040,312 +1046,312 @@ end subroutine iceberg_avvelo
  !***************************************************************************************************************************
 
 
-subroutine init_global_tides
-  ! initialize tides: read constituents (amplitude and phase)
-  ! The global tidal data should be on a grid with longitude range 0-360 degree.
-  ! Assumption: the number of columes/rows of the grids for global tidal data
-  !             are the same for all constituents and types (U,V, z), though 
-  !             the exact lon/lat values can be (are) different for different
-  ! 	        types.
-  !
-  ! This is an adapted version of the subroutine init_tidal_opbnd for use of
-  ! global tides in iceberg case; external model data is interpolated on the
-  ! grid and can be added to the surface slope ssh computed by FESOM for process studies.
-  !
-  ! Thomas Rackow, 17.12.2010, some cleaning up still to be done
-  !
-  use o_param
-  use o_arrays
-  use o_mesh
-  use g_rotate_grid
-  use g_parsup
-  implicit none
-  !
-  integer					:: i, j, n, num, fid, nodmin,m(1)
-  integer					:: num_lon_reg, num_lat_reg
-  integer                                       :: p_flag
-  character(2)    				:: cons_name
-  real(kind=8)					:: lon, lat, dep
-  real(kind=8)					:: x, y, x2, y2, d, dmin
-  real(kind=8), allocatable, dimension(:)	:: lon_reg_4u, lat_reg_4u
-  real(kind=8), allocatable, dimension(:)	:: lon_reg_4v, lat_reg_4v
-  real(kind=8), allocatable, dimension(:)	:: lon_reg_4z, lat_reg_4z
-  real(kind=8), allocatable, dimension(:,:)	:: amp_reg, pha_reg
-  real(kind=8), allocatable, dimension(:)	:: lon_opbnd_n2d, lat_opbnd_n2d
-  integer					:: mySize2D
-
-  mySize2D=myDim_nod2D+eDim_nod2D
-  
-  ! check
-  num=len(trim(tidal_constituent))
-  if(mod(num,2) /= 0 .or. num/2 /= nmbr_tidal_cons) then
-     write(*,*) 'wrong specification of tidal constituents in O_module'
-     call par_ex
-     stop
-  end if
-
-  ! allocate arrays
-  if(trim(tide_opbnd_type)=='Flather') then
-     allocate(opbnd_u_tide(nmbr_opbnd_t2D))
-     allocate(opbnd_v_tide(nmbr_opbnd_t2D))
-     allocate(opbnd_z_tide(nmbr_opbnd_t2D))
-     opbnd_u_tide=0.
-     opbnd_v_tide=0.
-     opbnd_z_tide=0.
-  elseif(trim(tide_opbnd_type)=='ssh') then
-     allocate(opbnd_z_tide(mySize2D))	!CHANGED: opbnd_z_tide(nmbr_opbnd_t2D)
-     allocate(opbnd_z0_tide(mySize2D))	!CHANGED: opbnd_z0_tide(nmbr_opbnd_t2D)
-     opbnd_z_tide=0.  
-     opbnd_z0_tide=0.
-  else !'vel'
-     allocate(opbnd_u_tide(nmbr_opbnd_t2D))
-     allocate(opbnd_v_tide(nmbr_opbnd_t2D))
-     opbnd_u_tide=0.
-     opbnd_v_tide=0.
-  end if
-
-  ! allocate tidal amp and pha arrays
-  allocate(tide_period_coeff(nmbr_tidal_cons))
-  tide_period_coeff=0.
-  if(trim(tide_opbnd_type)/='ssh') then
-     allocate(tide_u_amp(nmbr_opbnd_t2d, nmbr_tidal_cons))
-     allocate(tide_v_amp(nmbr_opbnd_t2d, nmbr_tidal_cons))
-     allocate(tide_u_pha(nmbr_opbnd_t2d, nmbr_tidal_cons))
-     allocate(tide_v_pha(nmbr_opbnd_t2d, nmbr_tidal_cons))
-     tide_u_amp=0.
-     tide_v_amp=0.
-     tide_u_pha=0.
-     tide_v_pha=0.
-  end if
-  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
-     allocate(tide_z_amp(mySize2D, nmbr_tidal_cons))	!tide_z_amp(nmbr_opbnd_t2d, nmbr_tidal_cons)
-     allocate(tide_z_pha(mySize2D, nmbr_tidal_cons))	!tide_z_pha(nmbr_opbnd_t2d, nmbr_tidal_cons)
-     tide_z_amp=0.
-     tide_z_pha=0.
-  end if
-
-  ! read the regular grid (for velocity)
-  if(trim(tide_opbnd_type)/='ssh') then
-     open(101,file=trim(TideForcingPath)//'lonlat_4U_'//trim(tidemodelname)//'.dat', status='old')
-     read(101,*) num_lon_reg, num_lat_reg 
-     allocate(lon_reg_4u(num_lon_reg), lat_reg_4u(num_lat_reg))
-     do i=1,num_lon_reg
-        read(101,*) lon_reg_4u(i)
-     end do
-     do i=1,num_lat_reg
-        read(101,*) lat_reg_4u(i)
-     end do
-     close(101)
-     open(102,file=trim(TideForcingPath)//'lonlat_4V_'//trim(tidemodelname)//'.dat', status='old')
-     read(102,*) num_lon_reg, num_lat_reg 
-     allocate(lon_reg_4v(num_lon_reg), lat_reg_4v(num_lat_reg))
-     do i=1,num_lon_reg
-        read(102,*) lon_reg_4v(i)
-     end do
-     do i=1,num_lat_reg
-        read(102,*) lat_reg_4v(i)
-     end do
-     close(102)
-  end if
-
-  ! read the regular grid (for ssh)
-  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
-     open(103,file=trim(TideForcingPath)//'lonlat_4z_'//trim(tidemodelname)//'.dat', status='old')
-     read(103,*) num_lon_reg, num_lat_reg 
-     allocate(lon_reg_4z(num_lon_reg), lat_reg_4z(num_lat_reg))
-     do i=1,num_lon_reg
-        read(103,*) lon_reg_4z(i)
-     end do
-     do i=1,num_lat_reg
-        read(103,*) lat_reg_4z(i)
-     end do
-     close(103)
-  end if
-
-  ! allocate arrays for global data on regular grids
-  allocate(amp_reg(num_lon_reg, num_lat_reg), pha_reg(num_lon_reg, num_lat_reg)) 
-
-  ! open-boundary nodes coordinates
-  !allocate(lon_opbnd_n2d(nmbr_opbnd_n2d), lat_opbnd_n2d(nmbr_opbnd_n2d))
-  !do i=1, nmbr_opbnd_n2d
-  !   n=opbnd_n2d(i)
-  !   if(rotated_grid) then
-  !      call r2g(lon, lat, coord_nod2d(1,n), coord_nod2d(2,n))
-  !      lon_opbnd_n2d(i)=lon/rad   ! change unit to degree
-  !      lat_opbnd_n2d(i)=lat/rad
-  !   else
-  !      lon_opbnd_n2d(i)=coord_nod2d(1,n)/rad
-  !      lat_opbnd_n2d(i)=coord_nod2d(2,n)/rad
-  !   end if
-  !   ! change lon range to [0 360]
-  !   if(lon_opbnd_n2d(i)<0.) lon_opbnd_n2d(i)=lon_opbnd_n2d(i) + 360.0  
-  !end do
-  allocate(lon_opbnd_n2d(mySize2D), lat_opbnd_n2d(mySize2D))
-  do i=1, mySize2D
-  !   n=opbnd_n2d(i)
-     if(rotated_grid) then
-        call r2g(lon, lat, coord_nod2d(1,i), coord_nod2d(2,i))
-        lon_opbnd_n2d(i)=lon/rad   ! change unit to degree
-        lat_opbnd_n2d(i)=lat/rad
-     else
-        lon_opbnd_n2d(i)=coord_nod2d(1,i)/rad
-        lat_opbnd_n2d(i)=coord_nod2d(2,i)/rad
-     end if
-     ! change lon range to [0 360]
-     if(lon_opbnd_n2d(i)<0.) lon_opbnd_n2d(i)=lon_opbnd_n2d(i) + 360.0  
-  end do
-  
-
-  ! read and interpolate each constituent (for U,V,z and their phase) 
-  do n=1,nmbr_tidal_cons
-     cons_name=tidal_constituent(2*n-1:2*n)
-     call tide_period(cons_name, tide_period_coeff(n))
-
-     if(trim(tide_opbnd_type)/='ssh') then
-        fid=103+n
-        open(fid,file=trim(TideForcingPath)//'U_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) amp_reg(i,j)         
-           end do
-        end do
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) pha_reg(i,j)         
-           end do
-        end do
-        close(fid)
-
-        p_flag=0
-        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4u, lat_reg_4u, amp_reg, &
-             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_u_amp(1:nmbr_opbnd_n2d,n),p_flag)
-        tide_u_amp(:,n)=tide_u_amp(:,n)/opbnd_dep  ! change transport (m^2/s) to depth mean velocity (m/s)
-
-        p_flag=1
-        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4u, lat_reg_4u, pha_reg, &
-             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_u_pha(1:nmbr_opbnd_n2d,n),p_flag)
-        tide_u_pha(:,n)=tide_u_pha(:,n)*rad   ! change units of phase from degree to radian 
-
-
-        open(fid,file=trim(TideForcingPath)//'V_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) amp_reg(i,j)         
-           end do
-        end do
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) pha_reg(i,j)         
-           end do
-        end do
-        close(fid)
-
-        p_flag=0
-        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4v, lat_reg_4v, amp_reg, &
-             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_v_amp(1:nmbr_opbnd_n2d,n),p_flag)
-        tide_v_amp(:,n)=tide_v_amp(:,n)/opbnd_dep  ! change transport (m^2/s) to depth mean velocity (m/s)
-
-        p_flag=1
-        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4v, lat_reg_4v, pha_reg, &
-             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_v_pha(1:nmbr_opbnd_n2d,n),p_flag)
-        tide_v_pha(:,n)=tide_v_pha(:,n)*rad   ! change units of phase from degree to radian 
-
-     end if
-
-
-     if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
-        fid=103+n
-        open(fid,file=trim(TideForcingPath)//'z_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) amp_reg(i,j)         
-           end do
-        end do
-        do i=1, num_lon_reg
-           do j=1, num_lat_reg
-              read(fid, *) pha_reg(i,j)         
-           end do
-        end do
-        close(fid)
-
-        p_flag=0
-	!CHANGED:
-        !call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, amp_reg, &
-        !     nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_amp(1:nmbr_opbnd_n2d,n),p_flag)
-	call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, amp_reg, &
-             mySize2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_amp(1:mySize2D,n),p_flag)
-	     
-        p_flag=1
-	!CHANGED:
-        !call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, pha_reg, &
-        !     nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_pha(1:nmbr_opbnd_n2d,n),p_flag)
-	call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, pha_reg, &
-             mySize2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_pha(1:mySize2D,n),p_flag)
-        tide_z_pha(:,n)=tide_z_pha(:,n)*rad   ! change units of phase from degree to radian 
-     end if
-  end do
-
-  ! amplifying the magnitude for process studies
-  if(trim(tide_opbnd_type)/='ssh') then
-     tide_u_amp=tide_u_amp*tide_amplify_coeff
-     tide_v_amp=tide_v_amp*tide_amplify_coeff
-  end if
-  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
-     tide_z_amp=tide_z_amp*tide_amplify_coeff
-  end if
-
-
-  ! deallocate temporary arrays
-  deallocate(lat_opbnd_n2d, lon_opbnd_n2d)
-  deallocate(pha_reg, amp_reg)
-  if(trim(tide_opbnd_type)/='ssh') deallocate(lat_reg_4v,lon_reg_4v,lat_reg_4u,lon_reg_4u)
-  if(trim(tide_opbnd_type)/='vel') deallocate(lat_reg_4z,lon_reg_4z) !for 'ssh'
-
-  if(mype==0) then 
-   write(*,*) 'Global Tidal Constituents ', trim(tidal_constituent), ' have been loaded for Iceberg Case'
-   write(*,*) '*************************************************************'
-  end if 
-end subroutine init_global_tides
+!subroutine init_global_tides
+!  ! initialize tides: read constituents (amplitude and phase)
+!  ! The global tidal data should be on a grid with longitude range 0-360 degree.
+!  ! Assumption: the number of columes/rows of the grids for global tidal data
+!  !             are the same for all constituents and types (U,V, z), though 
+!  !             the exact lon/lat values can be (are) different for different
+!  ! 	        types.
+!  !
+!  ! This is an adapted version of the subroutine init_tidal_opbnd for use of
+!  ! global tides in iceberg case; external model data is interpolated on the
+!  ! grid and can be added to the surface slope ssh computed by FESOM for process studies.
+!  !
+!  ! Thomas Rackow, 17.12.2010, some cleaning up still to be done
+!  !
+!  use o_param
+!  use o_arrays
+!  use o_mesh
+!  use g_rotate_grid
+!  use g_parsup
+!  implicit none
+!  !
+!  integer					:: i, j, n, num, fid, nodmin,m(1)
+!  integer					:: num_lon_reg, num_lat_reg
+!  integer                                       :: p_flag
+!  character(2)    				:: cons_name
+!  real(kind=8)					:: lon, lat, dep
+!  real(kind=8)					:: x, y, x2, y2, d, dmin
+!  real(kind=8), allocatable, dimension(:)	:: lon_reg_4u, lat_reg_4u
+!  real(kind=8), allocatable, dimension(:)	:: lon_reg_4v, lat_reg_4v
+!  real(kind=8), allocatable, dimension(:)	:: lon_reg_4z, lat_reg_4z
+!  real(kind=8), allocatable, dimension(:,:)	:: amp_reg, pha_reg
+!  real(kind=8), allocatable, dimension(:)	:: lon_opbnd_n2d, lat_opbnd_n2d
+!  integer					:: mySize2D
+!
+!  mySize2D=myDim_nod2D+eDim_nod2D
+!  
+!  ! check
+!  num=len(trim(tidal_constituent))
+!  if(mod(num,2) /= 0 .or. num/2 /= nmbr_tidal_cons) then
+!     write(*,*) 'wrong specification of tidal constituents in O_module'
+!     call par_ex
+!     stop
+!  end if
+!
+!  ! allocate arrays
+!  if(trim(tide_opbnd_type)=='Flather') then
+!     allocate(opbnd_u_tide(nmbr_opbnd_t2D))
+!     allocate(opbnd_v_tide(nmbr_opbnd_t2D))
+!     allocate(opbnd_z_tide(nmbr_opbnd_t2D))
+!     opbnd_u_tide=0.
+!     opbnd_v_tide=0.
+!     opbnd_z_tide=0.
+!  elseif(trim(tide_opbnd_type)=='ssh') then
+!     allocate(opbnd_z_tide(mySize2D))	!CHANGED: opbnd_z_tide(nmbr_opbnd_t2D)
+!     allocate(opbnd_z0_tide(mySize2D))	!CHANGED: opbnd_z0_tide(nmbr_opbnd_t2D)
+!     opbnd_z_tide=0.  
+!     opbnd_z0_tide=0.
+!  else !'vel'
+!     allocate(opbnd_u_tide(nmbr_opbnd_t2D))
+!     allocate(opbnd_v_tide(nmbr_opbnd_t2D))
+!     opbnd_u_tide=0.
+!     opbnd_v_tide=0.
+!  end if
+!
+!  ! allocate tidal amp and pha arrays
+!  allocate(tide_period_coeff(nmbr_tidal_cons))
+!  tide_period_coeff=0.
+!  if(trim(tide_opbnd_type)/='ssh') then
+!     allocate(tide_u_amp(nmbr_opbnd_t2d, nmbr_tidal_cons))
+!     allocate(tide_v_amp(nmbr_opbnd_t2d, nmbr_tidal_cons))
+!     allocate(tide_u_pha(nmbr_opbnd_t2d, nmbr_tidal_cons))
+!     allocate(tide_v_pha(nmbr_opbnd_t2d, nmbr_tidal_cons))
+!     tide_u_amp=0.
+!     tide_v_amp=0.
+!     tide_u_pha=0.
+!     tide_v_pha=0.
+!  end if
+!  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
+!     allocate(tide_z_amp(mySize2D, nmbr_tidal_cons))	!tide_z_amp(nmbr_opbnd_t2d, nmbr_tidal_cons)
+!     allocate(tide_z_pha(mySize2D, nmbr_tidal_cons))	!tide_z_pha(nmbr_opbnd_t2d, nmbr_tidal_cons)
+!     tide_z_amp=0.
+!     tide_z_pha=0.
+!  end if
+!
+!  ! read the regular grid (for velocity)
+!  if(trim(tide_opbnd_type)/='ssh') then
+!     open(101,file=trim(TideForcingPath)//'lonlat_4U_'//trim(tidemodelname)//'.dat', status='old')
+!     read(101,*) num_lon_reg, num_lat_reg 
+!     allocate(lon_reg_4u(num_lon_reg), lat_reg_4u(num_lat_reg))
+!     do i=1,num_lon_reg
+!        read(101,*) lon_reg_4u(i)
+!     end do
+!     do i=1,num_lat_reg
+!        read(101,*) lat_reg_4u(i)
+!     end do
+!     close(101)
+!     open(102,file=trim(TideForcingPath)//'lonlat_4V_'//trim(tidemodelname)//'.dat', status='old')
+!     read(102,*) num_lon_reg, num_lat_reg 
+!     allocate(lon_reg_4v(num_lon_reg), lat_reg_4v(num_lat_reg))
+!     do i=1,num_lon_reg
+!        read(102,*) lon_reg_4v(i)
+!     end do
+!     do i=1,num_lat_reg
+!        read(102,*) lat_reg_4v(i)
+!     end do
+!     close(102)
+!  end if
+!
+!  ! read the regular grid (for ssh)
+!  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
+!     open(103,file=trim(TideForcingPath)//'lonlat_4z_'//trim(tidemodelname)//'.dat', status='old')
+!     read(103,*) num_lon_reg, num_lat_reg 
+!     allocate(lon_reg_4z(num_lon_reg), lat_reg_4z(num_lat_reg))
+!     do i=1,num_lon_reg
+!        read(103,*) lon_reg_4z(i)
+!     end do
+!     do i=1,num_lat_reg
+!        read(103,*) lat_reg_4z(i)
+!     end do
+!     close(103)
+!  end if
+!
+!  ! allocate arrays for global data on regular grids
+!  allocate(amp_reg(num_lon_reg, num_lat_reg), pha_reg(num_lon_reg, num_lat_reg)) 
+!
+!  ! open-boundary nodes coordinates
+!  !allocate(lon_opbnd_n2d(nmbr_opbnd_n2d), lat_opbnd_n2d(nmbr_opbnd_n2d))
+!  !do i=1, nmbr_opbnd_n2d
+!  !   n=opbnd_n2d(i)
+!  !   if(rotated_grid) then
+!  !      call r2g(lon, lat, coord_nod2d(1,n), coord_nod2d(2,n))
+!  !      lon_opbnd_n2d(i)=lon/rad   ! change unit to degree
+!  !      lat_opbnd_n2d(i)=lat/rad
+!  !   else
+!  !      lon_opbnd_n2d(i)=coord_nod2d(1,n)/rad
+!  !      lat_opbnd_n2d(i)=coord_nod2d(2,n)/rad
+!  !   end if
+!  !   ! change lon range to [0 360]
+!  !   if(lon_opbnd_n2d(i)<0.) lon_opbnd_n2d(i)=lon_opbnd_n2d(i) + 360.0  
+!  !end do
+!  allocate(lon_opbnd_n2d(mySize2D), lat_opbnd_n2d(mySize2D))
+!  do i=1, mySize2D
+!  !   n=opbnd_n2d(i)
+!     if(rotated_grid) then
+!        call r2g(lon, lat, coord_nod2d(1,i), coord_nod2d(2,i))
+!        lon_opbnd_n2d(i)=lon/rad   ! change unit to degree
+!        lat_opbnd_n2d(i)=lat/rad
+!     else
+!        lon_opbnd_n2d(i)=coord_nod2d(1,i)/rad
+!        lat_opbnd_n2d(i)=coord_nod2d(2,i)/rad
+!     end if
+!     ! change lon range to [0 360]
+!     if(lon_opbnd_n2d(i)<0.) lon_opbnd_n2d(i)=lon_opbnd_n2d(i) + 360.0  
+!  end do
+!  
+!
+!  ! read and interpolate each constituent (for U,V,z and their phase) 
+!  do n=1,nmbr_tidal_cons
+!     cons_name=tidal_constituent(2*n-1:2*n)
+!     call tide_period(cons_name, tide_period_coeff(n))
+!
+!     if(trim(tide_opbnd_type)/='ssh') then
+!        fid=103+n
+!        open(fid,file=trim(TideForcingPath)//'U_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) amp_reg(i,j)         
+!           end do
+!        end do
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) pha_reg(i,j)         
+!           end do
+!        end do
+!        close(fid)
+!
+!        p_flag=0
+!        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4u, lat_reg_4u, amp_reg, &
+!             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_u_amp(1:nmbr_opbnd_n2d,n),p_flag)
+!        tide_u_amp(:,n)=tide_u_amp(:,n)/opbnd_dep  ! change transport (m^2/s) to depth mean velocity (m/s)
+!
+!        p_flag=1
+!        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4u, lat_reg_4u, pha_reg, &
+!             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_u_pha(1:nmbr_opbnd_n2d,n),p_flag)
+!        tide_u_pha(:,n)=tide_u_pha(:,n)*rad   ! change units of phase from degree to radian 
+!
+!
+!        open(fid,file=trim(TideForcingPath)//'V_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) amp_reg(i,j)         
+!           end do
+!        end do
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) pha_reg(i,j)         
+!           end do
+!        end do
+!        close(fid)
+!
+!        p_flag=0
+!        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4v, lat_reg_4v, amp_reg, &
+!             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_v_amp(1:nmbr_opbnd_n2d,n),p_flag)
+!        tide_v_amp(:,n)=tide_v_amp(:,n)/opbnd_dep  ! change transport (m^2/s) to depth mean velocity (m/s)
+!
+!        p_flag=1
+!        call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4v, lat_reg_4v, pha_reg, &
+!             nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_v_pha(1:nmbr_opbnd_n2d,n),p_flag)
+!        tide_v_pha(:,n)=tide_v_pha(:,n)*rad   ! change units of phase from degree to radian 
+!
+!     end if
+!
+!
+!     if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
+!        fid=103+n
+!        open(fid,file=trim(TideForcingPath)//'z_'//cons_name//'_'//trim(tidemodelname)//'.dat', status='old')
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) amp_reg(i,j)         
+!           end do
+!        end do
+!        do i=1, num_lon_reg
+!           do j=1, num_lat_reg
+!              read(fid, *) pha_reg(i,j)         
+!           end do
+!        end do
+!        close(fid)
+!
+!        p_flag=0
+!	!CHANGED:
+!        !call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, amp_reg, &
+!        !     nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_amp(1:nmbr_opbnd_n2d,n),p_flag)
+!	call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, amp_reg, &
+!             mySize2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_amp(1:mySize2D,n),p_flag)
+!	     
+!        p_flag=1
+!	!CHANGED:
+!        !call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, pha_reg, &
+!        !     nmbr_opbnd_n2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_pha(1:nmbr_opbnd_n2d,n),p_flag)
+!	call interp_2d_field(num_lon_reg, num_lat_reg, lon_reg_4z, lat_reg_4z, pha_reg, &
+!             mySize2D, lon_opbnd_n2d, lat_opbnd_n2d, tide_z_pha(1:mySize2D,n),p_flag)
+!        tide_z_pha(:,n)=tide_z_pha(:,n)*rad   ! change units of phase from degree to radian 
+!     end if
+!  end do
+!
+!  ! amplifying the magnitude for process studies
+!  if(trim(tide_opbnd_type)/='ssh') then
+!     tide_u_amp=tide_u_amp*tide_amplify_coeff
+!     tide_v_amp=tide_v_amp*tide_amplify_coeff
+!  end if
+!  if(trim(tide_opbnd_type)/='vel') then !'ssh' enters here
+!     tide_z_amp=tide_z_amp*tide_amplify_coeff
+!  end if
+!
+!
+!  ! deallocate temporary arrays
+!  deallocate(lat_opbnd_n2d, lon_opbnd_n2d)
+!  deallocate(pha_reg, amp_reg)
+!  if(trim(tide_opbnd_type)/='ssh') deallocate(lat_reg_4v,lon_reg_4v,lat_reg_4u,lon_reg_4u)
+!  if(trim(tide_opbnd_type)/='vel') deallocate(lat_reg_4z,lon_reg_4z) !for 'ssh'
+!
+!  if(mype==0) then 
+!   write(*,*) 'Global Tidal Constituents ', trim(tidal_constituent), ' have been loaded for Iceberg Case'
+!   write(*,*) '*************************************************************'
+!  end if 
+!end subroutine init_global_tides
 
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine update_global_tides  
-  !
-  ! This is an adapted version of the subroutine update_tidal_opbnd;
-  ! Thomas Rackow, 17.12.2010, some clean up still to be done
-  !
-  use o_param
-  use o_arrays
-  use g_config !for istep
-  use o_mesh
-  implicit none
-  integer		:: n
-  real(kind=8)		:: aux
-  !
-  aux=2.0*pi*istep*dt
-  if(trim(tide_opbnd_type)=='Flather') then
-     opbnd_u_tide=0.
-     opbnd_v_tide=0.
-     opbnd_z_tide=0.
-     do n=1, nmbr_tidal_cons
-        opbnd_u_tide=opbnd_u_tide + tide_u_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_u_pha(:,n))
-        opbnd_v_tide=opbnd_v_tide + tide_v_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_v_pha(:,n))
-        opbnd_z_tide=opbnd_z_tide + tide_z_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_z_pha(:,n))
-     end do
-  elseif(trim(tide_opbnd_type)=='ssh') then
-     opbnd_z0_tide=opbnd_z_tide
-     opbnd_z_tide=0.
-     do n=1, nmbr_tidal_cons
-        opbnd_z_tide=opbnd_z_tide + tide_z_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_z_pha(:,n))
-     end do
-  else
-     opbnd_u_tide=0.
-     opbnd_v_tide=0.
-     do n=1, nmbr_tidal_cons
-        opbnd_u_tide=opbnd_u_tide + tide_u_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_u_pha(:,n))
-        opbnd_v_tide=opbnd_v_tide + tide_v_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_v_pha(:,n))
-     end do
-  end if
-  !
-end subroutine update_global_tides
+!subroutine update_global_tides  
+!  !
+!  ! This is an adapted version of the subroutine update_tidal_opbnd;
+!  ! Thomas Rackow, 17.12.2010, some clean up still to be done
+!  !
+!  use o_param
+!  use o_arrays
+!  use g_config !for istep
+!  use o_mesh
+!  implicit none
+!  integer		:: n
+!  real(kind=8)		:: aux
+!  !
+!  aux=2.0*pi*istep*dt
+!  if(trim(tide_opbnd_type)=='Flather') then
+!     opbnd_u_tide=0.
+!     opbnd_v_tide=0.
+!     opbnd_z_tide=0.
+!     do n=1, nmbr_tidal_cons
+!        opbnd_u_tide=opbnd_u_tide + tide_u_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_u_pha(:,n))
+!        opbnd_v_tide=opbnd_v_tide + tide_v_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_v_pha(:,n))
+!        opbnd_z_tide=opbnd_z_tide + tide_z_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_z_pha(:,n))
+!     end do
+!  elseif(trim(tide_opbnd_type)=='ssh') then
+!     opbnd_z0_tide=opbnd_z_tide
+!     opbnd_z_tide=0.
+!     do n=1, nmbr_tidal_cons
+!        opbnd_z_tide=opbnd_z_tide + tide_z_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_z_pha(:,n))
+!     end do
+!  else
+!     opbnd_u_tide=0.
+!     opbnd_v_tide=0.
+!     do n=1, nmbr_tidal_cons
+!        opbnd_u_tide=opbnd_u_tide + tide_u_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_u_pha(:,n))
+!        opbnd_v_tide=opbnd_v_tide + tide_v_amp(:,n)*cos(aux/tide_period_coeff(n)-tide_v_pha(:,n))
+!     end do
+!  end if
+!  !
+!end subroutine update_global_tides

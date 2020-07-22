@@ -767,7 +767,6 @@ subroutine depth_bathy(Zdepth3, elem)
   
   use o_arrays         
   use g_clock
-  use g_forcing_index
   use g_forcing_arrays
   use g_rotate_grid
   
