@@ -38,6 +38,7 @@ module io_MEANDATA
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
+    logical :: is_elem_based = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: callback_level = 0
   contains
@@ -558,19 +559,17 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine write_mean(entry, mesh, entry_index)
+subroutine write_mean(entry, entry_index)
   use mod_mesh
   use g_PARSUP
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
   real(real32),   allocatable   :: aux_r4(:)
-  type(t_mesh), intent(in)     , target :: mesh  
   integer                       :: size1, size2
   integer                       :: lev
   integer, intent(in) :: entry_index
 
-#include  "associate_mesh.h"
 
   ! Serial output implemented so far
   if (mype==root_rank) then
@@ -584,8 +583,11 @@ subroutine write_mean(entry, mesh, entry_index)
   if (entry%accuracy == i_real8) then
      if (mype==root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
-       if (size1==nod2D  .or. size2==nod2D)  call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
-       if (size1==elem2D .or. size2==elem2D) call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+       if(.not. entry%is_elem_based) then
+         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+       else
+         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+       end if
         if (mype==root_rank) then
           entry%callback_level = lev
           call write_netcdf_callback(entry_index)
@@ -596,8 +598,11 @@ subroutine write_mean(entry, mesh, entry_index)
   elseif (entry%accuracy == i_real4) then
      if (mype==root_rank) allocate(aux_r4(size2))
      do lev=1, size1
-       if (size1==nod2D  .or. size2==nod2D)  call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
-       if (size1==elem2D .or. size2==elem2D) call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+       if(.not. entry%is_elem_based) then
+         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+       else
+         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+       end if
         if (mype==root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r4, 1), __LINE__)
@@ -732,12 +737,12 @@ subroutine output(istep, mesh)
 
         if (entry%accuracy == i_real8) then
            entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
-           call write_mean(entry, mesh, n)
+           call write_mean(entry, n)
            entry%local_values_r8 = 0. ! clean_meanarrays
 
         elseif (entry%accuracy == i_real4) then
            entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
-           call write_mean(entry, mesh, n)
+           call write_mean(entry, n)
            entry%local_values_r4 = 0. ! clean_meanarrays
 
         endif  ! accuracy
@@ -818,6 +823,14 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
 
+  if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
+    entry%is_elem_based = .false.
+  else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
+    entry%is_elem_based = .true.
+  else
+    if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
+    stop
+  end if
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -892,6 +905,14 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
 
+  if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
+    entry%is_elem_based = .false.
+  else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
+    entry%is_elem_based = .true.
+  else
+    if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
+    stop
+  end if
 end subroutine
 
 
