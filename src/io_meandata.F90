@@ -870,9 +870,12 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(1, lcsize))
      ! clean_meanarrays
-     entry%local_values_r4 = 0.  
-
-  endif
+     entry%local_values_r4 = 0.
+  else
+     if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
+     call par_ex
+     stop
+  endif ! accuracy
 
   entry%ndim=1
   entry%glsize=(/1, glsize/)
