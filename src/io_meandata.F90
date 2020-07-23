@@ -735,23 +735,35 @@ subroutine output(istep, mesh)
           write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
         end if
 
-        if (entry%accuracy == i_real8) then
-           entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
-           call write_mean(entry, n)
-           entry%local_values_r8 = 0. ! clean_meanarrays
-
-        elseif (entry%accuracy == i_real4) then
-           entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
-           call write_mean(entry, n)
-           entry%local_values_r4 = 0. ! clean_meanarrays
-
-        endif  ! accuracy
-
-        entry%addcounter   = 0  ! clean_meanarrays
+        call do_output_callback(n)
      endif
   end do
   lfirst=.false.
 end subroutine
+
+
+subroutine do_output_callback(entry_index)
+  integer, intent(in) :: entry_index
+  ! EO args
+  type(Meandata), pointer :: entry
+
+  entry=>io_stream(entry_index)
+
+  if (entry%accuracy == i_real8) then
+     entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
+     call write_mean(entry, entry_index)
+     entry%local_values_r8 = 0. ! clean_meanarrays
+
+  elseif (entry%accuracy == i_real4) then
+     entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
+     call write_mean(entry, entry_index)
+     entry%local_values_r4 = 0. ! clean_meanarrays
+
+  endif  ! accuracy
+
+  entry%addcounter   = 0  ! clean_meanarrays
+end subroutine
+
 !
 !--------------------------------------------------------------------------------------------
 !
