@@ -5,6 +5,18 @@ module mpi_topology_module_tests
 
 contains
 
+  @before
+  subroutine setup(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+  end subroutine
+
+  @after
+  subroutine teardown(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    
+    call mpi_topology%reset_state()
+  end subroutine
+
 
   @test(npes=[3])
   subroutine next_host_head_rank_ShouldAlwaysBeZeroForSoleHosts(mpitest)
