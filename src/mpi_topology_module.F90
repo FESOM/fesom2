@@ -23,7 +23,7 @@ module mpi_topology_module
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, reset_host_head_rank, am_i_host_head_rank, set_hostname_strategy, reset_state
+    procedure, nopass :: next_host_head_rank, reset_host_head_rank, set_hostname_strategy, reset_state
   end type
   type(mpi_topology_type) mpi_topology
 
@@ -57,19 +57,6 @@ contains
     procedure(hostname_interface) strategy
     hostname_strategy => strategy
   end subroutine
-
-
-  ! must be called collectively
-  logical function am_i_host_head_rank(communicator) result(result)
-    integer, intent(in) :: communicator
-    integer rank, ierror
-    
-    if(.not. IS_STATE_INITIALIZED) call reset_state()
-    if(communicator .ne. COMM) COMM = learn_topology(communicator)
-    
-    call MPI_COMM_RANK(communicator, rank, ierror)
-    result = mod(rank, STEP)==0
-  end function
 
 
   subroutine reset_host_head_rank()

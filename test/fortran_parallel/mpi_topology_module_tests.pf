@@ -120,35 +120,5 @@ contains
   end subroutine
 
 
-  @test(npes=[6])
-  subroutine test_am_i_host_head_rank(mpitest)
-    class(MpiTestMethod), intent(inout) :: mpitest
-    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
-    logical amihead
-  
-    call mpi_topology%set_hostname_strategy(hostname_mock2)
-
-    amihead = mpi_topology%am_i_host_head_rank(mpitest%getMpiCommunicator())
-  
-    if(mpitest%getProcessRank()==0) then
-      @assertTrue(amihead)
-    else if(mpitest%getProcessRank()==1) then
-      @assertFalse(amihead)
-    else if(mpitest%getProcessRank()==2) then
-      @assertTrue(amihead)
-    else if(mpitest%getProcessRank()==0) then
-      @assertTrue(amihead)
-    end if
-
-  contains
-
-    subroutine hostname_mock2(hostname)
-      implicit none
-      character(len=:), allocatable, intent(out) :: hostname
-      
-      allocate(character(32) :: hostname)
-      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
-     end subroutine
-  end subroutine
 
 end module
