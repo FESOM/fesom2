@@ -23,15 +23,17 @@ module mpi_topology_module
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, reset_host_head_rank, am_i_host_head_rank, set_hostname_strategy
+    procedure, nopass :: next_host_head_rank, reset_host_head_rank, am_i_host_head_rank, set_hostname_strategy, reset_state
   end type
   type(mpi_topology_type) mpi_topology
 
-  integer, save :: MAXRANK = 0
-  integer, save :: STEP = 0
-  integer, save :: count = 0
-  integer, save :: COMM = -1
-  procedure(hostname_interface), pointer, save :: hostname_strategy => hostname_sys
+  logical, save :: IS_STATE_INITIALIZED = .false.
+
+  integer, save :: MAXRANK
+  integer, save :: STEP
+  integer, save :: count
+  integer, save :: COMM
+  procedure(hostname_interface), pointer, save :: hostname_strategy
   abstract interface
     subroutine hostname_interface(hostname)
     character(len=:), allocatable, intent(out) :: hostname
@@ -39,6 +41,17 @@ module mpi_topology_module
   end interface
 
 contains
+
+  subroutine reset_state()
+    MAXRANK = 0
+    STEP = 0
+    count = 0
+    COMM = -1
+    hostname_strategy => hostname_sys
+    
+    IS_STATE_INITIALIZED = .true.
+  end subroutine
+
 
   subroutine set_hostname_strategy(strategy)
     procedure(hostname_interface) strategy
@@ -51,6 +64,7 @@ contains
     integer, intent(in) :: communicator
     integer rank, ierror
     
+    if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
     
     call MPI_COMM_RANK(communicator, rank, ierror)
@@ -66,6 +80,7 @@ contains
   integer recursive function next_host_head_rank(communicator) result(result)
     integer, intent(in) :: communicator
     
+    if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
     
     result = count*STEP
