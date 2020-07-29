@@ -14,7 +14,6 @@ end module
 module mpi_topology_module
 ! synopsis:
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
-! collectively call mpi_topology%reset_host_head_rank if there is need to start over with the first compute node
 
   use hostname_sys_module
   implicit none  
@@ -23,7 +22,7 @@ module mpi_topology_module
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, reset_host_head_rank, set_hostname_strategy, reset_state
+    procedure, nopass :: next_host_head_rank, set_hostname_strategy, reset_state
   end type
   type(mpi_topology_type) mpi_topology
 
@@ -59,11 +58,6 @@ contains
   end subroutine
 
 
-  subroutine reset_host_head_rank()
-    count = 0
-  end
-
-
   integer recursive function next_host_head_rank(communicator) result(result)
     integer, intent(in) :: communicator
     
@@ -72,7 +66,7 @@ contains
     
     result = count*STEP
     if(result > MAXRANK) then
-      call reset_host_head_rank()
+      count = 0
       result = next_host_head_rank(communicator)
     else
       count = count + 1
@@ -90,7 +84,7 @@ contains
     integer ranks_per_host
     integer, intent(in) :: communicator
 
-    call reset_host_head_rank()
+    count = 0
     result = communicator
   
     call MPI_COMM_RANK(communicator, rank, ierror)
