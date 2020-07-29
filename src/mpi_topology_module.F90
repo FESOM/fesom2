@@ -14,6 +14,8 @@ end module
 module mpi_topology_module
 ! synopsis:
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
+! after all hosts have been used up, we will start over at the first host and increment the rank by 1
+! after all ranks have been used up, we will start over at the first host with rank 0
 
   use hostname_sys_module
   implicit none  
@@ -31,6 +33,7 @@ module mpi_topology_module
   integer, save :: MAXRANK
   integer, save :: STEP
   integer, save :: count
+  integer, save :: lap
   integer, save :: COMM
   procedure(hostname_interface), pointer, save :: hostname_strategy
   abstract interface
@@ -45,6 +48,7 @@ contains
     MAXRANK = 0
     STEP = 0
     count = 0
+    lap = 1
     COMM = -1
     hostname_strategy => hostname_sys
     
@@ -64,9 +68,11 @@ contains
     if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
     
-    result = count*STEP
-    if(result > MAXRANK) then
+    result = count*STEP + lap-1
+    if(result > MAXRANK) then ! start a new lap
       count = 0
+      lap = lap + 1
+      if(lap > STEP) lap = 1 ! start over with the first rank on a host
       result = next_host_head_rank(communicator)
     else
       count = count + 1

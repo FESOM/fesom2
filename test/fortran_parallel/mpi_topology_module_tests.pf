@@ -19,16 +19,13 @@ contains
 
 
   @test(npes=[3])
-  subroutine next_host_head_rank_ShouldAlwaysBeZeroForSoleHosts(mpitest)
+  subroutine next_host_head_rank_ShouldAlwaysBeZeroForFirstCall(mpitest)
     class(MpiTestMethod), intent(inout) :: mpitest
     integer next
-    integer i
-  
-    do i = 1, mpitest%getNumProcesses()
-      next = mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator())
-      @assertEqual(0, next)
-    end do
- end subroutine
+    
+    next = mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator())
+    @assertEqual(0, next)
+  end subroutine
 
 
   @test(npes=[3])
@@ -64,7 +61,7 @@ contains
     @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
     @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
     @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
 
   contains
 
@@ -79,20 +76,18 @@ contains
 
 
   @test(npes=[6])
-  subroutine testHeadRanksIdenticalForThreeRounds(mpitest)
+  subroutine testFirstHeadRankIsIncrementedForTwoRounds(mpitest)
     class(MpiTestMethod), intent(inout) :: mpitest
     character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+
     call mpi_topology%set_hostname_strategy(hostname_mock2)
 
     @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
     @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
     @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
-    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(3, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(5, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
 
   contains
 
@@ -106,5 +101,31 @@ contains
   end subroutine
 
 
+  @test(npes=[6])
+  subroutine next_host_head_rank_ShouldBeZeroAfterLastRank(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(6) :: hostnames = ["a","a","b","b","c","c"]
+    integer i, r
+    call mpi_topology%set_hostname_strategy(hostname_mock2)
+
+    ! exhaust the available ranks
+    do i=1, mpitest%getNumProcesses()
+      r = mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator())
+    end do
+    
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+    @assertEqual(4, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))  
+
+  contains
+
+    subroutine hostname_mock2(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
+      
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
 
 end module
