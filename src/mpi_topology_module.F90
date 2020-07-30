@@ -16,6 +16,7 @@ module mpi_topology_module
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
 ! after all hosts have been used up, we will start over at the first host and increment the rank by 1
 ! after all ranks have been used up, we will start over at the first host with rank 0
+! optional second argument will return the number of times a rank for this host has been returned
 
   use hostname_sys_module
   implicit none  
@@ -34,6 +35,7 @@ module mpi_topology_module
   integer, save :: STEP
   integer, save :: count
   integer, save :: lap
+  integer, save :: total_laps
   integer, save :: COMM
   procedure(hostname_interface), pointer, save :: hostname_strategy
   abstract interface
@@ -49,6 +51,7 @@ contains
     STEP = 0
     count = 0
     lap = 1
+    total_laps = lap
     COMM = -1
     hostname_strategy => hostname_sys
     
@@ -62,9 +65,9 @@ contains
   end subroutine
 
 
-  integer recursive function next_host_head_rank(communicator, current_lap) result(result)
+  integer recursive function next_host_head_rank(communicator, host_use_count) result(result)
     integer, intent(in) :: communicator
-    integer, optional, intent(out) :: current_lap
+    integer, optional, intent(out) :: host_use_count
     
     if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
@@ -72,6 +75,7 @@ contains
     result = count*STEP + lap-1
     if(result > MAXRANK) then ! start a new lap
       count = 0
+      total_laps = total_laps + 1
       lap = lap + 1
       if(lap > STEP) lap = 1 ! start over with the first rank on a host
       result = next_host_head_rank(communicator)
@@ -79,8 +83,8 @@ contains
       count = count + 1
     end if
     
-    if(present(current_lap)) then
-      current_lap = lap
+    if(present(host_use_count)) then
+      host_use_count = total_laps
     end if
   end function
 
