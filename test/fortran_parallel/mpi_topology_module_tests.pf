@@ -154,7 +154,7 @@ contains
 
 
   @test(npes=[4])
-  subroutine next_host_head_rank_UsecountShouldBe2ForSecondLap(mpitest)
+  subroutine next_host_head_rank_UsecountShouldBe1ForSecondLap(mpitest)
     class(MpiTestMethod), intent(inout) :: mpitest
     character(1), dimension(4) :: hostnames = ["a","a","b","b"]
     integer i, r, usecount
@@ -164,9 +164,9 @@ contains
     @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))
 
     @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), usecount))
-    @assertEqual(2, usecount)
+    @assertEqual(1, usecount)
     @assertEqual(3, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), usecount))
-    @assertEqual(2, usecount)
+    @assertEqual(1, usecount)
 
   contains
 
@@ -193,9 +193,9 @@ contains
     end do
     
     @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), usecount))
-    @assertEqual(4, usecount)
+    @assertEqual(2, usecount)
     @assertEqual(3, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), usecount))
-    @assertEqual(4, usecount)
+    @assertEqual(2, usecount)
 
   contains
 
