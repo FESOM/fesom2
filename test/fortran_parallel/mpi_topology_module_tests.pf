@@ -128,4 +128,55 @@ contains
      end subroutine
   end subroutine
 
+
+  @test(npes=[4])
+  subroutine next_host_head_rank_LapShouldBe1ForFirstLap(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(4) :: hostnames = ["a","a","b","b"]
+    integer i, r, lap
+    call mpi_topology%set_hostname_strategy(hostname_mock)
+
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), lap))
+    @assertEqual(1, lap)
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), lap))
+    @assertEqual(1, lap)
+
+  contains
+
+    subroutine hostname_mock(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
+      
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
+
+
+  @test(npes=[4])
+  subroutine next_host_head_rank_LapShouldBe2ForSecondLap(mpitest)
+    class(MpiTestMethod), intent(inout) :: mpitest
+    character(1), dimension(4) :: hostnames = ["a","a","b","b"]
+    integer i, r, lap
+    call mpi_topology%set_hostname_strategy(hostname_mock)
+
+    @assertEqual(0, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))
+    @assertEqual(2, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator()))
+
+    @assertEqual(1, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), lap))
+    @assertEqual(2, lap)
+    @assertEqual(3, mpi_topology%next_host_head_rank(mpitest%getMpiCommunicator(), lap))
+    @assertEqual(2, lap)
+
+  contains
+
+    subroutine hostname_mock(hostname)
+      implicit none
+      character(len=:), allocatable, intent(out) :: hostname
+      
+      allocate(character(32) :: hostname)
+      write(hostname, '(aa)') 'mockhost_', hostnames(mpitest%getProcessRank()+1)
+     end subroutine
+  end subroutine
+
 end module

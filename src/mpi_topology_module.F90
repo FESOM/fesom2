@@ -62,8 +62,9 @@ contains
   end subroutine
 
 
-  integer recursive function next_host_head_rank(communicator) result(result)
+  integer recursive function next_host_head_rank(communicator, current_lap) result(result)
     integer, intent(in) :: communicator
+    integer, optional, intent(out) :: current_lap
     
     if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
@@ -76,6 +77,10 @@ contains
       result = next_host_head_rank(communicator)
     else
       count = count + 1
+    end if
+    
+    if(present(current_lap)) then
+      current_lap = lap
     end if
   end function
 
