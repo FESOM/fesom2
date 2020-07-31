@@ -55,6 +55,10 @@ contains
     this%run_ptr => thread_callback_procedure
     this%run_arg = procedure_argument
     
+#ifdef DISABLE_MULTITHREADING
+    call this%disable_async()
+#endif    
+
     if(this%with_real_threads) call init_ccall(this%idx)
   end subroutine
 

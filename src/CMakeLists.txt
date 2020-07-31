@@ -3,6 +3,8 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
+option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB sources_Fortran ${src_home}/*.F90)
@@ -32,6 +34,9 @@ target_link_libraries(${PROJECT_NAME}_C parms) #metis
 # create our binary (set its name to name of this project)
 add_executable(${PROJECT_NAME} ${sources_Fortran})
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+if(${DISABLE_MULTITHREADING})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+endif()
 if(${FESOM_COUPLED})
    if(${CRAY})
       include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS_cray.cmake)
