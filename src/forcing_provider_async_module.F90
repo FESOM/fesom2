@@ -32,9 +32,10 @@ module forcing_provider_async_module
   contains
 
 
-  subroutine get_forcingdata(varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
+  subroutine get_forcingdata(varcount, varindex, async_netcdf_allowed, filepath, fileyear, varname, time_index, forcingdata)
     integer, intent(in) :: varcount
     integer, intent(in) :: varindex ! todo: remove this arg and just use a hashmap for varname
+    logical async_netcdf_allowed
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear
     character(len=*), intent(in) :: varname
@@ -60,6 +61,7 @@ module forcing_provider_async_module
       all_readers(varindex)%thread_filepath = filepath
       all_readers(varindex)%thread_timeindex = -1
       call all_readers(varindex)%thread%initialize(thread_callback, varindex)
+      if(.not. async_netcdf_allowed) call all_readers(varindex)%thread%disable_async()
       
     else if(fileyear /= all_readers(varindex)%fileyear) then
       ! stop the thread, close our reader and create a new one

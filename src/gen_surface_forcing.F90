@@ -162,6 +162,7 @@ MODULE g_sbf
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
       integer read_forcing_rootrank
+      logical async_netcdf_allowed
       real(4), allocatable, dimension(:,:)     :: sbcdata_a
       integer sbcdata_a_t_index
       real(4), allocatable, dimension(:,:)     :: sbcdata_b
@@ -596,7 +597,7 @@ CONTAINS
 
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
       use forcing_provider_async_module
-      use mpi_topology_module
+      use io_netcdf_workaround_module
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -657,7 +658,7 @@ CONTAINS
         sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
         allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
         sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
-        sbc_flfi(fld_idx)%read_forcing_rootrank = mpi_topology%next_host_head_rank(MPI_COMM_FESOM)
+        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed)
       end if
       rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
 
@@ -738,7 +739,7 @@ CONTAINS
          nf_start(3)=t_indx
          nf_edges(3)=1
          if(.not. sbcdata1_from_cache) then
-           call forcing_provider%get_forcingdata(i_totfl, fld_idx, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+           call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
          end if
          iost = 0
       end if
@@ -759,7 +760,7 @@ CONTAINS
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
         if(.not. sbcdata2_from_cache) then
-        call forcing_provider%get_forcingdata(i_totfl, fld_idx, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
+        call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
       end if
       iost = 0
       end if
