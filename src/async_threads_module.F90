@@ -16,10 +16,12 @@ module async_threads_module
     integer :: idx = 0
     procedure(callback_interface), nopass, pointer :: run_ptr => null()
     integer :: run_arg = 0
+    logical :: with_real_threads = .true.
   contains
     procedure initialize
     procedure run
     procedure join
+    procedure disable_async
   end type
 
 
@@ -53,21 +55,32 @@ contains
     this%run_ptr => thread_callback_procedure
     this%run_arg = procedure_argument
     
-    call init_ccall(this%idx)
+    if(this%with_real_threads) call init_ccall(this%idx)
   end subroutine
 
 
   subroutine run(this)
     class(thread_type) this
     ! EO args
-    call begin_ccall(this%idx)
+    if(this%with_real_threads) then
+      call begin_ccall(this%idx)
+    else
+      call async_threads_execute_fcall(this%idx)
+    end if
   end subroutine
 
 
   subroutine join(this)
     class(thread_type) this
     ! EO args
-    call end_ccall(this%idx)
+    if(this%with_real_threads) call end_ccall(this%idx)
+  end subroutine
+  
+  
+  subroutine disable_async(this)
+    class(thread_type) this
+    ! EO args
+    this%with_real_threads = .false.  
   end subroutine
 
 
