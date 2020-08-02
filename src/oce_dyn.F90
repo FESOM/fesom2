@@ -508,8 +508,8 @@ SUBROUTINE visc_filt_bcksct(mesh)
         DO  nz=1,minval(nlevels(el))-1
             u1=UV(1,nz,el(1))-UV(1,nz,el(2))
             v1=UV(2,nz,el(1))-UV(2,nz,el(2))
-!           vi=dt*max(gamma0, max(gamma1*sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len
-            vi=dt*max(gamma0, gamma1*max(sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len 
+            vi=dt*max(gamma0, max(gamma1*sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len
+!            vi=dt*max(gamma0, gamma1*max(sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len 
             !here gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
             u1=u1*vi
             v1=v1*vi
@@ -596,8 +596,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      ! vi has the sense of harmonic viscosity coef. because of 
      ! division by area in the end 
      u1=U_c(nz,ed)**2+V_c(nz,ed)**2
-!    vi=max(gamma0, max(gamma1*sqrt(u1), gamma2*u1))*len*dt
-     vi=max(gamma0, gamma1*max(sqrt(u1), gamma2*u1))*len*dt
+     vi=max(gamma0, max(gamma1*sqrt(u1), gamma2*u1))*len*dt
+!     vi=max(gamma0, gamma1*max(sqrt(u1), gamma2*u1))*len*dt
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
@@ -652,8 +652,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
      vi=u1*u1+v1*v1
-!    vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
-     vi=sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+     vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+!     vi=sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
      u1=u1*vi
      v1=v1*vi
      U_c(nz,el(1))=U_c(nz,el(1))-u1
@@ -673,8 +673,8 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
      vi=u1*u1+v1*v1
-!    vi=-dt*sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
-     vi=-dt*sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+     vi=-dt*sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+!     vi=-dt*sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
      u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
      v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
      UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
