@@ -771,7 +771,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   use mod_mesh
   use g_PARSUP
   implicit none
-  integer                              :: glsize(2), lcsize(2)
+  integer,               intent(in)    :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(inout) :: data(:,:)
   integer,               intent(in)    :: freq
