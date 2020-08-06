@@ -752,12 +752,12 @@ subroutine do_output_callback(entry_index)
   if (entry%accuracy == i_real8) then
      entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
      call write_mean(entry, entry_index)
-     entry%local_values_r8 = 0. ! clean_meanarrays
+     entry%local_values_r8 = 0._real64 ! clean_meanarrays
 
   elseif (entry%accuracy == i_real4) then
      entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
      call write_mean(entry, entry_index)
-     entry%local_values_r4 = 0. ! clean_meanarrays
+     entry%local_values_r4 = 0._real32 ! clean_meanarrays
 
   endif  ! accuracy
 
@@ -812,11 +812,11 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
      allocate(entry%local_values_r8(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r8(1, lcsize))
-     entry%local_values_r8 = 0. 
+     entry%local_values_r8 = 0._real64
   elseif (accuracy == i_real4) then
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r4(1, lcsize))
-     entry%local_values_r4 = 0.
+     entry%local_values_r4 = 0._real32
   else
      if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
      call par_ex
@@ -895,11 +895,11 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
      allocate(entry%local_values_r8(1, lcsize))
-     entry%local_values_r8 = 0. 
+     entry%local_values_r8 = 0._real64 
   elseif (accuracy == i_real4) then
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(1, lcsize))
-     entry%local_values_r4 = 0.
+     entry%local_values_r4 = 0._real32
   else
      if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
      call par_ex
