@@ -825,37 +825,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)     !2D! entry%dimname(2)='unknown'
 
   ! non dimension specific
-  entry%accuracy = accuracy
-
-  if (accuracy == i_real8) then
-    allocate(data_strategy_nf_double_type :: entry%data_strategy)
-  elseif (accuracy == i_real4) then
-    allocate(data_strategy_nf_float_type :: entry%data_strategy)
-  else
-     if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
-     call par_ex
-     stop
-  endif ! accuracy
-
-  entry%name = name
-  entry%description = description
-  entry%units = units
-  entry%filename = ""
-
-  entry%freq=freq
-  entry%freq_unit=freq_unit
-  entry%addcounter   = 0
-  entry%is_in_use=.true.
-  io_NSTREAMS=io_NSTREAMS+1
-
-  if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
-    entry%is_elem_based = .false.
-  else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
-    entry%is_elem_based = .true.
-  else
-    if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
-    stop
-  end if
+  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -918,38 +888,53 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry%dimname(2)='unknown'
 
   ! non dimension specific
-  entry%accuracy = accuracy
-  
-  if (accuracy == i_real8) then
-    allocate(data_strategy_nf_double_type :: entry%data_strategy)
-  elseif (accuracy == i_real4) then
-    allocate(data_strategy_nf_float_type :: entry%data_strategy)
-  else
-     if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
-     call par_ex
-     stop
-  endif ! accuracy
-
-  entry%name = name
-  entry%description = description
-  entry%units = units
-  entry%filename = ""
-
-  entry%freq=freq
-  entry%freq_unit=freq_unit
-  entry%addcounter   = 0
-  entry%is_in_use=.true.
-  io_NSTREAMS=io_NSTREAMS+1
-
-  if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
-    entry%is_elem_based = .false.
-  else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
-    entry%is_elem_based = .true.
-  else
-    if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
-    stop
-  end if
+  call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
 end subroutine
+
+
+  subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
+    use mod_mesh
+    use g_PARSUP
+    type(Meandata), intent(inout) :: entry
+    character(len=*),      intent(in)    :: name, description, units
+    integer,               intent(in)    :: freq
+    character,             intent(in)    :: freq_unit
+    integer,               intent(in)    :: accuracy
+    type(t_mesh), intent(in), target     :: mesh
+    ! EO args
+    
+    entry%accuracy = accuracy
+
+    if (accuracy == i_real8) then
+      allocate(data_strategy_nf_double_type :: entry%data_strategy)
+    elseif (accuracy == i_real4) then
+      allocate(data_strategy_nf_float_type :: entry%data_strategy)
+    else
+       if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
+       call par_ex
+       stop
+    endif ! accuracy
+
+    entry%name = name
+    entry%description = description
+    entry%units = units
+    entry%filename = ""
+
+    entry%freq=freq
+    entry%freq_unit=freq_unit
+    entry%addcounter   = 0
+    entry%is_in_use=.true.
+    io_NSTREAMS=io_NSTREAMS+1
+
+    if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
+      entry%is_elem_based = .false.
+    else if(entry%glsize(1)==mesh%elem2D .or. entry%glsize(2)==mesh%elem2D) then
+      entry%is_elem_based = .true.
+    else
+      if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
+      stop
+    end if
+  end subroutine
 
 
   subroutine assert_nf(status, line)
