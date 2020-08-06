@@ -792,6 +792,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   if (mype==0) then
      write(*,*) 'adding I/O stream for ', trim(name)
   end if
+
    ! add this instance to io_stream array
   if ( .not. allocated(io_stream)) then
     allocate(io_stream(1))
@@ -802,16 +803,16 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     call move_alloc(tmparr, io_stream)
   end if
   entry=>io_stream(size(io_stream))
-  entry%ptr3 => data
+  entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
   entry%accuracy = accuracy
 
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
-     allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+     allocate(entry%local_values_r8(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r8(1, lcsize))
      entry%local_values_r8 = 0. 
   elseif (accuracy == i_real4) then
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
-     allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
+     allocate(entry%local_values_r4(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r4(1, lcsize))
      entry%local_values_r4 = 0.
   else
      if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
@@ -819,18 +820,17 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      stop
   endif ! accuracy
 
-  entry%ndim=2
-  entry%glsize=glsize
+  entry%ndim=2                            !2D! entry%ndim=1
+  entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
   entry%name = name
   entry%description = description
   entry%units = units
   entry%filename = ""
 
-  entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)
-  entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)
+  entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
+  entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)     !2D! entry%dimname(2)='unknown'
   entry%freq=freq
   entry%freq_unit=freq_unit
-  ! clean_meanarrays
   entry%addcounter   = 0
   entry%is_in_use=.true.
   io_NSTREAMS=io_NSTREAMS+1
@@ -885,16 +885,14 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   entry=>io_stream(size(io_stream))
   entry%ptr3(1:1,1:size(data)) => data
   entry%accuracy = accuracy
+  
   if (accuracy == i_real8) then
     allocate(data_strategy_nf_double_type :: entry%data_strategy)
      allocate(entry%local_values_r8(1, lcsize))
-     ! clean_meanarrays
      entry%local_values_r8 = 0. 
-
   elseif (accuracy == i_real4) then
     allocate(data_strategy_nf_float_type :: entry%data_strategy)
      allocate(entry%local_values_r4(1, lcsize))
-     ! clean_meanarrays
      entry%local_values_r4 = 0.
   else
      if (mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
