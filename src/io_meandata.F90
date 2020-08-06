@@ -784,7 +784,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   if ((ubound(data, dim = 1)<=0) .or. (ubound(data, dim = 2)<=0)) then
      if (mype==0) then
         write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
-        write(*,*) 'bounda are: [', UBOUND(data, DIM = 1), ' , ', UBOUND(data, DIM = 2),']'
+        write(*,*) 'bounds are: [', UBOUND(data, DIM = 1), ' , ', UBOUND(data, DIM = 2),']'
      end if
      return
   end if
