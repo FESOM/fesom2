@@ -1,6 +1,6 @@
 module io_gather_module
   implicit none
-  public gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
+  public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
 
   logical, save :: nod2D_lists_initialized = .false.
@@ -12,6 +12,13 @@ module io_gather_module
   integer, save, allocatable, dimension(:) :: rank0List_elem2D
   
 contains
+
+
+  subroutine init_io_gather()
+  
+    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+  end subroutine
 
 
   subroutine init_nod2D_lists()
@@ -74,6 +81,7 @@ contains
   end subroutine
   
 
+  ! thread-safe procedure
   subroutine gather_nod2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
@@ -90,12 +98,13 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
   end subroutine
 
 
+  ! thread-safe procedure
   subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
@@ -112,12 +121,13 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
 
-    if(.not. nod2D_lists_initialized) call init_nod2D_lists()
+    if(.not. nod2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_nod.inc"  
   end subroutine
 
 
+  ! thread-safe procedure
   subroutine gather_elem2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
@@ -134,12 +144,13 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
   end subroutine
 
 
+  ! thread-safe procedure
   subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
@@ -156,7 +167,7 @@ contains
     integer :: request_index
     integer :: mpi_precision = MPI_REAL
 
-    if(.not. elem2D_lists_initialized) call init_elem2D_lists()
+    if(.not. elem2D_lists_initialized) stop "io_gather_module has not been initialized"
 
     include "io_gather_elem.inc"
   end subroutine

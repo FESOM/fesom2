@@ -664,6 +664,7 @@ subroutine output(istep, mesh)
   use g_clock
   use mod_mesh
   use g_PARSUP
+  use io_gather_module
   implicit none
 
   integer       :: istep
@@ -676,7 +677,10 @@ subroutine output(istep, mesh)
   real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
-  if (lfirst) call ini_mean_io(mesh)
+  if (lfirst) then
+    call ini_mean_io(mesh)
+    call init_io_gather()
+  end if
 
   call update_means
 
