@@ -10,11 +10,18 @@ module io_gather_module
   logical, save :: elem2D_lists_initialized = .false.
   integer, save :: rank0Dim_elem2D
   integer, save, allocatable, dimension(:) :: rank0List_elem2D
+  integer, save :: io_comm
   
 contains
 
 
-  subroutine init_io_gather()
+  subroutine init_io_gather(communicator)
+    use g_PARSUP
+    integer communicator
+    ! EO args
+    integer err
+
+    call MPI_Comm_dup(communicator, io_comm, err)
   
     if(.not. nod2D_lists_initialized) call init_nod2D_lists()
     if(.not. elem2D_lists_initialized) call init_elem2D_lists()
@@ -82,13 +89,14 @@ contains
   
 
   ! thread-safe procedure
-  subroutine gather_nod2D(arr2D, arr2D_global, root_rank)
+  subroutine gather_nod2D(arr2D, arr2D_global, root_rank, tag)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     real(real64), intent(in)  :: arr2D(:)
     real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
+    integer, intent(in) :: tag
     ! EO args
     integer  ::  remote_rank = -1
     integer :: remote_node_count = -1
@@ -105,13 +113,14 @@ contains
 
 
   ! thread-safe procedure
-  subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank)
+  subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank, tag)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     real(real32), intent(in)  :: arr2D(:)
     real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
+    integer, intent(in) :: tag
     ! EO args
     integer  ::  remote_rank = -1
     integer :: remote_node_count = -1
@@ -128,13 +137,14 @@ contains
 
 
   ! thread-safe procedure
-  subroutine gather_elem2D(arr2D, arr2D_global, root_rank)
+  subroutine gather_elem2D(arr2D, arr2D_global, root_rank, tag)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     real(real64), intent(in)  :: arr2D(:)
     real(real64), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
+    integer, intent(in) :: tag
     ! EO args
     integer  ::  remote_rank = -1
     integer :: remote_elem_count = -1
@@ -151,13 +161,14 @@ contains
 
 
   ! thread-safe procedure
-  subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank)
+  subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank, tag)
     use g_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     real(real32), intent(in)  :: arr2D(:)
     real(real32), intent(out) :: arr2D_global(:)
     integer, intent(in) :: root_rank ! rank of receiving process
+    integer, intent(in) :: tag
     ! EO args
     integer  ::  remote_rank = -1
     integer :: remote_elem_count = -1

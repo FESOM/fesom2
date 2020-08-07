@@ -10,9 +10,9 @@
         endif
 
         if(remote_rank == 0) then
-          call mpi_irecv(recvbuf(remPtr_elem2D(npes)), remote_elem_count, mpi_precision, remote_rank, 2, MPI_COMM_FESOM, req(request_index), MPIerr)
+          call mpi_irecv(recvbuf(remPtr_elem2D(npes)), remote_elem_count, mpi_precision, remote_rank, tag, io_comm, req(request_index), MPIerr)
         else
-          call mpi_irecv(recvbuf(remPtr_elem2D(remote_rank)), remote_elem_count, mpi_precision, remote_rank, 2, MPI_COMM_FESOM, req(request_index), MPIerr)
+          call mpi_irecv(recvbuf(remPtr_elem2D(remote_rank)), remote_elem_count, mpi_precision, remote_rank, tag, io_comm, req(request_index), MPIerr)
         endif
         request_index = request_index + 1
       end do
@@ -31,5 +31,5 @@
     else
       allocate(sendbuf(myDim_elem2D))
       sendbuf(1:myDim_elem2D) = arr2D(1:myDim_elem2D)
-      call mpi_send(sendbuf, myDim_elem2D, mpi_precision, root_rank, 2, MPI_COMM_FESOM, MPIerr)
+      call mpi_send(sendbuf, myDim_elem2D, mpi_precision, root_rank, tag, io_comm, MPIerr)
     end if

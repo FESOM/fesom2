@@ -584,9 +584,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2)
        else
-         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank)
+         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2)
        end if
         if (mype==root_rank) then
           entry%callback_level = lev
@@ -599,9 +599,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==root_rank) allocate(aux_r4(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2)
        else
-         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank)
+         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2)
        end if
         if (mype==root_rank) then
            if (entry%ndim==1) then
@@ -679,7 +679,7 @@ subroutine output(istep, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
     call ini_mean_io(mesh)
-    call init_io_gather()
+    call init_io_gather(MPI_COMM_FESOM)
   end if
 
   call update_means
