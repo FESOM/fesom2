@@ -40,6 +40,7 @@ module io_MEANDATA
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
     class(data_strategy_type), allocatable :: data_strategy
+    integer :: comm
     integer :: callback_level = 0
   contains
     final destructor
@@ -584,9 +585,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2)
+         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2, entry%comm)
        else
-         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2)
+         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2, entry%comm)
        end if
         if (mype==root_rank) then
           entry%callback_level = lev
@@ -599,9 +600,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==root_rank) allocate(aux_r4(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2)
+         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2)
+         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2, entry%comm)
        end if
         if (mype==root_rank) then
            if (entry%ndim==1) then
@@ -679,7 +680,7 @@ subroutine output(istep, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
     call ini_mean_io(mesh)
-    call init_io_gather(MPI_COMM_FESOM)
+    call init_io_gather()
   end if
 
   call update_means
@@ -906,6 +907,7 @@ end subroutine
     integer,               intent(in)    :: accuracy
     type(t_mesh), intent(in), target     :: mesh
     ! EO args
+    integer err
     
     entry%accuracy = accuracy
 
@@ -938,6 +940,8 @@ end subroutine
       if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop
     end if
+
+    call MPI_Comm_dup(MPI_COMM_FESOM, entry%comm, err)
   end subroutine
 
 
