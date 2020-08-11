@@ -18,7 +18,8 @@ module g_config
   integer                :: step_per_day=72     ! number of steps per day
   integer                :: run_length=1	! run length
   character              :: run_length_unit='y' ! unit: y, d, s
-  namelist /timestep/ step_per_day, run_length, run_length_unit
+  integer                :: ib_num=0
+  namelist /timestep/ step_per_day, run_length, run_length_unit, ib_num
   
   ! *** Paths for all in and out ***
   character(100)         :: MeshPath='./mesh/'
@@ -97,10 +98,11 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
+  logical                       :: use_icebergs=.false.  
   logical 						:: use_floatice = .false.
   logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean
+  namelist /run_config/ use_ice,use_icebergs,use_floatice, use_sw_pene, toy_ocean
   
   ! *** others ***
   real(kind=WP)            	:: dt

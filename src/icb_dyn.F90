@@ -891,6 +891,7 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
     lev_low = zbar_3d_n(k, n2)
     dz = abs( lev_low - lev_up )
 	
+    write(*,*) 'LA DEBUG: lev_up: ',lev_up,', lev_low: ',lev_low,', dz: ',dz
     if(dz < 1) then
       write(*,*) 'dz 0!', dz
       !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)

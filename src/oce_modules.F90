@@ -131,6 +131,12 @@ real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
 integer                                    ::   edge2D     ! the number of 2D edges
 integer                                    ::   edge2D_in  
                                               ! the number of internal 2D edges
+type addresstype
+    integer                                 :: nmb
+    integer(KIND=8), dimension(:), pointer  :: addresses
+end type addresstype
+
+type(addresstype), allocatable, dimension(:)         ::   nghbr_nod2D !LA for iceberg coupling
 integer                                    ::   elem2D     ! the number of 2D elements
 integer, allocatable, dimension(:,:)       ::   elem2D_nodes
                                               ! elem2D_nodes(:,n) lists

@@ -1,4 +1,4 @@
-subroutine iceberg_calculation  
+subroutine iceberg_calculation(istep) 
  !======================================================================!
  !									!
  !                     ICEBERG MODULE FOR FESOM				!
@@ -16,7 +16,7 @@ subroutine iceberg_calculation
  									!=
  implicit none								!=
 									!=
- integer	:: ib, times						!=	
+ integer	:: ib, times, istep	
  real(kind=8) 	:: t0, t1, t2, t3, t4					!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
@@ -31,13 +31,14 @@ subroutine iceberg_calculation
  !==================== MODULES & DECLARATIONS ==========================!= 
 
  if(firstcall) then
+  write(*,*) 'ib_num: ', ib_num
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
   call iceberg_restart
   firstcall = .false.
   !call init_global_tides
   !call tides_distr
  end if  
- 
+
  t0=MPI_Wtime()
  
  !call update_global_tides !for each timestep istep once
@@ -68,12 +69,13 @@ subroutine iceberg_calculation
     !if(times == steps_per_FESOM_step) lastsubstep = .true. !do output at last substep
     lastsubstep = .true. !do output every timestep
 
+    if (mype==0) write(*,*) 'LA DEBUG istep: ', istep
     call iceberg_step1(	ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
 			Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 			conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 			u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
 			steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
-			semiimplicit_coeff, AB_coeff)			
+			semiimplicit_coeff, AB_coeff, istep)			
     !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
     !end do
    
@@ -148,7 +150,7 @@ subroutine iceberg_calculation
 			conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 			u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
 			steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
-			semiimplicit_coeff, AB_coeff)	
+			semiimplicit_coeff, AB_coeff, istep)	
     !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
     !end do
   end if
@@ -202,7 +204,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
 			lastsubstep, steps_per_FESOM_step, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
-			AB_coeff)
+			AB_coeff, istep)
 			
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
@@ -221,7 +223,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  implicit none											!=
  
  
- integer, intent(in)	:: ib
+ integer, intent(in)	:: ib, istep
  real,    intent(inout)	:: height_ib,length_ib,width_ib
  real,    intent(inout)	:: lon_deg,lat_deg
  real, 	  intent(in)	:: Co,Ca,Ci, Cdo_skin,Cda_skin
@@ -343,8 +345,10 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
   find_iceberg_elem = .false.
   
   !for AB method
-  f_u_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*u_ib
-  f_v_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*v_ib
+  !f_u_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*u_ib
+  !f_v_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*v_ib
+  f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
+  f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
  end if
  
  file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
@@ -471,7 +475,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
 			lastsubstep, steps_per_FESOM_step, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
-			AB_coeff)
+			AB_coeff, istep)
 			
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
@@ -515,7 +519,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  real				:: lon_deg_out, lat_deg_out  !for unrotated output
  real				:: u_ib_out, v_ib_out  	     !for unrotated output
  real				:: dudt_out, dvdt_out  	     !for unrotated output
- integer   			:: i, iceberg_node  
+ integer   			:: i, iceberg_node, istep 
  real 				:: dudt, dvdt
  
  !iceberg output 
@@ -784,12 +788,15 @@ subroutine depth_bathy(Zdepth3, elem)
    !for each 2D node of the iceberg element..
    n2=elem2D_nodes(m,elem)
 
-   k=num_layers_below_nod2d(n2)+1
-   n_low= nod3d_below_nod2d(k,   n2)	!deepest node below n2
+   !k=num_layers_below_nod2d(n2)+1
+   !n_low= nod3d_below_nod2d(k,   n2)	!deepest node below n2
+   k=nlevels_nod2D(n2)
 
    !..compute depth below this node: 
-   Zdepth3(m) = abs(coord_nod3D(3, n_low))
-  end do
+   !Zdepth3(m) = abs(coord_nod3D(3, n_low))
+   Zdepth3(m) = zbar(k)
+   write(*,*) 'Zdepth3(m) = ', Zdepth3(m)
+ end do
   
 end subroutine depth_bathy
 
@@ -817,7 +824,7 @@ subroutine parallel2coast(u, v, lon,lat, elem)
 #ifdef use_cavity
   SELECT CASE ( coastal_nodes(elem) ) !num of "coastal" points
 #else
-  SELECT CASE ( sum( index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
+  SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
 #endif
    CASE (0) !...coastal points: do nothing
     return
@@ -830,9 +837,9 @@ subroutine parallel2coast(u, v, lon,lat, elem)
       node = elem2D_nodes(m,elem)
       !write(*,*) 'index ', m, ':', index_nod2D(node)
 #ifdef use_cavity
-      if( index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
+      if( bc_index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
 #else
-      if( index_nod2D(node)==1 ) then
+      if( bc_index_nod2D(node)==1 ) then
 #endif
        n(i) = node
        exit
@@ -840,21 +847,23 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     end do 
     
    !write(*,*) 'one coastal node ', n(1)
-   
-   i = 2 
-   if ( n(1) <= myDim_nod2D ) then	!all neighbours known
-    do m = 1, nghbr_nod2D(n(1))%nmb
-      node = nghbr_nod2D(n(1))%addresses(m) 
-#ifdef use_cavity
-      if ( (node /= n(1)) .and. ( (index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1) ) ) then   
-#else
-      if ( (node /= n(1)) .and. (index_nod2D(node)==1)) then
-#endif
-       n(i) = node
-       i = i+1
-       if(i==4) exit
-      end if
-    end do
+  
+  !LA comment for testing
+   !i = 2 
+   !if ( n(1) <= myDim_nod2D ) then	!all neighbours known
+
+   ! do m = 1, nghbr_nod2D(n(1))%nmb
+   !   node = nghbr_nod2D(n(1))%addresses(m) 
+!#ifdef use_cavity
+   !   if ( (node /= n(1)) .and. ( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1) ) ) then   
+!#else
+   !   if ( (node /= n(1)) .and. (bc_index_nod2D(node)==1)) then
+!#endif
+   !    n(i) = node
+   !    i = i+1
+   !    if(i==4) exit
+   !   end if
+   ! end do
     
     !write(*,*) 'nodes n(i) ', n
     
@@ -870,10 +879,10 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     !write(*,*) 'velocity nach:', velocity
     !call projection(velocity, n(3), n(2))
       
-   else
-    !if coastal point is not first node of element, the coastal point could be in eDim_nod2D,
-    !so not all neighbours of this node are known to PE. WHAT SHOULD BE DONE?
-   end if    
+   !else
+   ! !if coastal point is not first node of element, the coastal point could be in eDim_nod2D,
+   ! !so not all neighbours of this node are known to PE. WHAT SHOULD BE DONE?
+   !end if    
     
     
    CASE (2) !...coastal points
@@ -883,9 +892,9 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     do m = 1, 3
       node = elem2D_nodes(m,elem) 
 #ifdef use_cavity
-      if( (index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
+      if( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
 #else
-      if( index_nod2D(node)==1 ) then
+      if( bc_index_nod2D(node)==1 ) then
 #endif
        n(i) = node
        i = i+1
@@ -995,12 +1004,12 @@ end subroutine iceberg_restart
 !****************************************************************************************************************************
 
 
-subroutine iceberg_out 
+subroutine iceberg_out
  use iceberg_params
  use g_parsup		!for mype
  use g_clock		!for dayold
  implicit none
- integer :: icbID, ib
+ integer :: icbID, ib, istep
  
  icbID = 42
  
@@ -1178,7 +1187,7 @@ subroutine init_buoy_output
   implicit none
 
 #include "netcdf.inc" 
-  integer                   :: status,ncid
+  integer                   :: status,ncid,year_start,month_start,day_start
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
@@ -1497,8 +1506,8 @@ subroutine write_buoy_props_netcdf
   
   use o_arrays
   use o_mesh
-  use o_passive_tracer_mod
-  use o_age_tracer_mod
+  !use o_passive_tracer_mod
+  !use o_age_tracer_mod
   use i_arrays
   use g_forcing_param
 
@@ -1506,7 +1515,7 @@ subroutine write_buoy_props_netcdf
 
 #include "netcdf.inc" 
 
-  integer                   :: status,ncid
+  integer                   :: status,ncid, istep
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id

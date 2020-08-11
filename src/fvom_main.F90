@@ -182,6 +182,10 @@ real(kind=real32) :: runtime_alltimesteps
             call oce_fluxes_mom ! momentum only
             call oce_fluxes
         end if  
+        if (use_icebergs) then
+            write(*,*) '*** CALCULATE ICEBERGS ***'
+            call iceberg_calculation(n)
+        end if
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
@@ -191,6 +195,11 @@ real(kind=real32) :: runtime_alltimesteps
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         call output (n)
+
+        if (use_icebergs) then
+            call iceberg_out
+        end if
+
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
         t6 = MPI_Wtime()

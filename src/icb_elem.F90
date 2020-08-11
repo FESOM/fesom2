@@ -24,8 +24,11 @@ subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
  
  if (notmynode) then 	!do no smoothing on gradient this time; change this
  			!so its not dependent on the processor distribution!
-  nablaeta(1) = sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-  nablaeta(2) = sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+  
+  !nablaeta(1) = sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
+  !nablaeta(2) = sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+  nablaeta(1) = sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
+  nablaeta(2) = sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
  else
   call FEM_3eval(nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
@@ -46,10 +49,10 @@ subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)
  real,    intent(OUT):: gradientx, gradienty
  logical, intent(OUT):: notmynode
  
- integer :: idx_elem, elem
- real :: area, patch
+ integer :: k, node, idx_elem, elem
+ real :: area_, patch
  
- area = 0.
+ area_ = 0.
  patch = 0.
  gradientx = 0.
  gradienty = 0.
@@ -59,14 +62,22 @@ subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)
   notmynode = .true.
   return !not my node
  end if 
- 
- do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
-  elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
-  area = voltriangle(elem)
-  patch= patch + area 
-  
-  gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-  gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) ) 
+
+ do node=1,myDim_nod2D
+   do k=1, nod_in_elem2D_num(node) 
+     elem  = nod_in_elem2D(k,node) 
+
+     !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
+     !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
+     !area_ = voltriangle(elem)
+     area_ = elem_area(elem)
+     patch= patch + area_
+     
+     !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
+     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) ) 
+     gradientx = gradientx + area_ * sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
+     gradienty = gradienty + area_ * sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
+   end do
  end do
  
  gradientx = gradientx / patch
@@ -88,7 +99,8 @@ end subroutine nodal_average
 subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use g_parsup !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-  
+  use o_mesh
+
   implicit none
   real, intent(in)			:: lon, lat 
   real, dimension(myDim_nod2D+eDim_nod2D), intent(in)  	:: field_u
@@ -486,9 +498,11 @@ do m=1, 3
  if(n2 > myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
  
  !...and for each element containing this node (so we get all neighbour elements)...
- do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
-  
-  elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
+ !do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
+ do idx_elem_containing_n2 = 1,  nod_in_elem2D_num(n2)
+ 
+  !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
+  elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
     
   call locbafu_2D(werte2D, elem_containing_n2, pt)
    
@@ -615,7 +629,7 @@ SUBROUTINE locbafu_2D(values, elem, coords)
 END SUBROUTINE locbafu_2D
 
 
- !***************************************************************************************************************************
+ !**************************************************************************************************************************
  !***************************************************************************************************************************
 
 SUBROUTINE stdbafu_2D(values,x,m) !(stdbafu,x,m)
@@ -640,6 +654,7 @@ END SUBROUTINE stdbafu_2D
 
 subroutine global2local(aux)
  use g_parsup !for myDim_elem2D, myList_elem2D
+ use o_mesh
  implicit none
  
  integer, dimension(elem2D), intent(out):: aux
@@ -846,15 +861,41 @@ SUBROUTINE tides_distr
   !left-adjust the string..
   mype_char = adjustl(mype_char)
 
-  DO m=1, myDim_nod2d
-  row=myList_nod2d(m)
-  open(unit=mype+66, file='/work/ab0046/a270046/results/TIDESprocessor' // trim(mype_char) // '.dat', position='append')
-  !		global local    M2		  S2		  K1		   O1	
-  write(mype+66,*) row, m, tide_z_amp(m,1), tide_z_amp(m,2), tide_z_amp(m,3), tide_z_amp(m,4)
-  close(mype+66)
-  END DO
+  !DO m=1, myDim_nod2d
+  !row=myList_nod2d(m)
+  !open(unit=mype+66, file='/work/ab0046/a270046/results/TIDESprocessor' // trim(mype_char) // '.dat', position='append')
+  !!		global local    M2		  S2		  K1		   O1	
+  !write(mype+66,*) row, m, tide_z_amp(m,1), tide_z_amp(m,2), tide_z_amp(m,3), tide_z_amp(m,4)
+  !close(mype+66)
+  !END DO
 END SUBROUTINE tides_distr
 
-
+!LA from oce_mesh_setup ofr iceberg coupling
+subroutine  matrix_inverse_2x2 (A, AINV, DET)
+  !
+  ! Coded by Sergey Danilov
+  ! Reviewed by Qiang Wang
+  !-------------------------------------------------------------
+  
+  implicit none
+  
+  real(kind=8), dimension(2,2), intent(IN)  :: A
+  real(kind=8), dimension(2,2), intent(OUT) :: AINV
+  real(kind=8), intent(OUT)                 :: DET
+  integer                                   :: i,j
+  
+  DET  = A(1,1)*A(2,2) - A(1,2)*A(2,1)
+  if ( DET .eq. 0.0 )  then
+     do j=1,2
+        write(*,*) (A(i,j),i=1,2)
+     end do
+     stop 'SINGULAR 2X2 MATRIX'
+  else
+     AINV(1,1) =  A(2,2)/DET
+     AINV(1,2) = -A(1,2)/DET
+     AINV(2,1) = -A(2,1)/DET
+     AINV(2,2) =  A(1,1)/DET
+  endif
+end subroutine matrix_inverse_2x2
  !***************************************************************************************************************************
  !***************************************************************************************************************************
