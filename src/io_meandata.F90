@@ -92,7 +92,7 @@ module io_MEANDATA
 subroutine ini_mean_io(mesh)
   implicit none
   integer                   :: i, j
-  integer, save             :: nm_io_unit  = 102       ! unit to open namelist file
+  integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
   integer,dimension(12)     :: sel_forcvar=0
   ! sel_forcvar(1) = uwind   ! sel_forcvar(2) = vwind
@@ -230,6 +230,12 @@ CASE ('uwind ')
 CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!!PS CASE ('tair_mo   ')
+!!PS     sel_forcvar(3) = 13
+!!PS     call def_stream(nod2D, myDim_nod2D, 'tair_mo',     'bulk formular surface air temperature',         '°C',     Tair_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!!PS CASE ('shum_mo   ')
+!!PS     sel_forcvar(4) = 14
+!!PS     call def_stream(nod2D, myDim_nod2D, 'shum_mo',     'bulk formular specific humidity',               '',       shum_mo(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
     
 !___________________________________________________________________________________________________________________________________
@@ -470,6 +476,12 @@ END DO
     end if
 
     !___________________________________________________________________________________________________________________________________
+    if (whichEVP==1) then
+        !call def_stream(elem2D, myDim_elem2D, 'eps12', 'eps12', 'n/a', eps12,  1, 'd', i_real4, mesh)
+        !call def_stream(elem2D, myDim_elem2D, 'eps11', 'eps12', 'n/a', eps11,  1, 'd', i_real4, mesh)
+        !call def_stream(elem2D, myDim_elem2D, 'eps22', 'eps22', 'n/a', eps22,  1, 'd', i_real4, mesh)
+    end if
+    
     if (whichEVP==2) then
         call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, mesh)
         call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, mesh)
@@ -497,6 +509,17 @@ END DO
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
         if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
         if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'cd','wind drag coef. '             , '', cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'tair_mo','bulk formular surf. air temp.'  , '°C'   , Tair_mo(:)       , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'shum_mo','bulk formular specific humidity', ''     , shum_mo(:)       , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(15)==0) call def_stream(nod2D , myDim_nod2D , 'dv10',''  , 'm/2'   , dv10(:)          , 1, 'm', i_real4, mesh)
+!!PS         if (sel_forcvar(16)==0) call def_stream(nod2D , myDim_nod2D , 'dv10_mo',''  , 'm/2'   , dv10_mo(:)    , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'mo_index','', ''     , mo_index(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt1','', ''     , auxt1(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt2','', ''     , auxt2(:)       , 1, 'm', i_real4, mesh)
+!!PS         call def_stream(nod2D , myDim_nod2D , 'auxt3','', ''     , auxt3(:)       , 1, 'm', i_real4, mesh)
     end if
     
     
@@ -904,7 +927,16 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   real(kind=WP), intent(in), optional  :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)            , target :: mesh
+  type(t_mesh), intent(in), target     :: mesh
+
+  if ((ubound(data, dim = 1)<=0) .or. (ubound(data, dim = 2)<=0)) then
+     if (mype==0) then
+        write(*,*) 'WARNING: addind I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+        write(*,*) 'bounda are: [', UBOUND(data, DIM = 1), ' , ', UBOUND(data, DIM = 2),']'
+     end if
+     return
+  end if
+
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)
   end if
@@ -981,7 +1013,15 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer, intent(in), optional        :: minvalue, maxvalue
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
-  type(t_mesh), intent(in)            , target :: mesh
+  type(t_mesh), intent(in), target     :: mesh
+
+  if ((ubound(data, dim = 1) <= 0)) then
+     if (mype==0) then
+        write(*,*) 'WARNING: addind I/O stream for ', trim(name), ' failed (contains 0 dimension)'
+        write(*,*) 'upper bound is: ', ubound(data, dim = 1)
+     end if
+     return
+  end if
 
   if (mype==0) then
      write(*,*) 'addind I/O stream for ', trim(name)

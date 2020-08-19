@@ -76,10 +76,10 @@ module g_config
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
   logical 						:: use_floatice = .false.
-  logical                       :: toy_ocean=.false. ! Ersatz forcing has
-                                                   ! to be supplied
+  logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
+  character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean, flag_debug
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean, which_toy, flag_debug
   
   ! *** others ***
   real(kind=WP)            	:: dt

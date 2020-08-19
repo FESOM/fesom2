@@ -15,8 +15,10 @@ MODULE gen_bulk
     public core_coeff_2z
   
     CONTAINS
-    
-subroutine ncar_ocean_fluxes_mode 
+!
+!
+!_______________________________________________________________________________    
+subroutine ncar_ocean_fluxes_mode_fesom14
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! In this routine we assume air temperature and humidity are at the same
@@ -38,11 +40,115 @@ subroutine ncar_ocean_fluxes_mode
     integer            :: i, j, m
     real(kind=WP) :: cd_n10, ce_n10, ch_n10, cd_n10_rt    ! neutral 10m drag coefficients
     real(kind=WP) :: cd, ce, ch, cd_rt                    ! full drag coefficients @ z
-    real(kind=WP) :: zeta_u, zeta_tq, x2, x, psi_m_u, psi_h_u, psi_m_tq, psi_h_tq, stab      ! stability parameters
+    real(kind=WP) :: zeta, x2, x, psi_m, psi_h, stab      ! stability parameters
     real(kind=WP) :: t, ts, q, qs, u, u10, tv, xx, dux, dvy
     real(kind=WP) :: tstar, qstar, ustar, bstar
     real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
     real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
+    real(kind=WP), parameter :: zz = 10.0_WP
+
+    do i=1,myDim_nod2d+eDim_nod2d       
+        t=tair(i) + tmelt					      ! degree celcium to Kelvin
+        ts=t_oc_array(i) + tmelt				      !
+        q=shum(i)
+        qs=0.98_WP*q1*inv_rhoair*exp(q2/ts) 			      ! L-Y eqn. 5 
+        tv = t*(1.0_WP+0.608_WP*q)
+        dux=u_wind(i)-u_w(i)
+        dvy=v_wind(i)-v_w(i)
+        u = max(sqrt(dux**2+dvy**2), 0.5_WP)           	      ! 0.5 m/s floor on wind (undocumented NCAR)
+        u10 = u                                                  ! first guess 10m wind
+        
+        cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.0e-3_WP                ! L-Y eqn. 6a
+        cd_n10_rt = sqrt(cd_n10) 
+        ce_n10 = 34.6_WP *cd_n10_rt*1.0e-3_WP       		      ! L-Y eqn. 6b
+        stab = 0.5_WP + sign(0.5_WP,t-ts)
+        ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP      ! L-Y eqn. 6c
+        
+        cd = cd_n10                                 	      ! first guess for exchange coeff's at z
+        ch = ch_n10
+        ce = ce_n10
+        do j=1,n_itts                                            ! Monin-Obukhov iteration
+            cd_rt = sqrt(cd)
+            ustar    = cd_rt*u                                    ! L-Y eqn. 7a
+            tstar    = (ch/cd_rt)*(t-ts)              	      ! L-Y eqn. 7b
+            qstar    = (ce/cd_rt)*(q-qs)              	      ! L-Y eqn. 7c
+            bstar    = grav*(tstar/tv+qstar/(q+1.0_WP/0.608_WP))
+            zeta     = vonkarm*bstar*zz/(ustar*ustar) 	      ! L-Y eqn. 8a
+            zeta     = sign( min(abs(zeta),10.0_WP), zeta )          ! undocumented NCAR
+            x2 = sqrt(abs(1._WP-16._WP*zeta))                           ! L-Y eqn. 8b
+            x2 = max(x2, 1.0_WP)                                     ! undocumented NCAR
+            x = sqrt(x2)
+            
+            if (zeta > 0._WP) then
+            psi_m = -5._WP*zeta                                    ! L-Y eqn. 8c
+            psi_h = -5._WP*zeta                                    ! L-Y eqn. 8c
+            else
+            psi_m = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
+            psi_h = 2._WP*log((1._WP+x2)/2._WP)                                  ! L-Y eqn. 8e
+            end if
+            
+            u10 = u/(1.0_WP+cd_n10_rt*(log(zz/10._WP)-psi_m)/vonkarm)        ! L-Y eqn. 9 !why cd_n10_rt not cd_rt
+            cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.e-3_WP                  ! L-Y eqn. 6a again
+            cd_n10_rt = sqrt(cd_n10) 
+            ce_n10 = 34.6_WP*cd_n10_rt*1.e-3_WP                              ! L-Y eqn. 6b again
+            stab = 0.5_WP + sign(0.5_WP,zeta)
+            ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP       ! L-Y eqn. 6c again
+            !z0 = 10*exp(-vonkarm/cd_n10_rt)                          ! diagnostic
+            
+            xx = (log(zz/10._WP)-psi_m)/vonkarm
+            cd = cd_n10/(1.0_WP+cd_n10_rt*xx)**2             		  ! L-Y 10a
+            xx = (log(zz/10._WP)-psi_h)/vonkarm
+            ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
+            ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
+        end do
+        
+        cd_atm_oce_arr(i)=cd
+        ch_atm_oce_arr(i)=ch
+        ce_atm_oce_arr(i)=ce 
+    end do
+
+end subroutine ncar_ocean_fluxes_mode_fesom14
+!
+!
+!_______________________________________________________________________________
+subroutine ncar_ocean_fluxes_mode 
+    ! Compute drag coefficient and the transfer coefficients for evaporation
+    ! and sensible heat according to LY2004.
+    ! with updates from Large et al. 2009 for the computation of the wind drag 
+    ! coefficient. 
+    ! In this routine air temperature, humidity and wind speed can be defined on
+    ! different levels. the levels are setted in namelist.forcing with the parameter
+    ! ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum --> default is 10m for all
+    ! three varaibles (CORE2 default)
+    !
+    ! original note:
+    ! Over-ocean fluxes following Large and Yeager (used in NCAR models)           
+    ! Coded by Mike Winton (Michael.Winton@noaa.gov) in 2004
+    ! A bug was found by Laurent Brodeau (brodeau@gmail.com) in 2007.
+    ! Stephen.Griffies@noaa.gov updated the code with the bug fix.  
+    ! 
+    ! Code from CORE website is adopted to FESOM by Qiang Wang
+    ! Reviewed by ??
+    !---------------------------------------------------------------------------
+
+    integer, parameter :: n_itts = 5
+    integer            :: i, j, m
+    real(kind=WP) :: cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1   ! neutral 10m drag coefficients
+    real(kind=WP) :: cd, ce, ch, cd_rt                    ! full drag coefficients @ z
+    real(kind=WP) :: x2, x, stab
+    real(kind=WP) :: zeta_u, zeta_t, zeta_q
+    real(kind=WP) :: psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q     ! stability parameters
+    real(kind=WP) :: ts, qs, tv, xx, dux, dvy
+    real(kind=WP) :: t, t10, q, q10, u, u10
+    real(kind=WP) :: tstar, qstar, ustar, bstar
+    real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
+    real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
+    
+    !--> from recomented JRA bulk formular, https://climate.mri-jma.go.jp/~htsujino/docs/JRA55-do/programs/bulk-ncar.F90
+    real(kind=WP), parameter :: u10min = 0.3_WP 
+    !--> check for convergence
+    real(kind=WP) :: test, cd_prev, inc_ratio=1.0e-4 
+    real(kind=WP) :: t_prev, q_prev
 
     do i=1,myDim_nod2d+eDim_nod2d       
         ! degree celcium to Kelvin
@@ -57,30 +163,41 @@ subroutine ncar_ocean_fluxes_mode
         ! first guess 10m wind
         dux    = u_wind(i)-u_w(i)
         dvy    = v_wind(i)-v_w(i)
-        u      = max(sqrt(dux**2+dvy**2), 0.5_WP)  ! 0.5 m/s floor on wind (undocumented NCAR)
-        u10    = u                               
+        u      = max(sqrt(dux**2+dvy**2), u10min)  ! 0.5 m/s floor on wind (undocumented NCAR)
         
-        cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.0e-3_WP     ! L-Y eqn. 6a
+        ! iteration variables for 10m level --> Monin-Obukov projection
+        u10    = u  
+        t10    = t  
+        q10    = q  
+        
+        ! large et al 2004: cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.0e-3_WP     ! L-Y eqn. 6a
+        !--> from recomented JRA bulk formular, https://climate.mri-jma.go.jp/~htsujino/docs/JRA55-do/programs/bulk-ncar.F90
+        ! update from large et al 2004 --> see large at al 2009 --> new equation for 
+        ! cd_n10
+        hl1       = (2.7_WP/u10 + 0.142_WP + 0.0764_WP*u10 - 3.14807e-10_WP*(u10**6)) / 1.0e3_WP                                    ! LY2009 eqn. 11a
+        cd_n10    = (0.5_WP - sign(0.5_WP,u10-33.0_WP)) * hl1 &
+                   +(0.5_WP + sign(0.5_WP,u10-33.0_WP)) * 2.34e-3_WP  ! LY2009 eqn. 11b
         cd_n10_rt = sqrt(cd_n10) 
-        ce_n10 = 34.6_WP *cd_n10_rt*1.0e-3_WP                      ! L-Y eqn. 6b
-        stab   = 0.5_WP + sign(0.5_WP,t-ts)
-        ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP ! L-Y eqn. 6c
+        ce_n10    = 34.6_WP *cd_n10_rt*1.0e-3_WP                      ! L-Y eqn. 6b
+        stab      = 0.5_WP + sign(0.5_WP,t-ts)
+        ch_n10    = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP ! L-Y eqn. 6c
         
         ! first guess for exchange coeff's at z
-        cd     = cd_n10                                 
-        ch     = ch_n10
-        ce     = ce_n10
+        cd        = cd_n10                                 
+        ch        = ch_n10
+        ce        = ce_n10
+        cd_prev   = cd
         
         !_______________________________________________________________________
-        ! Monin-Obukhov iteration
+        ! iteration loop
         do j=1,n_itts  
             !___________________________________________________________________
-            ! (1) for j==1 calculate initial turbulent scales
-            cd_rt = sqrt(cd)
-            ustar = cd_rt*u                                        ! L-Y eqn. 7a
-            tstar = (ch/cd_rt)*(t-ts)                              ! L-Y eqn. 7b
-            qstar = (ce/cd_rt)*(q-qs)                              ! L-Y eqn. 7c
-            bstar = grav*(tstar/tv+qstar/(q+1.0_WP/0.608_WP))
+            ! (1) for initialize/update turbulent scales
+            cd_rt  = sqrt(cd)
+            ustar  = cd_rt*u                                          ! L-Y eqn. 7a
+            tstar  = (ch/cd_rt)*(t10-ts)                              ! L-Y eqn. 7b
+            qstar  = (ce/cd_rt)*(q10-qs)                              ! L-Y eqn. 7c
+            bstar  = grav*(tstar/tv+qstar/(q10+1.0_WP/0.608_WP))
             
             !___________________________________________________________________
             ! (2a) calculate stability parameter zeta_u = z_u/L, L...Monin-Obukov length
@@ -102,43 +219,71 @@ subroutine ncar_ocean_fluxes_mode
             end if
             
             !___________________________________________________________________
-            ! (2b) calculate stability parameter zeta_tq = z_tq/L, L...Monin-Obukov length
-            zeta_tq = vonkarm*bstar*ncar_bulk_z_tair/(ustar*ustar)! L-Y eqn. 8a
-            zeta_tq = sign( min(abs(zeta_tq),10.0_WP), zeta_tq )     ! undocumented NCAR
-            x2      = sqrt(abs(1.-16._WP*zeta_tq))                   ! L-Y eqn. 8b
-            x2      = max(x2, 1.0_WP)                                ! undocumented NCAR
-            x       = sqrt(x2)
+            ! (2b) calculate stability parameter zeta_t = z_t/L, L...Monin-Obukov length
+            zeta_t = vonkarm*bstar*ncar_bulk_z_tair/(ustar*ustar)! L-Y eqn. 8a
+            zeta_t = sign( min(abs(zeta_t),10.0_WP), zeta_t )     ! undocumented NCAR
+            x2     = sqrt(abs(1._WP-16._WP*zeta_t))                   ! L-Y eqn. 8b
+            x2     = max(x2, 1.0_WP)                                ! undocumented NCAR
+            x      = sqrt(x2)
             
-            !___________________________________________________________________
             ! calculate integrals of dimensionless flux profiles of momentum 
             ! psi_m... and heat and moisture psi_h...
-            if (zeta_tq > 0._WP) then
-                psi_m_tq = -5._WP*zeta_tq                             ! L-Y eqn. 8c
-                psi_h_tq = -5._WP*zeta_tq                             ! L-Y eqn. 8c
+            if (zeta_t > 0._WP) then
+                psi_m_t = -5._WP*zeta_t                             ! L-Y eqn. 8c
+                psi_h_t = -5._WP*zeta_t                             ! L-Y eqn. 8c
             else
-                psi_m_tq = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
-                psi_h_tq = 2._WP*log((1._WP+x2)/2._WP)                              ! L-Y eqn. 8e
+                psi_m_t = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
+                psi_h_t = 2._WP*log((1._WP+x2)/2._WP)                              ! L-Y eqn. 8e
+            end if
+            
+            !___________________________________________________________________
+            ! (2c) calculate stability parameter zeta_q = z_q/L, L...Monin-Obukov length
+            zeta_q = vonkarm*bstar*ncar_bulk_z_shum/(ustar*ustar)! L-Y eqn. 8a
+            zeta_q = sign( min(abs(zeta_q),10.0_WP), zeta_q )     ! undocumented NCAR
+            x2     = sqrt(abs(1._WP-16._WP*zeta_q))                   ! L-Y eqn. 8b
+            x2     = max(x2, 1.0_WP)                                ! undocumented NCAR
+            x      = sqrt(x2)
+            
+            ! calculate integrals of dimensionless flux profiles of momentum 
+            ! psi_m... and heat and moisture psi_h...
+            if (zeta_q > 0._WP) then
+                psi_m_q = -5._WP*zeta_q                             ! L-Y eqn. 8cq
+                psi_h_q = -5._WP*zeta_q                             ! L-Y eqn. 8c
+            else
+                psi_m_q = log((1._WP+2._WP*x+x2)*(1.0_WP+x2)/8._WP)-2._WP*(atan(x)-atan(1.0_WP))  ! L-Y eqn. 8d
+                psi_h_q = 2._WP*log((1._WP+x2)/2._WP)                              ! L-Y eqn. 8e
             end if
             
             !___________________________________________________________________
             ! (3a) shift wind speed to 10m and neutral stability
             u10 = u/(1.0_WP+cd_n10_rt*(log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
+!!PS             u10 = u/(1.0_WP+cd_rt*(log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm) ! L-Y eqn. 9a !why cd_n10_rt not cd_rt
+            u10 = max(u10, u10min)             ! 0.3 [m/s] floor on wind
+            ! (3b) shift temperature and humidity to wind height
+            t10 = t - tstar/vonkarm*(log(ncar_bulk_z_tair/ncar_bulk_z_wind)+psi_h_u-psi_h_t)! L-Y eqn. 9b
+            q10 = q - qstar/vonkarm*(log(ncar_bulk_z_shum/ncar_bulk_z_wind)+psi_h_u-psi_h_q)! L-Y eqn. 9b
             
             !___________________________________________________________________
-            ! (3b) shift temperature and humidity to wind height
-            t = t - tstar/vonkarm*(log(ncar_bulk_z_tair/ncar_bulk_z_wind)+psi_h_u-psi_h_tq)! L-Y eqn. 9b
-            q = q - qstar/vonkarm*(log(ncar_bulk_z_shum/ncar_bulk_z_wind)+psi_h_u-psi_h_tq)! L-Y eqn. 9b
+            ! (3c) recompute virtual potential temperature tv and update tubulent 
+            !     scales (eqn. 7) at the beginning of next iteration loop
+            tv  = t10*(1.0_WP+0.608_WP*q10)
             
             !___________________________________________________________________
             ! (4a) update neutral 10m transfer coefficient
-            cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.e-3_WP  ! L-Y eqn. 6a again
+            ! large et al 2004: cd_n10 = (2.7_WP/u10+0.142_WP+0.0764_WP*u10)*1.e-3_WP  ! L-Y eqn. 6a again
+            !--> from recomented JRA bulk formular, https://climate.mri-jma.go.jp/~htsujino/docs/JRA55-do/programs/bulk-ncar.F90
+            ! update from large et al 2004 --> see large at al 2009 --> new equation for 
+            ! cd_n10
+            hl1       = (2.7_WP/u10 + 0.142_WP + 0.0764_WP*u10 - 3.14807e-10_WP*(u10**6)) / 1.0e3_WP                                    ! LY2009 eqn. 11a
+            cd_n10    = (0.5_WP - sign(0.5_WP,u10-33.0_WP)) * hl1 &
+                       +(0.5_WP + sign(0.5_WP,u10-33.0_WP)) * 2.34e-3_WP  ! LY2009 eqn. 11b
             cd_n10_rt = sqrt(cd_n10) 
-            ce_n10 = 34.6_WP*cd_n10_rt*1.e-3_WP                    ! L-Y eqn. 6b again
-            stab = 0.5_WP + sign(0.5_WP,zeta_u)
-            ch_n10 = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP ! L-Y eqn. 6c again
-            !z0 = 10*exp(-vonkarm/cd_n10_rt)                          ! diagnostic
+            ce_n10    = 34.6_WP*cd_n10_rt*1.e-3_WP                    ! L-Y eqn. 6b again
+            stab      = 0.5_WP + sign(0.5_WP,zeta_u)
+            ch_n10    = (18.0_WP*stab+32.7_WP*(1.0_WP-stab))*cd_n10_rt*1.e-3_WP ! L-Y eqn. 6c again
+            ! zrough = 10.d0 * exp(- karman / cdn10_rt)            ! diagnostic
             
-            !_______________________________________________________________________
+            !___________________________________________________________________
             ! (4b) shift them to the measurement height z_wind and stability zeta_u
             xx = (log(ncar_bulk_z_wind/10._WP)-psi_m_u)/vonkarm
             cd = cd_n10/(1.0_WP+cd_n10_rt*xx)**2                   ! L-Y 10a
@@ -146,17 +291,23 @@ subroutine ncar_ocean_fluxes_mode
             ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10b (corrected code aug2007)
             ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)*sqrt(cd/cd_n10)     ! 10c (corrected code aug2007)
             
-            !_______________________________________________________________________
-            ! (5) recompute virtual potential temperature tv and update tubulent 
-            !     scales (eqn. 7) at the beginning of next iteration loop
-            tv = t*(1.0+0.608*q)
+            ! --> not tested Large et al 2006
+            ! ch = ch_n10/(1.0_WP+ch_n10*xx/cd_n10_rt)**2     ! Large et al. 2006 eq. 52-2
+            ! ce = ce_n10/(1.0_WP+ce_n10*xx/cd_n10_rt)**2     ! Large et al. 2006 eq. 52-3
+            
+            !___________________________________________________________________
+            ! (5) check for convergence
+            test = abs(cd - cd_prev) / (cd + 1.0e-8_WP)
+            cd_prev = cd
+            if (test < inc_ratio) exit
             
         end do
         
+        ! final transfer coefficients for wind, sensible heat and evaporation
         cd_atm_oce_arr(i)=cd
         ch_atm_oce_arr(i)=ch
         ce_atm_oce_arr(i)=ce 
-        
+    
     end do
 
 end subroutine ncar_ocean_fluxes_mode
@@ -230,7 +381,7 @@ SUBROUTINE nemo_ocean_fluxes_mode
 !!$OMP END PARALLEL
 END SUBROUTINE nemo_ocean_fluxes_mode
 
-!---------------------------------------------------------------------------------------------------
+!-------------------------------------------------------------------------------
 SUBROUTINE core_coeff_2z(zt, zu, sst, T_zt, q_sat, q_zt, dU, Cd, Ch, Ce, T_zu, q_zu)
    !!----------------------------------------------------------------------
    !!                      ***  ROUTINE  core_coeff_2z  ***

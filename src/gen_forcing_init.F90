@@ -86,6 +86,18 @@ subroutine forcing_array_setup(mesh)
   Tair=0.0_WP
   shum=0.0_WP
   runoff=0.0_WP
+  
+!!PS   allocate(Tair_mo(n2),shum_mo(n2))
+!!PS   Tair_mo=0.0_WP !!PS
+!!PS   shum_mo=0.0_WP !!PS
+!!PS   
+!!PS   allocate(mo_index(n2),dv10_mo(n2),dv10(n2),auxt1(n2),auxt2(n2),auxt3(n2))  
+!!PS   mo_index = 0.0_WP
+!!PS   dv10_mo  =0.0_WP
+!!PS   dv10     =0.0_WP
+!!PS   auxt1    =0.0_WP
+!!PS   auxt2    =0.0_WP
+!!PS   auxt3    =0.0_WP
 
   if (l_cloud) then
      allocate(cloudiness(n2))

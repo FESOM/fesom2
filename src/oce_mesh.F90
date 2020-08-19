@@ -195,7 +195,7 @@ type(t_mesh), intent(inout), target :: mesh
   !===========================
  
   file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
-  fileID=10+mype  
+  fileID=103+mype  !skip unit range 100--102
     
   open(fileID, file=trim(file_name))
   read(fileID,*) n
@@ -319,7 +319,7 @@ type(t_mesh), intent(inout), target :: mesh
     
     !___________________________________________________________________________
     ! check if rotation is applied to an already rotated mesh
-    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1)) then
+    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1) .and. (.not. toy_ocean)) then
         write(*,*)
         print *, achar(27)//'[33m'
         write(*,*) '____________________________________________________________________'
@@ -340,7 +340,7 @@ type(t_mesh), intent(inout), target :: mesh
         call par_ex(0)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
-    elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1)) then
+    elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
         write(*,*)
         print *, achar(27)//'[33m'
         write(*,*) '____________________________________________________________________'
@@ -529,7 +529,7 @@ end if
  ! every proc reads its file
  ! ==============================
  file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
- fileID=10+mype  
+ fileID=103+mype !skip unit range 100--102  
  open(fileID, file=file_name)
  read(fileID,*)  n
  read(fileID,*) com_nod2D%rPEnum

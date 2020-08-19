@@ -153,7 +153,8 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             c1=0._wp
             nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
             do nz=1, nzmax-1
-                c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
+                c1=c1+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
+
             end do
             c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
             scaling=1._WP

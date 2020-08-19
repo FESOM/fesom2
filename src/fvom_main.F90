@@ -21,17 +21,18 @@ use io_RESTART
 use io_MEANDATA
 use io_mesh_info
 use diagnostics
+use mo_tidal
 #if defined (__oasis)
 use cpl_driver
 #endif
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
-real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice
-real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag
+real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
+real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
 real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
+real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh), target, save      :: mesh
@@ -146,6 +147,7 @@ type(t_mesh), target, save      :: mesh
     rtime_write_restart = 0._WP
     rtime_write_means   = 0._WP
     rtime_compute_diag  = 0._WP
+    rtime_read_forcing  = 0._WP
 
     if (mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
@@ -160,7 +162,13 @@ type(t_mesh), target, save      :: mesh
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
     !___MODEL TIME STEPPING LOOP________________________________________________
+    if (use_global_tides) then
+       call foreph_ini(yearnew, month)
+    end if
     do n=1, nsteps        
+        if (use_global_tides) then
+           call foreph(mesh)
+        end if
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='
@@ -185,8 +193,9 @@ type(t_mesh), target, save      :: mesh
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
+            t0_frc = MPI_Wtime()
             call update_atm_forcing(n, mesh)
-            
+            t1_frc = MPI_Wtime()            
             !___compute ice step________________________________________________
             if (ice_steps_since_upd>=ice_ave_steps-1) then
                 ice_update=.true.
@@ -201,7 +210,8 @@ type(t_mesh), target, save      :: mesh
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(mesh) ! momentum only
             call oce_fluxes(mesh)
-        end if  
+        end if
+        call before_oce_step(mesh) ! prepare the things if required
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________
@@ -223,6 +233,7 @@ type(t_mesh), target, save      :: mesh
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
+        rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
     end do
     
     !___FINISH MODEL RUN________________________________________________________
@@ -243,19 +254,19 @@ type(t_mesh), target, save      :: mesh
     mean_rtime(7)  = rtime_oce_solvetra
     mean_rtime(8)  = rtime_ice         
     mean_rtime(9)  = rtime_tot  
-    mean_rtime(10) = rtime_fullice 
+    mean_rtime(10) = rtime_fullice - rtime_read_forcing 
     mean_rtime(11) = rtime_compute_diag
     mean_rtime(12) = rtime_write_means
     mean_rtime(13) = rtime_write_restart
+    mean_rtime(14) = rtime_read_forcing   
     
+    max_rtime(1:14) = mean_rtime(1:14)
+    min_rtime(1:14) = mean_rtime(1:14)
 
-    max_rtime(1:13) = mean_rtime(1:13)
-    min_rtime(1:13) = mean_rtime(1:13)
-
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 13, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    mean_rtime(1:13) = mean_rtime(1:13) / real(npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  13, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  13, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 14, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    mean_rtime(1:14) = mean_rtime(1:14) / real(npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
     if (mype==0) then
         write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
@@ -271,6 +282,7 @@ type(t_mesh), target, save      :: mesh
         write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
         write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
         write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
+        write(*,*) '  runtime forcing:', mean_rtime(14), min_rtime(14), max_rtime(14)
         write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
         write(*,*)
         write(*,*) '============================================'

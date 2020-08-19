@@ -33,7 +33,7 @@ USE g_CONFIG
 implicit none
 
 real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
-real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta, aa
+real(kind=WP)   :: eta, xi, delta, aa
 integer         :: el, elnodes(3)
 real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
@@ -61,17 +61,17 @@ type(t_mesh), intent(in), target  :: mesh
       ! ===== Deformation rate tensor on element elem:
            !du/dx
 
-        eps11 = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
+        eps11(el) = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
                - metric_factor(el) * sum(V_ice(elem2D_nodes(1:3,el)))/3.0_WP
 
-        eps22 = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
+        eps22(el) = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
 
-        eps12 = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
+        eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
                       + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
                        + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
         ! ===== moduli:
-        delta = sqrt((eps11*eps11 + eps22*eps22)*(1.0_WP+vale) + 4.0_WP*vale*eps12*eps12 + &
-                              2.0_WP*eps11*eps22*(1.0_WP-vale))
+        delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
+                              2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))
 
        ! =======================================
        ! ===== Here the EVP rheology piece starts
@@ -103,9 +103,9 @@ type(t_mesh), intent(in), target  :: mesh
       
         zeta = zeta*Tevp_inv
       				     
-        r1  = zeta*(eps11+eps22) - ice_strength(el)*Tevp_inv
-        r2  = zeta*(eps11-eps22)*vale
-        r3  = zeta*eps12*vale
+        r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+        r2  = zeta*(eps11(el)-eps22(el))*vale
+        r3  = zeta*eps12(el)*vale
         
         si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
         si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
@@ -130,7 +130,7 @@ USE g_CONFIG
 implicit none
 
 real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
-real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta, aa
+real(kind=WP)   :: eta, xi, delta, aa
 integer         :: el, elnodes(3)
 real(kind=WP)   :: asum, msum, vale, dx(3), dy(3)
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
@@ -158,17 +158,17 @@ type(t_mesh), intent(in)              , target :: mesh
       ! ===== Deformation rate tensor on element elem:
            !du/dx
 
-        eps11 = sum(mesh%gradient_sca(1:3,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+        eps11(el) = sum(mesh%gradient_sca(1:3,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
                -mesh% metric_factor(el) * sum(V_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
 
-        eps22 = sum(mesh%gradient_sca(4:6, el)*V_ice(mesh%elem2D_nodes(1:3,el)))
+        eps22(el) = sum(mesh%gradient_sca(4:6, el)*V_ice(mesh%elem2D_nodes(1:3,el)))
 
-        eps12 = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+        eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
                       + sum(mesh%gradient_sca(1:3,el)*V_ice(mesh%elem2D_nodes(1:3,el))) &
                        + mesh%metric_factor(el) * sum(U_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
         ! ===== moduli:
-        delta = sqrt((eps11*eps11 + eps22*eps22)*(1.0_WP+vale) + 4.0_WP*vale*eps12*eps12 + &
-                              2.0_WP*eps11*eps22*(1.0_WP-vale))
+        delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
+                              2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))
 
        ! =======================================
        ! ===== Here the EVP rheology piece starts
@@ -200,9 +200,9 @@ type(t_mesh), intent(in)              , target :: mesh
       
         zeta = zeta*Tevp_inv
       				     
-        r1  = zeta*(eps11+eps22) - ice_strength(el)*Tevp_inv
-        r2  = zeta*(eps11-eps22)*vale
-        r3  = zeta*eps12*vale
+        r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
+        r2  = zeta*(eps11(el)-eps22(el))*vale
+        r3  = zeta*eps12(el)*vale
         
         si1 = det1*(sigma11(el) + sigma22(el) + dte*r1)
         si2 = det2*(sigma11(el) - sigma22(el) + dte*r2)
@@ -370,7 +370,7 @@ real(kind=WP)             :: inv_areamass(myDim_nod2D), inv_mass(myDim_nod2D)
 real(kind=WP)             :: ice_strength(myDim_elem2D), elevation_elem(3), p_ice(3)
 integer                   :: use_pice
 
-real(kind=WP)   :: eps11, eps12, eps22, eta, xi, delta
+real(kind=WP)   :: eta, xi, delta
 integer         :: k
 real(kind=WP)   :: vale, dx(3), dy(3), val3
 real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte 
