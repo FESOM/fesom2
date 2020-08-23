@@ -169,6 +169,8 @@ real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec
 real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
                                               ! Coefficients to compute
 					      ! gradient of scalars on elements
+! LA from FESOM-1.4
+integer, allocatable, dimension(:)          :: index_nod2D
 INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
 ! Vertical structure             
 integer                                    :: nl

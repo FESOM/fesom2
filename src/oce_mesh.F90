@@ -134,6 +134,8 @@ IMPLICIT NONE
   ! read the nod2D from nod2d.out and check whether it is equal to part(npes+1)-1
   nod2D=part(npes+1)-1
   allocate(coord_nod2D(2,myDim_nod2D+eDim_nod2D))
+  ! LA from FESOM-1.4
+  allocate(index_nod2D(myDim_nod2D+eDim_nod2D))
   if (mype==0) then
     file_name=trim(meshpath)//'nod2d.out'
     open(fileID, file=file_name)
@@ -209,6 +211,8 @@ IMPLICIT NONE
            mesh_check=mesh_check+1
            coord_nod2D(1,mapping(n))=x
            coord_nod2D(2,mapping(n))=y
+           ! LA from FESOM-1.4
+           index_nod2D(mapping(n))=ibuff(n,2)
         end if
      end do
   end do
@@ -1422,6 +1426,7 @@ END DO
 
     !array of 2D boundary conditions is used in ice_maEVP
     if (whichEVP > 0) then
+       write(*,*) 'LA DEBUG: mesh aux boundary conditions'
        allocate(bc_index_nod2D(myDim_nod2D+eDim_nod2D))
        bc_index_nod2D=1._WP
        do n=1, myDim_edge2D
@@ -1429,6 +1434,7 @@ END DO
           if (myList_edge2D(n)<=edge2D_in) cycle
           bc_index_nod2D(ed)=0.
        end do
+       write(*,*) 'LA DEBUG: bc_index_nod2D=',bc_index_nod2d
     end if
 
 #if defined (__oasis)

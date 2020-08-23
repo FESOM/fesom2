@@ -183,7 +183,6 @@ real(kind=real32) :: runtime_alltimesteps
             call oce_fluxes
         end if  
         if (use_icebergs) then
-            write(*,*) '*** CALCULATE ICEBERGS ***'
             call iceberg_calculation(n)
         end if
         t2 = MPI_Wtime()

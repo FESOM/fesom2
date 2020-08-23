@@ -142,8 +142,8 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
    
  new_u_ib = u_ib + au_ib * dt_ib
  new_v_ib = v_ib + av_ib * dt_ib
-  
-  
+ !write(*,*) 'LA DEBUG 145: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
+
  if (l_semiimplicit) then !a matrix multiplication is to be performed
   			  !for semiimpl. coriolis term and implicit
 			  !water drag
@@ -171,6 +171,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)
+ !write(*,*) 'LA DEBUG 174: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
    
  else !compute only water drag implicitly, coriolis: AB
   
@@ -190,6 +191,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
    !now the velocity can be updated
    new_u_ib = SI_velo(1)
    new_v_ib = SI_velo(2)  
+ !write(*,*) 'LA DEBUG 194: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
     
  end if !matrix-multiplication
  
@@ -200,6 +202,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
+ !write(*,*) 'LA DEBUG 205: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
  
 end subroutine iceberg_dyn
 
@@ -889,11 +892,13 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
    do k=2, nl+1
     lev_up  = zbar_3d_n(k-1, n2)
     lev_low = zbar_3d_n(k, n2)
+    
+    if (lev_up==lev_low) then
+        exit
+    end if
     dz = abs( lev_low - lev_up )
 	
-    write(*,*) 'LA DEBUG: lev_up: ',lev_up,', lev_low: ',lev_low,', dz: ',dz
     if(dz < 1) then
-      write(*,*) 'dz 0!', dz
       !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)
       call par_ex
       stop
