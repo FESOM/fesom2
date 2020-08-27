@@ -26,7 +26,7 @@ module async_threads_module
 
 
   type wrapper_type
-    type(thread_type), pointer :: ptr => null()
+    class(thread_type), pointer :: ptr => null()
   end type
   type(wrapper_type), save, allocatable :: threads(:)
 
@@ -92,7 +92,7 @@ contains
     use iso_c_binding
     integer(c_int), intent(in), value :: thread_idx
     ! EO args
-    type(thread_type), pointer :: t
+    class(thread_type), pointer :: t
     
     call assert(size(threads) >= thread_idx, __LINE__)
     t => threads(thread_idx)%ptr
