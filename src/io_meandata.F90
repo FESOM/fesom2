@@ -796,7 +796,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   end do
 
   if (mype==0) then
-     write(*,*) 'adding I/O stream for ', trim(name)
+     write(*,*) 'adding I/O stream 3D for ', trim(name)
   end if
 
    ! add this instance to io_stream array
@@ -859,7 +859,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   end do
 
   if (mype==0) then
-     write(*,*) 'adding I/O stream for ', trim(name)
+     write(*,*) 'adding I/O stream 2D for ', trim(name)
   end if
 
    ! add this instance to io_stream array
