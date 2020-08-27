@@ -954,5 +954,16 @@ end subroutine
     endif   
   end subroutine
 
+
+  subroutine assert(val, line)
+    logical, intent(in) :: val
+    integer, intent(in) :: line
+    ! EO args
+    if(.NOT. val) then
+      print *, "error in line ",line, __FILE__
+      stop 1
+    end if
+  end subroutine
+
 end module
 
