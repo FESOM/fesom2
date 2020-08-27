@@ -46,7 +46,7 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, allocatable, target :: io_stream(:)
+  type(Meandata), save, target :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
   integer, save                             :: io_NSTREAMS=0
   real(kind=WP)                             :: ctime !current time in seconds from the beginning of the year
 !
@@ -799,16 +799,10 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      write(*,*) 'adding I/O stream 3D for ', trim(name)
   end if
 
-   ! add this instance to io_stream array
-  if ( .not. allocated(io_stream)) then
-    allocate(io_stream(1))
-  else
-    allocate(tmparr(size(io_stream)+1))
-    tmparr(1:size(io_stream)) = io_stream
-    deallocate(io_stream)
-    call move_alloc(tmparr, io_stream)
-  end if
-  entry=>io_stream(size(io_stream))
+  ! add this instance to io_stream array
+  io_NSTREAMS = io_NSTREAMS +1
+  call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
+  entry=>io_stream(io_NSTREAMS)
 
   ! 3d specific
   entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
@@ -862,16 +856,10 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
      write(*,*) 'adding I/O stream 2D for ', trim(name)
   end if
 
-   ! add this instance to io_stream array
-  if ( .not. allocated(io_stream)) then
-    allocate(io_stream(1))
-  else
-    allocate(tmparr(size(io_stream)+1))
-    tmparr(1:size(io_stream)) = io_stream
-    deallocate(io_stream)
-    call move_alloc(tmparr, io_stream)
-  end if
-  entry=>io_stream(size(io_stream))
+  ! add this instance to io_stream array
+  io_NSTREAMS = io_NSTREAMS +1
+  call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
+  entry=>io_stream(io_NSTREAMS)
   
   ! 2d specific
   entry%ptr3(1:1,1:size(data)) => data
@@ -928,7 +916,6 @@ end subroutine
     entry%freq_unit=freq_unit
     entry%addcounter   = 0
     entry%is_in_use=.true.
-    io_NSTREAMS=io_NSTREAMS+1
 
     if(entry%glsize(1)==mesh%nod2D  .or. entry%glsize(2)==mesh%nod2D) then
       entry%is_elem_based = .false.
