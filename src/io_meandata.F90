@@ -13,9 +13,6 @@ module io_MEANDATA
 !
   integer, parameter  :: i_real8=8, i_real4=4
 
-  integer, parameter :: root_rank = 0
-
-
   type Meandata
     private
     integer                                            :: ndim
@@ -42,6 +39,7 @@ module io_MEANDATA
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     integer :: callback_level = 0
+    integer :: root_rank = 0
   contains
     final destructor
   end type  
@@ -505,7 +503,7 @@ subroutine create_new_file(entry)
 
   type(Meandata), intent(inout) :: entry
   ! Serial output implemented so far
-  if (mype/=root_rank) return
+  if (mype/=entry%root_rank) return
   ! create an ocean output file
   write(*,*) 'initializing I/O file for ', trim(entry%name)
 
@@ -573,7 +571,7 @@ subroutine write_mean(entry, entry_index)
 
 
   ! Serial output implemented so far
-  if (mype==root_rank) then
+  if (mype==entry%root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
   end if
@@ -582,29 +580,29 @@ subroutine write_mean(entry, entry_index)
   size2=entry%glsize(2)
 !___________writing 8 byte real_________________________________________ 
   if (entry%accuracy == i_real8) then
-     if (mype==root_rank) allocate(entry%aux_r8(size2))
+     if (mype==entry%root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2, entry%comm)
+         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, 2, entry%comm)
        else
-         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, root_rank, 2, entry%comm)
+         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, 2, entry%comm)
        end if
-        if (mype==root_rank) then
+        if (mype==entry%root_rank) then
           entry%callback_level = lev
           call write_netcdf_callback(entry_index)
         end if
      end do
-     if (mype==root_rank) deallocate(entry%aux_r8)
+     if (mype==entry%root_rank) deallocate(entry%aux_r8)
 !___________writing real 4 byte real _________________________________________ 
   elseif (entry%accuracy == i_real4) then
-     if (mype==root_rank) allocate(aux_r4(size2))
+     if (mype==entry%root_rank) allocate(aux_r4(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2, entry%comm)
+         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, 2, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, root_rank, 2, entry%comm)
+         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, 2, entry%comm)
        end if
-        if (mype==root_rank) then
+        if (mype==entry%root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
@@ -612,7 +610,7 @@ subroutine write_mean(entry, entry_index)
            end if
         end if
      end do
-     if (mype==root_rank) deallocate(aux_r4)
+     if (mype==entry%root_rank) deallocate(aux_r4)
   endif
 
 end subroutine
@@ -714,7 +712,7 @@ subroutine output(istep, mesh)
 
      if (do_output) then
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
-        if(mype == root_rank) then
+        if(mype == entry%root_rank) then
           if(filepath /= trim(entry%filename)) then
             if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
             entry%filename = filepath
