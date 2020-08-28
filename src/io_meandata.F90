@@ -886,6 +886,7 @@ end subroutine
   subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
     use mod_mesh
     use g_PARSUP
+    use io_netcdf_workaround_module
     type(Meandata), intent(inout) :: entry
     character(len=*),      intent(in)    :: name, description, units
     integer,               intent(in)    :: freq
@@ -894,6 +895,7 @@ end subroutine
     type(t_mesh), intent(in), target     :: mesh
     ! EO args
     integer err
+    logical async_netcdf_allowed
     
     entry%accuracy = accuracy
 
@@ -925,6 +927,8 @@ end subroutine
       if(mype == 0) print *,"can not determine if ",trim(name)," is node or elem based"
       stop
     end if
+
+    entry%root_rank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
 
     call MPI_Comm_dup(MPI_COMM_FESOM, entry%comm, err)
   end subroutine
