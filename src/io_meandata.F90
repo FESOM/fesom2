@@ -3,11 +3,12 @@ module io_MEANDATA
   use o_PARAM, only : WP
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
+  use async_threads_module
 
   implicit none
 #include "netcdf.inc"
   private
-  public output
+  public output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -38,8 +39,13 @@ module io_MEANDATA
     logical :: is_elem_based = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
+    type(thread_type) thread
     integer :: callback_level = 0
     integer :: root_rank = 0
+    logical :: thread_running = .false.
+    real(real64), allocatable, dimension(:,:) :: local_values_r8_copy
+    real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
+    real(kind=WP) :: ctime_copy
   contains
     final destructor
   end type  
@@ -574,7 +580,7 @@ subroutine write_mean(entry, entry_index)
   ! Serial output implemented so far
   if (mype==entry%root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
-     call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, ctime, 1), __LINE__)
+     call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
   end if
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
@@ -585,9 +591,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==entry%root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        else
-         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
           entry%callback_level = lev
@@ -600,9 +606,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==entry%root_rank) allocate(aux_r4(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
@@ -713,6 +719,10 @@ subroutine output(istep, mesh)
      endif
 
      if (do_output) then
+
+        if(entry%thread_running) call entry%thread%join()
+        entry%thread_running = .false.
+
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         if(mype == entry%root_rank) then
           if(filepath /= trim(entry%filename)) then
@@ -740,7 +750,17 @@ subroutine output(istep, mesh)
           write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
         end if
 
-        call do_output_callback(n)
+        if (entry%accuracy == i_real8) then
+          entry%local_values_r8_copy = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
+          entry%local_values_r8 = 0._real64 ! clean_meanarrays
+        else if (entry%accuracy == i_real4) then
+          entry%local_values_r4_copy = entry%local_values_r4 /real(entry%addcounter,real32)  ! compute_means
+          entry%local_values_r4 = 0._real32 ! clean_meanarrays
+        end if
+        entry%addcounter   = 0  ! clean_meanarrays
+        entry%ctime_copy = ctime
+        call entry%thread%run()
+        entry%thread_running = .true.
      endif
   end do
   lfirst=.false.
@@ -753,22 +773,20 @@ subroutine do_output_callback(entry_index)
   type(Meandata), pointer :: entry
 
   entry=>io_stream(entry_index)
-
-  if (entry%accuracy == i_real8) then
-     entry%local_values_r8 = entry%local_values_r8 /real(entry%addcounter,real64)  ! compute_means
-     call write_mean(entry, entry_index)
-     entry%local_values_r8 = 0._real64 ! clean_meanarrays
-
-  elseif (entry%accuracy == i_real4) then
-     entry%local_values_r4 = entry%local_values_r4 /real(entry%addcounter,real32) ! compute_means
-     call write_mean(entry, entry_index)
-     entry%local_values_r4 = 0._real32 ! clean_meanarrays
-
-  endif  ! accuracy
-
-  entry%addcounter   = 0  ! clean_meanarrays
+  call write_mean(entry, entry_index)
 end subroutine
 
+
+subroutine finalize_output()
+  integer i
+  type(Meandata), pointer :: entry
+
+  do i=1, io_NSTREAMS
+    entry=>io_stream(i)
+    if(entry%thread_running) call entry%thread%join()
+    entry%thread_running = .false.    
+  end do
+end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -896,8 +914,12 @@ end subroutine
     integer,               intent(in)    :: accuracy
     type(t_mesh), intent(in), target     :: mesh
     ! EO args
-    integer err
     logical async_netcdf_allowed
+    integer provided_mpi_thread_support_level
+    integer entry_index
+    integer err
+    
+    entry_index = io_NSTREAMS
     
     entry%accuracy = accuracy
 
@@ -930,9 +952,23 @@ end subroutine
       stop
     end if
 
+    if (accuracy == i_real8) then
+      allocate(entry%local_values_r8_copy(size(entry%local_values_r8, dim=1), size(entry%local_values_r8, dim=2)))
+    else if (accuracy == i_real4) then
+      allocate(entry%local_values_r4_copy(size(entry%local_values_r4, dim=1), size(entry%local_values_r4, dim=2)))
+    end if
+
+    ! set up async output
+    
     entry%root_rank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
 
     call MPI_Comm_dup(MPI_COMM_FESOM, entry%comm, err)
+
+    call entry%thread%initialize(do_output_callback, entry_index)
+    if(.not. async_netcdf_allowed) call entry%thread%disable_async()
+  
+    call MPI_Query_thread(provided_mpi_thread_support_level, err)
+    if(provided_mpi_thread_support_level < MPI_THREAD_FUNNELED) call entry%thread%disable_async()    
   end subroutine
 
 
@@ -944,7 +980,7 @@ end subroutine
     if(status /= NF_NOERR) then
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
-    endif   
+    end if   
   end subroutine
 
 
