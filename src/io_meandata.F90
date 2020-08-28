@@ -41,7 +41,6 @@ module io_MEANDATA
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
-    integer :: callback_level = 0
     integer :: root_rank = 0
     logical :: thread_running = .false.
     real(real64), allocatable, dimension(:,:) :: local_values_r8_copy
@@ -598,8 +597,11 @@ subroutine write_mean(entry, entry_index)
          call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
-          entry%callback_level = lev
-          call write_netcdf_callback(entry_index)
+          if (entry%ndim==1) then
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
+          elseif (entry%ndim==2) then
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+          end if
         end if
      end do
 
@@ -627,26 +629,6 @@ subroutine write_mean(entry, entry_index)
 end subroutine
 
 
-subroutine write_netcdf_callback(entry_index)
-  integer, intent(in) :: entry_index
-  ! EO args
-  type(Meandata), pointer :: entry
-  integer size2
-  integer lev
-  
-  entry=>io_stream(entry_index)
-  size2 = entry%glsize(2)
-  lev = entry%callback_level
-
-  if (entry%ndim==1) then
-    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
-  elseif (entry%ndim==2) then
-    call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
-  end if
-end subroutine
-!
-!--------------------------------------------------------------------------------------------
-!
 subroutine update_means
   use g_PARSUP
   implicit none
