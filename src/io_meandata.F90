@@ -22,6 +22,7 @@ module io_MEANDATA
     real(real64), allocatable, dimension(:,:) :: local_values_r8
     real(real32), allocatable, dimension(:,:) :: local_values_r4
     real(real64), allocatable :: aux_r8(:)
+    real(real32), allocatable :: aux_r4(:)
     integer                                            :: addcounter=0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
     character(500)                                     :: filename
@@ -570,7 +571,6 @@ subroutine write_mean(entry, entry_index)
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  real(real32),   allocatable   :: aux_r4(:)
   integer                       :: size1, size2
   integer                       :: lev
   integer, intent(in) :: entry_index
@@ -587,8 +587,10 @@ subroutine write_mean(entry, entry_index)
   size2=entry%glsize(2)
   tag = entry_index ! if we have a big value here, like entry_index+10000, it takes forever to run (at least on mistral)
 !___________writing 8 byte real_________________________________________ 
-  if (entry%accuracy == i_real8) then
-     if (mype==entry%root_rank) allocate(entry%aux_r8(size2))
+  if(entry%accuracy == i_real8) then
+     if(mype==entry%root_rank) then
+       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+     end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
          call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
@@ -600,26 +602,27 @@ subroutine write_mean(entry, entry_index)
           call write_netcdf_callback(entry_index)
         end if
      end do
-     if (mype==entry%root_rank) deallocate(entry%aux_r8)
-!___________writing real 4 byte real _________________________________________ 
-  elseif (entry%accuracy == i_real4) then
-     if (mype==entry%root_rank) allocate(aux_r4(size2))
+
+!___________writing 4 byte real _________________________________________ 
+  else if (entry%accuracy == i_real4) then
+     if(mype==entry%root_rank) then
+       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+     end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
      end do
-     if (mype==entry%root_rank) deallocate(aux_r4)
-  endif
+  end if
 
 end subroutine
 
