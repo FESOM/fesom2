@@ -568,6 +568,7 @@ subroutine write_mean(entry, entry_index)
   integer                       :: size1, size2
   integer                       :: lev
   integer, intent(in) :: entry_index
+  integer tag
 
 
   ! Serial output implemented so far
@@ -578,14 +579,15 @@ subroutine write_mean(entry, entry_index)
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
   size2=entry%glsize(2)
+  tag = entry_index ! if we have a big value here, like entry_index+10000, it takes forever to run (at least on mistral)
 !___________writing 8 byte real_________________________________________ 
   if (entry%accuracy == i_real8) then
      if (mype==entry%root_rank) allocate(entry%aux_r8(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, 2, entry%comm)
+         call gather_nod2D (entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        else
-         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, 2, entry%comm)
+         call gather_elem2D(entry%local_values_r8(lev,1:size(entry%local_values_r8,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
           entry%callback_level = lev
@@ -598,9 +600,9 @@ subroutine write_mean(entry, entry_index)
      if (mype==entry%root_rank) allocate(aux_r4(size2))
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, 2, entry%comm)
+         call gather_real4_nod2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, 2, entry%comm)
+         call gather_real4_elem2D(entry%local_values_r4(lev,1:size(entry%local_values_r4,dim=2)), aux_r4, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
