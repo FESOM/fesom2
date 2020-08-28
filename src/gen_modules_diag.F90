@@ -16,7 +16,7 @@ module diagnostics
   private
 !!PS   
   public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
-            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
+            compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, UV_d_Omega, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
             std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_RHOZ, &
             compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
@@ -26,7 +26,7 @@ module diagnostics
   real(kind=WP),  save, allocatable, target      :: rhs_diag(:)
   real(kind=WP),  save, allocatable, target      :: curl_stress_surf(:)
   real(kind=WP),  save, allocatable, target      :: curl_vel3(:,:)
-  real(kind=WP),  save, allocatable, target      :: wrhof(:,:), rhof(:,:)
+  real(kind=WP),  save, allocatable, target      :: wrhof(:,:), rhof(:,:), UV_d_Omega(:,:)
   real(kind=WP),  save, allocatable, target      :: u_x_u(:,:), u_x_v(:,:), v_x_v(:,:), v_x_w(:,:), u_x_w(:,:)
   real(kind=WP),  save, allocatable, target      :: dudx(:,:), dudy(:,:), dvdx(:,:), dvdy(:,:), dudz(:,:), dvdz(:,:), av_dudz(:,:), av_dvdz(:,:), av_dudz_sq(:,:)
   real(kind=WP),  save, allocatable, target      :: utau_surf(:), utau_bott(:)
@@ -210,13 +210,14 @@ subroutine diag_energy(mode, mesh)
 #include "associate_mesh.h"
 !=====================
   if (firstcall) then  !allocate the stuff at the first call
-     allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D))
+     allocate(wrhof(nl, myDim_nod2D), rhof(nl, myDim_nod2D), UV_d_Omega(nl-1, myDim_elem2D))
      allocate(u_x_u(nl-1, myDim_nod2D), u_x_v(nl-1, myDim_nod2D), v_x_v(nl-1, myDim_nod2D), v_x_w(nl-1, myDim_elem2D), u_x_w(nl-1, myDim_elem2D))
      allocate(dudx(nl-1, myDim_nod2D), dudy(nl-1, myDim_nod2D), dvdx(nl-1, myDim_nod2D), dvdy(nl-1, myDim_nod2D), dudz(nl, myDim_elem2D), dvdz(nl, myDim_elem2D))
      allocate(utau_surf(myDim_elem2D), utau_bott(myDim_elem2D), av_dudz_sq(nl, myDim_elem2D), av_dudz(nl, myDim_elem2D), av_dvdz(nl, myDim_elem2D))
      allocate(u_surf(myDim_elem2D), v_surf(myDim_elem2D), u_bott(myDim_elem2D), v_bott(myDim_elem2D), stress_bott(2, myDim_elem2D))
      rhof  =0.
      wrhof=0.
+     UV_d_Omega=0.
      u_x_u=0.
      u_x_v=0.
      v_x_v=0.
@@ -298,6 +299,12 @@ subroutine diag_energy(mode, mesh)
         ilo=min(nz, nzmax-1)
         u_x_w(nz,n)=sum(Wvel(nz, elnodes))/3.*(UV(1, iup, n)*helem(iup ,n)+UV(1, ilo, n)*helem(ilo,n))/(helem(iup ,n)+helem(ilo ,n))
         v_x_w(nz,n)=sum(Wvel(nz, elnodes))/3.*(UV(2, iup, n)*helem(iup ,n)+UV(2, ilo, n)*helem(ilo,n))/(helem(iup ,n)+helem(ilo ,n))
+     END DO
+     DO nz=1, nzmax-1
+        if (use_global_tides) then
+           UV_d_Omega(nz,n)=helem(nz,n)*(UV(1,nz,n)*sum(gradient_sca(1:3,n)*(-ssh_gp(elnodes)))  &
+                                        +UV(2,nz,n)*sum(gradient_sca(4:6,n)*(-ssh_gp(elnodes))) )
+        end if
      END DO
   END DO
   ! this loop might be very expensive
