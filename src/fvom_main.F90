@@ -337,6 +337,7 @@ subroutine main_finalize
   USE g_PARSUP, only: mype, npes, par_ex, MPI_COMM_FESOM, MPIERR, MPI_Wtime
   use g_clock, only: clock_finish
   USE o_PARAM, only: WP
+  USE io_MEANDATA, only: finalize_output
 
   IMPLICIT NONE
 
