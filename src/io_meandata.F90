@@ -584,7 +584,7 @@ subroutine write_mean(entry, entry_index)
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
   size2=entry%glsize(2)
-  tag = entry_index ! if we have a big value here, like entry_index+10000, it takes forever to run (at least on mistral)
+  tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
 !___________writing 8 byte real_________________________________________ 
   if(entry%accuracy == i_real8) then
      if(mype==entry%root_rank) then
