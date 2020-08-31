@@ -504,6 +504,7 @@ subroutine read_restart(id, mesh, arg)
 
 #include  "associate_mesh.h"
 
+  ! laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then
@@ -562,8 +563,7 @@ subroutine read_restart(id, mesh, arg)
         size2=id%var(i)%dims(2)
         if (mype==0)       allocate(aux (size2))
         if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
-        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
-	laux(:)=0.        
+        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))        
         do lev=1, size1
            if (mype==0) then
               id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1

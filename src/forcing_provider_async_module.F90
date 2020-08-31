@@ -1,27 +1,15 @@
 module forcing_provider_async_module
-  use iso_c_binding
   use forcing_lookahead_reader_module
+  use async_threads_module
   implicit none
   public forcing_provider
   private
-
-    
-  type cpp_thread
-    private
-    character(:), allocatable :: filepath
-    character(:), allocatable :: varname
-    integer timeindex
-    contains
-    procedure, public :: cpp_thread_begin
-    procedure, public :: cpp_thread_end
-    procedure, private :: init
-  end type
   
 
   type forcing_provider_type
     private
     contains
-    procedure, public :: get_forcingdata
+    procedure, public, nopass :: get_forcingdata
   end type
   type(forcing_provider_type), save :: forcing_provider ! handle to singleton instance
 
@@ -32,29 +20,28 @@ module forcing_provider_async_module
     type(forcing_lookahead_reader_type) reader_a, reader_b
     type(forcing_lookahead_reader_type), pointer :: reader_current , reader_next
     integer :: netcdf_timestep_size = -1
-    type(cpp_thread) thread
+    type(thread_type) thread
+    character(:), allocatable :: thread_filepath
+    integer thread_timeindex
     contains
     procedure initialize_async_reader
   end type
   type(forcing_async_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
-
-  character(len=*), parameter :: FILENAMESUFFIX = ".nc"
   
   
   contains
 
 
-  subroutine get_forcingdata(this, varcount, varindex, filepath, fileyear, varname, time_index, forcingdata)
-    class(forcing_provider_type), intent(inout) :: this
+  subroutine get_forcingdata(varcount, varindex, async_netcdf_allowed, filepath, fileyear, varname, time_index, forcingdata)
     integer, intent(in) :: varcount
     integer, intent(in) :: varindex ! todo: remove this arg and just use a hashmap for varname
+    logical async_netcdf_allowed
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear
     character(len=*), intent(in) :: varname
     integer, intent(in) :: time_index
     real(4), intent(out) :: forcingdata(:,:)
     ! EO args
-    type(forcing_async_reader_type), allocatable :: tmparr(:)
     type(forcing_lookahead_reader_type) new_reader_a, new_reader_b
     
     ! init our all_readers array if not already done
@@ -68,14 +55,19 @@ module forcing_provider_async_module
     
     if( all_readers(varindex)%netcdf_timestep_size == -1 ) then ! reader has never been initialized
       all_readers(varindex)%netcdf_timestep_size = 0
-      call all_readers(varindex)%initialize_async_reader(varindex, filepath, fileyear, varname)
+      call all_readers(varindex)%initialize_async_reader(filepath, fileyear, varname)
       
       ! attach thread for this forcing field to the c++ library
-      call all_readers(varindex)%thread%init(varindex, filepath, varname)
+      all_readers(varindex)%thread_filepath = filepath
+      all_readers(varindex)%thread_timeindex = -1
+      call all_readers(varindex)%thread%initialize(thread_callback, varindex)
+      if(.not. async_netcdf_allowed) call all_readers(varindex)%thread%disable_async()
+      
     else if(fileyear /= all_readers(varindex)%fileyear) then
       ! stop the thread, close our reader and create a new one
-      if(all_readers(varindex)%thread%timeindex == time_index) then
-        call all_readers(varindex)%thread%cpp_thread_end(varindex)
+      if(all_readers(varindex)%thread_timeindex == time_index) then
+        call all_readers(varindex)%thread%join()
+        all_readers(varindex)%thread_timeindex = -1
       end if
       
       call all_readers(varindex)%reader_a%finalize()
@@ -83,79 +75,43 @@ module forcing_provider_async_module
       all_readers(varindex)%reader_a = new_reader_a
       all_readers(varindex)%reader_b = new_reader_b
 
-      call all_readers(varindex)%initialize_async_reader(varindex, filepath, fileyear, varname)
+      call all_readers(varindex)%initialize_async_reader(filepath, fileyear, varname)
     end if
 
-call assert(allocated(all_readers), __LINE__)
-call assert(size(all_readers)>=varindex, __LINE__)
-if(.not. associated(all_readers(varindex)%reader_current, all_readers(varindex)%reader_a)) stop __LINE__
-if(.not. associated(all_readers(varindex)%reader_next, all_readers(varindex)%reader_b)) stop __LINE__
-
+    call assert(size(all_readers)>=varindex, __LINE__)
+    
     ! join thread
-    if(all_readers(varindex)%thread%timeindex == time_index) then
-      call all_readers(varindex)%thread%cpp_thread_end(varindex)
+    if(all_readers(varindex)%thread_timeindex == time_index) then
+      call all_readers(varindex)%thread%join()
+      all_readers(varindex)%thread_timeindex = -1
     end if
 
     call all_readers(varindex)%reader_current%yield_data(time_index, forcingdata)
 
     ! todo: kick off the thread before we fill the forcingdata array
-    if(all_readers(varindex)%thread%timeindex == -1) then ! we did not already kick off a thread
+    if(all_readers(varindex)%thread_timeindex == -1) then ! we did not already kick off a thread
       if(.not. all_readers(varindex)%reader_next%timeindex_in_cache_bounds(time_index+PREFETCH_SIZE)) then
         if(all_readers(varindex)%netcdf_timestep_size >= time_index+PREFETCH_SIZE) then
           ! prefetch the next timestep asynchronously
-          call all_readers(varindex)%thread%cpp_thread_begin(varindex, time_index+PREFETCH_SIZE)
+          call assert(all_readers(varindex)%thread_timeindex == -1, __LINE__)
+          all_readers(varindex)%thread_timeindex = time_index+PREFETCH_SIZE
+          call all_readers(varindex)%thread%run()
         end if
       end if
     end if
     
   end subroutine
-  
-  
-  subroutine init(this, varindex, filepath, varname)
-    class(cpp_thread), target :: this
-    integer, intent(in) :: varindex
-    character(len=*), intent(in) :: filepath
-    character(len=*), intent(in) :: varname
+
+
+  subroutine thread_callback(index)
+    integer, intent(in) :: index
     ! EO args
-    
-    this%filepath = filepath
-    this%varname = varname
-    this%timeindex = -1
-
-   call init_ccall(varindex)
+    call all_readers(index)%reader_next%timeindex_hint(all_readers(index)%thread_timeindex)
   end subroutine
 
 
-  subroutine cpp_thread_begin(this, varindex, timeindex)
-    class(cpp_thread) :: this
-    integer, intent(in) :: varindex
-    integer, intent(in) :: timeindex
-    ! EO args
-    call assert(this%timeindex == -1, __LINE__)
-    this%timeindex = timeindex
-    call begin_ccall(varindex)    
-  end subroutine
-
-
-   subroutine cpp_thread_end(this, varindex)
-    class(cpp_thread), intent(inout) :: this
-    integer, intent(in) :: varindex
-    ! EO args  
-    call end_ccall(varindex)
-    this%timeindex = -1
-  end subroutine
-
-
-  subroutine fortran_call(index) bind (C, name="fortran_call")
-    integer(c_int), intent(in), value :: index
-    ! EO args
-    call all_readers(index)%reader_next%timeindex_hint(all_readers(index)%thread%timeindex)
-  end subroutine
-
-
-  subroutine initialize_async_reader(this, varindex, filepath, fileyear, varname)
+  subroutine initialize_async_reader(this, filepath, fileyear, varname)
     class(forcing_async_reader_type), target, intent(inout) :: this
-    integer, intent(in) :: varindex
     character(len=*), intent(in) :: filepath
     integer, intent(in) :: fileyear
     character(len=*), intent(in) :: varname

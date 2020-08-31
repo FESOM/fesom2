@@ -50,11 +50,11 @@ use io_mesh_info, only: write_mesh_info
 use diagnostics,  only: compute_diagnostics
 use mo_tidal
 #if defined (__oasis)
-  use cpl_driver
+use cpl_driver
 #endif
-  IMPLICIT NONE
+IMPLICIT NONE
 
-integer :: n, offset, row, i
+integer :: n, offset, row, i, provided
 integer, INTENT(OUT) :: nsteps
 real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
 real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
@@ -70,9 +70,9 @@ type(t_mesh), target, save      :: mesh
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
-    call MPI_INIT(i) 
+    call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
-
+    
 #if defined (__oasis)
     call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
@@ -133,7 +133,7 @@ type(t_mesh), target, save      :: mesh
     call cpl_oasis3mct_define_unstr(mesh)
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
-
+    
 
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
@@ -321,7 +321,7 @@ subroutine main_timestepping(nsteps)
         rtime_write_restart = rtime_write_restart + t6 - t5
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
     end do
-
+    
 end subroutine main_timestepping
 
 
@@ -341,6 +341,8 @@ subroutine main_finalize
   IMPLICIT NONE
 
   real(kind=WP)     :: t0, t1
+
+    call finalize_output()
 
     !___FINISH MODEL RUN________________________________________________________
 
@@ -404,5 +406,5 @@ subroutine main_finalize
 #if !defined (__ifsinterface)
     call par_ex
 #endif
-
+    
 end subroutine main_finalize

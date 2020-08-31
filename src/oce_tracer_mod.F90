@@ -42,10 +42,10 @@ END SUBROUTINE tracer_gradient_elements
 SUBROUTINE init_tracers_AB(tr_num, mesh)
 use g_config, only: flag_debug
 use g_parsup
-use o_PARAM, only: tracer_adv
 use o_arrays
 use g_comm_auto
 use mod_mesh
+
 IMPLICIT NONE
 integer                    :: tr_num,n,nz 
 type(t_mesh), intent(in)   , target :: mesh
@@ -79,7 +79,7 @@ SUBROUTINE relax_to_clim(tr_num, mesh)
 use g_config,only: dt
 USE g_PARSUP
 use o_arrays
-use o_PARAM, only: tracer_adv
+
 IMPLICIT NONE
 
 type(t_mesh), intent(in) , target :: mesh

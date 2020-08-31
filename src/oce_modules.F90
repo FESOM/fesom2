@@ -73,7 +73,8 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 ! Tracers
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
-integer                       :: tracer_adv=1
+character(20)                 :: tra_adv_ver, tra_adv_hor, tra_adv_lim
+real(kind=WP)                 :: tra_adv_ph, tra_adv_pv
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_max_cfl=1.e-5_WP
 
@@ -152,7 +153,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-            ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
+            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl
@@ -169,10 +170,9 @@ USE, intrinsic :: ISO_FORTRAN_ENV
 ! of open boundaries and advection schemes
 !
 ! The fct part
-integer                                       :: fct_iter=1
-real(kind=WP),allocatable,dimension(:,:)      :: fct_LO, fct_HO           ! Low-order solution
-real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_h, fct_adf_h2    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
-real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_v, fct_adf_v2    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
+real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
+real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
+real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
 
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
@@ -191,22 +191,22 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
-real(kind=WP), allocatable    :: UV(:,:,:)
-real(kind=WP), allocatable    :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
-real(kind=WP), allocatable    :: eta_n(:), d_eta(:)
-real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
-real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
-real(kind=WP), allocatable    :: CFL_z(:,:)
-real(kind=WP), allocatable    :: stress_surf(:,:)
-REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_x(:)
-REAL(kind=WP), ALLOCATABLE    :: stress_atmoce_y(:)
-real(kind=WP), allocatable    :: T_rhs(:,:) 
-real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
-real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
-real(kind=WP), allocatable    :: S_rhs(:,:)
-real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
-real(kind=WP), allocatable    :: del_ttf(:,:)
-real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
+real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
+real(kind=WP), allocatable         :: UV(:,:,:)
+real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
+real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
+real(kind=WP), allocatable         :: CFL_z(:,:)
+real(kind=WP), allocatable         :: stress_surf(:,:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
+real(kind=WP), allocatable         :: T_rhs(:,:) 
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
+real(kind=WP), allocatable         :: S_rhs(:,:)
+real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+real(kind=WP), allocatable         :: del_ttf(:,:)
+real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)

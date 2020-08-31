@@ -31,6 +31,7 @@ use g_cvmix_tidal
 use Toy_Channel_Soufflet
 use array_setup_interface
 use oce_initial_state_interface
+use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
@@ -117,7 +118,7 @@ type(t_mesh), intent(in) , target :: mesh
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	call fct_init(mesh)
+    call oce_adv_tra_fct_init(mesh)
     call muscl_adv_init(mesh) !!PS test
 	!=====================
 	! Initialize fields

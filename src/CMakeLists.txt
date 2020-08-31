@@ -3,6 +3,8 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
+option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB sources_Fortran ${src_home}/*.F90)
@@ -27,7 +29,7 @@ list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 # depends on the parms library
 add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
-add_subdirectory(forcing_provider_async)
+add_subdirectory(async_threads_cpp)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
@@ -42,6 +44,9 @@ else()
 add_executable(${PROJECT_NAME} ${sources_Fortran})
 endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE PARMS -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
+if(${DISABLE_MULTITHREADING})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+endif()
 if(${FESOM_COUPLED})
    if(${CRAY})
       include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS_cray.cmake)
@@ -61,11 +66,13 @@ if(${VERBOSE})
 endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -init=zero)
+	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -init=zero -no-wrap-margin)
 #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
-	target_compile_options(${PROJECT_NAME} PRIVATE -fdefault-real-8 -ffree-line-length-none -g -O3)
-	#target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -march=native -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -march=native -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
+        target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
        target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64)
 endif()
@@ -74,7 +81,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTO
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} forcing_provider_async)
+target_link_libraries(${PROJECT_NAME} async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 

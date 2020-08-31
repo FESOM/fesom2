@@ -1,13 +1,12 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(forcing_provider_async CXX C Fortran) #  the FortranCInterface requires the C language to be enabled
+project(async_threads_cpp CXX C Fortran) #  the FortranCInterface requires the C language to be enabled
 
 # get our source files
-set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-file(GLOB sources_CXX ${src_home}/*.cpp)
+file(GLOB sources_CXX ${CMAKE_CURRENT_LIST_DIR}/*.cpp)
 
 include(FortranCInterface)
-FortranCInterface_HEADER(ForcingReaderFCMacros.h MACRO_NAMESPACE "ForcingReaderFCMacros_" SYMBOLS init_ccall begin_ccall end_ccall)
+FortranCInterface_HEADER(ThreadsManagerFCMacros.h MACRO_NAMESPACE "ThreadsManagerFCMacros_" SYMBOLS init_ccall begin_ccall end_ccall)
 
 add_library(${PROJECT_NAME} ${sources_CXX})
 target_include_directories(${PROJECT_NAME}
