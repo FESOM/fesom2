@@ -37,7 +37,7 @@ module io_data_strategy_module
   contains
     procedure, nopass :: initialize => initialize_float
     procedure, nopass :: netcdf_type => netcdf_type_float
-    procedure, pass :: add_values => add_values_float
+    procedure :: add_values => add_values_float
   end type
 
 
@@ -47,7 +47,7 @@ module io_data_strategy_module
   contains
     procedure, nopass :: initialize => initialize_double
     procedure, nopass :: netcdf_type => netcdf_type_double
-    procedure, pass :: add_values => add_values_double
+    procedure :: add_values => add_values_double
   end type
 
 
