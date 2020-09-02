@@ -493,7 +493,7 @@ SUBROUTINE net_rec_from_atm(action)
      atm_net_fluxes_north=0.
      atm_net_fluxes_south=0.
      if (my_global_rank==target_root) then
-	CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), MPIerr)
         CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), MPIerr)
         CALL MPI_Waitall(2, request, status, MPIerr)
      end if

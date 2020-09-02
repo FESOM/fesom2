@@ -395,6 +395,9 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
+  !write(*,*) 'LA DEBUG local_idx_of(iceberg_elem)=',local_idx_of(iceberg_elem)
+  call icb2fesom_grid(ib,i_have_element,local_idx_of(iceberg_elem))
+  write(*,*) 'LA DEBUG finished fw coupling'
   !write(*,*) 'LA DEBUG: iceberg_dyn - u_ib: ',u_ib,', new_u_ib: ',new_u_ib
   !new_u_ib = 2.0
   !new_v_ib = 0.0
@@ -447,9 +450,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 !  write(*,*) 'LA DEBUG: left_mype > 0'
    lon_rad = old_lon
    lat_rad = old_lat
-   write(*,*) 'LA DEBUG 450: start parallel2coast'
    call parallel2coast(new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
-   write(*,*) 'LA DEBUG 452: start trajectory'
    call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt/REAL(steps_per_FESOM_step))
    u_ib = new_u_ib
@@ -843,19 +844,17 @@ subroutine parallel2coast(u, v, lon,lat, elem)
 #ifdef use_cavity
   SELECT CASE ( coastal_nodes(elem) ) !num of "coastal" points
 #else
-  write(*,*) 'LA DEBUG: not use cavity!'
-  write(*,*) 'LA DEBUG: index_nod2D=',index_nod2D
-  write(*,*) 'LA DEBUG: elem2D_nodes=',elem2D_nodes
-  write(*,*) 'LA DEBUG: elem=',elem
+  !write(*,*) 'LA DEBUG: not use cavity!'
+  !write(*,*) 'LA DEBUG: index_nod2D=',index_nod2D
+  !write(*,*) 'LA DEBUG: elem2D_nodes=',elem2D_nodes
+  !write(*,*) 'LA DEBUG: elem=',elem
   SELECT CASE ( sum( index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
   !SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
 #endif
    CASE (0) !...coastal points: do nothing
-    write(*,*) 'LA DEBUG 849: case 0'
     return
     
    CASE (1) !...coastal point
-    write(*,*) 'LA DEBUG 853: case 1'
    n = 0
    i = 1
    velocity = (/ u, v /)
@@ -898,10 +897,8 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     !write(*,*) 'distances :' , d1, d2
     !write(*,*) 'velocity vor :' , velocity
     if (d1 < d2) then
-      write(*,*) 'LA DEBUG 896: case 0, start projection'
       call projection(velocity, n(2), n(1))
     else
-      write(*,*) 'LA DEBUG 899: case 0, start projection'
       call projection(velocity, n(3), n(1))
     end if
     !write(*,*) 'velocity nach:', velocity
@@ -914,7 +911,6 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     
     
    CASE (2) !...coastal points
-      write(*,*) 'LA DEBUG 912: case 2'
     n = 0
     i = 1
     velocity = (/ u, v /)
@@ -929,12 +925,10 @@ subroutine parallel2coast(u, v, lon,lat, elem)
        i = i+1
       end if
     end do   
-      write(*,*) 'LA DEBUG 927: case 2, start projection'
     call projection(velocity, n(1), n(2))
     
    
    CASE DEFAULT 
-      write(*,*) 'LA DEBUG 932: case default'
     return  	!mesh element MUST NOT have 3 coastal points!
 
  END SELECT

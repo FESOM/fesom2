@@ -1,7 +1,17 @@
 subroutine allocate_icb()
   use iceberg_params
   use g_config
- 
+  use g_PARSUP
+
+  integer       :: n2
+  n2=myDim_nod2D+eDim_nod2D
+
+  allocate(ibhf(n2), ibfwb(n2), ibfwl(n2), ibfwe(n2))
+  ibhf=0
+  ibfwb=0
+  ibfwl=0
+  ibfwe=0
+
   allocate(calving_day(ib_num))
   calving_day = 2 !271.0 	!28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
@@ -65,8 +75,14 @@ subroutine allocate_icb()
   lvle_mean = 0.0
   allocate(lvlb_mean(ib_num))
   lvlb_mean = 0.0 !averaged volume losses
-  allocate(fw_flux_ib(ib_num))
+  allocate(fwe_flux_ib(ib_num))
+  allocate(fwl_flux_ib(ib_num))
+  allocate(fwb_flux_ib(ib_num))
   allocate(heat_flux_ib(ib_num))
+  fwe_flux_ib = 0.0
+  fwl_flux_ib = 0.0
+  fwb_flux_ib = 0.0
+  heat_flux_ib = 0.0
   allocate(arr_block(15*ib_num))
   allocate(elem_block(ib_num))
   allocate(vl_block(4*ib_num))

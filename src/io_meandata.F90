@@ -74,6 +74,8 @@ module io_MEANDATA
 !--------------------------------------------------------------------------------------------
 !
 subroutine ini_mean_io
+  use iceberg_params
+  
   implicit none
   integer           :: i
   character(len=10) :: id_string
@@ -178,7 +180,12 @@ subroutine ini_mean_io
 #if defined (__oifs)
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',             'none',   ice_alb(:),                    1, 'm', i_real4)
 #endif
-
+if (use_icebergs) then
+  call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',   'm/s',    ibfwb(:),                1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting', 'm/s',    ibfwl(:),                  1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',         'm/s',    ibfwe(:),                  1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'ibhf',  'heat flux from iceberg melting','m/s',    ibhf(:),                1, 'm', i_real4)
+end if
   if (trim(mix_scheme)=='KPP') then
      call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm', i_real4)
      call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm', i_real4)

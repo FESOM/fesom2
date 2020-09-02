@@ -1426,7 +1426,6 @@ END DO
 
     !array of 2D boundary conditions is used in ice_maEVP
     if (whichEVP > 0) then
-       write(*,*) 'LA DEBUG: mesh aux boundary conditions'
        allocate(bc_index_nod2D(myDim_nod2D+eDim_nod2D))
        bc_index_nod2D=1._WP
        do n=1, myDim_edge2D
@@ -1434,7 +1433,6 @@ END DO
           if (myList_edge2D(n)<=edge2D_in) cycle
           bc_index_nod2D(ed)=0.
        end do
-       write(*,*) 'LA DEBUG: bc_index_nod2D=',bc_index_nod2d
     end if
 
 #if defined (__oasis)

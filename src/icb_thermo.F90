@@ -34,6 +34,8 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   use g_forcing_arrays
   use g_rotate_grid
 
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, heat_flux_ib
+  
   implicit none
   
   real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
@@ -73,6 +75,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
   M_v = 0.00762 * T_d + 0.00129 * T_d**2
   M_v = M_v/86400.
+  fwl_flux_ib = M_v
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -80,7 +83,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
-  
+  fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
 
@@ -442,8 +445,9 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
 
      heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-     fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
+     !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
+     fwb_flux_ib = M_b
      !fw_flux_ib(ib) = M_b
 
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting

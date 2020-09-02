@@ -151,6 +151,7 @@ real(kind=real32) :: runtime_alltimesteps
    
     !___MODEL TIME STEPPING LOOP________________________________________________
     do n=1, nsteps        
+        !write(*,*) 'LA DEBUG start'
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='
@@ -206,8 +207,8 @@ real(kind=real32) :: runtime_alltimesteps
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
+       ! write(*,*) 'LA DEBUG end'
     end do
-    
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
