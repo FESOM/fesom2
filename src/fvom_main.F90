@@ -22,6 +22,7 @@ use io_MEANDATA
 use io_mesh_info
 use diagnostics
 use mo_tidal
+use version
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -36,6 +37,14 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh), target, save      :: mesh
+
+
+
+WRITE(*,*) "============================================================================="
+WRITE(*,*) ""
+WRITE(*,*) "                 Finite Volume Sea-ice Ocean Model"
+WRITE(*,*) ""
+CALL vesion
 
 
 #ifndef __oifs
