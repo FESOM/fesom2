@@ -395,10 +395,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
-  !write(*,*) 'LA DEBUG local_idx_of(iceberg_elem)=',local_idx_of(iceberg_elem)
-  call icb2fesom_grid(ib,i_have_element,local_idx_of(iceberg_elem))
-  write(*,*) 'LA DEBUG finished fw coupling'
-  !write(*,*) 'LA DEBUG: iceberg_dyn - u_ib: ',u_ib,', new_u_ib: ',new_u_ib
+  call icb2fesom(ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
   !new_u_ib = 2.0
   !new_v_ib = 0.0
 

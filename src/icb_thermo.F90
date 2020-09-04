@@ -34,7 +34,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   use g_forcing_arrays
   use g_rotate_grid
 
-  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, heat_flux_ib
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib
   
   implicit none
   
@@ -58,10 +58,12 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
   call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
+  fwb_flux_ib = M_b
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
   call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
+  fwbv_flux_ib = M_bv
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -447,7 +449,6 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
-     fwb_flux_ib = M_b
      !fw_flux_ib(ib) = M_b
 
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting

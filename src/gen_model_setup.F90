@@ -35,6 +35,7 @@ subroutine read_namelist
   read (20,NML=geometry)
   read (20,NML=calendar)
   read (20,NML=run_config)
+  read (20,NML=icebergs)
 !!$  read (20,NML=machine)
   close (20)
   ! ==========
