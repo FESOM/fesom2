@@ -46,6 +46,7 @@ module io_MEANDATA
     real(real64), allocatable, dimension(:,:) :: local_values_r8_copy
     real(real32), allocatable, dimension(:,:) :: local_values_r4_copy
     real(kind=WP) :: ctime_copy
+    integer :: mype_workaround
   contains
     final destructor
   end type  
@@ -753,11 +754,15 @@ end subroutine
 
 
 subroutine do_output_callback(entry_index)
+use g_PARSUP
   integer, intent(in) :: entry_index
   ! EO args
   type(Meandata), pointer :: entry
 
+
   entry=>io_stream(entry_index)
+  mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+
   call write_mean(entry, entry_index)
 end subroutine
 
@@ -952,8 +957,13 @@ end subroutine
     call entry%thread%initialize(do_output_callback, entry_index)
     if(.not. async_netcdf_allowed) call entry%thread%disable_async()
   
+    ! check if we have multi thread support available in the MPI library
+    ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
+    ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
-    if(provided_mpi_thread_support_level < MPI_THREAD_FUNNELED) call entry%thread%disable_async()    
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call entry%thread%disable_async()
+    
+    entry%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
 
 
