@@ -719,8 +719,11 @@ subroutine output(istep, mesh)
           if(filepath /= trim(entry%filename)) then
             if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
             entry%filename = filepath
-            call create_new_file(entry)
-            call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+            ! use any existing file with this name or create a new one
+            if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
+              call create_new_file(entry)
+              call assert_nf( nf_open(entry%filename, nf_write, entry%ncid), __LINE__)
+            end if
             call assoc_ids(entry)
           end if
 
