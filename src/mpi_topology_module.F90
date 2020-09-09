@@ -1,29 +1,18 @@
-module hostname_sys_module
-  contains
-
-  subroutine hostname_sys(hostname)
-    character(len=:), allocatable, intent(out) :: hostname
-    integer*4 status, hostnm
-    
-    allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
-    status = hostnm(hostname)
-  end subroutine
-end module
-
-
 module mpi_topology_module
 ! synopsis:
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
 ! collectively call mpi_topology%reset_host_head_rank if there is need to start over with the first compute node
 
-  use hostname_sys_module
   implicit none  
   public mpi_topology
   private
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank, reset_host_head_rank, am_i_host_head_rank, set_hostname_strategy
+    procedure, nopass :: next_host_head_rank
+    procedure, nopass :: reset_host_head_rank
+    procedure, nopass :: am_i_host_head_rank
+    procedure, nopass :: set_hostname_strategy
   end type
   type(mpi_topology_type) mpi_topology
 
@@ -45,6 +34,13 @@ contains
     hostname_strategy => strategy
   end subroutine
 
+  subroutine hostname_sys(hostname)
+    character(len=:), allocatable, intent(out) :: hostname
+    integer*4 status, hostnm
+    
+    allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
+    status = hostnm(hostname)
+  end subroutine
 
   ! must be called collectively
   logical function am_i_host_head_rank(communicator) result(result)
