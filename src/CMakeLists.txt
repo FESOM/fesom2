@@ -9,6 +9,16 @@ file(GLOB sources_Fortran ${src_home}/*.F90)
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
+# generate a custom file from fesom_version_info.F90 which includes the current git SHA
+set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
+set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
+list(REMOVE_ITEM sources_Fortran ${FESOM_ORIGINAL_VERSION_FILE}) # we want to compile the generated file instead
+list(APPEND sources_Fortran ${FESOM_GENERATED_VERSION_FILE})
+add_custom_command(OUTPUT ${FESOM_GENERATED_VERSION_FILE} 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 # the second arg to OUTPUT is a name for a file we never create to make sure this command will run on every re-build
+                   COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+                   COMMENT "determining ${PROJECT_NAME} git SHA ...")
+
 #if(${FESOM_STANDALONE})
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
