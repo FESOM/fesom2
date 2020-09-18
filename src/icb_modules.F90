@@ -62,6 +62,8 @@ save
   real,dimension(:), allocatable:: rho_ice          !910 RT, 945.0 bei Lichey, aus Lemke (1993)
 
   character(100):: IcebergRestartPath='../icb/iceberg.restart'
+  character(100):: IcebergRestartPath_ISM='../icb/iceberg.restart.ISM'
+  character(100):: num_non_melted_icb_file='../icb/num_non_melted_icb_file'
   character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
   character(100):: buoys_xlon_file='../icb/LON.dat'     !buoy position in deg
   character(100):: buoys_ylat_file='../icb/LAT.dat'     !buoy position in deg
@@ -91,7 +93,9 @@ save
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
   real,dimension(:), allocatable:: ibfwe   !freshwater flux into ocean from erosion
-  
+ 
+  logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
+  integer   :: num_non_melted_icb = 0 !1 if iceberg melted, 0 otherwise
   !for communication
   real,dimension(:), allocatable:: arr_block
   !real,dimension(15*ib_num):: arr_block

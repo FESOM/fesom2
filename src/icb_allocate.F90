@@ -91,4 +91,6 @@ subroutine allocate_icb()
   allocate(vl_block(4*ib_num))
   allocate(buoy_props(ib_num,12))
   buoy_props = 0.0
+  allocate(melted(ib_num))
+  melted = .false.
 end subroutine allocate_icb

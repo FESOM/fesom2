@@ -31,14 +31,9 @@ subroutine iceberg_calculation(istep)
  !==================== MODULES & DECLARATIONS ==========================!= 
 
  if(firstcall) then
-  !write(*,*) 'ib_num: ', ib_num
+  write(*,*) 'ib_num: ', ib_num
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
-  
-  if (use_icesheet_coupling==.true.) then
-    call iceberg_restart_with_icesheet
-  else
-    call iceberg_restart
-  end if
+  call iceberg_restart
   firstcall = .false.
   !call init_global_tides
   !call tides_distr
@@ -220,11 +215,11 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- !=
+ 												!=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted	!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem	!=
 #else
- use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted			!=
+ use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale			!=
 #endif
  												!=
  implicit none											!=
@@ -288,7 +283,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  lat_rad = lat_deg*rad
  
  if(volume_ib .le. smallestvol_icb) then
-  melted(ib) = .true.
+ 
   if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
    write(*,*) 'iceberg ', ib,' melted'
   end if
@@ -313,9 +308,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
   lon_deg=lon_rad/rad !rotated lon in degree   
   
   !find LOCAL element where the iceberg starts:
-  write(*,*) 'LA DEBUG lon_deg=',lon_deg,', lat_deg=',lat_deg
   call point_in_triangle(iceberg_elem, (/lon_deg, lat_deg/))
-  write(*,*) 'LA DEBUG 1 iceberg_elem=',iceberg_elem
   i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
   
   if(i_have_element) then
@@ -331,10 +324,8 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
    iceberg_elem=myList_elem2D(iceberg_elem) !global now
 #endif 
   end if
-  write(*,*) 'LA DEBUG 2 iceberg_elem=',iceberg_elem
   call com_integer(i_have_element,iceberg_elem)
- 
-  write(*,*) 'LA DEBUG 3 iceberg_elem=',iceberg_elem
+  
   if(iceberg_elem .EQ. 0) then
    	call par_ex
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
@@ -507,9 +498,9 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  												!=
 #ifdef use_cavity
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem	!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted
 #else
- use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale		!=
+ use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, melted
 #endif
  												!=
  implicit none											!=
@@ -600,6 +591,8 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  volume_ib = height_ib * length_ib * width_ib ! * rho_icb
  if(volume_ib .le. smallestvol_icb) then
   buoy_props(ib, :) = 0. ! for output: NaN or MissVal could be written here
+  melted(ib) = .true.
+!  buoy_props(ib, 13) = 1. ! LA add melted flag
   return
  end if 
  !**** check if iceberg melted in step 1 ****!
@@ -982,35 +975,42 @@ subroutine iceberg_restart
  use g_config, only : ib_num
 
  implicit none
- integer :: icbID, ib
- LOGICAL :: file_exists
- INQUIRE(FILE=IcebergRestartPath, EXIST=file_exists) 
- icbID = mype+10
- 
+ integer :: icbID_tmp, icbID_non_melted_icb, ib
+ LOGICAL :: file_exists_tmp, file_exists_icb
+ INQUIRE(FILE=num_non_melted_icb_file, EXIST=file_exists_icb) 
+ INQUIRE(FILE=IcebergRestartPath_tmp, EXIST=file_exists_tmp) 
+ icbID_tmp = mype+10
+
+ if(file_exists_icb) then
+  open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,status='old')
+  read(icbID_non_melted_icb,'(18e15.7,I,L,3e15.7)')     &
+        num_non_melted_icb
+        write(*,*) 'LA DEBUG num_non_melted_icb',num_non_melted_icb
+  ib_num = ib_num + num_non_melted_icb
+ end if
+
  call allocate_icb
  
- if(file_exists) then
-  open(unit=icbID,file=IcebergRestartPath,status='old')
+ if(file_exists_tmp) then
+  open(unit=icbID_tmp,file=IcebergRestartPath_tmp,status='old')
   
-  do ib=1, ib_num 
-  
+  do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
-   read(icbID,'(18e15.7,I,L,3e15.7)')						&
+   read(icbID_tmp,'(18e15.7,I,L,3e15.7)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib) 
-
+	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib) 
   end do
-  close(icbID)
+  close(icbID_tmp)
+  !****************************************************************
+
 
   if(mype==0) then
-  !write(*,*) 'read iceberg restart file'
+  write(*,*) 'read iceberg restart file'
 
-  !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output
-  !call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
+  if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
 
   write(*,*) '*************************************************************'
   end if
@@ -1037,80 +1037,12 @@ end subroutine iceberg_restart
 !****************************************************************************************************************************
 
 
-subroutine iceberg_restart_with_icesheet
- use iceberg_params 
- use g_parsup		!for mype
- use g_config, only : ib_num
-
- implicit none
- integer :: icbID_ISM, icbID_non_melted_icb, ib
- LOGICAL :: file_exists, file_exists_non_melted
- INQUIRE(FILE=num_non_melted_icb_file, EXIST=file_exists_non_melted) 
- INQUIRE(FILE=IcebergRestartPath_ISM, EXIST=file_exists) 
- icbID_ISM = mype+10
- icbID_non_melted_icb = mype+11
-
- call allocate_icb
- 
-! write(*,*) 'LA DEBUG open ',num_non_melted_icb_file
- open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,status='old')
-    read(icbID_non_melted_icb,*) num_non_melted_icb
- close(icbID_non_melted_icb)
-! write(*,*) 'LA DEBUG num_non_melted_icb=',num_non_melted_icb
-
- if(file_exists) then
- ! write(*,*) 'LA DEBUG open ',IcebergRestartPath_ISM
-  open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
-  do ib=1, num_non_melted_icb 
-   !read all parameters that icb_step needs:			
-   write(*,*) "ib=",ib
-   read(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
-   	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib) 
-  end do
-  close(icbID_ISM)
-
-  if(mype==0) then
-  write(*,*) 'read iceberg restart file'
-
-  !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output
-  end if
-  call init_icebergs_with_icesheet
-  write(*,*) 'initialized positions and length/width from file'
-  write(*,*) '*************************************************************'
- else
-
-  if(mype==0) then
-  write(*,*) 'no iceberg restart'
-
-  if(.NOT.ascii_out) call init_buoy_output
-
-  end if
-
-  !call init_buoys ! all PEs read LON,LAT from files  
-  !write(*,*) 'initialized positions from file'
-  call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
-  write(*,*) 'initialized positions and length/width from file'
-  write(*,*) '*************************************************************'
- end if
-
-end subroutine iceberg_restart_with_icesheet
-
-
-!****************************************************************************************************************************
-!****************************************************************************************************************************
-
-
 subroutine iceberg_out
  use iceberg_params
  use g_parsup		!for mype
  use g_clock		!for dayold
  implicit none
- integer :: icbID, icbID_ISM, ib, istep
+ integer :: icbID, icbID_ISM, icbID_non_melted_icb, ib, istep
  
  icbID = 42
  
@@ -1126,11 +1058,12 @@ subroutine iceberg_out
  if(mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
+  num_non_melted_icb = 0
   
   do ib=1, ib_num 
   
    !write all parameters that icb_step needs:
-   write(icbID,'(18e15.7,I,L,3e15.7,L)')						&
+   write(icbID,'(18e15.7,I,L,3e15.7)')						&
    	height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1141,7 +1074,8 @@ subroutine iceberg_out
    !write new restart file with only non melted icebergs
    if(melted(ib)==.false.) then
        !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+       num_non_melted_icb = num_non_melted_icb + 1
+       write(icbID_ISM,'(18e15.7,I,L,3e15.7)')						&
             height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
@@ -1152,6 +1086,15 @@ subroutine iceberg_out
   end do
   close(icbID_ISM)
   close(icbID)
+  
+  open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,position='append', status='replace')
+  write(icbID_non_melted_icb,'(18e15.7,I,L,3e15.7)')    &
+        num_non_melted_icb
+  close(icbID_non_melted_icb)
+  !****************************************************************
+
+
+
  end if
 end subroutine iceberg_out
 
@@ -1206,76 +1149,33 @@ subroutine init_icebergs
 !buoys_xlon_file > lon_deg
  open(unit=99, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file buoys_xlon_file'
- do i = 1, ib_num
+ do i = 1+num_non_melted_icb, ib_num
     read(99,*) lon_deg(i)
  end do
  close (99)
 !buoys_ylat_file > lat_deg
  open(unit=98, file=buoys_ylat_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file buoys_ylat_file'
- do i = 1, ib_num
+ do i = 1+num_non_melted_icb, ib_num
     read(98,*) lat_deg(i)
  end do
  close(98)
 !length_icb_file > length_ib
  open(unit=99, file=length_icb_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file length_icb_file'
- do i = 1, ib_num
+ do i = 1+num_non_melted_icb, ib_num
     read(99,*) length_ib(i)
  end do
  close (99)
 !width_icb_file > lat_deg
  open(unit=98, file=width_icb_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file width_icb_file'
- do i = 1, ib_num
+ do i = 1+num_non_melted_icb, ib_num
     read(98,*) width_ib(i)
  end do
  close(98)
 
 end subroutine init_icebergs
-!
-!--------------------------------------------------------------------------------------------
-!
-
-subroutine init_icebergs_with_icesheet
- use iceberg_params
- use g_config
- use g_parsup
-
- implicit none
- integer :: i
- integer :: io_error
-
-!buoys_xlon_file > lon_deg
- open(unit=99, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
- if ( io_error.ne.0) stop 'ERROR while reading file buoys_xlon_file'
- do i = 1+num_non_melted_icb, ib_num
-    read(99,*) lon_deg(i)
- end do
- close (99)
-!buoys_ylat_file > lat_deg
- open(unit=98, file=buoys_ylat_file,status='old',action='read',iostat=io_error)
- if ( io_error.ne.0) stop 'ERROR while reading file buoys_ylat_file'
- do i = 1+num_non_melted_icb, ib_num
-    read(98,*) lat_deg(i)
- end do
- close(98)
-!length_icb_file > length_ib
- open(unit=99, file=length_icb_file,status='old',action='read',iostat=io_error)
- if ( io_error.ne.0) stop 'ERROR while reading file length_icb_file'
- do i = 1+num_non_melted_icb, ib_num
-    read(99,*) length_ib(i)
- end do
- close (99)
-!width_icb_file > lat_deg
- open(unit=98, file=width_icb_file,status='old',action='read',iostat=io_error)
- if ( io_error.ne.0) stop 'ERROR while reading file width_icb_file'
- do i = 1+num_non_melted_icb, ib_num
-    read(98,*) width_ib(i)
- end do
- close(98)
-
-end subroutine init_icebergs_with_icesheet
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -1298,7 +1198,6 @@ subroutine determine_save_count
  if (mype==0) then
 
   ! open file
-  write(*,*) 'LA DEBUG open buoy file'
   status = nf_open(file_icb_netcdf, nf_nowrite, ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 
@@ -1352,7 +1251,7 @@ subroutine init_buoy_output
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id
-  integer                   :: height_id, length_id, width_id
+  integer                   :: height_id, length_id, width_id!, melted_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id
   character(100)            :: longname, att_text, description
 
@@ -1422,6 +1321,11 @@ subroutine init_buoy_output
   status = nf_def_var(ncid, 'width', NF_DOUBLE, 2, dimids, width_id)
   if (status .ne. nf_noerr) call handle_err(status)
 
+!  ! 1 additional iceberg variable melted flag, comment for buoy case
+!  
+!  status = nf_def_var(ncid, 'melted', NF_DOUBLE, 2, dimids, melted_id)
+!  if (status .ne. nf_noerr) call handle_err(status)
+  
   ! 4 additional iceberg variables (meltrates), comment for buoy case
 
   status = nf_def_var(ncid, 'bvl', NF_DOUBLE, 2, dimids, bvl_id)
@@ -1587,6 +1491,18 @@ subroutine init_buoy_output
   status = nf_PUT_ATT_TEXT(ncid, width_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
   if (status .ne. nf_noerr) call handle_err(status)
 
+!  ! 1 additional iceberg variable melted flag, comment for buoy case
+!  
+!  longname='iceberg fully melted'
+!  status = nf_PUT_ATT_TEXT(ncid, melted_id, 'long_name', len_trim(longname), trim(longname)) 
+!  if (status .ne. nf_noerr) call handle_err(status)
+!  status = nf_put_att_text(ncid, melted_id, 'units', 0, '')
+!  if (status .ne. nf_noerr) call handle_err(status)  
+!  description='open'
+!  status = nf_put_att_text(ncid, melted_id, 'description', len_trim(description), trim(description)) 
+!  if (status .ne. nf_noerr) call handle_err(status)
+!  status = nf_PUT_ATT_TEXT(ncid, melted_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+!  if (status .ne. nf_noerr) call handle_err(status)
 
   ! 4 additional iceberg variables (meltrates), comment for buoy case
 
@@ -1680,7 +1596,7 @@ subroutine write_buoy_props_netcdf
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id  
-  integer                   :: height_id, length_id, width_id
+  integer                   :: height_id, length_id, width_id!, melted_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id
   integer                   :: start(2), count(2)
   real(kind=8)              :: sec_in_year
@@ -1740,6 +1656,11 @@ subroutine write_buoy_props_netcdf
      status = nf_inq_varid(ncid, 'width',  width_id)
      if (status .ne. nf_noerr) call handle_err(status)  
 
+!     ! inquire 1 additional ID for iceberg case, comment for buoy case
+!     
+!     status = nf_inq_varid(ncid, 'melted',  melted_id)
+!     if (status .ne. nf_noerr) call handle_err(status)  
+     
      ! inquire 4 additional IDs for iceberg case, comment for buoy case
 
      status = nf_inq_varid(ncid, 'bvl',  bvl_id)
@@ -1819,6 +1740,11 @@ subroutine write_buoy_props_netcdf
 
      status=nf_put_vara_double(ncid, width_id, start, count, buoy_props(:,12)) 
      if (status .ne. nf_noerr) call handle_err(status)
+
+!     ! write 1 additional variable for melted flag
+!
+!     status=nf_put_vara_double(ncid, melted_id, start, count, buoy_props(:,13)) 
+!     if (status .ne. nf_noerr) call handle_err(status)
 
      ! write 4 additional variables for iceberg case, comment for buoy case
 

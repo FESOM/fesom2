@@ -104,9 +104,10 @@ module g_config
  
   ! *** icebergs ***
   logical                       :: use_icebergs=.false.  
+  logical                       :: use_icesheet_coupling=.false.  
   integer                       :: ib_num=0
 
-  namelist /icebergs/ use_icebergs, ib_num
+  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num
 
   ! *** others ***
   real(kind=WP)            	:: dt

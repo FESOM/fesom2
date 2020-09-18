@@ -118,7 +118,7 @@ subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   !values of the 3 local basisfunctions at the 
   !position 'coords'
   call locbafu_2D(phi,elem,(/lon_deg,lat_deg/))
-  
+
   values_u = field_u(elem2D_nodes(:,elem))
   values_v = field_v(elem2D_nodes(:,elem))
 
@@ -550,7 +550,7 @@ SUBROUTINE point_in_triangle(el2D,   pt)
   el2D=0
   !DO l=1,elem2D
   DO l=1,myDim_elem2D
-
+ 
      call locbafu_2D(werte2D, l, pt)
      
      if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
