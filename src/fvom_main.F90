@@ -219,6 +219,7 @@ subroutine main_timestepping(nsteps)
   real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
   real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
   type(t_mesh), target :: mesh
+  integer, save :: fromstep = 1
 
     mesh = meshinmod
     !=====================
@@ -248,7 +249,7 @@ subroutine main_timestepping(nsteps)
     if (use_global_tides) then
        call foreph_ini(yearnew, month)
     end if
-    do n=1, nsteps        
+    do n=fromstep, fromstep-1+nsteps        
         if (use_global_tides) then
            call foreph(mesh)
         end if
@@ -322,6 +323,7 @@ subroutine main_timestepping(nsteps)
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
     end do
     
+    fromstep = fromstep+nsteps
 end subroutine main_timestepping
 
 
