@@ -240,7 +240,7 @@ def fesom_load_data_horiz(mesh,data,do_output=True):
         if data.var.find('norm')!=-1 or data.var.find('vec')!=-1:
             ncval2 = np.copy(ncid2.variables[aux_datavar2][:])
             
-        if data.var.find('tuv')!=-1 or data.var.find('tuv')!=-1:
+        if data.var.find('tuv')!=-1 or data.var.find('suv')!=-1:
             ncval3 = np.copy(ncid3.variables[aux_datavar3][:])
             if data.var.find('norm')!=-1:
                 ncval3 = ncval3[:,mesh.elem0_2d_i,:]
