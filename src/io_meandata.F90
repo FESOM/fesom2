@@ -767,6 +767,7 @@ use g_PARSUP
   mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
   call write_mean(entry, entry_index)
+  if(mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
 end subroutine
 
 
