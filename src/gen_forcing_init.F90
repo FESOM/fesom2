@@ -52,16 +52,15 @@ subroutine forcing_array_setup(mesh)
   allocate(u_wind(n2), v_wind(n2))
   allocate(Tair(n2), shum(n2))
   allocate(runoff(n2), evaporation(n2),ice_sublimation(n2))
+  allocate(sublimation(n2))
 
 #if defined (__oasis)
-  allocate(sublimation(n2), evap_no_ifrac(n2))
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
   allocate(flux_correction_north(nrecv), flux_correction_south(nrecv))
   allocate(flux_correction_total(nrecv))
-  sublimation=0.0_WP
-  evap_no_ifrac=0.0_WP
+  allocate(evap_no_ifrac(n2))
   tmp_sublimation = 0.0_WP
   tmp_evap_no_ifrac = 0.0_WP
   tmp_shortwave = 0.0_WP
@@ -72,6 +71,7 @@ subroutine forcing_array_setup(mesh)
   flux_correction_north=0.0_WP
   flux_correction_south=0.0_WP
   flux_correction_total=0.0_WP  
+  evap_no_ifrac=0.0_WP
 #endif 
 
 
@@ -86,6 +86,7 @@ subroutine forcing_array_setup(mesh)
   Tair=0.0_WP
   shum=0.0_WP
   runoff=0.0_WP
+  sublimation=0.0_WP
   
 !!PS   allocate(Tair_mo(n2),shum_mo(n2))
 !!PS   Tair_mo=0.0_WP !!PS
