@@ -69,6 +69,7 @@ save
   character(100):: buoys_ylat_file='../icb/LAT.dat'     !buoy position in deg
   character(100):: length_icb_file='../icb/LENGTH.dat' !iceberg length [m]
   character(100):: width_icb_file='../icb/LENGTH.dat' !iceberg width [m]
+  character(100):: height_icb_file='../icb/HEIGHT.dat' !iceberg height [m]
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq = 120          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates

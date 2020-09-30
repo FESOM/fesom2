@@ -182,6 +182,7 @@ subroutine ini_mean_io
 #endif
 if (use_icebergs) then
   call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',   'm/s',    ibfwb(:),                1, 'm', i_real4)
+  call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',   'm/s',    ibfwbv(:),                1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting', 'm/s',    ibfwl(:),                  1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',         'm/s',    ibfwe(:),                  1, 'm', i_real4)
   call def_stream(nod2D, myDim_nod2D, 'ibhf',  'heat flux from iceberg melting','m/s',    ibhf(:),                1, 'm', i_real4)

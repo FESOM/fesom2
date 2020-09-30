@@ -58,12 +58,10 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
   call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
-  fwb_flux_ib = M_b
 
   !3-eq. formulation for lateral 'basal' melting [m/s]
   v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
   call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
-  fwbv_flux_ib = M_bv
   
   !'thermal driving', defined as the elevation of ambient water 
   !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -77,7 +75,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
   M_v = 0.00762 * T_d + 0.00129 * T_d**2
   M_v = M_v/86400.
-  fwl_flux_ib = M_v
+  !fwl_flux_ib = M_v
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -85,7 +83,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
-  fwe_flux_ib = M_e  
+  !fwe_flux_ib = M_e  
 end subroutine iceberg_meltrates
 
 
@@ -113,7 +111,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb
+  use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib
 
   implicit none  
 
@@ -140,12 +138,18 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     !CALCULATION OF WORKING SURFACES AS IN BIGG (1997) & SILVA (2010)
     !basal volume loss
     bvl = dh_b*length_ib**2
+    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
     !lateral volume loss
     !lvl1 = (dh_b+dh_v) *2*length_ib*abs(depth_ib)+ dh_e*length_ib*height_ib
     !lvl2 = (dh_b+dh_v) *2*width_ib*abs(depth_ib) + dh_e*width_ib *height_ib
     lvl_e = dh_e*length_ib*height_ib + dh_e*width_ib*height_ib			! erosion just at 2 sides
+    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    
     lvl_b = dh_bv*2*length_ib*abs(depth_ib) + dh_bv*2*width_ib*abs(depth_ib)	! at all 4 sides
+    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    
     lvl_v = dh_v*2*length_ib*abs(depth_ib) + dh_v*2*width_ib*abs(depth_ib)	! at all 4 sides
+    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
     !total volume loss
     tvl = bvl + lvl_b + lvl_v + lvl_e 	![m^3] per timestep, for freshwater flux convert somehow to [m/s]
     			    		! by distributing over area(iceberg_elem) or over patch
@@ -450,7 +454,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
-
+     !fw = -M_b
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
 
      !      qo=-rhor*seta*oofw

@@ -74,18 +74,18 @@ subroutine iceberg_calculation(istep)
     !if(times == steps_per_FESOM_step) lastsubstep = .true. !do output at last substep
     lastsubstep = .true. !do output every timestep
 
-    call iceberg_step1(	ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
-			Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-			conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-			u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
-			steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
-			semiimplicit_coeff, AB_coeff, istep)			
-    !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
-    !end do
-   
+    if( melted(ib) == .false. ) then
+        call iceberg_step1(	ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
+                            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
+                            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
+                            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
+                            steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
+                            semiimplicit_coeff, AB_coeff, istep)			
+        !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
+        !end do
+    end if 
   end if
  end do
- !write(*,*) 'LA DEBUG 83: end of step1'
 
  t1=MPI_Wtime()
  
@@ -150,16 +150,16 @@ subroutine iceberg_calculation(istep)
     !if(times == steps_per_FESOM_step) lastsubstep = .true. !do output at last substep
     lastsubstep = .true. !do output every timestep
    
-!    write(*,*) 'LA DEBUG 148: start step2'
-    call iceberg_step2(	arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
-			Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-			conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-			u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
-			steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
-			semiimplicit_coeff, AB_coeff, istep)	
-!    write(*,*) 'LA DEBUG 155: finish step2'
-    !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
-    !end do
+    if( melted(ib) == .false. ) then
+        call iceberg_step2(	arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
+                            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
+                            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
+                            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
+                            steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
+                            semiimplicit_coeff, AB_coeff, istep)	
+        !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
+        !end do
+    end if
   end if
 end do
  
@@ -308,14 +308,13 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  if (find_iceberg_elem) then
  lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
+  write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
   lat_deg=lat_rad/rad !rotated lat in degree
   lon_deg=lon_rad/rad !rotated lon in degree   
   
   !find LOCAL element where the iceberg starts:
-  write(*,*) 'LA DEBUG lon_deg=',lon_deg,', lat_deg=',lat_deg
   call point_in_triangle(iceberg_elem, (/lon_deg, lat_deg/))
-  write(*,*) 'LA DEBUG 1 iceberg_elem=',iceberg_elem
   i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
   
   if(i_have_element) then
@@ -331,11 +330,10 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
    iceberg_elem=myList_elem2D(iceberg_elem) !global now
 #endif 
   end if
-  write(*,*) 'LA DEBUG 2 iceberg_elem=',iceberg_elem
   call com_integer(i_have_element,iceberg_elem)
  
-  write(*,*) 'LA DEBUG 3 iceberg_elem=',iceberg_elem
   if(iceberg_elem .EQ. 0) then
+        write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
    	call par_ex
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
@@ -431,8 +429,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
     left_mype = 0.0 
     u_ib = 0.0
     v_ib = 0.0
-    !write(*,*) 'LA DEBUG: iceberg_grounded - u_ib: ',u_ib
-    !write(*,*) 'LA DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
+    !write(*,*) 'A DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
     old_lon = lon_rad
     old_lat = lat_rad
     if (mod(istep,logfile_outfreq)==0) then 
@@ -442,18 +439,15 @@ if( local_idx_of(iceberg_elem) > 0 ) then
  else 
   !===================...ELSE CALCULATE TRAJECTORY====================
 
-!  write(*,*) 'LA DEBUG: start trajectory'
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt/REAL(steps_per_FESOM_step))
   	   
   iceberg_elem=local_idx_of(iceberg_elem)  	!local
   
-!  write(*,*) 'LA DEBUG: find new iceberg element'
   call find_new_iceberg_elem(iceberg_elem, (/lon_deg, lat_deg/), left_mype)
   iceberg_elem=myList_elem2D(iceberg_elem)  	!global
   
   if(left_mype > 0.) then
-!  write(*,*) 'LA DEBUG: left_mype > 0'
    lon_rad = old_lon
    lat_rad = old_lat
    call parallel2coast(new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
@@ -461,7 +455,6 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   lon_deg,lat_deg,old_lon,old_lat, dt/REAL(steps_per_FESOM_step))
    u_ib = new_u_ib
    v_ib = new_v_ib
-   !write(*,*) 'LA DEBUG: left_mype > 0 - u_ib: ',u_ib,', new_u_ib: ',new_u_ib
 		   
    iceberg_elem=local_idx_of(iceberg_elem)  	!local
    call find_new_iceberg_elem(iceberg_elem, (/lon_deg, lat_deg/), left_mype)
@@ -469,10 +462,8 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
  end if ! iceberg stationary?
-! write(*,*) 'LA DEBUG: end of trajectory calculation'
 
   !values for communication
-  !write(*,*) 'LA DEBUG step 457: u_ib: ',u_ib
   arr= (/ height_ib,length_ib,width_ib, u_ib,v_ib, lon_rad,lat_rad, &
           left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib/) 
 	
@@ -581,7 +572,6 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  length_ib= arr(2)
  width_ib = arr(3)
  u_ib     = arr(4)
- !write(*,*) 'LA DEBUG 565 step: u_ib: ',u_ib
  v_ib     = arr(5)
  lon_rad  = arr(6)
  lat_rad  = arr(7) 
@@ -610,7 +600,6 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  call iceberg_elem4all(iceberg_elem, lon_deg, lat_deg) !Just PE changed?
  
   if(iceberg_elem == 0) then !IB left model domain
-    !write(*,*) 'LA DEBUG 594 step' 
    !if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) write(*,*) 'iceberg ',ib, ' left model domain'
    lon_rad = old_lon
    lat_rad = old_lat 
@@ -638,7 +627,6 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  if(mype==0 .and. lastsubstep .and. mod(istep,icb_outfreq)==0) then
 
    !output in 1. unrotated or 2. rotated coordinates      
-!   write(*,*) 'LA DEBUG 627: u_ib_out ', u_ib_out
    u_ib_out = u_ib
    v_ib_out = v_ib
    dudt_out = dudt
@@ -680,7 +668,6 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
   buoy_props(ib, 5) = frozen_in
   buoy_props(ib, 6) = dudt_out
   buoy_props(ib, 7) = dvdt_out
-!  write(*,*) 'LA DEBUG 669: u_ib_out: ',u_ib_out
   buoy_props(ib, 8) = u_ib_out
   buoy_props(ib, 9) = v_ib_out
   buoy_props(ib,10) = height_ib
@@ -850,10 +837,6 @@ subroutine parallel2coast(u, v, lon,lat, elem)
 #ifdef use_cavity
   SELECT CASE ( coastal_nodes(elem) ) !num of "coastal" points
 #else
-  !write(*,*) 'LA DEBUG: not use cavity!'
-  !write(*,*) 'LA DEBUG: index_nod2D=',index_nod2D
-  !write(*,*) 'LA DEBUG: elem2D_nodes=',elem2D_nodes
-  !write(*,*) 'LA DEBUG: elem=',elem
   SELECT CASE ( sum( index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
   !SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
 #endif
@@ -1052,14 +1035,11 @@ subroutine iceberg_restart_with_icesheet
 
  call allocate_icb
  
-! write(*,*) 'LA DEBUG open ',num_non_melted_icb_file
  open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,status='old')
     read(icbID_non_melted_icb,*) num_non_melted_icb
  close(icbID_non_melted_icb)
-! write(*,*) 'LA DEBUG num_non_melted_icb=',num_non_melted_icb
 
  if(file_exists) then
- ! write(*,*) 'LA DEBUG open ',IcebergRestartPath_ISM
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,status='old')
   do ib=1, num_non_melted_icb 
    !read all parameters that icb_step needs:			
@@ -1231,6 +1211,13 @@ subroutine init_icebergs
     read(98,*) width_ib(i)
  end do
  close(98)
+!height_icb_file > height_ib
+ open(unit=99, file=height_icb_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file width_icb_file'
+ do i = 1, ib_num
+    read(99,*) height_ib(i)
+ end do
+ close(99)
 
 end subroutine init_icebergs
 !
@@ -1298,7 +1285,6 @@ subroutine determine_save_count
  if (mype==0) then
 
   ! open file
-  write(*,*) 'LA DEBUG open buoy file'
   status = nf_open(file_icb_netcdf, nf_nowrite, ncid)
   if (status .ne. nf_noerr) call handle_err(status)
 
