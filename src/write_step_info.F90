@@ -12,7 +12,7 @@ end module
 !
 !===============================================================================
 subroutine write_step_info(istep,outfreq, mesh)
-	use g_config, only: dt
+	use g_config, only: dt, use_ice
 	use MOD_MESH
 	use o_PARAM
 	use g_PARSUP
@@ -135,8 +135,10 @@ subroutine write_step_info(istep,outfreq, mesh)
 		call MPI_AllREDUCE(loc , max_pgfx , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(abs(pgf_y(:,1:myDim_nod2D)))
 		call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(m_ice(1:myDim_nod2D))
-		call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+                if (use_ice) then
+                   loc = maxval(m_ice(1:myDim_nod2D))
+                   call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+                end if
 		loc = maxval(abs(Av(:,1:myDim_nod2D)))
 		call MPI_AllREDUCE(loc , max_av , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(abs(Kv(:,1:myDim_nod2D)))
@@ -176,7 +178,7 @@ subroutine write_step_info(istep,outfreq, mesh)
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Av= ',' N.A.     ',' | ',max_av    ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Kv= ',' N.A.     ',' | ',max_kv    ,' | ','N.A.'
-			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
+	if (use_ice)    write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then

@@ -1,0 +1,9 @@
+export PATH=/home/rd/natr/cmake-3.11.2-Linux-x86_64/bin:$PATH
+
+module unload cray-hdf5
+module load cray-netcdf
+module load cray-hdf5
+
+#export CRAYPE_LINK_TYPE=dynamic
+
+export FC=ftn CC=cc CXX=CC

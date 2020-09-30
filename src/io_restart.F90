@@ -523,7 +523,7 @@ subroutine read_restart(id, mesh, arg)
 
 #include  "associate_mesh.h"
 
-  laux=0.
+  ! laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then

@@ -157,9 +157,6 @@ end subroutine read_other_NetCDF
     !
     ! Coded by Qiang Wang
     ! Reviewed by ??
-#ifndef __cray
-    use, intrinsic :: ISO_FORTRAN_ENV
-#endif
     use g_config
     use o_param
     USE MOD_MESH
