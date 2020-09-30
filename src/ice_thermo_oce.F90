@@ -10,9 +10,9 @@ end where
 
 where(a_ice<0.1e-8_WP)
  a_ice=0.0_WP
+#if defined (__oifs)
  m_ice=0.0_WP
  m_snow=0.0_WP
-#if defined (__oifs)
  ice_temp=273.15_WP
 #endif /* (__oifs) */
 end where
