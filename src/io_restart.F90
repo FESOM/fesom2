@@ -466,8 +466,11 @@ subroutine write_restart(id, istep, mesh)
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
         t2=MPI_Wtime()
+#ifdef DEBUG
+        ! Timeing information for collecting and writing restart file
         if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
         if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
+#endif
         if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
@@ -488,8 +491,11 @@ subroutine write_restart(id, istep, mesh)
               id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
            end if
            t2=MPI_Wtime()
+#ifdef DEBUG
+           ! Timeing information for collecting and writing output file
            if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
            if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
+#endif
         end do
         deallocate(laux)
         if (mype==0) deallocate(aux)

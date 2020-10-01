@@ -731,8 +731,11 @@ subroutine write_mean(entry, mesh)
               entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size1, 1/), aux_r4, 1); c=c+1
            end if
            t2=MPI_Wtime()
+#ifdef DEBUG
+            ! Timeing information for collecting and writing output file
            if (mype==0) write(*,*) 'size: ', size1, 'gather_nod: ', t1-t0
            if (mype==0) write(*,*) 'size: ', size1, 'nf_put_var: ', t2-t1
+#endif
            if (mype==0) deallocate(aux_r4)
 
 !___________writing real as 2 byte integer _________________________________________ 
@@ -767,8 +770,11 @@ subroutine write_mean(entry, mesh)
                  entry%error_status(c)=nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r8, 1); c=c+1
               end if
               t2=MPI_Wtime()
+#ifdef DEBUG
+              ! Timeing information for collecting and writing output file
               if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'gather_nod: ',t1-t0
               if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'nf_put_var: ',t2-t1
+#endif
            end do
            if (mype==0) deallocate(aux_r8)
 !___________writing real 4 byte real _________________________________________ 
@@ -783,8 +789,11 @@ subroutine write_mean(entry, mesh)
                  entry%error_status(c)=nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), aux_r4, 1); c=c+1
               end if
               t2=MPI_Wtime()
+#ifdef DEBUG
+              ! Timeing information for collecting and writing output file
               if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'gather_nod: ',t1-t0
               if (mype==0) write(*,*) 'size: ', size2, 'lev: ', lev, 'nf_put_var: ',t2-t1
+#endif
            end do
            if (mype==0) deallocate(aux_r4)
 !___________writing real as 2 byte integer _________________________________________ 
