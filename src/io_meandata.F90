@@ -33,7 +33,7 @@ module io_MEANDATA
     integer                                            :: ncid
     integer                                            :: rec_count=0
     integer                                            :: recID, tID
-    integer                                            :: dimID(2), varID
+    integer                                            :: dimID(2), dimvarID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
@@ -505,9 +505,12 @@ end function
 subroutine create_new_file(entry)
   use g_clock
   use g_PARSUP
+  use mod_mesh
+
   implicit none
   character(2000)               :: att_text
-
+  type(t_mesh) mesh
+ 
   type(Meandata), intent(inout) :: entry
   ! Serial output implemented so far
   if (mype/=entry%root_rank) return
@@ -520,7 +523,22 @@ subroutine create_new_file(entry)
   if (entry%ndim==1) then
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
   else if (entry%ndim==2) then
-     call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+     call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
+     
+    ! call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
+     if (entry%dimname(1)=='nz') then
+         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
+!         call assert_nf( nf_put_var_real(entry%ncid, entry%dimvarID(1), mesh%zbar), __LINE__)
+     elseif (entry%dimname(1)=='nz1') then
+         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
+!         call assert_nf( nf_put_var_real(entry%ncid, entry%dimvarID(1), mesh%Z), __LINE__)
+     else
+         if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+
+     end if 
+     
+     
+     
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
   end if
 !___Create time related dimensions__________________________________________
@@ -537,6 +555,8 @@ subroutine create_new_file(entry)
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis',        len_trim('T-Z'),             'T-Z'), __LINE__)
+ 
   call assert_nf( nf_close(entry%ncid), __LINE__)
 end subroutine
 !
