@@ -542,20 +542,17 @@ subroutine create_new_file(entry, mesh)
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(1), entry%glsize(2), entry%dimID(1)), __LINE__)
   else if (entry%ndim==2) then
      call assert_nf( nf_def_dim(entry%ncid,  entry%dimname(1), entry%glsize(1), entry%dimID(1)), __LINE__)
-     
      call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-!     if (entry%dimname(1)=='nz') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-!         call assert_nf( nf_put_var_real(entry%ncid, entry%dimvarID(1), mesh%zbar), __LINE__)
-!     elseif (entry%dimname(1)=='nz1') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-!         call assert_nf( nf_put_var_real(entry%ncid, entry%dimvarID(1), mesh%Z), __LINE__)
-!     else
-!         if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-
-!     end if 
-     
-     
+     if (entry%dimname(1)=='nz') then
+       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
+     elseif (entry%dimname(1)=='nz1') then
+       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+     else
+       if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+     end if 
+     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
+     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
+     call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'axis', len_trim('Z'),'Z'), __LINE__)
      
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
   end if
@@ -571,18 +568,22 @@ subroutine create_new_file(entry, mesh)
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis',        len_trim('T-Z'),             'T-Z'), __LINE__)
-  call assert_nf( nf_enddef(entry%ncid), __LINE__)
-   if (entry%dimname(1)=='nz') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), mesh%zbar), __LINE__)
-   elseif (entry%dimname(1)=='nz1') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-        call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), mesh%Z), __LINE__)
-     else
-        if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+  
+  if (entry%ndim==1) then 
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis', len_trim('T-'),'T-'), __LINE__)
+  else if (entry%ndim==2) then
+    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis', len_trim('T-Z'),'T-Z'), __LINE__)
+  end if 
 
-   end if 
+!___This ends definition part of the file, below filling in variables is possible
+  call assert_nf( nf_enddef(entry%ncid), __LINE__)
+  if (entry%dimname(1)=='nz') then
+      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
+  elseif (entry%dimname(1)=='nz1') then
+      call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
+  else
+      if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
+  end if 
  
   call assert_nf( nf_close(entry%ncid), __LINE__)
 end subroutine
@@ -617,8 +618,6 @@ subroutine write_mean(entry, entry_index)
   use g_PARSUP
   use io_gather_module
   implicit none
-  type(t_mesh) mesh
- 
   type(Meandata), intent(inout) :: entry
   integer                       :: size1, size2
   integer                       :: lev
@@ -630,20 +629,6 @@ subroutine write_mean(entry, entry_index)
   if (mype==entry%root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
-!     if (entry%dimname(1)=='nz') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-!      write(*,*) 'mesh nl', mesh%nl
-!      write(*,*) 'mesh zbar', mesh%zbar
-!      write(*,*) '***************'
-!      call assert_nf( nf_put_vara_real(entry%ncid, entry%dimvarID(1), 1, mesh%nl, mesh%zbar), __LINE__)
-!     elseif (entry%dimname(1)=='nz1') then
-!         call assert_nf( nf_def_var(entry%ncid,  entry%dimname(1), NF_DOUBLE,   1,  entry%dimID(1), entry%dimvarID(1)), __LINE__)
-!         call assert_nf( nf_put_var_real(entry%ncid, entry%dimvarID(1), mesh%Z), __LINE__)
-!     else
-!         if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-!
-!     end if 
-
   end if
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
