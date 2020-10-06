@@ -524,6 +524,10 @@ subroutine create_new_file(entry, mesh)
   use g_clock
   use g_PARSUP
   use mod_mesh
+  use fesom_version_info_module
+  use g_config
+  use i_PARAM
+  use o_PARAM
 
   implicit none
   character(2000)               :: att_text
@@ -562,19 +566,46 @@ subroutine create_new_file(entry, mesh)
   call assert_nf( nf_def_var(entry%ncid, 'time', NF_DOUBLE, 1, entry%recID, entry%tID), __LINE__)
   att_text='time'
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'long_name', len_trim(att_text), trim(att_text)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'standard_name', len_trim(att_text), trim(att_text)), __LINE__)
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
+  
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
   
-  if (entry%ndim==1) then 
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis', len_trim('T-'),'T-'), __LINE__)
-  else if (entry%ndim==2) then
-    call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'axis', len_trim('T-Z'),'T-Z'), __LINE__)
-  end if 
-
+ 
+!___Global attributes________  
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
+ 
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
+ 
+ 
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'whichEVP', NF_INT, 1,  whichEVP), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'evp_rheol_steps', NF_INT, 1,  evp_rheol_steps), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'visc_option', NF_INT, 1,  visc_option), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'w_split', NF_INT, 1,  w_split), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+ 
+ 
+ 
+  
 !___This ends definition part of the file, below filling in variables is possible
   call assert_nf( nf_enddef(entry%ncid), __LINE__)
   if (entry%dimname(1)=='nz') then
