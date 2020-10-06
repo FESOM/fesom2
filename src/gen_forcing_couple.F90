@@ -58,12 +58,25 @@ subroutine update_atm_forcing(istep, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
+#if defined (__oifs) 
+            ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-#if defined (__oifs)
             exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+            end do
+            elseif (i.eq.2) then
+            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+            elseif (i.eq.3) then
+            exchange(:) = m_snow(:)                                 ! snow thickness
+            elseif (i.eq.4) then
+            exchange(:) = ice_temp(:)                               ! ice surface temperature
+            elseif (i.eq.5) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
+            else	    
+            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
-            exchange(n)=tr_arr(1, n, 1)		                    ! sea surface temperature [°C]
-#endif
+            ! AWI-CM2 outgoing state vectors
+            do n=1,myDim_nod2D+eDim_nod2D
+            exchange(n)=tr_arr(1, n, 1)                             ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -71,12 +84,9 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
-#if defined (__oifs)
-            elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-#endif
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action)
       enddo
@@ -170,11 +180,11 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)                   =  exchange(:)        ! runoff + calving
+	     runoff(:)            =  exchange(:)        ! runoff + calving
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
-	  end if  	  
+	 end if  	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
