@@ -60,7 +60,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
@@ -75,6 +75,8 @@ save
   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
 							!(for flux correction)
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
+
 #endif /* (__oasis) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
@@ -110,6 +112,8 @@ REAL(kind=WP), parameter  :: rhosno=  290.            ! Snow density, AOMIP
 REAL(kind=WP), parameter  :: inv_rhosno=  1./290.     ! Snow density, AOMIP
 
 REAL(kind=WP), parameter  :: cpair=1005.       ! Specific heat of air [J/(kg * K)] 
+REAL(kind=WP), parameter  :: cpice=2106.       ! Specific heat of ice [J/(kg * K)] 
+REAL(kind=WP), parameter  :: cpsno=2090.       ! Specific heat of snow [J/(kg * K)] 
 REAL(kind=WP), parameter  :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
 REAL(kind=WP), parameter  :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
 REAL(kind=WP), parameter  :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor

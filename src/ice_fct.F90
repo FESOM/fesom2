@@ -55,6 +55,9 @@ subroutine ice_TG_rhs(mesh)
      rhs_m(row)=0._WP
      rhs_a(row)=0._WP
      rhs_ms(row)=0._WP        
+#if defined (__oifs)
+     ths_temp(row)=0._WP
+#endif /* (__oifs) */
   END DO
   ! Velocities at nodes
   do elem=1,myDim_elem2D          !assembling rhs over elements
@@ -89,6 +92,9 @@ subroutine ice_TG_rhs(mesh)
 		rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
 		rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
 		rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
+#if defined (__oifs)
+                rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
+#endif /* (__oifs) */
 	     END DO
 	  end do
 end subroutine ice_TG_rhs   
@@ -113,12 +119,19 @@ subroutine ice_fct_init(mesh)
   ! Initialization of arrays necessary to implement FCT algorithm
   allocate(m_icel(n_size), a_icel(n_size), m_snowl(n_size))  ! low-order solutions
   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
-                                                             ! order solutions
+                                                                              ! order solutions
+#if defined (__oifs)
+  allocate(m_templ(n_size))  
+  allocate(dm_temp(n_size))  
+#endif /* (__oifs) */
   allocate(icefluxes(myDim_elem2D,3))
   allocate(icepplus(n_size), icepminus(n_size))
   m_icel=0.0_WP
   a_icel=0.0_WP 
   m_snowl=0.0_WP
+#if defined (__oifs)
+  m_templ=0.0_WP
+#endif /* (__oifs) */
   
   ! Fill in  the mass matrix    
   call ice_mass_matrix_fill(mesh)
@@ -141,6 +154,10 @@ subroutine ice_fct_solve(mesh)
   call ice_fem_fct(1, mesh)    ! m_ice
   call ice_fem_fct(2, mesh)    ! a_ice
   call ice_fem_fct(3, mesh)    ! m_snow
+#if defined (__oifs)
+  call ice_fem_fct(4, mesh)    ! ice_temp
+#endif /* (__oifs) */
+
 end subroutine ice_fct_solve
 !
 !----------------------------------------------------------------------------
@@ -188,8 +205,17 @@ subroutine ice_solve_low_order(mesh)
         m_snowl(row)=(rhs_ms(row)+gamma*sum(mass_matrix(clo:clo2)* &
 	          m_snow(location(1:cn))))/area(1,row) + &
 		  (1.0_WP-gamma)*m_snow(row)
+#if defined (__oifs)
+        m_templ(row)=(rhs_temp(row)+gamma*sum(mass_matrix(clo:clo2)* &
+                  ice_temp(location(1:cn))))/area(1,row) + &
+                  (1.0_WP-gamma)*ice_temp(row)
+#endif /* (__oifs) */
  end do
      call exchange_nod(m_icel,a_icel,m_snowl)
+
+#if defined (__oifs)
+     call exchange_nod(m_templ)
+#endif /* (__oifs) */
 
         ! Low-order solution must be known to neighbours
 end subroutine ice_solve_low_order     
@@ -219,9 +245,16 @@ subroutine ice_solve_high_order(mesh)
      dm_ice(row)=rhs_m(row)/area(1,row)
      da_ice(row)=rhs_a(row)/area(1,row)
      dm_snow(row)=rhs_ms(row)/area(1,row)
+#if defined (__oifs)
+     dm_temp(row)=rhs_temp(row)/area(1,row)
+#endif /* (__oifs) */
   end do
+
      call exchange_nod(dm_ice, da_ice, dm_snow)
 
+#if defined (__oifs)
+     call exchange_nod(dm_temp)
+#endif /* (__oifs) */
   !iterate 
   do n=1,num_iter_solve-1
      do row=1,myDim_nod2D
@@ -234,14 +267,25 @@ subroutine ice_solve_high_order(mesh)
         rhs_new=rhs_a(row) - sum(mass_matrix(clo:clo2)*da_ice(location(1:cn)))
         a_icel(row)=da_ice(row)+rhs_new/area(1,row)
         rhs_new=rhs_ms(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
-        m_snowl(row)=dm_snow(row)+rhs_new/area(1,row)
+        m_snowl(row)=dm_snow(row)+rhs_new/area(1,row) 
+#if defined (__oifs)
+        rhs_new=rhs_temp(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
+        m_templ(row)=dm_temp(row)+rhs_new/area(1,row)
+#endif /* (__oifs) */
      end do
      do row=1,myDim_nod2D
         dm_ice(row)=m_icel(row)
         da_ice(row)=a_icel(row)
 	dm_snow(row)=m_snowl(row)
+#if defined (__oifs)
+        dm_temp(row)=m_templ(row)
+#endif /* (__oifs) */
      end do
      call exchange_nod(dm_ice, da_ice, dm_snow)
+
+#if defined (__oifs)
+     call exchange_nod(dm_temp)
+#endif /* (__oifs) */
 
   end do
 end subroutine ice_solve_high_order
@@ -317,6 +361,14 @@ subroutine ice_fem_fct(tr_array_id, mesh)
                       dm_snow(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
     end do
     end if
+#if defined (__oifs)
+    if (tr_array_id==4) then
+    do q=1,3
+    icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*ice_temp(elnodes) + &
+                      dm_temp(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+    end do
+    end if
+#endif /* (__oifs) */
  end do
      
  !==========================   
@@ -363,7 +415,19 @@ subroutine ice_fem_fct(tr_array_id, mesh)
  end do
  end if
  
- 
+#if defined (__oifs)
+ if (tr_array_id==4) then
+ do row=1, myDim_nod2D
+         n=nn_num(row)
+         tmax(row)=maxval(m_templ(nn_pos(1:n,row)))
+         tmin(row)=minval(m_templ(nn_pos(1:n,row)))
+         ! Admissible increments
+         tmax(row)=tmax(row)-m_templ(row)
+         tmin(row)=tmin(row)-m_templ(row)
+ end do
+ end if
+#endif /* (__oifs) */
+
  !=========================
  ! Sums of positive/negative fluxes to node row
  !=========================
@@ -448,6 +512,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
 	    end do
 	 end do   
          end if
+
 	 if(tr_array_id==3) then
 	 do n=1,myDim_nod2D
 	    m_snow(n)=m_snowl(n)
@@ -460,8 +525,27 @@ subroutine ice_fem_fct(tr_array_id, mesh)
 	    end do
 	 end do   
          end if
+
+#if defined (__oifs)
+         if(tr_array_id==4) then
+         do n=1,myDim_nod2D
+            ice_temp(n)=m_templ(n)
+         end do
+         do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            do q=1,3
+            n=elnodes(q)
+            ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
+            end do
+         end do
+         end if
+#endif /* (__oifs) */
 	 
         call exchange_nod(m_ice, a_ice, m_snow)
+
+#if defined (__oifs)
+        call exchange_nod(ice_temp)
+#endif /* (__oifs) */
 
 	deallocate(tmin, tmax)
 end subroutine ice_fem_fct
@@ -545,7 +629,7 @@ subroutine ice_TG_rhs_div(mesh)
   implicit none 
   real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer                  :: n, q, row, elem, elnodes(3)
-  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, entries2(3) 
+  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
   type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
@@ -559,9 +643,15 @@ subroutine ice_TG_rhs_div(mesh)
      rhs_m(row)=0.0_WP
      rhs_a(row)=0.0_WP
      rhs_ms(row)=0.0_WP
+#if defined (__oifs)
+     rhs_temp(row)=0.0_WP
+#endif /* (__oifs) */
      rhs_mdiv(row)=0.0_WP
      rhs_adiv(row)=0.0_WP
-     rhs_msdiv(row)=0.0_WP        
+     rhs_msdiv(row)=0.0_WP
+#if defined (__oifs)
+     rhs_tempdiv(row)=0.0_WP        
+#endif /* (__oifs) */
   END DO
   do elem=1,myDim_elem2D          !assembling rhs over elements
                   !! elem=myList_elem2D(m)
@@ -592,12 +682,21 @@ subroutine ice_TG_rhs_div(mesh)
         cx1=vol*ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
 	cx2=vol*ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
 	cx3=vol*ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
+#if defined (__oifs)
+        cx4=vol*ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
+#endif /* (__oifs) */
         rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
         rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
         rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))+cx3
+#if defined (__oifs)
+        rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))+cx4
+#endif /* (__oifs) */
 	rhs_mdiv(row)=rhs_mdiv(row)-cx1
         rhs_adiv(row)=rhs_adiv(row)-cx2
         rhs_msdiv(row)=rhs_msdiv(row)-cx3
+#if defined (__oifs)
+        rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
+#endif /* (__oifs) */
 
      END DO
   end do
@@ -631,10 +730,16 @@ subroutine ice_update_for_div(mesh)
      dm_ice(row) =rhs_mdiv(row) /area(1,row)
      da_ice(row) =rhs_adiv(row) /area(1,row)
      dm_snow(row)=rhs_msdiv(row)/area(1,row)
+#if defined (__oifs)
+     dm_temp(row)=rhs_tempdiv(row)/area(1,row)
+#endif /* (__oifs) */
   end do
      call exchange_nod(dm_ice)
      call exchange_nod(da_ice)
      call exchange_nod(dm_snow)
+#if defined (__oifs)
+     call exchange_nod(dm_temp)
+#endif /* (__oifs) */
   !iterate 
   do n=1,num_iter_solve-1
      do row=1,myDim_nod2D
@@ -649,19 +754,33 @@ subroutine ice_update_for_div(mesh)
         a_icel(row)=da_ice(row)+rhs_new/area(1,row)
         rhs_new=rhs_msdiv(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
         m_snowl(row)=dm_snow(row)+rhs_new/area(1,row)
+#if defined (__oifs)
+        rhs_new=rhs_tempdiv(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
+        m_templ(row)=dm_temp(row)+rhs_new/area(1,row)
+#endif /* (__oifs) */
    end do
      do row=1,myDim_nod2D
                   !! row=myList_nod2D(m)
         dm_ice(row)=m_icel(row)
         da_ice(row)=a_icel(row)
 	dm_snow(row)=m_snowl(row)
+#if defined (__oifs)
+	dm_temp(row)=m_templ(row)
+#endif /* (__oifs) */
      end do
      call exchange_nod(dm_ice)
      call exchange_nod(da_ice)
      call exchange_nod(dm_snow)
+#if defined (__oifs)
+     call exchange_nod(dm_temp)
+#endif /* (__oifs) */
   end do
   m_ice=m_ice+dm_ice
   a_ice=a_ice+da_ice
   m_snow=m_snow+dm_snow
+#if defined (__oifs)
+  ice_temp=ice_temp+dm_temp
+#endif /* (__oifs) */
+
 end subroutine ice_update_for_div
 ! =============================================================

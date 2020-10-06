@@ -42,6 +42,8 @@ def set_inputarray():
 	inputarray['proj'     ] 	   = 'cyl' # 'ortho', 'cyl', 'npstere'  
 	inputarray['proj_lon' ] 	   = 0 #only for ortho
 	inputarray['proj_lat' ] 	   = 75 #only for ortho
+	
+	inputarray['use_cavity' ] 	   = False #only for ortho
 	#___________________________________________________________________________
 	return inputarray
 

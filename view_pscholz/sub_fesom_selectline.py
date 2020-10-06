@@ -489,7 +489,7 @@ class fesom_line:
                 if len(bckp_value3)!=0:
                     data_di   = np.copy(bckp_value3[:,di])
                     if bckp_value3.shape[0]==mesh.n2dna:
-                        data_di[di>=mesh.nodes_2d_iz-1]=np.nan
+                        data_di[di>=mesh.nodes_2d_izg-1]=np.nan
                     elif bckp_value3.shape[0]==mesh.n2dea:
                         data_di[di>=np.concatenate((mesh.elem0_2d_iz,mesh.elem0_2d_iz[mesh.pbndtri_2d_i]))-1]=np.nan
                     if usemidpts==True:
@@ -891,7 +891,7 @@ class fesom_line:
                 # loop over sample points
                 dz = self.zlev[1:]-self.zlev[:-1]
                 for jj in range(0,self.value[ii].shape[0]):
-                    self.valueflx[ii][jj,:] = self.valueflx[ii][jj,:] * -dz * rho /1000
+                    self.valueflx[ii][jj,:] = self.valueflx[ii][jj,:] * -dz * rho0 /1000
                     
                 #_______________________________________________________________
                 self.unit='[10^-3 Sv]'    
@@ -1210,7 +1210,7 @@ class fesom_line:
     #+_________________________________________________________________________+
     #|                         PLOT LINE POSITION                                |
     #+_________________________________________________________________________+
-    def plot_lines_position(self,mesh,cmap,clevel,cref,numb=[],figsize=[],
+    def plot_lines_position(self,mesh,cmap='cmo.deep',clevel=np.arange(0,6000,200),cref=3000,numb=[],figsize=[],
                             do_subplot=[],do_nvec=False, do_cbar=True, allow_save=True,do_grid=False):
         from set_inputarray import inputarray
         fsize=10
