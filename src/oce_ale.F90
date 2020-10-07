@@ -209,7 +209,7 @@ subroutine init_bottom_elem_thickness(mesh)
             !  / / / / / /
             if(dd<zbar(nle)) then 
                 if(nle==nl) then
-                    zbar_e_bot(elem) = dd
+                    zbar_e_bot(elem) = max(dd,zbar(nle)+(zbar(nle)-Z(nle-1)))
                     
                 else
                     ! case 1 : max(Z(nle),dd) = dd
@@ -306,7 +306,7 @@ subroutine init_bottom_node_thickness(mesh)
             !  / / / / / /
             if(dd<zbar(nln)) then 
                 if(nln==nl) then
-                    zbar_n_bot(node) = dd
+                    zbar_n_bot(node) = max(dd,zbar(nln)+(zbar(nln)-Z(nln-1)))
                     
                 else
                     ! case 1 : max(Z(nle),dd) = dd
