@@ -240,6 +240,7 @@ USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
 
 interface
@@ -481,12 +482,9 @@ deallocate(aux1)
     call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
-    if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
-    if(xe(1)<-cyclic_length/2.) xe(1)=xe(1)+cyclic_length
-    if(xc(1)>=cyclic_length/2.) xc(1)=xc(1)-cyclic_length
-    if(xc(1)<-cyclic_length/2.) xc(1)=xc(1)+cyclic_length
-
-    if(xc(1)*xe(2)-xc(2)*xe(1)>0) then
+    call trim_cyclic(xe(1))
+    call trim_cyclic(xc(1))
+    if(xc(1)*xe(2)-xc(2)*xe(1)>0.0_WP) then
        ! Vector drawn to the center of the first triangle is to the right
        ! of the edge vector. Triangles have to be exchanged:
        elem=edge_tri(1,n)

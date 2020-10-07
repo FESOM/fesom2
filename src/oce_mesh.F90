@@ -772,6 +772,7 @@ USE MOD_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
@@ -1203,7 +1204,7 @@ type(t_mesh), intent(inout), target :: mesh
 
 a=mesh%coord_nod2D(:,n1)
 b=mesh%coord_nod2D(:,n2)
-if(a(1)-b(1)>cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
+if(a(1)-b(1)> cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
 if(a(1)-b(1)<-cyclic_length/2.0_WP) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
@@ -1777,13 +1778,3 @@ end if
 !stop
 END SUBROUTINE check_mesh_consistency
 !==================================================================
-subroutine trim_cyclic(b)
-use o_PARAM
-use g_config
-implicit none
-real(kind=WP) :: b
- if(b> cyclic_length/2.0_WP) b=b-cyclic_length
- if(b<-cyclic_length/2.0_WP) b=b+cyclic_length
-end subroutine trim_cyclic
-!===================================================================
-
