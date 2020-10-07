@@ -789,10 +789,8 @@ real(kind=WP)               :: t0, t1
 	  b=mesh%coord_nod2D(:,elnodes(2))-a
 	  c=mesh%coord_nod2D(:,elnodes(3))-a
           
-	  if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
-          if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
-	  if(c(1)>cyclic_length/2._WP) c(1)=c(1)-cyclic_length
-          if(c(1)<-cyclic_length/2._WP) c(1)=c(1)+cyclic_length
+	  call trim_cyclic(b(1))
+	  call trim_cyclic(c(1))
 	  
 	    
 	  r=b(1)*c(2)-b(2)*c(1)
@@ -1275,10 +1273,8 @@ t0=MPI_Wtime()
     if (cartesian) ay=1.0_WP
     a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
     b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
-    if(a(1)>cyclic_length/2._WP) a(1)=a(1)-cyclic_length
-    if(a(1)<-cyclic_length/2._WP) a(1)=a(1)+cyclic_length
-    if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
-    if(b(1)<-cyclic_length/2._WP) b(1)=b(1)+cyclic_length
+    call trim_cyclic(a(1))
+    call trim_cyclic(b(1))
     a(1)=a(1)*ay
     b(1)=b(1)*ay
     mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
@@ -1476,8 +1472,7 @@ t0=MPI_Wtime()
  DO n=1, myDim_edge2D+eDim_edge2D
     ed=mesh%edges(:,n)
     a=mesh%coord_nod2D(:,ed(2))-mesh%coord_nod2D(:, ed(1))
-    if(a(1)>cyclic_length/2) a(1)=a(1)-cyclic_length
-    if(a(1)<-cyclic_length/2) a(1)=a(1)+cyclic_length
+    call trim_cyclic(a(1))
       !a(1)=a(1)*aux_cos_edge(n)
       !a=a*r_earth
     mesh%edge_dxdy(:,n)=a
@@ -1563,13 +1558,11 @@ DO elem=1, myDim_elem2D
    elnodes = mesh%elem2D_nodes(:,elem)
    
    deltaX31 = mesh%coord_nod2D(1,elnodes(3)) - mesh%coord_nod2D(1,elnodes(1))
-   if(deltaX31>cyclic_length/2) deltaX31=deltaX31-cyclic_length
-   if(deltaX31<-cyclic_length/2) deltaX31=deltaX31+cyclic_length
+   call trim_cyclic(deltaX31)
    deltaX31 = mesh%elem_cos(elem)*deltaX31
    
    deltaX21 = mesh%coord_nod2D(1,elnodes(2)) - mesh%coord_nod2D(1,elnodes(1))
-   if(deltaX21>cyclic_length/2) deltaX21=deltaX21-cyclic_length
-   if(deltaX21<-cyclic_length/2) deltaX21=deltaX21+cyclic_length
+   call trim_cyclic(deltaX21)
    deltaX21 = mesh%elem_cos(elem)*deltaX21
    
    deltaY31 = mesh%coord_nod2D(2,elnodes(3)) - mesh%coord_nod2D(2,elnodes(1))
@@ -1657,16 +1650,14 @@ DO elem=1,myDim_elem2D
             b(1)=center_x(el(1))
             b(2)=center_y(el(1))
             x(j)=b(1)-a(1)
-            if(x(j)>cyclic_length/2) x(j)=x(j)-cyclic_length
-            if(x(j)<-cyclic_length/2) x(j)=x(j)+cyclic_length
+            call trim_cyclic(x(j))
             y(j)=b(2)-a(2)
         else
             ! Virtual element center is taken
             ed=mesh%edges(:,mesh%elem_edges(j,elem))
             call edge_center(ed(1), ed(2), b(1), b(2), mesh)
             x(j)=(b(1)-a(1))
-            if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
-            if(x(j)<-cyclic_length/2)  x(j)=x(j)+cyclic_length
+            call trim_cyclic(x(j))
             x(j)=2*x(j)
             y(j)=2*(b(2)-a(2))
         end if
