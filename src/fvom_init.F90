@@ -155,7 +155,6 @@ INTEGER                             :: i_error
      read(20,*) nq, x1, x2, tag
      x1=x1*rad
      x2=x2*rad
-if (n==1) write(*,*) 'coord_nod2D(:,1) before =', x1, x2 !TO REMOVE
      if (force_rotation) then
         gx1=x1
         gx2=x2
@@ -163,7 +162,6 @@ if (n==1) write(*,*) 'coord_nod2D(:,1) before =', x1, x2 !TO REMOVE
      end if      
      mesh%coord_nod2D(1,n)=x1
      mesh%coord_nod2D(2,n)=x2
-if (n==1) write(*,*) 'coord_nod2D(:,1) after  =', x1, x2 !TO REMOVE
   end do
   CLOSE(20)
   READ(21,*)  mesh%elem2D    
@@ -505,16 +503,6 @@ deallocate(aux1)
           edges(1,n)=elem
        end if
     end if
-!TO REMOVE
-if (n==5173) then
-write(*,*) 'n1,n2=', edges(:, n)
-write(*,*) 'condition=', xc(1)*xe(2)-xc(2)*xe(1)
-write(*,*) 'edge_tri=', edge_tri(:, n)
-write(*,*) 'xc=', xc
-write(*,*) 'xe=', xe
-write(*,*) 'coord_nod2D(:,1)=', coord_nod2D(:,1)
-write(*,*) 'force_rotation=', force_rotation
-end if
  END DO
 
  ! ====================
