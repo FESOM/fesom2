@@ -134,7 +134,7 @@ type(t_mesh), intent(inout), target :: mesh
 INTEGER                             :: nq
 INTEGER                             :: n1,n2,n3
 INTEGER                             :: n, nz, exit_flag
-REAL(kind=WP)                       :: x1, x2
+REAL(kind=WP)                       :: x1, x2, gx1, gx2
 INTEGER	                            :: tag
 INTEGER, allocatable                :: elem_data(:)
 INTEGER                             :: i_error
@@ -150,13 +150,18 @@ INTEGER                             :: i_error
     
   do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
+     x1=x1*rad
+     x2=x2*rad
+     call trim_cyclic(x1)
+if (n==1) write(*,*) 'coord_nod2D(:,1) before =', x1, x2 !TO REMOVE
      if (force_rotation) then
-        call g2r(x1*rad, x2*rad, x1, x2)
-        x1=x1/rad
-        x2=x2/rad
+        gx1=x1
+        gx2=x2
+        call g2r(gx1, gx2, x1, x2)
      end if      
-     mesh%coord_nod2D(1,nq)=x1*rad
-     mesh%coord_nod2D(2,nq)=x2*rad
+     mesh%coord_nod2D(1,n)=x1
+     mesh%coord_nod2D(2,n)=x2
+if (n==1) write(*,*) 'coord_nod2D(:,1) after  =', x1, x2 !TO REMOVE
   end do
   CLOSE(20) 
       
@@ -499,6 +504,16 @@ deallocate(aux1)
           edges(1,n)=elem
        end if
     end if
+!TO REMOVE
+if (n==5173) then
+write(*,*) 'n1,n2=', edges(:, n)
+write(*,*) 'condition=', xc(1)*xe(2)-xc(2)*xe(1)
+write(*,*) 'edge_tri=', edge_tri(:, n)
+write(*,*) 'xc=', xc
+write(*,*) 'xe=', xe
+write(*,*) 'coord_nod2D(:,1)=', coord_nod2D(:,1)
+write(*,*) 'force_rotation=', force_rotation
+end if
  END DO
 
  ! ====================
