@@ -85,6 +85,9 @@ end interface
   read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
+  alphaEuler=alphaEuler*rad 	
+  betaEuler=betaEuler*rad
+  gammaEuler=gammaEuler*rad
   call set_mesh_transform_matrix  !(rotated grid) 
   call read_mesh_ini(mesh)
   call system_clock(finish_t)
@@ -152,7 +155,6 @@ INTEGER                             :: i_error
      read(20,*) nq, x1, x2, tag
      x1=x1*rad
      x2=x2*rad
-     call trim_cyclic(x1)
 if (n==1) write(*,*) 'coord_nod2D(:,1) before =', x1, x2 !TO REMOVE
      if (force_rotation) then
         gx1=x1
@@ -163,8 +165,7 @@ if (n==1) write(*,*) 'coord_nod2D(:,1) before =', x1, x2 !TO REMOVE
      mesh%coord_nod2D(2,n)=x2
 if (n==1) write(*,*) 'coord_nod2D(:,1) after  =', x1, x2 !TO REMOVE
   end do
-  CLOSE(20) 
-      
+  CLOSE(20)
   READ(21,*)  mesh%elem2D    
   ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
   elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
