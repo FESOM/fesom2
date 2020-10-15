@@ -22,6 +22,7 @@ use io_MEANDATA
 use io_mesh_info
 use diagnostics
 use mo_tidal
+use fesom_version_info_module
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -53,6 +54,7 @@ type(t_mesh), target, save      :: mesh
     call par_init 
     if(mype==0) then
         write(*,*)
+        print *,"FESOM2 git SHA: "//fesom_git_sha()
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
@@ -147,6 +149,7 @@ type(t_mesh), target, save      :: mesh
     rtime_write_restart = 0._WP
     rtime_write_means   = 0._WP
     rtime_compute_diag  = 0._WP
+    rtime_read_forcing  = 0._WP
 
     if (mype==0) write(*,*) 'FESOM start iteration before the barrier...'
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)

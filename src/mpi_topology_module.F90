@@ -1,8 +1,22 @@
+module hostname_sys_module
+  contains
+
+  subroutine hostname_sys(hostname)
+    character(len=:), allocatable, intent(out) :: hostname
+    integer*4 status, hostnm
+    
+    allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
+    status = hostnm(hostname)
+  end subroutine
+end module
+
+
 module mpi_topology_module
 ! synopsis:
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
 ! collectively call mpi_topology%reset_host_head_rank if there is need to start over with the first compute node
 
+  use hostname_sys_module
   implicit none  
   public mpi_topology
   private
@@ -31,14 +45,6 @@ contains
     hostname_strategy => strategy
   end subroutine
 
-
-  subroutine hostname_sys(hostname)
-    character(len=:), allocatable, intent(out) :: hostname
-    integer*4 status, hostnm
-    
-    allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
-    status = hostnm(hostname)
-  end subroutine
 
   ! must be called collectively
   logical function am_i_host_head_rank(communicator) result(result)
@@ -90,7 +96,11 @@ contains
     MAXRANK = rank_count-1
     
     call hostname_strategy(hostname)
-    if(rank==0) allocate(character(len(hostname)) :: names(rank_count))
+    if(rank==0) then
+      allocate(character(len(hostname)) :: names(rank_count))
+    else
+      allocate(character(0) :: names(0))
+    end if
     call MPI_GATHER(hostname, len(hostname), MPI_CHAR, names, len(hostname), MPI_CHAR, 0, communicator, ierror)
     if(rank==0) then
         ranks_per_host = 1
@@ -101,8 +111,8 @@ contains
             exit
           end if
         end do    
-      deallocate(names)
     end if
+    deallocate(names)
 
     call MPI_BCAST(ranks_per_host, 1, MPI_INT, 0, communicator, ierror)
     STEP = ranks_per_host

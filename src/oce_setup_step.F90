@@ -31,6 +31,7 @@ use g_cvmix_tidal
 use Toy_Channel_Soufflet
 use array_setup_interface
 use oce_initial_state_interface
+use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
@@ -117,7 +118,7 @@ type(t_mesh), intent(in) , target :: mesh
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	call fct_init(mesh)
+    call oce_adv_tra_fct_init(mesh)
     call muscl_adv_init(mesh) !!PS test
 	!=====================
 	! Initialize fields
@@ -150,7 +151,7 @@ type(t_mesh), intent(in) , target :: mesh
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-        write(*,*) 'maximum explicit W is set to: ', w_exp_max
+        write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
@@ -203,7 +204,7 @@ if (use_ice .and. use_momix) mixlength=0.
 ! ================
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
-allocate(CFL_z(nl-1, node_size)) ! vertical CFL criteria
+allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 ! ================
 ! Temperature and salinity
 ! ================
