@@ -222,6 +222,7 @@ subroutine check_blowup(istep, mesh)
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
+				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'eta_n(n)    = ',eta_n(n)
 				write(*,*) 'd_eta(n)    = ',d_eta(n)
@@ -266,7 +267,6 @@ subroutine check_blowup(istep, mesh)
 				write(*,*)
 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
 				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
-				write(*,*) ' glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 			endif
 			
@@ -318,6 +318,7 @@ subroutine check_blowup(istep, mesh)
 					write(*,*) 'mype        = ',mype
 					write(*,*) 'mstep       = ',istep
 					write(*,*) 'node        = ',n
+					write(*,*) 'lon,lat     = ',geo_coord_nod2D(:,n)/rad
 					write(*,*) 'nz          = ',nz
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
@@ -360,7 +361,7 @@ subroutine check_blowup(istep, mesh)
 ! 						write(*,*) ' 	     V =',UV(2,:,elidx)
 ! 					enddo
 					write(*,*)
-					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,n)/rad
+					
 				endif ! --> if ( (tr_arr(nz, n,1) /= tr_arr(nz, n,1)) .or. & ...
 				
 				!_______________________________________________________________

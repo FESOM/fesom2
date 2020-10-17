@@ -1651,10 +1651,29 @@ subroutine vert_vel_ale(mesh)
                 write(*,*) "          mype = ", mype
                 write(*,*) "         mstep = ", mstep
                 write(*,*) "          node = ", n
+                write(*,*) 'glon,glat      = ',geo_coord_nod2D(:,n)/rad
+                write(*,*)
+                write(*,*) "ssh_rhs        = ", ssh_rhs(n)
+                write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
+                write(*,*) "eta_n          = ", eta_n(n)
+                write(*,*) "d_eta          = ", d_eta(n)
+                write(*,*)
+                write(*,*) "zbar_3d_n(1,n) = ", zbar_3d_n(1,n)
+                write(*,*) "dd1            = ", dd1
+                write(*,*) "nlevels_nod2D_min(n)-1 = ",nlevels_nod2D_min(n)-1
+                write(*,*)
+                write(*,*) "dhbar/H        = ", dd
+                write(*,*) "1/H*dhbar/dt   = ", dddt
+                write(*,*) "hbar(n)        = ", hbar(n)
+                write(*,*) "hbar_old(n)    = ", hbar_old(n)
+                write(*,*) "hbar(n)-hbar_old(n) = ", hbar(n)-hbar_old(n)
+                write(*,*)
                 write(*,*) "hnode_new(:,n) = ", hnode_new(:,n)
                 write(*,*) "hnode(:,n)     = ", hnode(:,n)
+                write(*,*)
                 write(*,*) "zbar_3d_n(:,n) = ", zbar_3d_n(:,n)
                 write(*,*) "Z_3d_n(:,n)    = ", Z_3d_n(:,n)
+                write(*,*)
                 write(*,*) "zbar_n_bot(n)  = ", zbar_n_bot(n)
                 write(*,*) "bottom_node_thickness(n) = ", bottom_node_thickness(n)
                 write(*,*)
