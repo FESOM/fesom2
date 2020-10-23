@@ -1653,6 +1653,8 @@ subroutine vert_vel_ale(mesh)
                 write(*,*) "          node = ", n
                 write(*,*) 'glon,glat      = ',geo_coord_nod2D(:,n)/rad
                 write(*,*)
+                write(*,*) 'water_flux     = ', water_flux
+                write(*,*)
                 write(*,*) "ssh_rhs        = ", ssh_rhs(n)
                 write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
                 write(*,*) "eta_n          = ", eta_n(n)
