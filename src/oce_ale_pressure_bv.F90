@@ -1403,7 +1403,8 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
      
      t1 = TF1(nz,n)*1.00024_WP
      s1 = SF1(nz,n)
-     p1 = abs(Z(nz)) 
+!!PS      p1 = abs(Z(nz))
+     p1 = abs(Z_3d_n(nz,n)) 
      
      t1_2 = t1*t1
      t1_3 = t1_2*t1
@@ -1572,7 +1573,8 @@ subroutine insitu2pot(mesh)
      do nz=1, nlevels_nod2D(n)-1    
         tt=tr_arr(nz,n,1)
         ss=tr_arr(nz,n,2)
-        pp=abs(Z(nz))
+!!PS         pp=abs(Z(nz))
+        pp=abs(Z_3d_n(nz,n))
         tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
      end do	
   end do
