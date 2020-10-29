@@ -1653,7 +1653,7 @@ subroutine vert_vel_ale(mesh)
                 write(*,*) "          node = ", n
                 write(*,*) 'glon,glat      = ',geo_coord_nod2D(:,n)/rad
                 write(*,*)
-                write(*,*) 'water_flux     = ', water_flux
+                write(*,*) 'water_flux     = ', water_flux(n)
                 write(*,*)
                 write(*,*) "ssh_rhs        = ", ssh_rhs(n)
                 write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
@@ -1681,7 +1681,7 @@ subroutine vert_vel_ale(mesh)
                 write(*,*)
             end if 
         end do
-        call par_ex(1)
+!!PS         call par_ex(1)
     endif
     
     !___________________________________________________________________________
