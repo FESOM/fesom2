@@ -73,51 +73,58 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     logical       :: do_zero_flux
 
 #include "associate_mesh.h"
+    !___________________________________________________________________________
+    ! compute FCT horzontal and vertical low order solution as well as lw order 
+    ! part of antidiffusive flux
     if (trim(tra_adv_lim)=='FCT') then 
-    ! compute the low order upwind horizontal flux
-    ! init_zero=.true.  : zero the horizontal flux before computation
-    ! init_zero=.false. : input flux will be substracted
-    call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
-
-    ! update the LO solution for horizontal contribution
-    fct_LO=0.0_WP
-    do e=1, myDim_edge2D
-       enodes=edges(:,e)
-       el=edge_tri(:,e)        
-       nl1=nlevels(el(1))-1
-       nl2=0
-       if(el(2)>0) nl2=nlevels(el(2))-1
-       do  nz=1, max(nl1, nl2)
-           fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
-           fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
-       end do
-    end do
-
-    ! compute the low order upwind vertical flux (explicit part only)
-    ! zero the input/output flux before computation
-    call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
-
-    ! update the LO solution for vertical contribution
-    do n=1, myDim_nod2D
-       do  nz=1, nlevels_nod2D(n)-1
-           fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/area(nz,n))/hnode_new(nz,n)
-       end do
-    end do
-    
-    if (w_split) then !wvel/=wvel_e
-       ! update for implicit contribution (w_split option)
-       call adv_tra_vert_impl(fct_LO, wi, mesh)
-       ! compute the low order upwind vertical flux (full vertical velocity)
-       ! zero the input/output flux before computation
-       call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
-    end if
-
-    call exchange_nod(fct_LO)
+        ! compute the low order upwind horizontal flux
+        ! init_zero=.true.  : zero the horizontal flux before computation
+        ! init_zero=.false. : input flux will be substracted
+        call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
+        
+        ! update the LO solution for horizontal contribution
+        fct_LO=0.0_WP
+        do e=1, myDim_edge2D
+            enodes=edges(:,e)
+            el=edge_tri(:,e)        
+            nl1=nlevels(el(1))-1
+            nl2=0
+            if(el(2)>0) nl2=nlevels(el(2))-1
+            do  nz=1, max(nl1, nl2)
+                fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+                fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
+            end do
+        end do
+        
+        ! compute the low order upwind vertical flux (explicit part only)
+        ! zero the input/output flux before computation
+        call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+        
+        ! update the LO solution for vertical contribution
+        do n=1, myDim_nod2D
+            do  nz=1, nlevels_nod2D(n)-1
+                fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/area(nz,n))/hnode_new(nz,n)
+            end do
+        end do
+        
+        if (w_split) then !wvel/=wvel_e
+            ! update for implicit contribution (w_split option)
+            call adv_tra_vert_impl(fct_LO, wi, mesh)
+            ! compute the low order upwind vertical flux (full vertical velocity)
+            ! zero the input/output flux before computation
+            ! --> compute here low order part of vertical anti diffusive fluxes, 
+            !     has to be done on the full vertical velocity w
+            call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+        end if
+        
+        call exchange_nod(fct_LO)
     end if
 
     do_zero_flux=.true.
     if (trim(tra_adv_lim)=='FCT') do_zero_flux=.false.
    
+    !___________________________________________________________________________
+    ! do horizontal tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tra_adv_hor))
         CASE('MUSCL')
             ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
@@ -137,6 +144,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
        pwvel=>we
     end if
  
+    !___________________________________________________________________________
+    ! do vertical tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
@@ -146,11 +155,17 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         CASE('PPM')
             call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('UPW1')
-	    call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+        call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
+        ! --> be aware the vertical implicite part in case without FCT is done in 
+        !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, mesh)
+        !     for do_wimpl=.true.
     END SELECT
+    
+    !___________________________________________________________________________
+    !
 !if (mype==0) then
 !   write(*,*) 'check new:'
 !   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
