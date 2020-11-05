@@ -42,6 +42,11 @@ subroutine stress_tensor_m(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
+
   implicit none
 
   integer         :: elem, elnodes(3)
@@ -99,6 +104,12 @@ subroutine stress_tensor_m(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -252,6 +263,10 @@ subroutine EVPdynamics_m(mesh)
   use g_parsup
   use g_comm_auto
 
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
+
   implicit none
   integer          :: steps, shortstep, i, ed,n
   real(kind=WP)    :: rdt, drag, det
@@ -379,6 +394,11 @@ subroutine EVPdynamics_m(mesh)
 ! Ice EVPdynamics Iteration main loop:
 !=======================================
 
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
+
   do shortstep=1, steps
 
 !NR inlining, to make it easier to have local arrays and fuse loops
@@ -421,6 +441,11 @@ subroutine EVPdynamics_m(mesh)
         sigma12(el) = det1*sigma12(el) +       pressure*eps12(el)*vale
         sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
         sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
+
+#if defined (__icepack)
+        rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
+        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
+#endif
 
         !  end do   ! fuse loops
         ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
@@ -577,6 +602,11 @@ subroutine stress_tensor_a(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
+
   implicit none
 
   integer                   :: elem, elnodes(3)
@@ -635,6 +665,12 @@ subroutine stress_tensor_a(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -660,7 +696,11 @@ use o_PARAM
 use i_therm_param
 use g_parsup
 use g_comm_auto
-  use ice_maEVP_interfaces
+use ice_maEVP_interfaces
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
 
   implicit none
   integer          :: steps, shortstep, i, ed
@@ -676,6 +716,11 @@ use g_comm_auto
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
   call ssh2rhs(mesh)
+
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
  
   do shortstep=1, steps 
      call stress_tensor_a(mesh)

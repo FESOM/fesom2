@@ -1119,6 +1119,7 @@ submodule (icedrv_main) icedrv_step
       module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
 
           use g_config,               only: dt
+          use i_PARAM,                only: whichEVP
           use g_parsup
           use mod_mesh    
 
@@ -1222,7 +1223,18 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             call EVPdynamics(mesh)
+             select case (whichEVP)
+                case (0)
+                   call EVPdynamics(mesh)
+                case (1)
+                   call EVPdynamics_m(mesh)
+                case (2)
+                   call EVPdynamics_a(mesh)
+                case default
+                   if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
+                   call par_ex
+                   stop
+             end select
 
              t3 = MPI_Wtime()
              time_evp = t3 - t2
