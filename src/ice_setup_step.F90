@@ -172,7 +172,7 @@ real(kind=WP)              :: time_evp, time_advec, time_therm
 t0=MPI_Wtime()
 
 #if defined (__icepack)
-    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
+    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
 #else     
 
  ! ===== Dynamics

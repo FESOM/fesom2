@@ -1119,6 +1119,7 @@ submodule (icedrv_main) icedrv_step
       module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
 
           use g_config,               only: dt
+          use g_parsup
           use mod_mesh    
 
           implicit none
@@ -1132,7 +1133,7 @@ submodule (icedrv_main) icedrv_step
          
           real (kind=dbl_kind) :: &
              offset,              &   ! d(age)/dt time offset
-             t1, t2, t3
+             t1, t2, t3, t4
 
           real (kind=dbl_kind), intent(out) :: &
              time_therm,                       &
@@ -1142,8 +1143,15 @@ submodule (icedrv_main) icedrv_step
           type(t_mesh), target, intent(in) :: mesh    
 
           character(len=*), parameter :: subname='(ice_step)'
+
+
+          t1 = c0
+          t2 = c0
+          t3 = c0
+          t4 = c0
     
-    
+          t1 = MPI_Wtime()    
+
           !-----------------------------------------------------------------
           ! query Icepack values
           !-----------------------------------------------------------------
@@ -1157,10 +1165,6 @@ submodule (icedrv_main) icedrv_step
               file=__FILE__,line= __LINE__)
     
           ! TODO: Add appropriate timing
-
-          t1 = c0
-          t2 = c0
-          t3 = c0
 
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
@@ -1216,7 +1220,12 @@ submodule (icedrv_main) icedrv_step
              ! EVP 
              !-----------------------------------------------------------------
 
+             t2 = MPI_Wtime()
+
              call EVPdynamics(mesh)
+
+             t3 = MPI_Wtime()
+             time_evp = t3 - t2
 
              !-----------------------------------------------------------------
              ! update ice velocities
@@ -1228,7 +1237,12 @@ submodule (icedrv_main) icedrv_step
              ! advect tracers
              !-----------------------------------------------------------------
 
+             t2 = MPI_Wtime()
+
              call tracer_advection_icepack(mesh)
+
+             t3 = MPI_Wtime()
+             time_advec = t3 - t2
 
              !-----------------------------------------------------------------
              ! ridging
@@ -1260,16 +1274,17 @@ submodule (icedrv_main) icedrv_step
 
           dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
           dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
-
-          !t3 = MPI_Wtime()
          
           !-----------------------------------------------------------------
           ! icepack timing
           !-----------------------------------------------------------------  
 
-          time_advec = c0
-          time_therm = c0
-          time_evp   = c0
+          t4 = MPI_Wtime()
+          time_therm = t4 - t1 - time_advec - time_evp
+
+          !time_advec = c0
+          !time_therm = c0
+          !time_evp   = c0
 
       end subroutine step_icepack
 
