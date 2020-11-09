@@ -650,7 +650,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  if (mype==0) then
     write(*,*) '========================='
     write(*,*) '2D mesh was read in ', t1-t0, ' seconds'
-    write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D
+    write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
 
