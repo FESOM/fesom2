@@ -73,6 +73,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     logical       :: do_zero_flux
 
 #include "associate_mesh.h"
+
+! Asynchronous copy of ttf to gpu
 !$acc enter data copyin(ttf) async(1)
     if (trim(tra_adv_lim)=='FCT') then 
     ! compute the low order upwind horizontal flux
@@ -131,6 +133,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
+! Asynchronous copy of adf_h to gpu in stream 2
 !$acc enter data copyin(adv_flux_hor) async(2)
    
     if (trim(tra_adv_lim)=='FCT') then
@@ -153,6 +156,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
     END SELECT
+
+! Asynchronous copy of adf_v to gpu in stream 3
 !$acc enter data copyin(adv_flux_ver) async(3)
 !if (mype==0) then
 !   write(*,*) 'check new:'
@@ -162,6 +167,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 !end if
     if (trim(tra_adv_lim)=='FCT') then
 !if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
+
+! Wait for ttf copy to be completed to start routine
 !$acc wait(1)
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
