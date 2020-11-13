@@ -538,6 +538,7 @@ subroutine create_new_file(entry, mesh)
   type(t_mesh) mesh
  
   type(Meandata), intent(inout) :: entry
+  character(len=*), parameter :: global_attributes_prefix = "FESOM_"
   ! Serial output implemented so far
   if (mype/=entry%root_rank) return
   ! create an ocean output file
@@ -584,29 +585,29 @@ subroutine create_new_file(entry, mesh)
   
  
 !___Global attributes________  
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
  
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
-  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, 'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'ClimateDataPath', len_trim(ClimateDataPath), trim(ClimateDataPath)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'which_ALE', len_trim(which_ALE), trim(which_ALE)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mix_scheme', len_trim(mix_scheme), trim(mix_scheme)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
+  call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
  
  
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'whichEVP', NF_INT, 1,  whichEVP), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'evp_rheol_steps', NF_INT, 1,  evp_rheol_steps), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'visc_option', NF_INT, 1,  visc_option), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'w_split', NF_INT, 1,  w_split), __LINE__)
-  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, 'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_floatice', NF_INT, 1,  use_floatice), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'whichEVP', NF_INT, 1,  whichEVP), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'evp_rheol_steps', NF_INT, 1,  evp_rheol_steps), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'visc_option', NF_INT, 1,  visc_option), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'w_split', NF_INT, 1,  w_split), __LINE__)
+  call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
  
  
  
