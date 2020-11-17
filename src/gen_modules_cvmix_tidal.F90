@@ -26,7 +26,8 @@ module g_cvmix_tidal
     ! Parameters associated with the Simmons et al. scheme
     character(20) :: tidal_mixscheme="Simmons"
     
-    ! units: unitless (fraction); (Gamma in Simmons et al.)
+    ! units: unitless (fraction); (Gamma in Simmons et al.), mixing efficiency, 
+    ! take to be 0.2 (Osborn,1980)
     real(kind=WP) :: tidal_efficiency=0.2                   
     
     ! units: m; zeta in Simmons et al. (used to compute the vertical deposition 
@@ -40,6 +41,13 @@ module g_cvmix_tidal
     
     ! units: unitless (fraction);  tidal dissipation efficiency (q in Simmons 
     ! et al.), i.e. fraction of energy that dissipates locally
+    ! Physical arguments suggest that 60–90% of this baroclinic wave energy is 
+    ! contained in low-mode internal waves that are able to propagate large distances 
+    ! from the generation site. The remaining portion of the energy lost from the 
+    ! barotropic tide, denoted the ‘‘tidal dissipation efficiency’’ (q), dissipates 
+    ! as locally enhanced turbulent mixing. St. Laurent et al. (2002) assumed that 
+    ! q = 1/3 of the generated energy flux is dissipated locally, with the remaining 
+    ! 1 - q = 2/3 radiating away as low mode internal waves.
     real(kind=WP) :: tidal_lcl_mixfrac=0.33           
     
     ! units: m; depth of the shallowest column where tidal mixing is 
