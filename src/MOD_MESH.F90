@@ -56,6 +56,8 @@ type(sparse_matrix)                         :: ssh_stiff
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south, lump2d_north  
 integer,       allocatable, dimension(:)    :: ind_south, ind_north    
 !#endif  
+
+  character(:), allocatable :: representative_checksum
 END TYPE T_MESH
 end module MOD_MESH
 !==========================================================
