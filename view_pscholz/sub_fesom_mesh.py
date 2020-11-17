@@ -323,8 +323,9 @@ class fesom_mesh:
                 self.nodes_2d_cg = self.nodes_2d_c
                 self.nodes_2d_icg = self.nodes_2d_ic
                 
-            if (str_mode == 'focus'):
-                self.fesom_remove_pbnd()
+            #if (str_mode == 'focus'):
+                #self.fesom_remove_pbnd()
+                
         elif (str_mode == 'g2r'):
             self.nodes_2d_yr=np.degrees(np.arcsin(zg));
             self.nodes_2d_xr=np.degrees(np.arctan2(yg,xg));
