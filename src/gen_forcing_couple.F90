@@ -180,9 +180,15 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)            =  exchange(:)        ! runoff + calving
+	     runoff(:)            =  exchange(:)        ! runoff
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
+             end if
+         elseif (i.eq.13) then
+             if (action) then
+	     calving(:)            =  exchange(:)        ! calving
+    	     mask=1.
+	     call force_flux_consv(calving, mask, i, 0,action, mesh)
              end if
 	 end if  	  
 #ifdef VERBOSE
