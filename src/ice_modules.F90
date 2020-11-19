@@ -41,8 +41,8 @@ MODULE i_PARAM
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
-NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
-ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
+NAMELIST /ice_dyn/ whichEVP, Pstar, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
+ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
 END MODULE i_PARAM
 !
 !=============================================================================
@@ -65,7 +65,8 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
@@ -83,8 +84,6 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
@@ -123,8 +122,8 @@ REAL(kind=WP), parameter  :: clhi=2.835e6      !                              se
 REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K 
 REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
 
-REAL(kind=WP), parameter  :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
-REAL(kind=WP), parameter  :: consn = 0.31      !                         snow
+REAL(kind=WP)    :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
+REAL(kind=WP)    :: consn = 0.31      !                         snow
 
 REAL(kind=WP)    :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
 
@@ -144,7 +143,7 @@ REAL(kind=WP)    :: albim=   0.68     !         melting ice
 REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
 
   NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
-  emiss_wat, albsn, albsnm, albi, albim, albw
+  emiss_wat, albsn, albsnm, albi, albim, albw, con, consn
 
 end module i_therm_param
 

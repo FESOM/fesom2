@@ -54,6 +54,13 @@ class fesom_mesh:
     nodes_2d_zg, nodes_2d_izg = [], []
     nodes_2d_ig               = []
     
+    # cavity info 
+    use_cavity                = False
+    nodes_2d_cg, nodes_2d_icg = [], []
+    nodes_2d_c,  nodes_2d_ic  = [], []
+    elem0_2d_ic               = []
+    
+    # rotated coordiantes
     nodes_2d_xr, nodes_2d_yr  = [], []
         
     pbndn_2d_i                = []
@@ -61,6 +68,7 @@ class fesom_mesh:
     #____mesh elem info__________________________
     elem0_2d_i, elem_2d_i     = [], []
     elem0_2d_iz,pbndtri_2d_i  = [], []
+    
     abnormtri_2d_i            = []
     
     #____fesom lsmask polygon____________________
@@ -96,6 +104,10 @@ class fesom_mesh:
         # load mesh from file
         self.fesom_load_mesh()
         
+        if (inputarray['use_cavity']==True):
+            self.use_cavity = True
+            self.fesom_load_cavity()
+        
         #_______________________________________________________________________
         # rotate mesh from rot to geo coordinates
         if (inputarray['mesh_rotate'     ]==True):
@@ -106,7 +118,9 @@ class fesom_mesh:
             self.nodes_2d_zg  = self.nodes_2d_z
             self.nodes_2d_izg = self.nodes_2d_iz
             self.nodes_2d_ig  = self.nodes_2d_i
-        
+            if (inputarray['use_cavity']==True):
+                self.nodes_2d_cg  = self.nodes_2d_c
+                self.nodes_2d_icg = self.nodes_2d_ic
         #_______________________________________________________________________
         # change grid focus from -180...180 to e.g. 0...360
         if (inputarray['mesh_focus']!=0):
@@ -176,6 +190,29 @@ class fesom_mesh:
                                        names=['numb_of_lev'])
         self.elem0_2d_iz= file_content.values.astype('uint16') - 1
         self.elem0_2d_iz= self.elem0_2d_iz.squeeze()
+        
+    #+___LOAD FESOM CAVITY INFORMATION FROM FILE_______________________________+
+    #|                                                                         |
+    #+_________________________________________________________________________+
+    def fesom_load_cavity(self):
+        
+        print(' --> read cavity files')
+        
+        #____load number of levels at each node_________________________________
+        print('     > cavity_nlvls.out') 
+        file_content    = pa.read_csv(self.path+'cavity_nlvls.out', delim_whitespace=True, skiprows=0, \
+                                       names=['numb_of_lev'])
+        self.nodes_2d_ic= file_content.values.astype('uint16') - 1
+        self.nodes_2d_ic= self.nodes_2d_ic.squeeze()
+        self.nodes_2d_c = np.float32(self.zlev[self.nodes_2d_ic])
+        
+        #____load number of levels at each elem_________________________________
+        print('     > cavity_elvls.out') 
+        file_content    = pa.read_csv(self.path+'cavity_elvls.out', delim_whitespace=True, skiprows=0, \
+                                       names=['numb_of_lev'])
+        self.elem0_2d_ic= file_content.values.astype('uint16') - 1
+        self.elem0_2d_ic= self.elem0_2d_ic.squeeze()
+        
         
     #+___ROTATE GRID ROT-->GEO_________________________________________________+
     #| input : r2g (default) change coordinate from rotated-->geo              |
@@ -282,8 +319,13 @@ class fesom_mesh:
             self.nodes_2d_zg = self.nodes_2d_z
             self.nodes_2d_izg = self.nodes_2d_iz
             self.nodes_2d_ig = self.nodes_2d_i
-            if (str_mode == 'focus'):
-                self.fesom_remove_pbnd()
+            if (self.use_cavity == True):
+                self.nodes_2d_cg = self.nodes_2d_c
+                self.nodes_2d_icg = self.nodes_2d_ic
+                
+            #if (str_mode == 'focus'):
+                #self.fesom_remove_pbnd()
+                
         elif (str_mode == 'g2r'):
             self.nodes_2d_yr=np.degrees(np.arcsin(zg));
             self.nodes_2d_xr=np.degrees(np.arctan2(yg,xg));
@@ -345,6 +387,10 @@ class fesom_mesh:
         self.nodes_2d_zg  = np.concatenate((self.nodes_2d_z,self.nodes_2d_z[self.pbndn_2d_i  ]))
         self.nodes_2d_ig  = np.concatenate((self.nodes_2d_i,self.nodes_2d_i[self.pbndn_2d_i  ]))
         self.nodes_2d_izg = np.concatenate((self.nodes_2d_iz,self.nodes_2d_iz[self.pbndn_2d_i]))
+        if (self.use_cavity==True):
+            self.nodes_2d_cg  = np.concatenate((self.nodes_2d_c,self.nodes_2d_c[self.pbndn_2d_i  ]))
+            self.nodes_2d_icg = np.concatenate((self.nodes_2d_ic,self.nodes_2d_ic[self.pbndn_2d_i]))
+            
         self.n2dna=self.n2dn+self.pbndn_2d_i.size # new (augmented) n2d
         
         #____loop over all periodic bnd. segments___________________________________

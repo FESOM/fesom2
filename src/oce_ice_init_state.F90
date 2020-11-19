@@ -781,7 +781,6 @@ end subroutine ini_global_ocean
 ! ============================================================================ 
 subroutine zero_dynamics
    use g_parsup
-   use o_PARAM, only: tracer_adv,num_tracers
    use o_arrays
    use g_comm_auto
    use o_tracers

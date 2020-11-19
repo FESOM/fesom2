@@ -1,0 +1,62 @@
+! This is the namelist file for model general configuration
+
+&modelname
+runid='fesom'
+/
+
+&timestep
+step_per_day=72 !96 !96 !72 !72 !45 !72 !96
+run_length= 10 !62 !62 !62 !28
+run_length_unit='y'		! y, m, d, s
+/
+
+&clockinit              ! the model starts at
+timenew=0.0
+daynew=1
+yearnew=1948
+/
+
+&paths
+MeshPath='/work/ollie/sjuricke/Soufflet_20/'
+ClimateDataPath='/work/ollie/dsidoren/input/hydrography/phc3.0/'
+ResultPath='/home/ollie/dsidoren/test_visc/'
+/
+
+&restart_log
+restart_length=1        !only required for d,h,s cases,  y, m take 1
+restart_length_unit='y' !output period: y,  d, h, s 
+logfile_outfreq=960     !in logfile info. output frequency, # steps
+/
+
+&ale_def
+which_ALE='linfs'       ! 'linfs','zlevel', 'zstar'
+use_partial_cell=.false.
+/
+
+&geometry
+cartesian=.false.
+fplane=.false.
+cyclic_length=4.5       ![degree]
+rotated_grid=.false.    !option only valid for coupled model case now
+force_rotation=.false.
+alphaEuler=50.          ![degree] Euler angles, convention:
+betaEuler=15.           ![degree] first around z, then around new x,
+gammaEuler=-90.         ![degree] then around new z.
+/
+
+&calendar
+include_fleapyear=.false.
+/
+
+&run_config
+use_ice=.false.         ! ocean+ice
+use_floatice = .false.
+use_sw_pene=.false.
+toy_ocean=.true.
+which_toy="soufflet"
+/
+
+&machine
+n_levels=2
+n_part= 12, 36          ! 432 number of partitions on each hierarchy level
+/

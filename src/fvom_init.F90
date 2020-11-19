@@ -11,13 +11,66 @@
 !> @brief
 !> Main driver routine for initialization
 program MAIN
+
   use o_PARAM
   use MOD_MESH
   use o_MESH
   use g_PARSUP
   use g_CONFIG
   use g_rotate_grid
+  
   implicit none
+
+interface
+   subroutine read_mesh_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_ini
+end interface
+
+interface
+   subroutine test_tri_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine test_tri_ini
+end interface
+interface
+   subroutine find_edges_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_edges_ini
+end interface
+interface
+   subroutine find_elem_neighbors_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_elem_neighbors_ini
+end interface
+interface
+   subroutine find_levels(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels
+end interface
+interface
+   subroutine stiff_mat_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine stiff_mat_ini
+end interface
+interface
+   subroutine set_par_support_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine set_par_support_ini
+end interface
+interface
+   subroutine communication_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine communication_ini
+end interface
+
   character(len=1000)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
   type(t_mesh), target, save  :: mesh
@@ -32,6 +85,9 @@ program MAIN
   read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
+  alphaEuler=alphaEuler*rad 	
+  betaEuler=betaEuler*rad
+  gammaEuler=gammaEuler*rad
   call set_mesh_transform_matrix  !(rotated grid) 
   call read_mesh_ini(mesh)
   call system_clock(finish_t)
@@ -81,7 +137,7 @@ type(t_mesh), intent(inout), target :: mesh
 INTEGER                             :: nq
 INTEGER                             :: n1,n2,n3
 INTEGER                             :: n, nz, exit_flag
-REAL(kind=WP)                       :: x1, x2
+REAL(kind=WP)                       :: x1, x2, gx1, gx2
 INTEGER	                            :: tag
 INTEGER, allocatable                :: elem_data(:)
 INTEGER                             :: i_error
@@ -97,16 +153,17 @@ INTEGER                             :: i_error
     
   do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
+     x1=x1*rad
+     x2=x2*rad
      if (force_rotation) then
-        call g2r(x1*rad, x2*rad, x1, x2)
-        x1=x1/rad
-        x2=x2/rad
+        gx1=x1
+        gx2=x2
+        call g2r(gx1, gx2, x1, x2)
      end if      
-     mesh%coord_nod2D(1,nq)=x1*rad
-     mesh%coord_nod2D(2,nq)=x2*rad
+     mesh%coord_nod2D(1,n)=x1
+     mesh%coord_nod2D(2,n)=x2
   end do
-  CLOSE(20) 
-      
+  CLOSE(20)
   READ(21,*)  mesh%elem2D    
   ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
   elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
@@ -187,7 +244,19 @@ USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
+
+interface
+   subroutine elem_center(elem, x, y, mesh)
+     USE MOD_MESH
+     USE g_CONFIG
+     integer, intent(in)        :: elem
+     real(kind=WP), intent(out) :: x, y
+     type(t_mesh), intent(in), target   :: mesh
+   end subroutine elem_center
+end interface
+
 integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:)
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
@@ -417,12 +486,9 @@ deallocate(aux1)
     call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
-    if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
-    if(xe(1)<-cyclic_length/2.) xe(1)=xe(1)+cyclic_length
-    if(xc(1)>=cyclic_length/2.) xc(1)=xc(1)-cyclic_length
-    if(xc(1)<-cyclic_length/2.) xc(1)=xc(1)+cyclic_length
-
-    if(xc(1)*xe(2)-xc(2)*xe(1)>0) then
+    call trim_cyclic(xe(1))
+    call trim_cyclic(xc(1))
+    if(xc(1)*xe(2)-xc(2)*xe(1)>0.0_WP) then
        ! Vector drawn to the center of the first triangle is to the right
        ! of the edge vector. Triangles have to be exchanged:
        elem=edge_tri(1,n)
@@ -676,9 +742,11 @@ subroutine elem_center(elem, x, y, mesh)
 USE MOD_MESH
 USE g_CONFIG
 implicit none
-integer       :: elem, elnodes(3), k    
-real(kind=WP) :: x, y, ax(3), amin
-type(t_mesh), intent(inout), target :: mesh
+integer, intent(in)  :: elem
+integer              ::  elnodes(3), k    
+real(kind=WP), intent(out) :: x, y
+real(kind=WP)        ::  ax(3), amin
+type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh_ini.h"
 
    elnodes=elem2D_nodes(1:3,elem)
@@ -907,6 +975,13 @@ subroutine set_par_support_ini(mesh)
   use g_config
   implicit none
 
+interface 
+   subroutine check_partitioning(mesh)
+     use MOD_MESH
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine check_partitioning
+end interface
+
   integer         :: n, j, k, nini, nend, ierr
   integer(idx_t)  :: np(10)
   type(t_mesh), intent(inout), target :: mesh
@@ -1120,4 +1195,5 @@ subroutine check_partitioning(mesh)
        100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
 
 end subroutine check_partitioning
+
 

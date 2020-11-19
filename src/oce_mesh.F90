@@ -135,6 +135,8 @@ type(t_mesh), intent(inout), target :: mesh
  integer, allocatable, dimension(:,:)      :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
  integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
+ integer fileunit, iostat
+ character(32) mesh_checksum
 
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
@@ -195,7 +197,7 @@ type(t_mesh), intent(inout), target :: mesh
   !===========================
  
   file_name=trim(dist_mesh_dir)//'my_list'//trim(mype_string)//'.out'  
-  fileID=10+mype  
+  fileID=103+mype  !skip unit range 100--102
     
   open(fileID, file=trim(file_name))
   read(fileID,*) n
@@ -319,7 +321,7 @@ type(t_mesh), intent(inout), target :: mesh
     
     !___________________________________________________________________________
     ! check if rotation is applied to an already rotated mesh
-    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1)) then
+    if ((mype==0) .and. (force_rotation) .and. (flag_checkisrot==1) .and. (.not. toy_ocean)) then
         write(*,*)
         print *, achar(27)//'[33m'
         write(*,*) '____________________________________________________________________'
@@ -340,7 +342,7 @@ type(t_mesh), intent(inout), target :: mesh
         call par_ex(0)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
-    elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1)) then
+    elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
         write(*,*)
         print *, achar(27)//'[33m'
         write(*,*) '____________________________________________________________________'
@@ -529,7 +531,7 @@ end if
  ! every proc reads its file
  ! ==============================
  file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
- fileID=10+mype  
+ fileID=103+mype !skip unit range 100--102  
  open(fileID, file=file_name)
  read(fileID,*)  n
  read(fileID,*) com_nod2D%rPEnum
@@ -627,12 +629,28 @@ end if
  if (mype==0) write(*,*) 'communication arrays are read'
  deallocate(rbuff, ibuff)
  deallocate(mapping)
+ 
+  ! try to calculate checksum and distribute it to every process
+  ! the shell command is probably not very portable and might fail, in which case we just do not have a checksum
+  mesh%representative_checksum = '                                ' ! we use md5 which is 32 chars long, so set default value to the same length
+  if(mype==0) then
+    call execute_command_line("md5sum "//trim(MeshPath)//"nod2d.out | cut -d ' ' -f 1 > "//trim(ResultPath)//"mesh_checksum")
+    ! we can not check if execute_command_line succeeded (e.g. with cmdstat), as the pipe will swallow any error from the initial command
+    ! so we have to thoroughly check if the file exists and if it contains our checksum
+    open(newunit=fileunit, file=trim(ResultPath)//"mesh_checksum", action="READ", iostat=iostat)
+    if(iostat==0) read(fileunit, *, iostat=iostat) mesh_checksum
+    close(fileunit)      
+    if(iostat==0 .and. len_trim(mesh_checksum)==32) mesh%representative_checksum = mesh_checksum
+  end if
+  call MPI_BCAST(mesh%representative_checksum, len(mesh%representative_checksum), MPI_CHAR, 0, MPI_COMM_FESOM, MPIerr)
+  mesh%representative_checksum = trim(mesh%representative_checksum) ! if we did not get a checksum, the string is empty
+
 CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  t1=MPI_Wtime()
  if (mype==0) then
     write(*,*) '========================='
     write(*,*) '2D mesh was read in ', t1-t0, ' seconds'
-    write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D
+    write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
 
@@ -772,6 +790,7 @@ USE MOD_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
@@ -789,10 +808,8 @@ real(kind=WP)               :: t0, t1
 	  b=mesh%coord_nod2D(:,elnodes(2))-a
 	  c=mesh%coord_nod2D(:,elnodes(3))-a
           
-	  if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
-          if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
-	  if(c(1)>cyclic_length/2._WP) c(1)=c(1)-cyclic_length
-          if(c(1)<-cyclic_length/2._WP) c(1)=c(1)+cyclic_length
+	  call trim_cyclic(b(1))
+	  call trim_cyclic(c(1))
 	  
 	    
 	  r=b(1)*c(2)-b(2)*c(1)
@@ -1205,7 +1222,7 @@ type(t_mesh), intent(inout), target :: mesh
 
 a=mesh%coord_nod2D(:,n1)
 b=mesh%coord_nod2D(:,n2)
-if(a(1)-b(1)>cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
+if(a(1)-b(1)> cyclic_length/2.0_WP) a(1)=a(1)-cyclic_length
 if(a(1)-b(1)<-cyclic_length/2.0_WP) b(1)=b(1)-cyclic_length
 x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
@@ -1275,10 +1292,8 @@ t0=MPI_Wtime()
     if (cartesian) ay=1.0_WP
     a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
     b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
-    if(a(1)>cyclic_length/2._WP) a(1)=a(1)-cyclic_length
-    if(a(1)<-cyclic_length/2._WP) a(1)=a(1)+cyclic_length
-    if(b(1)>cyclic_length/2._WP) b(1)=b(1)-cyclic_length
-    if(b(1)<-cyclic_length/2._WP) b(1)=b(1)+cyclic_length
+    call trim_cyclic(a(1))
+    call trim_cyclic(b(1))
     a(1)=a(1)*ay
     b(1)=b(1)*ay
     mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
@@ -1476,8 +1491,7 @@ t0=MPI_Wtime()
  DO n=1, myDim_edge2D+eDim_edge2D
     ed=mesh%edges(:,n)
     a=mesh%coord_nod2D(:,ed(2))-mesh%coord_nod2D(:, ed(1))
-    if(a(1)>cyclic_length/2) a(1)=a(1)-cyclic_length
-    if(a(1)<-cyclic_length/2) a(1)=a(1)+cyclic_length
+    call trim_cyclic(a(1))
       !a(1)=a(1)*aux_cos_edge(n)
       !a=a*r_earth
     mesh%edge_dxdy(:,n)=a
@@ -1563,13 +1577,11 @@ DO elem=1, myDim_elem2D
    elnodes = mesh%elem2D_nodes(:,elem)
    
    deltaX31 = mesh%coord_nod2D(1,elnodes(3)) - mesh%coord_nod2D(1,elnodes(1))
-   if(deltaX31>cyclic_length/2) deltaX31=deltaX31-cyclic_length
-   if(deltaX31<-cyclic_length/2) deltaX31=deltaX31+cyclic_length
+   call trim_cyclic(deltaX31)
    deltaX31 = mesh%elem_cos(elem)*deltaX31
    
    deltaX21 = mesh%coord_nod2D(1,elnodes(2)) - mesh%coord_nod2D(1,elnodes(1))
-   if(deltaX21>cyclic_length/2) deltaX21=deltaX21-cyclic_length
-   if(deltaX21<-cyclic_length/2) deltaX21=deltaX21+cyclic_length
+   call trim_cyclic(deltaX21)
    deltaX21 = mesh%elem_cos(elem)*deltaX21
    
    deltaY31 = mesh%coord_nod2D(2,elnodes(3)) - mesh%coord_nod2D(2,elnodes(1))
@@ -1657,16 +1669,14 @@ DO elem=1,myDim_elem2D
             b(1)=center_x(el(1))
             b(2)=center_y(el(1))
             x(j)=b(1)-a(1)
-            if(x(j)>cyclic_length/2) x(j)=x(j)-cyclic_length
-            if(x(j)<-cyclic_length/2) x(j)=x(j)+cyclic_length
+            call trim_cyclic(x(j))
             y(j)=b(2)-a(2)
         else
             ! Virtual element center is taken
             ed=mesh%edges(:,mesh%elem_edges(j,elem))
             call edge_center(ed(1), ed(2), b(1), b(2), mesh)
             x(j)=(b(1)-a(1))
-            if(x(j)>cyclic_length/2)   x(j)=x(j)-cyclic_length
-            if(x(j)<-cyclic_length/2)  x(j)=x(j)+cyclic_length
+            call trim_cyclic(x(j))
             x(j)=2*x(j)
             y(j)=2*(b(2)-a(2))
         end if
@@ -1786,13 +1796,3 @@ end if
 !stop
 END SUBROUTINE check_mesh_consistency
 !==================================================================
-subroutine trim_cyclic(b)
-use o_PARAM
-use g_config
-implicit none
-real(kind=WP) :: b
- if(b> cyclic_length/2.0_WP) b=b-cyclic_length
- if(b<-cyclic_length/2.0_WP) b=b+cyclic_length
-end subroutine trim_cyclic
-!===================================================================
-

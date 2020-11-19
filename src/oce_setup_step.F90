@@ -28,8 +28,10 @@ use g_cvmix_idemix
 use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
+use Toy_Channel_Soufflet
 use array_setup_interface
 use oce_initial_state_interface
+use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
 type(t_mesh), intent(in) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
@@ -116,28 +118,23 @@ type(t_mesh), intent(in) , target :: mesh
         
 	!if(open_boundary) call set_open_boundary   !TODO
 	
-	call fct_init(mesh)
+    call oce_adv_tra_fct_init(mesh)
     call muscl_adv_init(mesh) !!PS test
 	!=====================
 	! Initialize fields
 	! A user-defined routine has to be called here!
 	!=====================
-    if(toy_ocean) then  
-#ifdef NA_TEST
-        call init_fields_na_test(mesh)
-#else
-        call initial_state_test(mesh)
-#endif
-        !call initial_state_channel_test 
-        !call initial_state_channel_narrow_test
-        !call init_fields_na_test  
-        !call init_fields_global_test
+    if (toy_ocean) then  
+       SELECT CASE (TRIM(which_toy))
+         CASE ("soufflet") !forcing update for soufflet testcase
+           if (mod(mstep, soufflet_forc_update)==0) then
+              call initial_state_soufflet(mesh)
+              call compute_zonal_mean_ini(mesh)  
+              call compute_zonal_mean(mesh)
+           end if
+       END SELECT
     else
-#ifdef NA_TEST
-        call init_fields_na_test(mesh)
-#else
-        call oce_initial_state(mesh)   ! Use it if not running tests
-#endif
+       call oce_initial_state(mesh)   ! Use it if not running tests
     end if
 
     if (.not.r_restart) tr_arr_old=tr_arr
@@ -154,7 +151,7 @@ type(t_mesh), intent(in) , target :: mesh
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
-        write(*,*) 'maximum explicit W is set to: ', w_exp_max
+        write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
@@ -207,7 +204,7 @@ if (use_ice .and. use_momix) mixlength=0.
 ! ================
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
-allocate(CFL_z(nl-1, node_size)) ! vertical CFL criteria
+allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 ! ================
 ! Temperature and salinity
 ! ================
@@ -232,6 +229,7 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
@@ -293,7 +291,10 @@ neutral_slope=0.0_WP
 slope_tapered=0.0_WP
 
 allocate(MLD1(node_size), MLD2(node_size), MLD1_ind(node_size), MLD2_ind(node_size))
-
+if (use_global_tides) then
+   allocate(ssh_gp(node_size))
+   ssh_gp=0.
+end if
 ! xy gradient of a neutral surface
 allocate(sigma_xy(2, nl-1, node_size))
 sigma_xy=0.0_WP
@@ -352,6 +353,8 @@ end if
     Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
+    stress_atmoce_x=0.
+    stress_atmoce_y=0.
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
@@ -551,3 +554,27 @@ USE g_ic3d
   END DO
 end subroutine oce_initial_state
 !==========================================================================
+! Here we do things (if applicable) before the ocean timestep will be made
+! 
+SUBROUTINE before_oce_step(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE g_PARSUP
+USE g_config
+USE Toy_Channel_Soufflet
+implicit none
+integer                  :: i, k, counter, rcounter3, id
+character(len=10)        :: i_string, id_string
+type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+if (toy_ocean) then
+   SELECT CASE (TRIM(which_toy))
+     CASE ("soufflet") !forcing update for soufflet testcase
+       if (mod(mstep, soufflet_forc_update)==0) then
+          call compute_zonal_mean(mesh)
+       end if
+   END SELECT
+end if
+END SUBROUTINE before_oce_step

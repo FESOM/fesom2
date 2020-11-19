@@ -430,26 +430,25 @@ subroutine diag_densMOC(mode, mesh)
      std_dens_flux(3, is,elem)=std_dens_flux(3, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * water_flux(elnodes) * tr_arr(1,  elnodes, 2))/3.
      
      do nz=nzmax-1,1,-1
-        dmin  =minval(dens(nz:nz+1))
-        dmax  =maxval(dens(nz:nz+1))
-        ddiff =abs(dens(nz)-dens(nz+1))
-        is=findloc(std_dens > dmin, value=.true., dim=1)
-!	is=1
-!        do jj = 1, std_dens_N
-!           if (std_dens(jj) > dmin) then
-!              is = jj
-!              exit
-!           endif
-!        end do
+        dmin=minval(dens(nz:nz+1))
+        dmax=maxval(dens(nz:nz+1))
+!       is=findloc(std_dens > dmin, value=.true., dim=1)
+	is=std_dens_N
+        do jj = 1, std_dens_N
+           if (std_dens(jj) > dmin) then
+              is = jj
+              exit
+           endif
+        end do
 
-        ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
-!	ie=std_dens_N
-!        do jj = std_dens_N,1,-1
-!           if (std_dens(jj) < dmin) then
-!              ie = jj
-!              exit
-!           endif
-!        end do
+!       ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+	ie=1
+        do jj = std_dens_N,1,-1
+           if (std_dens(jj) < dmax) then
+              ie = jj
+              exit
+           endif
+        end do
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
         uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
@@ -619,9 +618,8 @@ end subroutine compute_diagnostics
 !                      Discrete variance decay in a Finite-Volume framework ...
 subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     use o_arrays
-    use o_PARAM, only: tracer_adv
     use g_PARSUP
-    
+    use oce_adv_tra_driver_interfaces    
     implicit none
     type(t_mesh), intent(in), target :: mesh
     integer, intent(in)      :: tr_num 
@@ -648,21 +646,7 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, mesh)
     ! numerically induced mixing in ocean models ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    select case (tracer_adv)
-        case(1) !MUSCL
-            ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-            call adv_tracers_muscle_ale(trAB_sqr, .25_WP, 1)
-            !                2nd tracer moment is used <--'
-            call adv_tracers_vert_ppm_ale(tr_sqr, 1)
-            !        2nd tracer moment is used <--'
-        case(2) !MUSCL+FCT(3D)
-            call adv_tracer_fct_ale(trAB_sqr,tr_sqr, 1.0_WP, 1)
-            !                   2nd tracer moment is used <--'
-        case default !unknown
-            if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
-            call par_ex(1)
-    end select
-
+    call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -694,9 +678,8 @@ end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 !                      Discrete variance decay in a Finite-Volume framework ...
 subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     use o_arrays
-    use o_PARAM, only: tracer_adv
     use g_PARSUP
-    
+    use oce_adv_tra_driver_interfaces
     implicit none
     integer, intent(in)      :: tr_num 
     integer                  :: node, nz
@@ -709,26 +692,7 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, mesh)
     ! numerically induced mixing in ocean models ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    select case (tracer_adv)
-        case(1) !MUSCL
-            ! --> tr_arr_old ... AB interpolated tracer from call init_tracers_AB(tr_num)
-            call adv_tracers_muscle_ale(tr_arr_old(:,:,tr_num), .25_WP, 2)
-            !                                                      |    | 
-            !             fraction of fourth-order contribution <--'    |
-            !                              2nd tracer moment is used <--'
-            call adv_tracers_vert_ppm_ale(tr_arr(:,:,tr_num), 2)
-            !                                                 | 
-            !                    2nd tracer moment is used <--'
-        case(2) !MUSCL+FCT(3D)
-            call adv_tracer_fct_ale(tr_arr_old(:,:,tr_num),tr_arr(:,:,tr_num), 1.0_WP, 2)
-            !                                                                     |    | 
-            !                            fraction of fourth-order contribution <--'    | 
-            !                                             2nd tracer moment is used <--'
-        case default !unknown
-            if (mype==0) write(*,*) 'Unknown ALE advection type. Check your namelists.'
-            call par_ex(1)
-    end select
-
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 2, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -769,7 +733,6 @@ end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
 subroutine compute_diag_dvd(tr_num, mesh)
     use g_config, only: dt
     use o_arrays
-    use o_PARAM, only: tracer_adv
     use g_PARSUP
     
     implicit none

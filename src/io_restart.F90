@@ -181,8 +181,10 @@ subroutine ini_ice_io(year, mesh)
   call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+#if defined (__oifs)
   call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
   call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
+#endif /* (__oifs) */
 
 end subroutine ini_ice_io
 !
@@ -309,8 +311,12 @@ subroutine create_new_file(id)
         end do
         !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
-     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, &
-                          (/dimid(1:n), id%rec/), id%var(j)%code);                                                                 c=c+1
+     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     !if (n==1) then
+     !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
+     if (n==2) then
+        id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1, id%dim(1)%size/)); ! c=c+1 
+     end if
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
   end do
@@ -460,8 +466,11 @@ subroutine write_restart(id, istep, mesh)
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
         t2=MPI_Wtime()
+#ifdef DEBUG
+        ! Timeing information for collecting and writing restart file
         if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
         if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
+#endif
         if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
@@ -482,8 +491,11 @@ subroutine write_restart(id, istep, mesh)
               id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
            end if
            t2=MPI_Wtime()
+#ifdef DEBUG
+           ! Timeing information for collecting and writing output file
            if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
            if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
+#endif
         end do
         deallocate(laux)
         if (mype==0) deallocate(aux)
@@ -517,7 +529,7 @@ subroutine read_restart(id, mesh, arg)
 
 #include  "associate_mesh.h"
 
-  laux=0.
+  ! laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then

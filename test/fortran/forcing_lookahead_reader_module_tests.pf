@@ -1,0 +1,26 @@
+module forcing_lookahead_reader_module_tests
+  use forcing_lookahead_reader_module
+  use funit; implicit none
+  
+contains  
+
+
+  @test
+  subroutine test_is_not_initialized_without_call_to_initialize()
+    type(forcing_lookahead_reader_type) r
+
+    @assertTrue(.not. r%is_initialized())
+  end subroutine
+
+
+  @test
+  subroutine test_is_initialized_after_call_to_initialize()
+    type(forcing_lookahead_reader_type) r
+
+    call r%initialize("fixtures/test.1948.nc", 0, "q")
+    @assertTrue(r%is_initialized())
+    call r%finalize()
+  end subroutine
+
+
+end module

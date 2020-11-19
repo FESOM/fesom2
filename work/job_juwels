@@ -1,12 +1,22 @@
 #!/bin/bash
-#SBATCH --job-name=fesom2.0
+#SBATCH --job-name=fes_core
+#SBATCH --ntasks-per-node=48
 #SBATCH --ntasks=288
 #SBATCH --time=00:30:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 #SBATCH --partition=batch
+#SBATCH -A hhb19
 
-module load CMake Intel IntelMPI imkl netCDF netCDF-Fortran
+module --force purge
+module use /gpfs/software/juwels/otherstages
+module load Stages/2019a
+module load StdEnv
+module load Intel/2019.3.199-GCC-8.3.0  IntelMPI/2018.5.288 imkl/2019.3.199
+# if you use ParaStation MPI
+#module load Intel/2019.3.199-GCC-8.3.0 ParaStationMPI/5.4 imkl/2019.5.281
+module load netCDF/4.6.3
+module load netCDF-Fortran/4.4.5
 
 set -x
 
@@ -15,7 +25,7 @@ ulimit -s unlimited
 # determine JOBID
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
-ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+ln -s ../bin/fesom.x .
 cp -n ../config/namelist.config  .
 cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
