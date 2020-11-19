@@ -449,8 +449,10 @@ subroutine diag_densMOC(mode, mesh)
               exit
            endif
         end do
+
         if (std_dens(is)>=dmax) is=ie
         if (std_dens(ie)<=dmin) ie=is
+
         uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
         rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
         vol_el =helem(nz,elem)*elem_area(elem)
@@ -523,27 +525,28 @@ subroutine diag_densMOC(mode, mesh)
            dmin =minval(dens(nz:nz+1))
            dmax =maxval(dens(nz:nz+1))
            ddiff=abs(dens(nz)-dens(nz+1))
-           is=findloc(std_dens > dmin, value=.true., dim=1)
-!          is=1
-!          do jj = 1, std_dens_N
-!             if (std_dens(jj) > dmin) then
-!                is = jj
-!                exit
-!             endif
-!          end do
+!          is=findloc(std_dens > dmin, value=.true., dim=1)
+           is=std_dens_N
+           do jj = 1, std_dens_N
+              if (std_dens(jj) > dmin) then
+                 is = jj
+                 exit
+              endif
+           end do
 
-           ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
-!          ie=std_dens_N
-!          do jj = std_dens_N,1,-1
-!             if (std_dens(jj) < dmin) then
-!                ie = jj
-!                exit
-!             endif
-!          end do
+!          ie=findloc(std_dens < dmax, value=.true., back=.true., dim=1)
+           ie=1
+           do jj = std_dens_N,1,-1
+              if (std_dens(jj) < dmax) then
+                 ie = jj
+                 exit
+              endif
+           end do
 
-        if (std_dens(is)>=dmax) is=ie
-        if (std_dens(ie)<=dmin) ie=is
-        if (ie-is > 0) then
+           if (std_dens(is)>=dmax) is=ie
+           if (std_dens(ie)<=dmin) ie=is
+
+           if (ie-is > 0) then
            weight=(std_dens(is)-dmin)+std_dd(is)/2.
            weight=max(weight, 0.)/ddiff
            std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
