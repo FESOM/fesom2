@@ -114,9 +114,9 @@ subroutine thermodynamics(mesh)
 
      ehf     = 0._WP
      fw      = 0._WP
-#ifdef use_fullfreesurf
-     rsf     = 0._WP
-#endif
+     if (.not. use_virt_salt) then
+        rsf     = 0._WP
+     end if
 
 !#if defined (__oifs)
 !     !---- different lead closing parameter for NH and SH
@@ -152,9 +152,9 @@ subroutine thermodynamics(mesh)
      m_snow(inod)        = hsn
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
-#ifdef use_fullfreesurf
-     real_salt_flux(inod)= rsf
-#endif
+     if (.not. use_virt_salt) then
+        real_salt_flux(inod)= rsf
+     end if
      thdgr(inod)         = dhgrowth
      thdgrsn(inod)       = dhsngrowth
      flice(inod)         = dhflice
@@ -385,12 +385,12 @@ contains
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
-#ifdef use_fullfreesurf
-    fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
-    rsf = -dhgrowth*rhoice*Sice
-#else
-    fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
-#endif
+    if (.not. use_virt_salt) then
+       fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
+       rsf = -dhgrowth*rhoice*Sice
+    else
+       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+    end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
     !---- NOTE: ehf = -ohf (in case of no cut-off)
@@ -416,18 +416,14 @@ contains
 
     !---- to maintain salt conservation for the current model version
     !---- (a way to avoid producing net salt from snow-type-ice) 
-#ifdef use_fullfreesurf
-    rsf = rsf - dhflice*rhoice*Sice
-#else
-    fw = fw + dhflice*rhoice*Sice/rsss
-#endif
+    if (.not. use_virt_salt) then
+       rsf = rsf - dhflice*rhoice*Sice/rhowat
+    else
+       fw = fw + dhflice*rhoice*Sice/rsss
+    end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw = fw/rhowat
-#ifdef use_fullfreesurf
-    rsf = rsf/rhowat
-#endif
-
     return
   end subroutine ice_growth
 
