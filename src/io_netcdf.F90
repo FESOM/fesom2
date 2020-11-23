@@ -16,12 +16,12 @@ module io_netcdf_module
 
 
   subroutine assert_nc(status, line)
+    use netcdf
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
-    include "netcdf.inc" ! old netcdf fortran interface required?
-    if(status /= NF_NOERR) then
-      print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+    if(status /= nf90_noerr) then
+      print *, "error in line ",line, __FILE__, ' ', trim(nf90_strerror(status))
       stop 1
     endif   
   end subroutine
