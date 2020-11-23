@@ -42,7 +42,7 @@ MODULE i_PARAM
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
-ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
+ice_gamma_fct, ice_diff, theta_io,ice_ave_steps, c_pressure
 END MODULE i_PARAM
 !
 !=============================================================================
@@ -123,7 +123,7 @@ REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K
 REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
 
 REAL(kind=WP), parameter  :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
-REAL(kind=WP), parameter  :: consn = 0.31      !                         snow
+REAL(kind=WP)    :: consn = 0.31      !                         snow
 
 REAL(kind=WP)    :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
 
@@ -143,7 +143,7 @@ REAL(kind=WP)    :: albim=   0.68     !         melting ice
 REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
 
   NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
-  emiss_wat, albsn, albsnm, albi, albim, albw
+  emiss_wat, albsn, albsnm, albi, albim, albw, consn
 
 end module i_therm_param
 

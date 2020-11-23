@@ -8,7 +8,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public output, finalize_output
+  public :: def_stream2D, def_stream3D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -501,6 +501,9 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
   use mod_mesh
   use g_PARSUP
   use diagnostics
+#if defined (__icepack)
+  use icedrv_main,   only: ncat ! number of ice thickness cathegories
+#endif
   implicit none
   integer       :: size
   type(t_mesh) mesh
@@ -516,6 +519,10 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
     name='nz1'
   elseif (size==std_dens_N) then
     name='ndens'
+#if defined (__icepack)
+  elseif (size==ncat) then
+    name='ncat'
+#endif
   else
     name='unknown'
     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
@@ -656,10 +663,10 @@ subroutine write_mean(entry, entry_index)
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  integer                       :: size1, size2
-  integer                       :: lev
   integer, intent(in) :: entry_index
   integer tag
+  integer                       :: i, size1, size2, size_gen, size_lev, order
+  integer                       :: c, lev
 
 
   ! Serial output implemented so far
@@ -670,23 +677,35 @@ subroutine write_mean(entry, entry_index)
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
   size2=entry%glsize(2)
+  if (size1 > size2) then
+      size_gen=size1
+      size_lev=size2
+      order=1
+  else if (size1 < size2) then
+      size_gen=size2
+      size_lev=size1
+      order=2
+  end if
   tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
 !___________writing 8 byte real_________________________________________ 
-  if(entry%accuracy == i_real8) then
+  if (entry%accuracy == i_real8) then
      if(mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size_gen))
      end if
-     do lev=1, size1
+     do lev=1, size_lev
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         if (order==2) call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         if (order==1) call gather_nod2D (entry%local_values_r8_copy(1:size(entry%local_values_r8_copy,dim=1),lev), entry%aux_r8, entry%root_rank, tag, entry%comm)
        else
-         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         if (order==2) call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         if (order==1) call gather_elem2D(entry%local_values_r8_copy(1:size(entry%local_values_r8_copy,dim=1),lev), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
+            if (order==2) call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), entry%aux_r8, 1), __LINE__)
+            if (order==1) call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), entry%aux_r8, 1), __LINE__)
           end if
         end if
      end do
@@ -694,19 +713,22 @@ subroutine write_mean(entry, entry_index)
 !___________writing 4 byte real _________________________________________ 
   else if (entry%accuracy == i_real4) then
      if(mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
+       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size_gen))
      end if
-     do lev=1, size1
+     do lev=1, size_lev
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         if (order==2) call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         if (order==1) call gather_real4_nod2D(entry%local_values_r4_copy(1:size(entry%local_values_r4_copy,dim=1),lev), entry%aux_r4, entry%root_rank, tag, entry%comm)
        else
-         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         if (order==2) call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         if (order==1) call gather_real4_elem2D(entry%local_values_r4_copy(1:size(entry%local_values_r4_copy,dim=1),lev), entry%aux_r4, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
+             if (order==2) call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), entry%aux_r4, 1), __LINE__)
+             if (order==1) call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
      end do
@@ -743,6 +765,10 @@ subroutine output(istep, mesh)
   use mod_mesh
   use g_PARSUP
   use io_gather_module
+#if defined (__icepack)
+  use icedrv_main,    only: init_io_icepack
+#endif
+
   implicit none
 
   integer       :: istep
@@ -756,8 +782,12 @@ subroutine output(istep, mesh)
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-    call ini_mean_io(mesh)
-    call init_io_gather()
+     call ini_mean_io(mesh)
+     call init_io_gather()
+#if defined (__icepack)
+     call init_io_icepack(mesh)
+#endif
+     call init_io_gather()
   end if
 
   call update_means
@@ -843,6 +873,7 @@ end subroutine
 
 subroutine do_output_callback(entry_index)
 use g_PARSUP
+use mod_mesh
   integer, intent(in) :: entry_index
   ! EO args
   type(Meandata), pointer :: entry

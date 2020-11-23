@@ -12,6 +12,11 @@ subroutine oce_fluxes_mom(mesh)
   use i_PARAM
   USE g_CONFIG
   use g_comm_auto
+
+#if defined (__icepack)
+  use icedrv_main,   only: icepack_to_fesom
+#endif
+
   implicit none
   
   integer                  :: n, elem, elnodes(3),n1
@@ -20,9 +25,14 @@ subroutine oce_fluxes_mom(mesh)
 
 #include  "associate_mesh.h"
 
- ! ==================
+  ! ==================
   ! momentum flux:
   ! ==================
+#if defined (__icepack)
+  call icepack_to_fesom(nx_in=(myDim_nod2D+eDim_nod2D), &
+                        aice_out=a_ice) 
+#endif
+
   do n=1,myDim_nod2D+eDim_nod2D   
      if(a_ice(n)>0.001_WP) then
        aux=sqrt((u_ice(n)-u_w(n))**2+(v_ice(n)-v_w(n))**2)*density_0*Cd_oce_ice
@@ -116,6 +126,11 @@ subroutine oce_fluxes(mesh)
   use g_support
   use i_therm_param
 
+#if defined (__icepack)
+  use icedrv_main,   only: icepack_to_fesom,    &
+                           init_flux_atm_ocn
+#endif
+
   implicit none
   type(t_mesh), intent(in)   , target :: mesh
   integer                    :: n, elem, elnodes(3),n1
@@ -139,8 +154,33 @@ subroutine oce_fluxes(mesh)
   ! ~~~~|~~~~|~~~~
   !     V    |
   !     
-  heat_flux   = -net_heat_flux 
-  water_flux  = -fresh_wa_flux
+
+#if defined (__icepack)
+
+  call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                         aice_out=a_ice,                 &
+                         vice_out=m_ice,                 &
+                         vsno_out=m_snow,                &
+                         fhocn_tot_out=net_heat_flux,    &
+                         fresh_tot_out=fresh_wa_flux,    &
+                         fsalt_out=real_salt_flux,       &
+                         dhi_dt_out=thdgrsn,             &
+                         dhs_dt_out=thdgr,               &
+                         evap_ocn_out=evaporation        )
+
+  heat_flux(:)   = - net_heat_flux(:)
+  water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+
+  ! Evaporation 
+  evaporation(:) = - evaporation(:) / 1000.0_WP
+  ice_sublimation(:) = 0.0_WP
+ 
+  call init_flux_atm_ocn()
+
+#else
+  heat_flux   = - net_heat_flux 
+  water_flux  = - fresh_wa_flux
+#endif
 
   call exchange_nod(heat_flux, water_flux) ! do we really need it?
 !___________________________________________________________________
@@ -190,7 +230,7 @@ subroutine oce_fluxes(mesh)
        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
   end if     
   
-  call integrate_nod(flux, net, mesh)
+  !call integrate_nod(flux, net, mesh)
   ! here the + sign must be used because we switched up the sign of the 
   ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
   ! have there original sign

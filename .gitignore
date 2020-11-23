@@ -4,3 +4,6 @@
 *.x
 *.out
 *~
+*.swp
+/Icepack
+/work_*

@@ -159,11 +159,26 @@ use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
 use mod_mesh
+
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack 
+#endif
+
 implicit none 
 type(t_mesh), intent(in)   , target :: mesh
 integer                    :: step,i
 REAL(kind=WP)              :: t0,t1, t2, t3
+
+#if defined (__icepack)
+real(kind=WP)              :: time_evp, time_advec, time_therm
+#endif
+
 t0=MPI_Wtime()
+
+#if defined (__icepack)
+    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+#else     
+
  ! ===== Dynamics
 if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
 SELECT CASE (whichEVP)
@@ -178,7 +193,8 @@ SELECT CASE (whichEVP)
       call par_ex
       stop
 END SELECT
- t1=MPI_Wtime()     
+ t1=MPI_Wtime()
+
  ! ===== Advection part
 
 ! old FCT routines
@@ -208,14 +224,21 @@ END SELECT
  ! ===== Thermodynamic part
  if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
  call thermodynamics(mesh)
+#endif /* (__icepack) */
  t3=MPI_Wtime()
  rtime_ice = rtime_ice + (t3-t0)
  rtime_tot = rtime_tot + (t3-t0)
 if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
+#if defined (__icepack)
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
+                write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
+                write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
+#else
 		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
 		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
- 		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+#endif
 		write(*,*) '   _______________________________'
 		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
 		write(*,*)
@@ -248,19 +271,21 @@ subroutine ice_initial_state(mesh)
   m_snow=0._WP
   if(mype==0) write(*,*) 'initialize the sea ice'
 
+#if defined (__icepack)
   do i=1,myDim_nod2D+eDim_nod2D                           
      if (tr_arr(1,i,1)< 0.0_WP) then
 	if (geo_coord_nod2D(2,i)>0._WP) then
-            m_ice(i) = 1.0_WP
-            m_snow(i)= 0.1_WP 
+            m_ice(i) = 0.0_WP
+            m_snow(i)= 0.0_WP 
         else
-            m_ice(i) = 2.0_WP
-            m_snow(i)= 0.5_WP 
+            m_ice(i) = 0.0_WP
+            m_snow(i)= 0.0_WP 
         end if
 
-        a_ice(i) = 0.9_WP
+        a_ice(i) = 0.0_WP
         u_ice(i) = 0.0_WP
         v_ice(i) = 0.0_WP
      endif
   enddo
+#endif
 end subroutine ice_initial_state
