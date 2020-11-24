@@ -11,7 +11,7 @@ module io_netcdf_module
     integer varid
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize
+    procedure, public :: initialize, finalize
     procedure open_netcdf_variable
   end type
 
@@ -58,6 +58,17 @@ module io_netcdf_module
   end subroutine  
 
 
+  subroutine finalize(this)
+    ! do not implicitly close the file (e.g. upon deallocation via destructor), as we might have a copy of this object with access to the same fileid
+    use netcdf
+    class(netcdf_variable_handle), intent(inout) :: this
+    ! EO args
+    if(allocated(this%varshape)) then
+      call assert_nc( nf90_close(this%fileid) , __LINE__)
+    end if
+  end subroutine
+
+  
   subroutine assert_nc(status, line)
     use netcdf
     integer, intent(in) :: status
