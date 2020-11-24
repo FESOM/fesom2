@@ -230,7 +230,7 @@ subroutine oce_fluxes(mesh)
        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
   end if     
   
-  !call integrate_nod(flux, net, mesh)
+  call integrate_nod(flux, net, mesh)
   ! here the + sign must be used because we switched up the sign of the 
   ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
   ! have there original sign

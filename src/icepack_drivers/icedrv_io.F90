@@ -126,7 +126,7 @@
              case ('aice0     ')
                  call def_stream2D(nod2D,              nx_nh,          'aice0', 'open water fraction',       'none', aice0(:),   io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
              case ('aicen     ')
-                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'aicen', 'sea ice concentration',     'none', aicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
+                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'aicen', 'sea ice concentration',     'none', aicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.) 
              case ('vicen     ')
                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vicen', 'volume per unit area of ice',  'm', vicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              case ('vsnon     ')

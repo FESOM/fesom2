@@ -38,6 +38,7 @@ module io_MEANDATA
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
+    logical :: flip
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -563,6 +564,8 @@ subroutine create_new_file(entry, mesh)
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
      elseif (entry%dimname(1)=='nz1') then
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+     elseif (entry%dimname(1)=='ncat') then
+       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
      else
        if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
      end if 
@@ -677,35 +680,23 @@ subroutine write_mean(entry, entry_index)
 ! !_______writing 2D and 3D fields________________________________________________
   size1=entry%glsize(1)
   size2=entry%glsize(2)
-  if (size1 > size2) then
-      size_gen=size1
-      size_lev=size2
-      order=1
-  else if (size1 < size2) then
-      size_gen=size2
-      size_lev=size1
-      order=2
-  end if
   tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
 !___________writing 8 byte real_________________________________________ 
   if (entry%accuracy == i_real8) then
      if(mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size_gen))
+       if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
-     do lev=1, size_lev
+     do lev=1, size1
        if(.not. entry%is_elem_based) then
-         if (order==2) call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
-         if (order==1) call gather_nod2D (entry%local_values_r8_copy(1:size(entry%local_values_r8_copy,dim=1),lev), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        else
-         if (order==2) call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
-         if (order==1) call gather_elem2D(entry%local_values_r8_copy(1:size(entry%local_values_r8_copy,dim=1),lev), entry%aux_r8, entry%root_rank, tag, entry%comm)
+         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
-            if (order==2) call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), entry%aux_r8, 1), __LINE__)
-            if (order==1) call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), entry%aux_r8, 1), __LINE__)
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
           end if
         end if
      end do
@@ -713,22 +704,19 @@ subroutine write_mean(entry, entry_index)
 !___________writing 4 byte real _________________________________________ 
   else if (entry%accuracy == i_real4) then
      if(mype==entry%root_rank) then
-       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size_gen))
+       if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
-     do lev=1, size_lev
+     do lev=1, size1
        if(.not. entry%is_elem_based) then
-         if (order==2) call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
-         if (order==1) call gather_real4_nod2D(entry%local_values_r4_copy(1:size(entry%local_values_r4_copy,dim=1),lev), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        else
-         if (order==2) call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
-         if (order==1) call gather_real4_elem2D(entry%local_values_r4_copy(1:size(entry%local_values_r4_copy,dim=1),lev), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        end if
         if (mype==entry%root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
-             if (order==2) call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size_gen, 1/), entry%aux_r4, 1), __LINE__)
-             if (order==1) call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size_gen, 1, 1/), entry%aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
      end do
@@ -747,12 +735,19 @@ subroutine update_means
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
     if (entry%accuracy == i_real8) then
-      entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:size(entry%local_values_r8,dim=1),1:size(entry%local_values_r8,dim=2))
-
+      if (entry%flip) then
+          entry%local_values_r8 = entry%local_values_r8 + transpose(entry%ptr3(1:size(entry%local_values_r8,dim=2),1:size(entry%local_values_r8,dim=1)))
+      else 
+          entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:size(entry%local_values_r8,dim=1),1:size(entry%local_values_r8,dim=2))
+      end if
 !_____________ compute in 4 byte accuracy _________________________
     elseif (entry%accuracy == i_real4) then
-      entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:size(entry%local_values_r4,dim=1),1:size(entry%local_values_r4,dim=2)),real32)
-     endif
+      if (entry%flip) then
+          entry%local_values_r4 = entry%local_values_r4 + transpose(real(entry%ptr3(1:size(entry%local_values_r4,dim=2),1:size(entry%local_values_r4,dim=1)),real32))
+      else
+          entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:size(entry%local_values_r4,dim=1),1:size(entry%local_values_r4,dim=2)),real32)
+      end if
+    endif
 
      entry%addcounter=entry%addcounter+1
   end do
@@ -900,7 +895,7 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
   use mod_mesh
   use g_PARSUP
   implicit none
@@ -913,6 +908,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
   integer i
   
   do i = 1, rank(data)
@@ -937,16 +933,26 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   ! 3d specific
   entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
 
-  if (accuracy == i_real8) then
-    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r8(1, lcsize))
-    entry%local_values_r8 = 0._real64
-  elseif (accuracy == i_real4) then
-    allocate(entry%local_values_r4(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r4(1, lcsize))
-    entry%local_values_r4 = 0._real32
+  if (present(flip_array)) then
+      if (flip_array) then
+          entry%flip = .true.
+      else
+          entry%flip = .false.
+      end if
+  else
+      entry%flip = .false.
   end if
 
   entry%ndim=2
   entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
+
+  if (accuracy == i_real8) then
+    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+    entry%local_values_r8 = 0._real64
+  elseif (accuracy == i_real4) then
+    allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
+    entry%local_values_r4 = 0._real32
+  end if
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)     !2D! entry%dimname(2)='unknown'
