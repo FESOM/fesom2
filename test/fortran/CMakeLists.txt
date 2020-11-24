@@ -12,6 +12,7 @@ add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_a
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/async_threads_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_lookahead_reader_module.F90
+                          ${CMAKE_CURRENT_LIST_DIR}/../../src/io_netcdf_module.F90
            )
 
 add_subdirectory(../../src/async_threads_cpp ${PROJECT_BINARY_DIR}/async_threads_cpp)
@@ -25,6 +26,7 @@ add_pfunit_ctest (${PROJECT_NAME}
   TEST_SOURCES forcing_provider_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
                forcing_provider_netcdf_module_tests.pf
                forcing_lookahead_reader_module_tests.pf
+               io_netcdf_module_tests.pf
   LINK_LIBRARIES ${LIB_TARGET}
   )
 

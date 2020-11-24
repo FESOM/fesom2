@@ -1,0 +1,16 @@
+module io_netcdf_module_tests
+  use io_netcdf_module
+  use funit; implicit none
+  
+contains  
+
+
+  @test
+  subroutine test_can_initialize_netcdf_variable_for_existing_file()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise.salt.nc", "salt")   
+  end subroutine
+
+
+end module
