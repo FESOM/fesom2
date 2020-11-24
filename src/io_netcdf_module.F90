@@ -11,7 +11,7 @@ module io_netcdf_module
     integer varid
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize, finalize
+    procedure, public :: initialize, finalize, number_of_timesteps
     procedure open_netcdf_variable
   end type
 
@@ -69,6 +69,16 @@ module io_netcdf_module
   end subroutine
 
   
+  function number_of_timesteps(this) result(t)
+    class(netcdf_variable_handle), intent(in) :: this
+    integer t
+    ! EO args
+    call assert(size(this%varshape) > 0, __LINE__)
+    ! assume the last dimension for this variable is the time dimension (i.e. first in ncdump)
+    t = this%varshape(size(this%varshape))
+  end function
+
+
   subroutine assert_nc(status, line)
     use netcdf
     integer, intent(in) :: status
