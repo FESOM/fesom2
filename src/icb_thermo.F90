@@ -111,7 +111,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib
+  use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling
 
   implicit none  
 
@@ -130,10 +130,10 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     force_last_output=.false.
 
     !changes in this timestep:
-    dh_b = M_b*dt/REAL(steps_per_FESOM_step)	!change of height..
-    dh_v = M_v*dt/REAL(steps_per_FESOM_step)    !..and length due to melting..
-    dh_e = M_e*dt/REAL(steps_per_FESOM_step)    !..and due to wave erosion [m].
-    dh_bv = M_bv*dt/REAL(steps_per_FESOM_step)  !change of length due to 'basal meltrate'
+    dh_b = M_b*dt/REAL(steps_per_FESOM_step)*scaling(ib)	!change of height..
+    dh_v = M_v*dt/REAL(steps_per_FESOM_step)*scaling(ib)    !..and length due to melting..
+    dh_e = M_e*dt/REAL(steps_per_FESOM_step)*scaling(ib)    !..and due to wave erosion [m].
+    dh_bv = M_bv*dt/REAL(steps_per_FESOM_step)*scaling(ib)  !change of length due to 'basal meltrate'
     
     !CALCULATION OF WORKING SURFACES AS IN BIGG (1997) & SILVA (2010)
     !basal volume loss
@@ -450,7 +450,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      !rt  t_surf_flux(i,j)=gat*(tf-tin)
      !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
 
-     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
+     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b

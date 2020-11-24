@@ -247,6 +247,7 @@ subroutine restart(istep, l_write, l_read)
   if (mype==0) then
 		write(*,*) ' --> actualize clock file to latest restart point'
 		call clock_finish  
+                write(*,*) '*** LA DEBUG: finished clock_finish ***'
   end if
   
 end subroutine restart

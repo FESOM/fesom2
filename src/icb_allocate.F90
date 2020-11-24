@@ -93,4 +93,6 @@ subroutine allocate_icb()
   buoy_props = 0.0
   allocate(melted(ib_num))
   melted = .false.
+  allocate(scaling(ib_num))
+  scaling = 1
 end subroutine allocate_icb

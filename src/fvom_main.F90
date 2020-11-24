@@ -27,11 +27,11 @@ use cpl_driver
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i
-real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice
-real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag
+real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t1_icb, t2_icb, t3_icb, t4_icb
+real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_icb_calc, rtime_icb_write
 real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-real(kind=real32) :: mean_rtime(14), max_rtime(14), min_rtime(14)
+real(kind=real32) :: mean_rtime(16), max_rtime(16), min_rtime(16)
 real(kind=real32) :: runtime_alltimesteps
   
 
@@ -98,6 +98,7 @@ real(kind=real32) :: runtime_alltimesteps
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
     call restart(0, .false., r_restart) ! istep, l_write, l_read
+    write(*,*) '*** LA DEBUG: finished restart 1 ***'
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
@@ -151,7 +152,6 @@ real(kind=real32) :: runtime_alltimesteps
    
     !___MODEL TIME STEPPING LOOP________________________________________________
     do n=1, nsteps        
-        !write(*,*) 'LA DEBUG start'
         mstep = n
         if (mod(n,logfile_outfreq)==0 .and. mype==0) then
             write(*,*) 'FESOM ======================================================='
@@ -184,7 +184,9 @@ real(kind=real32) :: runtime_alltimesteps
             call oce_fluxes
         end if  
         if (use_icebergs) then
+            t1_icb = MPI_Wtime()
             call iceberg_calculation(n)
+            t2_icb = MPI_Wtime()
         end if
         t2 = MPI_Wtime()
         
@@ -197,17 +199,21 @@ real(kind=real32) :: runtime_alltimesteps
         call output (n)
 
         if (use_icebergs) then
+            t3_icb = MPI_Wtime()
             call iceberg_out
+            t4_icb = MPI_Wtime()
         end if
 
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
+        write(*,*) '*** LA DEBUG: finished restart 2 ***'
         t6 = MPI_Wtime()
         rtime_fullice       = rtime_fullice       + t2 - t1
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
-       ! write(*,*) 'LA DEBUG end'
+        rtime_icb_calc      = rtime_icb_calc      + t2_icb - t1_icb
+        rtime_icb_write     = rtime_icb_write     + t4_icb - t3_icb
     end do
     !___FINISH MODEL RUN________________________________________________________
 
@@ -231,15 +237,16 @@ real(kind=real32) :: runtime_alltimesteps
     mean_rtime(11) = rtime_compute_diag
     mean_rtime(12) = rtime_write_means
     mean_rtime(13) = rtime_write_restart
-    
+    mean_rtime(14) = rtime_icb_calc
+    mean_rtime(15) = rtime_icb_write
 
-    max_rtime(1:13) = mean_rtime(1:13)
-    min_rtime(1:13) = mean_rtime(1:13)
+    max_rtime(1:15) = mean_rtime(1:15)
+    min_rtime(1:15) = mean_rtime(1:15)
 
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 13, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    mean_rtime(1:13) = mean_rtime(1:13) / real(npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  13, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  13, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 15, MPI_REAL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    mean_rtime(1:15) = mean_rtime(1:15) / real(npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  15, MPI_REAL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  15, MPI_REAL, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
     if (mype==0) then
         write(*,*) '___MODEL RUNTIME mean, min, max per task [seconds]________________________'
@@ -255,6 +262,8 @@ real(kind=real32) :: runtime_alltimesteps
         write(*,*) '  runtime diag:   ', mean_rtime(11), min_rtime(11), max_rtime(11)
         write(*,*) '  runtime output: ', mean_rtime(12), min_rtime(12), max_rtime(12)
         write(*,*) '  runtime restart:', mean_rtime(13), min_rtime(13), max_rtime(13)
+        write(*,*) '  runtime icb calc:', mean_rtime(14), min_rtime(14), max_rtime(14)
+        write(*,*) '  runtime icb write:', mean_rtime(15), min_rtime(15), max_rtime(15)
         write(*,*) '  runtime total (ice+oce):',mean_rtime(9), min_rtime(9), max_rtime(9)
         write(*,*)
         write(*,*) '============================================'

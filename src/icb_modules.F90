@@ -65,11 +65,12 @@ save
   character(100):: IcebergRestartPath_ISM='../icb/iceberg.restart.ISM'
   character(100):: num_non_melted_icb_file='../icb/num_non_melted_icb_file'
   character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
-  character(100):: buoys_xlon_file='../icb/LON.dat'     !buoy position in deg
-  character(100):: buoys_ylat_file='../icb/LAT.dat'     !buoy position in deg
-  character(100):: length_icb_file='../icb/LENGTH.dat' !iceberg length [m]
-  character(100):: width_icb_file='../icb/LENGTH.dat' !iceberg width [m]
-  character(100):: height_icb_file='../icb/HEIGHT.dat' !iceberg height [m]
+  character(100):: buoys_xlon_file='../icb/icb_longitude.dat'     !buoy position in deg
+  character(100):: buoys_ylat_file='../icb/icb_latitude.dat'     !buoy position in deg
+  character(100):: length_icb_file='../icb/icb_length.dat' !iceberg length [m]
+  character(100):: width_icb_file='../icb/icb_length.dat' !iceberg width [m]
+  character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
+  character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq = 120          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
@@ -94,7 +95,8 @@ save
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
   real,dimension(:), allocatable:: ibfwe   !freshwater flux into ocean from erosion
- 
+  integer,dimension(:), allocatable:: scaling   !scaling factor
+
   logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
   integer   :: num_non_melted_icb = 0 !1 if iceberg melted, 0 otherwise
   !for communication
