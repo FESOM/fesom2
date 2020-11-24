@@ -9,6 +9,7 @@ module io_netcdf_module
     character(:), allocatable :: varname
     integer fileid
     integer varid
+    integer timedim_index
     integer, allocatable :: varshape(:)
     contains
     procedure, public :: initialize, finalize, number_of_timesteps
@@ -33,6 +34,10 @@ module io_netcdf_module
     ! assert varshape is not allocated, i.e. initialize has not been called
     call assert(.not. allocated(this%varshape), __LINE__)
     call this%open_netcdf_variable(NF90_NOWRITE)
+
+    ! assume the last dimension for this variable is the time dimension (i.e. first in ncdump)
+    call assert(size(this%varshape) > 0, __LINE__)
+    this%timedim_index = size(this%varshape)
   end subroutine
 
 
@@ -73,9 +78,7 @@ module io_netcdf_module
     class(netcdf_variable_handle), intent(in) :: this
     integer t
     ! EO args
-    call assert(size(this%varshape) > 0, __LINE__)
-    ! assume the last dimension for this variable is the time dimension (i.e. first in ncdump)
-    t = this%varshape(size(this%varshape))
+    t = this%varshape(this%timedim_index)
   end function
 
 
