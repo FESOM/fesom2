@@ -6,6 +6,27 @@ contains
 
 
   @test
+  subroutine test_can_read_data()
+    type(netcdf_variable_handle) handle
+    real(4), allocatable :: values(:,:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise.salt.nc", "salt")
+    allocate(values(3,5))
+
+    call handle%read_values(1, values)
+    @assertEqual(1.001, values(1,1), tolerance=1.e-6)  
+    @assertEqual(2.001, values(2,1), tolerance=1.e-6)  
+    @assertEqual(3.001, values(3,1), tolerance=1.e-6)  
+
+    @assertEqual(1.005, values(1,5), tolerance=1.e-6)  
+    @assertEqual(2.005, values(2,5), tolerance=1.e-6)  
+    @assertEqual(3.005, values(3,5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
   subroutine test_can_read_number_of_timesteps()
     type(netcdf_variable_handle) handle
 

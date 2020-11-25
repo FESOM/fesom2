@@ -12,7 +12,7 @@ module io_netcdf_module
     integer timedim_index
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize, finalize, number_of_timesteps
+    procedure, public :: initialize, finalize, number_of_timesteps, read_values
     procedure open_netcdf_variable
   end type
 
@@ -80,6 +80,35 @@ module io_netcdf_module
     ! EO args
     t = this%varshape(this%timedim_index)
   end function
+
+
+  subroutine read_values(this, timeindex, values)
+    use netcdf
+    class(netcdf_variable_handle), intent(in) :: this
+    integer, intent(in) :: timeindex
+    real(4), allocatable, intent(inout) :: values(:,:) ! must be inout or the allocation is screwed
+    ! EO args
+    integer, allocatable, dimension(:) :: starts, sizes
+    integer i
+
+    call assert(allocated(this%varshape), __LINE__)
+   
+    ! todo: check if variable datatype is single precision (f77 real)
+    
+    allocate(starts(size(this%varshape)))
+    allocate(sizes(size(this%varshape)))
+
+    call assert(0 < timeindex, __LINE__)
+    call assert(timeindex <= this%number_of_timesteps(), __LINE__)
+    
+    starts = 1
+    sizes = this%varshape
+    starts(this%timedim_index) = timeindex
+    sizes(this%timedim_index) = 1 !timeindex_last-timeindex_first+1
+
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+    call assert_nc(nf90_get_var(this%fileid, this%varid, values, start=starts, count=sizes), __LINE__)  
+  end subroutine
 
 
   subroutine assert_nc(status, line)
