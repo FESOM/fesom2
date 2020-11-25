@@ -38,7 +38,8 @@ subroutine thermodynamics(mesh)
 
   !---- variables from gen_modules_forcing.F90
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
-       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice
+       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
+       , calving
 
   !---- variables from gen_modules_rotate_grid.F90
   use g_rotate_grid,    only: r2g
@@ -65,7 +66,7 @@ subroutine thermodynamics(mesh)
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- precipitation and runoff (provided by ECHAM)
-  real(kind=WP)  :: rain, snow, runo
+  real(kind=WP)  :: rain, snow, runo, calv
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
@@ -106,6 +107,7 @@ subroutine thermodynamics(mesh)
      rain    = prec_rain(inod)
      snow    = prec_snow(inod)
      runo    = runoff(inod)     
+     calv    = calving(inod)     
 
      ustar   = sqrt(Cd_oce_ice)*sqrt((u_ice(inod)-u_w(inod))**2+(v_ice(inod)-v_w(inod))**2)
      T_oc    = T_oc_array(inod)      
@@ -173,7 +175,7 @@ contains
     implicit none
 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
-    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
+    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow, dhcalv
 
     !---- heat fluxes (positive upward, negative downward)
     real(kind=WP)  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
@@ -309,8 +311,17 @@ contains
     !---- ice growth rate over open water (dhiow >= 0)
     dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
+#if defined (__oifs)
+    !---- ice growth rate through calving
+    dhcalv = (calv*1E7*dt)/A
+
+    !---- temporary new ice thickness [m]
+    htmp = h + dhice + dhiow +dhcalv
+#else
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
+#endif /* (__oifs) */
+
 
     if (htmp.lt.0._WP) then
        !---- all ice melts; now try to melt snow if still present,
