@@ -21,11 +21,11 @@ module io_netcdf_module
 
 
   subroutine initialize(this, filepath, varname)
-    use netcdf
     class(netcdf_variable_handle), intent(inout) :: this
     character(len=*), intent(in) :: filepath
     character(len=*), intent(in) :: varname
     ! EO args
+    include "netcdf.inc"
     integer mode
     
     this%filepath = filepath
@@ -33,7 +33,7 @@ module io_netcdf_module
     
     ! assert varshape is not allocated, i.e. initialize has not been called
     call assert(.not. allocated(this%varshape), __LINE__)
-    call this%open_netcdf_variable(NF90_NOWRITE)
+    call this%open_netcdf_variable(NF_NOWRITE)
 
     ! assume the last dimension for this variable is the time dimension (i.e. first in ncdump)
     call assert(size(this%varshape) > 0, __LINE__)
@@ -42,34 +42,34 @@ module io_netcdf_module
 
 
   subroutine open_netcdf_variable(this, mode)
-    use netcdf
     class(netcdf_variable_handle), intent(inout) :: this
     integer, intent(in) :: mode
     ! EO args
+    include "netcdf.inc"
     integer var_dim_size
     integer, allocatable, dimension(:) :: dimids
     integer i
    
-    call assert_nc( nf90_open(this%filepath, mode, this%fileid) , __LINE__)
-    call assert_nc( nf90_inq_varid(this%fileid, this%varname, this%varid) , __LINE__)
-    call assert_nc( nf90_inquire_variable(this%fileid, this%varid, ndims=var_dim_size) , __LINE__)
+    call assert_nc( nf_open(this%filepath, mode, this%fileid) , __LINE__)
+    call assert_nc( nf_inq_varid(this%fileid, this%varname, this%varid) , __LINE__)
+    call assert_nc( nf_inq_varndims(this%fileid, this%varid, var_dim_size) , __LINE__)
     allocate(dimids(var_dim_size))
-    call assert_nc( nf90_inquire_variable(this%fileid, this%varid, dimids=dimids) , __LINE__)
+    call assert_nc( nf_inq_vardimid(this%fileid, this%varid, dimids) , __LINE__)
 
     allocate(this%varshape(var_dim_size))
     do i=1, var_dim_size
-      call assert_nc( nf90_inquire_dimension(this%fileid, dimids(i), len=this%varshape(i)) , __LINE__)
+      call assert_nc( nf_inq_dimlen(this%fileid, dimids(i), this%varshape(i)) , __LINE__)
     end do
   end subroutine  
 
 
   subroutine finalize(this)
     ! do not implicitly close the file (e.g. upon deallocation via destructor), as we might have a copy of this object with access to the same fileid
-    use netcdf
     class(netcdf_variable_handle), intent(inout) :: this
     ! EO args
+    include "netcdf.inc"
     if(allocated(this%varshape)) then
-      call assert_nc( nf90_close(this%fileid) , __LINE__)
+      call assert_nc( nf_close(this%fileid) , __LINE__)
     end if
   end subroutine
 
@@ -83,10 +83,10 @@ module io_netcdf_module
 
 
   subroutine read_values(this, timeindex, values)
-    use netcdf
     class(netcdf_variable_handle), intent(in) :: this
     integer, intent(in) :: timeindex
     real(4), allocatable, intent(inout) :: values(:,:) ! must be inout or the allocation is screwed
+    include "netcdf.inc"
     ! EO args
     integer, allocatable, dimension(:) :: starts, sizes
     integer i
@@ -107,17 +107,17 @@ module io_netcdf_module
     sizes(this%timedim_index) = 1 !timeindex_last-timeindex_first+1
 
     call assert(product(sizes) == product(shape(values)), __LINE__)
-    call assert_nc(nf90_get_var(this%fileid, this%varid, values, start=starts, count=sizes), __LINE__)  
+    call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
   end subroutine
 
 
   subroutine assert_nc(status, line)
-    use netcdf
     integer, intent(in) :: status
     integer, intent(in) :: line
     ! EO args
-    if(status /= nf90_noerr) then
-      print *, "error in line ",line, __FILE__, ' ', trim(nf90_strerror(status))
+    include "netcdf.inc"
+    if(status /= nf_noerr) then
+      print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
     endif   
   end subroutine
