@@ -21,10 +21,10 @@
 
           public ::                                                         &
                     ! Variables
-                    ncat, rdg_conv_elem, rdg_shear_elem,                    & 
+                    ncat, rdg_conv_elem, rdg_shear_elem, strength,          & 
                     ! Subroutines
                     set_icepack, alloc_icepack, init_icepack, step_icepack, &
-                    icepack_to_fesom,                                       &
+                    icepack_to_fesom, icepack_to_fesom_single_point,        &
                     init_flux_atm_ocn, init_io_icepack, init_restart_icepack
     
           !=======================================================================
@@ -801,7 +801,7 @@
                   type(t_mesh), intent(in), target :: mesh
               end subroutine fesom_to_icepack
 
-              ! Copy variables from fesom to icepack
+              ! Copy variables from icepack to fesom
               module subroutine icepack_to_fesom(                          &
                                           nx_in,                           &
                                           aice_out,  vice_out,  vsno_out,  &
@@ -825,8 +825,19 @@
                      dhs_dt_out,    &
                      dhi_dt_out,    &
                      evap_ocn_out
-
               end subroutine icepack_to_fesom
+
+              ! Copy variables from icepack to fesom (single node or element)
+              module subroutine icepack_to_fesom_single_point(             &
+                                          nx_in,                           &
+                                          strength_out)
+                  use mod_mesh
+                  implicit none        
+                  integer (kind=int_kind), intent(in) :: &
+                     nx_in      ! block dimensions        
+                  real (kind=dbl_kind), intent(out), optional :: &
+                     strength_out
+              end subroutine icepack_to_fesom_single_point
 
               ! Trancers advection 
               module subroutine tracer_advection_icepack(mesh)

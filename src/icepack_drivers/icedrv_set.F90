@@ -28,7 +28,7 @@
                                          myDim_elem2D, eDim_elem2D, &
                                          mpi_comm_fesom
           use i_param,             only: whichEVP
-          use i_param,             only: cd_oce_ice   
+          use i_param,             only: cd_oce_ice, Pstar, c_pressure  
           use i_therm_param,       only: albw
 
           implicit none
@@ -145,6 +145,8 @@
           real (kind=dbl_kind)     :: ustar_min      
           real (kind=dbl_kind)     :: emissivity      
           real (kind=dbl_kind)     :: dragio      
+          real (kind=dbl_kind)     :: P_star      
+          real (kind=dbl_kind)     :: C_star      
           character (len=char_len) :: fbot_xfer_type  
           logical (kind=log_kind)  :: update_ocn_f    
           logical (kind=log_kind)  :: l_mpond_fresh   
@@ -175,7 +177,7 @@
 
           namelist / dynamics_nml /                                            &
              kstrength,      krdg_partic,    krdg_redist,    mu_rdg,           &
-             Cf
+             Cf,             P_star,         C_star
 
           namelist / shortwave_nml /                                           &
              shortwave,      albedo_type,     albocn,                          &
@@ -332,6 +334,7 @@
                 tfrz_option_out=tfrz_option, kalg_out=kalg,                      &
                 fbot_xfer_type_out=fbot_xfer_type, puny_out=puny,                &
                 wave_spec_type_out=wave_spec_type, dragio_out=dragio,            &
+                Pstar_out=P_star, Cstar_out=C_star,                              &
                 ksno_out=ksno, albocn_out=albocn                                 )
           call icepack_warnings_flush(nu_diag)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -648,7 +651,14 @@
              write(nu_diag,1010) ' calc_Tsfc                 = ', calc_Tsfc    
              write(nu_diag,1010) ' update_ocn_f              = ', update_ocn_f
              write(nu_diag,1010) ' wave_spec                 = ', wave_spec
-             write(nu_diag,1030) ' dragio                    = ', dragio
+             write(nu_diag,1005) ' dragio                    = ', dragio
+             write(nu_diag,1005) ' Pstar                     = ', P_star
+             write(nu_diag,1005) ' Cstar                     = ', C_star
+
+             if (kstrength==1) then
+                 write(nu_diag,*) '!! ATTENTION !! kstrength = 1                   '
+                 write(nu_diag,*) '                ==> P_star and C_star not used!!'
+             end if
 
              if (wave_spec) then
                 write(nu_diag,*)    ' wave_spec_type            = ', wave_spec_type
@@ -801,8 +811,14 @@
           ! set Icepack values
           !-----------------------------------------------------------------
 
+          ! Make the namelists.ice and namelist.icepack consistent (icepack wins
+          ! over fesom)
+
           cd_oce_ice = dragio
           albw       = albocn
+          Pstar      = P_star
+          c_pressure = C_star
+
     
           call icepack_init_parameters(ustar_min_in=ustar_min, Cf_in=Cf, &
                albicev_in=albicev, albicei_in=albicei, &
@@ -829,7 +845,8 @@
                tfrz_option_in=tfrz_option, kalg_in=kalg, &
                fbot_xfer_type_in=fbot_xfer_type, &
                wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
-               ksno_in=ksno, dragio_in=dragio, albocn_in=albocn)
+               ksno_in=ksno, dragio_in=dragio, Cstar_in=C_star, &
+               Pstar_in=P_star, albocn_in=albocn)
           call icepack_init_tracer_sizes(ntrcr_in=ntrcr, &
                ncat_in=ncat, nilyr_in=nilyr, nslyr_in=nslyr, nblyr_in=nblyr, &
                nfsd_in=nfsd, n_aero_in=n_aero)

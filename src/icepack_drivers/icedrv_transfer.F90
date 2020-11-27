@@ -217,4 +217,24 @@
 
 !=======================================================================
 
+      module subroutine icepack_to_fesom_single_point(nx_in,       &
+                                                      strength_out)
+
+          implicit none
+
+          integer (kind=int_kind), intent(in) :: &
+             nx_in      ! surface node or element
+
+          real (kind=dbl_kind), intent(out), optional :: &
+             strength_out
+
+          character(len=*),parameter :: subname='(icepack_to_fesom_single_point)'
+
+
+          if (present(strength_out)          ) strength_out     = strength(nx_in)
+
+      end subroutine icepack_to_fesom_single_point
+
+!=======================================================================
+
       end submodule icedrv_transfer 

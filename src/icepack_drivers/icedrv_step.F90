@@ -297,6 +297,7 @@ submodule (icedrv_main) icedrv_step
 
           ! column package_includes
           use icepack_intfc, only: icepack_step_therm2
+          use icepack_intfc, only: icepack_ice_strength
 
           implicit none
     
@@ -375,7 +376,12 @@ submodule (icedrv_main) icedrv_step
                           d_afsd_weld=d_afsd_weld(i,:),                &
                           floe_rad_c=floe_rad_c(:),                    &
                           floe_binwidth=floe_binwidth(:))
-    
+
+              ! Compute sea-ice internal stress (immediately before EVP)
+              call icepack_ice_strength(ncat,                     &
+                                        aice(i),     vice(i),     &
+                                        aice0(i),    aicen(i,:),  &
+                                        vicen(i,:),  strength(i))
           enddo                     ! i
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &

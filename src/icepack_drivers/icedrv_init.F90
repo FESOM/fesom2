@@ -999,7 +999,7 @@
 
           use icepack_intfc,   only: icepack_init_fsd
           use icepack_intfc,   only: icepack_aggregate
-
+          use o_arrays,        only: tr_arr
           implicit none
 
           ! local variables
@@ -1080,55 +1080,67 @@
 
           ! For the moment we start we no sea ice
 
-!          if (3 <= ncat) then
-!              n = 3
-!              ainit(n) = c1  ! assumes we are using the default ITD boundaries
-!              hinit(n) = c2
-!          else
-!              ainit(ncat) = c1
-!              hinit(ncat) = c2
-!          endif
-!
-!          do i = 1, nx
-!             if (sst(i) <= Tf(i)) then             !
-!                do n = 1, ncat
-!                   ! ice volume, snow volume
-!                   aicen(i,n) = ainit(n)
-!                   vicen(i,n) = hinit(n) * ainit(n) ! m
-!                   vsnon(i,n) = c0
-!                   ! tracers
-!                   call icepack_init_trcr(Tair     = T_air(i),    &
-!                                          Tf       = Tf(i),       &
-!                                          Sprofile = salinz(i,:), &
-!                                          Tprofile = Tmltz(i,:),  &
-!                                          Tsfc     = Tsfc,        &
-!                                          nilyr=nilyr, nslyr=nslyr, &
-!                                          qin=qin(:), qsn=qsn(:))
-!          
-!                   ! floe size distribution
-!                   if (tr_fsd) call icepack_init_fsd(nfsd=nfsd, ice_ic=ice_ic, &
-!                                            floe_rad_c=floe_rad_c,                &
-!                                            floe_binwidth=floe_binwidth,          &
-!                                            afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
-!                   ! surface temperature
-!                   trcrn(i,nt_Tsfc,n) = Tsfc ! deg C
-!                   ! ice enthalpy, salinity
-!                   do k = 1, nilyr
-!                      trcrn(i,nt_qice+k-1,n) = qin(k)
-!                      trcrn(i,nt_sice+k-1,n) = salinz(i,k)
-!                   enddo
-!                   ! snow enthalpy
-!                   do k = 1, nslyr
-!                      trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
-!                   enddo               ! nslyr
-!                   ! brine fraction
-!                   if (tr_brine) trcrn(i,nt_fbri,n) = c1
-!                enddo                  ! ncat
-!                call icepack_warnings_flush(ice_stderr)
-!                if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
-!                    file=__FILE__, line=__LINE__)
-!             endif 
-!          enddo
+          if (ncat > 7) then
+              hbar = c5
+          else
+              hbar = c3
+          end if 
+
+          sum = c0
+          do n = 1, ncat
+             if (n < ncat) then
+                hinit(n) = p5*(hin_max(n-1) + hin_max(n)) ! m
+             else                ! n=ncat
+                hinit(n) = (hin_max(n-1) + c1) ! m
+             endif
+             ! parabola, max at h=hbar, zero at h=0, 2*hbar
+             ainit(n) = max(c0, (c2*hbar*hinit(n) - hinit(n)**2))
+             sum = sum + ainit(n)
+          enddo
+          do n = 1, ncat
+             ainit(n) = ainit(n) / (sum + puny/ncat) ! normalize
+          enddo
+
+          do i = 1, nx
+             if (tr_arr(1,i,1) <= -1.7_dbl_kind) then             !
+                do n = 1, ncat
+                   ! ice volume, snow volume
+                   aicen(i,n) = ainit(n)
+                   vicen(i,n) = hinit(n) * ainit(n) ! m
+                   vsnon(i,n) = min(aicen(i,n)*hsno_init,p2*vicen(i,n))
+                   ! tracers
+                   call icepack_init_trcr(Tair     = T_air(i),    &
+                                          Tf       = Tf(i),       &
+                                          Sprofile = salinz(i,:), &
+                                          Tprofile = Tmltz(i,:),  &
+                                          Tsfc     = Tsfc,        &
+                                          nilyr=nilyr, nslyr=nslyr, &
+                                          qin=qin(:), qsn=qsn(:))
+          
+                   ! floe size distribution
+                   if (tr_fsd) call icepack_init_fsd(nfsd=nfsd, ice_ic=ice_ic, &
+                                            floe_rad_c=floe_rad_c,                &
+                                            floe_binwidth=floe_binwidth,          &
+                                            afsd=trcrn(i,nt_fsd:nt_fsd+nfsd-1,n))
+                   ! surface temperature
+                   trcrn(i,nt_Tsfc,n) = -10.0_dbl_kind ! deg C
+                   ! ice enthalpy, salinity
+                   do k = 1, nilyr
+                      trcrn(i,nt_qice+k-1,n) = -30000000.0_dbl_kind
+                      trcrn(i,nt_sice+k-1,n) = salinz(i,k)
+                   enddo
+                   ! snow enthalpy
+                   do k = 1, nslyr
+                      trcrn(i,nt_qsno+k-1,n) = -rhos * Lfresh
+                   enddo               ! nslyr
+                   ! brine fraction
+                   if (tr_brine) trcrn(i,nt_fbri,n) = c1
+                enddo                  ! ncat
+                call icepack_warnings_flush(ice_stderr)
+                if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
+                    file=__FILE__, line=__LINE__)
+             endif 
+          enddo
 
           !-----------------------------------------------------------------
           ! compute aggregate ice state and open water area

@@ -32,7 +32,7 @@ use g_parsup
 USE g_CONFIG
 
 #if defined (__icepack)
-use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
 
 implicit none
@@ -372,7 +372,7 @@ USE g_comm_auto
 use ice_EVP_interfaces
 
 #if defined (__icepack)
-  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
   use icedrv_main,   only: icepack_to_fesom   
 #endif
 
@@ -462,7 +462,11 @@ if ( .not. trim(which_ALE)=='linfs') then
 			
 			!___________________________________________________________________
 			! Hunke and Dukowicz c*h*p*
-			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#if defined (__icepack)
+			ice_strength(el) = sum(strength(elnodes))/3.0_WP
+#else
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#endif
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
 			!___________________________________________________________________
@@ -501,7 +505,11 @@ else
 			asum = sum(a_ice(elem2D_nodes(:,el)))/3.0_WP
 			
 			! ===== Hunke and Dukowicz c*h*p*
-			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#if defined (__icepack)
+                        ice_strength(el) = sum(strength(elnodes))/3.0_WP
+#else
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#endif
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
 			! use rhs_m and rhs_a for storing the contribution from elevation:
