@@ -98,7 +98,6 @@ real(kind=real32) :: runtime_alltimesteps
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
     call restart(0, .false., r_restart) ! istep, l_write, l_read
-    write(*,*) '*** LA DEBUG: finished restart 1 ***'
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
@@ -206,7 +205,6 @@ real(kind=real32) :: runtime_alltimesteps
 
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
-        write(*,*) '*** LA DEBUG: finished restart 2 ***'
         t6 = MPI_Wtime()
         rtime_fullice       = rtime_fullice       + t2 - t1
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
@@ -221,7 +219,6 @@ real(kind=real32) :: runtime_alltimesteps
     if (mype==0) then
        t1 = MPI_Wtime()
        runtime_alltimesteps = real(t1-t0,real32)
-       write(*,*) 'FESOM Run is finished, updating clock'
     endif
     
     mean_rtime(1)  = rtime_oce         
