@@ -659,9 +659,9 @@ class fesom_mesh:
             data_n     =np.zeros((self.n2dna,))
             data_n_area=np.zeros((self.n2dna,))
             for ii in range(self.n2de):     
-                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii]
-                data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e_area[ii] 
-            data_n[0:self.n2dn]=data_n[0:self.n2dn]/data_n_area[0:self.n2dn]
+                data_n[     self.elem0_2d_i[ii,:]] = data_n[     self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e[ii]
+                data_n_area[self.elem0_2d_i[ii,:]] = data_n_area[self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e_area[ii] 
+            data_n[        0:self.n2dn ] = data_n[0:self.n2dn]/data_n_area[0:self.n2dn]
             data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
         
         #_______________________________________________________________________
@@ -680,13 +680,13 @@ class fesom_mesh:
                 data_e_area = np.matlib.repmat(area_di,nd2,1).transpose()*np.invert(data_e==0)
                 del area_di
             
-            data_n=np.zeros((self.n2dna,nd2))
-            data_n_area=np.zeros((self.n2dna,nd2))
+            data_n      = np.zeros((self.n2dna,nd2))
+            data_n_area = np.zeros((self.n2dna,nd2))
             for ii in range(self.n2de):     
-                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e[ii,:],3,1)
-                data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e_area[ii,:],3,1)  
+                data_n[     self.elem0_2d_i[ii,:], :] = data_n[     self.elem0_2d_i[ii,:], :] + np.matlib.repmat(     data_e[ii,:], 3, 1)
+                data_n_area[self.elem0_2d_i[ii,:], :] = data_n_area[self.elem0_2d_i[ii,:], :] + np.matlib.repmat(data_e_area[ii,:], 3, 1)  
             #print(np.matlib.repmat(self.nodes_2d_area[0:self.n2dn]/3.,nd2,1).transpose())    
-            data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]
+            data_n[        0:self.n2dn ,:] = data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]
             data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
             
         t2 = time.time()
