@@ -616,7 +616,7 @@ class fesom_mesh:
             elif data_e.shape[0]==self.n2dea:
                 area_di = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
                 data_e=data_e*np.matlib.repmat(area_di,nd2,1).transpose()
-                data_e_area = area_di.transpose()*np.invert(data_e==0)
+                data_e_area = np.matlib.repmat(area_di,nd2,1).transpose()*np.invert(data_e==0)
                 del area_di
             
             data_n=np.zeros((self.n2dna,nd2))
