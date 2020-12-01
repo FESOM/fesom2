@@ -543,7 +543,7 @@ class fesom_mesh:
         #_______________________________________________________________________
         print(' --> calc. node resolution in km')
         if len(self.elem_2d_resol)==0: self.fesom_calc_triresol()
-        self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol*3)
+        self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
         
     
     #___CALCULATE TRIANGLE AREA("volume")_______________________________________
@@ -661,7 +661,7 @@ class fesom_mesh:
             for ii in range(self.n2de):     
                 data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii]
                 data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e_area[ii] 
-            data_n[0:self.n2dn]=data_n[0:self.n2dn]/data_n_area[0:self.n2dn]/3. 
+            data_n[0:self.n2dn]=data_n[0:self.n2dn]/data_n_area[0:self.n2dn]
             data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
         
         #_______________________________________________________________________
@@ -671,13 +671,13 @@ class fesom_mesh:
             nd2 = data_e.shape[1]
             
             if data_e.shape[0]==self.n2de:
-                data_e=data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
+                data_e      = data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
                 data_e_area = np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()*np.invert(data_e==0)
                 
             elif data_e.shape[0]==self.n2dea:
-                area_di = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
-                data_e=data_e*np.matlib.repmat(area_di,nd2,1).transpose()
-                data_e_area = area_di.transpose()*np.invert(data_e==0)
+                area_di     = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
+                data_e      = data_e*np.matlib.repmat(area_di,nd2,1).transpose()
+                data_e_area = np.matlib.repmat(area_di,nd2,1).transpose()*np.invert(data_e==0)
                 del area_di
             
             data_n=np.zeros((self.n2dna,nd2))
@@ -686,7 +686,7 @@ class fesom_mesh:
                 data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e[ii,:],3,1)
                 data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e_area[ii,:],3,1)  
             #print(np.matlib.repmat(self.nodes_2d_area[0:self.n2dn]/3.,nd2,1).transpose())    
-            data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]/3.
+            data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]
             data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
             
         t2 = time.time()
