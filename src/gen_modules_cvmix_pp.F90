@@ -50,7 +50,7 @@ module g_cvmix_pp
     
     
     namelist /param_pp/ pp_Av0, pp_alpha, pp_exp, pp_Avbckg, pp_Kvbckg, &
-                        pp_use_nonconstKvb, pp_use_fesompp
+                        pp_use_nonconstKvb, pp_use_fesompp, pp_use_AvbinKv
     
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:,:) :: pp_Av, pp_Kv

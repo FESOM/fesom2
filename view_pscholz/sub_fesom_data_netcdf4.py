@@ -201,7 +201,7 @@ def do_multiyear_fname_list(data, which_files, do_output):
         #_______________________________________________________________________
         # build filename list for data variables
         if any(x in data.var for x in ['norm','vec','ptemp','pdens','sigma']) or \
-                    data.var in ['u','v','uice','vice'] :
+                    data.var in ['u','v','uice','vice','unod','vnod'] :
             if   any(x in data.var for x in ['tuv']):
                 var_list = ['u', 'v', 'temp']
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -262,6 +262,10 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['iceoce_x', 'iceoce_y',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['uvnod','unod','vnod']):
+                var_list = ['unod', 'vnod',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
             elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -672,7 +676,7 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
     ## do vector rotation from ROT --> GEO in case of vector data   
     if do_vecrot==True:
         if any(x in data.var for x in ['norm','vec']) or \
-        data.var in ['u','v','uice','vice']:
+        data.var in ['u','v','uice','vice','unod','vnod']:
             data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
         
     # compute norm of vector data
@@ -680,8 +684,8 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
         data.value, data.value2 = np.sqrt(data.value**2+data.value2**2),[]
     
     # only single velocity component is choosen
-    if data.var in ['u','uice'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
-    if data.var in ['v','vice']: data.value, data.value2  = data.value2, []
+    if data.var in ['u','uice','unod'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
+    if data.var in ['v','vice','vnod']: data.value, data.value2  = data.value2, []
     
     # interpolate elemental values to nodes
     if 'vec' not in data.var and do_interp_e2n==True:
