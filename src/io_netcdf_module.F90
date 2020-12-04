@@ -12,8 +12,9 @@ module io_netcdf_module
     integer timedim_index
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize, finalize, number_of_timesteps, read_values
-    procedure open_netcdf_variable
+    generic, public :: read_values => read_values_r4,read_values_r8
+    procedure, public :: initialize, finalize, number_of_timesteps
+    procedure, private :: open_netcdf_variable, read_values_r4, read_values_r8
   end type
 
 
@@ -82,19 +83,53 @@ module io_netcdf_module
   end function
 
 
-  subroutine read_values(this, timeindex, values)
+  subroutine read_values_r8(this, timeindex, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
     class(netcdf_variable_handle), intent(in) :: this
     integer, intent(in) :: timeindex
-    real(4), allocatable, intent(inout) :: values(:,:) ! must be inout or the allocation is screwed
-    include "netcdf.inc"
+    real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
     ! EO args
+    real(8), pointer :: values_ptr(:)
     integer, allocatable, dimension(:) :: starts, sizes
-    integer i
+
+    call read_values_preflight(this, timeindex, starts, sizes)
+
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_get_vara_x(this%fileid, this%varid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+  
+  
+  subroutine read_values_r4(this, timeindex, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
+    class(netcdf_variable_handle), intent(in) :: this
+    integer, intent(in) :: timeindex
+    real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO args
+    real(4), pointer :: values_ptr(:)
+    integer, allocatable, dimension(:) :: starts, sizes
+    
+    call read_values_preflight(this, timeindex, starts, sizes)
+
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_get_vara_x(this%fileid, this%varid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  subroutine read_values_preflight(this, timeindex, starts, sizes)
+    class(netcdf_variable_handle), intent(in) :: this
+    integer, intent(in) :: timeindex
+    ! EO args
+
+    integer, allocatable, dimension(:) :: starts, sizes
 
     call assert(allocated(this%varshape), __LINE__)
-   
-    ! todo: check if variable datatype is single precision (f77 real)
-    
+       
     allocate(starts(size(this%varshape)))
     allocate(sizes(size(this%varshape)))
 
@@ -105,9 +140,6 @@ module io_netcdf_module
     sizes = this%varshape
     starts(this%timedim_index) = timeindex
     sizes(this%timedim_index) = 1 !timeindex_last-timeindex_first+1
-
-    call assert(product(sizes) == product(shape(values)), __LINE__)
-    call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
   end subroutine
 
 

@@ -6,7 +6,49 @@ contains
 
 
   @test
-  subroutine test_can_read_3d_variable()
+  subroutine test_can_read_2d_variable_real8()
+    type(netcdf_variable_handle) handle
+    real(8), allocatable :: values(:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise_2d_sss.nc", "sss")
+
+    allocate(values(5))
+
+    call handle%read_values(1, values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_real4()
+    type(netcdf_variable_handle) handle
+    real(4), allocatable :: values(:)
+    
+    call handle%initialize("fixtures/io_netcdf/columnwise_2d_sss.nc", "sss")
+
+    allocate(values(5))
+
+    call handle%read_values(1, values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_3d_variable_real4()
     type(netcdf_variable_handle) handle
     real(4), allocatable :: values(:,:)
     
