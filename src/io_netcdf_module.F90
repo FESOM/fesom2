@@ -12,7 +12,7 @@ module io_netcdf_module
     integer timedim_index
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize, finalize, number_of_timesteps, number_of_dims
+    procedure, public :: initialize, finalize, number_of_timesteps, number_of_dims, dimsize_at
     generic, public :: read_values => read_values_r4,read_values_r8
     procedure, private :: open_netcdf_variable, read_values_r4, read_values_r8
   end type
@@ -91,6 +91,16 @@ module io_netcdf_module
   end function
 
   
+  function dimsize_at(this,index) result(s)
+    class(netcdf_variable_handle), intent(in) :: this
+    integer, intent(in) :: index
+    integer s
+    ! EO args
+    call assert(index <= size(this%varshape), __LINE__)
+    s = this%varshape(index)
+  end function
+
+
   subroutine read_values_r8(this, timeindex, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING

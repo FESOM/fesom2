@@ -98,6 +98,19 @@ contains
 
 
   @test
+  subroutine test_can_read_dimension_size_at_index()
+    type(netcdf_variable_handle) handle
+
+    call handle%initialize("fixtures/io_netcdf/columnwise_3d_salt.nc", "salt")
+    @assertEqual(3,handle%dimsize_at(1))
+    @assertEqual(5,handle%dimsize_at(2))
+    @assertEqual(2,handle%dimsize_at(3))
+    
+    call handle%finalize()
+  end subroutine
+
+
+  @test
   subroutine test_can_initialize_netcdf_variable_for_existing_file()
     type(netcdf_variable_handle) handle
 
