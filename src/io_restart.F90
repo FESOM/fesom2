@@ -616,65 +616,65 @@ end subroutine read_restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine assoc_ids(id)
+subroutine assoc_ids(file)
   implicit none
 
-  type(nc_file),  intent(inout) :: id
+  type(nc_file),  intent(inout) :: file
   character(500)                :: longname
   integer                       :: c, j, k
   real(kind=WP)                 :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
-  id%error_status=0
+  file%error_status=0
   ! open existing netcdf file
-  write(*,*) 'associating restart file ', trim(id%filename)
+  write(*,*) 'associating restart file ', trim(file%filename)
 
-  id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid)
+  file%error_status(c) = nf_open(file%filename, nf_nowrite, file%ncid)
   !if the file does not exist it will be created!
-  if (id%error_status(c) .ne. nf_noerr) then
-     call create_new_file(id) ! error status counter will be reset
-     c=id%error_count+1
-     id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
+  if (file%error_status(c) .ne. nf_noerr) then
+     call create_new_file(file) ! error status counter will be reset
+     c=file%error_count+1
+     file%error_status(c) = nf_open(file%filename, nf_nowrite, file%ncid); c=c+1
   end if
 
-  do j=1, id%ndim
+  do j=1, file%ndim
 !___Associate mesh related dimentions_______________________________________
-    id%error_status(c) = nf_inq_dimid(id%ncid, id%dim(j)%name, id%dim(j)%code); c=c+1
+    file%error_status(c) = nf_inq_dimid(file%ncid, file%dim(j)%name, file%dim(j)%code); c=c+1
   end do
 !___Associate time related dimentions_______________________________________
-  id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec_dimid);       c=c+1
-  id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec_dimid, id%rec_count); c=c+1
+  file%error_status(c) = nf_inq_dimid (file%ncid, 'time', file%rec_dimid);       c=c+1
+  file%error_status(c) = nf_inq_dimlen(file%ncid, file%rec_dimid, file%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
-  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%time_varid); c=c+1
-  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iter_varid); c=c+1
+  file%error_status(c) = nf_inq_varid(file%ncid, 'time', file%time_varid); c=c+1
+  file%error_status(c) = nf_inq_varid(file%ncid, 'iter', file%iter_varid); c=c+1
 !___if the time rtime at the rec_count does not equal ctime we look for the closest record with the 
 ! timestamp less than ctime
-  do k=id%rec_count, 1, -1
-     id%error_status(c)=nf_get_vara_double(id%ncid, id%time_varid, k, 1, rtime, 1);
+  do k=file%rec_count, 1, -1
+     file%error_status(c)=nf_get_vara_double(file%ncid, file%time_varid, k, 1, rtime, 1);
      if (ctime > rtime) then
-        id%rec_count=k+1
+        file%rec_count=k+1
         exit ! a proper rec_count detected, ready for writing restart, exit the loop
      elseif (ctime == rtime) then
-        id%rec_count=k
+        file%rec_count=k
         exit ! a proper rec_count detected, ready for reading restart, exit the loop
      end if
      if (k==1) then
         if (mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
         if (mype==0) write(*,*) 'reading restart will not be possible !'
         if (mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
-        id%error_status(c)=-310;
+        file%error_status(c)=-310;
      end if
   end do
   c=c+1 ! check will be made only for the last nf_get_vara_double
-  id%rec_count=max(id%rec_count, 1)
+  file%rec_count=max(file%rec_count, 1)
 !___Associate physical variables____________________________________________
-  do j=1, id%nvar
-     id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
+  do j=1, file%nvar
+     file%error_status(c) = nf_inq_varid(file%ncid, file%var(j)%name, file%var(j)%code); c=c+1
   end do
-  id%error_status(c)=nf_close(id%ncid); c=c+1
-  id%error_count=c-1
-  write(*,*) 'current restart counter = ',       id%rec_count
+  file%error_status(c)=nf_close(file%ncid); c=c+1
+  file%error_count=c-1
+  write(*,*) 'current restart counter = ',       file%rec_count
 end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------
