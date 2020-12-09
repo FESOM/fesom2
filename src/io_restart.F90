@@ -53,12 +53,12 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
-  type(nc_file), save       :: oid, iid
+  type(nc_file), save       :: ocean_file, ice_file
   integer,       save       :: globalstep=0
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
-  PUBLIC :: restart, oid, iid 
+  PUBLIC :: restart, ocean_file, ice_file 
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -72,7 +72,7 @@ MODULE io_RESTART
   contains
 !
 !--------------------------------------------------------------------------------------------
-! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
+! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, mesh)
   implicit none
@@ -90,38 +90,38 @@ subroutine ini_ocean_io(year, mesh)
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
-  oid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
-  if (oid%is_in_use) return
-  oid%is_in_use=.true.
-  call def_dim(oid, 'node', nod2d)
-  call def_dim(oid, 'elem', elem2d)
-  call def_dim(oid, 'nz_1', nl-1)
-  call def_dim(oid, 'nz',   nl)
+  ocean_file%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  if (ocean_file%is_in_use) return
+  ocean_file%is_in_use=.true.
+  call def_dim(ocean_file, 'node', nod2d)
+  call def_dim(ocean_file, 'elem', elem2d)
+  call def_dim(ocean_file, 'nz_1', nl-1)
+  call def_dim(ocean_file, 'nz',   nl)
 
   !===========================================================================
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call def_variable(oid, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n);
+  call def_variable(ocean_file, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n);
   !___ALE related fields______________________________________________________
-  call def_variable(oid, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar);
-!!PS   call def_variable(oid, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs);
-  call def_variable(oid, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old);
-  call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
+  call def_variable(ocean_file, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar);
+!!PS   call def_variable(ocean_file, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs);
+  call def_variable(ocean_file, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old);
+  call def_variable(ocean_file, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
   
   !___Define the netCDF variables for 3D fields_______________________________
-  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:));
-  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
-  call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
-  call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
+  call def_variable(ocean_file, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:));
+  call def_variable(ocean_file, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
+  call def_variable(ocean_file, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
+  call def_variable(ocean_file, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
   
   !___Save restart variables for TKE and IDEMIX_________________________________
   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call def_variable(oid, 'tke',  (/nl, nod2d/), 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:));
+        call def_variable(ocean_file, 'tke',  (/nl, nod2d/), 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:));
   endif
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call def_variable(oid, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
+        call def_variable(ocean_file, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
   endif 
 
   do j=1,num_tracers
@@ -139,17 +139,17 @@ subroutine ini_ocean_io(year, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
+     call def_variable(ocean_file, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
      longname=trim(longname)//', Adams–Bashforth'
-     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+     call def_variable(ocean_file, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
   end do
-  call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
-  call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
-  call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
+  call def_variable(ocean_file, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
+  call def_variable(ocean_file, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
+  call def_variable(ocean_file, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
-! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
+! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ice_io(year, mesh)
   implicit none
@@ -167,23 +167,23 @@ subroutine ini_ice_io(year, mesh)
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
-  iid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
-  if (iid%is_in_use) return
-  iid%is_in_use=.true.
-  call def_dim(iid, 'node', nod2d)
+  ice_file%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+  if (ice_file%is_in_use) return
+  ice_file%is_in_use=.true.
+  call def_dim(ice_file, 'node', nod2d)
 
   !===========================================================================
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
-  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
-  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
-  call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
-  call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+  call def_variable(ice_file, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
+  call def_variable(ice_file, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
+  call def_variable(ice_file, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
+  call def_variable(ice_file, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
+  call def_variable(ice_file, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
 #if defined (__oifs)
-  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
-  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
+  call def_variable(ice_file, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
+  call def_variable(ice_file, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
@@ -212,11 +212,11 @@ subroutine restart(istep, l_write, l_read, mesh)
   end if
 
   if (l_read) then
-   call assoc_ids(oid);          call was_error(oid)
-   call read_restart(oid, mesh); call was_error(oid)
+   call assoc_ids(ocean_file);          call was_error(ocean_file)
+   call read_restart(ocean_file, mesh); call was_error(ocean_file)
    if (use_ice) then
-      call assoc_ids(iid);          call was_error(iid)
-      call read_restart(iid, mesh); call was_error(iid)
+      call assoc_ids(ice_file);          call was_error(ice_file)
+      call read_restart(ice_file, mesh); call was_error(ice_file)
    end if
   end if
 
@@ -248,11 +248,11 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   ! write restart
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);                  call was_error(oid)  
-  call write_restart(oid, istep, mesh); call was_error(oid)
+  call assoc_ids(ocean_file);                  call was_error(ocean_file)  
+  call write_restart(ocean_file, istep, mesh); call was_error(ocean_file)
   if (use_ice) then
-     call assoc_ids(iid);                  call was_error(iid)  
-     call write_restart(iid, istep, mesh); call was_error(iid)
+     call assoc_ids(ice_file);                  call was_error(ice_file)  
+     call write_restart(ice_file, istep, mesh); call was_error(ice_file)
   end if
   
   ! actualize clock file to latest restart point
