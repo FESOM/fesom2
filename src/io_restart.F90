@@ -44,15 +44,8 @@ MODULE io_RESTART
     integer :: error_status(250), error_count
     logical :: is_in_use=.false.
   end type nc_file
-!
-!--------------------------------------------------------------------------------------------
-!
-  type type_id
-    integer :: nd, el, nz, nz1, T, rec, iter
-  end type type_id
-!
-!--------------------------------------------------------------------------------------------
-! id will keep the IDs of all required dimentions and variables
+
+
   type(nc_file), save       :: ocean_file, ice_file
   integer,       save       :: globalstep=0
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
