@@ -255,67 +255,66 @@ subroutine restart(istep, l_write, l_read, mesh)
   end if
   
 end subroutine restart
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine create_new_file(id)
+
+
+subroutine create_new_file(file)
   implicit none
 
-  type(nc_file),  intent(inout) :: id
+  type(nc_file),  intent(inout) :: file
   integer                       :: c, j
   integer                       :: n, k, l, kdim, dimid(4)
   character(2000)               :: att_text
   ! Serial output implemented so far
   if (mype/=0) return
   c=1
-  id%error_status=0
+  file%error_status=0
   ! create an ocean output file
-  write(*,*) 'initializing restart file ', trim(id%filename)
-  id%error_status(c) = nf_create(id%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), id%ncid); c=c+1
+  write(*,*) 'initializing restart file ', trim(file%filename)
+  file%error_status(c) = nf_create(file%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), file%ncid); c=c+1
 
-  do j=1, id%ndim
+  do j=1, file%ndim
 !___Create mesh related dimentions__________________________________________
-     id%error_status(c) = nf_def_dim(id%ncid, id%dim(j)%name, id%dim(j)%size, id%dim(j)%code ); c=c+1
+     file%error_status(c) = nf_def_dim(file%ncid, file%dim(j)%name, file%dim(j)%size, file%dim(j)%code ); c=c+1
   end do
 
 !___Create time related dimentions__________________________________________
-  id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec_dimid);         c=c+1
+  file%error_status(c) = nf_def_dim(file%ncid, 'time', NF_UNLIMITED, file%rec_dimid);         c=c+1
 !___Define the time and iteration variables_________________________________
-  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec_dimid, id%time_varid); c=c+1
-  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec_dimid, id%iter_varid); c=c+1
+  file%error_status(c) = nf_def_var(file%ncid, 'time', NF_DOUBLE, 1, file%rec_dimid, file%time_varid); c=c+1
+  file%error_status(c) = nf_def_var(file%ncid, 'iter', NF_INT,    1, file%rec_dimid, file%iter_varid); c=c+1
 
 
   att_text='time'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%time_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  file%error_status(c) = nf_put_att_text(file%ncid, file%time_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%time_varid, 'units', len_trim(att_text), trim(att_text)); c=c+1
+  file%error_status(c) = nf_put_att_text(file%ncid, file%time_varid, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   att_text='iteration_count'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%iter_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  file%error_status(c) = nf_put_att_text(file%ncid, file%iter_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
 
-  do j=1, id%nvar
+  do j=1, file%nvar
 !___associate physical dimension with the netcdf IDs________________________
-     n=id%var(j)%ndim ! shape size of the variable (exluding time)
+     n=file%var(j)%ndim ! shape size of the variable (exluding time)
      do k=1, n
         !k_th dimension of the variable
-        kdim=id%var(j)%dims(k)
-        do l=1, id%ndim ! list all defined dimensions 
-           if (kdim==id%dim(l)%size) dimid(k)=id%dim(l)%code
+        kdim=file%var(j)%dims(k)
+        do l=1, file%ndim ! list all defined dimensions 
+           if (kdim==file%dim(l)%size) dimid(k)=file%dim(l)%code
         end do
         !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
-     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec_dimid/), id%var(j)%code); c=c+1
+     file%error_status(c) = nf_def_var(file%ncid, trim(file%var(j)%name), NF_DOUBLE, file%var(j)%ndim+1, (/dimid(1:n), file%rec_dimid/), file%var(j)%code); c=c+1
      !if (n==1) then
-     !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
+     !   file%error_status(c)=nf_def_var_chunking(file%ncid, file%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
      if (n==2) then
-        id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1, id%dim(1)%size/)); ! c=c+1 
+        file%error_status(c)=nf_def_var_chunking(file%ncid, file%var(j)%code, NF_CHUNKED, (/1, file%dim(1)%size/)); ! c=c+1 
      end if
-     id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
-     id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
+     file%error_status(c)=nf_put_att_text(file%ncid, file%var(j)%code, 'description', len_trim(file%var(j)%longname), file%var(j)%longname); c=c+1
+     file%error_status(c)=nf_put_att_text(file%ncid, file%var(j)%code, 'units',       len_trim(file%var(j)%units),    file%var(j)%units);    c=c+1
   end do
 
-  id%error_status(c)=nf_close(id%ncid); c=c+1
-  id%error_count=c-1
+  file%error_status(c)=nf_close(file%ncid); c=c+1
+  file%error_count=c-1
 end subroutine create_new_file
 
 
