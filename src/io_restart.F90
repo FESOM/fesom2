@@ -347,9 +347,9 @@ subroutine def_dim(file, name, ndim)
 end subroutine def_dim
 
 
-subroutine def_variable_1d(id, name, dims, longname, units, data)
+subroutine def_variable_1d(file, name, dims, longname, units, data)
   implicit none
-  type(nc_file),    intent(inout)        :: id
+  type(nc_file),    intent(inout)        :: file
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(1)
   character(len=*), intent(in), optional :: units, longname
@@ -357,35 +357,34 @@ subroutine def_variable_1d(id, name, dims, longname, units, data)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
-  if (id%nvar > 0) then
+  if (file%nvar > 0) then
      ! create temporal dimension
-     allocate(temp(id%nvar)); temp=id%var
+     allocate(temp(file%nvar)); temp=file%var
      ! deallocate the input data array
-     deallocate(id%var)
+     deallocate(file%var)
      ! then reallocate
-     id%nvar=id%nvar+1
-     allocate(id%var(id%nvar))
+     file%nvar=file%nvar+1
+     allocate(file%var(file%nvar))
      ! restore the original data
-     id%var(1:id%nvar-1)=temp  
+     file%var(1:file%nvar-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id%nvar=1
-     allocate(id%var(id%nvar))
+     file%nvar=1
+     allocate(file%var(file%nvar))
    end if
-   id%var(id%nvar)%name=trim(name)
-   id%var(id%nvar)%longname=trim(longname)
-   id%var(id%nvar)%units=trim(units)
-   id%var(id%nvar)%ndim=1
-   id%var(id%nvar)%dims(1)=dims(1)
-   id%var(id%nvar)%pt1=>data
+   file%var(file%nvar)%name=trim(name)
+   file%var(file%nvar)%longname=trim(longname)
+   file%var(file%nvar)%units=trim(units)
+   file%var(file%nvar)%ndim=1
+   file%var(file%nvar)%dims(1)=dims(1)
+   file%var(file%nvar)%pt1=>data
 end subroutine def_variable_1d
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine def_variable_2d(id, name, dims, longname, units, data)
+
+
+subroutine def_variable_2d(file, name, dims, longname, units, data)
   implicit none
-  type(nc_file),    intent(inout)        :: id
+  type(nc_file),    intent(inout)        :: file
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(2)
   character(len=*), intent(in), optional :: units, longname
@@ -393,32 +392,31 @@ subroutine def_variable_2d(id, name, dims, longname, units, data)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
-  if (id%nvar > 0) then
+  if (file%nvar > 0) then
      ! create temporal dimension
-     allocate(temp(id%nvar)); temp=id%var
+     allocate(temp(file%nvar)); temp=file%var
      ! deallocate the input data array
-     deallocate(id%var)
+     deallocate(file%var)
      ! then reallocate
-     id%nvar=id%nvar+1
-     allocate(id%var(id%nvar))
+     file%nvar=file%nvar+1
+     allocate(file%var(file%nvar))
      ! restore the original data
-     id%var(1:id%nvar-1)=temp  
+     file%var(1:file%nvar-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id%nvar=1
-     allocate(id%var(id%nvar))
+     file%nvar=1
+     allocate(file%var(file%nvar))
    end if
-   id%var(id%nvar)%name=trim(name)
-   id%var(id%nvar)%longname=trim(longname)
-   id%var(id%nvar)%units=trim(units)
-   id%var(id%nvar)%ndim=2
-   id%var(id%nvar)%dims(1:2)=dims
-   id%var(id%nvar)%pt2=>data
+   file%var(file%nvar)%name=trim(name)
+   file%var(file%nvar)%longname=trim(longname)
+   file%var(file%nvar)%units=trim(units)
+   file%var(file%nvar)%ndim=2
+   file%var(file%nvar)%dims(1:2)=dims
+   file%var(file%nvar)%pt2=>data
 end subroutine def_variable_2d
-!
-!--------------------------------------------------------------------------------------------
-!
+
+
 subroutine write_restart(id, istep, mesh)
   implicit none
   type(nc_file),  intent(inout) :: id
