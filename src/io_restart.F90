@@ -317,38 +317,36 @@ subroutine create_new_file(id)
   id%error_status(c)=nf_close(id%ncid); c=c+1
   id%error_count=c-1
 end subroutine create_new_file
-!
-!--------------------------------------------------------------------------------------------
-!
-subroutine def_dim(id, name, ndim)
+
+
+subroutine def_dim(file, name, ndim)
   implicit none
-  type(nc_file),    intent(inout) :: id
+  type(nc_file),    intent(inout) :: file
   character(len=*), intent(in)    :: name
   integer,          intent(in)    :: ndim
   type(nc_dims), allocatable, dimension(:) :: temp
 
-  if (id%ndim > 0) then
+  if (file%ndim > 0) then
      ! create temporal dimension
-     allocate(temp(id%ndim)); temp=id%dim
+     allocate(temp(file%ndim)); temp=file%dim
      ! deallocate the input data array
-     deallocate(id%dim)
+     deallocate(file%dim)
      ! then reallocate
-     id%ndim=id%ndim+1
-     allocate(id%dim(id%ndim))
+     file%ndim=file%ndim+1
+     allocate(file%dim(file%ndim))
      ! restore the original data
-     id%dim(1:id%ndim-1)=temp  
+     file%dim(1:file%ndim-1)=temp  
      deallocate(temp)
    else
      ! first dimension in a file
-     id%ndim=1
-     allocate(id%dim(id%ndim))
+     file%ndim=1
+     allocate(file%dim(file%ndim))
    end if
-   id%dim(id%ndim)%name=trim(name)
-   id%dim(id%ndim)%size=ndim
+   file%dim(file%ndim)%name=trim(name)
+   file%dim(file%ndim)%size=ndim
 end subroutine def_dim
-!
-!--------------------------------------------------------------------------------------------
-!
+
+
 subroutine def_variable_1d(id, name, dims, longname, units, data)
   implicit none
   type(nc_file),    intent(inout)        :: id
