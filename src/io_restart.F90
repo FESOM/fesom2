@@ -38,7 +38,7 @@ MODULE io_RESTART
     type(nc_dims), allocatable, dimension(:) :: dim
     type(nc_vars), allocatable, dimension(:) :: var
     integer :: ndim=0, nvar=0
-    integer :: rec, Tid, Iid
+    integer :: rec_dimid, time_varid, iter_varid
     integer :: ncid
     integer :: rec_count=0
     integer :: error_status(250), error_count
@@ -204,11 +204,11 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+    call ini_ocean_io(yearnew, mesh)
+    if (use_ice) call ini_ice_io  (yearnew, mesh)
   else
-               call ini_ocean_io(yearold, mesh)
-  if (use_ice) call ini_ice_io  (yearold, mesh)
+    call ini_ocean_io(yearold, mesh)
+    if (use_ice) call ini_ice_io  (yearold, mesh)
   end if
 
   if (l_read) then
@@ -286,19 +286,19 @@ subroutine create_new_file(id)
   end do
 
 !___Create time related dimentions__________________________________________
-  id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec);         c=c+1
+  id%error_status(c) = nf_def_dim(id%ncid, 'time', NF_UNLIMITED, id%rec_dimid);         c=c+1
 !___Define the time and iteration variables_________________________________
-  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec, id%tID); c=c+1
-  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec, id%iID); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'time', NF_DOUBLE, 1, id%rec_dimid, id%time_varid); c=c+1
+  id%error_status(c) = nf_def_var(id%ncid, 'iter', NF_INT,    1, id%rec_dimid, id%iter_varid); c=c+1
 
 
   att_text='time'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%time_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
   write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%time_varid, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   att_text='iteration_count'
-  id%error_status(c) = nf_put_att_text(id%ncid, id%iID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
+  id%error_status(c) = nf_put_att_text(id%ncid, id%iter_varid, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
 
   do j=1, id%nvar
 !___associate physical dimension with the netcdf IDs________________________
@@ -311,7 +311,7 @@ subroutine create_new_file(id)
         end do
         !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
-     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec_dimid/), id%var(j)%code); c=c+1
      !if (n==1) then
      !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
      if (n==2) then
@@ -446,8 +446,8 @@ subroutine write_restart(id, istep, mesh)
      !id%rec_count=id%rec_count+1
      write(*,*) 'writing restart record ', id%rec_count
      id%error_status(c)=nf_open(id%filename, nf_write, id%ncid); c=c+1
-     id%error_status(c)=nf_put_vara_double(id%ncid, id%tID, id%rec_count, 1, ctime, 1); c=c+1
-     id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
+     id%error_status(c)=nf_put_vara_double(id%ncid, id%time_varid, id%rec_count, 1, ctime, 1); c=c+1
+     id%error_status(c)=nf_put_vara_int(id%ncid,    id%iter_varid, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
   call was_error(id); c=1
@@ -538,8 +538,8 @@ subroutine read_restart(id, mesh, arg)
      if (file_exist) then
         write(*,*) '     reading restart file:  ', trim(id%filename)
         id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
-        id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
-        id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
+        id%error_status(c)=nf_get_vara_int(id%ncid,    id%iter_varid, id%rec_count, 1, globalstep, 1); c=c+1
+        id%error_status(c)=nf_get_vara_double(id%ncid, id%time_varid, id%rec_count, 1, rtime, 1);      c=c+1
      else
         write(*,*)
         print *, achar(27)//'[33m'
@@ -650,15 +650,15 @@ subroutine assoc_ids(id)
     id%error_status(c) = nf_inq_dimid(id%ncid, id%dim(j)%name, id%dim(j)%code); c=c+1
   end do
 !___Associate time related dimentions_______________________________________
-  id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec);       c=c+1
-  id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec, id%rec_count); c=c+1
+  id%error_status(c) = nf_inq_dimid (id%ncid, 'time', id%rec_dimid);       c=c+1
+  id%error_status(c) = nf_inq_dimlen(id%ncid, id%rec_dimid, id%rec_count); c=c+1
 !___Associate the time and iteration variables______________________________
-  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%tID); c=c+1
-  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iID); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'time', id%time_varid); c=c+1
+  id%error_status(c) = nf_inq_varid(id%ncid, 'iter', id%iter_varid); c=c+1
 !___if the time rtime at the rec_count does not equal ctime we look for the closest record with the 
 ! timestamp less than ctime
   do k=id%rec_count, 1, -1
-     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, k, 1, rtime, 1);
+     id%error_status(c)=nf_get_vara_double(id%ncid, id%time_varid, k, 1, rtime, 1);
      if (ctime > rtime) then
         id%rec_count=k+1
         exit ! a proper rec_count detected, ready for writing restart, exit the loop
