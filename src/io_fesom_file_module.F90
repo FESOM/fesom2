@@ -48,4 +48,28 @@ contains
   end function
   
 
+
+
+  subroutine assert(val, line)
+    logical, intent(in) :: val
+    integer, intent(in) :: line
+    ! EO parameters
+    if(.not. val) then
+      print *, "error in line ",line, __FILE__
+      stop 1
+    end if
+  end subroutine
+
+
+  subroutine assert_nc(status, line)
+    integer, intent(in) :: status
+    integer, intent(in) :: line
+    ! EO parameters
+    include "netcdf.inc"
+    if(status /= nf_noerr) then
+      print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
+      stop 1
+    endif   
+  end subroutine
+
 end module
