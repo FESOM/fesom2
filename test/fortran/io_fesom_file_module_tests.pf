@@ -1,0 +1,15 @@
+module io_fesom_file_module_tests
+  use io_fesom_file_module
+  use funit; implicit none
+  
+contains  
+
+
+  @test
+  subroutine test_can_initialize_without_filepath()
+    type(fesom_file) f
+    call f%initialize()
+  end subroutine
+
+
+end module

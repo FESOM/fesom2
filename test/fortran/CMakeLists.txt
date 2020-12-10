@@ -13,6 +13,7 @@ add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_a
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_lookahead_reader_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/io_netcdf_module.F90 ${CMAKE_CURRENT_LIST_DIR}/../../src/io_netcdf_nf_interface.F90
+                          ${CMAKE_CURRENT_LIST_DIR}/../../src/io_fesom_file_module.F90
            )
 
 add_subdirectory(../../src/async_threads_cpp ${PROJECT_BINARY_DIR}/async_threads_cpp)
