@@ -22,11 +22,9 @@ target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRA
 target_link_libraries(${LIB_TARGET} async_threads_cpp)
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+file(GLOB sources_pfunit RELATIVE ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/*.pf)
 add_pfunit_ctest (${PROJECT_NAME}
-  TEST_SOURCES forcing_provider_module_tests.pf # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
-               forcing_provider_netcdf_module_tests.pf
-               forcing_lookahead_reader_module_tests.pf
-               io_netcdf_module_tests.pf
+  TEST_SOURCES ${sources_pfunit} # must be a path relative to CMAKE_CURRENT_SOURCE_DIR, then the generated files will be placed in CMAKE_CURRENT_BINARY_DIR (see add_pfunit_ctest.cmake)
   LINK_LIBRARIES ${LIB_TARGET}
   )
 
