@@ -7,8 +7,22 @@ contains
 
   @test
   subroutine test_can_initialize_without_filepath()
-    type(fesom_file) f
+    type(fesom_file_type) f
+    
     call f%initialize()
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_dims()
+    type(fesom_file_type) f
+    integer nz_dimidx, node_dimidx
+
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz", 47)
+    @assertEqual(1, nz_dimidx)
+    node_dimidx = f%add_dim("node", 47)
+    @assertEqual(2, node_dimidx)
   end subroutine
 
 
