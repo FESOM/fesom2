@@ -487,14 +487,14 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 end if !... and first node belongs to processor?
 
  !t1=MPI_Wtime()
- if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) write(*,*) 'dynamics  took', t1-t0
- if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) then
-    write(*,*) 'trajectory 1  took', t1-t0
-    write(*,*) 'find_new_iceberg_elem 1  took', t3-t2
-    write(*,*) 'parallel2coast  took', t5-t4
-    write(*,*) 'trajectory 2  took', t6-t5
-    write(*,*) 'find_new_iceberg_elem 2  took', t8-t7
- end if
+ !if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) write(*,*) 'dynamics  took', t1-t0
+ !if (mod(istep,logfile_outfreq)==0 .and. i_have_element .and. lastsubstep) then
+ !   write(*,*) 'trajectory 1  took', t1-t0
+ !   write(*,*) 'find_new_iceberg_elem 1  took', t3-t2
+ !   write(*,*) 'parallel2coast  took', t5-t4
+ !   write(*,*) 'trajectory 2  took', t6-t5
+ !   write(*,*) 'find_new_iceberg_elem 2  took', t8-t7
+ !end if
  ! =================== END OF ICEBERG CALCULATION ==================
  
  end subroutine iceberg_step1
