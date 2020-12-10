@@ -346,13 +346,13 @@ subroutine def_dim(file, name, ndim)
 end subroutine def_dim
 
 
-subroutine def_variable_1d(file, name, dims, longname, units, data)
+subroutine def_variable_1d(file, name, global_shape, longname, units, local_data)
   implicit none
   type(nc_file),    intent(inout)        :: file
   character(len=*), intent(in)           :: name
-  integer, intent(in)                    :: dims(1)
+  integer, intent(in)                    :: global_shape(1)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout)        :: data(:)
+  real(kind=WP),target,     intent(inout)        :: local_data(:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
@@ -376,18 +376,18 @@ subroutine def_variable_1d(file, name, dims, longname, units, data)
    file%var(file%nvar)%longname=trim(longname)
    file%var(file%nvar)%units=trim(units)
    file%var(file%nvar)%ndim=1
-   file%var(file%nvar)%dims(1)=dims(1)
-   file%var(file%nvar)%pt1=>data
+   file%var(file%nvar)%dims(1)=global_shape(1)
+   file%var(file%nvar)%pt1=>local_data
 end subroutine def_variable_1d
 
 
-subroutine def_variable_2d(file, name, dims, longname, units, data)
+subroutine def_variable_2d(file, name, global_shape, longname, units, local_data)
   implicit none
   type(nc_file),    intent(inout)        :: file
   character(len=*), intent(in)           :: name
-  integer, intent(in)                    :: dims(2)
+  integer, intent(in)                    :: global_shape(2)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout) :: data(:,:)
+  real(kind=WP),target,     intent(inout) :: local_data(:,:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
@@ -411,8 +411,8 @@ subroutine def_variable_2d(file, name, dims, longname, units, data)
    file%var(file%nvar)%longname=trim(longname)
    file%var(file%nvar)%units=trim(units)
    file%var(file%nvar)%ndim=2
-   file%var(file%nvar)%dims(1:2)=dims
-   file%var(file%nvar)%pt2=>data
+   file%var(file%nvar)%dims(1:2)=global_shape
+   file%var(file%nvar)%pt2=>local_data
 end subroutine def_variable_2d
 
 
