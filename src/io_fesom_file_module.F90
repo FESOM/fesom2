@@ -7,18 +7,29 @@ module io_fesom_file_module
   type fesom_file_type
     private
     type(dim_type), allocatable :: dims(:)
+    type(var_type), allocatable :: vars(:)
 
     character(:), allocatable :: filepath
     integer mode
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, open_readmode, close_file
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, open_readmode, close_file
   end type
   
   
   type dim_type
     character(:), allocatable :: name
     integer len
+    
+    integer ncid
+  end type
+
+
+  type var_type ! todo: use variable type from io_netcdf_module here
+    character(:), allocatable :: name
+
+    character(:), allocatable :: units_txt
+    character(:), allocatable :: longname_txt
     
     integer ncid
   end type
@@ -66,6 +77,31 @@ contains
     this%dims(dimindex) = dim_type(name=name, len=len, ncid=-1)
   end function
   
+
+  ! the sizes of the dims define the global shape of the var
+  function add_var(this, name, dim_indices, units_txt, longname) result(varindex)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: dim_indices(:)
+    character(len=*), intent(in) :: units_txt
+    character(len=*), intent(in) :: longname
+    integer varindex
+    ! EO parameters
+    type(var_type), allocatable :: tmparr(:)
+    
+    if( .not. allocated(this%vars)) then
+      allocate(this%vars(1))
+    else
+      allocate( tmparr(size(this%vars)+1) )
+      tmparr(1:size(this%vars)) = this%vars
+      deallocate(this%vars)
+      call move_alloc(tmparr, this%vars)
+    end if
+    
+    varindex = size(this%vars)
+    this%vars(varindex) = var_type(name, units_txt, longname, ncid=-1)
+  end function
+
 
   subroutine open_readmode(this, filepath)
     class(fesom_file_type), intent(inout) :: this
