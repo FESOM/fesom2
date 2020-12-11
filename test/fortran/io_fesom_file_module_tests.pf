@@ -81,4 +81,24 @@ contains
   end subroutine
 
 
+  @test
+  subroutine test_can_open_file_with_variable()
+    type(fesom_file_type) f
+    integer nz_dimidx, node_dimidx, time_dimidx
+    integer salt_varid
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz1", 3)
+    @assertEqual(1, nz_dimidx)
+    node_dimidx = f%add_dim("nod2", 5)
+    @assertEqual(2, node_dimidx)
+    time_dimidx = f%add_dim_unlimited("time")
+    @assertEqual(3, time_dimidx)
+
+    salt_varid = f%add_var("salt", [nz_dimidx,node_dimidx,time_dimidx], "psu", "salinity")
+    call f%open_readmode("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    call f%close_file()
+  end subroutine
+
+
 end module

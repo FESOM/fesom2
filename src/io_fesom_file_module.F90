@@ -27,6 +27,7 @@ module io_fesom_file_module
 
   type var_type ! todo: use variable type from io_netcdf_module here
     character(:), allocatable :: name
+    integer, allocatable :: dim_indices(:)
 
     character(:), allocatable :: units_txt
     character(:), allocatable :: longname_txt
@@ -99,7 +100,7 @@ contains
     end if
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name, units_txt, longname, ncid=-1)
+    this%vars(varindex) = var_type(name, dim_indices, units_txt, longname, ncid=-1)
   end function
 
 
@@ -108,19 +109,34 @@ contains
     character(len=*), intent(in) :: filepath
     ! EO parameters
     include "netcdf.inc"
-    integer i
+    integer i, ii
     integer actual_len
+    integer actual_dimcount
+    integer, allocatable :: actual_dimids(:)
+    integer exp_dimid, act_dimid
 
     this%mode = nf_nowrite
     this%filepath = filepath
     
     call assert_nc( nf_open(this%filepath, this%mode, this%ncid) , __LINE__)
     
-    ! attach our dims to their counterparts in the file
+    ! attach our dims and vars to their counterparts in the file
     do i=1, size(this%dims)
       call assert_nc( nf_inq_dimid(this%ncid, this%dims(i)%name, this%dims(i)%ncid) , __LINE__)
       call assert_nc( nf_inq_dimlen(this%ncid, this%dims(i)%ncid, actual_len) , __LINE__)
       if(this%dims(i)%len .ne. nf_unlimited) call assert(this%dims(i)%len == actual_len, __LINE__)
+    end do
+    do i=1, size(this%vars)
+      call assert_nc( nf_inq_varid(this%ncid, this%vars(i)%name, this%vars(i)%ncid) , __LINE__)
+      ! see if this var has the expected dims
+      call assert_nc( nf_inq_varndims(this%ncid, this%vars(i)%ncid, actual_dimcount) , __LINE__)
+      call assert(size(this%vars(i)%dim_indices) == actual_dimcount, __LINE__)
+      allocate(actual_dimids(actual_dimcount))
+      call assert_nc( nf_inq_vardimid(this%ncid, this%vars(i)%ncid, actual_dimids) , __LINE__)
+      do ii=1, actual_dimcount
+        exp_dimid = this%dims( this%vars(i)%dim_indices(ii) )%ncid
+        call assert(exp_dimid == actual_dimids(ii), __LINE__)
+      end do
     end do
   end subroutine
 
