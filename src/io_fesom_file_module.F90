@@ -12,7 +12,7 @@ module io_fesom_file_module
     integer mode
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, open_readmode, close_file
+    procedure, public :: initialize, add_dim, add_dim_unlimited, open_readmode, close_file
   end type
   
   
@@ -32,6 +32,17 @@ contains
     
     this%filepath = ""
   end subroutine
+
+  
+  function add_dim_unlimited(this, name) result(dimindex)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    integer dimindex
+    ! EO parameters
+    include "netcdf.inc"
+
+    dimindex = this%add_dim(name, nf_unlimited)
+  end function
 
 
   function add_dim(this, name, len) result(dimindex)
@@ -73,7 +84,7 @@ contains
     do i=1, size(this%dims)
       call assert_nc( nf_inq_dimid(this%ncid, this%dims(i)%name, this%dims(i)%ncid) , __LINE__)
       call assert_nc( nf_inq_dimlen(this%ncid, this%dims(i)%ncid, actual_len) , __LINE__)
-      call assert(this%dims(i)%len == actual_len, __LINE__)
+      if(this%dims(i)%len .ne. nf_unlimited) call assert(this%dims(i)%len == actual_len, __LINE__)
     end do
   end subroutine
 

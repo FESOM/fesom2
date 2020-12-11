@@ -27,12 +27,37 @@ contains
 
 
   @test
+  subroutine test_can_add_unlimited_dim()
+    type(fesom_file_type) f
+    integer dimidx
+
+    call f%initialize()
+    dimidx = f%add_dim_unlimited("time")
+    @assertEqual(1, dimidx)
+  end subroutine
+
+
+  @test
   subroutine test_can_open_file_in_readmode()
     type(fesom_file_type) f
     integer z_dimidx
 
     call f%initialize()
     z_dimidx = f%add_dim("nz1", 3)
+
+    call f%open_readmode("fixtures/io_netcdf/columnwise_3d_salt.nc")
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_open_file_with_unlimited_dim()
+    type(fesom_file_type) f
+    integer dimidx
+
+    call f%initialize()
+    dimidx = f%add_dim_unlimited("time")
 
     call f%open_readmode("fixtures/io_netcdf/columnwise_3d_salt.nc")
     
