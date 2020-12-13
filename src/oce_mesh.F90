@@ -82,7 +82,7 @@ module mesh_auxiliary_arrays_interface
     end subroutine
   end interface
 end module
-module find_levels_min_e2n
+module find_levels_min_e2n_interface
   interface
     subroutine find_levels_min_e2n(mesh)
       use mod_mesh
