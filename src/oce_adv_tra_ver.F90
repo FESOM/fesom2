@@ -97,7 +97,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
-    integer                            :: nz, n, nzmax,tr_num
+    integer                            :: nz, n, nzmax, nzmin, tr_num
     real(kind=WP)                      :: m, zinv, dt_inv, dz
     real(kind=WP)                      :: c1, v_adv
 
@@ -120,6 +120,9 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         ! max. number of levels at node n
         nzmax=nlevels_nod2D(n)
         
+        ! upper surface index, in case of cavity !=1
+        nzmin=ulevels_nod2D(n)
+        
         !___________________________________________________________________________
         ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because  
         ! they be calculate from the actualized mesh with hnode_new
@@ -130,26 +133,27 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         Z_n=0.0_WP
         zbar_n(nzmax)=zbar_n_bot(n)
         Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-        do nz=nzmax-1,2,-1
+        do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
         end do
-        zbar_n(1) = zbar_n(2) + hnode_new(1,n)
+        zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer 
-        nz=1
+        nz=nzmin
         
         ! 1/dz(nz)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
         
-        a(1)=0.0_WP
-        v_adv=zinv*area(2,n)/area(1,n)
-        b(1)= hnode_new(1,n)+W(1, n)*zinv-min(0._WP, W(2, n))*v_adv
-        c(1)=-max(0._WP, W(2, n))*v_adv
+        a(nz)=0.0_WP
+        v_adv=zinv*area(nz+1,n)/area(nz,n)
+        b(nz)= hnode_new(nz,n)+W(nz, n)*zinv-min(0._WP, W(nz+1, n))*v_adv
+        c(nz)=-max(0._WP, W(nz+1, n))*v_adv
+        
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
-        do nz=2, nzmax-2
+        do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
             a(nz)=min(0._WP, W(nz, n))*zinv
             b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
@@ -167,11 +171,12 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
         c(nz)=0.0_WP
         
-        nz=1
+        !_______________________________________________________________________
+        nz=nzmin
         dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         
-        do nz=2,nzmax-2
+        do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
             tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         end do
@@ -179,31 +184,36 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)
         
-        cp(1) = c(1)/b(1)
-        tp(1) = tr(1)/b(1)
+        !_______________________________________________________________________
+        nz = nzmin
+        cp(nz) = c(nz)/b(nz)
+        tp(nz) = tr(nz)/b(nz)
         
         ! solve for vectors c-prime and t, s-prime
-        do nz = 2,nzmax-1
+        do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
             tp(nz) = (tr(nz)-tp(nz-1)*a(nz))/m
         end do
         
+        !_______________________________________________________________________
         ! start with back substitution 
         tr(nzmax-1) = tp(nzmax-1)
         
         ! solve for x from the vectors c-prime and d-prime
-        do nz = nzmax-2, 1, -1
+        do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
         
         !_______________________________________________________________________
         ! update tracer
-        do nz=1,nzmax-1
+        do nz=nzmin,nzmax-1
             ttf(nz,n)=ttf(nz,n)+tr(nz)
         end do
     end do ! --> do n=1,myDim_nod2D
 end subroutine adv_tra_vert_impl
+!
+!
 !===============================================================================
 subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use g_config
@@ -216,7 +226,7 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     type(t_mesh),  intent(in), target :: mesh
     integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP)                     :: tvert(mesh%nl)
-    integer                           :: n, nz, nzmax
+    integer                           :: n, nz, nzmax, nzmin
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  myDim_nod2D)
@@ -232,27 +242,32 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       
        !_______________________________________________________________________
        ! vert. flux at surface layer
-       nz=1
+       nz=nzmin
        flux(nz,n)=-W(nz,n)*ttf(nz,n)*area(nz,n)-flux(nz,n)
+       
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
        nz=nzmax
        flux(nz,n)= 0.0_WP-flux(nz,n)
+       
        !_______________________________________________________________________
        ! Be carefull have to do vertical tracer advection here on old vertical grid
        ! also horizontal advection is done on old mesh (see helem contains old 
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels    
-       do nz=2,nzmax-1
+       do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
                       (ttf(nz  ,n)**do_Xmoment)*(W(nz,n)+abs(W(nz,n)))+ &
                       (ttf(nz-1,n)**do_Xmoment)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
        end do
     end do
 end subroutine adv_tra_ver_upw1
+!
 !
 !===============================================================================
 subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
@@ -271,7 +286,7 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     real(kind=WP), intent(inout) :: flux(mesh%nl,  myDim_nod2D)
     logical, optional            :: init_zero
     real(kind=WP)                :: tvert(mesh%nl)
-    integer                      :: n, nz, nzmax
+    integer                      :: n, nz, nzmax, nzmin
     real(kind=WP)                :: Tmean, Tmean1, Tmean2
     real(kind=WP)                :: qc, qu, qd
 
@@ -286,42 +301,48 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
        !_______________________________________________________________________
        ! vert. flux at surface layer
-       nz=1
+       nz=nzmin
        flux(nz,n)=-ttf(nz,n)*W(nz,n)*area(nz,n)-flux(nz,n)
+       
        !_______________________________________________________________________
        ! vert. flux 2nd layer --> centered differences
-       nz=2
+       nz=nzmin+1
        flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       
        !_______________________________________________________________________
        ! vert. flux at bottom - 1 layer --> centered differences
        nz=nzmax-1
        flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
        nz=nzmax
        flux(nz,n)= 0.0_WP-flux(nz,n)
+       
        !_______________________________________________________________________
        ! Be carefull have to do vertical tracer advection here on old vertical grid
        ! also horizontal advection is done on old mesh (see helem contains old 
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels    
-       do nz=3,nzmax-2
-          !centered (4th order)
-	  qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
-	  qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
-	  qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
-			
-	  Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
-	  Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-	  Tmean =(W(nz,n)+abs(W(nz,n)))*(Tmean1**do_Xmoment)+(W(nz,n)-abs(W(nz,n)))*(Tmean2**do_Xmoment)
-!         flux(nz,n)=-0.5_WP*(num_ord*(Tmean1+Tmean2)*W(nz,n)+(1.0_WP-num_ord)*Tmean)*area(nz,n)-flux(nz,n)
-          flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*W(nz,n))*area(nz,n)-flux(nz,n)
+       do nz=nzmin+2,nzmax-2
+            !centered (4th order)
+            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
+            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))    
+            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
+                    
+            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
+            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
+            Tmean =(W(nz,n)+abs(W(nz,n)))*(Tmean1**do_Xmoment)+(W(nz,n)-abs(W(nz,n)))*(Tmean2**do_Xmoment)
+    !         flux(nz,n)=-0.5_WP*(num_ord*(Tmean1+Tmean2)*W(nz,n)+(1.0_WP-num_ord)*Tmean)*area(nz,n)-flux(nz,n)
+            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*W(nz,n))*area(nz,n)-flux(nz,n)
        end do
     end do
 end subroutine adv_tra_ver_qr4c
+!
 !
 !===============================================================================
 subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
@@ -340,7 +361,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     logical, optional                  :: init_zero
     real(kind=WP)                      :: tvert(mesh%nl), tv(mesh%nl), aL, aR, aj, x
     real(kind=WP)                      :: dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1
-    integer                            :: n, nz, nzmax
+    integer                            :: n, nz, nzmax, nzmin
     integer                            :: overshoot_counter, counter
 
 #include "associate_mesh.h"
@@ -368,21 +389,28 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! calculated on mid depth levels 
         ! nzmax ... number of depth levels at node n
         nzmax=nlevels_nod2D(n)
+        nzmin=ulevels_nod2D(n)
+        
         ! tracer at surface layer
-        tv(1)=ttf(1,n)
+        tv(nzmin)=ttf(nzmin,n)
+        
         ! tracer at surface+1 layer
         !   tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
-        tv(2)=0.5*(ttf(1,n)+ttf(2,n))
+        tv(nzmin+1)=0.5*(ttf(nzmin,n)+ttf(nzmin+1,n))
+        
         ! tacer at bottom-1 layer
         !tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, W(nzmax-1,n)), 0._WP)
         tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        
         ! tracer at bottom layer
         tv(nzmax)=ttf(nzmax-1,n)
+        
         !_______________________________________________________________________
         ! calc tracer for surface+2 until depth-2 layer
         ! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
         ! loop over layers (segments)
-         do nz=3, nzmax-3
+        !!PS do nz=3, nzmax-3
+        do nz=nzmin+2, nzmax-2 
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
             ! equation (1.9)
@@ -453,7 +481,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         
         tvert(1:nzmax)=0._WP
         ! loop over layers (segments)
-        do nz=1, nzmax-1
+        do nz=nzmin, nzmax-1
             if ((W(nz,n)<=0._WP) .AND. (W(nz+1,n)>=0._WP)) CYCLE
             counter=counter+1
             aL=tv(nz)
@@ -491,10 +519,10 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         
         !_______________________________________________________________________
         ! Surface flux
-        tvert(1)= -( tv(1)**do_Xmoment )*W(1,n)*area(1,n)
+        tvert(nzmin)= -( tv(nzmin)**do_Xmoment )*W(nzmin,n)*area(nzmin,n)
         ! Zero bottom flux
         tvert(nzmax)=0.0_WP        
-        flux(1:nzmax, n)=tvert(1:nzmax)-flux(1:nzmax, n)
+        flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
     end do ! --> do n=1, myDim_nod2D
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
 end subroutine adv_tra_vert_ppm
@@ -515,7 +543,7 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  myDim_nod2D)
     logical, optional                 :: init_zero
-    integer                           :: n, nz, nl1
+    integer                           :: n, nz, nzmax, nzmin
     real(kind=WP)                     :: tvert(mesh%nl), tv
 #include "associate_mesh.h"
 
@@ -527,21 +555,26 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
 
     do n=1, myDim_nod2D
         !_______________________________________________________________________
-        nl1=nlevels_nod2D(n)-1
+        nzmax=nlevels_nod2D(n)-1
+        nzmin=ulevels_nod2D(n)
+        
         !_______________________________________________________________________
         ! Surface flux
-        tvert(1)= -W(1,n)*(ttf(1,n)**do_Xmoment)*area(1,n)
+        tvert(nzmin)= -W(nzmin,n)*(ttf(nzmin,n)**do_Xmoment)*area(nzmin,n)
+        
         !_______________________________________________________________________
         ! Zero bottom flux
-        tvert(nl1+1)=0.0_WP        
+        tvert(nzmax+1)=0.0_WP        
+        
         !_______________________________________________________________________
         ! Other levels
-        do nz=2, nl1
+        do nz=nzmin+1, nzmax
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
             tv=tv**do_Xmoment
             tvert(nz)= -tv*W(nz,n)*area(nz,n)
         end do
+        
         !_______________________________________________________________________
-        flux(1:nl, n)=tvert(1:nl)-flux(1:nl, n)
+        flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
     end do ! --> do n=1, myDim_nod2D
 end subroutine adv_tra_ver_cdiff

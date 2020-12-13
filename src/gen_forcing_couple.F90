@@ -211,6 +211,22 @@ subroutine update_atm_forcing(istep, mesh)
   prec_rain = atmdata(i_prec ,:)/1000._WP
   prec_snow = atmdata(i_snow ,:)/1000._WP
   press_air = atmdata(i_mslp ,:) ! unit should be Pa
+  
+  
+  if (use_cavity) then 
+    do i=1,myDim_nod2d+eDim_nod2d
+        if (ulevels_nod2d(i)>1) then
+            u_wind(i)=0.0_WP
+            v_wind(i)=0.0_WP
+            shum(i)=0.0_WP
+            longwave(i)=0.0_WP
+            Tair(i)=0.0_WP
+            prec_rain(i)=0.0_WP
+            prec_snow(i)=0.0_WP
+            press_air(i)=0.0_WP            
+        end if 
+    end do
+  endif 
 
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
@@ -219,17 +235,32 @@ subroutine update_atm_forcing(istep, mesh)
   end if
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
-     call ncar_ocean_fluxes_mode
+     cd_atm_oce_arr=0.0_WP
+     ch_atm_oce_arr=0.0_WP
+     ce_atm_oce_arr=0.0_WP
+     call ncar_ocean_fluxes_mode(mesh)
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
-  do i=1,myDim_nod2d+eDim_nod2d     
+  do i=1,myDim_nod2d+eDim_nod2d   
+     !__________________________________________________________________________
+     if (ulevels_nod2d(i)>1) then
+        stress_atmoce_x(i)=0.0_WP
+        stress_atmoce_y(i)=0.0_WP
+        stress_atmice_x(i)=0.0_WP
+        stress_atmice_y(i)=0.0_WP
+        cycle
+     end if 
+     
+     !__________________________________________________________________________
      dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
      dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
      stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
      stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
+     
+     !__________________________________________________________________________
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
