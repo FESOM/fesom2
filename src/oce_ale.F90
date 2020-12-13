@@ -9,6 +9,16 @@ module oce_ale_interfaces
       use mod_mesh
       type(t_mesh), intent(in)  , target :: mesh
     end subroutine
+    
+    subroutine init_surface_elem_depth(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine init_surface_node_depth(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
 
     subroutine impl_vert_visc_ale(mesh)
       use mod_mesh
