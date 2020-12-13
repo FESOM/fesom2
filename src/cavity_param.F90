@@ -13,10 +13,10 @@ subroutine compute_nrst_pnt2cavline(mesh)
     implicit none
 
     type(t_mesh), intent(inout) , target :: mesh
-    integer                                             :: node, kk, elnodes(3), gnode
+    integer                                             :: node, kk, elnodes(3), gnode, aux_idx
     integer,       allocatable, dimension(:)            :: cavl_idx, lcl_cavl_idx
     real(kind=WP), allocatable, dimension(:)            :: cavl_lon, cavl_lat, cavl_dep,lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep
-    real(kind=WP)                                       :: aux_x, aux_y, aux_d, aux_dmin, aux_idx
+    real(kind=WP)                                       :: aux_x, aux_y, aux_d, aux_dmin
     
 #include "associate_mesh.h"  
 

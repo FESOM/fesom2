@@ -73,6 +73,16 @@ module diff_tracers_ale_interface
     end subroutine
   end interface
 end module
+module bc_surface_interface
+  interface
+    function bc_surface(n, id, mesh)
+      use mod_mesh
+      integer , intent(in)              :: n, id
+      type(t_mesh), intent(in) , target :: mesh
+      real(kind=WP)                     :: bc_surface
+    end function
+  end interface
+end module
 
 !
 !
@@ -372,11 +382,12 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     use g_PARSUP
     use g_CONFIG
     use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_        
+    use o_mixing_KPP_mod !for ghats _GO_    
+    use bc_surface_interface
         
     implicit none
     type(t_mesh), intent(in) , target :: mesh
-    real(kind=WP)            :: bc_surface    
+!!PS     real(kind=WP)            :: bc_surface    
     real(kind=WP)            :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax,nzmin, tr_num
