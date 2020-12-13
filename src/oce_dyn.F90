@@ -209,8 +209,8 @@ USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 
-real(kind=WP) :: u1, v1, le(2), len, vi , nzmin,nzmax
-integer       :: nz, ed, el(2)
+real(kind=WP) :: u1, v1, le(2), len, vi
+integer       :: nz, ed, el(2) , nzmin,nzmax
 type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"

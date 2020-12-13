@@ -82,6 +82,15 @@ module mesh_auxiliary_arrays_interface
     end subroutine
   end interface
 end module
+module find_levels_min_e2n
+  interface
+    subroutine find_levels_min_e2n(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
