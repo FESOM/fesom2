@@ -108,6 +108,7 @@ use find_levels_cavity_interface
 use mesh_auxiliary_arrays_interface
 use test_tri_interface
 use load_edges_interface
+use find_levels_min_e2n_interface
 use find_neighbors_interface
 use mesh_areas_interface
 IMPLICIT NONE
