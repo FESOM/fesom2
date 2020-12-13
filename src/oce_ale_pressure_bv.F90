@@ -243,7 +243,7 @@ subroutine pressure_bv(mesh)
             
         !_______________________________________________________________________
         ! calculate pressure 
-        if (trim(which_ale)=='linfs' .or. use_cavity==.true.) then
+        if (trim(which_ale)=='linfs' .or. use_cavity .eqv. .true.) then
             !!PS hpressure(1, node)=-Z_3d_n(1,node)*rho(1)*g
             !!PS hpressure(1, node)=0.5_WP*hnode(1,node)*rho(1)*g
             !___________________________________________________________________
@@ -938,7 +938,7 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
             drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
             
             ! cavity-ocean interface pressure boundary condition 
-            auxp            = drho_dx*-zbar_e_srf(elem)*g/density_0
+            auxp            = drho_dx*(-zbar_e_srf(elem))*g/density_0
             int_dp_dx(1)    = int_dp_dx(1) + auxp
             
             auxp            = drho_dx*helem(nlz,elem)*g/density_0
@@ -950,7 +950,7 @@ subroutine pressure_force_4_linfs_cubicspline(mesh)
             drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
             
             ! cavity-ocean interface pressure boundary condition 
-            auxp            = drho_dx*-zbar_e_srf(elem)*g/density_0
+            auxp            = drho_dx*(-zbar_e_srf(elem))*g/density_0
             int_dp_dx(2)    = int_dp_dx(2) + auxp
             
             auxp            = drho_dx*helem(nlz,elem)*g/density_0
@@ -2118,6 +2118,7 @@ subroutine init_ref_density(mesh)
     use o_PARAM
     use o_ARRAYS
     use g_PARSUP
+    use densityJM_components_interface
     implicit none
     
     !___________________________________________________________________________
