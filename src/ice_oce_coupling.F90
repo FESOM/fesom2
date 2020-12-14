@@ -176,12 +176,7 @@ subroutine oce_fluxes(mesh)
     
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
-!!PS     if (use_cavity) then
-!!PS         where (ulevels_nod2d > 1) water_flux = 0.0_WP
-!!PS         where (ulevels_nod2d > 1) heat_flux = 0.0_WP
-!!PS         where (ulevels_nod2d > 1) net_heat_flux = 0.0_WP
-!!PS         where (ulevels_nod2d > 1) fresh_wa_flux = 0.0_WP
-!!PS     end if
+    
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
 
