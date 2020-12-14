@@ -1,5 +1,5 @@
-module io_fesom_file_module_tests
-  use io_fesom_file_module
+module io_netcdf_file_module_tests
+  use io_netcdf_file_module
   use funit; implicit none
   
 contains  

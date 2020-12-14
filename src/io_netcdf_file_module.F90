@@ -1,4 +1,4 @@
-module io_fesom_file_module
+module io_netcdf_file_module
   implicit none
   public fesom_file_type
   private
