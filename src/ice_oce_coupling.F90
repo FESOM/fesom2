@@ -176,7 +176,12 @@ subroutine oce_fluxes(mesh)
     
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
-    
+!!PS     if (use_cavity) then
+!!PS         where (ulevels_nod2d > 1) water_flux = 0.0_WP
+!!PS         where (ulevels_nod2d > 1) heat_flux = 0.0_WP
+!!PS         where (ulevels_nod2d > 1) net_heat_flux = 0.0_WP
+!!PS         where (ulevels_nod2d > 1) fresh_wa_flux = 0.0_WP
+!!PS     end if
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
 
@@ -254,10 +259,15 @@ subroutine oce_fluxes(mesh)
         flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
     end if     
     
-    ! Why dont take into account cavity freshwater flux from cavity_heat_water_fluxes_3eq(mesh)
-    ! --> do we assume that cavity swims and fresh water flux from cavity boundary 
-    !     does not contribute to volume change ?
-    if (use_cavity) where (ulevels_nod2d > 1) flux = 0.0_WP
+    ! Also balance freshwater flux that come from ocean-cavity boundary
+    if (use_cavity) then
+        if (.not. use_virt_salt) then
+            ! only for full-free surface approach otherwise total ocean volume will drift
+            where (ulevels_nod2d > 1) flux = -water_flux
+        else
+            where (ulevels_nod2d > 1) flux =  0.0_WP
+        end if 
+    end if 
             
     call integrate_nod(flux, net, mesh)
     ! here the + sign must be used because we switched up the sign of the 

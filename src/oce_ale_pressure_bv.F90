@@ -1074,7 +1074,7 @@ subroutine pressure_force_4_linfs_cavity(mesh)
     use g_config
     implicit none
     
-    integer                  :: elem, elnodes(3), nle, ule,  nlz
+    integer             :: elem, elnodes(3), nle, ule,  nlz
     real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
     real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
     type(t_mesh), intent(in) , target :: mesh
