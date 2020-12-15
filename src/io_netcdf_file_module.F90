@@ -10,7 +10,6 @@ module io_netcdf_file_module
     type(var_type), allocatable :: vars(:)
 
     character(:), allocatable :: filepath
-    integer mode
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, add_var_att, open_readmode, close_file
@@ -140,11 +139,12 @@ contains
     integer actual_dimcount
     integer, allocatable :: actual_dimids(:)
     integer exp_dimid, act_dimid
+    integer mode
 
-    this%mode = nf_nowrite
+    mode = nf_nowrite
     this%filepath = filepath
     
-    call assert_nc( nf_open(this%filepath, this%mode, this%ncid) , __LINE__)
+    call assert_nc( nf_open(this%filepath, mode, this%ncid) , __LINE__)
     
     ! attach our dims and vars to their counterparts in the file
     do i=1, size(this%dims)
