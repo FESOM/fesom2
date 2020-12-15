@@ -13,7 +13,7 @@ module io_netcdf_file_module
     integer mode
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, open_readmode, close_file
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, add_var_att, open_readmode, close_file
     generic, public :: read_var => read_var_r4, read_var_r8
     procedure, private :: read_var_r4, read_var_r8
   end type
@@ -30,11 +30,16 @@ module io_netcdf_file_module
   type var_type ! todo: use variable type from io_netcdf_module here
     character(:), allocatable :: name
     integer, allocatable :: dim_indices(:)
-
-    character(:), allocatable :: units_txt
-    character(:), allocatable :: longname_txt
+    type(att_type), allocatable :: atts(:)
     
     integer ncid
+  end type
+  
+  
+  type att_type
+    character(:), allocatable :: name
+    character(:), allocatable :: text
+    ! todo: make this work for other data types like int
   end type
 
 
@@ -82,12 +87,10 @@ contains
   
 
   ! the sizes of the dims define the global shape of the var
-  function add_var(this, name, dim_indices, units_txt, longname) result(varindex)
+  function add_var(this, name, dim_indices) result(varindex)
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
-    character(len=*), intent(in) :: units_txt
-    character(len=*), intent(in) :: longname
     integer varindex
     ! EO parameters
     type(var_type), allocatable :: tmparr(:)
@@ -102,8 +105,29 @@ contains
     end if
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name, dim_indices, units_txt, longname, ncid=-1)
+    this%vars(varindex) = var_type(name, dim_indices, ncid=-1)
   end function
+
+
+  subroutine add_var_att(this, varindex, att_name, att_text)
+    class(fesom_file_type), intent(inout) :: this
+    integer, intent(in) :: varindex
+    character(len=*), intent(in) :: att_name
+    character(len=*), intent(in) :: att_text
+    ! EO parameters
+    type(att_type), allocatable :: tmparr(:)
+    
+    if( .not. allocated(this%vars(varindex)%atts)) then
+      allocate(this%vars(varindex)%atts(1))
+    else
+      allocate( tmparr(size(this%vars(varindex)%atts)+1) )
+      tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
+      deallocate(this%vars(varindex)%atts)
+      call move_alloc(tmparr, this%vars(varindex)%atts)
+    end if
+    
+    this%vars(varindex)%atts( size(this%vars(varindex)%atts) ) = att_type(name=att_name, text=att_text)
+  end subroutine
 
 
   subroutine open_readmode(this, filepath)
