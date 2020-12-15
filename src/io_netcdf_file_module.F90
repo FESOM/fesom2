@@ -169,6 +169,7 @@ contains
 
   ! values array is not required to have the same shape as the variable but must fit the product of all items of the sizes array
   ! this way we can retrieve e.g. data from a 3D variable to a 2D array with one size set to 1 (e.g. to get a single timestep)
+  ! starts and sizes must have the same rank as the variable has dimensions
   subroutine read_var_r8(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
@@ -179,6 +180,8 @@ contains
     ! EO parameters
     real(8), pointer :: values_ptr(:)
 
+    call assert(size(sizes) == size(starts), __LINE__)
+    call assert(size(starts) == size(this%dims), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
@@ -186,8 +189,7 @@ contains
   end subroutine
 
 
-  ! values array is not required to have the same shape as the variable but must fit the product of all items of the sizes array
-  ! this way we can retrieve e.g. data from a 3D variable to a 2D array with one size set to 1 (e.g. to get a single timestep)
+  ! see read_var_r8 for usage comment
   subroutine read_var_r4(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
@@ -198,6 +200,8 @@ contains
     ! EO parameters
     real(4), pointer :: values_ptr(:)
 
+    call assert(size(sizes) == size(starts), __LINE__)
+    call assert(size(starts) == size(this%dims), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
