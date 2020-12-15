@@ -14,6 +14,8 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, open_readmode, close_file
+    generic, public :: read_var => read_var_r4, read_var_r8
+    procedure, private :: read_var_r4, read_var_r8
   end type
   
   
@@ -138,6 +140,44 @@ contains
         call assert(exp_dimid == actual_dimids(ii), __LINE__)
       end do
     end do
+  end subroutine
+
+
+  ! values array is not required to have the same shape as the variable but must fit the product of all items of the sizes array
+  ! this way we can retrieve e.g. data from a 3D variable to a 2D array with one size set to 1 (e.g. to get a single timestep)
+  subroutine read_var_r8(this, varindex, starts, sizes, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
+    class(fesom_file_type), intent(in) :: this
+    integer, intent(in) :: varindex
+    integer, dimension(:) :: starts, sizes
+    real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO parameters
+    real(8), pointer :: values_ptr(:)
+
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_get_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  ! values array is not required to have the same shape as the variable but must fit the product of all items of the sizes array
+  ! this way we can retrieve e.g. data from a 3D variable to a 2D array with one size set to 1 (e.g. to get a single timestep)
+  subroutine read_var_r4(this, varindex, starts, sizes, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
+    class(fesom_file_type), intent(in) :: this
+    integer, intent(in) :: varindex
+    integer, dimension(:) :: starts, sizes
+    real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO parameters
+    real(4), pointer :: values_ptr(:)
+
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_get_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 

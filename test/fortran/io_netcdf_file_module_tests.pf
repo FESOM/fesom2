@@ -101,4 +101,58 @@ contains
   end subroutine
 
 
+  @test
+  subroutine test_can_read_2d_variable_real4()
+    type(fesom_file_type) f
+    real(4), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var("sss", [node_dimidx,time_dimidx], "psu", "sea surface salinity")
+    call f%open_readmode("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,1], [5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_2d_variable_real8()
+    type(fesom_file_type) f
+    real(8), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var("sss", [node_dimidx,time_dimidx], "psu", "sea surface salinity")
+    call f%open_readmode("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,1], [5,1], values)
+    ! check level 1 values
+    @assertEqual(1.001, values(1), tolerance=1.e-6)  
+    @assertEqual(1.002, values(2), tolerance=1.e-6)  
+    @assertEqual(1.003, values(3), tolerance=1.e-6)  
+    @assertEqual(1.004, values(4), tolerance=1.e-6)  
+    @assertEqual(1.005, values(5), tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
 end module
