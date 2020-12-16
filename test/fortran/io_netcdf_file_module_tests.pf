@@ -2,6 +2,8 @@ module io_netcdf_file_module_tests
   use io_netcdf_file_module
   use funit; implicit none
   
+  character(len=*), parameter :: TMPPATHPREFIX = "./io_netcdf_file_module_tests_DAEA1C34_F042_4243_AA88_273E4AA9D4A6__"
+  
 contains
 
 
@@ -227,5 +229,46 @@ contains
     call f%close_file()
   end subroutine
 
+
+  @test
+  subroutine test_can_create_empty_file()
+    type(fesom_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_empty_file.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%open_create(filepath)
+    call f%close_file()
+    ! todo: actually test if the file has bee written correctly
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_with_dims_and_vars()
+    type(fesom_file_type) f
+    integer z_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_dims_and_vars.nc"
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+    varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
+    
+    call f%open_create(filepath)
+    call f%close_file()
+    ! todo: actually test if the file has bee written correctly
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
 
 end module

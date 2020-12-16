@@ -12,7 +12,7 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_create
     generic, public :: read_var => read_var_r4, read_var_r8
     procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x
   end type
@@ -75,10 +75,10 @@ contains
     type(dim_type), allocatable :: tmparr(:)
     
     ! assume the dims array is allocated
-      allocate( tmparr(size(this%dims)+1) )
-      tmparr(1:size(this%dims)) = this%dims
-      deallocate(this%dims)
-      call move_alloc(tmparr, this%dims)
+    allocate( tmparr(size(this%dims)+1) )
+    tmparr(1:size(this%dims)) = this%dims
+    deallocate(this%dims)
+    call move_alloc(tmparr, this%dims)
     
     dimindex = size(this%dims)
     this%dims(dimindex) = dim_type(name=name, len=len, ncid=-1)
@@ -122,10 +122,10 @@ contains
     type(var_type), allocatable :: tmparr(:)
     
     ! assume the vars array is allocated
-      allocate( tmparr(size(this%vars)+1) )
-      tmparr(1:size(this%vars)) = this%vars
-      deallocate(this%vars)
-      call move_alloc(tmparr, this%vars)
+    allocate( tmparr(size(this%vars)+1) )
+    tmparr(1:size(this%vars)) = this%vars
+    deallocate(this%vars)
+    call move_alloc(tmparr, this%vars)
     
     varindex = size(this%vars)
     this%vars(varindex) = var_type(name, dim_indices, netcdf_datatype, ncid=-1)
@@ -209,6 +209,41 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  subroutine open_create(this, filepath)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    ! EO parameters
+    include "netcdf.inc"
+    integer cmode
+    integer i, ii
+    integer var_ndims
+    integer, allocatable :: var_dimids(:)
+
+    this%filepath = filepath
+
+    cmode = ior(nf_noclobber, ior(nf_netcdf4, nf_classic_model))
+    call assert_nc( nf_create(filepath, cmode, this%ncid) , __LINE__)
+        
+    ! create our dims in the file
+    do i=1, size(this%dims)
+      call assert_nc( nf_def_dim(this%ncid, this%dims(i)%name, this%dims(i)%len, this%dims(i)%ncid) , __LINE__)
+    end do
+
+    ! create our vars in the file
+    do i=1, size(this%vars)
+      var_ndims = size(this%vars(i)%dim_indices)
+      if(allocated(var_dimids)) deallocate(var_dimids)
+      allocate(var_dimids(var_ndims))
+      do ii=1, var_ndims
+        var_dimids(ii) = this%dims( this%vars(i)%dim_indices(ii) )%ncid
+      end do
+      call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%dims(i)%ncid) , __LINE__)
+    end do
+
+    call assert_nc( nf_enddef(this%ncid), __LINE__ )
   end subroutine
 
 
