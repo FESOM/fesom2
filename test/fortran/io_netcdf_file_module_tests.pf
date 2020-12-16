@@ -271,4 +271,84 @@ contains
     if(exitstat .ne. 0) stop 1
   end subroutine
 
+
+  @test
+  subroutine test_can_append_to_existing_file_real4()
+    type(fesom_file_type) f
+    real(4), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real4.nc"
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_write_append(filepath)
+    
+    allocate(values(5))
+    values(1) = 100.001
+    values(2) = 100.002
+    values(3) = 100.003
+    values(4) = 100.004
+    values(5) = 100.005
+
+    ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(varindex, [1,3], [5,1], values)
+    
+    call f%close_file()
+    ! todo: actually test if the file has bee written correctly
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_append_to_existing_file_real8()
+    type(fesom_file_type) f
+    real(8), allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real8.nc"
+
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_write_append(filepath)
+    
+    allocate(values(5))
+    values(1) = 100.001_8
+    values(2) = 100.002_8
+    values(3) = 100.003_8
+    values(4) = 100.004_8
+    values(5) = 100.005_8
+
+    ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(varindex, [1,3], [5,1], values)
+    
+    call f%close_file()
+    ! todo: actually test if the file has bee written correctly
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
 end module

@@ -12,9 +12,10 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_create
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_create, open_write_append
     generic, public :: read_var => read_var_r4, read_var_r8
-    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x
+    generic, public :: write_var => write_var_r4, write_var_r8
+    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8
   end type
   
   
@@ -244,6 +245,62 @@ contains
     end do
 
     call assert_nc( nf_enddef(this%ncid), __LINE__ )
+  end subroutine
+
+
+  ! open an existing file and prepare to write data to it
+  subroutine open_write_append(this, filepath)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    ! EO parameters
+    include "netcdf.inc"
+    integer cmode
+
+    this%filepath = filepath
+
+    cmode = nf_write
+    call assert_nc( nf_open(filepath, cmode, this%ncid) , __LINE__)
+
+    ! make sure that all our dims and vars exist in this file and get hold of them
+    call this%attach_dims_vars_to_file()
+  end subroutine
+
+
+  subroutine write_var_r8(this, varindex, starts, sizes, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
+    class(fesom_file_type), intent(in) :: this
+    integer, intent(in) :: varindex
+    integer, dimension(:) :: starts, sizes
+    real(8), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO parameters
+    real(8), pointer :: values_ptr(:)
+
+    call assert(size(sizes) == size(starts), __LINE__)
+    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_put_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  subroutine write_var_r4(this, varindex, starts, sizes, values)
+    use io_netcdf_nf_interface
+    use, intrinsic :: ISO_C_BINDING
+    class(fesom_file_type), intent(in) :: this
+    integer, intent(in) :: varindex
+    integer, dimension(:) :: starts, sizes
+    real(4), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO parameters
+    real(4), pointer :: values_ptr(:)
+
+    call assert(size(sizes) == size(starts), __LINE__)
+    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_put_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
