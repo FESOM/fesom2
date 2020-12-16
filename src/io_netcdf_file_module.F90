@@ -12,9 +12,9 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var, add_var_att, open_read, close_file
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file
     generic, public :: read_var => read_var_r4, read_var_r8
-    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file
+    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x
   end type
   
   
@@ -29,6 +29,7 @@ module io_netcdf_file_module
   type var_type ! todo: use variable type from io_netcdf_module here
     character(:), allocatable :: name
     integer, allocatable :: dim_indices(:)
+    integer datatype
     type(att_type), allocatable :: atts(:)
     
     integer ncid
@@ -86,12 +87,39 @@ contains
   
 
   ! the sizes of the dims define the global shape of the var
-  function add_var(this, name, dim_indices) result(varindex)
+  function add_var_double(this, name, dim_indices) result(varindex)
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
     integer varindex
     ! EO parameters
+    include "netcdf.inc"
+    
+    varindex = this%add_var_x(name, dim_indices, nf_double)
+  end function
+
+
+  ! the sizes of the dims define the global shape of the var
+  function add_var_real(this, name, dim_indices) result(varindex)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: dim_indices(:)
+    integer varindex
+    ! EO parameters
+    include "netcdf.inc"
+    
+    varindex = this%add_var_x(name, dim_indices, nf_real)
+  end function
+
+
+  function add_var_x(this, name, dim_indices, netcdf_datatype) result(varindex)
+    class(fesom_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: dim_indices(:)
+    integer netcdf_datatype
+    integer varindex
+    ! EO parameters
+    include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
     
     if( .not. allocated(this%vars)) then
@@ -104,7 +132,7 @@ contains
     end if
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name, dim_indices, ncid=-1)
+    this%vars(varindex) = var_type(name, dim_indices, netcdf_datatype, ncid=-1)
   end function
 
 
@@ -208,6 +236,7 @@ contains
     integer actual_dimcount
     integer, allocatable :: actual_dimids(:)
     integer exp_dimid, act_dimid
+    integer actual_datatype
 
     do i=1, size(this%dims)
       call assert_nc( nf_inq_dimid(this%ncid, this%dims(i)%name, this%dims(i)%ncid) , __LINE__)
@@ -216,6 +245,9 @@ contains
     end do
     do i=1, size(this%vars)
       call assert_nc( nf_inq_varid(this%ncid, this%vars(i)%name, this%vars(i)%ncid) , __LINE__)
+      ! see if this var has the expected datatype
+      call assert_nc( nf_inq_vartype(this%ncid, this%vars(i)%ncid, actual_datatype) , __LINE__)
+      call assert(this%vars(i)%datatype == actual_datatype, __LINE__)
       ! see if this var has the expected dims
       call assert_nc( nf_inq_varndims(this%ncid, this%vars(i)%ncid, actual_dimcount) , __LINE__)
       call assert(size(this%vars(i)%dim_indices) == actual_dimcount, __LINE__)

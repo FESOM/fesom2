@@ -49,7 +49,7 @@ contains
     node_dimidx = f%add_dim("node", 47)
     @assertEqual(2, node_dimidx)
 
-    salt_varid = f%add_var("salt", [1,2])
+    salt_varid = f%add_var_real("salt", [1,2])
     call f%add_var_att(salt_varid, "units", "psu")
     call f%add_var_att(salt_varid, "long_name", "salinity")
   end subroutine
@@ -96,7 +96,7 @@ contains
     time_dimidx = f%add_dim_unlimited("time")
     @assertEqual(3, time_dimidx)
 
-    salt_varid = f%add_var("salt", [nz_dimidx,node_dimidx,time_dimidx])
+    salt_varid = f%add_var_real("salt", [nz_dimidx,node_dimidx,time_dimidx])
     call f%add_var_att(salt_varid, "units", "psu")
     call f%add_var_att(salt_varid, "long_name", "salinity")
     
@@ -117,7 +117,7 @@ contains
     node_dimidx = f%add_dim("nod2", 5)
     time_dimidx = f%add_dim_unlimited("time")
 
-    sss_varindex = f%add_var("sss", [node_dimidx,time_dimidx])
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
     call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
     
     allocate(values(5))
@@ -144,7 +144,7 @@ contains
     node_dimidx = f%add_dim("nod2", 5)
     time_dimidx = f%add_dim_unlimited("time")
 
-    sss_varindex = f%add_var("sss", [node_dimidx,time_dimidx])
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
     call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
     
     allocate(values(5))
@@ -173,7 +173,7 @@ contains
     z_dimidx = f%add_dim("nz1", 3)
     time_dimidx = f%add_dim_unlimited("time")
 
-    varindex = f%add_var("salt", [z_dimidx, node_dimidx,time_dimidx])
+    varindex = f%add_var_real("salt", [z_dimidx, node_dimidx,time_dimidx])
     call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
     
     allocate(values(3,5))
@@ -209,7 +209,7 @@ contains
     z_dimidx = f%add_dim("nz1", 3)
     time_dimidx = f%add_dim_unlimited("time")
 
-    varindex = f%add_var("salt", [z_dimidx, node_dimidx,time_dimidx])
+    varindex = f%add_var_real("salt", [z_dimidx, node_dimidx,time_dimidx])
     call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
     
     allocate(values(3,5))
