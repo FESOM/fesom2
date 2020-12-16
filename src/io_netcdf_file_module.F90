@@ -12,7 +12,7 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_create, open_write_append
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_write_create, open_write_append
     generic, public :: read_var => read_var_r4, read_var_r8
     generic, public :: write_var => write_var_r4, write_var_r8
     procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8
@@ -213,7 +213,7 @@ contains
   end subroutine
 
 
-  subroutine open_create(this, filepath)
+  subroutine open_write_create(this, filepath)
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: filepath
     ! EO parameters

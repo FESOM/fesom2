@@ -239,7 +239,7 @@ contains
     call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
 
     call f%initialize()
-    call f%open_create(filepath)
+    call f%open_write_create(filepath)
     call f%close_file()
     ! todo: actually test if the file has bee written correctly
 
@@ -263,7 +263,7 @@ contains
     time_dimidx = f%add_dim_unlimited("time")
     varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
     
-    call f%open_create(filepath)
+    call f%open_write_create(filepath)
     call f%close_file()
     ! todo: actually test if the file has bee written correctly
 
