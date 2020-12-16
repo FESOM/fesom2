@@ -50,6 +50,8 @@ contains
     class(fesom_file_type), intent(inout) :: this
     
     this%filepath = ""
+    allocate(this%dims(0))
+    allocate(this%vars(0))
   end subroutine
 
   
@@ -72,14 +74,11 @@ contains
     ! EO parameters
     type(dim_type), allocatable :: tmparr(:)
     
-    if( .not. allocated(this%dims)) then
-      allocate(this%dims(1))
-    else
+    ! assume the dims array is allocated
       allocate( tmparr(size(this%dims)+1) )
       tmparr(1:size(this%dims)) = this%dims
       deallocate(this%dims)
       call move_alloc(tmparr, this%dims)
-    end if
     
     dimindex = size(this%dims)
     this%dims(dimindex) = dim_type(name=name, len=len, ncid=-1)
@@ -122,14 +121,11 @@ contains
     include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
     
-    if( .not. allocated(this%vars)) then
-      allocate(this%vars(1))
-    else
+    ! assume the vars array is allocated
       allocate( tmparr(size(this%vars)+1) )
       tmparr(1:size(this%vars)) = this%vars
       deallocate(this%vars)
       call move_alloc(tmparr, this%vars)
-    end if
     
     varindex = size(this%vars)
     this%vars(varindex) = var_type(name, dim_indices, netcdf_datatype, ncid=-1)

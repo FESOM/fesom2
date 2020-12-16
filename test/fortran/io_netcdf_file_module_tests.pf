@@ -56,15 +56,11 @@ contains
 
 
   @test
-  subroutine test_can_open_file_in_readmode()
+  subroutine test_can_open_file_in_readmode_without_expecting_dims_and_vars()
     type(fesom_file_type) f
-    integer z_dimidx
 
     call f%initialize()
-    z_dimidx = f%add_dim("nz1", 3)
-
     call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
-    
     call f%close_file()
   end subroutine
 
