@@ -211,7 +211,7 @@ contains
 
 
   subroutine open_write_create(this, filepath)
-    class(fesom_file_type), intent(inout) :: this
+    class(fesom_file_type), target, intent(inout) :: this
     character(len=*), intent(in) :: filepath
     ! EO parameters
     include "netcdf.inc"
@@ -219,6 +219,8 @@ contains
     integer i, ii
     integer var_ndims
     integer, allocatable :: var_dimids(:)
+    character(:), pointer :: att_name
+    character(:), pointer :: att_text
 
     this%filepath = filepath
 
@@ -239,6 +241,12 @@ contains
         var_dimids(ii) = this%dims( this%vars(i)%dim_indices(ii) )%ncid
       end do
       call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%vars(i)%ncid) , __LINE__)
+      
+      do ii=1, size(this%vars(i)%atts)
+        att_name => this%vars(i)%atts(ii)%name
+        att_text => this%vars(i)%atts(ii)%text
+        call assert_nc( nf_put_att_text(this%ncid, this%vars(i)%ncid, att_name, len(att_text), att_text) , __LINE__)
+      end do
     end do
 
     call assert_nc( nf_enddef(this%ncid), __LINE__ )
