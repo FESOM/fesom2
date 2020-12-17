@@ -238,7 +238,7 @@ contains
       do ii=1, var_ndims
         var_dimids(ii) = this%dims( this%vars(i)%dim_indices(ii) )%ncid
       end do
-      call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%dims(i)%ncid) , __LINE__)
+      call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%vars(i)%ncid) , __LINE__)
     end do
 
     call assert_nc( nf_enddef(this%ncid), __LINE__ )
