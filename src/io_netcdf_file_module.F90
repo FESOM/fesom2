@@ -121,6 +121,7 @@ contains
     ! EO parameters
     include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
+    type(att_type) empty_atts(0)
     
     ! assume the vars array is allocated
     allocate( tmparr(size(this%vars)+1) )
@@ -129,7 +130,7 @@ contains
     call move_alloc(tmparr, this%vars)
     
     varindex = size(this%vars)
-    this%vars(varindex) = var_type(name, dim_indices, netcdf_datatype, ncid=-1)
+    this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
   end function
 
 
@@ -141,14 +142,10 @@ contains
     ! EO parameters
     type(att_type), allocatable :: tmparr(:)
     
-    if( .not. allocated(this%vars(varindex)%atts)) then
-      allocate(this%vars(varindex)%atts(1))
-    else
-      allocate( tmparr(size(this%vars(varindex)%atts)+1) )
-      tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
-      deallocate(this%vars(varindex)%atts)
-      call move_alloc(tmparr, this%vars(varindex)%atts)
-    end if
+    allocate( tmparr(size(this%vars(varindex)%atts)+1) )
+    tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
+    deallocate(this%vars(varindex)%atts)
+    call move_alloc(tmparr, this%vars(varindex)%atts)
     
     this%vars(varindex)%atts( size(this%vars(varindex)%atts) ) = att_type(name=att_name, text=att_text)
   end subroutine
