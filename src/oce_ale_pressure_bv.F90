@@ -367,13 +367,11 @@ subroutine pressure_force_4_linfs(mesh)
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
         call pressure_force_4_linfs_fullcell(mesh)
-        !if     (trim(which_pgf)=='fullcell_test') then
-        !    call pressure_force_4_linfs_fullcell_test
-        !else
-        !    call pressure_force_4_linfs_fullcell
-        !end if   
+        
     elseif (use_cavity .and. use_cavity_partial_cell ) then
-        call pressure_force_4_linfs_cavity(mesh)    
+        !!PS call pressure_force_4_linfs_cavity(mesh)  
+        call pressure_force_4_linfs_shchepetkin(mesh)
+        
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
@@ -717,22 +715,21 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         
         !_______________________________________________________________________
         ! calculate pressure gradient for surface layer
-        int_dp_dx     = 0.0_WP
         nlz=ule
         if (ule==1) then 
             !___________________________________________________________________
             ! zonal gradients
             drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
             aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
-            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
-            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            pgf_x(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(1)    = aux_sum
                 
             !___________________________________________________________________
             ! meridional gradients
             drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
             aux_sum         = drho_dx*helem(nlz,elem)*g/density_0
-            pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
-            int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+            pgf_y(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(2)    = aux_sum
         else
             !___________________________________________________________________
             ! vertical gradient --> with average density and average 
@@ -769,16 +766,16 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
             drho_dx         = sum(gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
             dz_dx           = sum(gradient_sca(1:3,elem)*Z_3d_n(nlz,elnodes))
             aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
-            pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
-            int_dp_dx(1)    = int_dp_dx(1) + aux_sum
+            pgf_x(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(1)    = aux_sum
             
             !___________________________________________________________________
             ! meridional gradients
             drho_dx         = sum(gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
             dz_dx           = sum(gradient_sca(4:6,elem)*Z_3d_n(nlz,elnodes))
             aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
-            pgf_y(nlz,elem) = int_dp_dx(2) +aux_sum*0.5_WP
-            int_dp_dx(2)    = int_dp_dx(2) +aux_sum
+            pgf_y(nlz,elem) = aux_sum*0.5_WP
+            int_dp_dx(2)    = aux_sum
         end if 
         
         !_______________________________________________________________________
@@ -824,7 +821,7 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         ! f2' = a1 + a2*(x2-x1) + a2*(x2-x0)
         ! f2' = (f1-f0)/(x1-x0) + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x0)*(x1-x0))
         !       + ((x1-x0)*(f2-f1)-(x2-x1)*(f1-f0))/((x2-x1)*(x1-x0)) + 
-
+        
         !!PS dx10            = (sum(Z_3d_n(nlz-1,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
         !!PS dx21            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-1,elnodes))/3.0_WP)
         !!PS dx20            = (sum(Z_3d_n(nlz  ,elnodes))/3.0_WP-sum(Z_3d_n(nlz-2,elnodes))/3.0_WP)
@@ -832,7 +829,7 @@ subroutine pressure_force_4_linfs_shchepetkin(mesh)
         !!PS df21            = (sum(density_m_rho0(nlz  ,elnodes))/3.0_WP-sum(density_m_rho0(nlz-1,elnodes))/3.0_WP)
         !!PS drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx10) + (dx10*df21-dx21*df10)/(dx21*dx10)
         !--> method below a seemed to be a bit more stable/less noisy than method above
-
+        
         dx10         = Z_3d_n(nlz-1,elnodes)-Z_3d_n(nlz-2,elnodes)
         dx21         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-1,elnodes)
         dx20         = Z_3d_n(nlz  ,elnodes)-Z_3d_n(nlz-2,elnodes)
@@ -1630,7 +1627,6 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         !!PS aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
         aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0               
         pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
-        int_dp_dx(1)    = int_dp_dx(1) + aux_sum
         
         !_______________________________________________________________________
         ! meridional gradients
@@ -1639,7 +1635,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
         !!PS aux_sum         = (drho_dx-drho_dz*dz_dx)*helem(nlz,elem)*g/density_0
         aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*helem(nlz,elem)*g/density_0             
         pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
-        int_dp_dx(2)    = int_dp_dx(2) + aux_sum
+        
     end do ! --> do elem=1, myDim_elem2D
 end subroutine pressure_force_4_zxxxx_shchepetkin
 !

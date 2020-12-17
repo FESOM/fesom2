@@ -81,8 +81,10 @@ module g_config
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
-  logical                       :: flag_debug=.false.
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, use_cavity_partial_cell, toy_ocean, which_toy, flag_debug
+  logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
+  logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
+                        use_cavity_partial_cell, toy_ocean, which_toy, flag_debug, flag_warn_cflz
   
   ! *** others ***
   real(kind=WP)                 :: dt

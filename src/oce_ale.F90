@@ -143,14 +143,16 @@ subroutine init_ale(mesh)
     ! of partial cell bootom layer
     zbar_n_bot = 0.0
     zbar_e_bot = 0.0
-    call init_bottom_elem_thickness(mesh)
     call init_bottom_node_thickness(mesh)
+    call init_bottom_elem_thickness(mesh)
+    
     
     ! compute depth of partial cell ocean-cavity interface
     zbar_n_srf = zbar(1)
     zbar_e_srf = zbar(1)
-    call init_surface_elem_depth(mesh)
     call init_surface_node_depth(mesh)
+    call init_surface_elem_depth(mesh)
+    
     
     !___________________________________________________________________________
     ! initialise 3d field of depth levels and mid-depth levels
@@ -380,6 +382,7 @@ subroutine init_bottom_node_thickness(mesh)
             bottom_node_thickness(node)=zbar(nln-1)-zbar_n_bot(node)
             
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+        
     !___________________________________________________________________________
     ! use full bottom cells
     else
@@ -434,7 +437,7 @@ subroutine init_surface_elem_depth(mesh)
                 else
                     zbar_e_srf(elem) = min(Z(ule-1),dd)
                 end if
-                
+!!PS                 zbar_e_srf(elem) = sum(zbar_n_srf(elnodes))/3.0_WP
             else
                 zbar_e_srf(elem) = zbar(ule)
                 
@@ -482,7 +485,6 @@ subroutine init_surface_node_depth(mesh)
                 else
                     zbar_n_srf(node) = min(Z(uln-1),dd)
                 end if        
-                
             else
                 zbar_n_srf(node) = zbar(uln)
                 
@@ -701,12 +703,15 @@ subroutine init_thickness_ale(mesh)
             ! interpolated ssh variation at element elem
             if (nzmin==1) then 
                 dhe(elem)=sum(hbar(elnodes))/3.0_WP
+                helem(nzmin,elem)=sum(hnode(nzmin,elnodes))/3.0_WP
             else
                 dhe = 0.0_WP
+                helem(nzmin,elem)=zbar_e_srf(elem)-zbar(nzmin+1)
             end if 
             
             !!PS do nz=1,nlevels(elem)-2
-            do nz=nzmin,nzmax-1
+            !!PS do nz=nzmin,nzmax-1
+            do nz=nzmin+1,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
             
@@ -1453,16 +1458,6 @@ subroutine compute_ssh_rhs_ale(mesh)
         do nz=nzmin, nzmax
             c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
                          (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
-            if (c1/=c1) then
-                write(*,*) 'mype  = ',mype
-                write(*,*) 'el(1) = ',el(1)
-                write(*,*) 'nz,nzmin,nzmax     = ',nz,nzmin,nzmax
-                write(*,*) 'c1    = ',c1
-                write(*,*) 'alpha = ',alpha
-                write(*,*) 'UV(:,nz,el(1))     = ',UV(:,nz,el(1))
-                write(*,*) 'UV_rhs(:,nz,el(1)) = ',UV_rhs(:,nz,el(1))
-                write(*,*) 'helem(nz,el(1))    = ',helem(nz,el(1))
-            end if  
         end do
         
         !_______________________________________________________________________
@@ -1480,17 +1475,6 @@ subroutine compute_ssh_rhs_ale(mesh)
             do nz=nzmin, nzmax
                 c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
                              (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
-                             
-                if (c2/=c2) then
-                    write(*,*) 'mype  = ',mype
-                    write(*,*) 'el(2) = ',el(2)
-                    write(*,*) 'nz,nzmin,nzmax     = ',nz,nzmin,nzmax
-                    write(*,*) 'c2    = ',c2
-                    write(*,*) 'alpha = ',alpha
-                    write(*,*) 'UV(:,nz,el(2))     = ',UV(:,nz,el(2))
-                    write(*,*) 'UV_rhs(:,nz,el(2)) = ',UV_rhs(:,nz,el(2))
-                    write(*,*) 'helem(nz,el(2))    = ',helem(nz,el(2))
-                end if 
             end do
         end if
         
@@ -1651,7 +1635,7 @@ end subroutine compute_hbar_ale
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
 subroutine vert_vel_ale(mesh)
-    use g_config,only: dt, which_ALE,min_hnode,lzstar_lev
+    use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
     use O_MESH
     use o_ARRAYS
@@ -2037,6 +2021,7 @@ subroutine vert_vel_ale(mesh)
                 end do
             
             endif ! --> if (nzmin==1) then 
+            
             !___________________________________________________________________
             ! Add surface fresh water flux as upper boundary condition for 
             ! continutity
@@ -2113,7 +2098,7 @@ subroutine vert_vel_ale(mesh)
         end do
     end do
     cflmax=maxval(CFL_z(:, 1:myDim_nod2D)) !local CFL maximum is different on each mype
-    if (cflmax>1.0_WP) then
+    if (cflmax>1.0_WP .and. flag_warn_cflz) then
         do n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D(n)-1
