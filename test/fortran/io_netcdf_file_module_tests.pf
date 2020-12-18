@@ -241,7 +241,7 @@ contains
     call f%initialize()
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has bee written correctly
+    ! todo: actually test if the file has been written correctly
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -265,7 +265,7 @@ contains
     
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has bee written correctly
+    ! todo: actually test if the file has been written correctly
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -291,7 +291,7 @@ contains
     
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has bee written correctly
+    ! todo: actually test if the file has been written correctly
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -331,7 +331,7 @@ contains
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
-    ! todo: actually test if the file has bee written correctly
+    ! todo: actually test if the file has been written correctly
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -371,7 +371,7 @@ contains
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
-    ! todo: actually test if the file has bee written correctly
+    ! todo: actually test if the file has been written correctly
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
