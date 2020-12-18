@@ -256,6 +256,29 @@ contains
 
 
   @test
+  subroutine test_can_read_variable_with_less_dims_than_in_file()
+    type(netcdf_file_type) f
+    real(8) value
+    
+    integer node_dimidx, time_dimidx, unused_dimidx
+    integer varindex
+    call f%initialize()
+    ! 2 dims in file
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    ! read var with 1 dim
+    varindex = f%add_var_double("time", [time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var(varindex, [1], [1], value)
+    @assertEqual(10800.0_8, value, tolerance=1.e-6)  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
   subroutine test_can_create_empty_file()
     type(netcdf_file_type) f
     integer exitstat
@@ -279,7 +302,7 @@ contains
   subroutine test_can_create_file_with_dims_and_vars()
     type(netcdf_file_type) f
     integer z_dimidx, time_dimidx
-    integer varindex
+    integer varindex, time_varindex
     integer exitstat
     character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_dims_and_vars.nc"
 
@@ -288,6 +311,7 @@ contains
     call f%initialize()
     z_dimidx = f%add_dim("nz1", 3)
     time_dimidx = f%add_dim_unlimited("time")
+    time_varindex = f%add_var_double("time", [time_dimidx])
     varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
     
     call f%open_write_create(filepath)
@@ -296,6 +320,7 @@ contains
     ! test if the file has been written correctly
     @assertTrue( is_in_file_header(filepath, 'nz1 = 3 ;') )
     @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED') )
+    @assertTrue( is_in_file_header(filepath, 'double time(time) ;') )
     @assertTrue( is_in_file_header(filepath, 'float salt(time, nz1) ;') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
@@ -338,7 +363,7 @@ contains
     real(4), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
-    integer varindex
+    integer varindex, time_varindex
     integer exitstat
     character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real4.nc"
 
@@ -351,6 +376,7 @@ contains
     call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
 
+    time_varindex = f%add_var_double("time", [time_dimidx])
     varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
     call f%open_write_append(filepath)
     
@@ -362,6 +388,7 @@ contains
     values(5) = 100.005
 
     ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(time_varindex, [3], [1], [32400.0_8])
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
@@ -369,6 +396,7 @@ contains
     ! test if the file has been written correctly
     @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
     ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '32400') )
     @assertTrue( is_in_file(filepath, '100.00') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
@@ -382,7 +410,7 @@ contains
     real(8), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
-    integer varindex
+    integer varindex, time_varindex
     integer exitstat
     character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_append_to_existing_file_real8.nc"
 
@@ -395,6 +423,7 @@ contains
     call execute_command_line("cp fixtures/io_netcdf/columnwise_2d_sss.nc "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
 
+    time_varindex = f%add_var_double("time", [time_dimidx])
     varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
     call f%open_write_append(filepath)
     
@@ -406,6 +435,7 @@ contains
     values(5) = 100.005_8
 
     ! the file has 2 timesteps, we append a 3rd one
+    call f%write_var(time_varindex, [3], [1], [32400.0_8])
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
@@ -413,6 +443,7 @@ contains
     ! test if the file has been written correctly
     @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
     ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '32400') )
     @assertTrue( is_in_file(filepath, '100.00') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)

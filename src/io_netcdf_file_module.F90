@@ -181,7 +181,7 @@ contains
     real(8), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
-    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(size(starts) == size(this%vars(varindex)%dim_indices), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
@@ -201,7 +201,7 @@ contains
     real(4), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
-    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(size(starts) == size(this%vars(varindex)%dim_indices), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
@@ -279,7 +279,7 @@ contains
     real(8), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
-    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(size(starts) == size(this%vars(varindex)%dim_indices), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
@@ -298,7 +298,7 @@ contains
     real(4), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
-    call assert(size(starts) == size(this%dims), __LINE__)
+    call assert(size(starts) == size(this%vars(varindex)%dim_indices), __LINE__)
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
@@ -341,6 +341,7 @@ contains
       ! see if this var has the expected dims
       call assert_nc( nf_inq_varndims(this%ncid, this%vars(i)%ncid, actual_dimcount) , __LINE__)
       call assert(size(this%vars(i)%dim_indices) == actual_dimcount, __LINE__)
+      if(allocated(actual_dimids)) deallocate(actual_dimids)
       allocate(actual_dimids(actual_dimcount))
       call assert_nc( nf_inq_vardimid(this%ncid, this%vars(i)%ncid, actual_dimids) , __LINE__)
       do ii=1, actual_dimcount
