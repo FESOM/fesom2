@@ -66,7 +66,6 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
   real(kind=WP), allocatable, dimension(:)         :: oce_net_fluxes_north, oce_net_fluxes_south
   real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
-  real(kind=WP), allocatable, dimension(:)         :: calving
 #endif
   
   real(kind=WP), allocatable, dimension(:)         :: runoff_landice

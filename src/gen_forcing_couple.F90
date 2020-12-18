@@ -186,9 +186,9 @@ subroutine update_atm_forcing(istep, mesh)
              end if
          elseif (i.eq.13) then
              if (action) then
-	     calving(:)            =  exchange(:)        ! calving
+	     enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
     	     mask=1.
-	     call force_flux_consv(calving, mask, i, 0,action, mesh)
+	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
              end if
 	 end if  	  
 #ifdef VERBOSE

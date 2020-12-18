@@ -31,7 +31,7 @@ subroutine thermodynamics(mesh)
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
-       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, S_oc_array, T_oc_array
+       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
 
   !---- variables from gen_modules_config.F90
   use g_config,         only: dt
@@ -39,7 +39,7 @@ subroutine thermodynamics(mesh)
   !---- variables from gen_modules_forcing.F90
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
-       , calving
+       , enthalpyoffuse
 
   !---- variables from gen_modules_rotate_grid.F90
   use g_rotate_grid,    only: r2g
@@ -66,7 +66,7 @@ subroutine thermodynamics(mesh)
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- precipitation and runoff (provided by ECHAM)
-  real(kind=WP)  :: rain, snow, runo, calv
+  real(kind=WP)  :: rain, snow, runo
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  :: T_oc, S_oc, ustar
   !---- local variables (set in this subroutine)
@@ -100,14 +100,17 @@ subroutine thermodynamics(mesh)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
+#if defined (__oifs)
+     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+#else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+#endif
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)
      rain    = prec_rain(inod)
      snow    = prec_snow(inod)
      runo    = runoff(inod)     
-     calv    = calving(inod)     
 
      ustar   = sqrt(Cd_oce_ice)*sqrt((u_ice(inod)-u_w(inod))**2+(v_ice(inod)-v_w(inod))**2)
      T_oc    = T_oc_array(inod)      
@@ -175,7 +178,7 @@ contains
     implicit none
 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
-    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow, dhcalv
+    real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
 
     !---- heat fluxes (positive upward, negative downward)
     real(kind=WP)  :: Qatmice, Qatmocn, Qocnice, Qocnatm, Qicecon
@@ -311,17 +314,8 @@ contains
     !---- ice growth rate over open water (dhiow >= 0)
     dhiow = (1._WP-A)*max(Qatmocn-Qocnatm,0._WP)
 
-#if defined (__oifs)
-    !---- ice growth rate through calving
-    dhcalv = (calv*1E7*dt)/A
-
-    !---- temporary new ice thickness [m]
-    htmp = h + dhice + dhiow +dhcalv
-#else
     !---- temporary new ice thickness [m]
     htmp = h + dhice + dhiow
-#endif /* (__oifs) */
-
 
     if (htmp.lt.0._WP) then
        !---- all ice melts; now try to melt snow if still present,
