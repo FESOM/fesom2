@@ -13,10 +13,11 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_att, open_read, close_file, open_write_create, open_write_append
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, open_read, close_file, open_write_create, open_write_append
     generic, public :: read_var => read_var_r4, read_var_r8
     generic, public :: write_var => write_var_r4, write_var_r8
-    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8
+    generic, public :: add_var_att => add_var_att_text
+    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, add_var_att_text
   end type
   
   
@@ -32,12 +33,16 @@ module io_netcdf_file_module
     character(:), allocatable :: name
     integer, allocatable :: dim_indices(:)
     integer datatype
-    type(att_type), allocatable :: atts(:)
+    type(att_type_wrapper), allocatable :: atts(:)
     
     integer ncid
   end type
-  
-  
+
+
+  type att_type_wrapper ! work around Fortran not being able to have polymorphic types in the same array
+    class(att_type), allocatable :: it
+  end type
+ 
 contains
 
 
@@ -115,7 +120,7 @@ contains
     ! EO parameters
     include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
-    type(att_type) empty_atts(0)
+    type(att_type_wrapper) empty_atts(0)
     
     ! assume the vars array is allocated
     allocate( tmparr(size(this%vars)+1) )
@@ -128,20 +133,20 @@ contains
   end function
 
 
-  subroutine add_var_att(this, varindex, att_name, att_text)
+  subroutine add_var_att_text(this, varindex, att_name, att_text)
     class(netcdf_file_type), intent(inout) :: this
     integer, intent(in) :: varindex
     character(len=*), intent(in) :: att_name
     character(len=*), intent(in) :: att_text
     ! EO parameters
-    type(att_type), allocatable :: tmparr(:)
+    type(att_type_wrapper), allocatable :: tmparr(:)
     
     allocate( tmparr(size(this%vars(varindex)%atts)+1) )
     tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
     deallocate(this%vars(varindex)%atts)
     call move_alloc(tmparr, this%vars(varindex)%atts)
     
-    this%vars(varindex)%atts( size(this%vars(varindex)%atts) ) = att_type(name=att_name, text=att_text)
+    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_text(name=att_name, text=att_text)
   end subroutine
 
 
@@ -237,9 +242,7 @@ contains
       call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%vars(i)%ncid) , __LINE__)
       
       do ii=1, size(this%vars(i)%atts)
-        att_name => this%vars(i)%atts(ii)%name
-        att_text => this%vars(i)%atts(ii)%text
-        call assert_nc( nf_put_att_text(this%ncid, this%vars(i)%ncid, att_name, len(att_text), att_text) , __LINE__)
+        call this%vars(i)%atts(ii)%it%define_in_var(this%ncid, this%vars(i)%ncid)
       end do
     end do
 
