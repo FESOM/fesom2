@@ -334,7 +334,7 @@ contains
     integer z_dimidx, time_dimidx
     integer varindex
     integer exitstat
-    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_attributes.nc"
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_text_attributes.nc"
     
     call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
 
@@ -351,6 +351,33 @@ contains
     ! test if the file has been written correctly   
     @assertTrue( is_in_file_header(filepath, 'salt:units = "psu"') )
     @assertTrue( is_in_file_header(filepath, 'salt:long_name = "sea surface salinity"') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_and_var_int_attributes()
+    type(netcdf_file_type) f
+    integer z_dimidx, time_dimidx
+    integer varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_int_attributes.nc"
+    
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    z_dimidx = f%add_dim("nz1", 3)
+    time_dimidx = f%add_dim_unlimited("time")
+    varindex = f%add_var_real("salt", [z_dimidx, time_dimidx])
+    call f%add_var_att(varindex, "number", 42)
+    
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly   
+    @assertTrue( is_in_file_header(filepath, 'salt:number = 42 ;') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1

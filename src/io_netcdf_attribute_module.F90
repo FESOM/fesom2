@@ -1,6 +1,6 @@
 module io_netcdf_attribute_module
   implicit none
-  public att_type, att_type_text
+  public att_type, att_type_text, att_type_int
   private
   
   
@@ -28,6 +28,13 @@ module io_netcdf_attribute_module
   end type
 
 
+  type, extends(att_type) :: att_type_int
+    integer :: val
+  contains
+    procedure :: define_in_var => define_in_var_int
+  end type
+
+
 contains
 
 
@@ -39,6 +46,17 @@ contains
     include "netcdf.inc"
 
     call assert_nc( nf_put_att_text(fileid, varid, this%name, len(this%text), this%text) , __LINE__)
+  end subroutine
+
+
+  subroutine define_in_var_int(this, fileid, varid)
+    class(att_type_int), intent(inout) :: this
+    integer, intent(in) :: fileid
+    integer, intent(in) :: varid
+    ! EO parameters
+    include "netcdf.inc"
+
+    call assert_nc( nf_put_att_int(fileid, varid, this%name, nf_int, 1, this%val) , __LINE__)
   end subroutine
 
 

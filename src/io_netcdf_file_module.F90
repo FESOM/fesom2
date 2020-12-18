@@ -16,8 +16,8 @@ module io_netcdf_file_module
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, open_read, close_file, open_write_create, open_write_append
     generic, public :: read_var => read_var_r4, read_var_r8
     generic, public :: write_var => write_var_r4, write_var_r8
-    generic, public :: add_var_att => add_var_att_text
-    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, add_var_att_text
+    generic, public :: add_var_att => add_var_att_text, add_var_att_int
+    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, add_var_att_text, add_var_att_int
   end type
   
   
@@ -147,6 +147,23 @@ contains
     call move_alloc(tmparr, this%vars(varindex)%atts)
     
     this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_text(name=att_name, text=att_text)
+  end subroutine
+
+
+  subroutine add_var_att_int(this, varindex, att_name, att_val)
+    class(netcdf_file_type), intent(inout) :: this
+    integer, intent(in) :: varindex
+    character(len=*), intent(in) :: att_name
+    integer, intent(in) :: att_val
+    ! EO parameters
+    type(att_type_wrapper), allocatable :: tmparr(:)
+    
+    allocate( tmparr(size(this%vars(varindex)%atts)+1) )
+    tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
+    deallocate(this%vars(varindex)%atts)
+    call move_alloc(tmparr, this%vars(varindex)%atts)
+    
+    this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_int(name=att_name, val=att_val)
   end subroutine
 
 
