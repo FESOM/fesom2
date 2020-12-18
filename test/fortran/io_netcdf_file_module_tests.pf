@@ -6,6 +6,31 @@ module io_netcdf_file_module_tests
   
 contains
 
+  ! utility procedure to grep a NetCDF file for a string
+  function is_in_file_header(filepath, searchtext) result(is_in)
+    character(len=*), intent(in) :: filepath
+    character(len=*), intent(in) :: searchtext
+    logical is_in
+    ! EO parameters
+    integer exitstat
+
+    call execute_command_line("ncdump -h -p9,17 "//filepath//" | grep -q '"//searchtext//"'", exitstat=exitstat)    
+    is_in = (exitstat == 0)
+  end function
+
+
+  ! utility procedure to grep a NetCDF file for a string
+  function is_in_file(filepath, searchtext) result(is_in)
+    character(len=*), intent(in) :: filepath
+    character(len=*), intent(in) :: searchtext
+    logical is_in
+    ! EO parameters
+    integer exitstat
+
+    call execute_command_line("ncdump -p9,17 "//filepath//" | grep -q '"//searchtext//"'", exitstat=exitstat)    
+    is_in = (exitstat == 0)
+  end function
+
 
   @test
   subroutine test_can_initialize_without_filepath()
@@ -241,7 +266,9 @@ contains
     call f%initialize()
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has been written correctly
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, '}') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -265,7 +292,11 @@ contains
     
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has been written correctly
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'nz1 = 3 ;') )
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED') )
+    @assertTrue( is_in_file_header(filepath, 'float salt(time, nz1) ;') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -279,7 +310,7 @@ contains
     integer varindex
     integer exitstat
     character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_and_var_attributes.nc"
-
+    
     call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
 
     call f%initialize()
@@ -291,7 +322,10 @@ contains
     
     call f%open_write_create(filepath)
     call f%close_file()
-    ! todo: actually test if the file has been written correctly
+    
+    ! test if the file has been written correctly   
+    @assertTrue( is_in_file_header(filepath, 'salt:units = "psu"') )
+    @assertTrue( is_in_file_header(filepath, 'salt:long_name = "sea surface salinity"') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -331,7 +365,11 @@ contains
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
-    ! todo: actually test if the file has been written correctly
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
+    ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '100.00') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
@@ -371,7 +409,11 @@ contains
     call f%write_var(varindex, [1,3], [5,1], values)
     
     call f%close_file()
-    ! todo: actually test if the file has been written correctly
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, 'time = UNLIMITED ; // (3 currently)') )
+    ! todo: check if the values have been written correctly
+    @assertTrue( is_in_file(filepath, '100.00') )
 
     call execute_command_line("rm "//filepath, exitstat=exitstat)
     if(exitstat .ne. 0) stop 1
