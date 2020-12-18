@@ -1,4 +1,5 @@
 module io_netcdf_file_module
+  use io_netcdf_attribute_module
   implicit none
   public fesom_file_type
   private
@@ -37,13 +38,6 @@ module io_netcdf_file_module
   end type
   
   
-  type att_type
-    character(:), allocatable :: name
-    character(:), allocatable :: text
-    ! todo: make this work for other data types like int
-  end type
-
-
 contains
 
 
