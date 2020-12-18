@@ -1,11 +1,11 @@
 module io_netcdf_file_module
   use io_netcdf_attribute_module
   implicit none
-  public fesom_file_type
+  public netcdf_file_type
   private
 
 
-  type fesom_file_type
+  type netcdf_file_type
     private
     type(dim_type), allocatable :: dims(:)
     type(var_type), allocatable :: vars(:)
@@ -42,7 +42,7 @@ contains
 
 
   subroutine initialize(this)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     
     this%filepath = ""
     allocate(this%dims(0))
@@ -51,7 +51,7 @@ contains
 
   
   function add_dim_unlimited(this, name) result(dimindex)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer dimindex
     ! EO parameters
@@ -62,7 +62,7 @@ contains
 
 
   function add_dim(this, name, len) result(dimindex)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: len
     integer dimindex
@@ -82,7 +82,7 @@ contains
 
   ! the sizes of the dims define the global shape of the var
   function add_var_double(this, name, dim_indices) result(varindex)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
     integer varindex
@@ -95,7 +95,7 @@ contains
 
   ! the sizes of the dims define the global shape of the var
   function add_var_real(this, name, dim_indices) result(varindex)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
     integer varindex
@@ -107,7 +107,7 @@ contains
 
 
   function add_var_x(this, name, dim_indices, netcdf_datatype) result(varindex)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
     integer netcdf_datatype
@@ -129,7 +129,7 @@ contains
 
 
   subroutine add_var_att(this, varindex, att_name, att_text)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     integer, intent(in) :: varindex
     character(len=*), intent(in) :: att_name
     character(len=*), intent(in) :: att_text
@@ -146,7 +146,7 @@ contains
 
 
   subroutine open_read(this, filepath)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: filepath
     ! EO parameters
     include "netcdf.inc"
@@ -168,7 +168,7 @@ contains
   subroutine read_var_r8(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
-    class(fesom_file_type), intent(in) :: this
+    class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
@@ -188,7 +188,7 @@ contains
   subroutine read_var_r4(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
-    class(fesom_file_type), intent(in) :: this
+    class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
@@ -205,7 +205,7 @@ contains
 
 
   subroutine open_write_create(this, filepath)
-    class(fesom_file_type), target, intent(inout) :: this
+    class(netcdf_file_type), target, intent(inout) :: this
     character(len=*), intent(in) :: filepath
     ! EO parameters
     include "netcdf.inc"
@@ -249,7 +249,7 @@ contains
 
   ! open an existing file and prepare to write data to it
   subroutine open_write_append(this, filepath)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     character(len=*), intent(in) :: filepath
     ! EO parameters
     include "netcdf.inc"
@@ -268,7 +268,7 @@ contains
   subroutine write_var_r8(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
-    class(fesom_file_type), intent(in) :: this
+    class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(8), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
@@ -287,7 +287,7 @@ contains
   subroutine write_var_r4(this, varindex, starts, sizes, values)
     use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
-    class(fesom_file_type), intent(in) :: this
+    class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(4), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
@@ -305,7 +305,7 @@ contains
 
   subroutine close_file(this)
     ! do not implicitly close the file (e.g. upon deallocation via destructor), as we might have a copy of this object with access to the same ncid
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     ! EO parameters
     include "netcdf.inc"
     call assert_nc( nf_close(this%ncid) , __LINE__)
@@ -315,7 +315,7 @@ contains
   ! connect our dims and vars to their counterparts in the NetCDF file, bail out if they do not match
   ! ignore any additional dims and vars the file might contain
   subroutine attach_dims_vars_to_file(this)
-    class(fesom_file_type), intent(inout) :: this
+    class(netcdf_file_type), intent(inout) :: this
     ! EO parameters
     include "netcdf.inc"
     integer i, ii

@@ -9,7 +9,7 @@ contains
 
   @test
   subroutine test_can_initialize_without_filepath()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     
     call f%initialize()
   end subroutine
@@ -17,7 +17,7 @@ contains
 
   @test
   subroutine test_can_add_dims()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer nz_dimidx, node_dimidx
 
     call f%initialize()
@@ -30,7 +30,7 @@ contains
 
   @test
   subroutine test_can_add_unlimited_dim()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer dimidx
 
     call f%initialize()
@@ -41,7 +41,7 @@ contains
 
   @test
   subroutine test_can_add_vars()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer nz_dimidx, node_dimidx
     integer salt_varid
 
@@ -59,7 +59,7 @@ contains
 
   @test
   subroutine test_can_open_file_in_readmode_without_expecting_dims_and_vars()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
 
     call f%initialize()
     call f%open_read("fixtures/io_netcdf/columnwise_3d_salt.nc")
@@ -69,7 +69,7 @@ contains
 
   @test
   subroutine test_can_open_file_with_unlimited_dim()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer dimidx
 
     call f%initialize()
@@ -83,7 +83,7 @@ contains
 
   @test
   subroutine test_can_open_file_with_variable()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer nz_dimidx, node_dimidx, time_dimidx
     integer salt_varid
     call f%initialize()
@@ -106,7 +106,7 @@ contains
 
   @test
   subroutine test_can_read_2d_variable_real4()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(4), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
@@ -133,7 +133,7 @@ contains
 
   @test
   subroutine test_can_read_2d_variable_real8()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(8), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
@@ -160,7 +160,7 @@ contains
 
   @test
   subroutine test_can_read_3d_variable_real4()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(4), allocatable :: values(:,:)
     
     integer node_dimidx, time_dimidx, z_dimidx
@@ -196,7 +196,7 @@ contains
 
   @test
   subroutine test_can_read_3d_variable_real8()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(8), allocatable :: values(:,:)
     
     integer node_dimidx, time_dimidx, z_dimidx
@@ -232,7 +232,7 @@ contains
 
   @test
   subroutine test_can_create_empty_file()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer exitstat
     character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_empty_file.nc"
 
@@ -250,7 +250,7 @@ contains
 
   @test
   subroutine test_can_create_file_with_dims_and_vars()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer z_dimidx, time_dimidx
     integer varindex
     integer exitstat
@@ -274,7 +274,7 @@ contains
 
   @test
   subroutine test_can_create_file_and_var_text_attributes()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     integer z_dimidx, time_dimidx
     integer varindex
     integer exitstat
@@ -300,7 +300,7 @@ contains
 
   @test
   subroutine test_can_append_to_existing_file_real4()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(4), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
@@ -340,7 +340,7 @@ contains
 
   @test
   subroutine test_can_append_to_existing_file_real8()
-    type(fesom_file_type) f
+    type(netcdf_file_type) f
     real(8), allocatable :: values(:)
     
     integer node_dimidx, time_dimidx
