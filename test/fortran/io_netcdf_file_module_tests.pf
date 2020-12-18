@@ -65,7 +65,7 @@ contains
 
 
   @test
-  subroutine test_can_add_vars()
+  subroutine test_can_add_vars_with_attributes()
     type(netcdf_file_type) f
     integer nz_dimidx, node_dimidx
     integer salt_varid
@@ -79,6 +79,24 @@ contains
     salt_varid = f%add_var_real("salt", [1,2])
     call f%add_var_att(salt_varid, "units", "psu")
     call f%add_var_att(salt_varid, "long_name", "salinity")
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_global_attribute_text()
+    type(netcdf_file_type) f
+
+    call f%initialize()
+    call f%add_global_att("FESOM_model", "FESOM2")
+  end subroutine
+
+
+  @test
+  subroutine test_can_add_global_attribute_int()
+    type(netcdf_file_type) f
+
+    call f%initialize()
+    call f%add_global_att("FESOM_force_rotation", 0)
   end subroutine
 
 

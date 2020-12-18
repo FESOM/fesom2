@@ -9,6 +9,7 @@ module io_netcdf_file_module
     private
     type(dim_type), allocatable :: dims(:)
     type(var_type), allocatable :: vars(:)
+    type(att_type_wrapper), allocatable :: gatts(:)
 
     character(:), allocatable :: filepath
     integer ncid
@@ -17,7 +18,9 @@ module io_netcdf_file_module
     generic, public :: read_var => read_var_r4, read_var_r8
     generic, public :: write_var => write_var_r4, write_var_r8
     generic, public :: add_var_att => add_var_att_text, add_var_att_int
+    generic, public :: add_global_att => add_global_att_text, add_global_att_int
     procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, add_var_att_text, add_var_att_int
+    procedure, private :: add_global_att_text, add_global_att_int
   end type
   
   
@@ -52,6 +55,7 @@ contains
     this%filepath = ""
     allocate(this%dims(0))
     allocate(this%vars(0))
+    allocate(this%gatts(0))
   end subroutine
 
   
@@ -131,6 +135,38 @@ contains
     varindex = size(this%vars)
     this%vars(varindex) = var_type(name=name, dim_indices=dim_indices, datatype=netcdf_datatype, atts=empty_atts, ncid=-1)
   end function
+
+
+  subroutine add_global_att_text(this, att_name, att_text)
+    class(netcdf_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: att_name
+    character(len=*), intent(in) :: att_text
+    ! EO parameters
+    type(att_type_wrapper), allocatable :: tmparr(:)
+    
+    allocate( tmparr(size(this%gatts)+1) )
+    tmparr(1:size(this%gatts)) = this%gatts
+    deallocate(this%gatts)
+    call move_alloc(tmparr, this%gatts)
+    
+    this%gatts( size(this%gatts) )%it = att_type_text(name=att_name, text=att_text)
+  end subroutine
+
+
+  subroutine add_global_att_int(this, att_name, att_val)
+    class(netcdf_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: att_name
+    integer, intent(in) :: att_val
+    ! EO parameters
+    type(att_type_wrapper), allocatable :: tmparr(:)
+    
+    allocate( tmparr(size(this%gatts)+1) )
+    tmparr(1:size(this%gatts)) = this%gatts
+    deallocate(this%gatts)
+    call move_alloc(tmparr, this%gatts)
+    
+    this%gatts( size(this%gatts) )%it = att_type_int(name=att_name, val=att_val)
+  end subroutine
 
 
   subroutine add_var_att_text(this, varindex, att_name, att_text)
