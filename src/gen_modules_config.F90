@@ -21,17 +21,17 @@ module g_config
   namelist /timestep/ step_per_day, run_length, run_length_unit
   
   ! *** Paths for all in and out ***
-  character(100)         :: MeshPath='./mesh/'
-  character(100)         :: OpbndPath='./opbnd/'
-  character(100)         :: ClimateDataPath='./hydrography/'
-  character(100)         :: ForcingDataPath='./forcing/'
-  character(100)         :: TideForcingPath='./tide_forcing/'
-  character(100)         :: ResultPath='./result/'
+  character(4096)         :: MeshPath='./mesh/'
+  character(4096)         :: OpbndPath='./opbnd/'
+  character(4096)         :: ClimateDataPath='./hydrography/'
+  character(4096)         :: ForcingDataPath='./forcing/'
+  character(4096)         :: TideForcingPath='./tide_forcing/'
+  character(4096)         :: ResultPath='./result/'
   namelist /paths/  MeshPath, OpbndPath, ClimateDataPath, ForcingDataPath, &
        TideForcingPath, ResultPath
 
   ! *** ocean climatology data name ***
-  character(100)         :: OceClimaDataName='annual_woa01_ts.out'
+  character(4096)         :: OceClimaDataName='annual_woa01_ts.out'
   logical                :: use_prepared_init_ice=.false.  !initialize ice externally
   namelist /initialization/ OceClimaDataName, use_prepared_init_ice
 
