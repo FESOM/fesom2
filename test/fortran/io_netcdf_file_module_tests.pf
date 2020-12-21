@@ -317,6 +317,48 @@ contains
 
 
   @test
+  subroutine test_can_create_file_with_global_attributes_text()
+    type(netcdf_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_global_attributes_text.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%add_global_att("FESOM_model", "FESOM2")
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, ':FESOM_model = "FESOM2" ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
+  subroutine test_can_create_file_with_global_attributes_int()
+    type(netcdf_file_type) f
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_create_file_with_global_attributes_int.nc"
+
+    call execute_command_line("rm -f "//filepath) ! silently remove the file if it exists from an aborted previous run
+
+    call f%initialize()
+    call f%add_global_att("FESOM_force_rotation", 0)
+    call f%open_write_create(filepath)
+    call f%close_file()
+    
+    ! test if the file has been written correctly
+    @assertTrue( is_in_file_header(filepath, ':FESOM_force_rotation = 0 ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
   subroutine test_can_create_file_with_dims_and_vars()
     type(netcdf_file_type) f
     integer z_dimidx, time_dimidx

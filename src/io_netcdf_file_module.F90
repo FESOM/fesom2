@@ -283,6 +283,10 @@ contains
     do i=1, size(this%dims)
       call assert_nc( nf_def_dim(this%ncid, this%dims(i)%name, this%dims(i)%len, this%dims(i)%ncid) , __LINE__)
     end do
+    
+    do i=1, size(this%gatts)
+      call this%gatts(i)%it%define_in_var(this%ncid, nf_global)
+    end do
 
     ! create our vars in the file
     do i=1, size(this%vars)
