@@ -18,22 +18,24 @@ jobs:
     steps:
     # NK: this changes working directory to fesom2
     - uses: actions/checkout@v2
-    
-    - name: Compile model
+    - name: ls 
       run: |
-        bash -l configure.sh ubuntu
-    - name: Create test run
-      run: |
-        mkrun pi test_pi -m docker
-    - name: FESOM2 test run
-      run: |    
-        cd work_pi
-        chmod +x job_docker_new
-        ./job_docker_new
-    - name: Check results
-      run: |
-        cd work_pi
-        fcheck .
+        ls /fesom/fesom2/test/meshes/pi/dist_2/
+    # - name: Compile model
+    #   run: |
+    #     bash -l configure.sh ubuntu
+    # - name: Create test run
+    #   run: |
+    #     mkrun pi test_pi -m docker
+    # - name: FESOM2 test run
+    #   run: |    
+    #     cd work_pi
+    #     chmod +x job_docker_new
+    #     ./job_docker_new
+    # - name: Check results
+    #   run: |
+    #     cd work_pi
+    #     fcheck .
         
     
 
