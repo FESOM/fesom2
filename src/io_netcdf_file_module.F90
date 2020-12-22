@@ -224,13 +224,13 @@ contains
   ! this way we can retrieve e.g. data from a 3D variable to a 2D array with one size set to 1 (e.g. to get a single timestep)
   ! starts and sizes must have the same rank as the variable has dimensions
   subroutine read_var_r8(this, varindex, starts, sizes, values)
-    use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(8), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
     ! EO parameters
+    include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
@@ -238,19 +238,19 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
-    call assert_nc(nf_get_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+    call assert_nc(nf_get_vara_double(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
   ! see read_var_r8 for usage comment
   subroutine read_var_r4(this, varindex, starts, sizes, values)
-    use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(4), intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
     ! EO parameters
+    include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
@@ -258,7 +258,7 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
-    call assert_nc(nf_get_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+    call assert_nc(nf_get_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
@@ -326,13 +326,13 @@ contains
 
 
   subroutine write_var_r8(this, varindex, starts, sizes, values)
-    use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(8), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
     ! EO parameters
+    include "netcdf.inc"
     real(8), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
@@ -340,18 +340,18 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
-    call assert_nc(nf_put_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+    call assert_nc(nf_put_vara_double(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
   subroutine write_var_r4(this, varindex, starts, sizes, values)
-    use io_netcdf_nf_interface
     use, intrinsic :: ISO_C_BINDING
     class(netcdf_file_type), intent(in) :: this
     integer, intent(in) :: varindex
     integer, dimension(:) :: starts, sizes
     real(4), intent(in), target :: values(..) ! must be inout or the allocation might be screwed
     ! EO parameters
+    include "netcdf.inc"
     real(4), pointer :: values_ptr(:)
 
     call assert(size(sizes) == size(starts), __LINE__)
@@ -359,7 +359,7 @@ contains
     call assert(product(sizes) == product(shape(values)), __LINE__)
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
-    call assert_nc(nf_put_vara_x(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+    call assert_nc(nf_put_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
