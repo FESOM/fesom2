@@ -20,6 +20,9 @@ jobs:
     - uses: actions/checkout@v2
     - name: ls 
       run: |
+        pwd
+        ls 
+        
         ls /fesom/fesom2/test/meshes/pi/dist_2/
     # - name: Compile model
     #   run: |
