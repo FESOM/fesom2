@@ -8,6 +8,7 @@ ollie:
         pi: /work/ollie/nkolduno/meshes/pi_mesh/
         farc: /work/ollie/nkolduno/meshes/fArc/
         test_global: ./test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
     forcing:
         CORE2: /work/ollie/dsein/input/forcing/CORE2/
         JRA55: /work/ollie/clidyn/forcing/JRA55-do-v1.4.0/
@@ -57,6 +58,7 @@ docker:
     meshes:
         pi: /fesom/pi/
         test_global: /fesom/fesom2/test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
     forcing:
         CORE2: /fesom/dCORE2/
         JRA55: /fesom/dJRA55/
