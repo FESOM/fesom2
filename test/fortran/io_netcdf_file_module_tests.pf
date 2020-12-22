@@ -445,6 +445,36 @@ contains
 
 
   @test
+  subroutine test_can_write_to_new_file_int()
+    type(netcdf_file_type) f
+    
+    integer time_dimidx
+    integer varindex, time_varindex
+    integer exitstat
+    character(len=*), parameter :: filepath = TMPPATHPREFIX//"test_can_write_to_new_file_int.nc"
+
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+
+    call execute_command_line("rm -f "//filepath, exitstat=exitstat) ! silently remove the file if it exists from an aborted previous run
+
+    time_varindex = f%add_var_double("time", [time_dimidx])
+    varindex = f%add_var_int("iter", [time_dimidx])
+    call f%open_write_create(filepath)
+    
+    call f%write_var(time_varindex, [1], [1], [10800.0_8])
+    call f%write_var(varindex, [1], [1], [42])
+    
+    call f%close_file()
+    
+    @assertTrue( is_in_file(filepath, 'iter = 42 ;') )
+
+    call execute_command_line("rm "//filepath, exitstat=exitstat)
+    if(exitstat .ne. 0) stop 1
+  end subroutine
+
+
+  @test
   subroutine test_can_append_to_existing_file_real4()
     type(netcdf_file_type) f
     real(4), allocatable :: values(:)
