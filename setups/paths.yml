@@ -7,11 +7,14 @@ ollie:
         bold: /work/ollie/nkolduno/meshes/BOLD_RT_FIXED/
         pi: /work/ollie/nkolduno/meshes/pi_mesh/
         farc: /work/ollie/nkolduno/meshes/fArc/
+        test_global: ./test/meshes/pi/
     forcing:
         CORE2: /work/ollie/dsein/input/forcing/CORE2/
         JRA55: /work/ollie/clidyn/forcing/JRA55-do-v1.4.0/
+        test_global: ./test/input/global/
     clim:
         phc: /work/ollie/dsidoren/input/hydrography/phc3.0/
+        test_global: ./test/input/global/
     opath:
         opath: /work/ollie/${USER}/
 
