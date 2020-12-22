@@ -1,0 +1,67 @@
+ollie:
+    lnodename:
+        - 'ollie0*'
+        - 'ollie1*'
+    meshes:
+        core: /work/ollie/pscholz/mesh_fesom2.0/core2_meanz/
+        bold: /work/ollie/nkolduno/meshes/BOLD_RT_FIXED/
+        pi: /work/ollie/nkolduno/meshes/pi_mesh/
+        farc: /work/ollie/nkolduno/meshes/fArc/
+    forcing:
+        CORE2: /work/ollie/dsein/input/forcing/CORE2/
+        JRA55: /work/ollie/clidyn/forcing/JRA55-do-v1.4.0/
+    clim:
+        phc: /work/ollie/dsidoren/input/hydrography/phc3.0/
+    opath:
+        opath: /work/ollie/${USER}/
+
+mistral:
+    lnodename:
+        - 'mlogin*'
+        - 'mistralpp*'
+    meshes:
+        core: /pool/data/AWICM/FESOM2/MESHES/CORE2/
+        bold: /pool/data/AWICM/FESOM2/MESHES/BOLD_RT_FIXED/
+        pi: /pool/data/AWICM/FESOM2/MESHES/pi_mesh/
+        farc: /mnt/lustre01/work/ab0995/a270088/meshes/farc_sorted/
+    forcing:
+        CORE2: /pool/data/AWICM/FESOM2/FORCING/CORE2/
+        JRA55: /pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/
+    clim:
+        phc: /pool/data/AWICM/FESOM2/INITIAL/phc3.0/
+    opath:
+        opath: /scratch/a/${USER}/
+
+
+mycomp:
+    lnodename:
+        - 'vpn*'
+        - 'MacBook-Pro*'
+    meshes:
+        core: /Users/koldunovn/FESOM/FESOM2_minimal_input/mesh/CORE/
+        pi: /Users/koldunovn/FESOM/FESOM2_minimal_input/mesh/pi
+    forcing:
+        CORE2: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/CORE2/
+        JRA55: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/JRA55-do-v1.4.0/
+    clim:
+        phc: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/phc3.0/
+    opath:
+        opath: ../results/${USER}/
+
+docker:
+    lnodename:
+        - ' '
+    meshes:
+        pi: /fesom/pi/
+        test_global: /fesom/fesom2/test/meshes/pi/
+    forcing:
+        CORE2: /fesom/dCORE2/
+        JRA55: /fesom/dJRA55/
+        test_global: /fesom/fesom2/test/input/global/
+    clim:
+        phc: /fesom/phc3/
+        test_global: /fesom/fesom2/test/input/global/
+    opath:
+        opath: /fesom/results/
+
+
