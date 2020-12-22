@@ -274,6 +274,33 @@ contains
 
 
   @test
+  subroutine test_can_read_2d_variable_integer()
+    type(netcdf_file_type) f
+    integer, allocatable :: values(:)
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    allocate(values(5))
+    call f%read_var(sss_varindex, [1,2], [5,1], values)
+    ! check level 1 values
+    @assertEqual(10, values(1))  
+    @assertEqual(10, values(2))  
+    @assertEqual(10, values(3))  
+    @assertEqual(10, values(4))  
+    @assertEqual(10, values(5))  
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
   subroutine test_can_read_variable_with_less_dims_than_in_file()
     type(netcdf_file_type) f
     real(8) value

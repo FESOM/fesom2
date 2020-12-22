@@ -15,11 +15,11 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, close_file, open_write_create, open_write_append
-    generic, public :: read_var => read_var_r4, read_var_r8
+    generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
     generic, public :: write_var => write_var_r4, write_var_r8, write_var_integer
     generic, public :: add_var_att => add_var_att_text, add_var_att_int
     generic, public :: add_global_att => add_global_att_text, add_global_att_int
-    procedure, private :: read_var_r4, read_var_r8, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, write_var_integer, add_var_att_text, add_var_att_int
+    procedure, private :: read_var_r4, read_var_r8, read_var_integer, attach_dims_vars_to_file, add_var_x, write_var_r4, write_var_r8, write_var_integer, add_var_att_text, add_var_att_int
     procedure, private :: add_global_att_text, add_global_att_int
   end type
   
@@ -272,6 +272,26 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_real(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  ! see read_var_r8 for usage comment
+  subroutine read_var_integer(this, varindex, starts, sizes, values)
+    use, intrinsic :: ISO_C_BINDING
+    class(netcdf_file_type), intent(in) :: this
+    integer, intent(in) :: varindex
+    integer, dimension(:) :: starts, sizes
+    integer, intent(inout), target :: values(..) ! must be inout or the allocation might be screwed
+    ! EO parameters
+    include "netcdf.inc"
+    integer, pointer :: values_ptr(:)
+
+    call assert(size(sizes) == size(starts), __LINE__)
+    call assert(size(starts) == size(this%vars(varindex)%dim_indices), __LINE__)
+    call assert(product(sizes) == product(shape(values)), __LINE__)
+
+    call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
+    call assert_nc(nf_get_vara_int(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
   end subroutine
 
 
