@@ -15,6 +15,7 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, close_file, open_write_create, open_write_append
+    procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
     generic, public :: write_var => write_var_r4, write_var_r8, write_var_integer
     generic, public :: add_var_att => add_var_att_text, add_var_att_int
@@ -86,6 +87,16 @@ contains
     
     dimindex = size(this%dims)
     this%dims(dimindex) = dim_type(name=name, len=len, ncid=-1)
+  end function
+
+
+  ! return number of specified dimensions (which might be less dimensions than an attached file has)
+  function ndims(this)
+    class(netcdf_file_type), intent(inout) :: this
+    integer ndims
+    ! EO parameters
+    
+    ndims = size(this%dims)
   end function
   
 

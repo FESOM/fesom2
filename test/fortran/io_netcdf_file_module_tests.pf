@@ -65,6 +65,20 @@ contains
 
 
   @test
+  subroutine test_can_query_ndims()
+    type(netcdf_file_type) f
+    integer nz_dimidx, node_dimidx
+
+    call f%initialize()
+    nz_dimidx = f%add_dim("nz", 48)
+    node_dimidx = f%add_dim("nz_1", 47)
+    
+    @assertEqual(2, f%ndims())
+    
+  end subroutine
+
+
+  @test
   subroutine test_can_add_vars_with_attributes()
     type(netcdf_file_type) f
     integer nz_dimidx, node_dimidx
