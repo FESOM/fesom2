@@ -318,7 +318,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
-        nu1=nlevels(el(1))
+        nu1=ulevels(el(1))
         nl1=nlevels(el(1))-1
         nl2=0
         nu2=0
