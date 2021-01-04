@@ -3,19 +3,26 @@ ollie:
         - 'ollie0*'
         - 'ollie1*'
     meshes:
-        core: /work/ollie/pscholz/mesh_fesom2.0/core2_meanz/
-        bold: /work/ollie/nkolduno/meshes/BOLD_RT_FIXED/
-        pi: /work/ollie/nkolduno/meshes/pi_mesh/
-        farc: /work/ollie/nkolduno/meshes/fArc/
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/
+        pi: /work/ollie/clidyn/FESOM2/meshes/pi/
+        core2: /work/ollie/clidyn/FESOM2/meshes/core/
+        mr: /work/ollie/clidyn/FESOM2/meshes/mr/
+        hr: /work/ollie/clidyn/FESOM2/meshes/hr/
+        orca25: /work/ollie/clidyn/FESOM2/meshes/orca25/
+        farc: /work/ollie/clidyn/FESOM2/meshes/farc/
     forcing:
-        CORE2: /work/ollie/dsein/input/forcing/CORE2/
+        test_global: ./test/input/global/
+        CORE2: /work/ollie/clidyn/forcing/CORE2/
         JRA55: /work/ollie/clidyn/forcing/JRA55-do-v1.4.0/
-        test_global: ./test/input/global/
+        ERA5: /work/ollie/clidyn/forcing/ERA5/inverted/
     clim:
-        phc: /work/ollie/dsidoren/input/hydrography/phc3.0/
         test_global: ./test/input/global/
+        phc: /work/ollie/clidyn/FESOM2/hydrography/phc3.0/
+        woa18: /work/ollie/clidyn/FESOM2/hydrography/woa18/
+        en4-2-0: /work/ollie/clidyn/FESOM2/hydrography/en4-2-0/
+        mit: /work/ollie/clidyn/FESOM2/hydrography/mit/
+        gur: /work/ollie/clidyn/FESOM2/hydrography/gur/
     opath:
         opath: /work/ollie/${USER}/
 
@@ -24,33 +31,23 @@ mistral:
         - 'mlogin*'
         - 'mistralpp*'
     meshes:
-        core: /pool/data/AWICM/FESOM2/MESHES/CORE2/
-        bold: /pool/data/AWICM/FESOM2/MESHES/BOLD_RT_FIXED/
-        pi: /pool/data/AWICM/FESOM2/MESHES/pi_mesh/
-        farc: /mnt/lustre01/work/ab0995/a270088/meshes/farc_sorted/
+        test_global: ./test/meshes/pi/
+        test_souf: ./test/meshes/soufflet/
+        pi: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/pi/
+        core2: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2/
+        mr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/mr/
+        hr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/hr/
+        orca25: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/orca25/
+        farc: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/farc/
     forcing:
+        test_global: ./test/input/global/
         CORE2: /pool/data/AWICM/FESOM2/FORCING/CORE2/
         JRA55: /pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/
+        ERA5: /pool/data/AWICM/FESOM2/FORCING/
     clim:
         phc: /pool/data/AWICM/FESOM2/INITIAL/phc3.0/
     opath:
         opath: /scratch/a/${USER}/
-
-
-mycomp:
-    lnodename:
-        - 'vpn*'
-        - 'MacBook-Pro*'
-    meshes:
-        core: /Users/koldunovn/FESOM/FESOM2_minimal_input/mesh/CORE/
-        pi: /Users/koldunovn/FESOM/FESOM2_minimal_input/mesh/pi
-    forcing:
-        CORE2: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/CORE2/
-        JRA55: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/JRA55-do-v1.4.0/
-    clim:
-        phc: /Users/koldunovn/FESOM/FESOM2_minimal_input/input/phc3.0/
-    opath:
-        opath: ../results/${USER}/
 
 docker:
     lnodename:
