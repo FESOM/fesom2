@@ -6,7 +6,7 @@ ollie:
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/
         pi: /work/ollie/clidyn/FESOM2/meshes/pi/
-        core2: /work/ollie/clidyn/FESOM2/meshes/core/
+        core2: /work/ollie/clidyn/FESOM2/meshes/core2/
         mr: /work/ollie/clidyn/FESOM2/meshes/mr/
         hr: /work/ollie/clidyn/FESOM2/meshes/hr/
         orca25: /work/ollie/clidyn/FESOM2/meshes/orca25/

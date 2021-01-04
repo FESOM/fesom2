@@ -1,5 +1,5 @@
-mesh: core
-forcing: CORE2
+mesh: core2
+forcing: JRA55
 clim:
     type: phc
     filelist: ['phc3.0_winter.nc','phc3.0_winter.nc']
@@ -12,43 +12,22 @@ namelist.config:
         step_per_day: 32
         run_length: 1
         run_length_unit: "y"
-    geometry:
-        force_rotation: False
     inout:
         restart_length: 1
         restart_length_unit: "y"
-
-namelist.oce:
-    oce_dyn:
-        Div_c: 0.5
-        Leith_c: 0.05
-        w_split: False
-
-namelist.ice:
-    ice_dyn:
-        whichEVP: 0
-        evp_rheol_steps: 150
 
 namelist.io:
     diag_list:
         ldiag_energy: False
     nml_list:
         io_list:
-            "sst       ":
-                freq: 1
-                unit: y
-                prec: 4
-            "a_ice     ":
-                freq: 1
-                unit: y
-                prec: 4
             "temp      ":
                 freq: 1
-                unit: y
+                unit: m
                 prec: 4
             "salt      ":
                 freq: 1
-                unit: y
+                unit: m
                 prec: 4
 
 fcheck:
