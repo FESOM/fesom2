@@ -124,6 +124,70 @@ JRA55:
         calendar:
             include_fleapyear: True
 
+ERA5:
+    forcing_exchange_coeff:
+        Ce_atm_oce: 1.75e-3
+        Ch_atm_oce: 1.75e-3
+        Cd_atm_oce: 1.0e-3
+        Ce_atm_ice: 1.75e-3
+        Ch_atm_ice: 1.75e-3
+        Cd_atm_ice: 1.2e-3
+    forcing_bulk:
+        AOMIP_drag_coeff: False
+        ncar_bulk_formulae: True
+        ncar_bulk_z_wind: 10.0
+        ncar_bulk_z_tair: 2.0
+        ncar_bulk_z_shum: 2.0
+    land_ice:
+        use_landice_water: False
+        landice_start_mon: 5
+        landice_end_mon: 10
+    nam_sbc:
+        nm_xwind_file: u.
+        nm_ywind_file: v.
+        nm_humi_file: q.
+        nm_qsr_file: ssrd.
+        nm_qlw_file: strd.
+        nm_tair_file: t2m.
+        nm_prec_file: rf.
+        nm_snow_file: sf.
+        nm_mslp_file: sp.
+        nm_xwind_var: u
+        nm_ywind_var: v
+        nm_humi_var: q
+        nm_qsr_var: ssrd
+        nm_qlw_var: strd
+        nm_tair_var: t2m
+        nm_prec_var: rf
+        nm_snow_var: sf
+        nm_mslp_var: sp
+        nm_nc_iyear: 1900
+        nm_nc_imm: 1
+        nm_nc_idd: 1
+        nm_nc_freq: 1
+        nm_nc_tmid: 0
+        l_xwind: True
+        l_ywind: True
+        l_humi: True
+        l_qsr: True
+        l_qlw: True
+        l_tair: True
+        l_prec: True
+        l_mslp: False
+        l_cloud: False
+        l_snow: True
+        nm_runoff_file: CORE2_runoff.nc
+        runoff_data_source: CORE2
+        nm_sss_data_file: PHC2_salx.nc
+        sss_data_source: CORE2
+    # forcing related modifications in other namelists
+    # (only namelist.config and namelist.ice supported for now).
+    namelist.config:
+        clockinit:
+            yearnew: 2000
+        calendar:
+            include_fleapyear: True
+
 test_global:
     forcing_exchange_coeff:
         Ce_atm_oce: 1.75e-3
