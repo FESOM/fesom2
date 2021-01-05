@@ -45,6 +45,7 @@ mistral:
         JRA55: /pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/
         ERA5: /pool/data/AWICM/FESOM2/FORCING/
     clim:
+        test_global: ./test/input/global/
         phc: /pool/data/AWICM/FESOM2/INITIAL/phc3.0/
     opath:
         opath: /scratch/a/${USER}/
