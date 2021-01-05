@@ -5,18 +5,19 @@ clim:
     filelist: ['woa18_netcdf_5deg.nc','woa18_netcdf_5deg.nc']
     varlist: ['salt', 'temp']
 ntasks: 8
-time: "00:10:00"
+time: "03:00:00"
 
 namelist.config:
     timestep:
         step_per_day: 72
-        run_length: 1
-        run_length_unit: "m"
+        run_length: 10
+        run_length_unit: "y"
     geometry:
         force_rotation: False
     inout:
         restart_length: 1
         restart_length_unit: "y"
+        logfile_outfreq: 720
     geometry:
         cyclic_length: 4.5
         rotated_grid: False
