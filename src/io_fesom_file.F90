@@ -30,7 +30,7 @@ module io_fesom_file_module
     integer :: rec_cnt = 0
     integer :: iorank = 0
   contains
-    procedure, public :: gather_and_write, init, specify_node_var
+    procedure, public :: gather_and_write, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
   end type
   
   
@@ -38,6 +38,38 @@ module io_fesom_file_module
 
 
 contains
+
+
+  function is_iorank(this) result(x)
+    use g_PARSUP
+    class(fesom_file_type), intent(in) :: this
+    logical x
+    x = (mype == this%iorank)
+  end function
+
+
+  function rec_count(this) result(x)
+    use g_PARSUP
+    class(fesom_file_type), intent(in) :: this
+    integer x
+    x = this%rec_cnt
+  end function
+
+
+  function time_varindex(this) result(x)
+    use g_PARSUP
+    class(fesom_file_type), intent(in) :: this
+    integer x
+    x = this%time_varidx
+  end function
+
+
+  function time_dimindex(this) result(x)
+    use g_PARSUP
+    class(fesom_file_type), intent(in) :: this
+    integer x
+    x = this%time_dimidx
+  end function
 
 
   subroutine init(f, mesh_) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
