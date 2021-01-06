@@ -53,7 +53,7 @@ module g_config
   ! thinner. e.g 
   ! partial_cell_tresh=10 --> thinner partial bottom cells will be only applied for initial 
   ! bottom layer thicknesses larger than 10m 
-  real(kind=WP)          :: partial_cell_tresh=0.0_WP 
+  real(kind=WP)          :: partial_cell_thresh=0.0_WP 
   
   ! for zlevel: layer thickness should not become smaller than min_hnode of 
   ! original layer thickness. If it happens switch from zelvel to local zstar
@@ -66,7 +66,7 @@ module g_config
   ! maximal pressure from ice felt by the ocean
   real(kind=WP)          :: max_ice_loading=5.0
 
-  namelist /ale_def/ which_ALE, use_partial_cell, partial_cell_tresh, min_hnode, lzstar_lev, max_ice_loading
+  namelist /ale_def/ which_ALE, use_partial_cell, partial_cell_thresh, min_hnode, lzstar_lev, max_ice_loading
 
   !_____________________________________________________________________________
   ! *** model geometry ***
@@ -102,13 +102,13 @@ module g_config
   logical                       :: use_floatice = .false.
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
-  real(kind=WP)                 :: cavity_partial_cell_tresh=0.0_WP ! same as partial_cell_tresh but for surface
+  real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
-                        use_cavity_partial_cell, cavity_partial_cell_tresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz
   
   !_____________________________________________________________________________
   ! *** others ***

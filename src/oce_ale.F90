@@ -200,7 +200,7 @@ subroutine init_bottom_elem_thickness(mesh)
     use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_tresh
+    use g_config,only: use_partial_cell, partial_cell_thresh
     use g_comm_auto
     use g_support
     implicit none
@@ -227,8 +227,8 @@ subroutine init_bottom_elem_thickness(mesh)
             
             !___________________________________________________________________
             ! Only apply Partial Cells when the initial full cell bottom
-            ! layer thickness is above the treshhold partial_cell_tresh
-            if (zbar(nle-1)-zbar(nle)<=partial_cell_tresh) then
+            ! layer thickness is above the treshhold partial_cell_thresh
+            if (zbar(nle-1)-zbar(nle)<=partial_cell_thresh) then
                 zbar_e_bot(elem) = zbar(nle)
                 bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
                 cycle
@@ -281,9 +281,9 @@ subroutine init_bottom_elem_thickness(mesh)
 !!PS                 ! if a thicker partial bottom layer thickness is more realistic than
 !!PS                 ! always apply it, BUT when a thinner bottom layer thickness is more 
 !!PS                 ! realistic than only apply it when the initial full cell bottom
-!!PS                 ! layer thickness is above the treshhold partial_cell_tresh to 
+!!PS                 ! layer thickness is above the treshhold partial_cell_thresh to 
 !!PS                 ! not allow already thin layers to become even thinner
-!!PS                 if (zbar(nle-1)-zbar(nle)<=partial_cell_tresh) then
+!!PS                 if (zbar(nle-1)-zbar(nle)<=partial_cell_thresh) then
 !!PS                     zbar_e_bot(elem) = zbar(nle)
 !!PS                     bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
 !!PS                     cycle
@@ -424,7 +424,7 @@ subroutine init_surface_elem_depth(mesh)
     use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_tresh
+    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
     use g_comm_auto
     use g_support
     implicit none
@@ -457,8 +457,8 @@ subroutine init_surface_elem_depth(mesh)
                 
                 !___________________________________________________________________
                 ! Only apply Surface Partial Cells when the initial full cell surface
-                ! layer thickness is above the treshhold cavity_partial_cell_tresh
-                if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_tresh) then
+                ! layer thickness is above the treshhold cavity_partial_cell_thresh
+                if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
                     zbar_e_srf(elem) = zbar(ule)
                     cycle
                 end if         
@@ -468,9 +468,9 @@ subroutine init_surface_elem_depth(mesh)
 !!PS                     ! if a thicker partial surface layer thickness is more realistic than
 !!PS                     ! always apply it, BUT when a thinner surface layer thickness is more 
 !!PS                     ! realistic than only apply it when the initial full cell surface
-!!PS                     ! layer thickness is above the treshhold cavity_partial_cell_tresh to 
+!!PS                     ! layer thickness is above the treshhold cavity_partial_cell_thresh to 
 !!PS                     ! not allow already thin layers to become even thinner
-!!PS                     if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_tresh) then
+!!PS                     if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
 !!PS                         zbar_e_srf(elem) = zbar(ule)
 !!PS                     else
 !!PS                         zbar_e_srf(elem) = max(Z(ule),dd)
