@@ -315,6 +315,72 @@ contains
 
 
   @test
+  subroutine test_can_read_single_variable_integer()
+    type(netcdf_file_type) f
+    integer value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10, value)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_single_variable_real4()
+    type(netcdf_file_type) f
+    real(4) value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10.001, value, tolerance=1.e-6)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_single_variable_real8()
+    type(netcdf_file_type) f
+    real(8) value
+    
+    integer node_dimidx, time_dimidx
+    integer sss_varindex
+    call f%initialize()
+    node_dimidx = f%add_dim("nod2", 5)
+    time_dimidx = f%add_dim_unlimited("time")
+
+    sss_varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var1(sss_varindex, [1,2], value)
+    ! check level 1 values
+    @assertEqual(10.001_8, value, tolerance=1.e-6)
+    
+    call f%close_file()
+  end subroutine
+
+
+  @test
   subroutine test_can_read_variable_with_less_dims_than_in_file()
     type(netcdf_file_type) f
     real(8) value
