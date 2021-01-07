@@ -121,8 +121,8 @@ subroutine init_ale(mesh)
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
     allocate(bottom_elem_thickness(myDim_elem2D))
-    allocate(zbar_e_bot(myDim_elem2D)) 
-    allocate(zbar_e_srf(myDim_elem2D)) 
+    allocate(zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
+    allocate(zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
     ! also change bottom thickness at nodes due to partial cell --> bottom 
     ! thickness at nodes is the volume weighted mean of sorounding elemental 
@@ -143,16 +143,14 @@ subroutine init_ale(mesh)
     ! of partial cell bootom layer
     zbar_n_bot = 0.0
     zbar_e_bot = 0.0
-    call init_bottom_node_thickness(mesh)
     call init_bottom_elem_thickness(mesh)
-    
+    call init_bottom_node_thickness(mesh)
     
     ! compute depth of partial cell ocean-cavity interface
     zbar_n_srf = zbar(1)
     zbar_e_srf = zbar(1)
-    call init_surface_node_depth(mesh)
     call init_surface_elem_depth(mesh)
-    
+    call init_surface_node_depth(mesh)
     
     !___________________________________________________________________________
     ! initialise 3d field of depth levels and mid-depth levels
@@ -192,15 +190,6 @@ subroutine init_ale(mesh)
         Z_3d_n(nzmax-1,n) =zbar_3d_n(nzmax-1,n)+(zbar_n_bot(n)-zbar_3d_n(nzmax-1,n))/2;
         
     end do
-    
-!!PS     do elem=1, myDim_elem2D
-!!PS         nzmax=nlevels(elem)
-!!PS         elnodes=elem2D_nodes(:,elem) 
-!!PS         zbar_e_bot(elem) = sum(zbar_3d_n(nzmax,elnodes))/3.0_WP
-!!PS !!PS         zbar_e_bot(elem) = minval(zbar_3d_n(nzmax,elnodes))/3.0_WP
-!!PS !!PS         zbar_e_bot(elem) = maxval(zbar_3d_n(nzmax,elnodes))/3.0_WP
-!!PS         bottom_elem_thickness(elem)=zbar(nzmax-1)-zbar_e_bot(elem)
-!!PS     end do
 
 end subroutine init_ale
 !
@@ -211,7 +200,7 @@ subroutine init_bottom_elem_thickness(mesh)
     use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
-    use g_config,only: use_partial_cell
+    use g_config,only: use_partial_cell, partial_cell_thresh
     use g_comm_auto
     use g_support
     implicit none
@@ -234,7 +223,17 @@ subroutine init_bottom_elem_thickness(mesh)
             dd=sum(depth(elnodes))/3.0_WP
             
             ! number of full depth levels at elem
-            nle=nlevels(elem)    
+            nle=nlevels(elem)
+            
+            !___________________________________________________________________
+            ! Only apply Partial Cells when the initial full cell bottom
+            ! layer thickness is above the treshhold partial_cell_thresh
+            if (zbar(nle-1)-zbar(nle)<=partial_cell_thresh) then
+                zbar_e_bot(elem) = zbar(nle)
+                bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
+                cycle
+            end if 
+                
             !___________________________________________________________________
             ! if topographic depth dd is deeper than depth of deepest full cell 
             ! depth level zbar(nle)
@@ -262,6 +261,7 @@ subroutine init_bottom_elem_thickness(mesh)
                     ! case 2 : max(Z(nle),dd) = Z(nle)
                     zbar_e_bot(elem) = max(Z(nle),dd)
                 end if
+                bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
             !___________________________________________________________________
             ! if topographic depth dd is shallower than depth of deepest full cell 
             ! depth level zbar(nle)
@@ -277,13 +277,23 @@ subroutine init_bottom_elem_thickness(mesh)
             !  / / / / / / /
             ! / / / / / / / 
             else
+!!PS                 !_______________________________________________________________
+!!PS                 ! if a thicker partial bottom layer thickness is more realistic than
+!!PS                 ! always apply it, BUT when a thinner bottom layer thickness is more 
+!!PS                 ! realistic than only apply it when the initial full cell bottom
+!!PS                 ! layer thickness is above the treshhold partial_cell_thresh to 
+!!PS                 ! not allow already thin layers to become even thinner
+!!PS                 if (zbar(nle-1)-zbar(nle)<=partial_cell_thresh) then
+!!PS                     zbar_e_bot(elem) = zbar(nle)
+!!PS                     bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
+!!PS                     cycle
+!!PS                 end if     
+                
                 ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
                 ! case 2 : min(Z(nle-1),dd) = dd
                 zbar_e_bot(elem) = min(Z(nle-1),dd)
-                
-            end if        
-            bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
-            
+                bottom_elem_thickness(elem)=zbar(nle-1)-zbar_e_bot(elem)
+            end if  
         end do ! --> do elem=1, myDim_elem2D
         
     !___________________________________________________________________________
@@ -295,7 +305,10 @@ subroutine init_bottom_elem_thickness(mesh)
             zbar_e_bot(elem) = zbar(nle)
         end do
     end if 
-
+    
+    !___________________________________________________________________________
+    call exchange_elem(zbar_e_bot)
+    
 end subroutine init_bottom_elem_thickness
 !
 !
@@ -322,77 +335,86 @@ subroutine init_bottom_node_thickness(mesh)
     ! layer, nor -(1/2) of the current layer. 
     if(use_partial_cell) then 
         !Adjust the thickness of nodal bottom cells
-        do node=1, myDim_nod2D+eDim_nod2D
+        do node=1, myDim_nod2D
             
+!!PS             !___________________________________________________________________
+!!PS             ! nodal topographic depth must be as least as deep as deepest bottom depth 
+!!PS             ! of the sorounding elements          
+!!PS             dd = depth(node)
+!!PS             
+!!PS             ! number of full depth levels at node
+!!PS             nln  = nlevels_nod2D(node)
+!!PS             
+!!PS             !___________________________________________________________________
+!!PS             ! if topographic depth dd is deeper than depth of deepest full cell 
+!!PS             ! depth level zbar(nle)
+!!PS             !       : 
+!!PS             !       : 
+!!PS             ! ______________ zbar(nle-1)--------->+---->+
+!!PS             !                                     |     |
+!!PS             !                                     |     |
+!!PS             ! -------------- Z(nle-1)             |--case1--> zbar_n_bot=
+!!PS             !                                     |     |
+!!PS             !                                     |     |
+!!PS             ! ______________ zbar(nle)            |     |--case2--> zbar_n_bot = 
+!!PS             ! / / / / / / /                       |     |
+!!PS             !  / / o dd case1 ------------------->+     |
+!!PS             ! -------------- Z(nle)(mid-depth)--------->+
+!!PS             !  / / / / / / /
+!!PS             ! / /  o dd case2
+!!PS             !  / / / / / /
+!!PS             if(dd<zbar(nln)) then 
+!!PS                 if(nln==nl) then
+!!PS                     zbar_n_bot(node) = max(dd,zbar(nln)+(zbar(nln)-Z(nln-1)))
+!!PS                     
+!!PS                 else
+!!PS                     ! case 1 : max(Z(nle),dd) = dd
+!!PS                     ! case 2 : max(Z(nle),dd) = Z(nle)
+!!PS                     zbar_n_bot(node) = max(Z(nln),dd)
+!!PS                 end if
+!!PS             !___________________________________________________________________
+!!PS             ! if topographic depth dd is shallower than depth of deepest full cell 
+!!PS             ! depth level zbar(nle)
+!!PS             !        : 
+!!PS             !        : 
+!!PS             ! ______________ zbar(nle-1)--------->+---->+
+!!PS             !                                     |--dd case1--> zbar_n_bot=
+!!PS             !      o dd case1                     |     |
+!!PS             ! -------------- Z(nle-1)(mid-depth)->+     |--dd case 2 --> zbar_n_bot=
+!!PS             !      o dd case2 ------------------------->+
+!!PS             ! ______________ zbar(nle) 
+!!PS             ! / / / / / / / 
+!!PS             !  / / / / / / /
+!!PS             ! / / / / / / / 
+!!PS             else
+!!PS                 ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
+!!PS                 ! case 2 : min(Z(nle-1),dd) = dd
+!!PS                 zbar_n_bot(node) = min(Z(nln-1),dd)
+!!PS                 
+!!PS             end if        
             !___________________________________________________________________
-            ! nodal topographic depth must be as least as deep as deepest bottom depth 
-            ! of the sorounding elements          
-            dd = depth(node)
-            
-            ! number of full depth levels at node
-            nln  = nlevels_nod2D(node)
-            
-            !___________________________________________________________________
-            ! if topographic depth dd is deeper than depth of deepest full cell 
-            ! depth level zbar(nle)
-            !       : 
-            !       : 
-            ! ______________ zbar(nle-1)--------->+---->+
-            !                                     |     |
-            !                                     |     |
-            ! -------------- Z(nle-1)             |--case1--> zbar_n_bot=
-            !                                     |     |
-            !                                     |     |
-            ! ______________ zbar(nle)            |     |--case2--> zbar_n_bot = 
-            ! / / / / / / /                       |     |
-            !  / / o dd case1 ------------------->+     |
-            ! -------------- Z(nle)(mid-depth)--------->+
-            !  / / / / / / /
-            ! / /  o dd case2
-            !  / / / / / /
-            if(dd<zbar(nln)) then 
-                if(nln==nl) then
-                    zbar_n_bot(node) = max(dd,zbar(nln)+(zbar(nln)-Z(nln-1)))
-                    
-                else
-                    ! case 1 : max(Z(nle),dd) = dd
-                    ! case 2 : max(Z(nle),dd) = Z(nle)
-                    zbar_n_bot(node) = max(Z(nln),dd)
-                end if
-            !___________________________________________________________________
-            ! if topographic depth dd is shallower than depth of deepest full cell 
-            ! depth level zbar(nle)
-            !        : 
-            !        : 
-            ! ______________ zbar(nle-1)--------->+---->+
-            !                                     |--dd case1--> zbar_n_bot=
-            !      o dd case1                     |     |
-            ! -------------- Z(nle-1)(mid-depth)->+     |--dd case 2 --> zbar_n_bot=
-            !      o dd case2 ------------------------->+
-            ! ______________ zbar(nle) 
-            ! / / / / / / / 
-            !  / / / / / / /
-            ! / / / / / / / 
-            else
-                ! case 1 : min(Z(nle-1),dd) = Z(nle-1)
-                ! case 2 : min(Z(nle-1),dd) = dd
-                zbar_n_bot(node) = min(Z(nln-1),dd)
-                
-            end if        
-            bottom_node_thickness(node)=zbar(nln-1)-zbar_n_bot(node)
-            
+            ! compute vertice partial bottom depth from the deepest sorounding
+            ! elemental partial bottom depths
+            nln   = nlevels_nod2D(node)
+            nelem = nod_in_elem2d_num(node)
+            zbar_n_bot(node)           = minval(zbar_e_bot(nod_in_elem2d(1:nelem,node))) 
+            bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
         
     !___________________________________________________________________________
     ! use full bottom cells
     else
-        do node=1,myDim_nod2D+eDim_nod2D
+        do node=1,myDim_nod2D
             nln = nlevels_nod2D(node)
-            bottom_node_thickness(node)=zbar(nln-1)-zbar(nln)
-            zbar_n_bot(node) = zbar(nln)
+            zbar_n_bot(node)           = zbar(nln)
+            bottom_node_thickness(node)= zbar(nln-1)-zbar_n_bot(node)
         end do
-    end if 
+    end if ! --> if(use_partial_cell) then 
 
+    !___________________________________________________________________________
+    call exchange_nod(zbar_n_bot)
+    call exchange_nod(bottom_node_thickness)
+    
 end subroutine init_bottom_node_thickness
 !
 !
@@ -402,7 +424,7 @@ subroutine init_surface_elem_depth(mesh)
     use MOD_MESH
     use g_PARSUP
     use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell
+    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
     use g_comm_auto
     use g_support
     implicit none
@@ -432,18 +454,39 @@ subroutine init_surface_elem_depth(mesh)
             ! elemental cavity depth
             if (use_cavity_partial_cell) then 
                 dd=sum(cavity_depth(elnodes))/3.0_WP
+                
+                !___________________________________________________________________
+                ! Only apply Surface Partial Cells when the initial full cell surface
+                ! layer thickness is above the treshhold cavity_partial_cell_thresh
+                if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
+                    zbar_e_srf(elem) = zbar(ule)
+                    cycle
+                end if         
+                
                 if(dd<zbar(ule)) then 
+!!PS                     !_______________________________________________________________
+!!PS                     ! if a thicker partial surface layer thickness is more realistic than
+!!PS                     ! always apply it, BUT when a thinner surface layer thickness is more 
+!!PS                     ! realistic than only apply it when the initial full cell surface
+!!PS                     ! layer thickness is above the treshhold cavity_partial_cell_thresh to 
+!!PS                     ! not allow already thin layers to become even thinner
+!!PS                     if (zbar(ule)-zbar(ule+1)<=cavity_partial_cell_thresh) then
+!!PS                         zbar_e_srf(elem) = zbar(ule)
+!!PS                     else
+!!PS                         zbar_e_srf(elem) = max(Z(ule),dd)
+!!PS                     end if
                     zbar_e_srf(elem) = max(Z(ule),dd)
                 else
                     zbar_e_srf(elem) = min(Z(ule-1),dd)
                 end if
-!!PS                 zbar_e_srf(elem) = sum(zbar_n_srf(elnodes))/3.0_WP
             else
                 zbar_e_srf(elem) = zbar(ule)
-                
             end if 
                 
         end do ! --> do elem=1, myDim_elem2D
+        
+        !_______________________________________________________________________
+        call exchange_elem(zbar_e_srf)
     end if 
 end subroutine init_surface_elem_depth
 !
@@ -459,7 +502,7 @@ subroutine init_surface_node_depth(mesh)
     use g_support
     implicit none
     
-    integer       :: node, uln
+    integer       :: node, uln, nelem, elemi
     real(kind=WP) :: dd 
     type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
@@ -470,8 +513,8 @@ subroutine init_surface_node_depth(mesh)
         ! The adjustment is limited. It cannot be more than + (1/2) of the deeper
         ! layer, nor -(1/2) of the current layer. 
         !Adjust the thickness of nodal surface cells
-        do node=1, myDim_nod2D+eDim_nod2D
-            !_______________________________________________________________________
+        do node=1, myDim_nod2D
+            !___________________________________________________________________
             ! number of full depth levels at node
             uln  = ulevels_nod2D(node)
             if (uln==1) cycle
@@ -479,17 +522,24 @@ subroutine init_surface_node_depth(mesh)
             !___________________________________________________________________
             ! nodal cavity depth  
             if (use_cavity_partial_cell) then 
-                dd = cavity_depth(node)
-                if(dd<zbar(uln)) then 
-                    zbar_n_srf(node) = max(Z(uln),dd)
-                else
-                    zbar_n_srf(node) = min(Z(uln-1),dd)
-                end if        
+!!PS                 dd = cavity_depth(node)
+!!PS                 if(dd<zbar(uln)) then 
+!!PS                     zbar_n_srf(node) = max(Z(uln),dd)
+!!PS                 else
+!!PS                     zbar_n_srf(node) = min(Z(uln-1),dd)
+!!PS                 end if  
+                
+                nelem =  nod_in_elem2d_num(node)
+                zbar_n_srf(node)=maxval(zbar_e_srf(nod_in_elem2d(1:nelem,node))) 
+                
             else
                 zbar_n_srf(node) = zbar(uln)
                 
             end if 
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+        
+        !_______________________________________________________________________
+        call exchange_nod(zbar_n_srf)
     end if 
 end subroutine init_surface_node_depth
 !
@@ -672,7 +722,7 @@ subroutine init_thickness_ale(mesh)
                 ! do not distribute hbar into cells that intersect somehow with 
                 ! bottom layer 
                 !!PS do nz=nlevels_nod2D_min(n)-1, nlevels_nod2D(n)-1
-                do nz=nlevels_nod2D_min(n)-1, nzmax
+                do nz=nlevels_nod2D_min(n)-1, nzmax-1
                     hnode(nz,n)=(zbar(nz)-zbar(nz+1))
                 end do
             else
@@ -896,6 +946,7 @@ subroutine update_thickness_ale(mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             ! actualize 3d depth levels and mid-depth levels from bottom to top
             nzmin = ulevels_nod2D(n)
+!!PS             nzmin = ulevels_nod2D_max(n)
             nzmax = nlevels_nod2D_min(n)-2
             
             !___________________________________________________________________

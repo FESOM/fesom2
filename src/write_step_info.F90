@@ -298,10 +298,10 @@ subroutine check_blowup(istep, mesh)
 			! check surface vertical velocity --> in case of zlevel and zstar 
 			! vertical coordinate its indicator if Volume is conserved  for 
 			! Wvel(1,n)~maschine preccision
-			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-15 )) then
+			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
-				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-15'
+				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
@@ -311,6 +311,23 @@ subroutine check_blowup(istep, mesh)
 				write(*,*)
 				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
+				write(*,*) 'hnode(1, n) = ',hnode(1,n)
+				write(*,*) 'hnode(:, n) = ',hnode(:,n)
+				write(*,*) 'hflux       = ',heat_flux(n)
+                write(*,*) 'hflux_old   = ',heat_flux_old(n)
+                write(*,*) 'wflux       = ',water_flux(n)
+                write(*,*) 'wflux_old   = ',water_flux_old(n)
+                write(*,*)
+                write(*,*) 'eta_n       = ',eta_n(n)
+                write(*,*) 'd_eta(n)    = ',d_eta(n)
+                write(*,*) 'hbar        = ',hbar(n)
+                write(*,*) 'hbar_old    = ',hbar_old(n)
+                write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+                write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+                write(*,*)
+                write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
+                write(*,*)
+                
 			end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
 				
 			!___________________________________________________________________

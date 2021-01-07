@@ -127,6 +127,8 @@ integer                       :: windmix_nl    = 2
 !_______________________________________________________________________________
 ! use non-constant reference density if .false. density_ref=density_0
 logical                       :: use_density_ref   = .false.
+real(kind=WP)                 :: density_ref_T     = 2.0_WP
+real(kind=WP)                 :: density_ref_S     = 34.0_WP
 
 !_______________________________________________________________________________
 ! *** active tracer cutoff
@@ -147,6 +149,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
 ! > 'cubicspline'  ... like in FESOM1.4
+! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin' 
 
 
