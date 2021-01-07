@@ -900,6 +900,8 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
     use o_ARRAYS
     use g_PARSUP
     use g_config
+    use densityJM_components_interface
+    use density_linear_interface
     implicit none
     
     integer             :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
