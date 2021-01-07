@@ -2,11 +2,11 @@
 
 &oce_dyn
 C_d=0.0025             ! Bottom drag, nondimensional
-gamma0=0.00            ! [m/s],   backgroung viscosity= gamma0*len, it should be as small as possible (keep it < 0.01 m/s).
+gamma0=0.001            ! [m/s],   backgroung viscosity= gamma0*len, it should be as small as possible (keep it < 0.01 m/s).
 gamma1=0.0285          ! [nodim], for computation of the flow aware viscosity
 gamma2=0.285            ! [s/m],   is only used in easy backscatter option
 Div_c=.5  	       ! the strength of the modified Leith viscosity, nondimensional, 0.3 -- 1.0
-Leith_c=.5	       ! the strength of the Leith viscosity
+Leith_c=.05	       ! the strength of the Leith viscosity
 visc_option=5          ! 1=Harmonic Leith parameterization;
                        ! 2=Laplacian+Leith+biharmonic background
                        ! 3=Biharmonic Leith parameterization
