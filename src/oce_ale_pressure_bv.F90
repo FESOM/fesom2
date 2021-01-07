@@ -377,6 +377,7 @@ subroutine pressure_force_4_linfs(mesh)
     use pressure_force_4_linfs_shchepetkin_interface
     use pressure_force_4_linfs_cubicspline_interface
     use pressure_force_4_linfs_cavity_interface
+    use pressure_force_4_linfs_easypgf_interface
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
