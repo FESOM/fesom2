@@ -642,9 +642,39 @@ contains
     
     varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
     
-    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc") 
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
     call f%read_var_shape(varindex, varshape)
     @assertEqual([5,2], varshape)
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_file_is_attached_is_false_after_initializing()
+    type(netcdf_file_type) f
+    
+    call f%initialize()
+    @assertFalse(f%is_attached())
+  end subroutine
+
+
+  @test
+  subroutine test_file_is_attached_is_true_after_opening_a_file()
+    type(netcdf_file_type) f
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
+    
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+    node_dimidx = f%add_dim("nod2", 5)
+    
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
+    
+    call f%read_var_shape(varindex, varshape)
+    @assertTrue(f%is_attached())
     call f%close_file()
   end subroutine
 

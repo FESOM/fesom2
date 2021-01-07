@@ -15,7 +15,7 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, close_file, open_write_create, open_write_append
-    procedure, public :: read_var_shape
+    procedure, public :: is_attached, read_var_shape
     procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
     generic, public :: write_var => write_var_r4, write_var_r8, write_var_integer
@@ -201,7 +201,7 @@ contains
     character(len=*), intent(in) :: att_text
     ! EO parameters
     type(att_type_wrapper), allocatable :: tmparr(:)
-    
+
     allocate( tmparr(size(this%vars(varindex)%atts)+1) )
     tmparr(1:size(this%vars(varindex)%atts)) = this%vars(varindex)%atts
     deallocate(this%vars(varindex)%atts)
@@ -226,6 +226,15 @@ contains
     
     this%vars(varindex)%atts( size(this%vars(varindex)%atts) )%it = att_type_int(name=att_name, val=att_val)
   end subroutine
+  
+  
+  function is_attached(this) result(x)
+    class(netcdf_file_type), intent(in) :: this
+    logical x
+    ! EO parameters
+
+    x = (this%filepath .ne. "")
+  end function
 
 
   subroutine open_read(this, filepath)
@@ -464,6 +473,8 @@ contains
     ! EO parameters
     include "netcdf.inc"
     call assert_nc( nf_close(this%ncid) , __LINE__)
+    
+    this%filepath = ""
   end subroutine
 
 
