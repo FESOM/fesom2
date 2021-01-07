@@ -875,16 +875,17 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
         # file contains monthly data
         elif nti==12:                   
             sel_timeidx = [x-1 for x in data.month]
-            if data.month.size==12:
+            #if data.month.size==12:
+            if len(data.month)==12:
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([(x-1)/12 + year for x in box.month])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([(x-1)/12 + year for x in data.month])
                 data.time=np.array(aux_time)
             else:
-                aux_mon = np.arange(0,len(box.month),1)
+                aux_mon = np.arange(0,len(data.month),1)
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([x/len(box.month) + year for x in aux_mon])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([x/len(data.month) + year for x in aux_mon])
                 data.time=np.array(aux_time)
             
         # file contains 5 daily data    
