@@ -265,9 +265,9 @@ contains
     allocate(varshape(var_ndims))
          
     do i=1, var_ndims
-      if(this%dims(i)%len == nf_unlimited) then
+      if(this%dims( var%dim_indices(i) )%len == nf_unlimited) then
         ! actually read from the file
-        call assert_nc( nf_inq_dimlen(this%ncid, this%dims(i)%ncid, varshape(i)) , __LINE__)
+        call assert_nc( nf_inq_dimlen(this%ncid, this%dims( var%dim_indices(i) )%ncid, varshape(i)) , __LINE__)
       else
         ! use the dim size which has been set without the file and is thus known anyway to the user
         varshape(i) = this%dims( var%dim_indices(i) )%len

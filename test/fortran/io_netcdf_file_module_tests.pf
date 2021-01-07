@@ -613,9 +613,9 @@ contains
   subroutine test_can_read_var_shape_from_file()
     type(netcdf_file_type) f
     integer, allocatable :: varshape(:)
-    
     integer node_dimidx, time_dimidx
     integer varindex
+    
     call f%initialize()
     node_dimidx = f%add_dim("nod2", 5)
     time_dimidx = f%add_dim_unlimited("time")
@@ -624,9 +624,27 @@ contains
     call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc")
     
     call f%read_var_shape(varindex, varshape)
-    
     @assertEqual([5,2], varshape)
+    call f%close_file()
+  end subroutine
+
+
+  @test
+  subroutine test_can_read_var_shape_from_file_with_reverse_dim_index_order()
+    type(netcdf_file_type) f
+    integer, allocatable :: varshape(:)
+    integer node_dimidx, time_dimidx
+    integer varindex
     
+    call f%initialize()
+    time_dimidx = f%add_dim_unlimited("time")
+    node_dimidx = f%add_dim("nod2", 5)
+    
+    varindex = f%add_var_real("sss", [node_dimidx,time_dimidx])
+    
+    call f%open_read("fixtures/io_netcdf/columnwise_2d_sss.nc") 
+    call f%read_var_shape(varindex, varshape)
+    @assertEqual([5,2], varshape)
     call f%close_file()
   end subroutine
 
