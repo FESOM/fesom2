@@ -258,7 +258,7 @@ contains
   ! this currently only makes sense for variables with unlimited dimensions,
   ! as all other dimensions must be known when adding the variable to the file specification, e.g before reading the file
   subroutine read_var_shape(this, varindex, varshape)
-    class(netcdf_file_type), target, intent(inout) :: this
+    class(netcdf_file_type), target, intent(in) :: this
     integer, intent(in) :: varindex
     integer, allocatable, intent(out) :: varshape(:)
     ! EO parameters
