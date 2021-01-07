@@ -15,6 +15,7 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, close_file, open_write_create, open_write_append
+    procedure, public :: read_var_shape
     procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
     generic, public :: write_var => write_var_r4, write_var_r8, write_var_integer
@@ -241,6 +242,37 @@ contains
     
     ! attach our dims and vars to their counterparts in the file
     call this%attach_dims_vars_to_file()
+  end subroutine
+
+
+  ! return an array with the dimension sizes for all dimensions of the given variable
+  ! this currently only makes sense for variables with unlimited dimensions,
+  ! as all other dimensions must be known when adding the variable to the file specification, e.g before reading the file
+  subroutine read_var_shape(this, varindex, varshape)
+    class(netcdf_file_type), target, intent(inout) :: this
+    integer, intent(in) :: varindex
+    integer, allocatable, intent(out) :: varshape(:)
+    ! EO parameters
+    include "netcdf.inc"
+    type(var_type), pointer :: var
+    integer var_ndims
+    integer i
+    
+    var => this%vars(varindex)
+    var_ndims = size(var%dim_indices)
+    
+    if(allocated(varshape)) deallocate(varshape)
+    allocate(varshape(var_ndims))
+         
+    do i=1, var_ndims
+      if(this%dims(i)%len == nf_unlimited) then
+        ! actually read from the file
+        call assert_nc( nf_inq_dimlen(this%ncid, this%dims(i)%ncid, varshape(i)) , __LINE__)
+      else
+        ! use the dim size which has been set without the file and is thus known anyway to the user
+        varshape(i) = this%dims( var%dim_indices(i) )%len
+      end if
+    end do
   end subroutine
 
 
