@@ -168,7 +168,7 @@ module g_cvmix_tidal
     subroutine calc_cvmix_tidal(mesh)
         type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, node_size
-        integer       :: nz, nln
+        integer       :: nz, nln, nun
         integer       :: elnodes(3)
         real(kind=WP) :: simmonscoeff, vertdep(mesh%nl)
 
@@ -177,6 +177,7 @@ module g_cvmix_tidal
         node_size = myDim_nod2D
         do node = 1,node_size
             nln = nlevels_nod2D(node)-1
+            nun = ulevels_nod2D(node)
             vertdep = 0.0_WP
             
             !___________________________________________________________________
@@ -187,9 +188,9 @@ module g_cvmix_tidal
                  energy_flux     = tidal_forc_bottom_2D(node),& !in W m-2  
                  rho             = density_0,                 &
                  SimmonsCoeff    = simmonscoeff,              &
-                 VertDep         = vertdep(1:nln),                & ! vertical deposition function 
-                 zw              = zbar_3d_n(1:nln+1,node),         & 
-                 zt              = Z_3d_n(1:nln,node))
+                 VertDep         = vertdep(nun:nln),                & ! vertical deposition function 
+                 zw              = zbar_3d_n(nun:nln+1,node),         & 
+                 zt              = Z_3d_n(nun:nln,node))
                 
             !___________________________________________________________________
             ! Computes vertical diffusion coefficients for tidal mixing 
@@ -234,7 +235,8 @@ module g_cvmix_tidal
         call exchange_nod(tidal_Av)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            do nz=1,nlevels(elem)-1
+            !!PS do nz=1,nlevels(elem)-1
+            do nz=ulevels(elem),nlevels(elem)-1
                 Av(nz,elem) = Av(nz,elem) + sum(tidal_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do

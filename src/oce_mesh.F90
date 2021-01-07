@@ -14,6 +14,14 @@ module find_levels_interface
     end subroutine
   end interface
 end module
+module find_levels_cavity_interface
+  interface
+    subroutine find_levels_cavity(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
 module test_tri_interface
   interface
     subroutine test_tri(mesh)
@@ -74,6 +82,15 @@ module mesh_auxiliary_arrays_interface
     end subroutine
   end interface
 end module
+module find_levels_min_e2n_interface
+  interface
+    subroutine find_levels_min_e2n(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -87,9 +104,11 @@ USE g_parsup
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
+use find_levels_cavity_interface
 use mesh_auxiliary_arrays_interface
 use test_tri_interface
 use load_edges_interface
+use find_levels_min_e2n_interface
 use find_neighbors_interface
 use mesh_areas_interface
 IMPLICIT NONE
@@ -100,11 +119,16 @@ IMPLICIT NONE
       call read_mesh(mesh)
       call set_par_support(mesh)
       call find_levels(mesh)
+      
+      if (use_cavity) call find_levels_cavity(mesh)
+        
       call test_tri(mesh)
       call load_edges(mesh)
       call find_neighbors(mesh)
+      call find_levels_min_e2n(mesh)
       call mesh_areas(mesh)
       call mesh_auxiliary_arrays(mesh)
+           
 END SUBROUTINE mesh_setup
 !======================================================================
 ! Reads distributed mesh
@@ -655,135 +679,658 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  endif
 
  END subroutine  read_mesh
-!============================================================ 
+!
+!
+!_______________________________________________________________________________
+! load fesom2.0 mesh files: nlvls.out and elvls.out that are created during the 
+! partitioning
+!_______________________________________________________________________________
 subroutine find_levels(mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_PARSUP
-USE g_config
-!
-IMPLICIT NONE
-!
- type(t_mesh), intent(inout), target    :: mesh
- character*1000                         :: file_name
- integer                                :: ierror   ! MPI return error code
- integer                                :: k, n, fileID
- integer                                :: nchunk, chunk_size, ipos, iofs, mesh_check
- integer, allocatable, dimension(:)     :: mapping
- integer, allocatable, dimension(:)     :: ibuff
- real(kind=WP)                          :: t0, t1
+    use MOD_MESH
+    use o_PARAM
+    use g_PARSUP
+    use g_config
+    !
+    implicit none
+    !
+    type(t_mesh), intent(inout), target    :: mesh
+    character*1000                         :: file_name
+    integer                                :: ierror   ! MPI return error code
+    integer                                :: k, n, fileID
+    integer                                :: nchunk, chunk_size, ipos, iofs, mesh_check
+    integer, allocatable, dimension(:)     :: mapping
+    integer, allocatable, dimension(:)     :: ibuff
+    real(kind=WP)                          :: t0, t1
 
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
 
- t0=MPI_Wtime()
- allocate(mesh%nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- allocate(mesh%nlevels_nod2D(myDim_nod2D+eDim_nod2D))
- !mesh related files will be read in chunks of chunk_size
- chunk_size=100000
- !==============================
- ! Allocate mapping array (chunk_size)
- ! It will be used for several purposes 
- !==============================
- allocate(mapping(chunk_size))
- allocate(ibuff(chunk_size))
- !==============================
- !Part I: reading levels at elements...
- if (mype==0)  then 
-    fileID=10
-    file_name=trim(meshpath)//'elvls.out'
-    open(fileID, file=file_name)
-    write(*,*) 'reading '// trim(file_name)   
- end if
- ! 0 proc reads the data in chunks and distributes it between other procs
- mesh_check=0
- do nchunk=0, (mesh%elem2D-1)/chunk_size
-    !create the mapping for the current chunk
-    mapping(1:chunk_size)=0
-    do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
-       ipos=(myList_elem2D(n)-1)/chunk_size
-       if (ipos==nchunk) then
-          iofs=myList_elem2D(n)-nchunk*chunk_size
-          mapping(iofs)=n
-       end if
-    end do
-    !read the chunk into the buffers
-    k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
-    if (mype==0) then
-       do n=1, k
-          read(fileID,*) ibuff(n)
-       end do
+    t0=MPI_Wtime()
+    !___________________________________________________________________________
+    allocate(mesh%nlevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    allocate(mesh%nlevels_nod2D(myDim_nod2D+eDim_nod2D))
+    
+    !___________________________________________________________________________
+    !mesh related files will be read in chunks of chunk_size
+    chunk_size=100000
+    ! Allocate mapping array (chunk_size), It will be used for several purposes 
+    allocate(mapping(chunk_size))
+    allocate(ibuff(chunk_size))
+ 
+    !___________________________________________________________________________
+    ! Part I: reading levels at elements...
+    if (mype==0)  then 
+        fileID=10
+        file_name=trim(meshpath)//'elvls.out'
+        open(fileID, file=file_name)
+        write(*,*) 'reading '// trim(file_name)   
     end if
-    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    ! fill the local arrays
-    do n=1, k      
-       if (mapping(n)>0) then
-          mesh_check=mesh_check+1
-          mesh%nlevels(mapping(n))=ibuff(n)
-       end if
-    end do
- end do
- if (mype==0) close(fileID)
- if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
-    write(*,*) 'ERROR while reading elvls.out on mype=', mype
-    write(*,*) mesh_check, ' values have been read in according to partitioning'
-    write(*,*) 'it does not equal to myDim_elem2D+eDim_elem2D = ', myDim_elem2D+eDim_elem2D
- end if
-
- !==============================
- !Part II: reading levels at nodes...
- if (mype==0)  then 
-    file_name=trim(meshpath)//'nlvls.out'
-    open(fileID, file=file_name)
-    write(*,*) 'reading '// trim(file_name)   
- end if
- ! 0 proc reads the data in chunks and distributes it between other procs
- mesh_check=0
- do nchunk=0, (mesh%nod2D-1)/chunk_size
-    !create the mapping for the current chunk
-    mapping(1:chunk_size)=0
-    do n=1, myDim_nod2D+eDim_nod2D
-       ipos=(myList_nod2D(n)-1)/chunk_size
-       if (ipos==nchunk) then
-          iofs=myList_nod2D(n)-nchunk*chunk_size
-          mapping(iofs)=n
-       end if
-    end do
-    !read the chunk into the buffers
-    k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
-    if (mype==0) then
-       do n=1, k
-          read(fileID,*) ibuff(n)
-       end do
+    
+    ! 0 proc reads the data in chunks and distributes it between other procs
+    mesh_check=0
+    do nchunk=0, (mesh%elem2D-1)/chunk_size
+        !_______________________________________________________________________
+        !create the mapping for the current chunk
+        mapping(1:chunk_size)=0
+        do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            ! myList_elem2D(n) contains global element index of the local
+            ! element on that CPU
+            ! ipos is integer, (myList_elem2D(n)-1)/chunk_size always rounds 
+            ! off to integer values
+            ! --> ipos is an index to which chunk a global element on a local CPU 
+            !     belongs
+            ipos=(myList_elem2D(n)-1)/chunk_size
+            
+            ! if global element chunk index (ipos) lies within the actual chunk
+            if (ipos==nchunk) then
+                iofs=myList_elem2D(n)-nchunk*chunk_size
+                ! connect chunk reduced (iofs) global element index with local
+                ! element index n --> mapping(iofs)=n
+                mapping(iofs)=n
+            end if
+        end do
+        
+        !_______________________________________________________________________
+        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+        ! k ... is actual chunk size, considers also possible change in chunk size
+        !       at the end i.e elem2d=130000, nchunk_0 = 100000, nchunk_1=30000
+        k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) ibuff(n)
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        
+        !_______________________________________________________________________
+        ! fill the local arrays
+        do n=1, k      
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%nlevels(mapping(n))=ibuff(n)
+            end if
+        end do
+    end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+    if (mype==0) close(fileID)
+    if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: while reading elvls.out on mype=', mype
+        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+        write(*,*) '        it does not equal to myDim_elem2D+eDim_elem2D = ', myDim_elem2D+eDim_elem2D
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
     end if
-    call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-    ! fill the local arrays
-    do n=1, k      
-       if (mapping(n)>0) then
-          mesh_check=mesh_check+1
-          mesh%nlevels_nod2D(mapping(n))=ibuff(n)
-       end if
+
+    !___________________________________________________________________________
+    ! Part II: reading levels at nodes...
+    if (mype==0)  then 
+        file_name=trim(meshpath)//'nlvls.out'
+        open(fileID, file=file_name)
+        write(*,*) 'reading '// trim(file_name)   
+    end if
+    
+    ! 0 proc reads the data in chunks and distributes it between other procs
+    mesh_check=0
+    do nchunk=0, (mesh%nod2D-1)/chunk_size
+        !_______________________________________________________________________
+        !create the mapping for the current chunk
+        mapping(1:chunk_size)=0
+        do n=1, myDim_nod2D+eDim_nod2D
+            ! myList_nod2D(n) contains global vertice index of the local
+            ! vertice on that CPU
+            ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+            ! off to integer values
+            ! --> ipos is an index to which chunk a global vertice on a local CPU 
+            !     belongs
+            ipos=(myList_nod2D(n)-1)/chunk_size
+            
+            ! if global vertice chunk index (ipos) lies within the actual chunk
+            if (ipos==nchunk) then
+                iofs=myList_nod2D(n)-nchunk*chunk_size
+                ! connect chunk reduced (iofs) global vertice index with local
+                ! vertice index n --> mapping(iofs)=n
+                mapping(iofs)=n
+            end if
+        end do
+        
+        !_______________________________________________________________________
+        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+        ! k ... is actual chunk size, considers also possible change in chunk size
+        !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) ibuff(n)
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        
+        !_______________________________________________________________________
+        ! fill the local arrays
+        do n=1, k      
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%nlevels_nod2D(mapping(n))=ibuff(n)
+            end if
+        end do
     end do
- end do
- if (mype==0) close(fileID)
- if (mesh_check/=myDim_nod2D+eDim_nod2D) then
-    write(*,*) 'ERROR while reading nelvls.out on mype=', mype
-    write(*,*) mesh_check, ' values have been read in according to partitioning'
-    write(*,*) 'it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
- end if
- deallocate(ibuff)
- deallocate(mapping)
- !============================== 
-CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
- t1=MPI_Wtime()
+    if (mype==0) close(fileID)
+    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: while reading nlvls.out on mype=', mype
+        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+        write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+    end if
+    
+    !___________________________________________________________________________
+    ! deallocate mapping and buffer array
+    deallocate(ibuff)
+    deallocate(mapping)
 
- if (mype==0) then
-    write(*,*) '3D mesh was read in ', t1-t0, ' seconds'
-    write(*,*) 'Min/max depth on mype : ', mype, -mesh%zbar(minval(mesh%nlevels)),-mesh%zbar(maxval(mesh%nlevels))
-    write(*,*) '========================='
- endif
+    !___________________________________________________________________________
+    ! waits until all cpus have reached this points --> all cpus have to be
+    ! supplied with cavity info 
+    call MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
+    
+    !___________________________________________________________________________
+    ! initializes upper integration boundary index for all vertical vertice and 
+    ! element loops, default = 1, but when cavity is used can be different 
+    allocate(mesh%ulevels(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    allocate(mesh%ulevels_nod2D(myDim_nod2D+eDim_nod2D))
+    mesh%ulevels=1
+    mesh%ulevels_nod2D=1
+    
+    !___________________________________________________________________________
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> 3D mesh was read in ', t1-t0, ' seconds'
+        write(*,*) ' --> Min/max depth on mype : ', mype, -mesh%zbar(minval(mesh%nlevels)),-mesh%zbar(maxval(mesh%nlevels))
+    endif
+end subroutine find_levels
+!
+!
+!_______________________________________________________________________________
+! load cavity mesh files: cavity_depth, cavity_flag, cavity_nlvls.out and 
+! cavity_elvls.out that are created during the partitioning when namelist.config flag
+! use_cavity=.True.
+!_______________________________________________________________________________
+subroutine find_levels_cavity(mesh)
+    use MOD_MESH
+    use o_PARAM
+    use g_PARSUP
+    use g_config
+    !
+    implicit none
+    !
+    type(t_mesh), intent(inout), target :: mesh
+    character*1000                      :: file_name
+    integer                             :: ierror   ! MPI return error code
+    integer                             :: k, n, fileID
+    integer                             :: nchunk, chunk_size, ipos, iofs, mesh_check
+    integer, allocatable, dimension(:)  :: mapping
+    integer, allocatable, dimension(:)  :: ibuff
+    real(kind=WP)                       :: t0, t1
+    logical                             :: file_exist=.False.
+    integer                             :: elem, elnodes(3), ule,  uln(3)
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
+    
+    t0=MPI_Wtime()
+    !___________________________________________________________________________
+    ! allocate arrays, reset pointers
+!!PS     allocate(mesh%cavity_flag_e(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+!!PS     allocate(mesh%cavity_flag_n(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%cavity_depth(myDim_nod2D+eDim_nod2D))
+    
+    !___________________________________________________________________________
+    ! mesh related files will be read in chunks of chunk_size
+    chunk_size=100000
+    
+    ! Allocate mapping array (chunk_size) --> It will be used for several purposes 
+    allocate(mapping(chunk_size))
+    allocate(ibuff(chunk_size))
+    
+    !___________________________________________________________________________
+    ! Part I: reading cavity levels at elements...
+    if (mype==0)  then 
+        fileID=10
+        file_name=trim(meshpath)//'cavity_elvls.out'
+        file_exist=.False.
+        inquire(file=trim(file_name),exist=file_exist)
+        if (file_exist) then
+            open(fileID, file=file_name)
+            write(*,*) ' --> open '// trim(file_name)   
+        else
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: could not find file: cavity_elvls.out '
+            write(*,*) '        Either wrong mesh path, or this file still needs to be'
+            write(*,*) '        create during the partitioning with namelist.config flag'
+            write(*,*) '        use_cavity=.true.'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex
+        end if 
+    end if
+    
+    ! 0 proc reads the data in chunks and distributes it between other procs
+    mesh_check=0
+    do nchunk=0, (mesh%elem2D-1)/chunk_size
+        !_______________________________________________________________________
+        !create the mapping for the current chunk
+        mapping(1:chunk_size)=0
+        do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+            ! myList_elem2D(n) contains global element index of the local
+            ! element on that CPU
+            ! ipos is integer, (myList_elem2D(n)-1)/chunk_size always rounds 
+            ! off to integer values
+            ! --> ipos is an index to which chunk a global element on a local CPU 
+            !     belongs
+            ipos=(myList_elem2D(n)-1)/chunk_size
+            
+            ! if global element chunk index (ipos) lies within the actual chunk
+            if (ipos==nchunk) then
+                iofs=myList_elem2D(n)-nchunk*chunk_size
+                ! connect chunk reduced (iofs) global element index with local
+                ! element index n --> mapping(iofs)=n
+                mapping(iofs)=n
+            end if
+        end do
+        
+        !_______________________________________________________________________
+        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+        ! k ... is actual chunk size, considers also possible change in chunk size
+        !       at the end i.e elem2d=130000, nchunk_0 = 100000, nchunk_1=30000
+        k=min(chunk_size, mesh%elem2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) ibuff(n)
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        
+        !_______________________________________________________________________
+        ! fill the local arrays on each CPU
+        do n=1, k
+            ! if local mapping == 0, than the global chunk buffer element does not 
+            ! belong to local cpu
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%ulevels(mapping(n))=ibuff(n)
+            end if
+        end do
+        
+    end do ! --> do nchunk=0, (mesh%elem2D-1)/chunk_size
+    if (mype==0) close(fileID)
+    if (mesh_check/=myDim_elem2D+eDim_elem2D+eXDim_elem2D) then
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: while reading cavity_elvls.out on mype=', mype
+        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+        write(*,*) '        it does not equal to myDim_elem2D+eDim_elem2D = ', myDim_elem2D+eDim_elem2D
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+    end if
 
-END SUBROUTINE find_levels
+    !___________________________________________________________________________
+    ! Part II: reading cavity level at nodes
+    if (mype==0)  then 
+        file_name=trim(meshpath)//'cavity_nlvls.out'
+        file_exist=.False.
+        inquire(file=trim(file_name),exist=file_exist)
+        if (file_exist) then
+            open(fileID, file=file_name)
+            write(*,*) ' --> open '// trim(file_name)   
+        else
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: could not find file: cavity_nlvls.out '
+            write(*,*) '        Either wrong mesh path, or this file still needs to be'
+            write(*,*) '        create during the partitioning with namelist.config flag'
+            write(*,*) '        use_cavity=.true.'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex
+        end if    
+    end if
+    
+    ! 0 proc reads the data in chunks and distributes it between other procs
+    mesh_check=0
+    do nchunk=0, (mesh%nod2D-1)/chunk_size
+        !_______________________________________________________________________
+        !create the mapping for the current chunk
+        mapping(1:chunk_size)=0
+        do n=1, myDim_nod2D+eDim_nod2D
+            ! myList_nod2D(n) contains global vertice index of the local
+            ! vertice on that CPU
+            ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+            ! off to integer values
+            ! --> ipos is an index to which chunk a global vertice on a local CPU 
+            !     belongs
+            ipos=(myList_nod2D(n)-1)/chunk_size
+            
+            ! if global vertice chunk index (ipos) lies within the actual chunk
+            if (ipos==nchunk) then
+                iofs=myList_nod2D(n)-nchunk*chunk_size
+                ! connect chunk reduced (iofs) global vertice index with local
+                ! vertice index n --> mapping(iofs)=n
+                mapping(iofs)=n
+            end if
+        end do
+        
+        !_______________________________________________________________________
+        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+        ! k ... is actual chunk size, considers also possible change in chunk size
+        !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) ibuff(n)
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        
+        !_______________________________________________________________________
+        ! fill the local arrays
+        do n=1, k      
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%ulevels_nod2D(mapping(n))=ibuff(n)
+            end if
+        end do
+    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+    if (mype==0) close(fileID)
+    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: while reading cavity_nlvls.out on mype=', mype
+        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+        write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+    end if
+    
+    !___________________________________________________________________________
+    ! Part III: computing cavity flag at nodes and elements
+!!PS     mesh%cavity_flag_e = 0
+!!PS     do n=1,myDim_elem2D+eDim_elem2D+eXDim_elem2D
+!!PS         if (mesh%ulevels(n)>1) mesh%cavity_flag_e(n)=1
+!!PS     end do    
+!!PS     mesh%cavity_flag_n = 0
+!!PS     do n=1,myDim_nod2D+eDim_nod2D
+!!PS         if (mesh%ulevels_nod2D(n)>1) mesh%cavity_flag_n(n)=1
+!!PS     end do    
+!!PS     if (mype==0)  then 
+!!PS         file_name=trim(meshpath)//'cavity_flag.out'
+!!PS         open(fileID, file=file_name)
+!!PS         write(*,*) 'reading '// trim(file_name)   
+!!PS     end if
+!!PS     
+!!PS     ! 0 proc reads the data in chunks and distributes it between other procs
+!!PS     mesh_check=0
+!!PS     do nchunk=0, (mesh%nod2D-1)/chunk_size
+!!PS         !_______________________________________________________________________
+!!PS         !create the mapping for the current chunk
+!!PS         mapping(1:chunk_size)=0
+!!PS         do n=1, myDim_nod2D+eDim_nod2D
+!!PS             ! myList_nod2D(n) contains global vertice index of the local
+!!PS             ! vertice on that CPU
+!!PS             ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+!!PS             ! off to integer values
+!!PS             ! --> ipos is an index to which chunk a global vertice on a local CPU 
+!!PS             !     belongs
+!!PS             ipos=(myList_nod2D(n)-1)/chunk_size
+!!PS             
+!!PS             ! if global vertice chunk index (ipos) lies within the actual chunk
+!!PS             if (ipos==nchunk) then
+!!PS                 iofs=myList_nod2D(n)-nchunk*chunk_size
+!!PS                 ! connect chunk reduced (iofs) global vertice index with local
+!!PS                 ! vertice index n --> mapping(iofs)=n
+!!PS                 mapping(iofs)=n
+!!PS             end if
+!!PS         end do
+!!PS         
+!!PS         !_______________________________________________________________________
+!!PS         ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+!!PS         ! k ... is actual chunk size, considers also possible change in chunk size
+!!PS         !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+!!PS         k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+!!PS         if (mype==0) then
+!!PS             do n=1, k
+!!PS                 read(fileID,*) ibuff(n)
+!!PS             end do
+!!PS         end if
+!!PS         
+!!PS         !_______________________________________________________________________
+!!PS         ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+!!PS         call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+!!PS         
+!!PS         !_______________________________________________________________________
+!!PS         ! fill the local arrays
+!!PS         do n=1, k      
+!!PS             if (mapping(n)>0) then
+!!PS                 mesh_check=mesh_check+1
+!!PS                 mesh%cavity_flag(mapping(n))=ibuff(n)
+!!PS             end if
+!!PS         end do
+!!PS     end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+!!PS     if (mype==0) close(fileID)
+!!PS     if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+!!PS         write(*,*)
+!!PS         print *, achar(27)//'[33m'
+!!PS         write(*,*) '____________________________________________________________________'
+!!PS         write(*,*) ' ERROR: while reading cavity_flag.out on mype=', mype
+!!PS         write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+!!PS         write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+!!PS         write(*,*) '____________________________________________________________________'
+!!PS         print *, achar(27)//'[0m'
+!!PS     end if
+    
+    !___________________________________________________________________________
+    ! Part IV: reading cavity depth at nodes
+    if (mype==0)  then 
+        file_name=trim(meshpath)//'cavity_depth.out'
+        file_exist=.False.
+        inquire(file=trim(file_name),exist=file_exist)
+        if (file_exist) then
+            open(fileID, file=file_name)
+            write(*,*) ' --> open '// trim(file_name)   
+        else
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: could not find file: cavity_depth.out '
+            write(*,*) '        Wrong mesh path ? This file provides the necessary depth'
+            write(*,*) '        information of the cavity.'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+            call par_ex
+        end if 
+    end if
+    
+    ! 0 proc reads the data in chunks and distributes it between other procs
+    mesh_check=0
+    do nchunk=0, (mesh%nod2D-1)/chunk_size
+        !_______________________________________________________________________
+        !create the mapping for the current chunk
+        mapping(1:chunk_size)=0
+        do n=1, myDim_nod2D+eDim_nod2D
+            ! myList_nod2D(n) contains global vertice index of the local
+            ! vertice on that CPU
+            ! ipos is integer, (myList_nod2D(n)-1)/chunk_size always rounds 
+            ! off to integer values
+            ! --> ipos is an index to which chunk a global vertice on a local CPU 
+            !     belongs
+            ipos=(myList_nod2D(n)-1)/chunk_size
+            
+            ! if global vertice chunk index (ipos) lies within the actual chunk
+            if (ipos==nchunk) then
+                iofs=myList_nod2D(n)-nchunk*chunk_size
+                ! connect chunk reduced (iofs) global vertice index with local
+                ! vertice index n --> mapping(iofs)=n
+                mapping(iofs)=n
+            end if
+        end do
+        
+        !_______________________________________________________________________
+        ! read the chunk piece into the buffer --> done only by one CPU (mype==0)
+        ! k ... is actual chunk size, considers also possible change in chunk size
+        !       at the end i.e nod2d=130000, nchunk_0 = 100000, nchunk_1=30000
+        k=min(chunk_size, mesh%nod2D-nchunk*chunk_size)
+        if (mype==0) then
+            do n=1, k
+                read(fileID,*) ibuff(n)
+            end do
+        end if
+        
+        !_______________________________________________________________________
+        ! broadcast chunk buffer to all other CPUs (k...size of buffer)
+        call MPI_BCast(ibuff(1:k), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+        
+        !_______________________________________________________________________
+        ! fill the local arrays
+        do n=1, k      
+            if (mapping(n)>0) then
+                mesh_check=mesh_check+1
+                mesh%cavity_depth(mapping(n))=ibuff(n)
+            end if
+        end do
+    end do ! --> do nchunk=0, (mesh%nod2D-1)/chunk_size
+    if (mype==0) close(fileID)
+    if (mesh_check/=myDim_nod2D+eDim_nod2D) then
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: while reading cavity_depth.out on mype=', mype
+        write(*,*) '        ',mesh_check, ' values have been read in according to partitioning'
+        write(*,*) '        it does not equal to myDim_nod2D+eDim_nod2D = ', myDim_nod2D+eDim_nod2D
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+    end if
+    
+    !___________________________________________________________________________
+    ! deallocate mapping and buffer array
+    deallocate(ibuff)
+    deallocate(mapping)
+
+    !___________________________________________________________________________
+    ! waits until all cpus have reached this points --> all cpus have to be
+    ! supplied with cavity info 
+    call MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
+    
+    !___________________________________________________________________________
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> cavity info read in ', t1-t0, ' seconds'
+    end if
+    
+    !___________________________________________________________________________
+    ! check cavity info 
+    do elem=1,myDim_elem2d
+        elnodes = mesh%elem2D_nodes(:,elem)
+        ule = mesh%ulevels(elem)
+        uln = mesh%ulevels_nod2D(elnodes)
+        if (ule < maxval(uln)) then 
+            write(*,*) ' --> found cavity elem depth shallower than valid cavity node depth, mype=', mype
+        end if 
+    end do 
+    
+end subroutine find_levels_cavity
+!
+!
+!_______________________________________________________________________________
+! load cavity mesh files: cavity_depth, cavity_flag, cavity_nlvls.out and 
+! cavity_elvls.out that are created during the partitioning when namelist.config flag
+! use_cavity=.True.
+!_______________________________________________________________________________
+subroutine find_levels_min_e2n(mesh)
+    use MOD_MESH
+    use o_PARAM
+    use g_PARSUP
+    use g_config
+    use g_comm_auto
+    !
+    implicit none
+    !
+    type(t_mesh), intent(inout), target :: mesh
+    integer                             :: node, k
+    real(kind=WP)                       :: t0, t1
+    
+!NR Cannot include the pointers before the targets are allocated...
+!NR #include "associate_mesh.h"
+    
+    t0=MPI_Wtime()
+    !___________________________________________________________________________
+    allocate(mesh%nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%ulevels_nod2D_max(myDim_nod2D+eDim_nod2D))
+    do node=1, myDim_nod2d
+        k=mesh%nod_in_elem2D_num(node)
+        ! minimum depth in neigbouring elements around node n
+        mesh%nlevels_nod2D_min(node)=minval(mesh%nlevels(mesh%nod_in_elem2D(1:k,node)))
+        mesh%ulevels_nod2D_max(node)=maxval(mesh%ulevels(mesh%nod_in_elem2D(1:k,node)))
+    end do
+    call exchange_nod(mesh%nlevels_nod2D_min)
+    call exchange_nod(mesh%ulevels_nod2D_max)
+    
+    !___________________________________________________________________________
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> find min/max level e2n in', t1-t0, ' seconds'
+    end if
+    
+end subroutine find_levels_min_e2n
+!
+!
+!
 !===========================================================================
 SUBROUTINE test_tri(mesh)
 USE MOD_MESH
@@ -1308,8 +1855,9 @@ t0=MPI_Wtime()
  DO n=1, myDim_nod2D
     DO j=1,mesh%nod_in_elem2D_num(n)
        elem=mesh%nod_in_elem2D(j,n)
+       !!PS DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
        DO nz=1,mesh%nlevels(elem)-1
-       mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
+        mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
        END DO
     END DO
  END DO
@@ -1766,7 +2314,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
 
    aux=0._WP
    do n=1, myDim_nod2D
-      do nz=1, mesh%nlevels_nod2D(n)-1
+      do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
          aux(nz)=aux(nz)+mesh%area(nz, n)
       end do
    end do
@@ -1777,7 +2325,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    do elem=1, myDim_elem2D
       elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=1, mesh%nlevels(elem)         
+      do nz=mesh%ulevels(elem), mesh%nlevels(elem)         
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do

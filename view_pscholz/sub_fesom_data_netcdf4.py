@@ -101,6 +101,11 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
         return data
     
+    elif data.var=='cavity_depth':
+        data.value 	= -mesh.nodes_2d_cg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
+        return data
+    
     #___________________________________________________________________________
     # number of years to average 
     nyi         = data.year[1]-data.year[0]+1

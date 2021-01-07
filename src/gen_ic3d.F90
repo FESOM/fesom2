@@ -17,7 +17,7 @@ MODULE g_ic3d
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
-   USE g_config, only: dummy, ClimateDataPath
+   USE g_config, only: dummy, ClimateDataPath, use_cavity
    
    IMPLICIT NONE
 
@@ -224,6 +224,7 @@ CONTAINS
       integer                  :: i
       integer                  :: elnodes(3)
       real(wp)                 :: x, y       ! coordinates of elements
+      real(kind=WP), allocatable,dimension(:,:) :: cav_nrst_xyz
       type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh.h"
       
@@ -234,28 +235,65 @@ CONTAINS
          write(*,*) 'input file: ', trim(filename)
          write(*,*) 'variable  : ', trim(varname)
       end if
+      
       call nc_readGrid
 
       ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
-      do i = 1, myDim_nod2d
-!         ! get coordinates of elements
-         x  = geo_coord_nod2D(1,i)/rad
-         y  = geo_coord_nod2D(2,i)/rad
-         if (x<0.)   x=x+360.
-         if (x>360.) x=x-360.
-         ! find nearest
-         if ( x <= nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then               
-            call binarysearch(nc_Nlon, nc_lon, x, bilin_indx_i(i))
-         else ! NO extrapolation in space
-            bilin_indx_i(i)=-1         
-         end if
-
-         if ( y <= nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then      
-            call binarysearch(nc_Nlat, nc_lat, y, bilin_indx_j(i))
-         else ! NO extrapolation in space
-               bilin_indx_j(i)=-1         
-         end if
-      end do
+      !_________________________________________________________________________
+      ! cavity case
+      if (use_cavity) then
+        ! compute bilinear index
+        do i = 1, myDim_nod2d
+    !       ! its a cavity node use extrapolation points of closest cavity line point
+            ! exchange the coordinates of the cavity node with the coordinates of the 
+            ! closest cavity-line point --> use than these coordinates to estimate 
+            ! bilinear interpolation index
+            if (ulevels_nod2D(i)>1) then
+                x = mesh%cavity_nrst_cavlpnt_xyz(1,i)/rad
+                y = mesh%cavity_nrst_cavlpnt_xyz(2,i)/rad
+                !!PS if (mype==0) write(*,*) 'xold, yold, xnew, ynew = ',geo_coord_nod2D(1,i),geo_coord_nod2D(2,i),mesh%cavity_nrst_cavlpnt_xyz(1,i),mesh%cavity_nrst_cavlpnt_xyz(2,i)
+            ! its no cavity use normal vertice points    
+            else
+                x = geo_coord_nod2D(1,i)/rad
+                y = geo_coord_nod2D(2,i)/rad
+            end if 
+            if (x<0.)   x=x+360.
+            if (x>360.) x=x-360.
+            ! find nearest
+            if ( x <= nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then               
+                call binarysearch(nc_Nlon, nc_lon, x, bilin_indx_i(i))
+            else ! NO extrapolation in space
+                bilin_indx_i(i)=-1         
+            end if
+            if ( y <= nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then      
+                call binarysearch(nc_Nlat, nc_lat, y, bilin_indx_j(i))
+            else ! NO extrapolation in space
+                bilin_indx_j(i)=-1         
+            end if
+        end do
+       
+      !_________________________________________________________________________ 
+      ! standard non-cavity case
+      else ! use_cavity==.false.
+        do i = 1, myDim_nod2d
+    !       ! get coordinates of elements
+            x  = geo_coord_nod2D(1,i)/rad
+            y  = geo_coord_nod2D(2,i)/rad
+            if (x<0.)   x=x+360.
+            if (x>360.) x=x-360.
+            ! find nearest
+            if ( x <= nc_lon(nc_Nlon) .and. x >= nc_lon(1) ) then               
+                call binarysearch(nc_Nlon, nc_lon, x, bilin_indx_i(i))
+            else ! NO extrapolation in space
+                bilin_indx_i(i)=-1         
+            end if
+            if ( y <= nc_lat(nc_Nlat) .and. y >= nc_lat(1) ) then      
+                call binarysearch(nc_Nlat, nc_lat, y, bilin_indx_j(i))
+            else ! NO extrapolation in space
+                bilin_indx_j(i)=-1         
+            end if
+        end do
+      end if   
    END SUBROUTINE nc_ic3d_ini
 
    SUBROUTINE getcoeffld(mesh)
@@ -277,8 +315,8 @@ CONTAINS
       integer              :: fld_idx, i,j,ii, ip1, jp1, k
       integer              :: d_indx, d_indx_p1  ! index of neares      
       real(wp)             :: cf_a, cf_b, delta_d
-      integer              :: nl1
-      real(wp)             :: denom, x1, x2, y1, y2, x, y, d1,d2     
+      integer              :: nl1, ul1
+      real(wp)             :: denom, x1, x2, y1, y2, x, y, d1,d2, aux_z     
       
       real(wp), allocatable, dimension(:,:,:)  :: ncdata
       real(wp), allocatable, dimension(:)      :: data1d      
@@ -327,49 +365,99 @@ CONTAINS
       ! data is assumed to be sampled on a regular grid
       do ii = 1, myDim_nod2d
          nl1 = nlevels_nod2D(ii)-1
+         ul1 = ulevels_nod2D(ii)
          i = bilin_indx_i(ii)
          j = bilin_indx_j(ii)
          ip1 = i + 1   
          jp1 = j + 1
-         x  = geo_coord_nod2D(1,ii)/rad
-         y  = geo_coord_nod2D(2,ii)/rad
+!!PS          x  = geo_coord_nod2D(1,ii)/rad
+!!PS          y  = geo_coord_nod2D(2,ii)/rad
+         !______________________________________________________________________
+         ! its a cavity node use extrapolation points of closest cavity line point
+         ! exchange the coordinates of the cavity node with the coordinates of the 
+         ! closest cavity-line point --> use than these coordinates to estimate 
+         ! bilinear interpolation index
+         if (ul1>1) then
+            x = mesh%cavity_nrst_cavlpnt_xyz(1,ii)/rad
+            y = mesh%cavity_nrst_cavlpnt_xyz(2,ii)/rad
+         ! its no cavity use normal vertice points    
+         else
+            x = geo_coord_nod2D(1,ii)/rad
+            y = geo_coord_nod2D(2,ii)/rad
+         end if 
          if (x<0.)   x=x+360.
          if (x>360.) x=x-360.
          if ( min(i,j)>0 ) then
          if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99_WP)) cycle
-         x1 = nc_lon(i)
-         x2 = nc_lon(ip1)
-         y1 = nc_lat(j)
-         y2 = nc_lat(jp1)
-                  
-         ! if point inside forcing domain
-         denom = (x2 - x1)*(y2 - y1)
-         data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
-                       ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
-         where (ncdata(i,j,:)   > 0.99_WP*dummy .OR. ncdata(ip1,j,:)   > 0.99_WP*dummy .OR. &
-                ncdata(i,jp1,:) > 0.99_WP*dummy .OR. ncdata(ip1,jp1,:) > 0.99_WP*dummy)
-            data1d(:)=dummy
-         end where          
-         do k= 1, nl1
-            call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
-            if ( d_indx < nc_Ndepth .and. d_indx > 0) then
-               d_indx_p1 = d_indx+1
-               delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
-               ! values from OB data for nearest depth           
-               d1 = data1d(d_indx)
-               d2 = data1d(d_indx_p1)
-               if ((d1<0.99_WP*dummy) .and. (d2<0.99_WP*dummy)) then
-               ! line a*z+b coefficients calculation
-               cf_a  = (d2 - d1)/ delta_d
-               ! value of interpolated OB data on Z from model
-               cf_b  = d1 - cf_a * nc_depth(d_indx)
-               tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
-               end if
-            elseif (d_indx==0) then
-               tr_arr(k,ii,current_tracer)=data1d(1)
-            end if
-         enddo
-         end if
+            x1 = nc_lon(i)
+            x2 = nc_lon(ip1)
+            y1 = nc_lat(j)
+            y2 = nc_lat(jp1)
+                    
+            ! if point inside forcing domain
+            denom = (x2 - x1)*(y2 - y1)
+            data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
+                        ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
+            where (ncdata(i,j,:)   > 0.99_WP*dummy .OR. ncdata(ip1,j,:)   > 0.99_WP*dummy .OR. &
+                    ncdata(i,jp1,:) > 0.99_WP*dummy .OR. ncdata(ip1,jp1,:) > 0.99_WP*dummy)
+                data1d(:)=dummy
+            end where   
+            
+            !___________________________________________________________________
+            ! In case of cavity --> do vertical cavity extrapolation for init TS
+            if (use_cavity) then
+                !!PS do k= 1, nl1
+                do k= ul1, nl1
+                    if (ul1>1 .and. Z_3d_n(k,ii)<mesh%cavity_nrst_cavlpnt_xyz(3,ii)) then
+                        aux_z = mesh%cavity_nrst_cavlpnt_xyz(3,ii)
+                    else
+                        aux_z = Z_3d_n(k,ii)
+                    end if 
+                    call binarysearch(nc_Ndepth,nc_depth,-aux_z,d_indx)
+                    
+                    if ( d_indx < nc_Ndepth .and. d_indx > 0) then
+                        d_indx_p1 = d_indx+1
+                        delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
+                        ! values from OB data for nearest depth           
+                        d1 = data1d(d_indx)
+                        d2 = data1d(d_indx_p1)
+                        if ((d1<0.99_WP*dummy) .and. (d2<0.99_WP*dummy)) then
+                            ! line a*z+b coefficients calculation
+                            cf_a  = (d2 - d1)/ delta_d
+                            ! value of interpolated OB data on Z from model
+                            cf_b  = d1 - cf_a * nc_depth(d_indx)
+                            !!PS tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tr_arr(k,ii,current_tracer) = -cf_a * aux_z + cf_b
+                        end if
+                    elseif (d_indx==0) then
+                        tr_arr(k,ii,current_tracer)=data1d(1)
+                    end if
+                enddo
+            !___________________________________________________________________
+            ! normal non-cavity case
+            else
+                !!PS do k= 1, nl1
+                do k= ul1, nl1
+                    call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
+                    if ( d_indx < nc_Ndepth .and. d_indx > 0) then
+                        d_indx_p1 = d_indx+1
+                        delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
+                        ! values from OB data for nearest depth           
+                        d1 = data1d(d_indx)
+                        d2 = data1d(d_indx_p1)
+                        if ((d1<0.99_WP*dummy) .and. (d2<0.99_WP*dummy)) then
+                            ! line a*z+b coefficients calculation
+                            cf_a  = (d2 - d1)/ delta_d
+                            ! value of interpolated OB data on Z from model
+                            cf_b  = d1 - cf_a * nc_depth(d_indx)
+                            tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
+                        end if
+                    elseif (d_indx==0) then
+                        tr_arr(k,ii,current_tracer)=data1d(1)
+                    end if
+                enddo
+            end if ! --> if (use_cavity) then
+         end if ! --> if ( min(i,j)>0 ) then
       end do !ii
       if (mype==0) then
          iost = nf_close(ncid)
@@ -385,8 +473,9 @@ CONTAINS
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-      integer                       :: n
+      integer                       :: n, i
       type(t_mesh), intent(in)     , target :: mesh
+      real(kind=WP)                 :: locTmax, locTmin, locSmax, locSmin, glo
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
@@ -413,20 +502,85 @@ CONTAINS
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
+      !_________________________________________________________________________
+      ! set remaining dummy values from bottom topography to 0.0_WP
       where (tr_arr > 0.9_WP*dummy)
             tr_arr=0.0_WP
       end where
-
+      
+      !_________________________________________________________________________
+      ! convert temperature from Kelvin --> °C
       where (tr_arr(:,:,1) > 100._WP)
          tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
       end where
-
+      
+      !_________________________________________________________________________
+      ! eliminate values within cavity that result from the extrapolation of 
+      ! initialisation
+      do n=1,myDim_nod2d + eDim_nod2D
+            ! ensure cavity is zero
+            if (use_cavity) tr_arr(1:mesh%ulevels_nod2D(n)-1,n,:)=0.0_WP
+            ! ensure bottom is zero
+            tr_arr(mesh%nlevels_nod2D(n):mesh%nl-1,n,:)=0.0_WP            
+      end do 
+      
+      !_________________________________________________________________________
       if (t_insitu) then
          if (mype==0) write(*,*) "converting insitu temperature to potential..."
          call insitu2pot(mesh)
       end if
       if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
-   
+      
+      !_________________________________________________________________________
+      ! Homogenous temp salt initialisation --> for testing and debuging
+!!PS       do n=1,myDim_nod2d + eDim_nod2D
+!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1) = 16.0
+!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2) = 35.0
+!!PS       end do 
+        
+      !_________________________________________________________________________
+      ! check initial fields
+      locTmax = -6666
+      locTmin = 6666
+      locSmax = locTmax
+      locSmin = locTmin
+      do n=1,myDim_nod2d
+!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)>0.99_WP*dummy)) then
+!!PS             write(*,*) '____________________________________________________________'
+!!PS             write(*,*) ' --> check init fields SALT >0.99_WP*dummy'
+!!PS             write(*,*) 'mype =',mype
+!!PS             write(*,*) 'n    =',n
+!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
+!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
+!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
+!!PS             write(*,*) 'tr_arr(unl:lnl,n,2) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)
+!!PS             write(*,*) 'tr_arr(  1:lnl,n,2) =',tr_arr(1:mesh%nlevels_nod2D(n)-1,n,2)
+!!PS         end if 
+!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)>0.99_WP*dummy)) then
+!!PS             write(*,*) '____________________________________________________________'
+!!PS             write(*,*) ' --> check init fields TEMP >0.99_WP*dummy'
+!!PS             write(*,*) 'mype =',mype
+!!PS             write(*,*) 'n    =',n
+!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
+!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
+!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
+!!PS             write(*,*) 'tr_arr(:,n,1) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)
+!!PS         end if 
+        locTmax = max(locTmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
+        locTmin = min(locTmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
+        locSmax = max(locSmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
+        locSmin = min(locSmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
+      end do
+      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
+      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
+      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
+      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
+      
+  
    END SUBROUTINE do_ic3d
    
    SUBROUTINE err_call(iost,fname)

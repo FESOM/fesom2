@@ -55,13 +55,14 @@ module g_config
   real(kind=WP)          :: cyclic_length=360. ! [degree]
   logical                :: rotated_grid=.true. ! not used
   logical                :: force_rotation=.true.
-  real(kind=WP)          :: alphaEuler=50. 	! [degree] Euler angles, convention:
-  real(kind=WP)          :: betaEuler=15.  	! first around z, then around new x,
-  real(kind=WP)          :: gammaEuler=-90.	! then around new z.
-  				                ! Set to zeros to work with
-						! geographical coordinates
+  real(kind=WP)          :: alphaEuler=50.  ! [degree] Euler angles, convention:
+  real(kind=WP)          :: betaEuler=15.   ! first around z, then around new x,
+  real(kind=WP)          :: gammaEuler=-90. ! then around new z.
+                                            ! Set to zeros to work with
+                                            ! geographical coordinates
+  character(len=5)       :: which_depth_n2e='mean'                                           
   namelist /geometry/  cartesian, fplane, &
-       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation
+       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation, which_depth_n2e
 
   ! *** fleap_year ***
   logical                       :: include_fleapyear=.false.
@@ -75,20 +76,24 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
-  logical 						:: use_floatice = .false.
+  logical                       :: use_floatice = .false.
+  logical                       :: use_cavity = .false. ! switch on/off cavity usage
+  logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
-  logical                       :: flag_debug=.false.
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, toy_ocean, which_toy, flag_debug
+  logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
+  logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
+                        use_cavity_partial_cell, toy_ocean, which_toy, flag_debug, flag_warn_cflz
   
   ! *** others ***
-  real(kind=WP)            	:: dt
+  real(kind=WP)                 :: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
-  real(kind=WP)             	:: rtime_ice=0.0, rtime_tot=0.0
+  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
-  real(kind=WP)             	:: dummy=1.e10
+  real(kind=WP)                 :: dummy=1.e10
   
   
 end module g_config

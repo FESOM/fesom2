@@ -92,8 +92,10 @@ subroutine thermodynamics(mesh)
   ! Friction velocity 
   ! ================
   allocate(ustar_aux(myDim_nod2D+eDim_nod2D))
+    ustar_aux=0.0_WP
     DO i=1, myDim_nod2D
        ustar=0.0_WP
+       if(ulevels_nod2d(i)>1) cycle 
        ustar=((u_ice(i)-u_w(i))**2+ &
               (v_ice(i)-v_w(i))**2)
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
@@ -104,6 +106,11 @@ subroutine thermodynamics(mesh)
   ! ================
 
   do i=1, myDim_nod2d+eDim_nod2D
+     !__________________________________________________________________________
+     ! if there is a cavity no sea ice thermodynamics is apllied
+     if(ulevels_nod2d(i)>1) cycle 
+     
+     !__________________________________________________________________________
      h       = m_ice(i)
      hsn     = m_snow(i)
      A       = a_ice(i)
@@ -383,7 +390,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   else
      fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
   end if
-
+  
   ! Changes in compactnesses (equation 16 of Hibler 1979)
   rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
   rA= rhow - o2ihf*ice_dt/cl !Qiang: it was -(T_oc-TFrez(S_oc))*H_ML*cc/cl, changed in June 2010
@@ -398,7 +405,7 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   iflice=h
   call flooding(h,hsn)     
   iflice=(h-iflice)/ice_dt
-
+  
   ! to maintain salt conservation for the current model version
   !(a way to avoid producing net salt from snow-type-ice) 
   if (.not. use_virt_salt) then
