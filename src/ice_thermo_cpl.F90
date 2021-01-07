@@ -387,7 +387,7 @@ contains
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
     if (.not. use_virt_salt) then
        fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
-       rsf = -dhgrowth*rhoice*Sice
+       rsf = -dhgrowth*rhoice*Sice/rhowat
     else
        fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
     end if
