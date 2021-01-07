@@ -377,6 +377,7 @@ subroutine pressure_force_4_linfs(mesh)
     use pressure_force_4_linfs_shchepetkin_interface
     use pressure_force_4_linfs_cubicspline_interface
     use pressure_force_4_linfs_cavity_interface
+    use pressure_force_4_linfs_easypgf_interface
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
     !___________________________________________________________________________
@@ -900,6 +901,8 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
     use o_ARRAYS
     use g_PARSUP
     use g_config
+    use densityJM_components_interface
+    use density_linear_interface
     implicit none
     
     integer             :: elem, elnodes(3), nle, ule, nlz, idx(3),ni

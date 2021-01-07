@@ -326,7 +326,7 @@ class fesom_mesh:
                 self.nodes_2d_icg = self.nodes_2d_ic
                 
             if (str_mode == 'focus') and self.focus!=self.focus_old:
-               self.fesom_remove_pbnd()
+                self.fesom_remove_pbnd()
                 self.focus_old = self.focus
                 
         elif (str_mode == 'g2r'):
