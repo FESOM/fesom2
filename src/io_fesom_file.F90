@@ -1,6 +1,5 @@
  ! synopsis: generic implementation to asynchronously read/write FESOM mesh variable(s) with distributed cell or element data in 2D or 3D to/from a NetCDF file
 module io_fesom_file_module
-  use mod_mesh
   use io_netcdf_file_module
   implicit none
   public fesom_file_type
@@ -34,7 +33,9 @@ module io_fesom_file_module
   end type
   
   
-  type(t_mesh), save :: mesh
+  integer, save :: m_nod2d
+  integer, save :: m_elem2d
+  integer, save :: m_nl
 
 
 contains
@@ -70,35 +71,35 @@ contains
     integer x
     x = this%time_dimidx
   end function
-
-
-  subroutine init(f, mesh_) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
-    use mod_mesh
-    use o_arrays
+  
+  
+  subroutine init(f, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     class(fesom_file_type), intent(inout) :: f
-    type(t_mesh), intent(in) :: mesh_
+    integer mesh_nod2d
+    integer mesh_elem2d
+    integer mesh_nl
     ! EO parameters
 
-    mesh = mesh_ ! get hold of our mesh for later use (assume the mesh instance will never change)
-    
-    f%rec_cnt = 0
-
+    ! get hold of our mesh data for later use (assume the mesh instance will not change)
+    m_nod2d = mesh_nod2d
+    m_elem2d = mesh_elem2d
+    m_nl = mesh_nl
     call f%netcdf_file_type%initialize()
 
     ! add the dimensions we intend to use to the file spec and also store here so we can use them when creating the variables
     ! todo: store in a separate "dim pool" without calling f%add_dim and add only if a variable requires it
     allocate(f%dim_infos(4))
-    f%dim_infos(1) = dim_info( idx=f%add_dim('node', mesh%nod2d), len=mesh%nod2d)
-    f%dim_infos(2) = dim_info( idx=f%add_dim('elem', mesh%elem2d), len=mesh%elem2d)
-    f%dim_infos(3) = dim_info( idx=f%add_dim('nz_1', mesh%nl-1), len=mesh%nl-1)
-    f%dim_infos(4) = dim_info( idx=f%add_dim('nz', mesh%nl), len=mesh%nl)
+    f%dim_infos(1) = dim_info( idx=f%add_dim('node', m_nod2d), len=m_nod2d)
+    f%dim_infos(2) = dim_info( idx=f%add_dim('elem', m_elem2d), len=m_elem2d)
+    f%dim_infos(3) = dim_info( idx=f%add_dim('nz_1', m_nl-1), len=m_nl-1)
+    f%dim_infos(4) = dim_info( idx=f%add_dim('nz', m_nl), len=m_nl)
 
     f%time_dimidx = f%add_dim_unlimited('time')
 
     f%time_varidx = f%add_var_double('time', [f%time_dimidx])
   end subroutine
-
-
+  
+  
   subroutine gather_and_write(f)
     use g_PARSUP
     use io_gather_module
@@ -106,7 +107,7 @@ contains
     ! EO parameters
     integer i,lvl, nlvl, nodes_per_lvl
     logical is_2d
-  
+
     f%rec_cnt = f%rec_cnt+1
     
     do i=1, f%nvar_infos
@@ -131,7 +132,7 @@ call assert(associated(f%var_infos(i)%local_data_ptr3), __LINE__)
           ! z,nod,time
           call f%write_var(f%var_infos(i)%var_index, [lvl,1,f%rec_cnt], [1,size(f%var_infos(i)%global_level_data),1], f%var_infos(i)%global_level_data)
         end if
-     end if
+      end if
     end do
   end subroutine
 
@@ -147,7 +148,7 @@ call assert(associated(f%var_infos(i)%local_data_ptr3), __LINE__)
     real(8), pointer :: local_data_ptr3(:,:)
     type(dim_info) level_diminfo, depth_diminfo
 
-    level_diminfo = find_diminfo(f, mesh%nod2d)
+    level_diminfo = find_diminfo(f, m_nod2d)
    
     if(size(shape(local_data)) == 1) then ! 1D data
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
