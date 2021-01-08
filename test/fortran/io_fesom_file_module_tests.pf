@@ -1,0 +1,18 @@
+module io_fesom_file_module_tests
+  use io_fesom_file_module
+  use funit; implicit none
+  
+contains
+
+
+  @test
+  subroutine can_be_initialized()
+    type(fesom_file_type) f
+    integer, parameter :: mesh_nod2d = 3140
+    integer, parameter :: mesh_elem2d = 5839
+    integer, parameter :: mesh_nl = 48
+    
+    call f%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+  end subroutine
+
+end module
