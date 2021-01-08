@@ -25,7 +25,7 @@ module io_fesom_file_module
     integer time_dimidx
     integer time_varidx
     type(var_info) var_infos(20); integer :: nvar_infos = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
-    type(dim_info), allocatable :: dim_infos(:)
+    type(dim_info), allocatable :: used_mesh_dims(:) ! the dims we add for our variables, we need to identify them when adding our mesh related variables
     integer :: rec_cnt = -1
     integer :: iorank = 0
   contains
@@ -58,6 +58,7 @@ contains
     integer, allocatable :: time_shape(:)
     
     if(this%rec_cnt == -1 .and. this%is_attached()) then
+call assert(this%is_iorank(),__LINE__)
       ! update from file if rec_cnt has never been used before
       call this%read_var_shape(this%time_varidx, time_shape)
       this%rec_cnt = time_shape(1)
@@ -96,13 +97,7 @@ contains
     m_nl = mesh_nl
     call f%netcdf_file_type%initialize()
 
-    ! add the dimensions we intend to use to the file spec and also store here so we can use them when creating the variables
-    ! todo: store in a separate "dim pool" without calling f%add_dim and add only if a variable requires it
-    allocate(f%dim_infos(4))
-    f%dim_infos(1) = dim_info( idx=f%add_dim('node', m_nod2d), len=m_nod2d)
-    f%dim_infos(2) = dim_info( idx=f%add_dim('elem', m_elem2d), len=m_elem2d)
-    f%dim_infos(3) = dim_info( idx=f%add_dim('nz_1', m_nl-1), len=m_nl-1)
-    f%dim_infos(4) = dim_info( idx=f%add_dim('nz', m_nl), len=m_nl)
+    allocate(f%used_mesh_dims(0))
 
     f%time_dimidx = f%add_dim_unlimited('time')
 
@@ -158,36 +153,56 @@ call assert(associated(f%var_infos(i)%local_data_ptr3), __LINE__)
     real(8), pointer :: local_data_ptr3(:,:)
     type(dim_info) level_diminfo, depth_diminfo
 
-    level_diminfo = find_diminfo(f, m_nod2d)
+    level_diminfo = obtain_diminfo(f, m_nod2d)
    
     if(size(shape(local_data)) == 1) then ! 1D data
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
       call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, longname, units)
     
     else if(size(shape(local_data)) == 2) then ! 2D data
-      depth_diminfo = find_diminfo(f, size(local_data, dim=1))
+      depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
       call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, longname, units)
     end if        
   end subroutine
   
   
-  function find_diminfo(f, len) result(info)
+  function obtain_diminfo(f, len) result(info)
     type(fesom_file_type), intent(inout) :: f
     type(dim_info) info
     integer len
     ! EO parameters
     integer i
+    type(dim_info), allocatable :: tmparr(:)
     
-    do i=1, size(f%dim_infos)
-      if(f%dim_infos(i)%len == len) then
-        info = f%dim_infos(i)
+    do i=1, size(f%used_mesh_dims)
+      if(f%used_mesh_dims(i)%len == len) then
+        info = f%used_mesh_dims(i)
         return
       end if
     end do
     
-    print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
-    stop 1
+    ! the dim has not been added yet, see if it is one of our allowed mesh related dims
+    if(len == m_nod2d) then
+      info = dim_info( idx=f%add_dim('node', len), len=len)
+    else if(len == m_elem2d) then
+      info = dim_info( idx=f%add_dim('elem', len), len=len)
+    else if(len == m_nl-1) then
+      info = dim_info( idx=f%add_dim('nz_1', len), len=len)
+    else if(len == m_nl) then
+      info = dim_info( idx=f%add_dim('nz', len), len=len)
+    else
+      print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
+      stop 1
+    end if
+    
+    ! append the new dim to our list of used dims, i.e. the dims we use for the mesh based variables created via #specify_variable
+    ! assume the used_mesh_dims array is allocated
+    allocate( tmparr(size(f%used_mesh_dims)+1) )
+    tmparr(1:size(f%used_mesh_dims)) = f%used_mesh_dims
+    deallocate(f%used_mesh_dims)
+    call move_alloc(tmparr, f%used_mesh_dims)
+    f%used_mesh_dims( size(f%used_mesh_dims) ) = info
   end function
 
 
