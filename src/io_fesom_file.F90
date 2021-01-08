@@ -26,7 +26,7 @@ module io_fesom_file_module
     integer time_varidx
     type(var_info) var_infos(20); integer :: nvar_infos = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
     type(dim_info), allocatable :: dim_infos(:)
-    integer :: rec_cnt = 0
+    integer :: rec_cnt = -1
     integer :: iorank = 0
   contains
     procedure, public :: gather_and_write, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
@@ -49,10 +49,20 @@ contains
   end function
 
 
+  ! return the number of timesteps of the file if a file is attached or return the default value of -1
   function rec_count(this) result(x)
     use g_PARSUP
-    class(fesom_file_type), intent(in) :: this
+    class(fesom_file_type), intent(inout) :: this
     integer x
+    ! EO parameters
+    integer, allocatable :: time_shape(:)
+    
+    if(this%rec_cnt == -1 .and. this%is_attached()) then
+      ! update from file if rec_cnt has never been used before
+      call this%read_var_shape(this%time_varidx, time_shape)
+      this%rec_cnt = time_shape(1)
+    end if
+    
     x = this%rec_cnt
   end function
 
@@ -108,7 +118,7 @@ contains
     integer i,lvl, nlvl, nodes_per_lvl
     logical is_2d
 
-    f%rec_cnt = f%rec_cnt+1
+    if(f%is_iorank()) f%rec_cnt = f%rec_count()+1
     
     do i=1, f%nvar_infos
     
