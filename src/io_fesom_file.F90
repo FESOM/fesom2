@@ -128,16 +128,18 @@ contains
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
       end if
 
-      lvl=1 ! todo: loop lvls
-      if(mype == f%iorank) then
-        if(is_2d) then
-          call f%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
-        else
-          ! z,nod,time
-          call f%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
+      do lvl=1, nlvl
+        if(mype == f%iorank) then
+          if(is_2d) then
+            call f%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
+          else
+            ! z,nod,time
+            call f%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
+          end if
         end if
-      end if
-      call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+
+        call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+      end do
     end do
   end subroutine
 
@@ -166,16 +168,18 @@ contains
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
       end if
 
-      lvl=1 ! todo: loop lvls
-      call gather_nod2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom) 
-      if(mype == f%iorank) then
-        if(is_2d) then
-          call f%write_var(var%var_index, [1,f%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
-        else
-          ! z,nod,time
-          call f%write_var(var%var_index, [lvl,1,f%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
+      do lvl=1, nlvl
+        call gather_nod2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom) 
+
+        if(mype == f%iorank) then
+          if(is_2d) then
+            call f%write_var(var%var_index, [1,f%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
+          else
+            ! z,nod,time
+            call f%write_var(var%var_index, [lvl,1,f%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
+          end if
         end if
-      end if
+      end do
     end do
   end subroutine
 
