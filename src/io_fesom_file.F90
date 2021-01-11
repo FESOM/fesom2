@@ -29,7 +29,7 @@ module io_fesom_file_module
     integer :: rec_cnt = -1
     integer :: iorank = 0
   contains
-    procedure, public :: gather_and_write, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
   end type
   
   
@@ -104,7 +104,45 @@ contains
   end subroutine
   
   
-  subroutine gather_and_write(f)
+  subroutine read_and_scatter_variables(f)
+    use g_PARSUP
+    use io_scatter_module
+    class(fesom_file_type), target :: f
+    ! EO parameters
+    integer i,lvl, nlvl, nodes_per_lvl
+    logical is_2d
+    integer last_rec_idx
+    type(var_info), pointer :: var
+  
+    last_rec_idx = f%rec_count()
+    
+    do i=1, f%nvar_infos
+      var => f%var_infos(i)
+    
+      nlvl = size(var%local_data_ptr3,dim=1)
+      nodes_per_lvl = var%global_level_data_size
+      is_2d = (nlvl == 1)
+
+      if(mype == f%iorank) then
+        ! todo: choose how many levels we read at once
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
+      end if
+
+      lvl=1 ! todo: loop lvls
+      if(mype == f%iorank) then
+        if(is_2d) then
+          call f%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
+        else
+          ! z,nod,time
+          call f%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
+        end if
+      end if
+      call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+    end do
+  end subroutine
+
+
+  subroutine gather_and_write_variables(f)
     use g_PARSUP
     use io_gather_module
     class(fesom_file_type), target :: f
