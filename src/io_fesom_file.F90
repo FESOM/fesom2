@@ -58,7 +58,6 @@ contains
     integer, allocatable :: time_shape(:)
     
     if(this%rec_cnt == -1 .and. this%is_attached()) then
-call assert(this%is_iorank(),__LINE__)
       ! update from file if rec_cnt has never been used before
       call this%read_var_shape(this%time_varidx, time_shape)
       this%rec_cnt = time_shape(1)
