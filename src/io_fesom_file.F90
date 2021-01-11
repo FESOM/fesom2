@@ -108,34 +108,35 @@ call assert(this%is_iorank(),__LINE__)
   subroutine gather_and_write(f)
     use g_PARSUP
     use io_gather_module
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), target :: f
     ! EO parameters
     integer i,lvl, nlvl, nodes_per_lvl
     logical is_2d
+    type(var_info), pointer :: var
 
     if(f%is_iorank()) f%rec_cnt = f%rec_count()+1
     
     do i=1, f%nvar_infos
+      var => f%var_infos(i)
     
-call assert(associated(f%var_infos(i)%local_data_ptr3), __LINE__)
 
-      nlvl = size(f%var_infos(i)%local_data_ptr3,dim=1)
-      nodes_per_lvl = f%var_infos(i)%global_level_data_size
+      nlvl = size(var%local_data_ptr3,dim=1)
+      nodes_per_lvl = var%global_level_data_size
       is_2d = (nlvl == 1)
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we write at once
-        if(.not. allocated(f%var_infos(i)%global_level_data)) allocate(f%var_infos(i)%global_level_data(nodes_per_lvl))
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
       end if
 
       lvl=1 ! todo: loop lvls
-      call gather_nod2D(f%var_infos(i)%local_data_ptr3(lvl,:), f%var_infos(i)%global_level_data, f%iorank, 42, MPI_comm_fesom) 
+      call gather_nod2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom) 
       if(mype == f%iorank) then
         if(is_2d) then
-          call f%write_var(f%var_infos(i)%var_index, [1,f%rec_cnt], [size(f%var_infos(i)%global_level_data),1], f%var_infos(i)%global_level_data)
+          call f%write_var(var%var_index, [1,f%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
         else
           ! z,nod,time
-          call f%write_var(f%var_infos(i)%var_index, [lvl,1,f%rec_cnt], [1,size(f%var_infos(i)%global_level_data),1], f%var_infos(i)%global_level_data)
+          call f%write_var(var%var_index, [lvl,1,f%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
         end if
       end if
     end do
