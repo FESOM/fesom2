@@ -15,6 +15,8 @@ target_include_directories(${PROJECT_NAME}
 )
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL Cray )
    target_compile_options(${PROJECT_NAME} PRIVATE -hstd=c++11)
+elif(${CMAKE_CXX_COMPILER_ID} STREQUAL Pgi )
+   target_compile_options(${PROJECT_NAME} PRIVATE -D__GCC_HAVE_SYNC_COMPARE_AND_SWAP_{1,2,4} -pthread -std=c++11)
 else()
    target_compile_options(${PROJECT_NAME} PRIVATE -std=c++11)
 endif()
