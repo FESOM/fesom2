@@ -73,10 +73,11 @@ contains
     real(real64), allocatable :: sendbuf(:)
     integer elem_size
 
-    call assert(size(arr2D_local) == size(mylist_elem2d), __LINE__) ! == mydim_elem2d+edim_elem2d, i.e. partition elems + halo elems
+    elem_size = size(arr2D_local)
+    call assert(elem_size == mydim_elem2d+edim_elem2d, __LINE__) ! mylist_elem2d is larger and can not be used for comparison here
 
     if(mype == root_rank) then
-      arr2D_local = arr2D_global(mylist_elem2d)
+      arr2D_local = arr2D_global(1:elem_size)
       do  n = 1, npes-1
         ! receive remote partition 2D size
         call mpi_recv(elem_size, 1, mpi_integer, MPI_ANY_SOURCE, tag+0, comm, status, mpierr)
@@ -95,7 +96,6 @@ contains
       end do
     
     else  
-      elem_size = size(mylist_elem2d)
       call mpi_send(elem_size, 1, mpi_integer, root_rank, tag+0, comm, mpierr)
       call mpi_send(mylist_elem2d(1), elem_size, mpi_integer, root_rank, tag+1, comm, mpierr)
       
