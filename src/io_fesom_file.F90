@@ -30,7 +30,7 @@ module io_fesom_file_module
     integer :: rec_cnt = -1
     integer :: iorank = 0
   contains
-    procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, specify_elem_var, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
   end type
   
@@ -141,7 +141,7 @@ contains
         end if
 
         if(var%is_elem_based) then
-         ;
+          call scatter_elem2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
         else
           call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
         end if
@@ -176,7 +176,7 @@ contains
 
       do lvl=1, nlvl
         if(var%is_elem_based) then
-          ;
+          call gather_elem2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom)
         else
           call gather_nod2D (var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom)
         end if
@@ -215,6 +215,31 @@ contains
       depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
       call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .false., longname, units)
+    end if        
+  end subroutine
+
+
+  subroutine specify_elem_var(f, name, local_data, longname, units)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    class(fesom_file_type), intent(inout) :: f
+    character(len=*), intent(in) :: name
+    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
+    character(len=*), intent(in) :: units, longname
+    ! EO parameters
+    real(8), pointer :: local_data_ptr3(:,:)
+    type(dim_info) level_diminfo, depth_diminfo
+
+    level_diminfo = obtain_diminfo(f, m_elem2d)
+   
+    if(size(shape(local_data)) == 1) then ! 1D data
+      call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
+      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)
+    
+    else if(size(shape(local_data)) == 2) then ! 2D data
+      depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
+      call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
+      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)
     end if        
   end subroutine
   
