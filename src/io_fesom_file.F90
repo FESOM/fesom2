@@ -194,13 +194,13 @@ contains
   end subroutine
 
 
-  subroutine specify_node_var(f, name, local_data, longname, units)
+  subroutine specify_node_var(f, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
     class(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
-    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
     character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
     ! EO parameters
     real(8), pointer :: local_data_ptr3(:,:)
     type(dim_info) level_diminfo, depth_diminfo
@@ -219,13 +219,13 @@ contains
   end subroutine
 
 
-  subroutine specify_elem_var(f, name, local_data, longname, units)
+  subroutine specify_elem_var(f, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
     class(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
-    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
     character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
     ! EO parameters
     real(8), pointer :: local_data_ptr3(:,:)
     type(dim_info) level_diminfo, depth_diminfo
