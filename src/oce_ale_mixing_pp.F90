@@ -25,14 +25,18 @@ IMPLICIT NONE
 
 type(t_mesh), intent(in) , target :: mesh
 real(kind=WP)            :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
-integer                  :: node, nz, nzmax, elem, elnodes(3), i
+integer                  :: node, nz, nzmax, nzmin, elem, elnodes(3), i
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
     do node=1, myDim_nod2D+eDim_nod2D
-        !___________________________________________________________________
+        nzmin = ulevels_nod2d(node)
+        nzmax = nlevels_nod2d(node)
+        
+        !_______________________________________________________________________
         ! implement changing ALE zlevel at every node in PP mxing 
-        do nz=2,nlevels_nod2d(node)-1
+        !!PS do nz=2,nlevels_nod2d(node)-1
+        do nz=nzmin+1,nzmax-1
             dz_inv=1.0_WP/(Z_3d_n(nz-1,node)-Z_3d_n(nz,node))
             shear = (Unode(1,nz-1,node)-Unode(1,nz,node))**2 +&
                     (Unode(2,nz-1,node)-Unode(2,nz,node))**2 
@@ -45,7 +49,10 @@ integer                  :: node, nz, nzmax, elem, elnodes(3), i
     ! viscosity
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
-        DO nz=2,nlevels(elem)-1
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)
+        !!PS DO nz=2,nlevels(elem)-1
+        DO nz=nzmin+1,nzmax-1
             Av(nz,elem)= mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP+A_ver
         END DO
     END DO
@@ -53,17 +60,21 @@ integer                  :: node, nz, nzmax, elem, elnodes(3), i
     !_______________________________________________________________________
     ! diffusivity
     do node=1,myDim_nod2D+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
         !___________________________________________________________________
         ! set constant background diffusivity with namelist value K_ver
         if(Kv0_const) then
-            do nz=2,nlevels_nod2d(node)-1 
+            !!PS do nz=2,nlevels_nod2d(node)-1
+            do nz=nzmin+1,nzmax-1 
                 Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+K_ver
             end do
         !___________________________________________________________________________
         ! set latitudinal and depth dependent background diffusivity after 
         ! Q. Wang FESOM1.4 approach
         else
-            do nz=2,nlevels_nod2d(node)-1 
+            !!PS do nz=2,nlevels_nod2d(node)-1
+            do nz=nzmin+1,nzmax-1 
                 call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
                 Kv(nz,node) = mix_coeff_PP*Kv(nz,node)**3+Kv0_b
             end do

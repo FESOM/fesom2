@@ -4,7 +4,7 @@ subroutine thermodynamics(mesh)
   !===================================================================
   !
   ! This subroutine computes thermodynamic changes of ice and snow
-  ! for coupled simulations of FESOM and ECHAM.
+  ! for coupled simulations of FESOM2.
   ! It replaces the original FESOM scheme for uncoupled simulations.
   ! Note that atmospheric fluxes already need to be available.
   !
@@ -79,6 +79,7 @@ subroutine thermodynamics(mesh)
   real(kind=WP)  :: h0min = 0.50, h0max = 1.5
   type(t_mesh), intent(in)   , target :: mesh  
 
+  real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
 #include  "associate_mesh.h"
 
 
@@ -113,25 +114,36 @@ subroutine thermodynamics(mesh)
 
      ehf     = 0._WP
      fw      = 0._WP
-#ifdef use_fullfreesurf
-     rsf     = 0._WP
-#endif
+     if (.not. use_virt_salt) then
+        rsf     = 0._WP
+     end if
 
-     !---- different lead closing parameter for NH and SH
-     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+!#if defined (__oifs)
+!     !---- different lead closing parameter for NH and SH
+!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
 !     if (geolat.lt.0.) then
-!        h0min = 1.0
-!        h0max = 1.5
-!     else
 !        h0min = 0.75
 !        h0max = 1.0
+!     else
+!        h0min = 0.5
+!        h0max = 0.75
 !     endif
+!#endif /* (__oifs) */
 
      call ice_growth
 #if defined (__oifs)
-     call ice_albedo(hsn,t,alb)
-     ice_alb(inod)	 = alb
-     ice_temp(inod)      = t+tmelt
+     !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
+     ! then send those to OpenIFS where they are used to calucate the 
+     ! energy fluxes ---!
+     t                   = ice_temp(inod)
+     if(A>Aimin) then
+        call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
+        ice_temp(inod) = t
+     else
+        ice_temp(inod) = 275.15_WP
+     endif
+     call ice_albedo(h,hsn,t,alb)
+     ice_alb(inod)       = alb
 #endif
 
 
@@ -140,9 +152,9 @@ subroutine thermodynamics(mesh)
      m_snow(inod)        = hsn
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
-#ifdef use_fullfreesurf
-     real_salt_flux(inod)= rsf
-#endif
+     if (.not. use_virt_salt) then
+        real_salt_flux(inod)= rsf
+     end if
      thdgr(inod)         = dhgrowth
      thdgrsn(inod)       = dhsngrowth
      flice(inod)         = dhflice
@@ -373,12 +385,12 @@ contains
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
-#ifdef use_fullfreesurf
-    fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
-    rsf = -dhgrowth*rhoice*Sice
-#else
-    fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
-#endif
+    if (.not. use_virt_salt) then
+       fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
+       rsf = -dhgrowth*rhoice*Sice/rhowat
+    else
+       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+    end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
     !---- NOTE: ehf = -ohf (in case of no cut-off)
@@ -404,39 +416,97 @@ contains
 
     !---- to maintain salt conservation for the current model version
     !---- (a way to avoid producing net salt from snow-type-ice) 
-#ifdef use_fullfreesurf
-    rsf = rsf - dhflice*rhoice*Sice
-#else
-    fw = fw + dhflice*rhoice*Sice/rsss
-#endif
+    if (.not. use_virt_salt) then
+       rsf = rsf - dhflice*rhoice*Sice/rhowat
+    else
+       fw = fw + dhflice*rhoice*Sice/rsss
+    end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw = fw/rhowat
-#ifdef use_fullfreesurf
-    rsf = rsf/rhowat
-#endif
-
     return
   end subroutine ice_growth
 
 
- subroutine ice_albedo (hsn,t,alb)
+
+
+ subroutine ice_surftemp(h,hsn,a2ihf,t)
   ! INPUT:
-  ! hsn - snow thickness, used for albedo parameterization [m]
+  ! a2ihf - Total atmo heat flux to ice
+  ! A  - Ice fraction
+  ! h  - Ice thickness
+  ! hsn   - Snow thickness
+  ! 
+  ! INPUT/OUTPUT:
+  ! t     - Ice surface temperature
+
   use i_therm_param
   implicit none
 
+  !---- atmospheric heat net flux into to ice (provided by OpenIFS)
+  real(kind=WP)  a2ihf
+  !---- ocean variables (provided by FESOM)
+  real(kind=WP)  h
+  real(kind=WP)  hsn
+  real(kind=WP)  t
+  !---- local variables
+  real(kind=WP)  snicecond
+  real(kind=WP)  zsniced
+  real(kind=WP)  zicefl
+  real(kind=WP)  hcapice
+  real(kind=WP)  zcpdt
+  real(kind=WP)  zcpdte
+  real(kind=WP)  zcprosn
+  !---- local parameters
+  real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+  real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
+
+
+  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
+  zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
+  zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
+  zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
+  zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
+  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
+  t=min(ctfreez,t)                      ! Not warmer than freezing please!
+ end subroutine ice_surftemp
+
+ subroutine ice_albedo(h,hsn,t,alb)
+  ! INPUT:
+  ! hsn - snow thickness, used for albedo parameterization [m]
+  ! t - temperature of snow/ice surface [C]
+  ! 
+  ! OUTPUT:
+  ! alb - snow albedo
+  use i_therm_param
+  implicit none
+
+  real(kind=WP)  h
   real(kind=WP)  hsn    
   real(kind=WP)  t    
-  real(kind=WP)  alb             ! Albedo of sea ice
+  real(kind=WP)  alb
 
   ! set albedo
-  ! ice and snow, freezing and melting conditions are distinguished.
-  if (hsn.gt.0.0) then	!   snow cover present  
-     alb=albsn         	
-  else              		!   no snow cover       
-     alb=albi       	
-  endif
+  ! ice and snow, freezing and melting conditions are distinguished
+  if (h>0.0_WP) then
+     if (t<273.14_WP) then         ! freezing condition    
+        if (hsn.gt.0.0_WP) then !   snow cover present  
+           alb=albsn            
+        else                    !   no snow cover       
+           alb=albi             
+        endif
+     else                               ! melting condition     
+        if (hsn.gt.0.0_WP) then !   snow cover present  
+           alb=albsnm           
+        else                    !   no snow cover       
+           alb=albim            
+        endif
+     endif
+   else
+      alb=0.066_WP            !  ocean albedo
+   endif
  end subroutine ice_albedo
 
 end subroutine thermodynamics

@@ -58,12 +58,25 @@ subroutine update_atm_forcing(istep, mesh)
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
+#if defined (__oifs) 
+            ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-#if defined (__oifs)
             exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+            end do
+            elseif (i.eq.2) then
+            exchange(:) = a_ice(:)                                  ! ice concentation [%]
+            elseif (i.eq.3) then
+            exchange(:) = m_snow(:)                                 ! snow thickness
+            elseif (i.eq.4) then
+            exchange(:) = ice_temp(:)                               ! ice surface temperature
+            elseif (i.eq.5) then
+            exchange(:) = ice_alb(:)                                ! ice albedo
+            else	    
+            print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
-            exchange(n)=tr_arr(1, n, 1)		                    ! sea surface temperature [°C]
-#endif
+            ! AWI-CM2 outgoing state vectors
+            do n=1,myDim_nod2D+eDim_nod2D
+            exchange(n)=tr_arr(1, n, 1)                             ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
@@ -71,12 +84,9 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
-#if defined (__oifs)
-            elseif (i.eq.5) then
-            exchange(:) = ice_alb(:)                                ! ice albedo
-#endif
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action)
       enddo
@@ -170,11 +180,11 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)                   =  exchange(:)        ! runoff + calving
+	     runoff(:)            =  exchange(:)        ! runoff + calving
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
-	  end if  	  
+	 end if  	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
@@ -201,6 +211,22 @@ subroutine update_atm_forcing(istep, mesh)
   prec_rain = atmdata(i_prec ,:)/1000._WP
   prec_snow = atmdata(i_snow ,:)/1000._WP
   press_air = atmdata(i_mslp ,:) ! unit should be Pa
+  
+  
+  if (use_cavity) then 
+    do i=1,myDim_nod2d+eDim_nod2d
+        if (ulevels_nod2d(i)>1) then
+            u_wind(i)=0.0_WP
+            v_wind(i)=0.0_WP
+            shum(i)=0.0_WP
+            longwave(i)=0.0_WP
+            Tair(i)=0.0_WP
+            prec_rain(i)=0.0_WP
+            prec_snow(i)=0.0_WP
+            press_air(i)=0.0_WP            
+        end if 
+    end do
+  endif 
 
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
@@ -209,17 +235,32 @@ subroutine update_atm_forcing(istep, mesh)
   end if
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
-     call ncar_ocean_fluxes_mode
+     cd_atm_oce_arr=0.0_WP
+     ch_atm_oce_arr=0.0_WP
+     ce_atm_oce_arr=0.0_WP
+     call ncar_ocean_fluxes_mode(mesh)
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if
   ! third, compute wind stress
-  do i=1,myDim_nod2d+eDim_nod2d     
+  do i=1,myDim_nod2d+eDim_nod2d   
+     !__________________________________________________________________________
+     if (ulevels_nod2d(i)>1) then
+        stress_atmoce_x(i)=0.0_WP
+        stress_atmoce_y(i)=0.0_WP
+        stress_atmice_x(i)=0.0_WP
+        stress_atmice_y(i)=0.0_WP
+        cycle
+     end if 
+     
+     !__________________________________________________________________________
      dux=u_wind(i)-(1.0_WP-Swind)*u_w(i) 
      dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
      stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
      stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
+     
+     !__________________________________________________________________________
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair

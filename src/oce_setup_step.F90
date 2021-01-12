@@ -14,8 +14,9 @@ module oce_initial_state_interface
     end subroutine
   end interface
 end module
-
-! =================================================================
+!
+!
+!_______________________________________________________________________________
 subroutine ocean_setup(mesh)
 USE MOD_MESH
 USE o_PARAM
@@ -33,7 +34,7 @@ use array_setup_interface
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
-type(t_mesh), intent(in) , target :: mesh
+type(t_mesh), intent(inout) , target :: mesh
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -49,6 +50,7 @@ type(t_mesh), intent(in) , target :: mesh
         is_nonlinfs = 0.0_WP
     end if
     call array_setup(mesh)
+    
     !___________________________________________________________________________
     ! initialize arrays for ALE
     if (mype==0) then
@@ -57,7 +59,8 @@ type(t_mesh), intent(in) , target :: mesh
        write(*,*)
     end if
     call init_ale(mesh)
-    call init_stiff_mat_ale(mesh) !!PS test        
+    call init_stiff_mat_ale(mesh) !!PS test  
+    
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
@@ -112,18 +115,31 @@ type(t_mesh), intent(in) , target :: mesh
     elseif (mod(mix_scheme_nmb,10)==7) then
         call init_cvmix_tidal(mesh)
     end if         
-
+    
+    !___________________________________________________________________________
+    ! set use_density_ref .true. when cavity is used and initialse cavity boundary 
+    ! line for the extrapolation of the initialisation
+    if (use_cavity .and. .not. use_density_ref) use_density_ref=.true.
+    
+    ! compute for all cavity points (ulevels_nod2D>1), which is the closest
+    ! cavity line point to that point --> use their coordinates and depth -->
+    ! use for extrapolation of init state under cavity
+    if (use_cavity) call compute_nrst_pnt2cavline(mesh)
+      
+    if (use_density_ref) call init_ref_density(mesh)
+    
+    
     !___________________________________________________________________________
     if(mype==0) write(*,*) 'Arrays are set'
         
-	!if(open_boundary) call set_open_boundary   !TODO
-	
+    !if(open_boundary) call set_open_boundary   !TODO
+    
     call oce_adv_tra_fct_init(mesh)
     call muscl_adv_init(mesh) !!PS test
-	!=====================
-	! Initialize fields
-	! A user-defined routine has to be called here!
-	!=====================
+    !=====================
+    ! Initialize fields
+    ! A user-defined routine has to be called here!
+    !=====================
     if (toy_ocean) then  
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
@@ -138,7 +154,7 @@ type(t_mesh), intent(in) , target :: mesh
     end if
 
     if (.not.r_restart) tr_arr_old=tr_arr
-         
+    
     !___________________________________________________________________________
     ! first time fill up array for hnode & helem
     if (mype==0) then
@@ -147,6 +163,8 @@ type(t_mesh), intent(in) , target :: mesh
         write(*,*)
     end if
     call init_thickness_ale(mesh)
+    
+    !___________________________________________________________________________
     if(mype==0) write(*,*) 'Initial state'
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
@@ -155,9 +173,9 @@ type(t_mesh), intent(in) , target :: mesh
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
-
-!==========================================================
 !
+!
+!_______________________________________________________________________________
 SUBROUTINE array_setup(mesh)
 USE MOD_MESH
 USE o_ARRAYS
@@ -376,6 +394,8 @@ end if
     tau_y_t=0.0_WP
     
     ! init field for pressure force 
+    allocate(density_ref(nl-1,node_size))
+    density_ref = density_0
     allocate(density_m_rho0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
     if (ldiag_dMOC) then
@@ -398,7 +418,9 @@ end if
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
 END SUBROUTINE array_setup
-!==========================================================================
+!
+!
+!_______________________________________________________________________________
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
 ! ID = 0 and 1 are reserved for temperature and salinity
 SUBROUTINE oce_initial_state(mesh)
@@ -414,6 +436,7 @@ USE g_ic3d
   integer                  :: i, k, counter, rcounter3, id
   character(len=10)        :: i_string, id_string
   type(t_mesh), intent(in) , target :: mesh
+  real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
 
 #include "associate_mesh.h"
 
@@ -425,6 +448,7 @@ USE g_ic3d
   if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
   if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
   call do_ic3d(mesh)
+  
   Tclim=tr_arr(:,:,1)
   Sclim=tr_arr(:,:,2)
   Tsurf=tr_arr(1,:,1)
@@ -553,28 +577,29 @@ USE g_ic3d
      END SELECT
   END DO
 end subroutine oce_initial_state
+!
+!
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
-! 
 SUBROUTINE before_oce_step(mesh)
-USE MOD_MESH
-USE o_ARRAYS
-USE g_PARSUP
-USE g_config
-USE Toy_Channel_Soufflet
-implicit none
-integer                  :: i, k, counter, rcounter3, id
-character(len=10)        :: i_string, id_string
-type(t_mesh), intent(in) , target :: mesh
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE g_PARSUP
+    USE g_config
+    USE Toy_Channel_Soufflet
+    implicit none
+    integer                  :: i, k, counter, rcounter3, id
+    character(len=10)        :: i_string, id_string
+    type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
 
-if (toy_ocean) then
-   SELECT CASE (TRIM(which_toy))
-     CASE ("soufflet") !forcing update for soufflet testcase
-       if (mod(mstep, soufflet_forc_update)==0) then
-          call compute_zonal_mean(mesh)
-       end if
-   END SELECT
-end if
+    if (toy_ocean) then
+        SELECT CASE (TRIM(which_toy))
+            CASE ("soufflet") !forcing update for soufflet testcase
+            if (mod(mstep, soufflet_forc_update)==0) then
+                call compute_zonal_mean(mesh)
+            end if
+        END SELECT
+    end if
 END SUBROUTINE before_oce_step

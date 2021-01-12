@@ -245,7 +245,7 @@ module g_cvmix_tke
     subroutine calc_cvmix_tke(mesh)
         implicit none
         type(t_mesh), intent(in), target :: mesh
-        integer       :: node, elem, nelem, nz, nln, elnodes(3), node_size
+        integer       :: node, elem, nelem, nz, nln, nun, elnodes(3), node_size
         real(kind=WP) :: tvol
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
@@ -271,6 +271,7 @@ module g_cvmix_tke
             !___________________________________________________________________
             ! number of above bottom levels at node
             nln = nlevels_nod2D(node)-1
+            nun = ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calcualte for TKE surface momentum forcing --> norm of nodal 
@@ -288,7 +289,8 @@ module g_cvmix_tke
             !___________________________________________________________________
             ! calculate for TKE 3D vertical velocity shear
             vshear2=0.0_WP
-            do nz=2,nln
+            !!PS do nz=2,nln
+            do nz=nun+1,nln
                 vshear2(nz)=(( Unode(1, nz-1, node) - Unode(1, nz, node))**2 + &
                              ( Unode(2, nz-1, node) - Unode(2, nz, node))**2)/ &
                              ((Z_3d_n(nz-1,node)-Z_3d_n(nz,node))**2)
@@ -305,14 +307,19 @@ module g_cvmix_tke
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
             bvfreq2        = 0.0_WP
-            bvfreq2(2:nln) = bvfreq(2:nln,node)
+            !!PS bvfreq2(2:nln) = bvfreq(2:nln,node)
+            bvfreq2(nun+1:nln) = bvfreq(nun+1:nln,node)
             
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
+            !!PS dz_trr         = 0.0_WP
+            !!PS dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
+            !!PS dz_trr(1)      = hnode(1,node)/2.0_WP
+            !!PS dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
             dz_trr         = 0.0_WP
-            dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
-            dz_trr(1)      = hnode(1,node)/2.0_WP
+            dz_trr(nun+1:nln)  = abs(Z_3d_n(nun:nln-1,node)-Z_3d_n(nun+1:nln,node))
+            dz_trr(nun)      = hnode(nun,node)/2.0_WP
             dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
@@ -368,8 +375,10 @@ module g_cvmix_tke
             
             tke_Av(nln+1,node)=0.0_WP
             tke_Kv(nln+1,node)=0.0_WP
-            tke_Av(1,node)=0.0_WP
-            tke_Kv(1,node)=0.0_WP
+            !!PS tke_Av(1,node)=0.0_WP
+            !!PS tke_Kv(1,node)=0.0_WP
+            tke_Av(nun,node)=0.0_WP
+            tke_Kv(nun,node)=0.0_WP
             
         end do !--> do node = 1,node_size
         
@@ -384,7 +393,8 @@ module g_cvmix_tke
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            do nz=2,nlevels(elem)-1
+            !!PS do nz=2,nlevels(elem)-1
+            do nz=ulevels(elem)+1,nlevels(elem)-1
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do

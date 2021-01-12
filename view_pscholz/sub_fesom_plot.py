@@ -15,7 +15,7 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False, 
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False,do_cavity=True, 
                       which_orient='vertical', nmax_cbar_l=8 ):
     if do_output==True:
         print('')
@@ -224,6 +224,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #___________________________________________________________________________
     # make custom colormap
     if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+    print(cmin,cmax,cref,cnumb,data.cmap)
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
     if do_output==True:print('clevel = ',clevel)
     do_drawedges=True
@@ -283,7 +284,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     vmin=clevel[0],vmax=clevel[-1])
         
         if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.15)
-    
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
@@ -346,6 +346,19 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     elif inputarray['which_mask'] == 'etopo':
         map.etopo()
         fesom_plot_lmask(map,mesh,ax,'none')
+    
+    #___________________________________________________________________________
+    if (data.use_cavity and do_cavity):
+        cav_aux = np.abs(mesh.nodes_2d_cg)
+        cav_levels=np.concatenate((np.array([1.0]),np.arange(50.0,1100.0,150.0)))
+        cav_lwidth=np.linspace(0.5,0.1,cav_levels.size)
+        cav_mx,cav_my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
+        cav_cmap = cm.get_cmap(name='YlGnBu_r')
+        ax.tricontour(cav_mx,cav_my,mesh.elem_2d_i,cav_aux,
+                levels=cav_levels,
+                linewidths=cav_lwidth,
+                antialiased=True,
+                cmap=cav_cmap)
     
     #___________________________________________________________________________
     # arange colorbar position and labels
@@ -1589,8 +1602,14 @@ def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=Fal
 def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto',fac=0):
     cref = cmin + (cmax-cmin)/2
     if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1+fac)) 
-    if varname in ['u','v','w','ssh','fw','fh'] or \
+    if varname in ['u','v','w','fw','fh'] or \
        any(x in varname for x in ['vec','anom','dvd']):
        if not do_rescale=='log10': cref=0.0
+    if varname in ['shh']: 
+        if (cmin<0 and cmax<0) or (cmin>0 and cmax>0):
+            cref = cmin+(cmax-cmin)/2
+            cref = np.around(cref,0)
+        else :
+            cref = 0.0
     if varname in ['Kv']: cref = np.around(cref,0)
     return(cref)    

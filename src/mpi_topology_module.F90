@@ -1,26 +1,29 @@
 module mpi_topology_module
 ! synopsis:
 ! collectively call mpi_topology%next_host_head_rank to get the first mpi rank of the next compute node (host) within the given communicator
-! collectively call mpi_topology%reset_host_head_rank if there is need to start over with the first compute node
+! after all hosts have been used up, we will start over at the first host and increment the rank by 1
+! after all ranks have been used up, we will start over at the first host with rank 0
+! optional second argument will return the number of times this rank has been returned
 
-  implicit none  
+  implicit none
   public mpi_topology
   private
 
   type :: mpi_topology_type
   contains
-    procedure, nopass :: next_host_head_rank
-    procedure, nopass :: reset_host_head_rank
-    procedure, nopass :: am_i_host_head_rank
-    procedure, nopass :: set_hostname_strategy
+    procedure, nopass :: next_host_head_rank, set_hostname_strategy, reset_state
   end type
   type(mpi_topology_type) mpi_topology
 
-  integer, save :: MAXRANK = 0
-  integer, save :: STEP = 0
-  integer, save :: count = 0
-  integer, save :: COMM = -1
-  procedure(hostname_interface), pointer, save :: hostname_strategy => hostname_sys
+  logical, save :: IS_STATE_INITIALIZED = .false.
+
+  integer, save :: MAXRANK
+  integer, save :: STEP
+  integer, save :: count
+  integer, save :: lap
+  integer, save :: host_use_count
+  integer, save :: COMM
+  procedure(hostname_interface), pointer, save :: hostname_strategy
   abstract interface
     subroutine hostname_interface(hostname)
     character(len=:), allocatable, intent(out) :: hostname
@@ -28,6 +31,19 @@ module mpi_topology_module
   end interface
 
 contains
+
+  subroutine reset_state()
+    MAXRANK = 0
+    STEP = 0
+    count = 0
+    lap = 1
+    host_use_count = lap
+    COMM = -1
+    hostname_strategy => hostname_sys
+
+    IS_STATE_INITIALIZED = .true.
+  end subroutine
+
 
   subroutine set_hostname_strategy(strategy)
     procedure(hostname_interface) strategy
@@ -37,39 +53,31 @@ contains
   subroutine hostname_sys(hostname)
     character(len=:), allocatable, intent(out) :: hostname
     integer*4 status, hostnm
-    
+
     allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
     status = hostnm(hostname)
   end subroutine
 
-  ! must be called collectively
-  logical function am_i_host_head_rank(communicator) result(result)
+  integer recursive function next_host_head_rank(communicator, rank_use_count) result(result)
     integer, intent(in) :: communicator
-    integer rank, ierror
-    
+    integer, optional, intent(out) :: rank_use_count
+
+    if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
-    
-    call MPI_COMM_RANK(communicator, rank, ierror)
-    result = mod(rank, STEP)==0
-  end function
 
-
-  subroutine reset_host_head_rank()
-    count = 0
-  end
-
-
-  integer recursive function next_host_head_rank(communicator) result(result)
-    integer, intent(in) :: communicator
-    
-    if(communicator .ne. COMM) COMM = learn_topology(communicator)
-    
-    result = count*STEP
-    if(result > MAXRANK) then
-      call reset_host_head_rank()
+    result = count*STEP + lap-1
+    if(result > MAXRANK) then ! start a new lap
+      count = 0
+      host_use_count = host_use_count + 1
+      lap = lap + 1
+      if(lap > STEP) lap = 1 ! start over with the first rank on a host
       result = next_host_head_rank(communicator)
     else
       count = count + 1
+    end if
+
+    if(present(rank_use_count)) then
+      rank_use_count = (host_use_count-1)/STEP +1
     end if
   end function
 
@@ -84,13 +92,13 @@ contains
     integer ranks_per_host
     integer, intent(in) :: communicator
 
-    call reset_host_head_rank()
+    count = 0
     result = communicator
-  
+
     call MPI_COMM_RANK(communicator, rank, ierror)
     call MPI_COMM_SIZE(communicator, rank_count, ierror)
     MAXRANK = rank_count-1
-    
+
     call hostname_strategy(hostname)
     if(rank==0) then
       allocate(character(len(hostname)) :: names(rank_count))
@@ -106,7 +114,7 @@ contains
           else
             exit
           end if
-        end do    
+        end do
     end if
     deallocate(names)
 
