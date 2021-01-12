@@ -1139,15 +1139,15 @@ subroutine iceberg_out
    
    !***************************************************************
    !write new restart file with only non melted icebergs
-   if(melted(ib)==.false.) then
-       !write all parameters that icb_step needs:
-       write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
-            height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
-            Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
-            conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
-            u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
-   end if
+   !if(melted(ib)==.false.) then
+   !    !write all parameters that icb_step needs:
+   !    write(icbID_ISM,'(18e15.7,I,L,3e15.7,L)')						&
+   !         height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),	&
+   !         Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
+   !         conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
+   !         u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
+   !         f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), melted(ib)
+   !end if
 
   end do
   close(icbID_ISM)
