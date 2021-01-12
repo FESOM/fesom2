@@ -1,10 +1,15 @@
 cmake_minimum_required(VERSION 3.4)
 
 # set default build type cache entry (do so before project(...) is called, which would create this cache entry on its own)
-if(NOT CMAKE_BUILD_TYPE)
-	message(STATUS "setting default build type: Release")
-	set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
+set(CMAKE_BUILD_TYPE_Values "None;Debug;Release;RelWithDebInfo;MinSizeRel" CACHE INTERNAL "List of possible build type")
+# Combobox to avoid erroneous value (in cmake-gui)
+# https://blog.kitware.com/constraining-values-with-comboboxes-in-cmake-cmake-gui
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_BUILD_TYPE_Values})
+if(NOT CMAKE_BUILD_TYPE IN_LIST CMAKE_BUILD_TYPE_Values)
+	message(FATAL_ERROR "CMAKE_BUILD_TYPE must be one of ${CMAKE_BUILD_TYPE_Values}")
 endif()
+message(STATUS "setting build type: ${CMAKE_BUILD_TYPE}")
 
 project(FESOM2.0)
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
