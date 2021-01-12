@@ -20,7 +20,7 @@ module io_fesom_file_module
   end type
 
   
-  type, extends(netcdf_file_type) :: fesom_file_type
+  type, extends(netcdf_file_type) :: fesom_file_type ! todo maybe: do not inherit but use composition to have different implementations for the iorank and non-io ranks
     private
     integer time_dimidx
     integer time_varidx
@@ -30,6 +30,7 @@ module io_fesom_file_module
     integer :: iorank = 0
   contains
     procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: close_file ! inherited procedures we overwrite
   end type
   
   
@@ -271,6 +272,13 @@ contains
     f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
   end subroutine
   
+  
+  subroutine close_file(this)
+    class(fesom_file_type), intent(inout) :: this
+    
+    this%rec_cnt = -1 ! reset state (should probably be done in all the open_ procedures, not here)
+    call this%netcdf_file_type%close_file()
+  end subroutine  
 
 
   subroutine assert(val, line)
