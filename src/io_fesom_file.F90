@@ -11,6 +11,7 @@ module io_fesom_file_module
     real(kind=8), pointer :: local_data_ptr3(:,:) => null()
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
+    logical is_elem_based
   end type
   
   
@@ -139,7 +140,11 @@ contains
           end if
         end if
 
-        call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+        if(var%is_elem_based) then
+         ;
+        else
+          call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+        end if
       end do
     end do
   end subroutine
@@ -170,7 +175,11 @@ contains
       end if
 
       do lvl=1, nlvl
-        call gather_nod2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom) 
+        if(var%is_elem_based) then
+          ;
+        else
+          call gather_nod2D (var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom)
+        end if
 
         if(mype == f%iorank) then
           if(is_2d) then
@@ -200,12 +209,12 @@ contains
    
     if(size(shape(local_data)) == 1) then ! 1D data
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
-      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, longname, units)
+      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .false., longname, units)
     
     else if(size(shape(local_data)) == 2) then ! 2D data
       depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
-      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, longname, units)
+      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .false., longname, units)
     end if        
   end subroutine
   
@@ -249,7 +258,7 @@ contains
   end function
 
 
-  subroutine specify_variable(f, name, dim_indices, global_level_data_size, local_data, longname, units)
+  subroutine specify_variable(f, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
     use g_PARSUP
     type(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
@@ -257,6 +266,7 @@ contains
     integer, intent(in) :: dim_indices(:)
     integer global_level_data_size
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision?
+    logical, intent(in) :: is_elem_based
     character(len=*), intent(in) :: units, longname
     ! EO parameters
     integer var_index
@@ -270,6 +280,7 @@ contains
     f%var_infos(f%nvar_infos)%var_index = var_index
     f%var_infos(f%nvar_infos)%local_data_ptr3 => local_data
     f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
+    f%var_infos(f%nvar_infos)%is_elem_based = is_elem_based
   end subroutine
   
   
