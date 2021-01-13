@@ -7,16 +7,10 @@ option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-file(GLOB sources_Fortran ${src_home}/*.F90)
-#list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
-file(GLOB sources_C ${src_home}/*.c)
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
-list(REMOVE_ITEM sources_Fortran ${FESOM_ORIGINAL_VERSION_FILE}) # we want to compile the generated file instead
-list(REMOVE_ITEM sources_Fortran ${FESOM_GENERATED_VERSION_FILE}) # we don't want to include twice the generated file (included by the glob *.F90)
-list(APPEND sources_Fortran ${FESOM_GENERATED_VERSION_FILE})
 add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED_VERSION_FILE} # the first arg to OUTPUT is a name for a file we never create to make sure this command will run on every re-build (let our file be the second arg, as the first file is inadvertently removed by make)
                    COMMAND ${CMAKE_COMMAND} -DFESOM_ORIGINAL_VERSION_FILE=${FESOM_ORIGINAL_VERSION_FILE} -DFESOM_GENERATED_VERSION_FILE=${FESOM_GENERATED_VERSION_FILE} -P GitRepositoryInfo.cmake
                    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
@@ -25,8 +19,6 @@ add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED
 #if(${FESOM_STANDALONE})
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
-list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90)
-list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -38,12 +30,102 @@ add_subdirectory(async_threads_cpp)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
 
-add_library(fesom_C ${sources_C})
+add_library(fesom_C
+  psolve.c
+  psolve_feom.c
+)
 target_compile_definitions(fesom_C PRIVATE PARMS USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
 target_link_libraries(fesom_C parms) #metis
 
 # create our binary (set its name to name of this project)
-add_executable(fesom ${sources_Fortran})
+add_executable(fesom
+  async_threads_module.F90
+  cavity_param.F90
+  cpl_driver.F90
+  cvmix_background.F90
+  cvmix_convection.F90
+  cvmix_ddiff.F90
+  cvmix_idemix.F90
+  cvmix_kinds_and_types.F90
+  cvmix_kpp.F90
+  cvmix_math.F90
+  cvmix_put_get.F90
+  cvmix_shear.F90
+  cvmix_tidal.F90
+  cvmix_tke.F90
+  cvmix_utils.F90
+  fesom_version_info-generated.F90
+  forcing_lookahead_reader_module.F90
+  forcing_provider_async_module.F90
+  forcing_provider_netcdf_module.F90
+  fvom_main.F90
+  gen_bulk_formulae.F90
+  gen_comm.F90
+  gen_events.F90
+  gen_forcing_couple.F90
+  gen_forcing_init.F90
+  gen_halo_exchange.F90
+  gen_ic3d.F90
+  gen_interpolation.F90
+  gen_model_setup.F90
+  gen_modules_clock.F90
+  gen_modules_config.F90
+  gen_modules_cvmix_idemix.F90
+  gen_modules_cvmix_kpp.F90
+  gen_modules_cvmix_pp.F90
+  gen_modules_cvmix_tidal.F90
+  gen_modules_cvmix_tke.F90
+  gen_modules_diag.F90
+  gen_modules_forcing.F90
+  gen_modules_gpot.F90
+  gen_modules_partitioning.F90
+  gen_modules_read_NetCDF.F90
+  gen_modules_rotate_grid.F90
+  gen_support.F90
+  gen_surface_forcing.F90
+  ice_EVP.F90
+  ice_fct.F90
+  ice_maEVP.F90
+  ice_modules.F90
+  ice_oce_coupling.F90
+  ice_setup_step.F90
+  ice_thermo_cpl.F90
+  ice_thermo_oce.F90
+  io_blowup.F90
+  io_data_strategy.F90
+  io_gather.F90
+  io_meandata.F90
+  io_mesh_info.F90
+  io_netcdf_workaround_module.F90
+  io_restart.F90
+  MOD_MESH.F90
+  mpi_topology_module.F90
+  oce_adv_tra_driver.F90
+  oce_adv_tra_fct.F90
+  oce_adv_tra_hor.F90
+  oce_adv_tra_ver.F90
+  oce_ale.F90
+  oce_ale_mixing_kpp.F90
+  oce_ale_mixing_pp.F90
+  oce_ale_pressure_bv.F90
+  oce_ale_tracer.F90
+  oce_ale_vel_rhs.F90
+  oce_dyn.F90
+  oce_fer_gm.F90
+  oce_ice_init_state.F90
+  oce_local.F90
+  oce_mesh.F90
+  oce_mo_conv.F90
+  oce_modules.F90
+  oce_muscl_adv.F90
+  oce_setup_step.F90
+  oce_shortwave_pene.F90
+  oce_spp.F90
+  oce_tracer_mod.F90
+  oce_vel_rhs_vinv.F90
+  toy_channel_soufflet.F90
+  write_step_info.F90
+)
 target_compile_definitions(fesom PRIVATE
   PARMS
   -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243
