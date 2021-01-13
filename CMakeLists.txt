@@ -13,6 +13,7 @@ message(STATUS "setting build type: ${CMAKE_BUILD_TYPE}")
 
 project(FESOM2.0)
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. Also needs FESOM_COUPLED to work)")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")

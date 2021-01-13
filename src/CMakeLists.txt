@@ -18,8 +18,6 @@ add_subdirectory(../lib/parms ${PROJECT_BINARY_DIR}/parms)
 
 add_subdirectory(async_threads_cpp)
 
-include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindNETCDF.cmake)
-
 # create our binary (set its name to name of this project)
 add_executable(fesom
   async_threads_module.F90
@@ -175,15 +173,21 @@ if(${FESOM_COUPLED})
 endif()
 # https://cmake.org/cmake/help/v3.13/module/FindMPI.html
 find_package(MPI REQUIRED)
+# https://www.scivision.dev/cmake-find-netcdf4/
+# https://github.com/geospace-code/nc4fortran/blob/master/cmake/Modules/FindNetCDF.cmake
+find_package(NetCDF REQUIRED COMPONENTS Fortran)
 
-target_include_directories(fesom PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
+target_include_directories(fesom PRIVATE ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(fesom PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(fesom PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
-target_link_libraries(fesom ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
+target_link_libraries(fesom ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(fesom ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
-target_link_libraries(fesom MPI::MPI_Fortran)
-target_link_libraries(fesom parms) #metis
-target_link_libraries(fesom async_threads_cpp)
+target_link_libraries(fesom
+    MPI::MPI_Fortran
+    NetCDF::NetCDF_Fortran
+    parms # metis
+    async_threads_cpp
+)
 set_target_properties(fesom PROPERTIES LINKER_LANGUAGE Fortran)
 
 set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")
