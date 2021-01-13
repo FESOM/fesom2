@@ -52,6 +52,10 @@ contains
       
       call mpi_recv(arr2D_local(1), node_size, mpi_precision, root_rank, tag+2, comm, status, mpierr)
     end if
+
+    ! without a barrier, we get wrong results in arr2D_local
+    ! todo: not sure why this happens (probably because the 3D levels have the same send/recv signature), get rid of the barrier if possible
+    call mpi_barrier(comm, mpierr)
   end subroutine
 
 
@@ -101,6 +105,10 @@ contains
       
       call mpi_recv(arr2D_local(1), elem_size, mpi_precision, root_rank, tag+2, comm, status, mpierr)
     end if
+    
+    ! without a barrier, we get wrong results in arr2D_local
+    ! todo: not sure why this happens (probably because the 3D levels have the same send/recv signature), get rid of the barrier if possible
+    call mpi_barrier(comm, mpierr)
   end subroutine
 
 
