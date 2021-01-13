@@ -41,7 +41,7 @@ contains
         sendbuf = arr2D_global(remote_list_nod2d)
         deallocate(remote_list_nod2d)
 
-        call mpi_send(sendbuf(1), node_size, mpi_double_precision, sender_rank, tag+2, comm, mpierr)
+        call mpi_send(sendbuf(1), node_size, mpi_precision, sender_rank, tag+2, comm, mpierr)
         deallocate(sendbuf)
       end do
     
@@ -91,7 +91,7 @@ contains
         sendbuf = arr2D_global(remote_list_elem2d)
         deallocate(remote_list_elem2d)
 
-        call mpi_send(sendbuf(1), elem_size, mpi_double_precision, sender_rank, tag+2, comm, mpierr)
+        call mpi_send(sendbuf(1), elem_size, mpi_precision, sender_rank, tag+2, comm, mpierr)
         deallocate(sendbuf)
       end do
     
