@@ -173,11 +173,15 @@ if(${FESOM_COUPLED})
       endif()
    endif()
 endif()
+# https://cmake.org/cmake/help/v3.13/module/FindMPI.html
+find_package(MPI REQUIRED)
+
 target_include_directories(fesom PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(fesom PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(fesom PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(fesom ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(fesom ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+target_link_libraries(fesom MPI::MPI_Fortran)
 target_link_libraries(fesom parms) #metis
 target_link_libraries(fesom async_threads_cpp)
 set_target_properties(fesom PROPERTIES LINKER_LANGUAGE Fortran)
