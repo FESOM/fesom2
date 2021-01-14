@@ -115,6 +115,7 @@ contains
     logical is_2d
     integer last_rec_idx
     type(var_info), pointer :: var
+    real(kind=8), allocatable :: laux(:)
   
     last_rec_idx = f%rec_count()
     
@@ -123,6 +124,7 @@ contains
     
       nlvl = size(var%local_data_ptr3,dim=1)
       is_2d = (nlvl == 1)
+      allocate(laux( size(var%local_data_ptr3,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we read at once
@@ -142,11 +144,14 @@ contains
         end if
 
         if(var%is_elem_based) then
-          call scatter_elem2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+          call scatter_elem2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
         else
-          call scatter_nod2D(var%global_level_data, var%local_data_ptr3(lvl,:), f%iorank, MPI_comm_fesom)
+          call scatter_nod2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
         end if
+        ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
+        var%local_data_ptr3(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
       end do
+      deallocate(laux)
     end do
   end subroutine
 
@@ -158,16 +163,17 @@ contains
     ! EO parameters
     integer i,lvl, nlvl
     logical is_2d
+    real(kind=8), allocatable :: laux(:)
     type(var_info), pointer :: var
 
     if(f%is_iorank()) f%rec_cnt = f%rec_count()+1
     
     do i=1, f%nvar_infos
       var => f%var_infos(i)
-    
 
       nlvl = size(var%local_data_ptr3,dim=1)
       is_2d = (nlvl == 1)
+      allocate(laux( size(var%local_data_ptr3,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we write at once
@@ -177,10 +183,13 @@ contains
       end if
 
       do lvl=1, nlvl
+        ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
+        laux = var%local_data_ptr3(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+
         if(var%is_elem_based) then
-          call gather_elem2D(var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom)
+          call gather_elem2D(laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
         else
-          call gather_nod2D (var%local_data_ptr3(lvl,:), var%global_level_data, f%iorank, 42, MPI_comm_fesom)
+          call gather_nod2D (laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
         end if
 
         if(mype == f%iorank) then
@@ -192,6 +201,7 @@ contains
           end if
         end if
       end do
+      deallocate(laux)
     end do
   end subroutine
 
@@ -233,13 +243,13 @@ contains
     type(dim_info) level_diminfo, depth_diminfo
 
     level_diminfo = obtain_diminfo(f, m_elem2d)
-   
+
     if(size(shape(local_data)) == 1) then ! 1D data
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
-      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)
-    
+    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)    
+
     else if(size(shape(local_data)) == 2) then ! 2D data
-      depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
+    depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
       call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
       call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)
     end if        
