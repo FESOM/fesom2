@@ -81,7 +81,7 @@ contains
     call assert(elem_size == mydim_elem2d+edim_elem2d, __LINE__) ! mylist_elem2d is larger and can not be used for comparison here
 
     if(mype == root_rank) then
-      arr2D_local = arr2D_global(1:elem_size)
+      arr2D_local = arr2D_global(myList_elem2D(1:elem_size))
       do  n = 1, npes-1
         ! receive remote partition 2D size
         call mpi_recv(elem_size, 1, mpi_integer, MPI_ANY_SOURCE, tag+0, comm, status, mpierr)
