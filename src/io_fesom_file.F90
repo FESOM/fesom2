@@ -111,7 +111,7 @@ contains
     use io_scatter_module
     class(fesom_file_type), target :: f
     ! EO parameters
-    integer i,lvl, nlvl, nodes_per_lvl
+    integer i,lvl, nlvl
     logical is_2d
     integer last_rec_idx
     type(var_info), pointer :: var
@@ -122,12 +122,13 @@ contains
       var => f%var_infos(i)
     
       nlvl = size(var%local_data_ptr3,dim=1)
-      nodes_per_lvl = var%global_level_data_size
       is_2d = (nlvl == 1)
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we read at once
-        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
+      else
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( 0 ))
       end if
 
       do lvl=1, nlvl
@@ -155,7 +156,7 @@ contains
     use io_gather_module
     class(fesom_file_type), target :: f
     ! EO parameters
-    integer i,lvl, nlvl, nodes_per_lvl
+    integer i,lvl, nlvl
     logical is_2d
     type(var_info), pointer :: var
 
@@ -166,12 +167,13 @@ contains
     
 
       nlvl = size(var%local_data_ptr3,dim=1)
-      nodes_per_lvl = var%global_level_data_size
       is_2d = (nlvl == 1)
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we write at once
-        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data(nodes_per_lvl))
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
+      else
+        if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( 0 ))
       end if
 
       do lvl=1, nlvl
