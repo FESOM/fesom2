@@ -14,7 +14,7 @@ module io_netcdf_file_module
     character(:), allocatable :: filepath
     integer ncid
   contains
-    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, close_file, open_write_create, open_write_append
+    procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, flush_file, close_file, open_write_create, open_write_append
     procedure, public :: is_attached, read_var_shape
     procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
@@ -514,6 +514,15 @@ contains
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_put_vara_int(this%ncid, this%vars(varindex)%ncid, starts, sizes, values_ptr), __LINE__)
+  end subroutine
+
+
+  subroutine flush_file(this)
+    class(netcdf_file_type), intent(inout) :: this
+    ! EO parameters
+    include "netcdf.inc"
+
+    call assert_nc( nf_sync(this%ncid), __LINE__ ) ! flush the file to disk
   end subroutine
 
 
