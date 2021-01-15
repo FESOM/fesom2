@@ -1,6 +1,7 @@
  ! synopsis: generic implementation to asynchronously read/write FESOM mesh variable(s) with distributed cell or element data in 2D or 3D to/from a NetCDF file
 module io_fesom_file_module
   use io_netcdf_file_module
+  use async_threads_module
   implicit none
   public fesom_file_type
   private
@@ -30,6 +31,10 @@ module io_fesom_file_module
     integer :: rec_cnt = -1
     integer :: iorank = 0
     integer :: fesom_file_index
+    type(thread_type) thread
+    logical :: thread_running = .false.
+    integer :: comm
+    integer :: mype_workaround
   contains
     procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
@@ -229,6 +234,36 @@ contains
   end subroutine
 
 
+  subroutine join(f)
+    class(fesom_file_type) f
+    ! EO parameters
+    
+    if(f%thread_running) call f%thread%join()
+    f%thread_running = .false.
+  end subroutine
+
+
+  subroutine async_gather_and_write_variables(f)
+    class(fesom_file_type) f
+    ! EO parameters
+    
+    call assert(.not. f%thread_running, __LINE__)
+
+    call f%thread%run()
+    f%thread_running = .true.
+  end subroutine
+
+
+  subroutine async_worker(fesom_file_index)
+    integer, intent(in) :: fesom_file_index
+    ! EO parameters
+    type(fesom_file_type), pointer :: f
+
+    f => all_fesom_files(fesom_file_index)%ptr
+!     mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+  end subroutine
+
+
   subroutine specify_node_var(f, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
@@ -330,6 +365,7 @@ contains
 
   subroutine specify_variable(f, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
     use g_PARSUP
+    use io_netcdf_workaround_module
     type(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
@@ -339,6 +375,9 @@ contains
     character(len=*), intent(in) :: units, longname
     ! EO parameters
     integer var_index
+    logical async_netcdf_allowed
+    integer err
+    integer provided_mpi_thread_support_level
 
     var_index = f%add_var_double(name, dim_indices)
     call f%add_var_att(var_index, "units", units)
@@ -350,11 +389,31 @@ contains
     f%var_infos(f%nvar_infos)%local_data_ptr3 => local_data
     f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
     f%var_infos(f%nvar_infos)%is_elem_based = is_elem_based
+
+    ! set up async output
+    
+    f%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
+
+    call MPI_Comm_dup(MPI_COMM_FESOM, f%comm, err)
+
+    call f%thread%initialize(async_worker, f%fesom_file_index)
+    if(.not. async_netcdf_allowed) call f%thread%disable_async()
+  
+    ! check if we have multi thread support available in the MPI library
+    ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
+    ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
+    call MPI_Query_thread(provided_mpi_thread_support_level, err)
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call f%thread%disable_async()
+    
+    f%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
   
   
   subroutine close_file(this)
     class(fesom_file_type), intent(inout) :: this
+
+    if(this%thread_running) call this%thread%join()
+    this%thread_running = .false.    
    
     this%rec_cnt = -1 ! reset state (should probably be done in all the open_ procedures, not here)
     call this%netcdf_file_type%close_file()
