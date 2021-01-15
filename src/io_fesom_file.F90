@@ -311,7 +311,6 @@ contains
     use g_PARSUP
     type(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
-!    integer, intent(in) :: global_shape(:)
     integer, intent(in) :: dim_indices(:)
     integer global_level_data_size
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision?
