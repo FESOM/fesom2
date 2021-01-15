@@ -29,6 +29,7 @@ module io_fesom_file_module
     type(dim_info), allocatable :: used_mesh_dims(:) ! the dims we add for our variables, we need to identify them when adding our mesh related variables
     integer :: rec_cnt = -1
     integer :: iorank = 0
+    integer :: fesom_file_index
   contains
     procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
@@ -40,6 +41,12 @@ module io_fesom_file_module
   integer, save :: m_nod2d
   integer, save :: m_elem2d
   integer, save :: m_nl
+  
+
+  type fesom_file_type_ptr
+    class(fesom_file_type), pointer :: ptr
+  end type
+  type(fesom_file_type_ptr), allocatable, save :: all_fesom_files(:)
 
 
 contains
@@ -88,11 +95,12 @@ contains
   
   
   subroutine init(f, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), target, intent(inout) :: f
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
     ! EO parameters
+    type(fesom_file_type_ptr), allocatable :: tmparr(:)
 
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
     m_nod2d = mesh_nod2d
@@ -105,6 +113,19 @@ contains
     f%time_dimidx = f%add_dim_unlimited('time')
 
     f%time_varidx = f%add_var_double('time', [f%time_dimidx])
+
+    ! add this instance to global array
+    ! the array is being used to identify the instance in an async call
+    if( .not. allocated(all_fesom_files)) then
+      allocate(all_fesom_files(1))
+    else
+      allocate( tmparr(size(all_fesom_files)+1) )
+      tmparr(1:size(all_fesom_files)) = all_fesom_files
+      deallocate(all_fesom_files)
+      call move_alloc(tmparr, all_fesom_files)
+    end if
+    all_fesom_files(size(all_fesom_files))%ptr => f
+    f%fesom_file_index = size(all_fesom_files)
   end subroutine
   
   
@@ -334,7 +355,7 @@ contains
   
   subroutine close_file(this)
     class(fesom_file_type), intent(inout) :: this
-    
+   
     this%rec_cnt = -1 ! reset state (should probably be done in all the open_ procedures, not here)
     call this%netcdf_file_type%close_file()
   end subroutine  
