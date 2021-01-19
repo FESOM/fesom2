@@ -216,7 +216,7 @@ contains
     real(kind=8), allocatable :: laux(:)
     type(var_info), pointer :: var
 
-    if(f%is_iorank()) f%rec_cnt = f%rec_count()+1
+    if(mype == f%iorank) f%rec_cnt = f%rec_count()+1
     
     do i=1, f%nvar_infos
       var => f%var_infos(i)
@@ -253,6 +253,8 @@ contains
       end do
       deallocate(laux)
     end do
+    
+    if(mype == f%iorank) call f%flush_file() ! flush the file to disk after each write
   end subroutine
 
 
