@@ -10,6 +10,7 @@ module io_fesom_file_module
   type var_info
     integer var_index
     real(kind=8), pointer :: external_local_data_ptr(:,:) => null()
+    real(kind=8), allocatable, dimension(:,:) :: local_data_copy
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
@@ -34,12 +35,14 @@ module io_fesom_file_module
     type(thread_type) thread
     logical :: thread_running = .false.
     integer :: comm
+    logical gather_and_write
     integer :: mype_workaround
   contains
-    procedure, public :: read_and_scatter_variables, gather_and_write_variables, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
+    procedure, private :: read_and_scatter_variables, gather_and_write_variables
   end type
   
   
@@ -221,9 +224,9 @@ contains
     do i=1, f%nvar_infos
       var => f%var_infos(i)
 
-      nlvl = size(var%external_local_data_ptr,dim=1)
+      nlvl = size(var%local_data_copy,dim=1)
       is_2d = (nlvl == 1)
-      allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      allocate(laux( size(var%local_data_copy,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we write at once
@@ -234,7 +237,7 @@ contains
 
       do lvl=1, nlvl
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
-        laux = var%external_local_data_ptr(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+        laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 
         if(var%is_elem_based) then
           call gather_elem2D(laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
@@ -263,28 +266,56 @@ contains
     ! EO parameters
     
     if(f%thread_running) call f%thread%join()
-    f%thread_running = .false.
+    f%thread_running = .false.    
+  end subroutine
+
+
+  subroutine async_read_and_scatter_variables(f)
+    class(fesom_file_type), target :: f
+  
+    call assert(.not. f%thread_running, __LINE__)
+
+    f%gather_and_write = .false.
+    call f%thread%run()
+    f%thread_running = .true.
   end subroutine
 
 
   subroutine async_gather_and_write_variables(f)
-    class(fesom_file_type) f
+    class(fesom_file_type), target :: f
     ! EO parameters
+    integer i
+    type(var_info), pointer :: var
     
     call assert(.not. f%thread_running, __LINE__)
 
+    ! copy data so we can write the current values asynchonously
+    do i=1, f%nvar_infos
+      var => f%var_infos(i)
+      if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
+      var%local_data_copy = var%external_local_data_ptr
+    end do
+    
+    f%gather_and_write = .true.
     call f%thread%run()
     f%thread_running = .true.
   end subroutine
 
 
   subroutine async_worker(fesom_file_index)
+    use g_PARSUP
     integer, intent(in) :: fesom_file_index
     ! EO parameters
     type(fesom_file_type), pointer :: f
 
     f => all_fesom_files(fesom_file_index)%ptr
-!     mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+    mype = f%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+
+    if(f%gather_and_write) then
+      call f%gather_and_write_variables()
+    else
+      call f%read_and_scatter_variables()
+    end if
   end subroutine
 
 
