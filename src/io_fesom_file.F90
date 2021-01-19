@@ -38,9 +38,11 @@ module io_fesom_file_module
     logical gather_and_write
     integer :: mype_workaround
   contains
-    procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, specify_node_var, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
+    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_3d
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
+    procedure, private :: specify_node_var_2d, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: read_and_scatter_variables, gather_and_write_variables
   end type
@@ -319,28 +321,38 @@ contains
   end subroutine
 
 
-  subroutine specify_node_var(f, name, longname, units, local_data)
+  subroutine specify_node_var_2d(f, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
     class(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
+    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     ! EO parameters
     real(8), pointer :: external_local_data_ptr(:,:)
-    type(dim_info) level_diminfo, depth_diminfo
+    type(dim_info) level_diminfo
 
     level_diminfo = obtain_diminfo(f, m_nod2d)
    
-    if(size(shape(local_data)) == 1) then ! 1D data
-      call c_f_pointer(c_loc(local_data), external_local_data_ptr, [1,size(local_data)])
-      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)
-    
-    else if(size(shape(local_data)) == 2) then ! 2D data
-      depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
-      call c_f_pointer(c_loc(local_data), external_local_data_ptr, [size(local_data, dim=1),size(local_data, dim=2)])
-      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)
-    end if        
+    external_local_data_ptr(1:1,1:size(local_data)) => local_data
+    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
+  end subroutine
+
+
+  subroutine specify_node_var_3d(f, name, longname, units, local_data)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    class(fesom_file_type), intent(inout) :: f
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    ! EO parameters
+    type(dim_info) level_diminfo, depth_diminfo
+
+    level_diminfo = obtain_diminfo(f, m_nod2d)    
+    depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
+
+    call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
   end subroutine
 
 
