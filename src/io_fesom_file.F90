@@ -100,12 +100,17 @@ contains
   
   
   subroutine init(f, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
+    use g_PARSUP
+    use io_netcdf_workaround_module
     class(fesom_file_type), target, intent(inout) :: f
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
+    logical async_netcdf_allowed
+    integer err
+    integer provided_mpi_thread_support_level
 
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
     m_nod2d = mesh_nod2d
@@ -131,6 +136,23 @@ contains
     end if
     all_fesom_files(size(all_fesom_files))%ptr => f
     f%fesom_file_index = size(all_fesom_files)
+
+    ! set up async output
+    
+    f%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
+
+    call MPI_Comm_dup(MPI_COMM_FESOM, f%comm, err)
+
+    call f%thread%initialize(async_worker, f%fesom_file_index)
+    if(.not. async_netcdf_allowed) call f%thread%disable_async()
+  
+    ! check if we have multi thread support available in the MPI library
+    ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
+    ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
+    call MPI_Query_thread(provided_mpi_thread_support_level, err)
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call f%thread%disable_async()
+    
+    f%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
   
   
@@ -364,8 +386,6 @@ contains
 
 
   subroutine specify_variable(f, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
-    use g_PARSUP
-    use io_netcdf_workaround_module
     type(fesom_file_type), intent(inout) :: f
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
@@ -375,9 +395,6 @@ contains
     character(len=*), intent(in) :: units, longname
     ! EO parameters
     integer var_index
-    logical async_netcdf_allowed
-    integer err
-    integer provided_mpi_thread_support_level
 
     var_index = f%add_var_double(name, dim_indices)
     call f%add_var_att(var_index, "units", units)
@@ -389,23 +406,6 @@ contains
     f%var_infos(f%nvar_infos)%local_data_ptr3 => local_data
     f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
     f%var_infos(f%nvar_infos)%is_elem_based = is_elem_based
-
-    ! set up async output
-    
-    f%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
-
-    call MPI_Comm_dup(MPI_COMM_FESOM, f%comm, err)
-
-    call f%thread%initialize(async_worker, f%fesom_file_index)
-    if(.not. async_netcdf_allowed) call f%thread%disable_async()
-  
-    ! check if we have multi thread support available in the MPI library
-    ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
-    ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
-    call MPI_Query_thread(provided_mpi_thread_support_level, err)
-    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call f%thread%disable_async()
-    
-    f%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
   
   
