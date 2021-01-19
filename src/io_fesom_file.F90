@@ -9,7 +9,7 @@ module io_fesom_file_module
   
   type var_info
     integer var_index
-    real(kind=8), pointer :: local_data_ptr3(:,:) => null()
+    real(kind=8), pointer :: external_local_data_ptr(:,:) => null()
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
@@ -172,9 +172,9 @@ contains
     do i=1, f%nvar_infos
       var => f%var_infos(i)
     
-      nlvl = size(var%local_data_ptr3,dim=1)
+      nlvl = size(var%external_local_data_ptr,dim=1)
       is_2d = (nlvl == 1)
-      allocate(laux( size(var%local_data_ptr3,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we read at once
@@ -199,7 +199,7 @@ contains
           call scatter_nod2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
         end if
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
-        var%local_data_ptr3(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
       end do
       deallocate(laux)
     end do
@@ -221,9 +221,9 @@ contains
     do i=1, f%nvar_infos
       var => f%var_infos(i)
 
-      nlvl = size(var%local_data_ptr3,dim=1)
+      nlvl = size(var%external_local_data_ptr,dim=1)
       is_2d = (nlvl == 1)
-      allocate(laux( size(var%local_data_ptr3,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
+      allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
       if(mype == f%iorank) then
         ! todo: choose how many levels we write at once
@@ -234,7 +234,7 @@ contains
 
       do lvl=1, nlvl
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
-        laux = var%local_data_ptr3(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+        laux = var%external_local_data_ptr(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 
         if(var%is_elem_based) then
           call gather_elem2D(laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
@@ -296,19 +296,19 @@ contains
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(..) ! todo: be able to set precision
     ! EO parameters
-    real(8), pointer :: local_data_ptr3(:,:)
+    real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo, depth_diminfo
 
     level_diminfo = obtain_diminfo(f, m_nod2d)
    
     if(size(shape(local_data)) == 1) then ! 1D data
-      call c_f_pointer(c_loc(local_data), local_data_ptr3, [1,size(local_data)])
-      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .false., longname, units)
+      call c_f_pointer(c_loc(local_data), external_local_data_ptr, [1,size(local_data)])
+      call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)
     
     else if(size(shape(local_data)) == 2) then ! 2D data
       depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
-      call c_f_pointer(c_loc(local_data), local_data_ptr3, [size(local_data, dim=1),size(local_data, dim=2)])
-      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .false., longname, units)
+      call c_f_pointer(c_loc(local_data), external_local_data_ptr, [size(local_data, dim=1),size(local_data, dim=2)])
+      call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)
     end if        
   end subroutine
 
@@ -321,13 +321,13 @@ contains
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     ! EO parameters
-    real(8), pointer :: local_data_ptr3(:,:)
+    real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
     level_diminfo = obtain_diminfo(f, m_elem2d)
 
-    local_data_ptr3(1:1,1:size(local_data)) => local_data
-    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data_ptr3, .true., longname, units)    
+    external_local_data_ptr(1:1,1:size(local_data)) => local_data
+    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .true., longname, units)    
   end subroutine
 
 
@@ -405,7 +405,7 @@ contains
     call assert(f%nvar_infos < size(f%var_infos), __LINE__)
     f%nvar_infos = f%nvar_infos+1
     f%var_infos(f%nvar_infos)%var_index = var_index
-    f%var_infos(f%nvar_infos)%local_data_ptr3 => local_data
+    f%var_infos(f%nvar_infos)%external_local_data_ptr => local_data
     f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
     f%var_infos(f%nvar_infos)%is_elem_based = is_elem_based
   end subroutine
