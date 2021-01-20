@@ -405,7 +405,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
-  call icb2fesom(ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
+  call prepare_icb2fesom(ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
   !new_u_ib = 2.0
   !new_v_ib = 0.0
 
@@ -1029,8 +1029,8 @@ subroutine iceberg_restart
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
   call init_icebergs ! all PEs read LON,LAT,LENGTH from files
-  write(*,*) 'initialized positions and length/width from file'
-  write(*,*) '*************************************************************'
+  !write(*,*) 'initialized positions and length/width from file'
+  !write(*,*) '*************************************************************'
  end if
 
 end subroutine iceberg_restart
@@ -1080,8 +1080,8 @@ subroutine iceberg_restart_with_icesheet
   if(.NOT.ascii_out) call init_buoy_output
   end if
   call init_icebergs_with_icesheet
-  write(*,*) 'initialized positions and length/width from file'
-  write(*,*) '*************************************************************'
+  !write(*,*) 'initialized positions and length/width from file'
+  !write(*,*) '*************************************************************'
  else
 
   if(mype==0) then
@@ -1094,8 +1094,8 @@ subroutine iceberg_restart_with_icesheet
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
   call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
-  write(*,*) 'initialized positions and length/width from file'
-  write(*,*) '*************************************************************'
+  !write(*,*) 'initialized positions and length/width from file'
+  !write(*,*) '*************************************************************'
  end if
 
 end subroutine iceberg_restart_with_icesheet

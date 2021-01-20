@@ -185,6 +185,7 @@ real(kind=real32) :: runtime_alltimesteps
         if (use_icebergs) then
             t1_icb = MPI_Wtime()
             call iceberg_calculation(n)
+            call icb2fesom
             t2_icb = MPI_Wtime()
         end if
         t2 = MPI_Wtime()
@@ -197,12 +198,6 @@ real(kind=real32) :: runtime_alltimesteps
         !___prepare output______________________________________________________
         call output (n)
 
-        if (use_icebergs) then
-            t3_icb = MPI_Wtime()
-            call iceberg_out
-            t4_icb = MPI_Wtime()
-        end if
-
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
         t6 = MPI_Wtime()
@@ -213,6 +208,12 @@ real(kind=real32) :: runtime_alltimesteps
         rtime_icb_calc      = rtime_icb_calc      + t2_icb - t1_icb
         rtime_icb_write     = rtime_icb_write     + t4_icb - t3_icb
     end do
+    if (use_icebergs) then
+        t3_icb = MPI_Wtime()
+        call iceberg_out
+        t4_icb = MPI_Wtime()
+    end if
+
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)

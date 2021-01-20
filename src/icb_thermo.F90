@@ -155,6 +155,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     			    		! by distributing over area(iceberg_elem) or over patch
 					! surrounding one node
     
+    !write(*,*) '*** tvl=',tvl
     volume_before=height_ib*length_ib*width_ib
     
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then

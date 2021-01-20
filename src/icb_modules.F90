@@ -62,28 +62,28 @@ save
   real,dimension(:), allocatable:: rho_ice          !910 RT, 945.0 bei Lichey, aus Lemke (1993)
 
   !python version
-  !character(100):: IcebergRestartPath='iceberg.restart'
-  !character(100):: IcebergRestartPath_ISM='iceberg.restart.ISM'
-  !character(100):: num_non_melted_icb_file='num_non_melted_icb_file'
-  !character(100):: file_icb_netcdf='buoys_track.nc' !output file of buoys/icebergs
-  !character(100):: buoys_xlon_file='icb_longitude.dat'     !buoy position in deg
-  !character(100):: buoys_ylat_file='icb_latitude.dat'     !buoy position in deg
-  !character(100):: length_icb_file='icb_length.dat' !iceberg length [m]
-  !character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
-  !character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
-  !character(100):: scaling_file='icb_scaling.dat' !scaling factor
+  character(100):: IcebergRestartPath='iceberg.restart'
+  character(100):: IcebergRestartPath_ISM='iceberg.restart.ISM'
+  character(100):: num_non_melted_icb_file='num_non_melted_icb_file'
+  character(100):: file_icb_netcdf='buoys_track.nc' !output file of buoys/icebergs
+  character(100):: buoys_xlon_file='icb_longitude.dat'     !buoy position in deg
+  character(100):: buoys_ylat_file='icb_latitude.dat'     !buoy position in deg
+  character(100):: length_icb_file='icb_length.dat' !iceberg length [m]
+  character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
+  character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
+  character(100):: scaling_file='icb_scaling.dat' !scaling factor
   
   !kshell version
-  character(100):: IcebergRestartPath='../icb/iceberg.restart'
-  character(100):: IcebergRestartPath_ISM='../icb/iceberg.restart.ISM'
-  character(100):: num_non_melted_icb_file='../icb/num_non_melted_icb_file'
-  character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
-  character(100):: buoys_xlon_file='../icb/icb_longitude.dat'     !buoy position in deg
-  character(100):: buoys_ylat_file='../icb/icb_latitude.dat'     !buoy position in deg
-  character(100):: length_icb_file='../icb/icb_length.dat' !iceberg length [m]
-  character(100):: width_icb_file='../icb/icb_length.dat' !iceberg width [m]
-  character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
-  character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
+  !character(100):: IcebergRestartPath='../icb/iceberg.restart'
+  !character(100):: IcebergRestartPath_ISM='../icb/iceberg.restart.ISM'
+  !character(100):: num_non_melted_icb_file='../icb/num_non_melted_icb_file'
+  !character(100):: file_icb_netcdf='../icb/buoys_track.nc' !output file of buoys/icebergs
+  !character(100):: buoys_xlon_file='../icb/icb_longitude.dat'     !buoy position in deg
+  !character(100):: buoys_ylat_file='../icb/icb_latitude.dat'     !buoy position in deg
+  !character(100):: length_icb_file='../icb/icb_length.dat' !iceberg length [m]
+  !character(100):: width_icb_file='../icb/icb_length.dat' !iceberg width [m]
+  !character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
+  !character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq = 120          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates

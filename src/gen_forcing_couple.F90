@@ -370,7 +370,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats)
 #endif
   
   !last flux			   
-  if (n==nrecv .AND. mype==0) write(*,*) 'Fluxes have been modified.'  
+  !if (n==nrecv .AND. mype==0) write(*,*) 'Fluxes have been modified.'  
 END SUBROUTINE force_flux_consv
 
 !
