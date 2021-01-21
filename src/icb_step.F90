@@ -311,7 +311,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  if (find_iceberg_elem) then
  lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
-  write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
+  !write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
   lat_deg=lat_rad/rad !rotated lat in degree
   lon_deg=lon_rad/rad !rotated lon in degree   
@@ -342,8 +342,8 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
   end if
   
   if(i_have_element) then 
-   write(*,*) 'IB ',ib,' in element ',iceberg_elem
-   write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
+   !write(*,*) 'IB ',ib,' in element ',iceberg_elem
+   !write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
    !do i=1,3
    ! iceberg_node=elem2D_nodes(i,local_idx_of(iceberg_elem))
    ! write(*,*) 'node ', i, 's coords lon:', coord_nod2d(1,iceberg_node)/rad,' lat: ', coord_nod2d(2,iceberg_node)/rad
@@ -1015,7 +1015,7 @@ subroutine iceberg_restart
   if(.NOT.ascii_out) call init_buoy_output
   !call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
 
-  write(*,*) '*************************************************************'
+  !write(*,*) '*************************************************************'
   end if
  else
 
