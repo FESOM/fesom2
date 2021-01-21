@@ -107,6 +107,7 @@ contains
   subroutine init(f, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use g_PARSUP
     use io_netcdf_workaround_module
+    use io_gather_module
     class(fesom_file_type), target, intent(inout) :: f
     integer mesh_nod2d
     integer mesh_elem2d
@@ -116,6 +117,8 @@ contains
     logical async_netcdf_allowed
     integer err
     integer provided_mpi_thread_support_level
+
+    call init_io_gather()
 
     ! get hold of our mesh data for later use (assume the mesh instance will not change)
     m_nod2d = mesh_nod2d
