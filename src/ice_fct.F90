@@ -656,6 +656,10 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem) 
         
+        !___________________________________________________________________
+        ! if cavity cycle over
+        if(ulevels(elem)>1) cycle
+        
         do n=1,3
             row=elnodes(n)
             if(row>myDim_nod2D) cycle
