@@ -336,8 +336,8 @@ subroutine diag_energy(mode, mesh)
 
      DO nz=1, nzmax-1
         if (use_global_tides) then
-           UV_d_Omega(nz,n)=helem(nz,n)*(UV(1,nz,n)*sum(gradient_sca(1:3,n)*(-ssh_gp(elnodes)))  &
-                                        +UV(2,nz,n)*sum(gradient_sca(4:6,n)*(-ssh_gp(elnodes))) )
+           UV_d_Omega(nz,n) = UV(1,nz,n)*sum(gradient_sca(1:3,n)*(-ssh_gp(elnodes)+0.1*9.81_WP*eta_n(elnodes)))  &
+                            + UV(2,nz,n)*sum(gradient_sca(4:6,n)*(-ssh_gp(elnodes)+0.1*9.81_WP*eta_n(elnodes))) 
         end if
      END DO
   END DO ! --> DO n=1, myDim_elem2D
