@@ -151,7 +151,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         CASE('PPM')
             call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('UPW1')
-	    call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
