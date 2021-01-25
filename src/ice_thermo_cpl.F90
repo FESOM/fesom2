@@ -22,7 +22,7 @@ subroutine thermodynamics(mesh)
 #endif
   use g_parsup,         only: myDim_nod2D, eDim_nod2D
 #ifdef use_cavity
-  use o_mesh,           only: coord_nod2D, cavity_flag_nod2d
+  use o_mesh,           only: coord_nod2D, ulevels_nod2D
 #else
   use o_mesh,           only: coord_nod2D
 #endif
@@ -92,7 +92,7 @@ subroutine thermodynamics(mesh)
   do inod=1,myDim_nod2d+eDim_nod2d
 
 #ifdef use_cavity
-     if (cavity_flag_nod2d(inod).eq.1) cycle
+     if (ulevels_nod2D(inod) > 1) cycle
 #endif
 
      A       = a_ice(inod)
