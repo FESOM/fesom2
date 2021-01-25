@@ -343,7 +343,7 @@ module g_cvmix_kpp
     ! calculate PP vertrical mixing coefficients from CVMIX library
     subroutine calc_cvmix_kpp(mesh)
         type(t_mesh), intent(in)  , target :: mesh
-        integer       :: node, elem, nz, nln, elnodes(3), aux_nz
+        integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
         real(kind=WP) :: aux_ustar, aux_surfbuoyflx_nl(mesh%nl)
@@ -359,6 +359,7 @@ module g_cvmix_kpp
         do node= 1, myDim_nod2D
             !___________________________________________________________________
             nln = nlevels_nod2D(node)-1
+            nun = ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! initialide 1d arrays
@@ -382,13 +383,15 @@ module g_cvmix_kpp
             !___3D Quantities___________________________________________________
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call shear variables'//achar(27)//'[0m'
             if (kpp_use_fesomkpp) then
-                do nz=2, nln
+                !!PS do nz=2, nln
+                do nz=nun+1, nln
                     !___________________________________________________________
                     ! calculate squared velocity shear referenced to the surface
                     ! --> cvmix wants to have it with  respect to the midlevel rather than full levels
-                    kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,1,node) )**2 + &
-                                      ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
-                    
+                    !!PS kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,1,node) )**2 + &
+                    !!PS                   ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,1,node) )**2
+                    kpp_dvsurf2(nz) = ((Unode(1,nz-1,node)+Unode(1,nz,node))*0.5 - Unode( 1,nun,node) )**2 + &
+                                      ((Unode(2,nz-1,node)+Unode(2,nz,node))*0.5 - Unode( 2,nun,node) )**2
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2
                     dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
@@ -401,7 +404,8 @@ module g_cvmix_kpp
                     ! buoyancy difference with respect to the surface --> computed in
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
-                    call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    !!PS call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(tr_arr(nun,node,1), tr_arr(nun,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
                     call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
@@ -410,14 +414,17 @@ module g_cvmix_kpp
                     kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do 
             else
-                do nz=1, nln
+                !!PS do nz=1, nln
+                do nz=nun, nln
                     !___________________________________________________________
                     ! Calculate the surface layer depth, averaged surface layer 
                     ! quantities
                     
-                    sldepth = kpp_surf_layer_ext*max( max(-Z_3d_n(nz,node),-zbar_3d_n(2,node)),kpp_minOBLdepth )
+                    !!PS sldepth = kpp_surf_layer_ext*max( max(-Z_3d_n(nz,node),-zbar_3d_n(2,node)),kpp_minOBLdepth )
+                    sldepth = kpp_surf_layer_ext*max( max(-Z_3d_n(nz,node),-zbar_3d_n(nun+1,node)),kpp_minOBLdepth )
                     nzsfc = nz
-                    do nztmp = 1, nz
+                    !!PS do nztmp = 1, nz
+                    do nztmp = nun, nz
                         if (-zbar_3d_n(nztmp+1,node)>=sldepth) then
                             nzsfc = nztmp
                             exit
@@ -430,7 +437,8 @@ module g_cvmix_kpp
                     sfc_u    = 0.0_WP
                     sfc_v    = 0.0_WP
                     htot     = 0.0_WP
-                    do nztmp = 1, nzsfc
+                    !!PS do nztmp = 1, nzsfc
+                    do nztmp = nun, nzsfc
                         delh     = min( max(0.0_WP,sldepth-htot), hnode(nztmp,node) )
                         htot     = htot+delh
                         sfc_temp = sfc_temp + tr_arr(nztmp,node,1)*delh
@@ -464,7 +472,8 @@ module g_cvmix_kpp
                     kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do ! --> do nz=1, nln   
                 
-                do nz=2, nln   
+                !!PS do nz=2, nln 
+                do nz=nun+1, nln 
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2 for 
                     ! mixing parameterisation below ocean boundary layer 
@@ -480,10 +489,14 @@ module g_cvmix_kpp
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call surface buyflux[0m'
+            !!PS kpp_sbuoyflx(node) = -g * &
+            !!PS                         (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
+            !!PS                          sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
             kpp_sbuoyflx(node) = -g * &
-                                    (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-                                     sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
-                                     
+                                    (sw_alpha(nun,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
+                                     sw_beta( nun,node)*water_flux(node)*tr_arr(nun,node,2))
+            
+            
             ! calculate friction velocity (ustar) at surface (m/s)
             aux_ustar = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
             
@@ -507,7 +520,8 @@ module g_cvmix_kpp
             ! --> PP parameterisation after Pacanowski and Philander 1981
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc internal mixing'//achar(27)//'[0m'
             if (kpp_internalmix .eq. 'PP') then
-                do nz = 2, nln
+                !!PS do nz = 2, nln
+                do nz = nun+1, nln
                     kpp_Av(nz,node) = kpp_pp_Av0     /(1.0_WP+kpp_pp_alpha*kpp_shearRi(nz))**kpp_pp_loc_exp + kpp_Avbckg
                     kpp_Kv(nz,node) = kpp_Av(nz,node)/(1.0_WP+kpp_pp_alpha*kpp_shearRi(nz)) ! + background diffusivity
                 end do
@@ -516,7 +530,8 @@ module g_cvmix_kpp
             ! --> KPP shear parameterization below the mixed layer after (Large et
             ! al.,1994)     
             elseif (kpp_internalmix .eq. 'KPP') then
-                do nz = 2, nln
+                !!PS do nz = 2, nln
+                do nz = nun+1, nln
                     ! to avoid if conditions: if Ri>0, if 0<Ri<Ri0, if Ri>Ri0
                     ! see Large et al., 1994 eq. 28a, 28b, 28c 
                     aux = max(kpp_shearRi(nz),0.0_WP)
@@ -539,14 +554,16 @@ module g_cvmix_kpp
             ! of Qiang from FESOM1.4
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc background diff'//achar(27)//'[0m'
             if (kpp_use_nonconstKvb) then
-                do nz = 2, nln
+                !!PS do nz = 2, nln
+                do nz = nun+1, nln
                     call Kv0_background_qiang( &
                         aux,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node))&
                         )
                     kpp_Kv(nz,node) = kpp_Kv(nz,node) + aux
                 end do 
             else
-                do nz = 2, nln
+                !!PS do nz = 2, nln
+                do nz = nun+1, nln
                     kpp_Kv(nz,node) = kpp_Kv(nz,node) + kpp_Kvbckg
                 end do 
             end if
@@ -566,16 +583,20 @@ module g_cvmix_kpp
             ! --> avoid if condition in depth loop --> should be a tiny bit faster 
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc turbulent vel. scale'//achar(27)//'[0m'
             aux_surfbuoyflx_nl = 0.0_WP
-            aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
+            !!PS aux_surfbuoyflx_nl(1:nln) = kpp_sbuoyflx(node)
+            aux_surfbuoyflx_nl(nun:nln) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! coeffcient to transfer SW temp flux into buoyancy flux
-                aux_coeff       = g*sw_alpha(1,node)
-                do nz = 1, nln
+                !!PS aux_coeff       = g*sw_alpha(1,node)
+                aux_coeff       = g*sw_alpha(nun,node)
+                
+                !!PS do nz = 1, nln
+                do nz = nun, nln
                     ! sw_3d is the temperature through the full depth levels into/
                     ! out off the tacervolume 
                     ! --> (sw_3d(1,node)-sw_3d(nz,node)) contains all the penetrated 
                     ! heatflux until level nz
-                    aux_surfbuoyflx_nl(nz) = kpp_sbuoyflx(node)+aux_coeff*(sw_3d(1,node)-sw_3d(nz+1,node))
+                    aux_surfbuoyflx_nl(nz) = kpp_sbuoyflx(node)+aux_coeff*(sw_3d(nun,node)-sw_3d(nz+1,node))
                                                    ! look in oce_shortwave_pene.F90<--|
                                                    ! substract swsurf from surface 
                                                    ! heat flux 
@@ -598,13 +619,20 @@ module g_cvmix_kpp
                 sigma = kpp_surf_layer_ext
             end if 
             
+            !!PS call cvmix_kpp_compute_turbulent_scales(         &
+            !!PS     sigma_coord     = sigma             ,        & ! (in)  sigma: Normalized surface layer depth
+            !!PS     OBL_depth       = abs(Z_3d_n(1:nln,node)),   & ! (in)  Assume OBL depth (m) =  mid-depth level
+            !!PS     surf_buoy_force = aux_surfbuoyflx_nl(1:nln), & ! (in)  surfce buoyancy flux (m2/s3) consider sw_pene
+            !!PS     surf_fric_vel   = aux_ustar,                 & ! (in)  turbulent friction velocity at surface (m/s)
+            !!PS     w_s             = kpp_ws_cntr(1:nln)    & ! (out) Turbulent velocity scale profile (m/s) for skalars
+            !!PS    ) 
             call cvmix_kpp_compute_turbulent_scales(         &
                 sigma_coord     = sigma             ,        & ! (in)  sigma: Normalized surface layer depth
-                OBL_depth       = abs(Z_3d_n(1:nln,node)),   & ! (in)  Assume OBL depth (m) =  mid-depth level
-                surf_buoy_force = aux_surfbuoyflx_nl(1:nln), & ! (in)  surfce buoyancy flux (m2/s3) consider sw_pene
+                OBL_depth       = abs(Z_3d_n(nun:nln,node)),   & ! (in)  Assume OBL depth (m) =  mid-depth level
+                surf_buoy_force = aux_surfbuoyflx_nl(nun:nln), & ! (in)  surfce buoyancy flux (m2/s3) consider sw_pene
                 surf_fric_vel   = aux_ustar,                 & ! (in)  turbulent friction velocity at surface (m/s)
-                w_s             = kpp_ws_cntr(1:nln)    & ! (out) Turbulent velocity scale profile (m/s) for skalars
-                ) 
+                w_s             = kpp_ws_cntr(nun:nln)    & ! (out) Turbulent velocity scale profile (m/s) for skalars
+                )     
             
             !___________________________________________________________________
             ! 5) Calculate Bulk Richardson number at centers of cell 
@@ -621,13 +649,20 @@ module g_cvmix_kpp
             !     --> v_t = z * ws * N * v_tc
             !                             |-> v_tc = Cv * sqrt(0.2/Cs/epsilon) / kpp_vonKarman^2 / kpp_Rib_crit
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc bulk richards'//achar(27)//'[0m'
-            kpp_bulkRi(1:nln+1) = cvmix_kpp_compute_bulk_Richardson(   &
-                zt_cntr         = Z_3d_n(     1:nln  ,node),  & ! (in) Depth of cell center (m)
-                delta_buoy_cntr = kpp_dbsurf( 1:nln),         & ! (in) Bulk buoyancy difference, Br-B(z) (1/s)
-                delta_Vsqr_cntr = kpp_dvsurf2(1:nln),         & ! (in) Square of resolved velocity difference (m2/s2)
-                ws_cntr         = kpp_ws_cntr(1:nln),         & ! (in) Turbulent velocity scale profile (m/s)
-                Nsqr_iface      = bvfreq(     1:nln+1,node)   & ! (in) Buoyancy frequency (1/s)
-                )
+            !!PS kpp_bulkRi(1:nln+1) = cvmix_kpp_compute_bulk_Richardson(   &
+            !!PS     zt_cntr         = Z_3d_n(     1:nln  ,node),  & ! (in) Depth of cell center (m)
+            !!PS     delta_buoy_cntr = kpp_dbsurf( 1:nln),         & ! (in) Bulk buoyancy difference, Br-B(z) (1/s)
+            !!PS     delta_Vsqr_cntr = kpp_dvsurf2(1:nln),         & ! (in) Square of resolved velocity difference (m2/s2)
+            !!PS     ws_cntr         = kpp_ws_cntr(1:nln),         & ! (in) Turbulent velocity scale profile (m/s)
+            !!PS     Nsqr_iface      = bvfreq(     1:nln+1,node)   & ! (in) Buoyancy frequency (1/s)
+            !!PS     )
+            kpp_bulkRi(nun:nln+1) = cvmix_kpp_compute_bulk_Richardson(   &
+                zt_cntr         = Z_3d_n(     nun:nln  ,node),  & ! (in) Depth of cell center (m)
+                delta_buoy_cntr = kpp_dbsurf( nun:nln),         & ! (in) Bulk buoyancy difference, Br-B(z) (1/s)
+                delta_Vsqr_cntr = kpp_dvsurf2(nun:nln),         & ! (in) Square of resolved velocity difference (m2/s2)
+                ws_cntr         = kpp_ws_cntr(nun:nln),         & ! (in) Turbulent velocity scale profile (m/s)
+                Nsqr_iface      = bvfreq(     nun:nln+1,node)   & ! (in) Buoyancy frequency (1/s)
+                )    
             
             !___________________________________________________________________
             ! 6) Compute depth of oceanic boundary layer (kpp_obldepth)
@@ -643,24 +678,37 @@ module g_cvmix_kpp
             ! check if surface buoyancy forcing is stable, it limits to ekman depth
             ! everywhere and eradicates possible obldepths from bulkRi number 
             ! --> thats why kpp_use_compEkman = .False.
+            ! --> check if its still the case
             aux_surfbuoyflx_nl(1) = kpp_sbuoyflx(node)
             if (use_sw_pene) then
                 ! take total heatflux from shortwave radiation into account --> 
                 ! here only needed to calculate monin-obukov mixing length
-                aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node) 
+                !!PS aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(1,node)
+                aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1)+aux_coeff*sw_3d(nun,node) 
             end if 
             
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc obl depth'//achar(27)//'[0m'
+            !!PS call cvmix_kpp_compute_OBL_depth(          &
+            !!PS     Ri_bulk    = kpp_bulkRi(1:nln+1),      & ! (in) Bulk Richardson number dim=(ke+1)
+            !!PS     zw_iface   = zbar_3d_n( 1:nln+1,node), & ! (in) Height of interfaces (m) dim=(ke+1)
+            !!PS     zt_cntr    = Z_3d_n(    1:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
+            !!PS     surf_fric  = aux_ustar,                & ! (in) Turbulent friction velocity at surface (m/s) dim=1
+            !!PS     surf_buoy  = aux_surfbuoyflx_nl(1),    & ! (in) Buoyancy flux at surface (m2/s3) dim=1
+            !!PS     Coriolis   = coriolis_node(node),      & ! (in) Coriolis parameter (1/s) dim=1
+            !!PS     OBL_depth  = kpp_obldepth(node),       & ! (out) OBL depth (m) dim=1
+            !!PS     kOBL_depth = kpp_nzobldepth(node)      & ! (out) level (+fraction) of OBL extent dim=1
+            !!PS     )
             call cvmix_kpp_compute_OBL_depth(          &
-                Ri_bulk    = kpp_bulkRi(1:nln+1),      & ! (in) Bulk Richardson number dim=(ke+1)
-                zw_iface   = zbar_3d_n( 1:nln+1,node), & ! (in) Height of interfaces (m) dim=(ke+1)
-                zt_cntr    = Z_3d_n(    1:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
+                Ri_bulk    = kpp_bulkRi(nun:nln+1),      & ! (in) Bulk Richardson number dim=(ke+1)
+                zw_iface   = zbar_3d_n( nun:nln+1,node), & ! (in) Height of interfaces (m) dim=(ke+1)
+                zt_cntr    = Z_3d_n(    nun:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
                 surf_fric  = aux_ustar,                & ! (in) Turbulent friction velocity at surface (m/s) dim=1
                 surf_buoy  = aux_surfbuoyflx_nl(1),    & ! (in) Buoyancy flux at surface (m2/s3) dim=1
                 Coriolis   = coriolis_node(node),      & ! (in) Coriolis parameter (1/s) dim=1
                 OBL_depth  = kpp_obldepth(node),       & ! (out) OBL depth (m) dim=1
                 kOBL_depth = kpp_nzobldepth(node)      & ! (out) level (+fraction) of OBL extent dim=1
-                )
+                )    
+            kpp_nzobldepth(node) = kpp_nzobldepth(node) + nun - 1
             
             !___safty switches for kpp_nzobldepth_______________________________
             ! A hack from MOM6 to avoid KPP reaching the bottom. It was needed during
@@ -673,10 +721,12 @@ module g_cvmix_kpp
             end if 
             
             ! no shallower than top layer
-            kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(2, node)) )
+            !!PS kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(2, node)) )
+            kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(nun+1, node)) )
             
             ! no deeper than bottom layer 
-            kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nlevels_nod2D(node),node)) )
+            !!PS kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nlevels_nod2D(node),node)) )
+            kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nln+1,node)) )
             
             ! model level of OBL depth (note: float number)
             kpp_nzobldepth(node)= cvmix_kpp_compute_kOBL_depth(zbar_3d_n(:,node), &
@@ -684,8 +734,11 @@ module g_cvmix_kpp
                                                                kpp_obldepth(node) )
             
             ! safety for kOBL
-            if (kpp_nzobldepth(node) > nlevels_nod2D(node)) then
-                kpp_nzobldepth(node) = nlevels_nod2D(node)
+            !!PS if (kpp_nzobldepth(node) > nlevels_nod2D(node)) then
+            !!PS     kpp_nzobldepth(node) = nlevels_nod2D(node)
+            !!PS end if 
+            if (kpp_nzobldepth(node) > nln+1) then
+                kpp_nzobldepth(node) = nln+1
             end if 
             
             !___________________________________________________________________
@@ -703,7 +756,7 @@ module g_cvmix_kpp
                 ! that reached until the obldepth --> do linear interpolation 
                 aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1) + &
                                         aux_coeff * &
-                                        ( sw_3d(1,node) - &
+                                        ( sw_3d(nun,node) - &
                                             ( sw_3d(aux_nz-1, node) + &
                                                 ( sw_3d(aux_nz, node) - sw_3d(aux_nz-1, node) ) &
                                                 * ( kpp_obldepth(node) + zbar_3d_n( aux_nz-1,node) ) &
@@ -723,7 +776,7 @@ module g_cvmix_kpp
                 elseif (trim(kpp_sw_method) == 'fesom') then
                     aux_surfbuoyflx_nl(1) = aux_surfbuoyflx_nl(1) + &
                                         aux_coeff * &
-                                        ( sw_3d(1,node) - &
+                                        ( sw_3d(nun,node) - &
                                             ( sw_3d(aux_nz-1, node) + &
                                                 ( sw_3d(aux_nz, node) - sw_3d(aux_nz-1, node) ) &
                                                 * ( kpp_obldepth(node) + zbar_3d_n( aux_nz-1,node) ) &
@@ -800,25 +853,29 @@ module g_cvmix_kpp
             !     between FESOM2 and MOM6/MPIOM --> keep kpp_nlt_shape='cvmix'
             if (aux_surfbuoyflx_nl(1) < 0.0_WP) then
                 if (kpp_nlt_shape == "cubic") then
-                    do nz = 2,nln+1
+                    !!PS do nz = 2,nln+1
+                    do nz = nun+1,nln+1
                         sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)**2 * (1.0_wp + 2.0_wp*sigma)!*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "parabolic") then
-                    do nz = 2,nln+1
+                    !!PS do nz = 2,nln+1
+                    do nz = nun+1,nln+1
                         sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)**2 !*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "linear") then
-                    do nz = 2,nln+1
+                    !!PS do nz = 2,nln+1
+                    do nz = nun+1,nln+1
                         sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)!*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "cubic_LMD") then
-                    do nz = 2,nln+1
+                    !!PS do nz = 2,nln+1
+                    do nz = nun+1,nln+1
                         sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = kpp_cs2 * sigma*(1.0_wp -sigma)**2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
@@ -855,13 +912,15 @@ module g_cvmix_kpp
         do node= 1, myDim_nod2D
             ! FESOM14 approach
             if (kpp_use_fesomkpp) then
-                do nz = 2,int(kpp_nzobldepth(node))
+                !!PS do nz = 2,int(kpp_nzobldepth(node))
+                do nz = ulevels_nod2D(node)+1,int(kpp_nzobldepth(node))
                     kpp_Av(nz,node) = max(kpp_Av(nz,node),kpp_oblmixc(nz,node,1))
                     kpp_Kv(nz,node) = max(kpp_Kv(nz,node),kpp_oblmixc(nz,node,2))
                 end do
             ! MOM6/MPIOM approach
             else
-                do nz = 2,nlevels_nod2D(node)-1
+                !!PS do nz = 2,nlevels_nod2D(node)-1
+                do nz = ulevels_nod2D(node)+1,nlevels_nod2D(node)-1
                     kpp_Av(nz,node) = kpp_oblmixc(nz,node,1)
                     kpp_Kv(nz,node) = min(kpp_oblmixc(nz,node,2),kpp_oblmixc(nz,node,3))
                 end do
@@ -880,7 +939,8 @@ module g_cvmix_kpp
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            do nz=2,nlevels(elem)-1
+            !!PS do nz=2,nlevels(elem)-1
+            do nz=ulevels(elem),nlevels(elem)-1
                 Av(nz,elem) = sum(kpp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do

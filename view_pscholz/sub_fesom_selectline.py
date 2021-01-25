@@ -1210,7 +1210,7 @@ class fesom_line:
     #+_________________________________________________________________________+
     #|                         PLOT LINE POSITION                                |
     #+_________________________________________________________________________+
-    def plot_lines_position(self,mesh,cmap,clevel,cref,numb=[],figsize=[],
+    def plot_lines_position(self,mesh,cmap='cmo.deep',clevel=np.arange(0,6000,200),cref=3000,numb=[],figsize=[],
                             do_subplot=[],do_nvec=False, do_cbar=True, allow_save=True,do_grid=False):
         from set_inputarray import inputarray
         fsize=10
@@ -1239,7 +1239,7 @@ class fesom_line:
             if ymin==ymax: ymin,ymax = ymin-(xmax-xmin)/2,ymin+(xmax-xmin)/2,  
             
             xmin,xmax,ymin,ymax = xmin-5.0, xmax+5.0, ymin-5.0, ymax+5.0
-            xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
+            xmin,xmax,ymin,ymax = np.max([xmin,-180.0+mesh.focus]),np.min([xmax,180.0+mesh.focus]),np.max([ymin,-90.0]),np.min([ymax,90.0])
             print(xmin,xmax,ymin,ymax)
             #___________________________________________________________________
             #fig, ax = plt.figure(figsize=(13, 13)), plt.gca()

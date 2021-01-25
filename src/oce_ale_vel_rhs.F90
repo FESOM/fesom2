@@ -26,7 +26,7 @@ subroutine compute_vel_rhs(mesh)
     
     implicit none 
     type(t_mesh), intent(in) , target :: mesh   
-    integer                  :: elem, elnodes(3), nz 
+    integer                  :: elem, elnodes(3), nz, nzmax, nzmin 
     real(kind=WP)            :: ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
     logical, save            :: lfirst=.true.
@@ -41,9 +41,12 @@ subroutine compute_vel_rhs(mesh)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') use_pice=1
     
     do elem=1, myDim_elem2D
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
         !___________________________________________________________________________
         ! Take care of the AB part
-        do nz=1,nl-1 
+        !!PS do nz=1,nl-1
+        do nz=nzmin,nzmax-1
             UV_rhs(1,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(1,nz,elem)   
             UV_rhs(2,nz,elem)=-(0.5_WP+epsilon)*UV_rhsAB(2,nz,elem)
         end do
@@ -92,7 +95,8 @@ subroutine compute_vel_rhs(mesh)
 
         Fx  = sum(gradient_sca(1:3,elem)*pre)
         Fy  = sum(gradient_sca(4:6,elem)*pre)
-        do nz=1,nlevels(elem)-1
+        !!PS do nz=1,nlevels(elem)-1
+        do nz=nzmin,nzmax-1
             ! add pressure gradient terms
             UV_rhs(1,nz,elem)   = UV_rhs(1,nz,elem) + (Fx-pgf_x(nz,elem))*elem_area(elem) 
             UV_rhs(2,nz,elem)   = UV_rhs(2,nz,elem) + (Fy-pgf_y(nz,elem))*elem_area(elem)
@@ -123,7 +127,10 @@ subroutine compute_vel_rhs(mesh)
     end if
 
     do elem=1, myDim_elem2D
-        do nz=1,nlevels(elem)-1   
+        nzmax = nlevels(elem)
+        nzmin = ulevels(elem)
+        !!PS do nz=1,nlevels(elem)-1
+        do nz=nzmin,nzmax-1
             UV_rhs(1,nz,elem)=dt*(UV_rhs(1,nz,elem)+UV_rhsAB(1,nz,elem)*ff)/elem_area(elem)
             UV_rhs(2,nz,elem)=dt*(UV_rhs(2,nz,elem)+UV_rhsAB(2,nz,elem)*ff)/elem_area(elem)
         end do
@@ -154,7 +161,7 @@ IMPLICIT NONE
 
 type(t_mesh), intent(in) , target :: mesh
 integer                  :: n, nz, el1, el2
-integer                  :: nl1, nl2, nod(2), el, ed, k, nle
+integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
 real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
@@ -164,25 +171,34 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
    nl1 = nlevels_nod2D(n)-1
+   ul1 = ulevels_nod2D(n)
    wu(1:nl1+1) = 0._WP
    wv(1:nl1+1) = 0._WP
 
    do k=1,nod_in_elem2D_num(n)
       el = nod_in_elem2D(k,n)
       nle = nlevels(el)-1
-   !___________________________________________________________________________
-   ! The vertical part for each element is collected
-      wu(1) = wu(1) + UV(1,1,el)*elem_area(el)
-      wv(1) = wv(1) + UV(2,1,el)*elem_area(el)
+      ule = ulevels(el)
+      !___________________________________________________________________________
+      ! The vertical part for each element is collected
+      !!PS wu(1) = wu(1) + UV(1,1,el)*elem_area(el)
+      !!PS wv(1) = wv(1) + UV(2,1,el)*elem_area(el)
+      wu(ule) = wu(ule) + UV(1,ule,el)*elem_area(el)
+      wv(ule) = wv(ule) + UV(2,ule,el)*elem_area(el)
              
-      wu(2:nle) = wu(2:nle) + 0.5_WP*(UV(1,2:nle,el)+UV(1,1:nle-1,el))*elem_area(el)
-      wv(2:nle) = wv(2:nle) + 0.5_WP*(UV(2,2:nle,el)+UV(2,1:nle-1,el))*elem_area(el)
+      !!PS wu(2:nle) = wu(2:nle) + 0.5_WP*(UV(1,2:nle,el)+UV(1,1:nle-1,el))*elem_area(el)
+      !!PS wv(2:nle) = wv(2:nle) + 0.5_WP*(UV(2,2:nle,el)+UV(2,1:nle-1,el))*elem_area(el)
+      wu(ule+1:nle) = wu(ule+1:nle) + 0.5_WP*(UV(1,ule+1:nle,el)+UV(1,ule:nle-1,el))*elem_area(el)
+      wv(ule+1:nle) = wv(ule+1:nle) + 0.5_WP*(UV(2,ule+1:nle,el)+UV(2,ule:nle-1,el))*elem_area(el)
    enddo
 
-   wu(1:nl1) = wu(1:nl1)*Wvel_e(1:nl1,n)
-   wv(1:nl1) = wv(1:nl1)*Wvel_e(1:nl1,n)
+   !!PS wu(1:nl1) = wu(1:nl1)*Wvel_e(1:nl1,n)
+   !!PS wv(1:nl1) = wv(1:nl1)*Wvel_e(1:nl1,n)
+   wu(ul1:nl1) = wu(ul1:nl1)*Wvel_e(ul1:nl1,n)
+   wv(ul1:nl1) = wv(ul1:nl1)*Wvel_e(ul1:nl1,n)
 
-   do nz=1,nl1
+   !!PS do nz=1,nl1
+   do nz=ul1,nl1
       ! Here 1/3 because 1/3 of the area is related to the node
       Unode_rhs(1,nz,n) = - (wu(nz) - wu(nz+1) ) / (3._WP*hnode(nz,n)) 
       Unode_rhs(2,nz,n) = - (wv(nz) - wv(nz+1) ) / (3._WP*hnode(nz,n)) 
@@ -191,49 +207,56 @@ do n=1,myDim_nod2d
 
    ! To get a clean checksum, set the remaining values to zero
    Unode_rhs(1:2,nl1+1:nl-1,n) = 0._WP
-
+   Unode_rhs(1:2,1:ul1-1   ,n) = 0._WP
 end do
 
 
 !_______________________________________________________________________________
 DO ed=1, myDim_edge2D
    nod = edges(:,ed)   
-   el1  = edge_tri(1,ed)   
-   el2  = edge_tri(2,ed)
+   el1 = edge_tri(1,ed)   
+   el2 = edge_tri(2,ed)
    nl1 = nlevels(el1)-1
+   ul1 = ulevels(el1)
 
    !___________________________________________________________________________
    ! The horizontal part
-   un1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-              - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
-   
+   !!PS un1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+   !!PS            - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
+   un1(ul1:nl1) = UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+                - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)  
    !___________________________________________________________________________
    if (el2>0) then
       nl2 = nlevels(el2)-1
+      ul2 = ulevels(el2)
       
-      un2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
-                   + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
+      !!PS un2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) &
+      !!PS              + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
+      un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
+                     + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
 
       ! fill with zeros to combine the loops
       ! Usually, no or only a very few levels have to be filled. In this case, 
       ! computing "zeros" is cheaper than the loop overhead.
-      
       un1(nl1+1:max(nl1,nl2)) = 0._WP
       un2(nl2+1:max(nl1,nl2)) = 0._WP
+      un1(1:ul1-1)            = 0._WP
+      un2(1:ul2-1)            = 0._WP
 
       ! first edge node
       ! Do not calculate on Halo nodes, as the result will not be used. 
       ! The "if" is cheaper than the avoided computiations.
       if (nod(1) <= myDim_nod2d) then
-         do nz=1, max(nl1,nl2)
-            
+         !!PS do nz=1, max(nl1,nl2)
+         do nz=min(ul1,ul2), max(nl1,nl2)
             Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
             Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
          end do
       endif
       
       if (nod(2) <= myDim_nod2d) then
-         do nz=1, max(nl1,nl2)
+         !!PS do nz=1, max(nl1,nl2)
+         do nz=min(ul1,ul2), max(nl1,nl2)
             Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
             Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
          end do
@@ -242,7 +265,8 @@ DO ed=1, myDim_edge2D
 
    else  ! ed is a boundary edge, there is only the contribution from el1
       if (nod(1) <= myDim_nod2d) then
-         do nz=1, nl1
+         !!PS do nz=1, nl1
+         do nz=ul1, nl1
             
             Unode_rhs(1,nz,nod(1)) = Unode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
             Unode_rhs(2,nz,nod(1)) = Unode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
@@ -250,7 +274,8 @@ DO ed=1, myDim_edge2D
       endif
       ! second edge node
       if  (nod(2) <= myDim_nod2d) then
-         do nz=1, nl1
+         !!PS do nz=1, nl1
+         do nz=ul1, nl1
             Unode_rhs(1,nz,nod(2)) = Unode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
             Unode_rhs(2,nz,nod(2)) = Unode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
          end do
@@ -262,10 +287,12 @@ end do
 !_______________________________________________________________________________
 do n=1,myDim_nod2d
    nl1 = nlevels_nod2D(n)-1
+   ul1 = ulevels_nod2D(n)
    
-   Unode_rhs(1,1:nl1,n) = Unode_rhs(1,1:nl1,n) *area_inv(1:nl1,n)
-   Unode_rhs(2,1:nl1,n) = Unode_rhs(2,1:nl1,n) *area_inv(1:nl1,n)
-   
+   !!PS Unode_rhs(1,1:nl1,n) = Unode_rhs(1,1:nl1,n) *area_inv(1:nl1,n)
+   !!PS Unode_rhs(2,1:nl1,n) = Unode_rhs(2,1:nl1,n) *area_inv(1:nl1,n)
+   Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *area_inv(ul1:nl1,n)
+   Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n)
 end do
 
 !_______________________________________________________________________________
@@ -274,10 +301,15 @@ call exchange_nod(Unode_rhs)
 !_______________________________________________________________________________
 do el=1, myDim_elem2D
    nl1 = nlevels(el)-1
-   UV_rhsAB(1:2,1:nl1,el) = UV_rhsAB(1:2,1:nl1,el) &
-        + elem_area(el)*(Unode_rhs(1:2,1:nl1,elem2D_nodes(1,el)) &
-        + Unode_rhs(1:2,1:nl1,elem2D_nodes(2,el)) & 
-        + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
+   ul1 = ulevels(el)
+   !!PS UV_rhsAB(1:2,1:nl1,el) = UV_rhsAB(1:2,1:nl1,el) &
+   !!PS      + elem_area(el)*(Unode_rhs(1:2,1:nl1,elem2D_nodes(1,el)) &
+   !!PS      + Unode_rhs(1:2,1:nl1,elem2D_nodes(2,el)) & 
+   !!PS      + Unode_rhs(1:2,1:nl1,elem2D_nodes(3,el))) / 3.0_WP
+   UV_rhsAB(1:2,ul1:nl1,el) = UV_rhsAB(1:2,ul1:nl1,el) &
+        + elem_area(el)*(Unode_rhs(1:2,ul1:nl1,elem2D_nodes(1,el)) &
+        + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(2,el)) & 
+        + Unode_rhs(1:2,ul1:nl1,elem2D_nodes(3,el))) / 3.0_WP     
    
 end do
 end subroutine momentum_adv_scalar

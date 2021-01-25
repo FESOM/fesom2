@@ -188,7 +188,7 @@ else
 end if
 
 if (present(KappaM_max)) then
-  if(KappaM_max.lt. 10.d0 .or. KappaM_max .gt. 100.d0) then
+  if(KappaM_max.lt. 1.d0 .or. KappaM_max .gt. 100.d0) then
     print*, "ERROR:kappaM_max can only be allowed_range"
     stop 1
   end if

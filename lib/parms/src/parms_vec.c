@@ -743,8 +743,7 @@ int parms_VecGather(FLOAT *self, FLOAT *ga, parms_Map map)
 
   lsize = parms_MapGetLocalSize(map);
   if (isserial) {
-      incx = 1;
-      GCOPY(lsize, self, incx, ga, incx);
+      for (i = 0; i < lsize; i++) ga[i] = self[i];
   }
   else {
     PARMS_NEWARRAY0(num_recv, npro);

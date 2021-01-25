@@ -26,7 +26,8 @@ module g_cvmix_tidal
     ! Parameters associated with the Simmons et al. scheme
     character(20) :: tidal_mixscheme="Simmons"
     
-    ! units: unitless (fraction); (Gamma in Simmons et al.)
+    ! units: unitless (fraction); (Gamma in Simmons et al.), mixing efficiency, 
+    ! take to be 0.2 (Osborn,1980)
     real(kind=WP) :: tidal_efficiency=0.2                   
     
     ! units: m; zeta in Simmons et al. (used to compute the vertical deposition 
@@ -40,6 +41,13 @@ module g_cvmix_tidal
     
     ! units: unitless (fraction);  tidal dissipation efficiency (q in Simmons 
     ! et al.), i.e. fraction of energy that dissipates locally
+    ! Physical arguments suggest that 60–90% of this baroclinic wave energy is 
+    ! contained in low-mode internal waves that are able to propagate large distances 
+    ! from the generation site. The remaining portion of the energy lost from the 
+    ! barotropic tide, denoted the ‘‘tidal dissipation efficiency’’ (q), dissipates 
+    ! as locally enhanced turbulent mixing. St. Laurent et al. (2002) assumed that 
+    ! q = 1/3 of the generated energy flux is dissipated locally, with the remaining 
+    ! 1 - q = 2/3 radiating away as low mode internal waves.
     real(kind=WP) :: tidal_lcl_mixfrac=0.33           
     
     ! units: m; depth of the shallowest column where tidal mixing is 
@@ -160,7 +168,7 @@ module g_cvmix_tidal
     subroutine calc_cvmix_tidal(mesh)
         type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, node_size
-        integer       :: nz, nln
+        integer       :: nz, nln, nun
         integer       :: elnodes(3)
         real(kind=WP) :: simmonscoeff, vertdep(mesh%nl)
 
@@ -169,6 +177,7 @@ module g_cvmix_tidal
         node_size = myDim_nod2D
         do node = 1,node_size
             nln = nlevels_nod2D(node)-1
+            nun = ulevels_nod2D(node)
             vertdep = 0.0_WP
             
             !___________________________________________________________________
@@ -179,9 +188,9 @@ module g_cvmix_tidal
                  energy_flux     = tidal_forc_bottom_2D(node),& !in W m-2  
                  rho             = density_0,                 &
                  SimmonsCoeff    = simmonscoeff,              &
-                 VertDep         = vertdep(1:nln),                & ! vertical deposition function 
-                 zw              = zbar_3d_n(1:nln+1,node),         & 
-                 zt              = Z_3d_n(1:nln,node))
+                 VertDep         = vertdep(nun:nln),                & ! vertical deposition function 
+                 zw              = zbar_3d_n(nun:nln+1,node),         & 
+                 zt              = Z_3d_n(nun:nln,node))
                 
             !___________________________________________________________________
             ! Computes vertical diffusion coefficients for tidal mixing 
@@ -226,7 +235,8 @@ module g_cvmix_tidal
         call exchange_nod(tidal_Av)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
-            do nz=1,nlevels(elem)-1
+            !!PS do nz=1,nlevels(elem)-1
+            do nz=ulevels(elem),nlevels(elem)-1
                 Av(nz,elem) = Av(nz,elem) + sum(tidal_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do

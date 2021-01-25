@@ -41,8 +41,8 @@ MODULE i_PARAM
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
-NAMELIST /ice_dyn/ whichEVP, Pstar, delta_min, evp_rheol_steps, Cd_oce_ice, &
-ice_gamma_fct, ice_diff, theta_io,ice_ave_steps
+NAMELIST /ice_dyn/ whichEVP, Pstar, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
+ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
 END MODULE i_PARAM
 !
 !=============================================================================
@@ -60,12 +60,13 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: elevation
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22  
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: sigma11, sigma12, sigma22
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: eps11, eps12, eps22
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: fresh_wa_flux
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
@@ -74,6 +75,8 @@ save
   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
 							!temporary flux fields
 							!(for flux correction)
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
+
 #endif /* (__oasis) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
@@ -81,8 +84,6 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_iceoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_x         
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmice_y
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_x         
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: stress_atmoce_y
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: t_skin
  ! FCT implementation
  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)          :: m_icel, a_icel, m_snowl
@@ -111,6 +112,8 @@ REAL(kind=WP), parameter  :: rhosno=  290.            ! Snow density, AOMIP
 REAL(kind=WP), parameter  :: inv_rhosno=  1./290.     ! Snow density, AOMIP
 
 REAL(kind=WP), parameter  :: cpair=1005.       ! Specific heat of air [J/(kg * K)] 
+REAL(kind=WP), parameter  :: cpice=2106.       ! Specific heat of ice [J/(kg * K)] 
+REAL(kind=WP), parameter  :: cpsno=2090.       ! Specific heat of snow [J/(kg * K)] 
 REAL(kind=WP), parameter  :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
 REAL(kind=WP), parameter  :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf) 
 REAL(kind=WP), parameter  :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
@@ -119,8 +122,8 @@ REAL(kind=WP), parameter  :: clhi=2.835e6      !                              se
 REAL(kind=WP), parameter  :: tmelt=273.15      ! 0 deg C expressed in K 
 REAL(kind=WP), parameter  :: boltzmann=5.67E-8 ! S. Boltzmann const.*longw. emissivity
 
-REAL(kind=WP), parameter  :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
-REAL(kind=WP), parameter  :: consn = 0.31      !                         snow
+REAL(kind=WP)    :: con   = 2.1656    ! Thermal conductivities: ice; W/m/K
+REAL(kind=WP)    :: consn = 0.31      !                         snow
 
 REAL(kind=WP)    :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
 
@@ -140,7 +143,7 @@ REAL(kind=WP)    :: albim=   0.68     !         melting ice
 REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
 
   NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
-  emiss_wat, albsn, albsnm, albi, albim, albw
+  emiss_wat, albsn, albsnm, albi, albim, albw, con, consn
 
 end module i_therm_param
 

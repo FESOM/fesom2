@@ -2,25 +2,26 @@
 
 &oce_dyn
 C_d=0.0025             ! Bottom drag, nondimensional
-A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
-laplacian=.false.      ! Use Laplacian viscosity 
-A_hor=0.               ! 500.      ! Background horizontal viscosity
-A_hor_max=0.           ! 8000.     ! Maximum viscosity allowed (to limit Smag and Leith contributions when they are too large
-Div_c=.5  	       ! 0.35   ! Modified Leith viscosity, nondimensional, 0.3 -- 1.0
-Leith_c=.05	       ! The strength of the Leith viscosity
-tau_c= 0.              ! 1.5 !0.2 !1.5	       ! Controls the strength of filters (1.5 and 0.2 for dt=1min and 15min, respectively)
-Smag_c=0.              ! 0.2 Smagorinsky viscosity, nondimensional, 0.1 --0.2
-biharmonic=.false.     ! Use biharmonic viscosity
-visc_option=5          ! 2=Laplacian+Leith+biharmonic background; 5=easy backscatter;
-easy_bs_scale = 35.     ! area scaling, to be used with visc_option=5 (easy backscatter)
+gamma0=0.001            ! [m/s],   backgroung viscosity= gamma0*len, it should be as small as possible (keep it < 0.01 m/s).
+gamma1=0.0285          ! [nodim], for computation of the flow aware viscosity
+gamma2=0.285            ! [s/m],   is only used in easy backscatter option
+Div_c=.5  	       ! the strength of the modified Leith viscosity, nondimensional, 0.3 -- 1.0
+Leith_c=.05	       ! the strength of the Leith viscosity
+visc_option=5          ! 1=Harmonic Leith parameterization;
+                       ! 2=Laplacian+Leith+biharmonic background
+                       ! 3=Biharmonic Leith parameterization
+                       ! 4=Biharmonic flow aware
+                       ! 5=Easy Backscatter
+                       ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
+                       ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
 easy_bs_return= 1.5     ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
-Abh0=0.                ! 1.e12 ! Biharmonic viscosity, m^4/s
+A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
 mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.false.
-w_exp_max=1.e-3
+w_max_cfl=1.0          ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) ! in older FESOM it used to be w_exp_max=1.e-3
 SPP=.false.                 ! Salt Plume Parameterization
 Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
 K_GM_max     = 3000.0       ! max. GM thickness diffusivity (m2/s)
@@ -63,8 +64,12 @@ balance_salt_water =.true.   ! balance virtual-salt or freshwater flux or not
 clim_relax=0.0	                    ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
 ref_sss=34.
-i_vert_diff=.true.  ! true
-tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
+i_vert_diff =.true.  ! true
+tra_adv_hor ='MFCT'  !'MUSCL', 'UPW1'
+tra_adv_ver ='QR4C'  !'QR4C', 'CDIFF', 'UPW1'
+tra_adv_lim ='FCT'   !'FCT', 'NONE' (default)
+tra_adv_ph  = 1. ! a parameter to be used in horizontal advection (for MUSCL it is the fraction of fourth-order contribution in the solution)
+tra_adv_pv  = 1. ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
 ! Implemented trassers (3d restoring):
 ! 301 - Fram strait.
 ! 302 - Bering Strait

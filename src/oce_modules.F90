@@ -16,25 +16,19 @@ real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
 real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
+integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
 
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
 real(kind=WP)	              :: kappa=0.4      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
-real(kind=WP)                 :: A_hor=100.0_WP		! Horizontal harm. visc.    
-real(kind=WP)                 :: A_hor_max=1500.0_WP	! Maximum viscosity allowed (to limit Smag and Leith
-							! contributions when they are too large
-real(kind=WP)                 :: Leith_c=0.		! Leith viscosity. It needs vorticity, which is only computed for 
-							! the vector invariant form of momentum advection (mom_adv=4)
-real(kind=WP)                 :: tau_c=0.4		! Controls the strength of filters. Should be about 0.4
+real(kind=WP)                 :: gamma0=0.01! [m/s], gamma0*len*dt is the background viscosity
+real(kind=WP)                 :: gamma1=0.1!  [non dim.], or computation of the flow aware viscosity
+real(kind=WP)                 :: gamma2=10.!  [s/m],      is only used in easy backscatter option
+real(kind=WP)                 :: Div_c  =1.0_WP !modified Leith viscosity weight
+real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It needs vorticity!
+real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
-real(kind=WP)                 :: Div_c=0.5_WP
-real(kind=WP)                 :: Smag_c=0.0_WP  ! 0.2   ! (C/pi)^2
-real(kind=WP)                 :: Abh0=8.0e12    ! 
-logical                       :: laplacian=.false.
-logical                       :: biharmonic=.true.
 integer                       :: visc_option=5
-real(kind=WP)                 :: easy_bs_scale=35.
-real(kind=WP)                 :: easy_bs_return=1.5
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -79,9 +73,10 @@ real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 ! Tracers
 logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
-integer                       :: tracer_adv=1
+character(20)                 :: tra_adv_ver, tra_adv_hor, tra_adv_lim
+real(kind=WP)                 :: tra_adv_ph, tra_adv_pv
 logical                       :: w_split  =.false.
-real(kind=WP)                 :: w_exp_max=1.e-5_WP
+real(kind=WP)                 :: w_max_cfl=1.e-5_WP
 
 logical                       :: SPP=.false.
 
@@ -130,6 +125,12 @@ real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
 !_______________________________________________________________________________
+! use non-constant reference density if .false. density_ref=density_0
+logical                       :: use_density_ref   = .false.
+real(kind=WP)                 :: density_ref_T     = 2.0_WP
+real(kind=WP)                 :: density_ref_S     = 34.0_WP
+
+!_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
@@ -148,17 +149,18 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
 ! > 'cubicspline'  ... like in FESOM1.4
+! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ C_d, A_ver, laplacian, A_hor, A_hor_max, Leith_c, tau_c, Div_c, Smag_c, &
-                    biharmonic, Abh0, scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_exp_max, SPP,&
+ NAMELIST /oce_dyn/ state_equation, C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+                    scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, easy_bs_scale, easy_bs_return, visc_option, use_global_tides
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, use_global_tides
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-            ref_sss_local, ref_sss, i_vert_diff, tracer_adv, num_tracers, tracer_ID, &
+            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl
@@ -175,15 +177,14 @@ USE, intrinsic :: ISO_FORTRAN_ENV
 ! of open boundaries and advection schemes
 !
 ! The fct part
-integer                                       :: fct_iter=1
-real(kind=WP),allocatable,dimension(:,:)      :: fct_LO, fct_HO           ! Low-order solution
-real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_h, fct_adf_h2    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
-real(kind=WP),allocatable,dimension(:,:)      :: fct_adf_v, fct_adf_v2    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
+real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
+real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
+real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
 
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num, nboundary_lay
+integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
 real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
 integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
@@ -197,20 +198,22 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
-real(kind=WP), allocatable    :: UV(:,:,:)
-real(kind=WP), allocatable    :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
-real(kind=WP), allocatable    :: eta_n(:), d_eta(:)
-real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
-real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
-real(kind=WP), allocatable    :: CFL_z(:,:)
-real(kind=WP), allocatable    :: stress_surf(:,:)
-real(kind=WP), allocatable    :: T_rhs(:,:) 
-real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
-real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
-real(kind=WP), allocatable    :: S_rhs(:,:)
-real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
-real(kind=WP), allocatable    :: del_ttf(:,:)
-real(kind=WP), allocatable    :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
+real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
+real(kind=WP), allocatable         :: UV(:,:,:)
+real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
+real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
+real(kind=WP), allocatable         :: CFL_z(:,:)
+real(kind=WP), allocatable         :: stress_surf(:,:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
+REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
+real(kind=WP), allocatable         :: T_rhs(:,:) 
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
+real(kind=WP), allocatable         :: S_rhs(:,:)
+real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+real(kind=WP), allocatable         :: del_ttf(:,:)
+real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
@@ -281,6 +284,10 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 
+! new depth of cavity-ocean interface at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
 ! --> multiplication factor for surface boundary condition in 
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
@@ -290,6 +297,7 @@ real(kind=WP)                               :: is_nonlinfs
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
+real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 

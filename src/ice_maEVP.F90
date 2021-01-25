@@ -46,7 +46,7 @@ subroutine stress_tensor_m(mesh)
 
   integer         :: elem, elnodes(3)
   real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)   :: eps1, eps2, pressure, delta
   real(kind=WP)   :: val3, meancos, usum, vsum, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
   type(t_mesh), intent(in)              , target :: mesh
@@ -59,7 +59,11 @@ subroutine stress_tensor_m(mesh)
   det1=alpha_evp*det2
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
-
+     !_______________________________________________________________________
+	 ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -72,25 +76,25 @@ subroutine stress_tensor_m(mesh)
           meancos=metric_factor(elem)
       !  
       ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
     
         r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
-        r3=pressure*eps12*vale
+        r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
         si2=sigma11(elem)-sigma22(elem)
 
@@ -142,6 +146,11 @@ subroutine ssh2rhs(mesh)
     do elem=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(elem) > 1) cycle
+        
+        !_______________________________________________________________________
         vol=elem_area(elem)
         dx=gradient_sca(1:3,elem)
         dy=gradient_sca(4:6,elem)     
@@ -163,6 +172,11 @@ subroutine ssh2rhs(mesh)
   else
     do elem=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,elem)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(elem) > 1) cycle
+        
         vol=elem_area(elem)
         dx=gradient_sca(1:3,elem)
         dy=gradient_sca(4:6,elem)     
@@ -208,6 +222,11 @@ subroutine stress2rhs_m(mesh)
 
   do elem=1,myDim_elem2d         
      elnodes=elem2D_nodes(:,elem)
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+
      if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
      
      vol=elem_area(elem)
@@ -226,11 +245,15 @@ subroutine stress2rhs_m(mesh)
      end do
   end do
   
-  do row=1, myDim_nod2d               
+  do row=1, myDim_nod2d     
+     !_________________________________________________________________________
+     ! if cavity node skip it 
+     if ( ulevels_nod2d(row)>1 ) cycle
+     
      mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
      mass=mass/(1.0_WP+mass*mass)
-        u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
-        v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
+     u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
+     v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
   end do
 end subroutine stress2rhs_m
 !
@@ -261,7 +284,7 @@ subroutine EVPdynamics_m(mesh)
 !NR for stress_tensor_m
   integer         :: el, elnodes(3)
   real(kind=WP)   :: dx(3), dy(3), msum, asum
-  real(kind=WP)   :: eps11, eps12, eps22, eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
+  real(kind=WP)   :: eps1, eps2, pressure, pressure_fac(myDim_elem2D), delta
   real(kind=WP)   :: val3, meancos, vale
   real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2
 
@@ -299,6 +322,12 @@ subroutine EVPdynamics_m(mesh)
   if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
     do el=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,el)
+        
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(el) > 1) cycle
+        
         !_______________________________________________________________________
         vol=elem_area(el)
         dx=gradient_sca(1:3,el)
@@ -323,6 +352,11 @@ subroutine EVPdynamics_m(mesh)
   else
     do el=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,el)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(el) > 1)  cycle
+        
         vol=elem_area(el)
         dx=gradient_sca(1:3,el)
         dy=gradient_sca(4:6,el)
@@ -339,7 +373,10 @@ subroutine EVPdynamics_m(mesh)
      inv_thickness(i) = 0._WP
      mass(i) = 0._WP
      ice_nod(i) = .false.
-
+     !_________________________________________________________________________
+     ! if cavity ndoe skip it 
+     if ( ulevels_nod2d(i)>1 ) cycle
+     
      if (a_ice(i) >= 0.01_WP) then
         inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
         inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
@@ -361,6 +398,12 @@ subroutine EVPdynamics_m(mesh)
 
      pressure_fac(el) = 0._WP
      ice_el(el) = .false.
+     
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(el) > 1) cycle
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum > 0.01) then
         ice_el(el) = .true.
@@ -389,7 +432,10 @@ subroutine EVPdynamics_m(mesh)
   !===================================================================
  
    do el=1,myDim_elem2D
-
+     !__________________________________________________________________________
+     if (ulevels(el)>1) cycle
+     
+     !__________________________________________________________________________
      if(ice_el(el)) then
      
         elnodes=elem2D_nodes(:,el)
@@ -399,17 +445,17 @@ subroutine EVPdynamics_m(mesh)
         meancos = val3*metric_factor(el)
         !  
         ! ====== Deformation rate tensor on element elem:
-        eps11 = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
-        eps22 = sum(dy(:)*v_ice_aux(elnodes))
-        eps12 = 0.5_WP*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
+        eps11(el) = sum(dx(:)*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos                !metrics
+        eps22(el) = sum(dy(:)*v_ice_aux(elnodes))
+        eps12(el) = 0.5_WP*(sum(dy(:)*u_ice_aux(elnodes) + dx(:)*v_ice_aux(elnodes)) &
                          +sum(u_ice_aux(elnodes))*meancos )          !metrics 
         
         ! ======= Switch to eps1,eps2
-        eps1 = eps11 + eps22
-        eps2 = eps11 - eps22   
+        eps1 = eps11(el) + eps22(el)
+        eps2 = eps11(el) - eps22(el)   
         
         ! ====== moduli:
-        delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12**2))
+        delta = sqrt(eps1**2+vale*(eps2**2+4.0_WP*eps12(el)**2))
         
         pressure = pressure_fac(el)/(delta+delta_min)
         
@@ -418,7 +464,7 @@ subroutine EVPdynamics_m(mesh)
 !        sigma11(el) = 0.5_WP*(si1+si2)
 !        sigma22(el) = 0.5_WP*(si1-si2)
 !NR directly insert si1, si2 cancels some operations and should increase accuracy
-        sigma12(el) = det1*sigma12(el) +       pressure*eps12*vale
+        sigma12(el) = det1*sigma12(el) +       pressure*eps12(el)*vale
         sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
         sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
 
@@ -456,6 +502,10 @@ subroutine EVPdynamics_m(mesh)
   end do
   
   do i=1, myDim_nod2d 
+     !__________________________________________________________________________
+     if (ulevels_nod2D(i)>1) cycle
+     
+     !__________________________________________________________________________
      if (ice_nod(i)) then                   ! Skip if ice is absent              
 
         u_rhs_ice(i) = u_rhs_ice(i)*mass(i) + rhs_a(i)
@@ -518,7 +568,7 @@ subroutine find_alpha_field_a(mesh)
 
   integer                  :: elem, elnodes(3)
   real(kind=WP)            :: dx(3), dy(3), msum, asum
-  real(kind=WP)            :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)            :: eps1, eps2, pressure, delta
   real(kind=WP)            :: val3, meancos, usum, vsum, vale
   type(t_mesh), intent(in) , target :: mesh
 
@@ -528,7 +578,11 @@ subroutine find_alpha_field_a(mesh)
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
-
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+        
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -541,18 +595,18 @@ subroutine find_alpha_field_a(mesh)
      meancos=metric_factor(elem)
      !  
      ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
          
      pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
@@ -581,7 +635,7 @@ subroutine stress_tensor_a(mesh)
 
   integer                   :: elem, elnodes(3)
   real(kind=WP)             :: dx(3), dy(3), msum, asum
-  real(kind=WP)             :: eps11, eps12, eps22, eps1, eps2, pressure, delta
+  real(kind=WP)             :: eps1, eps2, pressure, delta
   real(kind=WP)             :: val3, meancos, usum, vsum, vale
   real(kind=WP)             :: det1, det2, r1, r2, r3, si1, si2
   type(t_mesh), intent(in)  , target :: mesh
@@ -591,11 +645,17 @@ subroutine stress_tensor_a(mesh)
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
+     !__________________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
+     !__________________________________________________________________________
      det2=1.0_WP/(1.0_WP+alpha_evp_array(elem))     ! Take alpha from array
      det1=alpha_evp_array(elem)*det2
   
      elnodes=elem2D_nodes(:,elem)
-
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -608,25 +668,25 @@ subroutine stress_tensor_a(mesh)
      meancos=metric_factor(elem)
      !  
      ! ====== Deformation rate tensor on element elem:
-     eps11=sum(dx*u_ice_aux(elnodes))
-     eps11=eps11-val3*vsum*meancos                !metrics
-     eps22=sum(dy*v_ice_aux(elnodes))
-     eps12=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
-     eps12=eps12+0.5_WP*val3*usum*meancos          !metrics 
+     eps11(elem)=sum(dx*u_ice_aux(elnodes))
+     eps11(elem)=eps11(elem)-val3*vsum*meancos                !metrics
+     eps22(elem)=sum(dy*v_ice_aux(elnodes))
+     eps12(elem)=0.5_WP*sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes))
+     eps12(elem)=eps12(elem)+0.5_WP*val3*usum*meancos          !metrics 
      
       ! ======= Switch to eps1,eps2
-     eps1=eps11+eps22
-     eps2=eps11-eps22   
+     eps1=eps11(elem)+eps22(elem)
+     eps2=eps11(elem)-eps22(elem)   
      
       ! ====== moduli:
-     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12**2)
+     delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
     
         r1=pressure*(eps1-delta) 
         r2=pressure*eps2*vale
-        r3=pressure*eps12*vale
+        r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
         si2=sigma11(elem)-sigma22(elem)
 
@@ -681,6 +741,11 @@ use g_comm_auto
      call stress_tensor_a(mesh)
      call stress2rhs_m(mesh)    ! _m=_a, so no _m version is the only one!
      do i=1,myDim_nod2D 
+     
+         !_______________________________________________________________________
+         ! if element has any cavity node skip it 
+         if (ulevels_nod2d(i)>1) cycle
+        
          thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
          thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
          inv_thickness=1.0_WP/thickness

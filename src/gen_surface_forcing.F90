@@ -92,7 +92,7 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
-   real(wp), allocatable, dimension(:,:),     public     :: sbcdata1,sbcdata2
+   real(4), allocatable, dimension(:,:),     private, save, target     :: sbcdata1_,sbcdata2_
 !   real(wp), allocatable, save, dimension(:), public     :: qns_2   ! downward non solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: qsr_2   ! downward solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: emp_2   ! evaporation minus precipitation        [kg/m2/s]
@@ -109,7 +109,7 @@ MODULE g_sbf
 
 
    ! namelists
-   integer, save  :: nm_sbc_unit     = 101       ! unit to open namelist file
+   integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
    integer, save  :: nm_sbc       = 1        ! data  1= constant, 2=from file
@@ -141,6 +141,7 @@ MODULE g_sbf
    integer, save :: nm_nc_idd   = 1       ! initial day of time axis in netCDF
    real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
    integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
+   logical, save :: y_perpetual=.false.
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
@@ -160,6 +161,12 @@ MODULE g_sbf
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
+      integer read_forcing_rootrank
+      logical async_netcdf_allowed
+      real(4), allocatable, dimension(:,:)     :: sbcdata_a
+      integer sbcdata_a_t_index
+      real(4), allocatable, dimension(:,:)     :: sbcdata_b
+      integer sbcdata_b_t_index
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -203,30 +210,41 @@ CONTAINS
       ! get dimensions
       if (mype==0) then
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
+
       if (mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
-         if      (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         end if
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
+
       if (mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
          if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time", id_timed)
+                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -235,11 +253,14 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid,    "LAT",      id_lat)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lat",      id_lat)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "latitude", id_lat)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -252,24 +273,30 @@ CONTAINS
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lon",       id_lon)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,flf%file_name)
+
       if (mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "time", id_time)
          end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
-      
       ! get dimensions size
       if (mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,flf%file_name)
       if (mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
@@ -292,7 +319,7 @@ CONTAINS
       ! only the temporal axis is allowed to vary between the files
          deallocate(flf%nc_time)
            allocate(flf%nc_time(flf%nc_Ntime))
-      end if
+      end if  
     !____________________________________________________________________________   
     !read variables from file
     ! read lat
@@ -320,8 +347,7 @@ CONTAINS
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
-         ! digg for calendar attribute in time axis variable
-         
+         ! digg for calendar attribute in time axis variable         
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -445,20 +471,21 @@ CONTAINS
       character(len=4)            :: yyear
 
       write(yyear,"(I4)") yyyy
+      if (y_perpetual)    yyear = ''
 
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name,*) trim(nm_xwind_file),yyear,'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name,*) trim(nm_ywind_file),yyear,'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file),yyear,'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file),yyear,'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file),yyear,'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file),yyear,'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file),yyear,'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file),yyear,'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file),yyear,'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),yyear,'.nc'
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -569,6 +596,8 @@ CONTAINS
    END SUBROUTINE nc_sbc_ini
 
    SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
+      use forcing_provider_async_module
+      use io_netcdf_workaround_module
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -606,9 +635,13 @@ CONTAINS
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
       type(t_mesh), intent(in) , target :: mesh
+      real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
+      logical sbcdata1_from_cache, sbcdata2_from_cache
+      integer rootrank
 
 #include  "associate_mesh.h"
 
+      ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
       nc_Nlat  =>sbc_flfi(fld_idx)%nc_Nlat
@@ -620,11 +653,16 @@ CONTAINS
       nc_lon   =>sbc_flfi(fld_idx)%nc_lon
       nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
-      ALLOCATE (sbcdata1(nc_Nlon,nc_Nlat), &
-                sbcdata2(nc_Nlon,nc_Nlat), STAT=sbc_alloc )
-      if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'
-      sbcdata1 = 0.0_WP
-      sbcdata2 = 0.0_WP
+      if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
+        allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
+        allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
+        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed)
+      end if
+      rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
+
+      ! no initialization of sbcdata required, the whole array will be overwritten anyway
 
       ! find time index in files
       now_date = rdate
@@ -651,49 +689,94 @@ CONTAINS
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
+
+
+      ! determine if we can use the broadcast cache
+      if(yearold == yearnew) then ! todo: simplify if clause
+        if(sbc_flfi(fld_idx)%sbcdata_a_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+        else if(sbc_flfi(fld_idx)%sbcdata_b_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_b
+        
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_a ! 
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx_p1
+        else
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+        end if
+      else
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+      end if
+      sbcdata2_from_cache = .false.         
+
+      iost = 0
       !open file sbc_flfi
       if (mype==0) then
          !write(*,*) 'check: ', trim(file_name)
-         iost = nf_open(trim(file_name),NF_NOWRITE,ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-      ! get variable id
-      if (mype==0) then
-          iost = nf_inq_varid(ncid, var_name, id_data)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
+
       !read data from file
-      if (mype==0) then
+      if (mype==rootrank) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
          nf_edges(2)=nc_Nlat
          nf_start(3)=t_indx
          nf_edges(3)=1
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+         if(.not. sbcdata1_from_cache) then
+           call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+         end if
+         iost = 0
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-      if (mype==0) then
-         sbcdata1(1,1:nc_Nlat)       =sbcdata1(nc_Nlon-1,1:nc_Nlat)
-         sbcdata1(nc_Nlon,1:nc_Nlat) =sbcdata1(2,1:nc_Nlat)
+
+      if(mype == rootrank) then
+        if(.not. sbcdata1_from_cache) then
+           sbcdata1(1, 1:nc_Nlat)       = sbcdata1(nc_Nlon-1, 1:nc_Nlat)
+           sbcdata1(nc_Nlon,1:nc_Nlat) = sbcdata1(2, 1:nc_Nlat)
+        end if
       end if
-      call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      if(sbcdata1_from_cache) then ! use the cache instead of bcast
+      else
+        call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+     end if
+
        ! read next time step in file (check for +1 done before)
-      if (mype==0) then
-         nf_start(3)=t_indx_p1
-         nf_edges(3)=1
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
+      if (mype==rootrank) then
+        nf_start(3)=t_indx_p1
+        nf_edges(3)=1
+        if(.not. sbcdata2_from_cache) then
+        call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost, file_name)
-      if (mype==0) then
-         sbcdata2(1, 1:nc_Nlat)       =sbcdata2(nc_Nlon-1,1:nc_Nlat)
-         sbcdata2(nc_Nlon, 1:nc_Nlat) =sbcdata2(2,1:nc_Nlat)
+      iost = 0
       end if
-      call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+
+      if (mype==rootrank) then
+        if(.not. sbcdata2_from_cache) then
+         sbcdata2(1, 1:nc_Nlat)       = sbcdata2(nc_Nlon-1, 1:nc_Nlat)
+         sbcdata2(nc_Nlon, 1:nc_Nlat) = sbcdata2(2, 1:nc_Nlat)
+        end if
+      end if
+     if(sbcdata2_from_cache) then ! use the cache instead of bcast
+      !
+     else
+       call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+     end if
+
 !      !flip data in case of lat from -90 to 90
 !      !!!! WARNING
 !      if ( flip_lat == 1 ) then
@@ -763,12 +846,6 @@ CONTAINS
       end do !ii
 !!$OMP END DO
 !!$OMP END PARALLEL
-      if (mype==0) then
-         iost = nf_close(ncid)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost, file_name)
-      DEALLOCATE( sbcdata2, sbcdata1 )
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
@@ -789,6 +866,7 @@ CONTAINS
 !!$OMP DO
       do fld_idx = 1, i_totfl
          do i = 1, myDim_nod2D+eDim_nod2D
+            ! store processed forcing data for fesom computation
             atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
          end do !nod2D
       end do !fld_idx
@@ -818,7 +896,7 @@ CONTAINS
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
+                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
@@ -985,6 +1063,7 @@ CONTAINS
       if (yearnew/=yearold) then
          rdate = real(julday(yearnew,1,1),WP)
          call calendar_date(int(rdate),yyyy,dd,mm)
+         ! use next set of forcing files
          call nc_sbc_ini_fillnames(yyyy)
          ! we assume that all NetCDF files have identical grid and time variable
          do fld_idx = 1, i_totfl
@@ -1095,11 +1174,15 @@ CONTAINS
       integer, INTENT(IN) :: mm, dd, yyyy
       integer             :: julday
       ! In this routine julday returns the Julian Day Number that begins at noon of the calendar     
-      !    date specified by month mm , day dd , and year yyyy , all integer variables. Positive year
+      !    date specified by month mm, day dd , and year yyyy, all integer variables. Positive year
       !    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
       integer, PARAMETER  :: IGREG=15+31*(10+12*1582)
       ! Gregorian Calendar adopted Oct. 15, 1582.
       integer             :: ja,jm,jy
+      if (y_perpetual) then !to work with COREI forcing
+         julday=0
+         return
+      end if
       if (include_fleapyear) then
          jy = yyyy
          if (jy == 0) STOP 'julday: there is no year zero'

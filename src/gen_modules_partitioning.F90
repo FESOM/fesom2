@@ -85,6 +85,8 @@ subroutine par_init    ! initializes MPI
 
 
   integer :: i
+  integer provided_mpi_thread_support_level
+  character(:), allocatable :: provided_mpi_thread_support_level_name
 
 #ifndef __oasis
   call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
@@ -96,8 +98,20 @@ subroutine par_init    ! initializes MPI
 #endif  
 
   if(mype==0) then
-  write(*,*) 'MPI has been initialized'
-  write(*, *) 'Running on ', npes, ' PEs'
+    call MPI_Query_thread(provided_mpi_thread_support_level, i)
+    if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
+      provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
+    else if(provided_mpi_thread_support_level == MPI_THREAD_FUNNELED) then
+      provided_mpi_thread_support_level_name = "MPI_THREAD_FUNNELED"
+    else if(provided_mpi_thread_support_level == MPI_THREAD_SERIALIZED) then
+      provided_mpi_thread_support_level_name = "MPI_THREAD_SERIALIZED"
+    else if(provided_mpi_thread_support_level == MPI_THREAD_MULTIPLE) then
+      provided_mpi_thread_support_level_name = "MPI_THREAD_MULTIPLE"
+    else
+      provided_mpi_thread_support_level_name = "unknown"
+    end if
+    write(*,*) 'MPI has been initialized, provided MPI thread support level: '//provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+    write(*, *) 'Running on ', npes, ' PEs'
   end if
 end subroutine par_init
 !=================================================================
