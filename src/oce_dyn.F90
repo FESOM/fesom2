@@ -67,6 +67,23 @@ module visc_filt_bidiff_interface
     end subroutine
   end interface
 end module
+module visc_filt_dbcksc_interface
+  interface
+    subroutine visc_filt_dbcksc(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module backscatter_coef_interface
+  interface
+    subroutine backscatter_coef(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
@@ -143,6 +160,8 @@ use visc_filt_biharm_interface
 use visc_filt_bcksct_interface
 use visc_filt_bilapl_interface
 use visc_filt_bidiff_interface
+use visc_filt_dbcksc_interface
+use backscatter_coef_interface
 IMPLICIT NONE 
 integer                  :: option
 type(t_mesh), intent(in) , target :: mesh
@@ -185,6 +204,9 @@ CASE (6)
      call visc_filt_bilapl(mesh)
 CASE (7)
      call visc_filt_bidiff(mesh)
+CASE (8)
+     call backscatter_coef(mesh)
+     call visc_filt_dbcksc(mesh) 
 CASE DEFAULT
      if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
      call par_ex
@@ -210,7 +232,7 @@ type(t_mesh), intent(in) , target :: mesh
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
  ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
  ! The contribution from boundary edges is neglected (free slip). 
-
+ UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -225,6 +247,10 @@ type(t_mesh), intent(in) , target :: mesh
         UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
         UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
         UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
+        UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
+        UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
+        UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO
  END DO
 end subroutine visc_filt_harmon
@@ -298,6 +324,7 @@ if(option==2) then
 
  call exchange_elem(U_c)
  call exchange_elem(V_c)
+ UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -308,6 +335,10 @@ if(option==2) then
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+     UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
+     UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
+     UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
+     UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
      
@@ -370,6 +401,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  end do
  call exchange_elem(U_c)
  call exchange_elem(V_c)
+ UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -380,6 +412,10 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
         UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
         UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
         UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
+        UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
+        UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
+        UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))        
     END DO 
  END DO
      
@@ -541,12 +577,20 @@ SUBROUTINE visc_filt_bcksct(mesh)
     END DO
     call exchange_nod(U_c)
     call exchange_nod(V_c)
-    
+    UV_total_tend=0.0_8
+    UV_back_tend=0.0_8
+    UV_dis_tend=0.0_8
     do ed=1, myDim_elem2D
         nelem=elem2D_nodes(:,ed)
         Do nz=1, nlevels(ed)-1
             UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
+            UV_total_tend(1,nz,ed)=UV_total_tend(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
+            UV_total_tend(2,nz,ed)=UV_total_tend(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
+            UV_back_tend(1,nz,ed)=UV_back_tend(1,nz,ed)-easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
+            UV_back_tend(2,nz,ed)=UV_back_tend(2,nz,ed)-easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
+            UV_dis_tend(1,nz,ed)=UV_dis_tend(1,nz,ed)+U_b(nz,ed)
+            UV_dis_tend(2,nz,ed)=UV_dis_tend(2,nz,ed)+V_b(nz,ed)
         END DO
     end do
     deallocate(V_c,U_c,V_b,U_b)
@@ -604,6 +648,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  end do
  call exchange_elem(U_c)
  call exchange_elem(V_c)
+ UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -614,6 +659,10 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+     UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
+     UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
+     UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
+     UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
  deallocate(V_c,U_c)
@@ -627,7 +676,6 @@ end subroutine visc_filt_bilapl
 ! Quadratic in velocity term can be introduced if needed.
 SUBROUTINE visc_filt_bidiff(mesh)
 USE MOD_MESH
-USE o_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -665,6 +713,7 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
  
  call exchange_elem(U_c)
  call exchange_elem(V_c)
+ UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
      el=edge_tri(:,ed)
@@ -681,8 +730,363 @@ allocate(U_c(nl-1,ed), V_c(nl-1, ed))
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+     UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
+     UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
+     UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
+     UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
  deallocate(V_c, U_c)
 end subroutine visc_filt_bidiff
+! ===================================================================
+
+
+! ===================================================================
+SUBROUTINE visc_filt_dbcksc(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+USE g_comm_auto
+USE g_support
+IMPLICIT NONE
+
+real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1 
+integer       :: nz, ed, el(2)
+real(kind=8), allocatable  :: U_c(:,:), V_c(:,:), UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
+real(kind=8), allocatable  :: uuu(:)
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+ ! An analog of harmonic viscosity operator.  
+ ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
+ ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
+ ! The contribution from boundary edges is neglected (free slip). 
+ ! Filter is applied twice. 
+
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+allocate(UV_back(2,nl-1,ed), UV_dis(2,nl-1, ed)) 
+allocate(uke_d(nl-1,ed)) 
+allocate(uuu(ed))
+ 
+ U_c=0.0_8
+ V_c=0.0_8
+ UV_back=0.0_8
+ UV_dis=0.0_8
+ uke_d=0.0_8
+
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    DO  nz=1,minval(nlevels(el))-1
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     
+     U_c(nz,el(1))=U_c(nz,el(1))-u1
+     U_c(nz,el(2))=U_c(nz,el(2))+u1
+     V_c(nz,el(1))=V_c(nz,el(1))-v1
+     V_c(nz,el(2))=V_c(nz,el(2))+v1
+    END DO 
+ END DO
+ 
+
+ Do ed=1,myDim_elem2D
+    len=sqrt(elem_area(ed))                     
+    len=dt*len/30.0_8
+    Do nz=1,nlevels(ed)-1
+     ! vi has the sense of harmonic viscosity coefficient because of 
+     ! the division by area in the end 
+     ! ====
+     ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
+     ! ====
+     vi=max(0.2_8,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
+     U_c(nz,ed)=-U_c(nz,ed)*vi                             
+     V_c(nz,ed)=-V_c(nz,ed)*vi
+    END DO
+ end do
+
+
+ call exchange_elem(U_c)
+ call exchange_elem(V_c) 
+
+ DO ed=1, myDim_edge2D+eDim_edge2D
+    if(myList_edge2D(ed)>edge2D_in) cycle
+    el=edge_tri(:,ed)
+    le=edge_dxdy(:,ed)
+    le(1)=le(1)*sum(elem_cos(el))*0.25_8
+    len=sqrt(le(1)**2+le(2)**2)*r_earth
+    le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
+    le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
+    crosslen=sqrt(le(1)**2+le(2)**2) 
+    DO  nz=1,minval(nlevels(el))-1
+     vi=dt*len*(v_back(nz,el(1))+v_back(nz,el(2)))/crosslen
+     !if(mype==0) write(*,*) 'vi ', vi , ' and ed' , ed
+     !if(mype==0) write(*,*) 'dt*len/crosslen ', dt*len/crosslen, ' and ed' , ed
+     !vi=max(vi,0.005*len*dt) ! This helps to reduce noise in places where 
+                              ! Visc is small and decoupling might happen 
+     !Backscatter contribution
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))*vi
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
+     
+     !UKE diffusion
+     vi=dt*len*(K_back*sqrt(elem_area(el(1))/scale_area)+K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
+
+     uke1=(uke(nz,el(1))-uke(nz,el(2)))*vi
+
+     
+     UV_back(1,nz,el(1))=UV_back(1,nz,el(1))-u1/elem_area(el(1))
+     UV_back(1,nz,el(2))=UV_back(1,nz,el(2))+u1/elem_area(el(2))
+     UV_back(2,nz,el(1))=UV_back(2,nz,el(1))-v1/elem_area(el(1))
+     UV_back(2,nz,el(2))=UV_back(2,nz,el(2))+v1/elem_area(el(2))  
+     
+     !Correct scaling for the diffusion?
+     uke_d(nz,el(1))=uke_d(nz,el(1))-uke1/elem_area(el(1))
+     uke_d(nz,el(2))=uke_d(nz,el(2))+uke1/elem_area(el(2))
+     
+     
+     
+     !Biharmonic contribution
+     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+
+     UV_dis(1,nz,el(1))=UV_dis(1,nz,el(1))-u1/elem_area(el(1))
+     UV_dis(1,nz,el(2))=UV_dis(1,nz,el(2))+u1/elem_area(el(2))
+     UV_dis(2,nz,el(1))=UV_dis(2,nz,el(1))-v1/elem_area(el(1))
+     UV_dis(2,nz,el(2))=UV_dis(2,nz,el(2))+v1/elem_area(el(2))
+     
+    END DO 
+ END DO
+ 
+call exchange_elem(UV_back)
+
+DO  nz=1, nl-1
+    uuu=0.0_8
+    uuu=UV_back(1,nz,:)
+    call smooth_elem(uuu,smooth_back_tend, mesh)
+    UV_back(1,nz,:)=uuu
+    uuu=0.0_8
+    uuu=UV_back(2,nz,:)
+    call smooth_elem(uuu,smooth_back_tend, mesh)
+    UV_back(2,nz,:)=uuu 
+END DO
+
+ DO ed=1, myDim_elem2D
+     DO  nz=1,nlevels(ed)-1
+     UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_dis(1,nz,ed)+UV_back(1,nz,ed)
+     UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_dis(2,nz,ed)+UV_back(2,nz,ed)               
+     END DO 
+ END DO
+
+ UV_dis_tend=UV_dis!+UV_back
+ UV_total_tend=UV_dis+UV_back
+ UV_back_tend=UV_back
+ uke_dif=uke_d
+ 
+ call uke_update(mesh)
+ deallocate(V_c,U_c)
+ deallocate(UV_dis,UV_back) 
+ deallocate(uke_d)
+ deallocate(uuu)
+
+end subroutine visc_filt_dbcksc
+!===========================================================================
+
+SUBROUTINE backscatter_coef(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+use g_comm_auto
+IMPLICIT NONE
+type(t_mesh), intent(in) , target :: mesh
+integer                 :: elem, nz
+#include "associate_mesh.h"
+
+!Potentially add the Rossby number scaling to the script...
+!check if sign is right! Different in the Jansen paper
+!Also check with the normalization by area; as before we use element length sqrt(2*elem_area(ed))
+
+v_back=0.0_8
+DO  elem=1, myDim_elem2D 
+     DO  nz=1,nlevels(elem)-1
+!v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
+!v_back(nz,elem)=-c_back*sqrt(4._8/sqrt(3.0_8)*elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)) !Is the scaling correct
+v_back(nz,elem)=min(-c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
+!Scaling by sqrt(2*elem_area) or sqrt(elem_area)?
+     END DO
+END DO
+
+call exchange_elem(v_back)
+
+end subroutine backscatter_coef
+!===========================================================================
+
+SUBROUTINE uke_update(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+use g_comm_auto
+USE g_support
+USE g_rotate_grid
+IMPLICIT NONE
+
+!I had to change uke(:) to uke(:,:) to make output and restart work!!
+
+!Why is it necessary to implement the length of the array? It doesn't work without!
+!integer, intent(in)        :: t_levels
+type(t_mesh), intent(in) , target :: mesh
+!real(kind=8), dimension(:,:,:), intent(in)   :: UV_dis, UV_back
+!real(kind=8), dimension(:,:), intent(in)   :: UV_dif
+!real(kind=8), intent(in)   :: UV_dis(nl-1,myDim_elem2D+eDim_elem2D), UV_back(nl-1, myDim_elem2D+eDim_elem2D)
+!real(kind=8), intent(in)   :: UV_dif(nl-1,myDim_elem2D+eDim_elem2D)
+real(kind=8)		   :: hall, h1_eta, hnz, vol
+integer			   :: elnodes(3), nz, ed, edi, node, j, elem, q
+real(kind=8), allocatable  :: uuu(:), work_array(:), U_work(:,:), V_work(:,:), rosb_array(:,:), work_uv(:)
+integer			   :: kk, nzmax, el
+real(kind=8)       :: c1, rosb, vel_u, vel_v, vel_uv, scaling, reso
+real*8             :: c_min=0.5, f_min=1.e-6, r_max=200000., ex, ey, a1, a2, len_reg, dist_reg(2) ! Are those values still correct?
+#include "associate_mesh.h"
+!rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
+!rossby_num=2
+
+ed=myDim_elem2D+eDim_elem2D
+allocate(uuu(ed)) 
+
+uke_back=0.0_8
+uke_dis=0.0_8
+DO ed=1, myDim_elem2D
+DO nz=1, nlevels(ed)-1  
+   uke_dis(nz,ed)=(UV(1,nz,ed)*UV_dis_tend(1,nz,ed)+UV(2,nz,ed)*UV_dis_tend(2,nz,ed))   
+   uke_back(nz,ed)=(UV(1,nz,ed)*UV_back_tend(1,nz,ed)+UV(2,nz,ed)*UV_back_tend(2,nz,ed))
+END DO
+END DO
+
+DO  nz=1,nl-1
+    uuu=0.0_8
+    uuu=uke_back(nz,:)
+    call smooth_elem(uuu,smooth_back, mesh) !3) ?
+    uke_back(nz,:)=uuu
+END DO
+
+
+
+!Timestepping use simple backward timestepping; all components should have dt in it, unless they need it twice
+!Amplitudes should be right given the correction of the viscosities; check for all, also for biharmonic
+!uke(1,ed)=uke(1,ed)-uke_dis(1,ed)-uke_back(1,ed)+uke_dif(1,ed)
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_work(nl-1,myDim_nod2D+eDim_nod2D),V_work(nl-1,myDim_nod2D+eDim_nod2D))
+allocate(work_uv(myDim_nod2D+eDim_nod2D))
+allocate(rosb_array(nl-1,ed))
+call exchange_elem(UV)
+rosb_array=0._8
+DO nz=1, nl-1
+    work_uv=0._WP
+    DO node=1, myDim_nod2D
+       vol=0._WP
+       U_work(nz,node)=0._WP 
+       V_work(nz,node)=0._WP 
+       DO j=1, nod_in_elem2D_num(node)
+           elem=nod_in_elem2D(j, node)
+           U_work(nz,node)=U_work(nz,node)+UV(1,nz,elem)*elem_area(elem)
+           V_work(nz,node)=V_work(nz,node)+UV(2,nz,elem)*elem_area(elem)
+           vol=vol+elem_area(elem)
+       END DO
+       U_work(nz,node)=U_work(nz,node)/vol
+       V_work(nz,node)=U_work(nz,node)/vol
+    END DO
+    work_uv=U_work(nz,:)
+    call exchange_nod(work_uv)
+    U_work(nz,:)=work_uv
+    work_uv=V_work(nz,:)
+    call exchange_nod(work_uv)
+    V_work(nz,:)=work_uv    
+END DO
+
+    DO el=1,myDim_elem2D
+     DO nz=1, nlevels(el)-1     
+        rosb_array(nz,el)=sqrt((sum(gradient_sca(1:3,el)*U_work(nz,elem2D_nodes(1:3,el)))-&
+              sum(gradient_sca(4:6, el)*V_work(nz,elem2D_nodes(1:3,el))))**2+&
+              (sum(gradient_sca(4:6, el)*U_work(nz,elem2D_nodes(1:3,el)))+&
+              +sum(gradient_sca(1:3, el)*V_work(nz,elem2D_nodes(1:3,el))))**2)
+!        hall=hall+hnz
+     END DO
+!     rosb_array(el)=rosb_array(el)/hall
+    END DO
+DO ed=1, myDim_elem2D
+    scaling=1._WP
+    IF(uke_scaling) then
+      reso=sqrt(elem_area(ed)*4._wp/sqrt(3._wp))
+      rosb=0._wp
+      elnodes=elem2D_nodes(:, ed)   
+      DO kk=1,3
+        c1=0._wp
+        nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(elnodes(kk)), elnodes(kk))), 1)
+        !Vertical average; same scaling in the vertical
+        DO nz=1, nzmax-1
+         c1=c1+hnode_new(nz,elnodes(kk))*(sqrt(max(bvfreq(nz,elnodes(kk)), 0._WP))+sqrt(max(bvfreq(nz+1,elnodes(kk)), 0._WP)))/2.
+        END DO
+        c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
+        !Cutoff K_GM depending on (Resolution/Rossby radius) ratio
+        rosb=rosb+min(c1/max(abs(coriolis_node(elnodes(kk))), f_min), r_max)
+      END DO
+      rosb=rosb/3._8
+      scaling=1._WP/(1._WP+(uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
+    END IF
+    
+    DO nz=1, nlevels(ed)-1  
+    elnodes=elem2D_nodes(:,ed)
+    
+    !Taking out that one place where it is always weird (Pacific Southern Ocean)
+    !Should not really be used later on, once we fix the issue with the 1/4 degree grid
+    if(.not. (TRIM(which_toy)=="soufflet")) then
+      call elem_center(ed, ex, ey)
+      !a1=-104.*rad
+      !a2=-49.*rad
+      call g2r(-104.*rad, -49.*rad, a1, a2)
+      dist_reg(1)=ex-a1
+      dist_reg(2)=ey-a2
+      call trim_cyclic(dist_reg(1))
+      dist_reg(1)=dist_reg(1)*elem_cos(ed)
+      dist_reg=dist_reg*r_earth
+      len_reg=sqrt(dist_reg(1)**2+dist_reg(2)**2)
+    
+    
+      !if(mype==0) write(*,*) 'len_reg ', len_reg , ' and dist_reg' , dist_reg, ' and ex, ey', ex, ey, ' and a ', a1, a2
+      rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+      !uke_dif(nz, ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
+      uke_dis(nz,ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
+    else
+      rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+      !uke_dif(nz, ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
+      uke_dis(nz,ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
+    end if
+    
+    END DO
+END DO
+deallocate(U_work, V_work)
+deallocate(rosb_array)
+deallocate(work_uv)
+call exchange_elem(uke_dis)
+!call exchange_elem(uke_dif)
+DO nz=1, nl-1  
+    uuu=uke_dis(nz,:)
+    call smooth_elem(uuu,smooth_dis, mesh)
+    uke_dis(nz,:)=uuu
+END DO
+DO ed=1, myDim_elem2D
+    DO  nz=1,nlevels(ed)-1
+    uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+    uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
+    uke(nz,ed)=uke(nz,ed)+1.5_8*uke_rhs(nz,ed)-0.5_8*uke_rhs_old(nz,ed)
+    END DO
+END DO
+call exchange_elem(uke)
+
+deallocate(uuu)
+end subroutine uke_update
+
 ! ===================================================================

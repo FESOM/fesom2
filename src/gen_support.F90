@@ -161,7 +161,7 @@ subroutine smooth_elem2D(arr, N, mesh)
 #include "associate_mesh.h"    
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
-        DO node=1, myDim_nod2D+eDim_nod2D
+        DO node=1, myDim_nod2D
             vol=0._WP
             work_array(node)=0._WP
             DO j=1, nod_in_elem2D_num(node)
@@ -172,7 +172,7 @@ subroutine smooth_elem2D(arr, N, mesh)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
-
+        call exchange_nod(work_array)
         DO elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
@@ -196,7 +196,7 @@ subroutine smooth_elem3D(arr, N, mesh)
   my_nl=ubound(arr,1)
   DO q=1, N !apply mass matrix N times to smooth the field
      DO nz=1, my_nl
-        DO node=1, myDim_nod2D+eDim_nod2D
+        DO node=1, myDim_nod2D
            vol=0._WP
            work_array(node)=0._WP
            if (nlevels_nod2d(node) < nz) CYCLE
@@ -206,16 +206,16 @@ subroutine smooth_elem3D(arr, N, mesh)
               elnodes=elem2D_nodes(:,elem)
               work_array(node)=work_array(node)+arr(nz, elem)*elem_area(elem)
               vol=vol+elem_area(elem)
-          END DO
-          work_array(node)=work_array(node)/vol
+           END DO
+           work_array(node)=work_array(node)/vol
         END DO
+        call exchange_nod(work_array)
+        DO elem=1, myDim_elem2D
+           elnodes=elem2D_nodes(:, elem)
+           arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
+        ENDDO
      END DO
-
-    DO elem=1, myDim_elem2D
-       elnodes=elem2D_nodes(:, elem)
-       arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
-    ENDDO
-    call exchange_elem(arr)
+     call exchange_elem(arr)
   END DO
   deallocate(work_array)
 end subroutine smooth_elem3D

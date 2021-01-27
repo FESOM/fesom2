@@ -183,7 +183,6 @@ type(t_mesh), target, save      :: mesh
         
         !___compute horizontal velocity on nodes (originaly on elements)________
         call compute_vel_nodes(mesh)
-        
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then

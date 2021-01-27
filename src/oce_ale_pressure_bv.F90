@@ -1587,6 +1587,7 @@ USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 use g_PARSUP !, only: par_ex,pe_status
+use g_config !, only: which_toy, toy_ocean
 IMPLICIT NONE
 
   real(kind=WP), intent(IN)  :: t,s
@@ -1600,6 +1601,10 @@ IMPLICIT NONE
   bulk_0   = 1
   bulk_pz  = 0
   bulk_pz2 = 0
-  rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+  IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
+      rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+  ELSE
+      rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+  END IF
 end subroutine density_linear
 

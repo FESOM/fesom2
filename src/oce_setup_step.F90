@@ -268,6 +268,39 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 end if
 
+! =================
+! Backscatter arrays
+! =================
+
+if(backscatter) then
+!Is the size of the arrays appropriate, especially when it comes to communication with processors
+allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
+allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
+allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
+allocate(uke_dif(nl-1,elem_size))
+allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
+allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
+!allocate(UV_dis_posdef_b2(nl-1,elem_size), UV_dis_posdef(nl-1,elem_size), UV_back_posdef(nl-1,elem_size))
+!Unresolved kinetic energy tendency contributions from dissipation, diffusion, backscatter
+!allocate(UV_dis_tend_node(2,nl-1,node_size))
+
+uke=0.0_8
+v_back=0.0_8
+uke_dis=0.0_8
+uke_dif=0.0_8
+uke_back=0.0_8
+uke_rhs=0.0_8
+uke_rhs_old=0.0_8
+UV_dis_tend=0.0_8
+UV_back_tend=0.0_8
+!UV_dis_posdef_b2=0.0_8
+!UV_dis_posdef=0.0_8
+!UV_back_posdef=0.0_8
+!UV_dis_tend_node=0.0_8
+end if
+allocate(UV_total_tend(2,nl-1,elem_size))
+UV_total_tend=0.0_8
+
 !Velocities at nodes
 allocate(Unode(2,nl-1,node_size))
 

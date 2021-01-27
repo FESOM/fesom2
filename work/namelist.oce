@@ -22,7 +22,7 @@ mom_adv=2              ! 1=vector CV, p1 vel, 2=sca. CV, 3=vector inv.
 free_slip=.false.      ! Switch on free slip
 i_vert_visc=.true.    
 w_split=.false.
-w_exp_max=1.e-3
+w_max_cfl=1.0
 SPP=.false.                 ! Salt Plume Parameterization
 Fer_GM=.false.              ! to swith on/off GM after Ferrari et al. 2010
 K_GM_max     = 3000.0       ! max. GM thickness diffusivity (m2/s)
@@ -65,7 +65,11 @@ clim_relax=0.0	             ! 1/s, geometrical information has to be supplied
 ref_sss_local=.true.
 ref_sss=34.
 i_vert_diff=.true.  ! true
-tracer_adv =2       ! 1=MUSCL, 2=MUSCL+FCT
+tra_adv_hor ='MFCT'  !'MUSCL', 'UPW1'
+tra_adv_ver ='QR4C'  !'QR4C', 'CDIFF', 'UPW1'
+tra_adv_lim ='FCT'   !'FCT', 'NONE' (default)
+tra_adv_ph  = 1. ! a parameter to be used in horizontal advection (for MUSCL it is the fraction of fourth-order contribution in the solution)
+tra_adv_pv  = 1. ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
 ! Implemented trassers (3d restoring):
 ! 301 - Fram strait.
 ! 302 - Bering Strait
