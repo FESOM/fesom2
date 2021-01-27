@@ -209,7 +209,7 @@ subroutine init_bottom_elem_thickness(mesh)
             !  / / / / / /
             if(dd<zbar(nle)) then 
                 if(nle==nl) then
-                    zbar_e_bot(elem) = dd
+                    zbar_e_bot(elem) = max(dd,zbar(nle)+(zbar(nle)-Z(nle-1)))
                     
                 else
                     ! case 1 : max(Z(nle),dd) = dd
@@ -306,7 +306,7 @@ subroutine init_bottom_node_thickness(mesh)
             !  / / / / / /
             if(dd<zbar(nln)) then 
                 if(nln==nl) then
-                    zbar_n_bot(node) = dd
+                    zbar_n_bot(node) = max(dd,zbar(nln)+(zbar(nln)-Z(nln-1)))
                     
                 else
                     ! case 1 : max(Z(nle),dd) = dd
@@ -1651,16 +1651,37 @@ subroutine vert_vel_ale(mesh)
                 write(*,*) "          mype = ", mype
                 write(*,*) "         mstep = ", mstep
                 write(*,*) "          node = ", n
+                write(*,*) 'glon,glat      = ',geo_coord_nod2D(:,n)/rad
+                write(*,*)
+                write(*,*) 'water_flux     = ', water_flux(n)
+                write(*,*)
+                write(*,*) "ssh_rhs        = ", ssh_rhs(n)
+                write(*,*) "ssh_rhs_old    = ", ssh_rhs_old(n)
+                write(*,*) "eta_n          = ", eta_n(n)
+                write(*,*) "d_eta          = ", d_eta(n)
+                write(*,*)
+                write(*,*) "zbar_3d_n(1,n) = ", zbar_3d_n(1,n)
+                write(*,*) "dd1            = ", dd1
+                write(*,*) "nlevels_nod2D_min(n)-1 = ",nlevels_nod2D_min(n)-1
+                write(*,*)
+                write(*,*) "dhbar/H        = ", dd
+                write(*,*) "1/H*dhbar/dt   = ", dddt
+                write(*,*) "hbar(n)        = ", hbar(n)
+                write(*,*) "hbar_old(n)    = ", hbar_old(n)
+                write(*,*) "hbar(n)-hbar_old(n) = ", hbar(n)-hbar_old(n)
+                write(*,*)
                 write(*,*) "hnode_new(:,n) = ", hnode_new(:,n)
                 write(*,*) "hnode(:,n)     = ", hnode(:,n)
+                write(*,*)
                 write(*,*) "zbar_3d_n(:,n) = ", zbar_3d_n(:,n)
                 write(*,*) "Z_3d_n(:,n)    = ", Z_3d_n(:,n)
+                write(*,*)
                 write(*,*) "zbar_n_bot(n)  = ", zbar_n_bot(n)
                 write(*,*) "bottom_node_thickness(n) = ", bottom_node_thickness(n)
                 write(*,*)
             end if 
         end do
-        call par_ex(1)
+!!PS         call par_ex(1)
     endif
     
     !___________________________________________________________________________
@@ -1687,11 +1708,11 @@ subroutine vert_vel_ale(mesh)
         do n=1, myDim_nod2D
             do nz=1,nlevels_nod2D(n)
                 !!PS if (abs(CFL_z(nz,n)-cflmax) < 1.e-12) then
-                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.2_WP .and. CFL_z(nz,n)<=2.0_WP ) then
+                if (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 1.75_WP .and. CFL_z(nz,n)<=2.5_WP ) then
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[33m'//' --> WARNING CFLz>1.2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz
-                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.0_WP) then          
+                elseif (abs(CFL_z(nz,n)-cflmax) < 1.e-12 .and. CFL_z(nz,n) > 2.5_WP) then          
                     print '(A, A, F4.2, A, I6, A, F7.2,A,F6.2, A, I3)', achar(27)//'[31m'//' --> WARNING CFLz>2:'//achar(27)//'[0m',&
                           'CFLz_max=',cflmax,',mstep=',mstep,',glon/glat=',geo_coord_nod2D(1,n)/rad,'/',geo_coord_nod2D(2,n)/rad,&
                           ',nz=',nz

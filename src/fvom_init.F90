@@ -85,6 +85,9 @@ end interface
   read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
+  alphaEuler=alphaEuler*rad 	
+  betaEuler=betaEuler*rad
+  gammaEuler=gammaEuler*rad
   call set_mesh_transform_matrix  !(rotated grid) 
   call read_mesh_ini(mesh)
   call system_clock(finish_t)
@@ -134,7 +137,7 @@ type(t_mesh), intent(inout), target :: mesh
 INTEGER                             :: nq
 INTEGER                             :: n1,n2,n3
 INTEGER                             :: n, nz, exit_flag
-REAL(kind=WP)                       :: x1, x2
+REAL(kind=WP)                       :: x1, x2, gx1, gx2
 INTEGER	                            :: tag
 INTEGER, allocatable                :: elem_data(:)
 INTEGER                             :: i_error
@@ -150,16 +153,17 @@ INTEGER                             :: i_error
     
   do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
+     x1=x1*rad
+     x2=x2*rad
      if (force_rotation) then
-        call g2r(x1*rad, x2*rad, x1, x2)
-        x1=x1/rad
-        x2=x2/rad
+        gx1=x1
+        gx2=x2
+        call g2r(gx1, gx2, x1, x2)
      end if      
-     mesh%coord_nod2D(1,nq)=x1*rad
-     mesh%coord_nod2D(2,nq)=x2*rad
+     mesh%coord_nod2D(1,n)=x1
+     mesh%coord_nod2D(2,n)=x2
   end do
-  CLOSE(20) 
-      
+  CLOSE(20)
   READ(21,*)  mesh%elem2D    
   ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
   elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
@@ -240,6 +244,7 @@ USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
 
 interface
@@ -481,12 +486,9 @@ deallocate(aux1)
     call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
-    if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
-    if(xe(1)<-cyclic_length/2.) xe(1)=xe(1)+cyclic_length
-    if(xc(1)>=cyclic_length/2.) xc(1)=xc(1)-cyclic_length
-    if(xc(1)<-cyclic_length/2.) xc(1)=xc(1)+cyclic_length
-
-    if(xc(1)*xe(2)-xc(2)*xe(1)>0) then
+    call trim_cyclic(xe(1))
+    call trim_cyclic(xc(1))
+    if(xc(1)*xe(2)-xc(2)*xe(1)>0.0_WP) then
        ! Vector drawn to the center of the first triangle is to the right
        ! of the edge vector. Triangles have to be exchanged:
        elem=edge_tri(1,n)

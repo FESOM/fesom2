@@ -42,6 +42,7 @@ class fesom_data(object):
     rescale                     = []
     which_mean                  = 'monthly'
     anom                        = False
+    use_cavity                  = False
     
     #___INIT DATA OBJECT________________________________________________________
     #
@@ -54,6 +55,7 @@ class fesom_data(object):
             self.proj_lon    = inputarray['proj_lon']
             self.proj_lat    = inputarray['proj_lat']
             self.which_plot  = inputarray['which_plot']
+            self.use_cavity  = inputarray['use_cavity']
     
 #___LOAD FESOM2.0 DATA AS TIME AVERAGED HORIZONTAL SLICE________________________
 #
@@ -81,10 +83,22 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         return data
     #_______________________________________________________________________________
     # plot triangle area interpolated to node
+    elif data.var=='nodearea':
+        if len(mesh.nodes_2d_area)==0: mesh.fesom_calc_nodearea()
+        data.value 	= mesh.nodes_2d_area
+        data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'rygbw'
+        return data
+    #_______________________________________________________________________________
+    # plot triangle area 
     elif data.var=='triarea':
         if len(mesh.nodes_2d_area)==0: mesh.fesom_calc_triarea()
-        data.value 	= mesh.nodes_2d_area
-        data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'cmocean.cm.balance'
+        data.value 	= np.concatenate((mesh.elem0_2d_area,mesh.elem0_2d_area[mesh.pbndtri_2d_i]))
+        data.sname,data.lname, data.unit, data.cmap= 'triarea', 'Area', 'km^2', 'rygbw'
+        return data
+    
+    elif data.var=='cavity_depth':
+        data.value 	= -mesh.nodes_2d_cg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
         return data
     
     #___________________________________________________________________________
@@ -108,6 +122,11 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
     # compute dimension contained in file
     nti,nsi,ndi = do_filedims(fname_data, nyi, do_output)
     
+    # fix ndi issue for blowup file he can determine automatical if its a 2d or 3d 
+    # variable 
+    if which_files=='blowup_oce' and any(x in data.var for x in ['eta_n','d_eta','ssh_rhs','ssh_rhs_old','zbar_n_bot','zbar_e_bot','bottom_node_thickness','bottom_node_thickness','heat_flux','water_flux']):
+        ndi=0
+        
     #___________________________________________________________________________
     # get attributes of variable 
     data        = do_fileattr(fname_data, data, var_list)
@@ -216,10 +235,18 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['temp', 'salt',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
-            elif any(x in data.var for x in ['pgf_x','pgf_y','pgf_xy','pgf']):
+            elif any(x in data.var for x in ['pgf_x','pgf_y','pgf_xy']):
                 var_list = ['pgf_x', 'pgf_y',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
-                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))    
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['pgfa_x','pgfa_y','pgfa_xy']):
+                var_list = ['pgfa_x', 'pgfa_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
+            elif any(x in data.var for x in ['pgfb_x','pgfb_y','pgfb_xy']):
+                var_list = ['pgfb_x', 'pgfb_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
             elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -490,13 +517,28 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
             weight[zi,0], weight[zi,1] = sel_levidx.index(auxidx), sel_levidx.index(auxidx+1)
             if ndi!=mesh.nlev: 
                 depth = mesh.zmid
+                #_______________________________________________________________
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=auxidx+1
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=auxidx+1
+                #_______________________________________________________________
+                # case of cavity
+                if (mesh.use_cavity):
+                    if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=auxidx,isvalid)
+                    elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=auxidx,isvalid)
+                #_______________________________________________________________
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             else             :
                 depth = mesh.zlev
+                #_______________________________________________________________
                 if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=auxidx+1
                 elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=auxidx+1
+                #_______________________________________________________________
+                # case of cavity
+                if (mesh.use_cavity):
+                    if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=auxidx,isvalid)
+                    elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=auxidx,isvalid)
+                    
+                #_______________________________________________________________
                 valid_lay[isvalid,zi] = valid_lay[isvalid,zi] + 1.0
             weight[zi,2] = (idepth[zi]+depth[auxidx])/(depth[auxidx]-depth[auxidx+1])    
             div[isvalid] = div[isvalid]+1.0
@@ -545,7 +587,41 @@ def do_zinterp(mesh, idata, idepth, ndi, nsi, sel_levidx,do_output):
                 idata[it,isvalid]                 = idata[it,isvalid]/div[isvalid]
                 # set nodes where are no valid layers for interpolation to nan 
                 idata[it,np.logical_not(isvalid)] = np.nan
-    
+                
+    # if data.depth is empty --> still fill the bottom topography with nan's
+    else:
+        if idata.ndim==3:
+            valid_lay= np.zeros((nsi,len(idepth))) 
+            
+            ndimax = mesh.nodes_2d_izg.max()-1
+            if ndi==mesh.nlev: ndimax = mesh.nodes_2d_izg.max()
+            
+            for zi in range(0,ndi):
+                if ndi!=mesh.nlev: 
+                    #_______________________________________________________________
+                    if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]-1>=zi+1
+                    elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]-1>=zi+1
+                    #_______________________________________________________________
+                    # case of cavity
+                    if (mesh.use_cavity):
+                        if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=zi,isvalid)
+                        elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=zi,isvalid)
+                    #_______________________________________________________________
+                else             :
+                    depth = mesh.zlev
+                    #_______________________________________________________________
+                    if   nsi==mesh.n2dn: isvalid = mesh.nodes_2d_izg[:nsi]>=zi+1
+                    elif nsi==mesh.n2de: isvalid = mesh.elem0_2d_iz[:nsi]>=zi+1
+                    #_______________________________________________________________
+                    # case of cavity
+                    if (mesh.use_cavity):
+                        if   nsi==mesh.n2dn: isvalid = np.logical_and(mesh.nodes_2d_icg[:nsi]<=zi,isvalid)
+                        elif nsi==mesh.n2de: isvalid = np.logical_and(mesh.elem0_2d_ic[:nsi] <=zi,isvalid)
+                        
+                    #_______________________________________________________________
+                    
+                idata[:,np.logical_not(isvalid),zi] = np.nan
+            
     return(idata)
 
 #___DO NECCESSARY POSTPROCESSING________________________________________________
@@ -751,10 +827,22 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
         if   nti==1:
             sel_timeidx = [0]
             if nmi!=12: print(' --> WARNING --> no monthly information in file --> load annual instead')
+            data.time = np.arange(data.year[0],data.year[1]+1,1)
             
         # file contains monthly data
         elif nti==12:                   
             sel_timeidx = [x-1 for x in data.month]
+            if data.month.size==12:
+                aux_time=list()
+                for year in range(box.year[0],box.year[1]+1):
+                    aux_time.extend([(x-1)/12 + year for x in box.month])
+                data.time=np.array(aux_time)
+            else:
+                aux_mon = np.arange(0,len(box.month),1)
+                aux_time=list()
+                for year in range(box.year[0],box.year[1]+1):
+                    aux_time.extend([x/len(box.month) + year for x in aux_mon])
+                data.time=np.array(aux_time)
             
         # file contains 5 daily data    
         elif nti==73:                   
@@ -890,6 +978,7 @@ def fesom_data_copy(data):
     copy.anom                           = data.anom  
     copy.value2                         = data.value2
     copy.which_mean                     = data.which_mean
+    copy.use_cavity                     = data.use_cavity
     
     #___________________________________________________________________________
     return(copy)

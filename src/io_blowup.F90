@@ -131,8 +131,8 @@ MODULE io_BLOWUP
 				units='none'
 			END SELECT
 			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
-			longname=trim(longname)//', Adams–Bashforth'
-			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+!!PS 			longname=trim(longname)//', Adams–Bashforth'
+!!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
 		end do
 		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel);
 		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_e);
@@ -151,12 +151,19 @@ MODULE io_BLOWUP
 !!PS  		call def_variable(bid, 'm_snow_old'	, (/nod2D/)			, 'effective snow thickness',   'm', m_snow_old); !PS
 !!PS 		call def_variable(bid, 'u_ice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
 !!PS  		call def_variable(bid, 'v_ice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
- 		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',    '?', heat_flux); !PS
+ 		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',     '?', heat_flux); !PS
 !!PS  		call def_variable(bid, 'heat_flux_old', (/nod2D/)		, 'heat flux old',    '?', heat_flux_old); !PS
 		call def_variable(bid, 'water_flux'	, (/nod2D/)			, 'water flux ',    '?', water_flux); !PS
+		call def_variable(bid, 'tx_sur'	    , (/elem2d/)		, 'tx_sur',         '?', stress_surf(1, :)); !PS
+		call def_variable(bid, 'ty_sur'	    , (/elem2d/)		, 'ty_sur',         '?', stress_surf(2, :)); !PS
 !!PS 		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
 		
-		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
+!!PS 		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
+		
+		call def_variable(bid, 'Kv'			, (/nl, nod2D/)		, 'vertical diffusivity', '', Kv);
+		call def_variable(bid, 'Av'			, (/nl, elem2d/)	, 'vertical viscosity', '', Av);
+		call def_variable(bid, 'N2'			, (/nl, nod2D/)		, 'squared bouyancy freq', '', bvfreq);
+		
 	end subroutine ini_blowup_io
 !
 !
