@@ -3,6 +3,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
+set(PGI_GPU_ARCH "cc80" CACHE STRING "GPU Arch for PGI Compiler (cc35,cc50,cc60,cc70,cc80,...)")
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 file(GLOB sources_Fortran ${src_home}/*.F90)
@@ -54,10 +55,10 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 	target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -march=native -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
 	set(CMAKE_EXE_LINKER_FLAGS "-pthread")
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
-       target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64)
+	target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64)
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI)
     if(${FESOM_OPENACC})
-       target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Minline -Mr8 -Munroll -pgf90libs -acc -ta=tesla:cc80 -Minfo=accel)
+	target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Minline -Mr8 -Munroll -pgf90libs -acc -ta=tesla:${PGI_GPU_ARCH} -Minfo=accel)
 	set(CMAKE_EXE_LINKER_FLAGS "-acc")
     else()
         target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Minline -Mr8 -Munroll -pgf90libs)
