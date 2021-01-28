@@ -1,3 +1,4 @@
+
 ! A set of routines for computing the horizonlal viscosity
 ! the control parameters (their default values) are:
 ! gamma0 (0.01 [m/s]), gamma1 (0.1 [no dim.]), gamma2 (10.[s/m]), Div_c [1.], Leith_c[1.?]
