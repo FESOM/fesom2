@@ -84,6 +84,15 @@ module backscatter_coef_interface
     end subroutine
   end interface
 end module
+module uke_update_interface
+  interface
+    subroutine uke_update(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
