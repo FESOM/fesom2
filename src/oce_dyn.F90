@@ -760,6 +760,7 @@ USE g_PARSUP
 USE g_CONFIG
 USE g_comm_auto
 USE g_support
+USE uke_update_interface
 IMPLICIT NONE
 
 real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1 
@@ -1021,7 +1022,7 @@ END DO
         rosb_array(nz,el)=sqrt((sum(gradient_sca(1:3,el)*U_work(nz,elem2D_nodes(1:3,el)))-&
               sum(gradient_sca(4:6, el)*V_work(nz,elem2D_nodes(1:3,el))))**2+&
               (sum(gradient_sca(4:6, el)*U_work(nz,elem2D_nodes(1:3,el)))+&
-              +sum(gradient_sca(1:3, el)*V_work(nz,elem2D_nodes(1:3,el))))**2)
+              sum(gradient_sca(1:3, el)*V_work(nz,elem2D_nodes(1:3,el))))**2)
 !        hall=hall+hnz
      END DO
 !     rosb_array(el)=rosb_array(el)/hall
