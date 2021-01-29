@@ -272,7 +272,8 @@ subroutine integrate_nod_2D(data, int2D, mesh)
 #include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
-     lval=lval+data(row)*area(1,row)
+     !!PS lval=lval+data(row)*area(1,row)
+     lval=lval+data(row)*area(ulevels_nod2D(row),row)
   end do
 
   int2D=0.0_WP

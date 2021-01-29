@@ -1811,8 +1811,8 @@ IMPLICIT NONE
 ! area(nl, myDim_nod2D)
 
 
-integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz
-real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol
+integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin
+real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol, vol2
 real(kind=WP), allocatable,dimension(:)   :: work_array
 real(kind=WP)                             :: t0, t1
 type(t_mesh), intent(inout), target       :: mesh
@@ -1855,13 +1855,12 @@ t0=MPI_Wtime()
  DO n=1, myDim_nod2D
     DO j=1,mesh%nod_in_elem2D_num(n)
        elem=mesh%nod_in_elem2D(j,n)
-       !!PS DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
-       DO nz=1,mesh%nlevels(elem)-1
+       DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
+       !!PS DO nz=1,mesh%nlevels(elem)-1
         mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
        END DO
     END DO
  END DO
- 
  ! Only areas through which there is exchange are counted
 
  ! ===========
@@ -1870,7 +1869,17 @@ t0=MPI_Wtime()
  mesh%elem_area=mesh%elem_area*r_earth*r_earth
  mesh%area=mesh%area*r_earth*r_earth
  
- call exchange_nod(mesh%area)
+call exchange_nod(mesh%area)
+
+
+!!PS do n=1, myDim_nod2D
+!!PS     nzmin = mesh%ulevels_nod2d(n)
+!!PS     if (nzmin>1) then 
+!!PS         write(*,*) ' --> mesh area:', mype, n, nzmin, mesh%area(nzmin,n),mesh%area(nzmin+1,n),mesh%area(nzmin+2,n)
+!!PS     end if 
+!!PS end do
+
+
 
 do n=1,myDim_nod2d+eDim_nod2D
    do nz=1,mesh%nl
@@ -1884,9 +1893,19 @@ end do
  ! coordinates are in radians, edge_dxdy are in meters,
  ! and areas are in m^2
  
+!!PS do n=1,myDim_nod2d+eDim_nod2D
+!!PS    mesh%area_inv(1:mesh%ulevels_nod2D(n)-1,n) = 0.0_WP
+!!PS    mesh%area(1:mesh%ulevels_nod2D(n)-1,n) = 0.0_WP
+!!PS end do 
+ 
+ 
 
  allocate(work_array(myDim_nod2D))
- mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
+ !!PS mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
+ do n=1,myDim_nod2d+eDim_nod2D
+    mesh%mesh_resolution(n)=sqrt(mesh%area(mesh%ulevels_nod2D(n), n)/pi)*2._WP
+ end do 
+ 
  DO q=1, 3 !apply mass matrix N times to smooth the field
     DO n=1, myDim_nod2D
        vol=0._WP
@@ -1907,11 +1926,17 @@ end do
  deallocate(work_array)
 
  vol=0.0_WP
+ vol2=0.0_WP
  do n=1, myDim_nod2D
+    vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n)
+    if (mesh%ulevels_nod2D(n)>1) cycle
     vol=vol+mesh%area(1, n)
  end do
  mesh%ocean_area=0.0
+ mesh%ocean_areawithcav=0.0
  call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+       MPI_COMM_FESOM, MPIerr)
+ call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
@@ -1921,9 +1946,11 @@ if (mype==0) then
             '   MinScArea ', minval(mesh%area(1,:))
  write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
  if (mype==0) then
-    write(*,*) 'Total ocean area is: ', mesh%ocean_area, ' m^2'
+    write(*,*) 'Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
+    write(*,*) 'Total ocean surface area wth cavity is: ', mesh%ocean_areawithcav, ' m^2'
  end if
 endif
+
 
 t1=MPI_Wtime()
 if (mype==0) then

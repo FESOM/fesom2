@@ -572,7 +572,10 @@ subroutine init_thickness_ale(mesh)
     end if
     !___________________________________________________________________________
     ! Fill in ssh_rhs_old
-    ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
+    !!PS ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
+    do n=1,myDim_nod2D+eDim_nod2D
+        ssh_rhs_old(n)=(hbar(n)-hbar_old(n))*area(ulevels_nod2D(n),n)/dt
+    end do
     
     ! -->see equation (14) FESOM2:from finite elements to finie volume
     eta_n=alpha*hbar_old+(1.0_WP-alpha)*hbar   
@@ -1258,7 +1261,8 @@ subroutine init_stiff_mat_ale(mesh)
     ! Mass matrix part
     do row=1, myDim_nod2D
         offset = ssh_stiff%rowptr(row)
-        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
+        !!PS SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
+        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(ulevels_nod2D(row),row)/dt
     end do
     deallocate(n_pos,n_num)
     
@@ -2550,9 +2554,11 @@ subroutine oce_timestep_ale(n, mesh)
 
     t0=MPI_Wtime()
     
-!!PS     water_flux = 0.0_WP
-!!PS     heat_flux  = 0.0_WP
-!!PS     stress_surf= 0.0_WP
+    water_flux = 0.0_WP
+    heat_flux  = 0.0_WP
+    stress_surf= 0.0_WP
+    stress_node_surf= 0.0_WP
+    
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'

@@ -613,13 +613,13 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
-        if (use_sw_pene .and. tr_num==1) then
-            !!PS do nz=1, nzmax-1
-            do nz=nzmin, nzmax-1
-                zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
-            end do
-        end if
+!!PS         if (use_sw_pene .and. tr_num==1) then
+!!PS             !!PS do nz=1, nzmax-1
+!!PS             do nz=nzmin, nzmax-1
+!!PS                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
+!!PS                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
+!!PS             end do
+!!PS         end if
         
         !_______________________________________________________________________
         !  The first row contains also the boundary condition from heatflux, 
@@ -634,7 +634,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !                            v   (+)                        v   (+) 
         !                            
         !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),mesh) 
+!!PS         tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),mesh) 
         
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix 
@@ -719,15 +719,15 @@ subroutine diff_ver_part_redi_expl(mesh)
             Tx=0.0_WP
             Ty=0.0_WP
             do k=1, nod_in_elem2D_num(n)
-            elem=nod_in_elem2D(k,n)
-            !!PS if(nz.LE.(nlevels(elem)-1)) then
-            if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
-                Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
-                Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
-            endif
-        end do
-        tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
-        tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
+                elem=nod_in_elem2D(k,n)
+                !!PS if(nz.LE.(nlevels(elem)-1)) then
+                if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
+                    Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
+                    Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
+                endif
+            end do
+            tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
+            tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
         end do
     end do
     

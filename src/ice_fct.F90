@@ -663,6 +663,10 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
         do n=1,3
             row=elnodes(n)
             if(row>myDim_nod2D) cycle
+            !___________________________________________________________________
+            ! if node is cavity cycle over
+            if(ulevels_nod2d(row)>1) cycle
+            
             ! Global-to-local neighbourhood correspondence  
             DO q=1,nn_num(row)
                 col_pos(nn_pos(q,row))=q
@@ -670,6 +674,10 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
             offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
             DO q=1,3 
                 col=elnodes(q)
+                !___________________________________________________________________
+                ! if node is cavity cycle over
+                if(ulevels_nod2d(col)>1) cycle
+                
                 ipos=offset+col_pos(col)
                 mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
                 if(q==n) then                     
@@ -689,7 +697,8 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
         offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))  
-        if(abs(area(1,q)-aa)>.1_WP) then
+        !!PS if(abs(area(1,q)-aa)>.1_WP) then
+        if(abs(area(ulevels_nod2d(q),q)-aa)>.1_WP) then
             iflag=q
             flag=1
         endif
@@ -698,7 +707,7 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
         offset=ssh_stiff%rowptr(iflag)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(iflag+1)-ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))
-        write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag)
+        write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
     endif
     deallocate(col_pos)
 END SUBROUTINE ice_mass_matrix_fill

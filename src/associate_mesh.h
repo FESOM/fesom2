@@ -3,6 +3,7 @@ integer         , pointer :: elem2D
 integer         , pointer :: edge2D   
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
+real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
@@ -35,7 +36,8 @@ nod2D              => mesh%nod2D
 elem2D             => mesh%elem2D             
 edge2D             => mesh%edge2D             
 edge2D_in          => mesh%edge2D_in          
-ocean_area         => mesh%ocean_area         
+ocean_area         => mesh%ocean_area
+ocean_areawithcav  => mesh%ocean_areawithcav         
 nl                 => mesh%nl  
 
 !!$coord_nod2D        => mesh%coord_nod2D        

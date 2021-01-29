@@ -247,6 +247,7 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+allocate(stress_node_surf(2,node_size))
 allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
@@ -371,8 +372,11 @@ end if
     Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
-    stress_atmoce_x=0.
-    stress_atmoce_y=0.
+    
+    stress_surf      =0.0_WP
+    stress_node_surf =0.0_WP
+    stress_atmoce_x  =0.0_WP
+    stress_atmoce_y  =0.0_WP
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP

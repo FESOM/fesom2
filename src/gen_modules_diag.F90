@@ -134,7 +134,8 @@ subroutine diag_curl_stress_surf(mode, mesh)
      end if
   END DO
   DO n=1, myDim_nod2D+eDim_nod2D
-     curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
+     !!PS curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
+     curl_stress_surf(n)=curl_stress_surf(n)/area(ulevels_nod2D(n),n)
   END DO
 end subroutine diag_curl_stress_surf
 ! ==============================================================
