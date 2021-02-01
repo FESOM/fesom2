@@ -76,3 +76,13 @@ set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILE
 get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
 get_filename_component(FESOM_INSTALL_NAME ${FESOM_INSTALL_FILEPATH} NAME)
 install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTALL_PATH} RENAME ${FESOM_INSTALL_NAME})
+
+add_library(settings INTERFACE)
+
+option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU in a round robin distribution" ON)
+#target_compile_features(settings INTERFACE cxx_std_17)
+target_compile_definitions(settings
+  INTERFACE
+  $<$<BOOL:${OPTIM_ACC_SET_DEVICE}>:OPTIM_ACC_SET_DEVICE>
+)
+target_link_libraries(${PROJECT_NAME} settings)
