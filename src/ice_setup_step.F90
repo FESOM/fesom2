@@ -255,7 +255,7 @@ subroutine ice_initial_state(mesh)
     !
     type(t_mesh), intent(in)           , target :: mesh
     integer                            :: i
-    character*100                      :: filename
+    character(MAX_PATH)                      :: filename
     real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
 #include  "associate_mesh.h"

@@ -71,7 +71,7 @@ interface
    end subroutine communication_ini
 end interface
 
-  character(len=1000)         :: nmlfile  !> name of configuration namelist file
+  character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
   type(t_mesh), target, save  :: mesh
 
@@ -211,7 +211,7 @@ subroutine read_mesh_cavity(mesh)
 
     type(t_mesh), intent(inout), target :: mesh
     integer                             :: node
-    character(len=1000)                 :: fname
+    character(len=MAX_PATH)                 :: fname
     logical                             :: file_exist=.False.
 #include "associate_mesh_ini.h"
     
@@ -640,7 +640,7 @@ INTEGER :: nodes(3), elems(3), eledges(3)
 integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=111
 real(kind=WP) :: x,dmean
 integer :: thers_lev=5
-character*200 :: file_name
+character(MAX_PATH) :: file_name
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
@@ -830,7 +830,7 @@ subroutine find_levels_cavity(mesh)
     integer        :: elem, node, nz, j
     integer        :: exit_flag, count_iter, count_neighb_open, nneighb, cavity_maxlev
     real(kind=WP)  :: dmean
-    character*200  :: file_name
+    character(MAX_PATH) :: file_name
     type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
@@ -1249,7 +1249,7 @@ subroutine communication_ini(mesh)
 
   integer        :: n
   character*10   :: npes_string
-  character*200  :: dist_mesh_dir
+  character(MAX_PATH)  :: dist_mesh_dir
   LOGICAL        :: L_EXISTS
   type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
