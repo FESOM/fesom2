@@ -372,7 +372,7 @@ subroutine EVPdynamics_m(mesh)
 
      if (a_ice(i) >= 0.01_WP) then
         inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-        inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
+        inv_thickness(i) = 1.0_WP/inv_thickness(i) !max(inv_thickness(i), 9.0_WP)  ! Limit the mass
 
         mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
         mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
@@ -395,11 +395,11 @@ subroutine EVPdynamics_m(mesh)
      if(msum > 0.01) then
         ice_el(el) = .true.
         asum=sum(a_ice(elnodes))*val3          
-#if defined (__icepack)
-        pressure = det2*sum(strength(elnodes))*val3
-#else
-        pressure = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
-#endif
+!#if defined (__icepack)
+!        pressure_fac(el) = det2*sum(strength(elnodes))*val3
+!#else
+        pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+!#endif
      endif
   end do
 

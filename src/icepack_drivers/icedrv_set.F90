@@ -103,7 +103,9 @@
           integer (kind=int_kind)  :: krdg_partic     
           integer (kind=int_kind)  :: krdg_redist     
           real (kind=dbl_kind)     :: mu_rdg          
-          real (kind=dbl_kind)     :: Cf              
+          real (kind=dbl_kind)     :: Cf             
+          real (kind=dbl_kind)     :: P_star
+          real (kind=dbl_kind)     :: C_star
           
           ! shortwave namelist
       
@@ -145,8 +147,6 @@
           real (kind=dbl_kind)     :: ustar_min      
           real (kind=dbl_kind)     :: emissivity      
           real (kind=dbl_kind)     :: dragio      
-          real (kind=dbl_kind)     :: P_star      
-          real (kind=dbl_kind)     :: C_star      
           character (len=char_len) :: fbot_xfer_type  
           logical (kind=log_kind)  :: update_ocn_f    
           logical (kind=log_kind)  :: l_mpond_fresh   
@@ -393,6 +393,10 @@
 
              if (mype == 0) print*,'Reading forcing_nml'
              read(nu_nml, nml=forcing_nml,iostat=nml_error)
+             if (nml_error /= 0) exit
+
+             if (mype == 0) print*,'Reading dynamics_nml'
+             read(nu_nml, nml=dynamics_nml,iostat=nml_error)
              if (nml_error /= 0) exit
           end do
 

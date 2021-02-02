@@ -1102,7 +1102,7 @@
           enddo
 
           do i = 1, nx
-             if (tr_arr(1,i,1) <= -1.7_dbl_kind) then             !
+             if (tr_arr(1,i,1) < 0.0_dbl_kind) then             !
                 do n = 1, ncat
                    ! ice volume, snow volume
                    aicen(i,n) = ainit(n)

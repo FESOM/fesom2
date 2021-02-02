@@ -16,6 +16,7 @@ submodule (icedrv_main) icedrv_step
       use icepack_intfc,    only: icepack_query_tracer_indices
       use icepack_intfc,    only: icepack_query_tracer_sizes
       use icepack_intfc,    only: icepack_query_parameters
+      
 
       implicit none
 
@@ -297,7 +298,6 @@ submodule (icedrv_main) icedrv_step
 
           ! column package_includes
           use icepack_intfc, only: icepack_step_therm2
-          use icepack_intfc, only: icepack_ice_strength
 
           implicit none
     
@@ -377,11 +377,6 @@ submodule (icedrv_main) icedrv_step
                           floe_rad_c=floe_rad_c(:),                    &
                           floe_binwidth=floe_binwidth(:))
 
-              ! Compute sea-ice internal stress (immediately before EVP)
-              call icepack_ice_strength(ncat,                     &
-                                        aice(i),     vice(i),     &
-                                        aice0(i),    aicen(i,:),  &
-                                        vicen(i,:),  strength(i))
           enddo                     ! i
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -1124,6 +1119,7 @@ submodule (icedrv_main) icedrv_step
 
       module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
 
+          use icepack_intfc,          only: icepack_ice_strength
           use g_config,               only: dt
           use i_PARAM,                only: whichEVP
           use g_parsup
@@ -1132,7 +1128,7 @@ submodule (icedrv_main) icedrv_step
           implicit none
     
           integer (kind=int_kind) :: &
-             k               ! dynamics supercycling index
+             k, i               ! for loop indexes
     
           logical (kind=log_kind) :: &
              calc_Tsfc, skl_bgc, solve_zsal, z_tracers, tr_brine, &  ! from icepack
@@ -1206,6 +1202,13 @@ submodule (icedrv_main) icedrv_step
           call step_therm1     (dt) ! vertical thermodynamics
           call step_therm2     (dt) ! ice thickness distribution thermo
     
+          !-----------------------------------------------------------------
+          ! tendencies needed by fesom
+          !-----------------------------------------------------------------
+
+          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
+          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
+         
           ! clean up, update tendency diagnostics
     
           offset = dt
@@ -1217,6 +1220,13 @@ submodule (icedrv_main) icedrv_step
     
           call init_history_dyn
     
+          ! Compute sea-ice internal stress (immediately before EVP)
+          do i = 1, nx
+              call icepack_ice_strength(ncat,                     &
+                                        aice(i),     vice(i),     &
+                                        aice0(i),    aicen(i,:),  &
+                                        vicen(i,:),  strength(i))
+          end do   
           ! wave fracture of the floe size distribution
           ! note this is called outside of the dynamics subcycling loop
           if (tr_fsd .and. wave_spec) call step_dyn_wave(dt)
@@ -1286,13 +1296,6 @@ submodule (icedrv_main) icedrv_step
     
           call coupling_prep (dt)
 
-          !-----------------------------------------------------------------
-          ! tendencies needed by fesom
-          !-----------------------------------------------------------------
-
-          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
-         
           !-----------------------------------------------------------------
           ! icepack timing
           !-----------------------------------------------------------------  

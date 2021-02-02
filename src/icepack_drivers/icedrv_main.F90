@@ -856,6 +856,10 @@
               ! Driving subroutine for column physics
               module subroutine step_icepack(mesh, time_evp, time_advec, time_therm)
                   use mod_mesh
+                  use g_config,              only: dt
+                  use i_PARAM,               only: whichEVP
+                  use g_parsup
+                  use icepack_intfc,         only: icepack_ice_strength
                   implicit none
                   real (kind=dbl_kind), intent(out) :: &
                      time_therm,                       &
