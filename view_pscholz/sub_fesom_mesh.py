@@ -34,6 +34,7 @@ class fesom_mesh:
     #____mesh euler angles_______________________
     alpha, beta, gamma        = 0, 0, 0
     focus                     = 0
+    focus_old                 = 0
     rotate_grid               = True
     
     #____mesh vertical info______________________
@@ -95,6 +96,7 @@ class fesom_mesh:
         self.beta        = inputarray['mesh_beta' ]
         self.gamma       = inputarray['mesh_gamma']
         self.focus       = inputarray['mesh_focus']
+        self.focus_old   = self.focus    
         self.rotate_grid = inputarray['mesh_rotate'	 ]
         
         print('')
@@ -323,8 +325,10 @@ class fesom_mesh:
                 self.nodes_2d_cg = self.nodes_2d_c
                 self.nodes_2d_icg = self.nodes_2d_ic
                 
-            if (str_mode == 'focus'):
+            if (str_mode == 'focus') and self.focus!=self.focus_old:
                 self.fesom_remove_pbnd()
+                self.focus_old = self.focus
+                
         elif (str_mode == 'g2r'):
             self.nodes_2d_yr=np.degrees(np.arcsin(zg));
             self.nodes_2d_xr=np.degrees(np.arctan2(yg,xg));
@@ -486,7 +490,7 @@ class fesom_mesh:
         nodes_2d_y     = np.concatenate((self.nodes_2d_yg[:self.n2dn] , \
                                       self.nodes_2d_yg[self.pbndn_2d_i]))
         elem_2d_x      = nodes_2d_x[self.elem_2d_i]
-        elem_2d_y      =  nodes_2d_y[self.elem_2d_i]
+        elem_2d_y      = nodes_2d_y[self.elem_2d_i]
         elem_2d_xy     = np.array([elem_2d_x,elem_2d_y])
         del nodes_2d_x
         del nodes_2d_y
@@ -499,7 +503,7 @@ class fesom_mesh:
         # | dx_31 dy_31 |_i , i=1....n2dea
         jacobian     = elem_2d_xy[:,:,1]-elem_2d_xy[:,:,0]
         jacobian     = np.array([jacobian,elem_2d_xy[:,:,2]-elem_2d_xy[:,:,1],\
-                                elem_2d_xy[:,:,0]-elem_2d_xy[:,:,2] ])
+                                          elem_2d_xy[:,:,0]-elem_2d_xy[:,:,2] ])
         
         # account for triangles with periodic bounaries
         for ii in range(3):
@@ -510,8 +514,8 @@ class fesom_mesh:
             del idx
         
         # calc from geocoord to cartesian coord
-        R_earth        = 12735/2;
-        jacobian     = jacobian*R_earth*2*np.pi/360
+        R_earth       = 12735/2;
+        jacobian      = jacobian*R_earth*2*np.pi/360
         cos_theta     = np.cos(np.radians(elem_2d_y)).mean(axis=1)
         del elem_2d_y
         for ii in range(3):    
@@ -529,6 +533,18 @@ class fesom_mesh:
         self.elem_2d_resol = jacobian.mean(axis=1)
         #self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
     
+    
+    #+___CALCULATE MESH RESOLUTION_____________________________________________+
+    #| calculate mean length of the three triangle sides                       |
+    #|                                                                         |
+    #+_________________________________________________________________________+
+    def fesom_calc_noderesol(self):
+        
+        #_______________________________________________________________________
+        print(' --> calc. node resolution in km')
+        if len(self.elem_2d_resol)==0: self.fesom_calc_triresol()
+        self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
+        
     
     #___CALCULATE TRIANGLE AREA("volume")_______________________________________
     # calculate TRIANGLE AREA IN M^2
@@ -643,9 +659,9 @@ class fesom_mesh:
             data_n     =np.zeros((self.n2dna,))
             data_n_area=np.zeros((self.n2dna,))
             for ii in range(self.n2de):     
-                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii]
-                data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e_area[ii] 
-            data_n[0:self.n2dn]=data_n[0:self.n2dn]/data_n_area[0:self.n2dn]/3. 
+                data_n[     self.elem0_2d_i[ii,:]] = data_n[     self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e[ii]
+                data_n_area[self.elem0_2d_i[ii,:]] = data_n_area[self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e_area[ii] 
+            data_n[        0:self.n2dn ] = data_n[0:self.n2dn]/data_n_area[0:self.n2dn]
             data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
         
         #_______________________________________________________________________
@@ -655,22 +671,22 @@ class fesom_mesh:
             nd2 = data_e.shape[1]
             
             if data_e.shape[0]==self.n2de:
-                data_e=data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
+                data_e      = data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
                 data_e_area = np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()*np.invert(data_e==0)
                 
             elif data_e.shape[0]==self.n2dea:
-                area_di = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
-                data_e=data_e*np.matlib.repmat(area_di,nd2,1).transpose()
-                data_e_area = area_di.transpose()*np.invert(data_e==0)
+                area_di     = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
+                data_e      = data_e*np.matlib.repmat(area_di,nd2,1).transpose()
+                data_e_area = np.matlib.repmat(area_di,nd2,1).transpose()*np.invert(data_e==0)
                 del area_di
             
-            data_n=np.zeros((self.n2dna,nd2))
-            data_n_area=np.zeros((self.n2dna,nd2))
+            data_n      = np.zeros((self.n2dna,nd2))
+            data_n_area = np.zeros((self.n2dna,nd2))
             for ii in range(self.n2de):     
-                data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e[ii,:],3,1)
-                data_n_area[self.elem0_2d_i[ii,:]]=data_n_area[self.elem0_2d_i[ii,:],:]+ np.matlib.repmat(data_e_area[ii,:],3,1)  
+                data_n[     self.elem0_2d_i[ii,:], :] = data_n[     self.elem0_2d_i[ii,:], :] + np.matlib.repmat(     data_e[ii,:], 3, 1)
+                data_n_area[self.elem0_2d_i[ii,:], :] = data_n_area[self.elem0_2d_i[ii,:], :] + np.matlib.repmat(data_e_area[ii,:], 3, 1)  
             #print(np.matlib.repmat(self.nodes_2d_area[0:self.n2dn]/3.,nd2,1).transpose())    
-            data_n[0:self.n2dn,:]=data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]/3.
+            data_n[        0:self.n2dn ,:] = data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]
             data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
             
         t2 = time.time()

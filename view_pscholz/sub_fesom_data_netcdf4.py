@@ -101,6 +101,11 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
         return data
     
+    elif data.var=='cavity_depth':
+        data.value 	= -mesh.nodes_2d_cg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
+        return data
+    
     #___________________________________________________________________________
     # number of years to average 
     nyi         = data.year[1]-data.year[0]+1
@@ -120,7 +125,10 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
      
     #___________________________________________________________________________
     # compute dimension contained in file
-    nti,nsi,ndi = do_filedims(fname_data, nyi, do_output)
+    if which_files=='blowup_oce':
+        nti,nsi,ndi = do_filedims_blowup(fname_data,nyi,var_list,do_output)
+    else:
+        nti,nsi,ndi = do_filedims(fname_data, nyi, do_output)
     
     # fix ndi issue for blowup file he can determine automatical if its a 2d or 3d 
     # variable 
@@ -198,7 +206,7 @@ def do_multiyear_fname_list(data, which_files, do_output):
         #_______________________________________________________________________
         # build filename list for data variables
         if any(x in data.var for x in ['norm','vec','ptemp','pdens','sigma']) or \
-                    data.var in ['u','v','uice','vice'] :
+                    data.var in ['u','v','uice','vice','unod','vnod'] :
             if   any(x in data.var for x in ['tuv']):
                 var_list = ['u', 'v', 'temp']
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -247,6 +255,22 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['pgfb_x', 'pgfb_y',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['atmoce_x','atmoce_y','atmoce_xy']):
+                var_list = ['atmoce_x', 'atmoce_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['atmice_x','atmice_y','atmice_xy']):
+                var_list = ['atmice_x', 'atmice_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['iceoce_x','iceoce_y','iceoce_xy']):
+                var_list = ['iceoce_x', 'iceoce_y',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['uvnod','unod','vnod']):
+                var_list = ['unod', 'vnod',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
             elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -279,6 +303,7 @@ def do_fname_mask(which_files,varname,runid,year):
         
     return(fname)    
 
+
 #___COMPUTE DIMENSIONS CONTAINED IN FILES_______________________________________
 #
 #_______________________________________________________________________________
@@ -296,6 +321,24 @@ def do_filedims(fname_data,nyi,do_output):
     if do_output==True: print(' --> nti/nsi/ndi   : [{:d}, {:d}, {:d}]'.format(nti,nsi,ndi))  
     
     return(nti,nsi,ndi)
+
+
+#___COMPUTE DIMENSIONS CONTAINED IN FILES_______________________________________
+#
+#_______________________________________________________________________________
+def do_filedims_blowup(fname_data,nyi,var_list,do_output):
+    dimname     = list(fname_data.dimensions.keys())
+    nti,nsi,ndi = 0,0,0
+    
+    aux = fname_data.variables[var_list[0]].shape
+    if len(aux)==2:
+        nti,nsi = aux[0],aux[1]
+    elif len(aux)==3:
+        nti,nsi,ndi = aux[0],aux[1],aux[2]
+    if do_output==True: print(' --> nti/nsi/ndi   : [{:d}, {:d}, {:d}]'.format(nti,nsi,ndi))  
+    
+    return(nti,nsi,ndi)
+
     
 #___LOAD MULTI-FILE DATA VIA MFDATASET__________________________________________
 #
@@ -311,9 +354,9 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
             if len(fname_list[1]): data.value2 = MFDataset(fname_list[1],'r').variables[var_list[1]][sel_timeidx,:,sel_levidx].mean(axis=0)
             if len(fname_list[2]): data.value3 = MFDataset(fname_list[2],'r').variables[var_list[2]][sel_timeidx,:,sel_levidx].mean(axis=0)
         else:
-            data.value = MFDataset(fname_list[0],'r').variables[var_list[0]][sel_timeidx,:,sel_levidx]
-            if len(fname_list[1]): data.value2 = MFDataset(fname_list[1],'r').variables[var_list[1]][sel_timeidx,:,sel_levidx]
-            if len(fname_list[2]): data.value3 = MFDataset(fname_list[2],'r').variables[var_list[2]][sel_timeidx,:,sel_levidx]
+            data.value = MFDataset(fname_list[0],'r').variables[var_list[0]][sel_timeidx,:,sel_levidx].squeeze()
+            if len(fname_list[1]): data.value2 = MFDataset(fname_list[1],'r').variables[var_list[1]][sel_timeidx,:,sel_levidx].squeeze()
+            if len(fname_list[2]): data.value3 = MFDataset(fname_list[2],'r').variables[var_list[2]][sel_timeidx,:,sel_levidx].squeeze()
         
         #_______________________________________________________________________
         # compute potential density & temperatur if selected
@@ -334,7 +377,7 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
                 if 'ptemp' in data.var: data.value = sw.ptmp(data.value2,data.value,press,press_ref)
                 if any(x in data.var for x in ['pdens','sigma']): data.value = sw.pden(data.value2,data.value,press,press_ref)-1000.025 
             else:
-                for it in range(0,data.value.shape[0]):
+                for it in range(0,nsi):
                     if 'ptemp' in data.var: data.value[it,:,:] = sw.ptmp(data.value2[it,:,:],data.value[it,:,:],press,press_ref)
                     if any(x in data.var for x in ['pdens','sigma']): data.value[it,:,:] = sw.pden(data.value2[it,:,:],data.value[it,:,:],press,press_ref)-1000.025 
             fname_list[1]=[]
@@ -342,13 +385,13 @@ def do_load_mfdata(mesh, data, fname_list, var_list, sel_timeidx, sel_levidx, \
         #_______________________________________________________________________    
         # compute depth mean + linear interpolation to selected depth levels
         if do_tmean:
-            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[0], sel_levidx,do_output)
-            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[0], sel_levidx,do_output)
-            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[0], sel_levidx,do_output)
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
         else:
-            data.value = do_zinterp(mesh, data.value, data.depth, ndi, data.value.shape[1], sel_levidx,do_output)
-            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, data.value2.shape[1], sel_levidx,do_output)
-            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, data.value3.shape[1], sel_levidx,do_output)
+            data.value = do_zinterp(mesh, data.value, data.depth, ndi, nsi, sel_levidx,do_output)
+            if len(fname_list[1]): data.value2 = do_zinterp(mesh, data.value2, data.depth, ndi, nsi, sel_levidx,do_output)
+            if len(fname_list[2]): data.value3 = do_zinterp(mesh, data.value3, data.depth, ndi, nsi, sel_levidx,do_output)
         
     # 2D data:
     else: 
@@ -638,7 +681,7 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
     ## do vector rotation from ROT --> GEO in case of vector data   
     if do_vecrot==True:
         if any(x in data.var for x in ['norm','vec']) or \
-        data.var in ['u','v','uice','vice']:
+        data.var in ['u','v','uice','vice','unod','vnod']:
             data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
         
     # compute norm of vector data
@@ -646,8 +689,8 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
         data.value, data.value2 = np.sqrt(data.value**2+data.value2**2),[]
     
     # only single velocity component is choosen
-    if data.var in ['u','uice'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
-    if data.var in ['v','vice']: data.value, data.value2  = data.value2, []
+    if data.var in ['u','uice','unod'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
+    if data.var in ['v','vice','vnod']: data.value, data.value2  = data.value2, []
     
     # interpolate elemental values to nodes
     if 'vec' not in data.var and do_interp_e2n==True:
@@ -832,16 +875,17 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
         # file contains monthly data
         elif nti==12:                   
             sel_timeidx = [x-1 for x in data.month]
-            if data.month.size==12:
+            #if data.month.size==12:
+            if len(data.month)==12:
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([(x-1)/12 + year for x in box.month])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([(x-1)/12 + year for x in data.month])
                 data.time=np.array(aux_time)
             else:
-                aux_mon = np.arange(0,len(box.month),1)
+                aux_mon = np.arange(0,len(data.month),1)
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([x/len(box.month) + year for x in aux_mon])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([x/len(data.month) + year for x in aux_mon])
                 data.time=np.array(aux_time)
             
         # file contains 5 daily data    

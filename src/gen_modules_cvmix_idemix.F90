@@ -272,7 +272,7 @@ module g_cvmix_idemix
         implicit none
         type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, edge, node_size
-        integer       :: nz, nln, nl1, nl2, nl12
+        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
@@ -402,7 +402,8 @@ module g_cvmix_idemix
                 iwe_v0(1,node) = min(iwe_v0(1,node),aux)
                 
                 ! bulk cells
-                do nz=2,nln
+                !!PS do nz=2,nln
+                do nz=ulevels_nod2D(node)+1,nln
                     ! inverse volumne 
                     vol_wcelli(nz,node) = 1/(area(nz-1,node)*dz_trr(nz))
                     
@@ -451,11 +452,14 @@ module g_cvmix_idemix
                 elnodes1 = elem2d_nodes(:,el(1))
                 ! nl1 ... number of layers at element el(1)
                 nl1      = nlevels(el(1))
+                ! nu1 ... upper index of ocean default = 1 but can consider cavity !=1
+                nu1      = ulevels(el(1))
                 
                 ! thickness of mid-level to mid-level interface of element el(1)
                 dz_trr         = 0.0_WP
                 dz_trr(1)      = helem(1,el(1))/2.0_WP
-                do nz=2,nl1-1
+                !!PS do nz=2,nl1-1
+                do nz=nu1+1,nl1-1
                     dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
                 end do
                 dz_trr(nl1)    = helem(nl1-1,el(1))/2.0_WP
@@ -464,26 +468,96 @@ module g_cvmix_idemix
                 ! the same as above but for el(2)--> if el(2)==0 than this edge 
                 ! is a boundary edge and el(2) does not exist
                 nl2=0
+                nu2=0
                 if (el(2)>0) then 
                     deltaX2  = edge_cross_dxdy(3,edge)
                     deltaY2  = edge_cross_dxdy(4,edge)
                     elnodes2 = elem2d_nodes(:,el(2))
                     nl2      = nlevels(el(2))
+                    nu2      = ulevels(el(2))
                     
                     ! thickness of mid-level to mid-level interface of element el(2)
                     dz_trr2         = 0.0_WP
                     dz_trr2(1)      = helem(1,el(2))/2.0_WP
-                    do nz=2,nl2-1
+                    !!PS do nz=2,nl2-1
+                    do nz=nu2+1,nl2-1
                         dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP
                     end do
                     dz_trr2(nl2)    = helem(nl2-1,el(2))/2.0_WP
                 endif
                 
                 !_______________________________________________________________
-                ! goes only into this loop when the edge has two facing elements
-                ! --> so the edge is not a boundary edge
                 nl12=min(nl1,nl2)
-                do nz=1,nl12
+                nu12=max(nu1,nu2)
+                
+                !_______________________________________________________________
+                ! (A) goes only into this loop when the edge has only facing element
+                ! el(1) --> so the edge is a boundary edge --> this is for ocean 
+                ! surface in case of cavity
+                do nz=nu1,nu12-1
+                    !___________________________________________________________
+                    ! --> calc: grad_h(v_0*E_iw)
+                    ! calculate flux from el(1) with respect to edge mid 
+                    ! point
+                    grad_v0Eiw(1) = sum(gradient_sca(1:3,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
+                    grad_v0Eiw(2) = sum(gradient_sca(4:6,el(1))*iwe_v0(nz,elnodes1)*iwe(nz,elnodes1))
+                    dz_el         = dz_trr(nz)
+                    
+                    ! calculate flux 
+                    vflux = (grad_v0Eiw(1)*deltaY1-grad_v0Eiw(2)*deltaX1)*dz_el
+                    
+                    !___________________________________________________________
+                    ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                    ! multiply vflux with iwe_v0 interpolate to the edge-
+                    ! mid point 
+                    vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
+                    
+                    !___________________________________________________________
+                    ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                    ! sum fluxes over the surface --> gaussian integral satz
+                    iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                    iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                end do !-->do nz=nu1,nu12-1
+                
+                !_______________________________________________________________
+                ! (B) goes only into this loop when the edge has only facing elemenmt
+                ! el(2) --> so the edge is a boundary edge --> this is for ocean 
+                ! surface in case of cavity
+                if (nu2 > 0) then 
+                    do nz=nu2,nu12-1
+                        !___________________________________________________________
+                        ! --> calc: grad_h(v_0*E_iw)
+                        ! first calculate flux from el(1) with respect to edge mid 
+                        ! point
+                        grad_v0Eiw(1) = sum(gradient_sca(1:3,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
+                        grad_v0Eiw(2) = sum(gradient_sca(4:6,el(2))*iwe_v0(nz,elnodes2)*iwe(nz,elnodes2))
+                        dz_el         = dz_trr2(nz)
+                        
+                        ! calculate flux 
+                        vflux = -(grad_v0Eiw(1)*deltaY2-grad_v0Eiw(2)*deltaX2)*dz_el
+                        !       |--> minus sign comes from the fact that the the 
+                        !            normal vectors (dx1,dy1) and (dx2,dy2) face 
+                        !            in opposite direction (Right-Hand-Rule)
+                        
+                        !___________________________________________________________
+                        ! --> calc: v_0*idemix_tau_h* grad_h(v_0*E_iw)
+                        ! multiply vflux with iwe_v0 interpolate to the edge-
+                        ! mid point 
+                        vflux = vflux * (iwe_v0(nz,ednodes(1))+iwe_v0(nz,ednodes(2)))*0.5_WP
+                        
+                        !___________________________________________________________
+                        ! --> calc: div(v_0*idemix_tau_h* grad_h(v_0*E_iw))
+                        ! sum fluxes over the surface --> gaussian integral satz
+                        iwe(nz,ednodes(1)) = iwe(nz,ednodes(1)) + dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(1))*vflux
+                        iwe(nz,ednodes(2)) = iwe(nz,ednodes(2)) - dt*idemix_tau_h/idemix_n_hor_iwe_prop_iter*vol_wcelli(nz,ednodes(2))*vflux
+                        
+                    end do !-->do nz=nu2,nu12-1
+                end if 
+                !_______________________________________________________________
+                ! (C) goes only into this loop when the edge has two facing elements
+                ! --> so the edge is not a boundary edge
+                !!PS do nz=1,nl12
+                do nz=nu12,nl12
                     !___________________________________________________________
                     ! --> calc: grad_h(v_0*E_iw)
                     ! calculate grad(iwe*iwe_v0) for el(1)
@@ -515,7 +589,7 @@ module g_cvmix_idemix
                 end do !-->do nz=1,n2
                 
                 !_______________________________________________________________
-                ! goes only into this loop when the edge has only facing element
+                ! (D) goes only into this loop when the edge has only facing element
                 ! el(1) --> so the edge is a boundary edge
                 do nz=nl12+1,nl1
                     !___________________________________________________________
@@ -543,7 +617,7 @@ module g_cvmix_idemix
                 end do !-->do nz=nl12+1,nl1
                 
                 !_______________________________________________________________
-                ! goes only into this loop when the edge has only facing elemenmt
+                ! (E) goes only into this loop when the edge has only facing elemenmt
                 ! el(2) --> so the edge is a boundary edge
                 do nz=nl12+1,nl2
                     !___________________________________________________________
@@ -598,7 +672,8 @@ module g_cvmix_idemix
             call exchange_nod(iwe_Av) !Warning: don't forget to communicate before averaging on elements!!!
             do elem=1, myDim_elem2D
                 elnodes1=elem2D_nodes(:,elem)
-                do nz=1,nlevels(elem)-1
+                !!PS do nz=1,nlevels(elem)-1
+                do nz=ulevels(elem),nlevels(elem)-1
                     Av(nz,elem) = sum(iwe_Av(nz,elnodes1))/3.0_WP    ! (elementwise)                
                 end do
             end do

@@ -9,7 +9,7 @@ integer, parameter            :: WP=8        ! Working precision
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
-real(kind=WP), parameter      :: density_0=1028.0_WP
+real(kind=WP)                 :: density_0=1030.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
@@ -135,6 +135,12 @@ real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
 !_______________________________________________________________________________
+! use non-constant reference density if .false. density_ref=density_0
+logical                       :: use_density_ref   = .false.
+real(kind=WP)                 :: density_ref_T     = 2.0_WP
+real(kind=WP)                 :: density_ref_S     = 34.0_WP
+
+!_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
@@ -153,15 +159,16 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
 ! > 'cubicspline'  ... like in FESOM1.4
+! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ state_equation, C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+ NAMELIST /oce_dyn/ state_equation, C_d, A_ver, density_0, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta,  backscatter, & 
-                    K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, &
+                    backscatter, K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
@@ -189,7 +196,7 @@ real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num, nboundary_lay
+integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
 real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
 integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
@@ -293,6 +300,10 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 
+! new depth of cavity-ocean interface at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
 ! --> multiplication factor for surface boundary condition in 
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
@@ -302,6 +313,7 @@ real(kind=WP)                               :: is_nonlinfs
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
+real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 

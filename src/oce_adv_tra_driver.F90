@@ -65,7 +65,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     real(kind=WP), pointer, dimension (:,:) :: pwvel
  
     integer       :: el(2), enodes(2), nz, n, e
-    integer       :: n2, nl1, nl2, tr_num
+    integer       :: nl12, nu12, nl1, nl2, nu1, nu2, tr_num
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
     real(kind=WP) :: tvert(mesh%nl), tvert_e(mesh%nl), a, b, c, d, da, db, dg, vflux, Tupw1
@@ -88,9 +88,20 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             enodes=edges(:,e)
             el=edge_tri(:,e)        
             nl1=nlevels(el(1))-1
+            nu1=ulevels(el(1))
             nl2=0
-            if(el(2)>0) nl2=nlevels(el(2))-1
-            do  nz=1, max(nl1, nl2)
+            nu2=0
+            if(el(2)>0) then
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+            end if     
+            
+            nl12 = max(nl1,nl2)
+            nu12 = nu1
+            if (nu2>0) nu12 = min(nu1,nu2)
+            
+            !!PS do  nz=1, max(nl1, nl2)
+            do nz=nu12, nl12
                 fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
                 fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
@@ -102,7 +113,10 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         
         ! update the LO solution for vertical contribution
         do n=1, myDim_nod2D
-            do  nz=1, nlevels_nod2D(n)-1
+            nu1 = ulevels_nod2D(n)
+            nl1 = nlevels_nod2D(n)
+            !!PS do  nz=1, nlevels_nod2D(n)-1
+            do  nz= nu1, nl1-1
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/area(nz,n))/hnode_new(nz,n)
             end do
         end do
@@ -181,6 +195,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
 end subroutine do_oce_adv_tra
+!
+!
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
     use MOD_MESH
@@ -199,7 +215,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     logical,       optional           :: use_lo
     real(kind=WP), optional           :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), optional           :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
+    integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! c. Update the solution
@@ -207,7 +223,10 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     if (present(use_lo)) then
        if (use_lo) then
           do n=1, myDim_nod2d
-             do nz=1,nlevels_nod2D(n)-1  
+             nu1 = ulevels_nod2D(n)
+             nl1 = nlevels_nod2D(n)
+             !!PS do nz=1,nlevels_nod2D(n)-1
+             do nz=nu1, nl1-1  
                 dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
              end do
            end do
@@ -215,7 +234,9 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     end if
 
     do n=1, myDim_nod2d
-        do nz=1,nlevels_nod2D(n)-1  
+        nu1 = ulevels_nod2D(n)
+        nl1 = nlevels_nod2D(n)
+        do nz=nu1,nl1-1  
             dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
         end do
     end do
@@ -226,9 +247,21 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
         nl1=nlevels(el(1))-1
+        nu1=ulevels(el(1))
+        
         nl2=0
-        if(el(2)>0) nl2=nlevels(el(2))-1
-        do nz=1, max(nl1,nl2)
+        nu2=0
+        if(el(2)>0) then
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+        end if 
+        
+        nl12 = max(nl1,nl2)
+        nu12 = nu1
+        if (nu2>0) nu12 = min(nu1,nu2)
+            
+        !!PS do  nz=1, max(nl1, nl2)
+        do nz=nu12, nl12
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/area(nz,enodes(1))
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
         end do
