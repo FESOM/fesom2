@@ -163,6 +163,7 @@ real(kind=real32) :: runtime_alltimesteps
 #endif
         call clock
         call compute_vel_nodes 
+        call iceberg_calculation(n)
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
@@ -184,7 +185,7 @@ real(kind=real32) :: runtime_alltimesteps
         end if  
         if (use_icebergs) then
             t1_icb = MPI_Wtime()
-            call iceberg_calculation(n)
+            !call iceberg_calculation(n)
             call icb2fesom
             t2_icb = MPI_Wtime()
         end if
