@@ -463,7 +463,8 @@ if ( .not. trim(which_ALE)=='linfs') then
 			!___________________________________________________________________
 			! Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
-			ice_strength(el) = sum(strength(elnodes))/3.0_WP
+!			ice_strength(el) = sum(strength(elnodes))/3.0_WP
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
 #else
                         ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
 #endif
@@ -506,7 +507,8 @@ else
 			
 			! ===== Hunke and Dukowicz c*h*p*
 #if defined (__icepack)
-                        ice_strength(el) = sum(strength(elnodes))/3.0_WP
+!                        ice_strength(el) = sum(strength(elnodes))/3.0_WP
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
 #else
                         ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
 #endif
