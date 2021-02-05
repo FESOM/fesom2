@@ -180,7 +180,7 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)            =  exchange(:)        ! runoff (for AWI-CM3), or combined runoff + calving (for AWI-CM1&2)
+	     runoff(:)            =  exchange(:)        ! runoff (for AWI-CM3), or combined runoff + calving (for AWI-CM2)
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
