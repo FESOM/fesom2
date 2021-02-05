@@ -180,17 +180,19 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)            =  exchange(:)        ! runoff
+	     runoff(:)            =  exchange(:)        ! runoff (for AWI-CM3), or combined runoff + calving (for AWI-CM1&2)
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
+#if defined (__oifs)
          elseif (i.eq.13) then
              if (action) then
 	     enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
     	     mask=1.
 	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
              end if
-	 end if  	  
+	 end if  
+#endif	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
