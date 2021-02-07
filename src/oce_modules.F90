@@ -5,6 +5,7 @@
 !==========================================================
 MODULE o_PARAM
 integer, parameter            :: WP=8        ! Working precision
+integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP

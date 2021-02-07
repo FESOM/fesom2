@@ -68,7 +68,7 @@ module g_cvmix_pp
         use MOD_MESH
         implicit none
         type(t_mesh), intent(in), target :: mesh        
-        character(len=100)       :: nmlfile
+        character(len=MAX_PATH)       :: nmlfile
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
 #include "associate_mesh.h"

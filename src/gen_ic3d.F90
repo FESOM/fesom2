@@ -36,12 +36,12 @@ MODULE g_ic3d
    logical                                      :: t_insitu =.true.
    integer,        save                         :: n_ic3d
    integer,        save,  dimension(ic_max)     :: idlist
-   character(256), save,  dimension(ic_max)     :: filelist
+   character(MAX_PATH), save, dimension(ic_max) :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
    namelist / oce_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
 
-   character(256), save                         :: filename
+   character(MAX_PATH), save                    :: filename
    character(50),  save                         :: varname
    integer,        save                         :: current_tracer
    integer,        save                         :: warn       ! warning switch node/element coordinate out of forcing bounds
@@ -61,7 +61,7 @@ MODULE g_ic3d
    integer,save              :: nc_Nlat
    integer,save              :: nc_Ndepth   
 
-!============== NETCDF ==========================================   
+!============== NETCDF ==========================================
 CONTAINS
    SUBROUTINE nc_readGrid
    ! Read time array and grid from nc file
@@ -589,7 +589,7 @@ CONTAINS
       !!----------------------------------------------------------------------
    IMPLICIT NONE
       integer, intent(in)            :: iost
-      character(len=256), intent(in) :: fname
+      character(len=MAX_PATH), intent(in) :: fname
       write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
       call par_ex
       stop
@@ -605,8 +605,8 @@ CONTAINS
    END SUBROUTINE nc_end
 
    SUBROUTINE check_nferr(iost,fname)
-   IMPLICIT NONE 
-      character(len=256), intent(in) :: fname
+   IMPLICIT NONE
+      character(len=MAX_PATH), intent(in) :: fname
       integer, intent(in) :: iost
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
