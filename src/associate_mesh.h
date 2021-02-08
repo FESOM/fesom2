@@ -21,11 +21,15 @@ real(kind=WP), dimension(:,:), pointer :: gradient_vec
 real(kind=WP), dimension(:,:), pointer :: gradient_sca 
 integer,       dimension(:)  , pointer :: bc_index_nod2D
 real(kind=WP), dimension(:)  , pointer :: zbar, Z, elem_depth
-integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D
+integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D, nlevels_nod2D_min
 real(kind=WP), dimension(:,:), pointer :: area, area_inv
 real(kind=WP), dimension(:)  , pointer :: mesh_resolution
 real(kind=WP), dimension(:)  , pointer :: lump2d_north, lump2d_south
 type(sparse_matrix)          , pointer :: ssh_stiff
+!!$integer,       dimension(:)  , pointer :: cavity_lev_nod2D, cavity_lev_elem2D
+integer,       dimension(:)  , pointer :: cavity_flag_n, cavity_flag_e
+real(kind=WP), dimension(:)  , pointer :: cavity_depth
+integer,       dimension(:)  , pointer :: ulevels, ulevels_nod2D, ulevels_nod2D_max
 
 nod2D              => mesh%nod2D              
 elem2D             => mesh%elem2D             
@@ -34,9 +38,9 @@ edge2D_in          => mesh%edge2D_in
 ocean_area         => mesh%ocean_area         
 nl                 => mesh%nl  
 
-!!$coord_nod2D     => mesh%coord_nod2D        
-!!$geo_coord_nod2D => mesh%geo_coord_nod2D    
-!!$elem2D_nodes    => mesh%elem2D_nodes       
+!!$coord_nod2D        => mesh%coord_nod2D        
+!!$geo_coord_nod2D    => mesh%geo_coord_nod2D    
+!!$elem2D_nodes       => mesh%elem2D_nodes       
 !!$edges              => mesh%edges              
 !!$edge_tri           => mesh%edge_tri           
 !!$elem_edges         => mesh%elem_edges         
@@ -59,11 +63,18 @@ nl                 => mesh%nl
 !!$elem_depth         => mesh%elem_depth      
 !!$nlevels            => mesh%nlevels            
 !!$nlevels_nod2D      => mesh%nlevels_nod2D
+!!$nlevels_nod2D_min  => mesh%nlevels_nod2D_min
 !!$area               => mesh%area     
 !!$area_inv           => mesh%area_inv     
 !!$mesh_resolution    => mesh%mesh_resolution    
 !!$ssh_stiff          => mesh%ssh_stiff          
-
+!!$cavity_flag        => mesh%cavity_flag  
+!!$cavity_lev_nod2D   => mesh%cavity_lev_nod2D  
+!!$cavity_lev_elem2D  => mesh%cavity_lev_elem2D  
+!!$cavity_depth       => mesh%cavity_depth  
+!!$ulevels            => mesh%ulevels  
+!!$ulevels_nod2D      => mesh%ulevels_nod2D
+!!$ulevels_nod2D_max  => mesh%ulevels_nod2D_max
 
 coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D        
 geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D    
@@ -90,9 +101,18 @@ Z(1:mesh%nl-1)                                             => mesh%Z
 elem_depth         => mesh%elem_depth      ! never used, not even allocated
 nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels            
 nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
-area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                     => mesh%area     
-area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                 => mesh%area_inv     
+nlevels_nod2D_min(1:myDim_nod2D+eDim_nod2D)                => mesh%nlevels_nod2D_min
+area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                   => mesh%area     
+area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%area_inv     
 mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution    
 ssh_stiff                                                  => mesh%ssh_stiff
 lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north
 lump2d_south(1:myDim_nod2d)                                => mesh%lump2d_south
+cavity_flag_n(1:myDim_nod2D+eDim_nod2D)                    => mesh%cavity_flag_n
+cavity_flag_e(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)     => mesh%cavity_flag_e  
+!!$cavity_lev_nod2D(1:myDim_nod2D+eDim_nod2D)                 => mesh%cavity_lev_nod2D  
+!!$cavity_lev_elem2D(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%cavity_lev_elem2D  
+cavity_depth(1:myDim_nod2D+eDim_nod2D)                     => mesh%cavity_depth  
+ulevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%ulevels            
+ulevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%ulevels_nod2D
+ulevels_nod2D_max(1:myDim_nod2D+eDim_nod2D)                => mesh%ulevels_nod2D_max

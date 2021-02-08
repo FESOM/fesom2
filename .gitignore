@@ -2,7 +2,7 @@
 *.o
 *.mod
 *.x
-*.out
+#*.out
 *~
 *.swp
 /Icepack
