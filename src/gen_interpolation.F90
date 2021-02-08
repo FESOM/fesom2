@@ -335,7 +335,8 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
 #include "associate_mesh.h"
 
   do n=1,num_mod
-  do nz=1,nlevels_nod2D(n)-1
+  !!PS do nz=1,nlevels_nod2D(n)-1
+  do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
 !  do nz=1,num_mod_z-1
      x=lon_mod(n)
      y=lat_mod(n)
