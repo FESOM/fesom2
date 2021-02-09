@@ -5,5 +5,5 @@
 #*.out
 *~
 *.swp
-/Icepack
+src/icepack_drivers/Icepack
 /work_*
