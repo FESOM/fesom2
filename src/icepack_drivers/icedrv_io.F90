@@ -128,9 +128,9 @@
              case ('aicen     ')
                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'aicen', 'sea ice concentration',     'none', aicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.) 
              case ('vicen     ')
-                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vicen', 'volume per unit area of ice',  'm', vicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'vicen', 'volume per unit area of ice',  'm', vicen(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
              case ('vsnon     ')
-                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vsnon', 'volume per unit area of snow', 'm', vsnon(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'vsnon', 'volume per unit area of snow', 'm', vsnon(:,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
              case ('aice      ')
                  call def_stream2D(nod2D,  nx_nh,  'aice', 'sea ice concentration',     'none', aice(:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
              case ('vice      ')
@@ -146,64 +146,64 @@
              case ('Tsfc      ')
                  call def_stream2D(nod2D,  nx_nh,  'Tsfc', 'sea ice surf. temperature',  'degC', trcr(:,nt_Tsfc), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              case ('Tsfcn     ')
-                 call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'Tsfcn',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                 call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'Tsfcn',  'sea ice surf. temperature', 'degC', trcrn(:,nt_Tsfc,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
              case ('strength  ')
                  call def_stream2D(nod2D,              nx_nh,          'strength', 'sea ice strength',       'N', strength(:),   io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
              ! If the following tracers are not defined they will not be outputed
              case ('iagen     ')
                 if (tr_iage) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'iage', 'sea ice age', 's', trcrn(:,nt_iage,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'iage', 'sea ice age', 's', trcrn(:,nt_iage,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('FYn       ')
                 if (tr_FY) then 
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'FY', 'first year ice', 'none', trcrn(:,nt_FY,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'FY', 'first year ice', 'none', trcrn(:,nt_FY,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('lvln      ')
                 if (tr_lvl) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'alvl', 'ridged sea ice area',   'none', trcrn(:,nt_alvl,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'vlvl', 'ridged sea ice volume', 'm',    trcrn(:,nt_vlvl,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'alvl', 'ridged sea ice area',   'none', trcrn(:,nt_alvl,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'vlvl', 'ridged sea ice volume', 'm',    trcrn(:,nt_vlvl,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('pond_cesmn')
                 if (tr_pond_cesm) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'apnd', 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'hpnd', 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh) 
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'apnd', 'melt pond area fraction', 'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.) 
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'hpnd', 'melt pond depth',         'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.) 
                 end if
              case ('pond_topon')
                 if (tr_pond_topo) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'apnd', 'melt pond area fraction',          'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'hpnd', 'melt pond depth',                  'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'apnd', 'melt pond area fraction',          'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'hpnd', 'melt pond depth',                  'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('pond_lvln ')
                 if (tr_pond_lvl) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'apnd', 'melt pond area fraction',          'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'hpnd', 'melt pond depth',                  'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'apnd', 'melt pond area fraction',          'none', trcrn(:,nt_apnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'hpnd', 'melt pond depth',                  'm',    trcrn(:,nt_hpnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'ipnd', 'melt pond refrozen lid thickness', 'm',    trcrn(:,nt_ipnd,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('brinen    ')
                 if (tr_brine) then
-                  call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/),  'fbri', 'volume fraction of ice with dynamic salt', 'none',    trcrn(:,nt_fbri,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                  call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/),  'fbri', 'volume fraction of ice with dynamic salt', 'none',    trcrn(:,nt_fbri,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                 end if
              case ('qicen     ')
                  do k = 1,nilyr  ! Separate variable for each sea ice layer
                     write(trname,'(A6,i1)') 'qicen_', k
                     write(longname,'(A22,i1)') 'sea ice enthalpy lyr: ', k 
                     units='J/m3'
-                    call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/), trim(trname), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                    call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/), trim(trname), trim(longname), trim(units), trcrn(:,nt_qice+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                  end do
              case ('sicen     ')
                  do k = 1,nilyr  ! Separate variable for each sea ice layer
                     write(trname,'(A6,i1)') 'sicen_', k
                     write(longname,'(A22,i1)') 'sea ice salinity lyr: ', k
                     units='psu'
-                    call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/), trim(trname), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                    call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/), trim(trname), trim(longname), trim(units), trcrn(:,nt_sice+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                  end do
              case ('qsnon     ')
                  do k = 1,nslyr  ! Separate variable for each snow layer
                     write(trname,'(A6,i1)') 'qsnon_', k
                     write(longname,'(A19,i1)') 'snow enthalpy lyr: ', k
                     units='J/m3'
-                    call def_stream3D((/nod2D, ncat/),  (/nx_nh, ncat/), trim(trname), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh)
+                    call def_stream3D((/ncat, nod2D/),  (/ncat, nx_nh/), trim(trname), trim(longname), trim(units), trcrn(:,nt_qsno+k-1,:), io_list_icepack(i)%freq, io_list_icepack(i)%unit, io_list_icepack(i)%precision, mesh, .true.)
                  end do
              ! Average over categories
              case ('iage      ')

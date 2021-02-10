@@ -32,7 +32,7 @@ MODULE i_PARAM
   real(kind=WP)             :: theta_io=0.0_WP           ! rotation angle
                                                          ! (ice-ocean), available
 						         ! in EVP
-  real(kind=WP)             :: alpha_evp=500, beta_evp=500
+  real(kind=WP)             :: alpha_evp=250, beta_evp=250
   real(kind=WP)             :: c_aevp=0.15 ! 0.1--0.2, but should be adjusted experimentally   
   ! Ice forcing averaging
   integer		    :: ice_ave_steps=1 !ice step=ice_ave_steps*oce_step
