@@ -89,7 +89,6 @@ save
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
   logical :: ascii_out = .false.        ! old ascii output (slow, more detailed); false: faster nc output
   !===== NUMERICS (DONT HAVE TO BE CHANGED) =====
-  real :: steps_per_FESOM_step = 1      !deprecated
   logical :: l_semiimplicit = .true.    !false: adams-bashforth for coriolis
   real :: semiimplicit_coeff = 1.0      !1. fully implicit, 0.5 no damping
   real :: AB_coeff = 1.53               !1.5 original AB (amplifying), 1.6 stabilized

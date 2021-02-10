@@ -16,7 +16,7 @@ subroutine iceberg_calculation(istep)
  									!=
  implicit none								!=
 									!=
- integer	:: ib, times, istep	
+ integer	:: ib, times, istep
  real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
@@ -27,9 +27,7 @@ subroutine iceberg_calculation(istep)
  real,dimension(15*ib_num):: arr_block_red				!=
  integer,dimension(ib_num):: elem_block_red				!=
  real, dimension(4*ib_num):: vl_block_red				!=
-									!=
  !==================== MODULES & DECLARATIONS ==========================!= 
-
  if(firstcall) then
   !write(*,*) 'ib_num: ', ib_num
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
@@ -81,7 +79,7 @@ subroutine iceberg_calculation(istep)
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
-                            steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
+                            f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)			
         !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
         !end do
@@ -153,11 +151,11 @@ subroutine iceberg_calculation(istep)
     lastsubstep = .true. !do output every timestep
    
     if( melted(ib) == .false. ) then
-        call iceberg_step2(	arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
+        call iceberg_step2(arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
-                            steps_per_FESOM_step, f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
+                            f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)	
         !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
         !end do
@@ -212,7 +210,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 			Co,Ca,Ci, Cdo_skin,Cda_skin, rho_icb, 		   &
 			conc_sill,P_sill, rho_h2o,rho_air,rho_ice,	   & 
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
-			lastsubstep, steps_per_FESOM_step, f_u_ib_old,	   &
+			lastsubstep, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
 			AB_coeff, istep)
 			
@@ -223,6 +221,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
+ use g_config, only: steps_per_ib_step
  !=
 #ifdef use_cavity
  use iceberg_params, only: smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted	!=
@@ -242,7 +241,6 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  integer, intent(inout)	:: iceberg_elem !global
  logical, intent(inout)	:: find_iceberg_elem
  logical, intent(in)	:: lastsubstep 
- real, intent(in)	:: steps_per_FESOM_step
  real,    intent(inout)	:: f_u_ib_old, f_v_ib_old
  logical, intent(in)	:: l_semiimplicit
  real,    intent(in)	:: semiimplicit_coeff
@@ -401,7 +399,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   		   mass_ib, Ci, Ca, Co, Cda_skin, Cdo_skin, &
   		   rho_ice, rho_air, rho_h2o, P_sill,conc_sill, frozen_in, &
   		   file_forces_u, file_forces_v, P_ib, conci_ib, &
-		   dt/REAL(steps_per_FESOM_step), l_output, f_u_ib_old, &
+		   dt*REAL(steps_per_ib_step), l_output, f_u_ib_old, &
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
@@ -409,8 +407,8 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !new_u_ib = 2.0
   !new_v_ib = 0.0
 
-  dudt = (new_u_ib-u_ib)*REAL(steps_per_FESOM_step) / dt
-  dvdt = (new_v_ib-v_ib)*REAL(steps_per_FESOM_step) / dt		   
+  dudt = (new_u_ib-u_ib)/REAL(steps_per_ib_step) / dt
+  dvdt = (new_v_ib-v_ib)/REAL(steps_per_ib_step) / dt		   
 		   
   !new_u_ib = 0.
   !new_v_ib = -0.20
@@ -444,7 +442,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt/REAL(steps_per_FESOM_step))
+		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
   	   
  t1=MPI_Wtime()
   iceberg_elem=local_idx_of(iceberg_elem)  	!local
@@ -461,7 +459,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
    call parallel2coast(new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
  t5=MPI_Wtime()
    call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt/REAL(steps_per_FESOM_step))
+		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
  t6=MPI_Wtime()
    u_ib = new_u_ib
    v_ib = new_v_ib
@@ -504,7 +502,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
 			Co,Ca,Ci, Cdo_skin,Cda_skin, rho_icb, 		   &
 			conc_sill,P_sill, rho_h2o,rho_air,rho_ice,	   & 
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
-			lastsubstep, steps_per_FESOM_step, f_u_ib_old,	   &
+			lastsubstep, f_u_ib_old,	   &
 			f_v_ib_old, l_semiimplicit, semiimplicit_coeff,    &
 			AB_coeff, istep)
 			
@@ -515,7 +513,8 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- 												!=
+ use g_config, only: steps_per_ib_step
+!=
 #ifdef use_cavity
  use iceberg_params, only: smallestvol_icb, buoy_props, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, ascii_out, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem	!=
 #else
@@ -535,7 +534,6 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  integer, intent(inout)	:: iceberg_elem !global
  logical, intent(inout)	:: find_iceberg_elem
  logical, intent(in)	:: lastsubstep 
- integer, intent(in)	:: steps_per_FESOM_step
  real,    intent(inout)	:: f_u_ib_old, f_v_ib_old
  logical, intent(in)	:: l_semiimplicit
  real,    intent(in)	:: semiimplicit_coeff
@@ -990,7 +988,7 @@ subroutine iceberg_restart
  INQUIRE(FILE=IcebergRestartPath, EXIST=file_exists) 
  icbID = mype+10
  
- call allocate_icb
+ !call allocate_icb
  
  if(file_exists) then
   open(unit=icbID,file=IcebergRestartPath,status='old')
@@ -1053,7 +1051,7 @@ subroutine iceberg_restart_with_icesheet
  icbID_ISM = mype+10
  icbID_non_melted_icb = mype+11
 
- call allocate_icb
+ !call allocate_icb
  
  open(unit=icbID_non_melted_icb,file=num_non_melted_icb_file,status='old')
     read(icbID_non_melted_icb,*) num_non_melted_icb

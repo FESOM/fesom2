@@ -1,3 +1,21 @@
+subroutine reset_ib_fluxes()
+    use o_param
+    use o_arrays
+    use o_mesh
+    use g_config
+    use g_parsup
+    use i_arrays
+    use iceberg_params
+    
+    !alles wieder auf null setzen
+    ibfwbv = 0
+    ibfwb = 0
+    ibfwl = 0
+    ibfwe = 0
+    ibhf = 0
+end subroutine
+
+
 subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
@@ -11,13 +29,6 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
     use iceberg_params
 
     integer   			:: iceberg_node  
-
-    !alles wieder auf null setzen
-    !ibfwbv = 0
-    !ibfwb = 0
-    !ibfwl = 0
-    !ibfwe = 0
-    !ibhf = 0
 
     if(i_have_element) then 
         iceberg_node=elem2D_nodes(1,localelement)

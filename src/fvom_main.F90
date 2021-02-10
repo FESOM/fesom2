@@ -21,6 +21,7 @@ use io_RESTART
 use io_MEANDATA
 use io_mesh_info
 use diagnostics
+use iceberg_params
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -87,7 +88,12 @@ real(kind=real32) :: runtime_alltimesteps
     call cpl_oasis3mct_define_unstr
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
-    
+   
+    !LA: allocate arrays for icebergs
+    if (use_icebergs) then
+        call allocate_icb
+    endif
+
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
@@ -162,8 +168,11 @@ real(kind=real32) :: runtime_alltimesteps
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock
-        call compute_vel_nodes 
-        call iceberg_calculation(n)
+        call compute_vel_nodes
+        if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
+            if (mype==0) write(*,*) '*** step n=',n
+            call iceberg_calculation(n)
+        end if
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
@@ -183,10 +192,12 @@ real(kind=real32) :: runtime_alltimesteps
             call oce_fluxes_mom ! momentum only
             call oce_fluxes
         end if  
-        if (use_icebergs) then
+        if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
             t1_icb = MPI_Wtime()
             !call iceberg_calculation(n)
             call icb2fesom
+            !alles auf null setzen
+            call reset_ib_fluxes
             t2_icb = MPI_Wtime()
         end if
         t2 = MPI_Wtime()
@@ -206,8 +217,8 @@ real(kind=real32) :: runtime_alltimesteps
         rtime_compute_diag  = rtime_compute_diag  + t4 - t3
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
-        rtime_icb_calc      = rtime_icb_calc      + t2_icb - t1_icb
-        rtime_icb_write     = rtime_icb_write     + t4_icb - t3_icb
+        rtime_icb_calc      = 0 !rtime_icb_calc      + t2_icb - t1_icb
+        rtime_icb_write     = 0 !rtime_icb_write     + t4_icb - t3_icb
     end do
     if (use_icebergs) then
         t3_icb = MPI_Wtime()

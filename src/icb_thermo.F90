@@ -28,7 +28,7 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   use i_param
   use i_arrays
   use g_parsup
-  
+
   use o_arrays         
   use g_clock
   use g_forcing_arrays
@@ -111,7 +111,8 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor,steps_per_FESOM_step, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling
+  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling
+  use g_config, only: steps_per_ib_step
 
   implicit none  
 
@@ -130,26 +131,26 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     force_last_output=.false.
 
     !changes in this timestep:
-    dh_b = M_b*dt/REAL(steps_per_FESOM_step)*scaling(ib)	!change of height..
-    dh_v = M_v*dt/REAL(steps_per_FESOM_step)*scaling(ib)    !..and length due to melting..
-    dh_e = M_e*dt/REAL(steps_per_FESOM_step)*scaling(ib)    !..and due to wave erosion [m].
-    dh_bv = M_bv*dt/REAL(steps_per_FESOM_step)*scaling(ib)  !change of length due to 'basal meltrate'
+    dh_b = M_b*dt*REAL(steps_per_ib_step)*scaling(ib)    !change of height..
+    dh_v = M_v*dt*REAL(steps_per_ib_step)*scaling(ib)    !..and length due to melting..
+    dh_e = M_e*dt*REAL(steps_per_ib_step)*scaling(ib)    !..and due to wave erosion [m].
+    dh_bv = M_bv*dt*REAL(steps_per_ib_step)*scaling(ib)  !change of length due to 'basal meltrate'
     
     !CALCULATION OF WORKING SURFACES AS IN BIGG (1997) & SILVA (2010)
     !basal volume loss
     bvl = dh_b*length_ib**2
-    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    fwb_flux_ib(ib) = -bvl*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
     !lateral volume loss
     !lvl1 = (dh_b+dh_v) *2*length_ib*abs(depth_ib)+ dh_e*length_ib*height_ib
     !lvl2 = (dh_b+dh_v) *2*width_ib*abs(depth_ib) + dh_e*width_ib *height_ib
-    lvl_e = dh_e*length_ib*height_ib + dh_e*width_ib*height_ib			! erosion just at 2 sides
-    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    lvl_e = dh_e*length_ib*height_ib + dh_e*width_ib*height_ib  ! erosion just at 2 sides
+    fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
     
-    lvl_b = dh_bv*2*length_ib*abs(depth_ib) + dh_bv*2*width_ib*abs(depth_ib)	! at all 4 sides
-    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    lvl_b = dh_bv*2*length_ib*abs(depth_ib) + dh_bv*2*width_ib*abs(depth_ib)    ! at all 4 sides
+    fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
     
-    lvl_v = dh_v*2*length_ib*abs(depth_ib) + dh_v*2*width_ib*abs(depth_ib)	! at all 4 sides
-    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt*REAL(steps_per_FESOM_step)
+    lvl_v = dh_v*2*length_ib*abs(depth_ib) + dh_v*2*width_ib*abs(depth_ib)      ! at all 4 sides
+    fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
     !total volume loss
     tvl = bvl + lvl_b + lvl_v + lvl_e 	![m^3] per timestep, for freshwater flux convert somehow to [m/s]
     			    		! by distributing over area(iceberg_elem) or over patch

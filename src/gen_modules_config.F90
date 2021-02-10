@@ -106,8 +106,9 @@ module g_config
   logical                       :: use_icebergs=.false.  
   logical                       :: use_icesheet_coupling=.false.  
   integer                       :: ib_num=0
+  integer                       :: steps_per_ib_step=8
 
-  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num
+  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step
 
   ! *** others ***
   real(kind=WP)            	:: dt
