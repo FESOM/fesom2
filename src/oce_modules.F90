@@ -9,8 +9,8 @@ integer, parameter            :: WP=8        ! Working precision
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
-real(kind=WP)                 :: density_0=1030.0_WP
-real(kind=WP)                 :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
+real(kind=WP), parameter      :: density_0=1028.0_WP
+real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
@@ -163,7 +163,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 character(20)                  :: which_pgf='shchepetkin' 
 
 
- NAMELIST /oce_dyn/ state_equation, C_d, A_ver, density_0, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
+ NAMELIST /oce_dyn/ state_equation, C_d, A_ver, gamma0, gamma1, gamma2, Leith_c, Div_c, easy_bs_return, &
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
