@@ -9,7 +9,7 @@ integer, parameter            :: WP=8        ! Working precision
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
-real(kind=WP), parameter      :: density_0=1028.0_WP
+real(kind=WP), parameter      :: density_0=1030.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]         
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
