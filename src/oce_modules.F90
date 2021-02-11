@@ -30,7 +30,7 @@ real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It need
 real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
 integer                       :: visc_option=5
-logical			              :: backscatter=.false. !Backscatter scheme on (together with filter operator)
+logical			      :: backscatter=.true. !Backscatter scheme on (together with filter operator)
 logical                       :: uke_scaling=.true.
 real(kind=WP)                 :: uke_scaling_factor=1._WP
 real(kind=WP)		          :: rosb_dis=1._WP
