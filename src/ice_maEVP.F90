@@ -42,6 +42,11 @@ subroutine stress_tensor_m(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+
   implicit none
 
   integer         :: elem, elnodes(3)
@@ -90,7 +95,11 @@ subroutine stress_tensor_m(mesh)
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/max(delta,delta_min)
+#else
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
+#endif
     
         r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
@@ -103,6 +112,12 @@ subroutine stress_tensor_m(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -275,6 +290,11 @@ subroutine EVPdynamics_m(mesh)
   use g_parsup
   use g_comm_auto
 
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+  use icedrv_main,   only: icepack_to_fesom
+#endif
+
   implicit none
   integer          :: steps, shortstep, i, ed,n
   real(kind=WP)    :: rdt, drag, det
@@ -307,6 +327,16 @@ subroutine EVPdynamics_m(mesh)
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
 
+#if defined (__icepack)
+  a_ice_old(:)  = a_ice(:)
+  m_ice_old(:)  = a_ice(:)
+  m_snow_old(:) = m_snow(:)
+
+  call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                         aice_out=a_ice,                 &
+                         vice_out=m_ice,                 &
+                         vsno_out=m_snow)
+#endif
 
 !NR inlined, to have all initialization in one place.
 !  call ssh2rhs
@@ -407,8 +437,7 @@ subroutine EVPdynamics_m(mesh)
      msum=sum(m_ice(elnodes))*val3
      if(msum > 0.01) then
         ice_el(el) = .true.
-        asum=sum(a_ice(elnodes))*val3     
-     
+        asum=sum(a_ice(elnodes))*val3          
         pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
      endif
   end do
@@ -421,6 +450,11 @@ subroutine EVPdynamics_m(mesh)
 !=======================================
 ! Ice EVPdynamics Iteration main loop:
 !=======================================
+
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
 
   do shortstep=1, steps
 
@@ -467,6 +501,11 @@ subroutine EVPdynamics_m(mesh)
         sigma12(el) = det1*sigma12(el) +       pressure*eps12(el)*vale
         sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
         sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
+
+#if defined (__icepack)
+        rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
+        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
+#endif
 
         !  end do   ! fuse loops
         ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
@@ -564,6 +603,11 @@ subroutine find_alpha_field_a(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+  use icedrv_main,   only: strength
+#endif
+
   implicit none
 
   integer                  :: elem, elnodes(3)
@@ -609,8 +653,12 @@ subroutine find_alpha_field_a(mesh)
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
          
-     pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
-                                                                    ! with thickness (msum)
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/(delta+delta_min)/msum
+#else
+     pressure = pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
+                                                                       ! with thickness (msum)
+#endif
      !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
      alpha_evp_array(elem)=max(50.0_WP,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
      ! /voltriangle(elem) for FESOM1.4
@@ -631,6 +679,11 @@ subroutine stress_tensor_a(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+
   implicit none
 
   integer                   :: elem, elnodes(3)
@@ -681,8 +734,12 @@ subroutine stress_tensor_a(mesh)
       ! ====== moduli:
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
-    
+   
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/(delta+delta_min)
+#else
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
+#endif
     
         r1=pressure*(eps1-delta) 
         r2=pressure*eps2*vale
@@ -695,6 +752,12 @@ subroutine stress_tensor_a(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -720,7 +783,11 @@ use o_PARAM
 use i_therm_param
 use g_parsup
 use g_comm_auto
-  use ice_maEVP_interfaces
+use ice_maEVP_interfaces
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
 
   implicit none
   integer          :: steps, shortstep, i, ed
@@ -736,6 +803,11 @@ use g_comm_auto
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
   call ssh2rhs(mesh)
+
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
  
   do shortstep=1, steps 
      call stress_tensor_a(mesh)
