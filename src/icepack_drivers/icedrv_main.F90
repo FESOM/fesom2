@@ -870,12 +870,14 @@
 
               ! Initialize output
               module subroutine init_io_icepack(mesh)
+                  use mod_mesh
                   implicit none
                   type(t_mesh), intent(in), target :: mesh
               end subroutine init_io_icepack
 
               ! Initialize restart
               module subroutine init_restart_icepack(year, mesh)
+                  use mod_mesh
                   implicit none
                   type(t_mesh), intent(in), target     :: mesh
                   integer(kind=int_kind),  intent(in) :: year
