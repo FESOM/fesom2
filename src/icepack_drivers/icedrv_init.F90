@@ -916,6 +916,7 @@
           use icepack_intfc, only: icepack_init_fsd
           use icepack_intfc, only: icepack_init_fsd_bounds
           use icepack_intfc, only: icepack_warnings_flush
+          use mod_mesh
     
           implicit none
     

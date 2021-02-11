@@ -61,6 +61,9 @@
         
           type(io_entry), save, allocatable, target   :: io_list_icepack(:)
 
+          namelist /nml_listsize      / io_listsize
+          namelist /nml_list_icepack  / io_list_icepack        
+
 #include "../associate_mesh.h"
 
           ! Get the tracers information from icepack
@@ -85,9 +88,6 @@
                tr_bgc_PON_out=tr_bgc_PON, tr_bgc_DON_out=tr_bgc_DON,                  &
                tr_zaero_out=tr_zaero,     tr_bgc_Fe_out=tr_bgc_Fe,                    &
                tr_bgc_hum_out=tr_bgc_hum)
-        
-          namelist /nml_listsize      / io_listsize
-          namelist /nml_list_icepack  / io_list_icepack
         
           ! OPEN and read namelist for icepack I/O
           open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )

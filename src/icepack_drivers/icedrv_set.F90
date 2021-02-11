@@ -158,9 +158,7 @@
           !-----------------------------------------------------------------
           ! Namelist definition
           !-----------------------------------------------------------------
- 
-          nml_filename = 'namelist.icepack'        ! name of icepack namelist file
-   
+    
           namelist / env_nml /                                                &
              nicecat, nfsdcat, nicelyr, nsnwlyr, ntraero, trzaero, tralg,     &
              trdoc,   trdic,   trdon,   trfed,   trfep,   nbgclyr, trbgcz,    &
@@ -199,6 +197,8 @@
              fbot_xfer_type,  oceanmixed_ice,  emissivity,                     &
              formdrag,        highfreq,        natmiter,                       &
              tfrz_option,     wave_spec_type,  dragio
+
+          nml_filename = 'namelist.icepack'        ! name of icepack namelist file
 
           !-----------------------------------------------------------------
           ! env namelist - STANDARD VALUES

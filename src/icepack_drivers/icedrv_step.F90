@@ -7,7 +7,6 @@
 
 submodule (icedrv_main) icedrv_step
 
-      use icedrv_constants, only: c0, c4, nu_diag, ice_stderr
       use icedrv_kinds
       use icedrv_system,    only: icedrv_system_abort
       use icepack_intfc,    only: icepack_warnings_flush
