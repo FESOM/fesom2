@@ -1,0 +1,30 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file, utf-8 charset
+[*]
+end_of_line = lf
+insert_final_newline = false
+trim_trailing_whitespace = false
+charset = utf-8
+
+# 4 tab indentation
+[*.{c,h,cpp}]
+indent_style = space
+indent_size = 3
+
+# 4 space indentation
+[*.F90]
+indent_style = space
+indent_size = 4
+
+# Tab indentation (no size specified)
+[Makefile]
+indent_style = tab
+
+[CMakeLists.txt]
+indent_style = space
+indent_size = 3
+

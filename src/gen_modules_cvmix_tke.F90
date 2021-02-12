@@ -118,7 +118,7 @@ module g_cvmix_tke
     ! routine from cvmix library
     subroutine init_cvmix_tke(mesh)
         implicit none
-        character(len=100)       :: nmlfile
+        character(len=cvmix_strlen)       :: nmlfile
         logical                  :: nmlfile_exist=.False.
         integer                  :: node_size
         type(t_mesh), intent(in), target :: mesh

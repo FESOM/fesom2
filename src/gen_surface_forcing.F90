@@ -82,10 +82,10 @@ MODULE g_sbf
    logical :: l_snow  = .false.
 
    character(10),      save   :: runoff_data_source='CORE2'
-   character(len=256), save   :: nm_runoff_file    ='runoff.nc'
+   character(len=MAX_PATH), save   :: nm_runoff_file    ='runoff.nc'
 
    character(10),      save   :: sss_data_source   ='CORE2'
-   character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+   character(len=MAX_PATH), save   :: nm_sss_data_file  ='PHC2_salx.nc'
 
    logical :: runoff_climatology =.false.
 
@@ -151,7 +151,7 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
    type, public ::   flfi_type    !flux file informations
-      character(len = 256)                 :: file_name ! file name
+      character(len = MAX_PATH)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
       character(len = 34)                  :: calendar  ! variable name in the NetCDF file
       integer                              :: nc_Nlon
@@ -631,7 +631,7 @@ CONTAINS
       integer              :: yyyy,mm,dd
       integer              :: ierror              ! return error code
       integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
-      character(len=256), pointer   :: file_name
+      character(len=MAX_PATH), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
       type(t_mesh), intent(in) , target :: mesh
@@ -1054,7 +1054,7 @@ CONTAINS
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-      character(len=256)   :: filename
+      character(len=MAX_PATH)   :: filename
       type(t_mesh), intent(in) , target :: mesh
       
 #include  "associate_mesh.h"
@@ -1161,7 +1161,7 @@ CONTAINS
       !!----------------------------------------------------------------------
    IMPLICIT NONE
       integer, intent(in)            :: iost
-      character(len=256), intent(in) :: fname
+      character(len=MAX_PATH), intent(in) :: fname
       write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
       STOP 'ERROR:  stop'
 
@@ -1259,7 +1259,7 @@ CONTAINS
 
    SUBROUTINE check_nferr(iost,fname)
    IMPLICIT NONE
-      character(len=256), intent(in) :: fname
+      character(len=MAX_PATH), intent(in) :: fname
       integer, intent(in) :: iost
 
       if (iost .ne. NF_NOERR) then

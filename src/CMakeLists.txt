@@ -7,7 +7,13 @@ option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-file(GLOB sources_Fortran ${src_home}/*.F90)
+if(${USE_ICEPACK})
+   file(GLOB sources_Fortran ${src_home}/*.F90
+                             ${src_home}/icepack_drivers/*.F90
+                             ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
+else()
+   file(GLOB sources_Fortran ${src_home}/*.F90)
+endif()
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 
@@ -61,6 +67,9 @@ if(${FESOM_COUPLED})
 endif()
 if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
+endif()
+if(${USE_ICEPACK})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 if(${VERBOSE})
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
