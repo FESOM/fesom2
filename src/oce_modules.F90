@@ -30,7 +30,6 @@ real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It need
 real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
 integer                       :: visc_option=5
-logical			      :: backscatter=.true. !Backscatter scheme on (together with filter operator)
 logical                       :: uke_scaling=.true.
 real(kind=WP)                 :: uke_scaling_factor=1._WP
 real(kind=WP)		          :: rosb_dis=1._WP
@@ -168,7 +167,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
                     Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, &
-                    backscatter, K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
+                    K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis
 
  NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &

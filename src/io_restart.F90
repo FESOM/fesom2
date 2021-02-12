@@ -123,7 +123,7 @@ subroutine ini_ocean_io(year, mesh)
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
         call def_variable(oid, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
   endif 
-  if (backscatter) then
+  if (visc_option==8) then
         call def_variable(oid, 'uke',      (/nl-1, elem2D/), 'unresolved kinetic energy', 'm2/s2', uke(:,:));
         call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
   endif
