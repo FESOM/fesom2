@@ -110,7 +110,8 @@ subroutine par_init    ! initializes MPI
     else
       provided_mpi_thread_support_level_name = "unknown"
     end if
-    write(*,*) 'MPI has been initialized, provided MPI thread support level: '//provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
+    write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
+         provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
     write(*, *) 'Running on ', npes, ' PEs'
   end if
 end subroutine par_init
