@@ -2412,12 +2412,10 @@ deallocate(center_y, center_x)
   do i=1, myDim_nod2D
      if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-!!PS         mesh%lump2d_north(i)=mesh%area(1, i)! --> TEST_cavity
-        mesh%lump2d_north(i)=mesh%node_area(i)
+        mesh%lump2d_north(i)=mesh%areasvol(mesh%ulevels_nod2d(i), i)
      else
         ns=ns+1     
-!!PS         mesh%lump2d_south(i)=mesh%area(1, i)! --> TEST_cavity
-        mesh%lump2d_south(i)=mesh%node_area(i)
+        mesh%lump2d_south(i)=mesh%area(mesh%ulevels_nod2d(i), i)
      end if	   
   end do   
 
@@ -2468,7 +2466,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    aux=0._WP
    do n=1, myDim_nod2D
       do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
-         aux(nz)=aux(nz)+mesh%area(nz, n)
+         aux(nz)=aux(nz)+mesh%areasvol(nz, n)
       end do
    end do
    call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
