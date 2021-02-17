@@ -118,13 +118,17 @@ IMPLICIT NONE
       call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh(mesh)
       call set_par_support(mesh)
-      call find_levels(mesh)
-      
-      if (use_cavity) call find_levels_cavity(mesh)
-        
+!!PS       call find_levels(mesh)
+!!PS       
+!!PS       if (use_cavity) call find_levels_cavity(mesh)
+!!PS         
       call test_tri(mesh)
       call load_edges(mesh)
       call find_neighbors(mesh)
+      
+      call find_levels(mesh)
+      if (use_cavity) call find_levels_cavity(mesh)
+      
       call find_levels_min_e2n(mesh)
       call mesh_areas(mesh)
       call mesh_auxiliary_arrays(mesh)
@@ -904,7 +908,8 @@ subroutine find_levels_cavity(mesh)
     integer, allocatable, dimension(:)  :: ibuff
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
-    integer                             :: elem, elnodes(3), ule,  uln(3)
+    integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
+    integer, allocatable, dimension(:,:) :: numelemtonode
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
     
@@ -1281,6 +1286,30 @@ subroutine find_levels_cavity(mesh)
         if (ule < maxval(uln)) then 
             write(*,*) ' --> found cavity elem depth shallower than valid cavity node depth, mype=', mype
         end if 
+    end do 
+    
+    
+    !___________________________________________________________________________
+    allocate(numelemtonode(mesh%nl,myDim_nod2d+eDim_nod2D))
+    numelemtonode=0
+    do node=1, myDim_nod2D+eDim_nod2D
+        do j=1,mesh%nod_in_elem2D_num(node)
+            elem=mesh%nod_in_elem2D(j,node)
+            do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
+                numelemtonode(nz,node) = numelemtonode(nz,node) + 1
+            end do
+        end do
+    end do
+    
+    ! check how many triangle elements contribute to every vertice in every layer
+    ! every vertice in every layer should be connected to at least two triangle 
+    ! elements !
+    do node=1, myDim_nod2D+eDim_nod2D
+        do nz=1,mesh%nl
+            if (numelemtonode(nz,node)== 1) then 
+                write(*,*) 'ERROR A: found vertice with just one triangle:', mype, node, nz
+            end if 
+        end do 
     end do 
     
 end subroutine find_levels_cavity
@@ -1799,164 +1828,257 @@ type(t_mesh), intent(inout), target :: mesh
 end subroutine elem_center
 !==========================================================================
 SUBROUTINE mesh_areas(mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_PARSUP
-USE g_ROTATE_GRID
-use g_comm_auto
-IMPLICIT NONE
-! Collects auxilliary information on the mesh
-! Allocated and filled in are:
-! elem_area(myDim_elem2D)
-! area(nl, myDim_nod2D)
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_arrays, only: dum_3d_n
+    USE g_PARSUP
+    USE g_ROTATE_GRID
+    use g_comm_auto
+    IMPLICIT NONE
+    ! Collects auxilliary information on the mesh
+    ! Allocated and filled in are:
+    ! elem_area(myDim_elem2D)
+    ! area(nl, myDim_nod2D)
 
+    integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin, nzmax
+    real(kind=WP)                             :: a(2), b(2), ax, ay, lon, lat, vol, vol2
+    real(kind=WP), allocatable,dimension(:)   :: work_array
+    integer, allocatable,dimension(:,:)       :: cavity_contribut
+    real(kind=WP)                             :: t0, t1
+    type(t_mesh), intent(inout), target       :: mesh
 
-integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin
-real(kind=WP)	                          :: a(2), b(2), ax, ay, lon, lat, vol, vol2
-real(kind=WP), allocatable,dimension(:)   :: work_array
-real(kind=WP)                             :: t0, t1
-type(t_mesh), intent(inout), target       :: mesh
+    !NR Cannot include the pointers before the targets are allocated...
+    !NR #include "associate_mesh.h"
 
-!NR Cannot include the pointers before the targets are allocated...
-!NR #include "associate_mesh.h"
-
-t0=MPI_Wtime()
-
- allocate(mesh%elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- !allocate(elem_area(myDim_elem2D))
- allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))   !! Extra size just for simplicity
-                                             !! in some further routines
- allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D)) 
- allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
- ! ============
- ! The areas of triangles:
- ! ============
- DO n=1, myDim_elem2D
- !DO n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
-    elnodes=mesh%elem2D_nodes(:,n)
-    ay=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
-    ay=cos(ay)
-    if (cartesian) ay=1.0_WP
-    a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
-    b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
-    call trim_cyclic(a(1))
-    call trim_cyclic(b(1))
-    a(1)=a(1)*ay
-    b(1)=b(1)*ay
-    mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
- END DO
- call exchange_elem(mesh%elem_area)
- ! =============
- ! Scalar element 
- ! areas at different levels (there can be partly land)
- ! =============
+    t0=MPI_Wtime()
+    
+    ! area of triangles 
+    allocate(mesh%elem_area(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+    
+    ! area of upper edge and lower edge of scalar cell: size nl x node
+    allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))
+    
+    ! "mid" area of scalar cell in case of cavity area \= areasvol, size: nl-1 x node
+    allocate(mesh%areasvol(mesh%nl-1,myDim_nod2d+eDim_nod2D))
+    
+    ! area inverse
+    allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D))
+    allocate(mesh%areasvol_inv(mesh%nl-1,myDim_nod2d+eDim_nod2D))
+    
+    ! resolution at nodes 
+    allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
+    
+    !___compute triangle areas__________________________________________________
+    do n=1, myDim_elem2D
+        elnodes=mesh%elem2D_nodes(:,n)
+        ay=sum(mesh%coord_nod2D(2,elnodes))/3.0_WP
+        ay=cos(ay)
+        if (cartesian) ay=1.0_WP
+        a = mesh%coord_nod2D(:,elnodes(2))-mesh%coord_nod2D(:,elnodes(1))
+        b = mesh%coord_nod2D(:,elnodes(3))-mesh%coord_nod2D(:,elnodes(1))
+        call trim_cyclic(a(1))
+        call trim_cyclic(b(1))
+        a(1)=a(1)*ay
+        b(1)=b(1)*ay
+        mesh%elem_area(n)=0.5_WP*abs(a(1)*b(2)-b(1)*a(2))
+    end do
+    call exchange_elem(mesh%elem_area)
+    
+    !___compute areas of upper/lower scalar cell edge___________________________
+    ! areas at different levels (there can be partly land)
+    ! --> only areas through which there is exchange are counted
+    !
+    !-----------------------------~+~~~~~~~+~~~
+    ! ############################ |       |   
+    ! ############################ |       |   layer k-3
+    ! #################### ._______|_______|___area_k-2   
+    ! ##  CAVITY  ######## | / / / |       |   
+    ! #################### |/ /°/ /|       |   layer k-2 --> Transport:  w_k-2*A_k-1
+    ! ############ ._______|_/_/_/_|_______|___area_k-1         -> A_k-1 lower prisma area defines 
+    ! ############ |       |       |       |                    scalar area under the cavity
+    ! ############ |   °   |       |       |   layer k-1
+    !______________|_______|_______|_______|___area_k
+    !      |       | / / / |       |       |   
+    !      |       |/ /°/ /|       |       |   layer k --> Transport: w_k*A_k
+    !______|_______|_/_/_/_|_______|_______|___area_k+1       -> A_k upper prisma face area defines      
+    !      |       |       |       |       |                  scalar area of cell   
+    !      |       |   °   |       |       |   layer k+1
+    !______|_______|_______|_______|_______|___area_k+2
+    ! #############|       |       |       |   
+    ! #############|   °   |       |       |   layer k+2
+    ! #############|_______|_______|_______|___area_k+3
+    ! #####################|       |       |   
+    ! #####################|       |       |   layer k+3
+    ! ##  BOTTOM  #########|_______|_______|___area_k+4
+    ! #############################|       |   
+    ! #############################|       |   :
+    ! #############################|_______|___area_k+5
+    ! #########################################
+    mesh%area     = 0.0_WP
+    mesh%areasvol = 0.0_WP
+    
+    if (use_cavity) then
+        allocate(cavity_contribut(mesh%nl,myDim_nod2d+eDim_nod2D))
+        cavity_contribut = 0
+    end if 
+    
+    do n=1, myDim_nod2D+eDim_nod2D
+        do j=1,mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(j,n)
+            
+            !___________________________________________________________________
+            ! compute scalar area of prisms at different depth layers. In normal 
+            ! case without cavity the area of the scalar cell corresponds to the
+            ! area of the upper edge of the prism --> if there is cavity its
+            ! different. Directly under the cavity the area of scalar cell 
+            ! corresponds to the area of the lower edge
+            nzmin = mesh%ulevels(elem)
+            nzmax = mesh%nlevels(elem)
+            do nz=nzmin,nzmax
+                mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
+            end do
+            
+            !___________________________________________________________________
+            ! how many ocean-cavity triangles contribute to an upper edge of a 
+            ! scalar area 
+            if (use_cavity) then
+                do nz=1,nzmin-1
+                    cavity_contribut(nz,n)=cavity_contribut(nz,n)+1
+                end do
+            end if 
+        end do
+    end do
+    
+    !___compute "mid" scalar cell area__________________________________________
+    ! for cavity case: redefine scalar cell area from upper edge of prism to 
+    ! lower edge of prism if a cavity triangle is present at the upper scalar
+    ! cell edge 
+    if (use_cavity) then
+        do n = 1, myDim_nod2D+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+                if (cavity_contribut(nz,n)>0) then
+                    mesh%areasvol(nz,n) = mesh%area(min(nz+1,nzmax),n)
+                end if
+            end do 
+        end do
+        deallocate(cavity_contribut)
+    ! for non cavity case: the "mid" area of the scalar cell always corresponds to 
+    ! the area of the upper scalar cell edge    
+    else    
+        do n = 1, myDim_nod2D+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+                mesh%areasvol(nz,n) = mesh%area(nz,n)
+            end do 
+        end do
+    end if 
+    
+    ! update to proper dimension
+    ! coordinates are in radians, edge_dxdy are in meters,
+    ! and areas are in m^2
+    mesh%elem_area = mesh%elem_area*r_earth*r_earth
+    mesh%area      = mesh%area     *r_earth*r_earth
+    mesh%areasvol  = mesh%areasvol *r_earth*r_earth
  
- mesh%area=0.0_WP
- DO n=1, myDim_nod2D
-    DO j=1,mesh%nod_in_elem2D_num(n)
-       elem=mesh%nod_in_elem2D(j,n)
-       DO nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
-       !!PS DO nz=1,mesh%nlevels(elem)-1
-        mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
-       END DO
+    call exchange_nod(mesh%area)
+    call exchange_nod(mesh%areasvol)
+    
+    !___compute inverse area____________________________________________________
+    mesh%area_inv = 0.0_WP
+    do n=1,myDim_nod2d+eDim_nod2D
+        nzmin = mesh%ulevels_nod2d(n)
+        nzmax = mesh%nlevels_nod2d(n)
+        do nz=nzmin,nzmax
+            mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+!!PS             if (mesh%area(nz,n) > 0._WP) then
+!!PS                 mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+!!PS             else
+!!PS                 mesh%area_inv(nz,n) = 0._WP
+!!PS             end if
+        end do
+    end do
+    
+    if (use_cavity) then
+        mesh%areasvol_inv = 0.0_WP
+        do n=1,myDim_nod2d+eDim_nod2D
+            nzmin = mesh%ulevels_nod2d(n)
+            nzmax = mesh%nlevels_nod2d(n)-1
+            do nz=nzmin,nzmax
+                mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+!!PS                 if (mesh%areasvol(nz,n) > 0._WP) then
+!!PS                     mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+!!PS                 else
+!!PS                     mesh%areasvol_inv(nz,n) = 0._WP
+!!PS                 end if
+            end do
+        end do
+    else
+        mesh%areasvol_inv = mesh%area_inv
+    endif 
+ 
+    !___compute scalar cell resolution__________________________________________
+    allocate(work_array(myDim_nod2D))
+    !!PS mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
+    do n=1,myDim_nod2d+eDim_nod2D
+        mesh%mesh_resolution(n)=sqrt(mesh%areasvol(mesh%ulevels_nod2d(n),n)/pi)*2._WP
+    end do 
+ 
+    ! smooth resolution
+    DO q=1, 3 !apply mass matrix N times to smooth the field
+        DO n=1, myDim_nod2D
+        vol=0._WP
+        work_array(n)=0._WP
+        DO j=1, mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(j, n)
+            elnodes=mesh%elem2D_nodes(:,elem)
+            work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
+            vol=vol+mesh%elem_area(elem)
+        END DO
+        work_array(n)=work_array(n)/vol
+        END DO
+        DO n=1,myDim_nod2D
+        mesh%mesh_resolution(n)=work_array(n)
+        ENDDO
+        call exchange_nod(mesh%mesh_resolution)
     END DO
- END DO
- ! Only areas through which there is exchange are counted
+    deallocate(work_array)
 
- ! ===========
- ! Update to proper dimension
- ! ===========
- mesh%elem_area=mesh%elem_area*r_earth*r_earth
- mesh%area=mesh%area*r_earth*r_earth
- 
-call exchange_nod(mesh%area)
+    !___compute total ocean areas with/without cavity___________________________
+    vol = 0.0_WP
+    vol2= 0.0_WP
+    do n=1, myDim_nod2D
+        vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
+        if (mesh%ulevels_nod2D(n)>1) cycle
+        vol=vol+mesh%area(1, n) ! area only surface  
+    end do
+    mesh%ocean_area=0.0
+    mesh%ocean_areawithcav=0.0
+    call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+    
+    !___write mesh statistics___________________________________________________
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> mesh statistics:', mype
+        write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
+        write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
+                    '   MinScArea ', minval(mesh%area(1,:))
+        write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
+        if (mype==0) then
+            write(*,*) '     > Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
+            write(*,*) '     > Total ocean surface area wth cavity is: ', mesh%ocean_areawithcav, ' m^2'
+        end if
+    endif
 
-
-!!PS do n=1, myDim_nod2D
-!!PS     nzmin = mesh%ulevels_nod2d(n)
-!!PS     if (nzmin>1) then 
-!!PS         write(*,*) ' --> mesh area:', mype, n, nzmin, mesh%area(nzmin,n),mesh%area(nzmin+1,n),mesh%area(nzmin+2,n)
-!!PS     end if 
-!!PS end do
-
-
-
-do n=1,myDim_nod2d+eDim_nod2D
-   do nz=1,mesh%nl
-      if (mesh%area(nz,n) > 0._WP) then
-         mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
-      else
-         mesh%area_inv(nz,n) = 0._WP
-      end if
-   end do
-end do
- ! coordinates are in radians, edge_dxdy are in meters,
- ! and areas are in m^2
- 
-!!PS do n=1,myDim_nod2d+eDim_nod2D
-!!PS    mesh%area_inv(1:mesh%ulevels_nod2D(n)-1,n) = 0.0_WP
-!!PS    mesh%area(1:mesh%ulevels_nod2D(n)-1,n) = 0.0_WP
-!!PS end do 
- 
- 
-
- allocate(work_array(myDim_nod2D))
- !!PS mesh%mesh_resolution=sqrt(mesh%area(1, :)/pi)*2._WP
- do n=1,myDim_nod2d+eDim_nod2D
-    mesh%mesh_resolution(n)=sqrt(mesh%area(mesh%ulevels_nod2D(n), n)/pi)*2._WP
- end do 
- 
- DO q=1, 3 !apply mass matrix N times to smooth the field
-    DO n=1, myDim_nod2D
-       vol=0._WP
-       work_array(n)=0._WP
-       DO j=1, mesh%nod_in_elem2D_num(n)
-          elem=mesh%nod_in_elem2D(j, n)
-          elnodes=mesh%elem2D_nodes(:,elem)
-          work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
-          vol=vol+mesh%elem_area(elem)
-       END DO
-       work_array(n)=work_array(n)/vol
-    END DO
-    DO n=1,myDim_nod2D
-       mesh%mesh_resolution(n)=work_array(n)
-    ENDDO
-    call exchange_nod(mesh%mesh_resolution)
- END DO
- deallocate(work_array)
-
- vol=0.0_WP
- vol2=0.0_WP
- do n=1, myDim_nod2D
-    vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n)
-    if (mesh%ulevels_nod2D(n)>1) cycle
-    vol=vol+mesh%area(1, n)
- end do
- mesh%ocean_area=0.0
- mesh%ocean_areawithcav=0.0
- call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
- call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
-
-if (mype==0) then
- write(*,*)  mype, 'Mesh statistics:'
- write(*,*)  mype, 'maxArea ',maxval(mesh%elem_area), '   MinArea ', minval(mesh%elem_area)
- write(*,*)  mype, 'maxScArea ',maxval(mesh%area(1,:)), &
-            '   MinScArea ', minval(mesh%area(1,:))
- write(*,*)  mype, 'Edges:    ', mesh%edge2D, ' internal ', mesh%edge2D_in
- if (mype==0) then
-    write(*,*) 'Total ocean surface area is           : ', mesh%ocean_area, ' m^2'
-    write(*,*) 'Total ocean surface area wth cavity is: ', mesh%ocean_areawithcav, ' m^2'
- end if
-endif
-
-
-t1=MPI_Wtime()
-if (mype==0) then
-   write(*,*) 'mesh_areas finished in ', t1-t0, ' seconds'
-   write(*,*) '========================='
-endif
+    t1=MPI_Wtime()
+    if (mype==0) then
+        write(*,*) '     > mesh_areas finished in ', t1-t0, ' seconds'
+    endif
 END SUBROUTINE mesh_areas
 
 !===================================================================
@@ -2288,10 +2410,12 @@ deallocate(center_y, center_x)
   do i=1, myDim_nod2D
      if (mesh%geo_coord_nod2D(2, i) > 0) then
         nn=nn+1
-        mesh%lump2d_north(i)=mesh%area(1, i)
+!!PS         mesh%lump2d_north(i)=mesh%area(1, i)! --> TEST_cavity
+        mesh%lump2d_north(i)=mesh%node_area(i)
      else
         ns=ns+1     
-        mesh%lump2d_south(i)=mesh%area(1, i)
+!!PS         mesh%lump2d_south(i)=mesh%area(1, i)! --> TEST_cavity
+        mesh%lump2d_south(i)=mesh%node_area(i)
      end if	   
   end do   
 

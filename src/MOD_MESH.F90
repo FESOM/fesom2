@@ -63,7 +63,7 @@ integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D, nlevels_n
 !
 !
 !___horizontal mesh info________________________________________________________
-real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
+real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv, areasvol, areasvol_inv
 real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
 
 !

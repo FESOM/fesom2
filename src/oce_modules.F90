@@ -304,7 +304,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
-!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n !, dum_3d_e
 !!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
 
 !_______________________________________________________________________________
