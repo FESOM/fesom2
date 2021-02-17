@@ -1950,7 +1950,7 @@ SUBROUTINE mesh_areas(mesh)
     end do
     
     !___compute "mid" scalar cell area__________________________________________
-    ! for cavity case: redefine scalar cell area from upper edge of prism to 
+    ! for cavity case: redefine "mid" scalar cell area from upper edge of prism to 
     ! lower edge of prism if a cavity triangle is present at the upper scalar
     ! cell edge 
     if (use_cavity) then
@@ -1960,6 +1960,8 @@ SUBROUTINE mesh_areas(mesh)
             do nz=nzmin,nzmax
                 if (cavity_contribut(nz,n)>0) then
                     mesh%areasvol(nz,n) = mesh%area(min(nz+1,nzmax),n)
+                else
+                    mesh%areasvol(nz,n) = mesh%area(nz,n)
                 end if
             end do 
         end do
@@ -2027,23 +2029,23 @@ SUBROUTINE mesh_areas(mesh)
     end do 
  
     ! smooth resolution
-    DO q=1, 3 !apply mass matrix N times to smooth the field
-        DO n=1, myDim_nod2D
-        vol=0._WP
-        work_array(n)=0._WP
-        DO j=1, mesh%nod_in_elem2D_num(n)
-            elem=mesh%nod_in_elem2D(j, n)
-            elnodes=mesh%elem2D_nodes(:,elem)
-            work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
-            vol=vol+mesh%elem_area(elem)
-        END DO
-        work_array(n)=work_array(n)/vol
-        END DO
-        DO n=1,myDim_nod2D
-        mesh%mesh_resolution(n)=work_array(n)
-        ENDDO
+    do q=1, 3 !apply mass matrix N times to smooth the field
+        do n=1, myDim_nod2D
+            vol=0._WP
+            work_array(n)=0._WP
+            do j=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(j, n)
+                elnodes=mesh%elem2D_nodes(:,elem)
+                work_array(n)=work_array(n)+sum(mesh%mesh_resolution(elnodes))/3._WP*mesh%elem_area(elem)
+                vol=vol+mesh%elem_area(elem)
+            end do
+            work_array(n)=work_array(n)/vol
+        end do
+        do n=1,myDim_nod2D
+            mesh%mesh_resolution(n)=work_array(n)
+        end do
         call exchange_nod(mesh%mesh_resolution)
-    END DO
+    end do
     deallocate(work_array)
 
     !___compute total ocean areas with/without cavity___________________________
