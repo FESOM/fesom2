@@ -298,6 +298,7 @@ allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size))
 allocate(uke_dif(nl-1,elem_size))
 allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
 allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
+allocate(UV_total_tend(2,nl-1,elem_size))
 
 uke=0.0_8
 v_back=0.0_8
@@ -308,16 +309,8 @@ uke_rhs=0.0_8
 uke_rhs_old=0.0_8
 UV_dis_tend=0.0_8
 UV_back_tend=0.0_8
-end if
-
-if(visc_option==5) then
-allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
-UV_dis_tend=0.0_8
-UV_back_tend=0.0_8
-end if 
-
-allocate(UV_total_tend(2,nl-1,elem_size))
 UV_total_tend=0.0_8
+end if
 
 !Velocities at nodes
 allocate(Unode(2,nl-1,node_size))

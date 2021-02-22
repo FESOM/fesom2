@@ -251,7 +251,6 @@ type(t_mesh), intent(in) , target :: mesh
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
  ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
  ! The contribution from boundary edges is neglected (free slip). 
- UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
@@ -269,10 +268,6 @@ type(t_mesh), intent(in) , target :: mesh
         UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
         UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
         UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-        UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
-        UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
-        UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
-        UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO
  END DO
 end subroutine visc_filt_harmon
@@ -357,7 +352,6 @@ SUBROUTINE visc_filt_biharm(option, mesh)
 
  call exchange_elem(U_c)
  call exchange_elem(V_c)
- UV_total_tend=0.0_8
  DO ed=1, myDim_edge2D+eDim_edge2D
      ! check if its a boudnary edge
     if(myList_edge2D(ed)>edge2D_in) cycle
@@ -372,10 +366,6 @@ SUBROUTINE visc_filt_biharm(option, mesh)
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-     UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
-     UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
-     UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
-     UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
      
@@ -446,7 +436,6 @@ SUBROUTINE visc_filt_hbhmix(mesh)
     end do
     call exchange_elem(U_c)
     call exchange_elem(V_c)
-    UV_total_tend=0.0_8
     DO ed=1, myDim_edge2D+eDim_edge2D
         ! check if its a boudnary edge
         if(myList_edge2D(ed)>edge2D_in) cycle
@@ -461,10 +450,6 @@ SUBROUTINE visc_filt_hbhmix(mesh)
             UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-            UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
-            UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
-            UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
-            UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))  
         END DO 
     END DO
      
@@ -650,9 +635,6 @@ SUBROUTINE visc_filt_bcksct(mesh)
     END DO
     call exchange_nod(U_c)
     call exchange_nod(V_c)
-    UV_total_tend=0.0_8
-    UV_back_tend=0.0_8
-    UV_dis_tend=0.0_8
     do ed=1, myDim_elem2D
         nelem=elem2D_nodes(:,ed)
         nzmin = ulevels(ed)
@@ -661,12 +643,6 @@ SUBROUTINE visc_filt_bcksct(mesh)
         Do nz=nzmin, nzmax-1
             UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
             UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
-            UV_total_tend(1,nz,ed)=UV_total_tend(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
-            UV_total_tend(2,nz,ed)=UV_total_tend(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
-            UV_back_tend(1,nz,ed)=UV_back_tend(1,nz,ed)-easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
-            UV_back_tend(2,nz,ed)=UV_back_tend(2,nz,ed)-easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
-            UV_dis_tend(1,nz,ed)=UV_dis_tend(1,nz,ed)+U_b(nz,ed)
-            UV_dis_tend(2,nz,ed)=UV_dis_tend(2,nz,ed)+V_b(nz,ed)
         END DO
     end do
     deallocate(V_c,U_c,V_b,U_b)
@@ -730,7 +706,6 @@ SUBROUTINE visc_filt_bilapl(mesh)
     
     call exchange_elem(U_c)
     call exchange_elem(V_c)
-    UV_total_tend=0.0_8
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -744,10 +719,6 @@ SUBROUTINE visc_filt_bilapl(mesh)
             UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-            UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
-            UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
-            UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
-            UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
         END DO 
     END DO  
     deallocate(V_c,U_c)
@@ -804,7 +775,6 @@ SUBROUTINE visc_filt_bidiff(mesh)
     
     call exchange_elem(U_c)
     call exchange_elem(V_c)
-    UV_total_tend=0.0_8
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -824,10 +794,6 @@ SUBROUTINE visc_filt_bidiff(mesh)
             UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
             UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
             UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-            UV_total_tend(1,nz,el(1))=UV_total_tend(1,nz,el(1))-u1/elem_area(el(1))
-            UV_total_tend(1,nz,el(2))=UV_total_tend(1,nz,el(2))+u1/elem_area(el(2))
-            UV_total_tend(2,nz,el(1))=UV_total_tend(2,nz,el(1))-v1/elem_area(el(1))
-            UV_total_tend(2,nz,el(2))=UV_total_tend(2,nz,el(2))+v1/elem_area(el(2))
         END DO 
     END DO
     deallocate(V_c, U_c)
