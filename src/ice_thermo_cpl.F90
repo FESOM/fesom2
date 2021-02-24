@@ -476,13 +476,11 @@ contains
   real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
 
 
-  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
+  snicecond = con/consn   ! equivalence fraction thickness of ice/snow
   zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
   zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
-  zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
-  zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  zcpdte=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
   t=min(ctfreez,t)                      ! Not warmer than freezing please!
  end subroutine ice_surftemp
