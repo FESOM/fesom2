@@ -11,9 +11,10 @@ visc_option=5          ! 1=Harmonic Leith parameterization;
                        ! 2=Laplacian+Leith+biharmonic background
                        ! 3=Biharmonic Leith parameterization
                        ! 4=Biharmonic flow aware
-                       ! 5=Easy Backscatter
+                       ! 5=Kinematic (easy) Backscatter
                        ! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
                        ! 7=Biharmonic flow aware (viscosity depends on velocity differences)
+                       ! 8=Dynamic Backscatter
 easy_bs_return= 1.5     ! coefficient for returned sub-gridscale energy, to be used with visc_option=5 (easy backscatter)
 A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
 scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
