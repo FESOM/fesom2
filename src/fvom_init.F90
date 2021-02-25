@@ -71,6 +71,20 @@ interface
    end subroutine communication_ini
 end interface
 
+interface
+   subroutine read_mesh_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_cavity
+end interface
+
+interface
+   subroutine find_levels_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels_cavity
+end interface
+
   character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
   type(t_mesh), target, save  :: mesh
