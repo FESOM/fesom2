@@ -200,12 +200,10 @@ as=sin(theta_io)
      DO i=1,3  ! Cycle over rows elem contributes to
 	row=elnodes(i)
 	if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
-
-         offset=SSH_stiff%rowptr_loc(row)-ssh_stiff%rowptr_loc(1)
-         DO q=1,SSH_stiff%rowptr_loc(row+1)-SSH_stiff%rowptr_loc(row)
-            n2=nn_pos(q,row)
-            n_num(n2)=offset+q
-         END DO
+        DO q=1,SSH_stiff%rowptr_loc(row), SSH_stiff%rowptr_loc(row+1)-1
+           n2=SSH_stiff%colind_loc(q)
+           n_num(n2)=q
+        END DO
 
         inv_mass=(rhoice*m_ice(row)+rhosno*m_snow(row)) !/a_ice(row)
         inv_mass=max(inv_mass, 9.0_8)        ! Limit the weighted mass 
