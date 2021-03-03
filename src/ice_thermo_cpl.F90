@@ -154,7 +154,8 @@ subroutine thermodynamics(mesh)
         call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
         ice_temp(inod) = t
      else
-        ice_temp(inod) = 271.34_WP
+        ! Freezing temp of saltwater in K
+        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
@@ -477,8 +478,7 @@ contains
   real(kind=WP)  :: TFrezs
 
   !---- compute freezing temperature of sea-water from salinity
-  TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) -
-2.155e-4_WP*(S_oc**2)+273.15
+  TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
 
   snicecond = con/consn*rhoice/rhosno   ! equivalence fraction thickness of ice/snow
   zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
