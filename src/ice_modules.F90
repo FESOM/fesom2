@@ -42,6 +42,9 @@ MODULE i_PARAM
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
 
+! VP param
+  integer                   :: ice_VP_iter=0
+
 NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
 
@@ -101,6 +104,9 @@ save
 ! Mean arrays
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_mean, V_ice_mean
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: m_ice_mean, a_ice_mean, m_snow_mean
+! VP arrays
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: ice_stiff_values !the structure for colptr and rowind is the same as in ssh_stiff
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_u, rhs_v
   END MODULE i_ARRAYS
 !=====================================================================
 module i_therm_param

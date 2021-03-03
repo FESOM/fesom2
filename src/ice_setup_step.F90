@@ -199,7 +199,10 @@ t0=MPI_Wtime()
         call EVPdynamics_m(mesh)
     CASE (2)
         call EVPdynamics_a(mesh)
+    CASE (3)
+        call    VPdynamics(mesh)
     CASE DEFAULT
+
         if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
         call par_ex
         stop
