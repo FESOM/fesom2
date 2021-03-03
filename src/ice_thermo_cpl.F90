@@ -132,17 +132,17 @@ subroutine thermodynamics(mesh)
         rsf     = 0._WP
      end if
 
-!#if defined (__oifs)
-!     !---- different lead closing parameter for NH and SH
-!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-!     if (geolat.lt.0.) then
-!        h0min = 0.75
-!        h0max = 1.0
-!     else
-!        h0min = 0.5
-!        h0max = 0.75
-!     endif
-!#endif /* (__oifs) */
+#if defined (__oifs)
+     !---- different lead closing parameter for NH and SH
+     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+     if (geolat.lt.0.) then
+        h0min = 1.0
+        h0max = 1.0
+     else
+        h0min = 0.5
+        h0max = 0.5
+     endif
+#endif /* (__oifs) */
 
      call ice_growth
 #if defined (__oifs)
