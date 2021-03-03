@@ -154,7 +154,7 @@ subroutine thermodynamics(mesh)
         call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
         ice_temp(inod) = t
      else
-        ice_temp(inod) = 275.15_WP
+        ice_temp(inod) = 271.34_WP
      endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
@@ -505,7 +505,7 @@ contains
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (h>0.0_WP) then
-     if (t<273.14_WP) then         ! freezing condition    
+     if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       
