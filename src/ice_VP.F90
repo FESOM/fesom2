@@ -201,8 +201,8 @@ as=sin(theta_io)
 	row=elnodes(i)
 	if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
 
-         offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-         DO q=1,SSH_stiff%rowptr(row+1)-SSH_stiff%rowptr(row)
+         offset=SSH_stiff%rowptr_loc(row)-ssh_stiff%rowptr_loc(1)
+         DO q=1,SSH_stiff%rowptr_loc(row+1)-SSH_stiff%rowptr_loc(row)
             n2=nn_pos(q,row)
             n_num(n2)=offset+q
          END DO
