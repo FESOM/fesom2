@@ -83,7 +83,7 @@ type(t_mesh), intent(in), target  :: mesh
 #include "associate_mesh.h"
 
 allocate(ice_stiff_values(ssh_stiff%nza))
-allocate(rhs_u(nod2D), rhs_v(nod2D))
+allocate(rhs_u(myDim_nod2D+eDim_nod2D), rhs_v(myDim_nod2D+eDim_nod2D))
 ice_stiff_values=0.
 rhs_u=0.0_WP
 rhs_v=0.0_WP
@@ -134,20 +134,19 @@ as=sin(theta_io)
          Cd_oce_ice*density_0*inv_mass
                     ! PP DO q=nini,nend 
 
-    offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-    ice_stiff_values(offset+1)=area(1,row)*(1.0/ice_dt+drag*ac)  ! Diagonal value
-    DO q=2,ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
-       ice_stiff_values(offset+q)=0.0_8                      ! Initialize with 0.0
-    END DO
-   
-!    DO q=ssh_stiff%rowptr_loc(row), ssh_stiff%rowptr_loc(row+1)-1
-!       if (ssh_stiff%colind_loc(q)==row) then
-!          ice_stiff_values(q)=area(1, row)*(1.0/ice_dt+drag*ac)
-!       else
-!          ice_stiff_values(q)=0.0_8
-!       end if
+!    offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
+!    ice_stiff_values(offset+1)=area(1,row)*(1.0/ice_dt+drag*ac)  ! Diagonal value
+!    DO q=2,ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
+!       ice_stiff_values(offset+q)=0.0_8                      ! Initialize with 0.0
 !    END DO
-
+   
+    DO q=ssh_stiff%rowptr_loc(row), ssh_stiff%rowptr_loc(row+1)-1
+       if (ssh_stiff%colind_loc(q)==row) then
+          ice_stiff_values(q)=area(1, row)*(1.0/ice_dt+drag*ac)
+       else
+          ice_stiff_values(q)=0.0_8
+       end if
+    END DO
 
     ! =========
      rhs_u(row)=area(1, row)*(rhs_m(row)/ice_dt+drag*ac*u_w(row) &
@@ -200,7 +199,7 @@ as=sin(theta_io)
      DO i=1,3  ! Cycle over rows elem contributes to
 	row=elnodes(i)
 	if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
-        DO q=1,SSH_stiff%rowptr_loc(row), SSH_stiff%rowptr_loc(row+1)-1
+        DO q=SSH_stiff%rowptr_loc(row), SSH_stiff%rowptr_loc(row+1)-1
            n2=SSH_stiff%colind_loc(q)
            n_num(n2)=q
         END DO
@@ -336,8 +335,8 @@ end if
 !write(*,*) 'rhs_u min/max=', mype, minval(rhs_u), maxval(rhs_u)
 !write(*,*) 'ice_stiff',      mype, minval(ice_stiff_values), maxval(ice_stiff_values), sum(ice_stiff_values)
 
-call exchange_nod(u_ice) !is this required after calling psolve ?
-call exchange_nod(v_ice) !is this required after calling psolve ?
+!call exchange_nod(u_ice) !is this required after calling psolve ?
+!call exchange_nod(v_ice) !is this required after calling psolve ?
 end subroutine VPsolve 
 ! ============================================================================
 subroutine VPdynamics(mesh)
@@ -372,33 +371,6 @@ rhs_diag_ice=0.0
  call VPbc(mesh)
  call VPsolve(mesh, 1)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  do n=1, myDim_nod2D
-     is=ssh_stiff%rowptr_loc(n)
-     ie=ssh_stiff%rowptr_loc(n+1)-1     
-     rhs_diag_ice(n)=sum(ice_stiff_values(is:ie)*u_ice(ssh_stiff%colind_loc(is:ie)))
-
-  end do
-
-if (mype==147) then
-     do n=1, myDim_nod2D
-        is=ssh_stiff%rowptr_loc(n)
-        ie=ssh_stiff%rowptr_loc(n+1)-1  
-        write(*,*) rhs_diag_ice(n), rhs_u(n), u_ice(n)
-        write(*,*) n, '***********values*******'
-        write(*,*) ice_stiff_values(is:ie)
-        write(*,*) n, '***********u_ice********'       
-        write(*,*) u_ice(ssh_stiff%colind_loc(is:ie))
-        write(*,*) n, '***********RHS**********'       
-        write(*,*) rhs_u(n)
-        write(*,*) '***************************'       
-     end do
-end if
-
-call par_ex
-stop
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
  DO row=1,myDim_nod2D+eDim_nod2D     !! PP n=1,myDim_nod2D+eDim_nod2D       
                                      !! PP row=myList_nod2D(n)
    u_ice(row)=0.5*(u_ice(row)+rhs_m(row))
@@ -409,7 +381,7 @@ stop
  DO n=1, ice_VP_iter   !(Picard iterations)
   call VPmatrix_rhs(mesh)
   call VPbc(mesh)
-  call VPsolve(mesh, 0)
+  call VPsolve(mesh, 1)
  END DO  
  DO row=1,myDim_nod2D+eDim_nod2D     !! PP  n=1,myDim_nod2D+eDim_nod2D       
                                      !! PP row=myList_nod2D(n)
@@ -477,42 +449,52 @@ type(t_mesh), intent(in), target :: mesh
 
 #include "associate_mesh.h"
 
-
 ! Sets boundary conditions to the rhs and operator part.
-DO row=1,myDim_nod2D  !! PP i=1,myDim_nod2D       
-                      !! PP row=myList_nod2D(i)
-  if((a_ice(row)<0.01).or.(bc_index_nod2D(row)<0.5)) then
-  ! If there is no ice or a point is at the boundary, 
-  ! enforce velocity to zero/previous value
-  ! or ocean surface velocity  
- 
+DO row=1,myDim_nod2D
+   if((a_ice(row)<0.01).or.(bc_index_nod2D(row)<0.5)) then
 
-   ! Global memory code:
-   ! nini=ssh_stiff%rowptr(row)        
-   ! nend=ssh_stiff%rowptr(row+1)-1    
-     !do j=nini, nend
-     !  if (ssh_stiff%colind(j)==row) then 
-     !     ice_stiff_values(j)=1.0_8
-     !  else
-     !     ice_stiff_values(j)=0.0_8 
-     !  end if
-     !end do 
-    ! Distributed memory code:
+     is=ssh_stiff%rowptr_loc(row)
+     ie=ssh_stiff%rowptr_loc(row+1)-1
 
-    is=ssh_stiff%rowptr_loc(row)
-    ie=ssh_stiff%rowptr_loc(row+1)-1
+     where (ssh_stiff%colind_loc(is:ie)==row)
+           ice_stiff_values(is:ie)=1.0_8
+     elsewhere
+           ice_stiff_values(is:ie)=0.0_8
+     end where
 
-    where (ssh_stiff%colind_loc(is:ie)==row)
-          ice_stiff_values(is:ie)=1.0_8
-    elsewhere
-          ice_stiff_values(is:ie)=0.0_8
-    end where
-!
-!    rhs_u(row)=0._8 !u_w(row) !rhs_m(row)
-!    rhs_v(row)=0._8 !v_w(row) !rhs_a(row)
-  end if   
+     rhs_u(row)=0._8
+     rhs_v(row)=0._8
+   end if   
 END DO  
-
 
 end subroutine VPbc
 !=========================================================================
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  do n=1, myDim_nod2D
+!     is=ssh_stiff%rowptr_loc(n)
+!     ie=ssh_stiff%rowptr_loc(n+1)-1     
+!     rhs_diag_ice(n)=sum(ice_stiff_values(is:ie)*u_ice(ssh_stiff%colind_loc(is:ie)))
+!
+!  end do
+!
+!if (mype==147) then
+!     do n=1, myDim_nod2D
+!        is=ssh_stiff%rowptr_loc(n)
+!        ie=ssh_stiff%rowptr_loc(n+1)-1  
+!        write(*,*) rhs_diag_ice(n), rhs_u(n), u_ice(n)
+!        write(*,*) n, '***********values*******'
+!        write(*,*) ice_stiff_values(is:ie)
+!        write(*,*) n, '***********u_ice********'       
+!        write(*,*) u_ice(ssh_stiff%colind_loc(is:ie))
+!        write(*,*) n, '***********RHS**********'       
+!        write(*,*) rhs_u(n)
+!        write(*,*) '***************************'       
+!     end do
+!end if
+!call par_ex
+!stop
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
