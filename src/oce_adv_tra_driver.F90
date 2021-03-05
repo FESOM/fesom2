@@ -159,6 +159,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 
 ! Asynchronous copy of adf_v to gpu in stream 3
 !$acc enter data copyin(adv_flux_ver) async(3)
+
 !if (mype==0) then
 !   write(*,*) 'check new:'
 !   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
@@ -176,6 +177,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     else
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
+!$acc wait(3)
+!$acc wait(4)
 end subroutine do_oce_adv_tra
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
@@ -190,43 +193,60 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, myDim_edge2D)
-    real(kind=WP), intent(inout)      :: flux_v(mesh%nl,  myDim_nod2D)
+    real(kind=WP), intent(in)         :: flux_h(mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(in)         :: flux_v(mesh%nl,  myDim_nod2D)
     logical,       optional           :: use_lo
     real(kind=WP), optional           :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), optional           :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, edge
+    logical                           :: do_lo
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
+    do_lo=.false.
     if (present(use_lo)) then
-       if (use_lo) then
-          do n=1, myDim_nod2d
-             do nz=1,nlevels_nod2D(n)-1  
-                dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
-             end do
-           end do
-       end if
+        if (use_lo) then
+            do_lo=.true.
+        end if
     end if
 
-    do n=1, myDim_nod2d
-        do nz=1,nlevels_nod2D(n)-1  
-            dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
+    if (do_lo) then
+        !$acc parallel loop gang present(dttf_v,nlevels_nod2D,hnode,hnode_new,ttf, &
+        !$acc& LO,flux_v,area) vector_length(128)
+        do n=1, myDim_nod2d
+            !$acc loop vector
+            do nz=1,nlevels_nod2D(n)-1
+                dttf_v(nz,n)=dttf_v(nz,n) - ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n) &
+                                          + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
+            end do
         end do
-    end do
-
+    else
+        !$acc parallel loop gang present(dttf_v,nlevels_nod2D,flux_v,area) &
+        !$acc& vector_length(128)
+        do n=1, myDim_nod2d
+            !$acc loop vector
+            do nz=1,nlevels_nod2D(n)-1  
+                dttf_v(nz,n)=dttf_v(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))*dt/area(nz,n)
+            end do
+        end do
+    end if
     
     ! Horizontal
+    !$acc parallel loop gang present(nlevels,edges,edge_tri,dttf_h,flux_h,area)&
+    !$acc& private(enodes,el,nl1,nl2) vector_length(128)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
         nl1=nlevels(el(1))-1
         nl2=0
         if(el(2)>0) nl2=nlevels(el(2))-1
+        !$acc loop vector
         do nz=1, max(nl1,nl2)
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/area(nz,enodes(1))
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
+
+    !$acc update self(dttf_v, dttf_h)
 end subroutine oce_tra_adv_flux2dtracer

@@ -389,10 +389,6 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
             adf_h(nz,edge)=ae*adf_h(nz,edge)
         end do
     end do
-
     !$acc update self(adf_h) async(4)
-    ! Wait for streams to finish
-    !$acc wait(3)
-    !$acc wait(4)
     !$acc end data
 end subroutine oce_tra_adv_fct

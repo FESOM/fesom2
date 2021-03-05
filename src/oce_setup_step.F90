@@ -147,6 +147,9 @@ type(t_mesh), intent(in) , target :: mesh
         write(*,*)
     end if
     call init_thickness_ale(mesh)
+   
+    !$acc enter data copyin(hnode, hnode_new, helem, del_ttf_advhoriz, del_ttf_advvert)
+    
     if(mype==0) write(*,*) 'Initial state'
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
