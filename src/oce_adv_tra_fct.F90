@@ -86,7 +86,6 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     integer                           :: vlimit=1, vec_len
 
 #include "associate_mesh.h"
-    !$acc data copyin(LO)
 
     ! ------------      --------------------------------------------------------------
     ! ttf is the tracer field on step n
@@ -390,5 +389,4 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
         end do
     end do
     !$acc update self(adf_h) async(4)
-    !$acc end data
 end subroutine oce_tra_adv_fct
