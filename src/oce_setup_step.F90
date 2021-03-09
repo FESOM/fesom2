@@ -147,9 +147,6 @@ type(t_mesh), intent(in) , target :: mesh
         write(*,*)
     end if
     call init_thickness_ale(mesh)
-   
-    !$acc enter data copyin(hnode, hnode_new, helem, del_ttf_advhoriz, del_ttf_advvert)
-    
     if(mype==0) write(*,*) 'Initial state'
     if (w_split .and. mype==0) then
         write(*,*) '******************************************************************************'
@@ -157,6 +154,7 @@ type(t_mesh), intent(in) , target :: mesh
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
+    !$acc enter data copyin(hnode,hnode_new)
 end subroutine ocean_setup
 
 !==========================================================
@@ -219,6 +217,7 @@ allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
 del_ttf_advhoriz = 0.0_WP
 del_ttf_advvert  = 0.0_WP
+!$acc enter data copyin(del_ttf,del_ttf_advhoriz,del_ttf_advvert)
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
     allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))

@@ -195,13 +195,11 @@ subroutine adv_tracers_ale(tr_num, mesh)
     !___________________________________________________________________________
     ! horizontal ale tracer advection 
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-    
-    !$acc kernels present(del_ttf_advhoriz, del_ttf_advvert)
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    !$acc end kernels
-
+    !$acc update device(del_ttf_advhoriz, del_ttf_advvert) async(6)
     call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+    !$acc update self(del_ttf_advhoriz, del_ttf_advvert)
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection

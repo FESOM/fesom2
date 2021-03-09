@@ -52,7 +52,7 @@ subroutine oce_adv_tra_fct_init(mesh)
     fct_plus=0.0_WP
     fct_minus=0.0_WP
 ! Allocate gpu arrays for fct kernels.
-!$acc enter data create(fct_ttf_max,fct_ttf_min,UV_rhs,fct_plus,fct_minus)
+!$acc enter data create(fct_ttf_max,fct_ttf_min,UV_rhs,fct_plus,fct_minus, fct_LO, adv_flux_hor, adv_flux_ver)
     
     if (mype==0) write(*,*) 'FCT is initialized'
 end subroutine oce_adv_tra_fct_init
@@ -352,7 +352,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! the bottom flux is always zero 
     end do
 
-    !$acc update self(adf_v) async(3)
+    !!$acc update self(adf_v) async(3)
 
     call exchange_nod_end  ! fct_plus, fct_minus
 
@@ -388,5 +388,9 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
             adf_h(nz,edge)=ae*adf_h(nz,edge)
         end do
     end do
-    !$acc update self(adf_h) async(4)
+
+    !!$acc update self(adf_h) async(4)
+    ! Wait for streams to finish
+    !!$acc wait(3)
+    !!$acc wait(4)
 end subroutine oce_tra_adv_fct
