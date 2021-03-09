@@ -318,7 +318,7 @@ restart=15
 fillin=3
 lutype=2
 droptol=1.e-8
-soltol=1.e-10
+soltol=1.e-12
 
 
 if (lfirst) then
@@ -330,13 +330,6 @@ if (lfirst) then
 end if
     call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
     call psolve(ident, rhs_v, ice_stiff_values, v_ice, new_values)
-
-!write(*,*) 'u_ice min/max=', mype, minval(u_ice), maxval(u_ice)
-!write(*,*) 'rhs_u min/max=', mype, minval(rhs_u), maxval(rhs_u)
-!write(*,*) 'ice_stiff',      mype, minval(ice_stiff_values), maxval(ice_stiff_values), sum(ice_stiff_values)
-
-!call exchange_nod(u_ice) !is this required after calling psolve ?
-!call exchange_nod(v_ice) !is this required after calling psolve ?
 end subroutine VPsolve 
 ! ============================================================================
 subroutine VPdynamics(mesh)
@@ -350,15 +343,15 @@ IMPLICIT NONE
 integer        :: n, row, is, ie
 logical, save  :: lfirst=.true.
 type(t_mesh), intent(in), target  :: mesh
-REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice
+REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice !!! just for testing, remove it afterwards
 #include "associate_mesh.h"
 
  if (lfirst) then
     call VP_init(mesh)
     lfirst=.false.
 
-allocate(rhs_diag_ice(myDim_nod2D))
-rhs_diag_ice=0.0
+    allocate(rhs_diag_ice(myDim_nod2D)) !!! just for testing, remove it afterwards
+    rhs_diag_ice=0.0                    !!! just for testing, remove it afterwards
  end if
 
 
@@ -392,6 +385,33 @@ rhs_diag_ice=0.0
  call VPbc(mesh)
  call VPsolve(mesh, 1)
  call VPmake_implicit(mesh)
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!  do n=1, myDim_nod2D
+!     is=ssh_stiff%rowptr_loc(n)
+!     ie=ssh_stiff%rowptr_loc(n+1)-1     
+!     rhs_diag_ice(n)=sum(ice_stiff_values(is:ie)*u_ice(ssh_stiff%colind_loc(is:ie)))
+!  end do
+!
+!if (mype==61) then
+!     do n=1, myDim_nod2D
+!        is=ssh_stiff%rowptr_loc(n)
+!        ie=ssh_stiff%rowptr_loc(n+1)-1  
+!        write(*,*) rhs_diag_ice(n), rhs_u(n), u_ice(n)
+!        write(*,*) n, '***********values*******'
+!        write(*,*) ice_stiff_values(is:ie)
+!        write(*,*) n, '***********u_ice********'       
+!        write(*,*) u_ice(ssh_stiff%colind_loc(is:ie))
+!        write(*,*) n, '***********RHS**********'       
+!        write(*,*) rhs_u(n)
+!        write(*,*) '***************************'       
+!     end do
+!end if
+!call par_ex
+!stop
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 end subroutine VPdynamics
 ! ============================================================================
 subroutine VPmake_implicit(mesh)
@@ -469,9 +489,6 @@ END DO
 
 end subroutine VPbc
 !=========================================================================
-
-
-
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !  do n=1, myDim_nod2D
 !     is=ssh_stiff%rowptr_loc(n)
