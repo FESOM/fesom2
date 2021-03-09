@@ -50,6 +50,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -64,7 +65,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     real(kind=WP), intent(in)         :: opth, optv
     real(kind=WP), pointer, dimension (:,:) :: pwvel
  
-    integer       :: el(2), enodes(2), nz, n, e, nz
+    integer       :: el(2), enodes(2), nz, n, e
     integer       :: n2, nl1, nl2, tr_num
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
@@ -134,8 +135,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
-! Asynchronous copy of adf_h to gpu in stream 2
-!$acc update device(adv_flux_hor) async(2)
+! Asynchronous copy of adf_h to gpu
+!$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
    
     if (trim(tra_adv_lim)=='FCT') then
        pwvel=>w
@@ -158,8 +159,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             call par_ex(1)
     END SELECT
 
-! Asynchronous copy of adf_v to gpu in stream 3
-!$acc update device(adv_flux_ver) async(3)
+! Asynchronous copy of adf_v to gpu
+!$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
 
 !if (mype==0) then
 !   write(*,*) 'check new:'
@@ -173,15 +174,16 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 !$acc wait(1)
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
-!$acc wait(5)
+!$acc wait(stream_hnode_update)
+!$acc wait(stream_dttf_reset)
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
     else
-!$acc wait(5)
-       call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
+!$acc wait(stream_dttf_reset)
+        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
 !$acc end data
-!$acc wait(3)
-!$acc wait(4)
+!$acc wait(stream_ver_adv_tra)
+!$acc wait(stream_hor_adv_tra)
 end subroutine do_oce_adv_tra
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
@@ -192,6 +194,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -209,7 +212,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     if (present(use_lo)) then
         if (use_lo) then
             !$acc parallel loop gang present(hnode,hnode_new,dttf_v,LO,ttf,nlevels_nod2D) &
-            !$acc& vector_length(128) async(3)
+            !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
             do n=1, myDim_nod2d
                 !$acc loop vector
                 do nz=1,nlevels_nod2D(n)-1
@@ -220,7 +223,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     end if
 
     !$acc parallel loop gang present(dttf_v,flux_v,nlevels_nod2D,area) &
-    !$acc& vector_length(128) async(3)
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2d
         !$acc loop vector
         do nz=1,nlevels_nod2D(n)-1
@@ -231,7 +234,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
     ! Horizontal
     !$acc parallel loop gang present(dttf_h,nlevels,edges,edge_tri,flux_h,area)&
-    !$acc& private(enodes,el,nl1,nl2) vector_length(128) async(4)
+    !$acc& private(enodes,el,nl1,nl2) vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)

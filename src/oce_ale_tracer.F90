@@ -174,6 +174,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use adv_tracers_muscle_ale_interface
     use adv_tracers_vert_ppm_ale_interface
     use oce_adv_tra_driver_interfaces
+    use openacc_params
     implicit none
     integer :: tr_num, node, nz
     type(t_mesh), intent(in) , target :: mesh    
@@ -197,7 +198,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     del_ttf_advhoriz = 0.0_WP
     del_ttf_advvert  = 0.0_WP
-    !$acc update device(del_ttf_advhoriz, del_ttf_advvert) async(6)
+    !$acc update device(del_ttf_advhoriz, del_ttf_advvert) async(stream_dttf_reset)
     call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !$acc update self(del_ttf_advhoriz, del_ttf_advvert)
     !___________________________________________________________________________
