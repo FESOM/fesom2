@@ -98,7 +98,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
 
     ! Double loop over blocks then threads. Copy LO array, rest is either static mesh info or copied in 
     ! calling routine do_oce_adv_tra
-    !$acc parallel loop gang present(LO,ttf,nlevels_nod2D) vector_length(z_vector_length)
+    !$acc parallel loop gang present(fct_ttf_max,fct_ttf_min,LO,ttf,nlevels_nod2D) vector_length(z_vector_length)
     do n=1,myDim_nod2D+edim_nod2d
         !$acc loop vector
         do nz=1, nlevels_nod2D(n)-1 
@@ -114,7 +114,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
 
     ! Double loop over blocks then threads. All arrays are either static mesh info or copied in 
     ! calling routine do_oce_adv_tra, enodes are private array
-    !$acc parallel loop gang present(nl,nlevels,elem2D_nodes,fct_ttf_min,fct_ttf_max) &
+    !$acc parallel loop gang present(UV_rhs,nl,nlevels,elem2D_nodes,fct_ttf_min,fct_ttf_max) &
     !$acc& private(enodes) vector_length(z_vector_length)
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
@@ -143,7 +143,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     if(vlimit==1) then
         !Horizontal
         !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
-        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max) copyout(fct_ttf_min, fct_ttf_max) &
+        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max)&
         !$acc& vector_length(z_vector_length)
         do n=1, myDim_nod2D
             !___________________________________________________________________
@@ -182,7 +182,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! local  
     if(vlimit==2) then
         !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
-        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max) copyout(fct_ttf_min, fct_ttf_max) &
+        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max)&
         !$acc& vector_length(z_vector_length)
         do n=1, myDim_nod2D
             !$acc loop vector
@@ -208,7 +208,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     !            horizontal ones  
     if(vlimit==3) then
         !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
-        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max) copyout(fct_ttf_min, fct_ttf_max)&
+        !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max)&
         !$acc& vector_length(z_vector_length)
         do n=1, myDim_nod2D
             !$acc loop vector
@@ -250,8 +250,8 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     !Vertical
 
     ! Wait for stream copying adf_v onto GPU, then perform kernel
-    !$acc wait(stream_ver_adv_tra)
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,adf_v) vector_length(z_vector_length)
+    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,adf_v)&
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
         !$acc loop vector
         do nz=1,nlevels_nod2D(n)-1
@@ -261,7 +261,9 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
 !             fct_minus(nz,n)=fct_minus(nz,n)+ &
 !                             (min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n))) &
 !                             /hnode(nz,n)
+            !$acc atomic
             fct_plus(nz,n) =fct_plus(nz,n) +(max(0.0_WP,adf_v(nz,n))+max(0.0_WP,-adf_v(nz+1,n)))
+            !$acc atomic
             fct_minus(nz,n)=fct_minus(nz,n)+(min(0.0_WP,adf_v(nz,n))+min(0.0_WP,-adf_v(nz+1,n)))
         end do
     end do
@@ -269,9 +271,8 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     !Horizontal
 
     ! Wait for stream copying adf_h onto GPU, then perform kernel
-    !$acc wait(stream_hor_adv_tra)
     !$acc parallel loop gang present(nlevels,edges,edge_tri,fct_plus,fct_minus,adf_h) private(enodes,el)&
-    !$acc& vector_length(z_vector_length)
+    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -293,6 +294,8 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
         end do
     end do
     
+    !$acc wait(stream_ver_adv_tra)
+    !$acc wait(stream_hor_adv_tra)
     !___________________________________________________________________________
     ! b2. Limiting factors
 
