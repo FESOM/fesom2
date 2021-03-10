@@ -76,7 +76,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 #include "associate_mesh.h"
 
 ! Asynchronous copy of ttf to gpu
-!$acc data copyin(ttf) async(1)
+!$acc data copyin(ttf, ttfAB) async(1)
     if (trim(tra_adv_lim)=='FCT') then 
     ! compute the low order upwind horizontal flux
     ! init_zero=.true.  : zero the horizontal flux before computation
@@ -144,6 +144,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
        pwvel=>we
     end if
  
+    !$acc wait(1)
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
@@ -160,7 +161,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     END SELECT
 
 ! Asynchronous copy of adf_v to gpu
-!$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
+!!$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
 
 !if (mype==0) then
 !   write(*,*) 'check new:'
@@ -171,7 +172,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     if (trim(tra_adv_lim)=='FCT') then
 !if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
 ! Wait for ttf copy to be completed to start routine
-!$acc wait(1)
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
 !$acc wait(stream_hnode_update)

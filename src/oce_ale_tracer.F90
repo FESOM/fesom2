@@ -109,6 +109,9 @@ subroutine solve_tracers_ale(mesh)
         Wvel_e=Wvel_e+fer_Wvel
         Wvel  =Wvel  +fer_Wvel
     end if
+
+    !$acc update device(Wvel, Wvel_e) async(8)
+
     !___________________________________________________________________________
     ! loop over all tracers 
     do tr_num=1,num_tracers

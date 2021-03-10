@@ -331,6 +331,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in) , target :: mesh
     integer,       intent(in)          :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -346,9 +347,22 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
 #include "associate_mesh.h"
 
     if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
+      nzmax=mesh%nl
+      if (init_zero)then
+        !$acc parallel loop collapse(2) present(flux)
+        do n=1, myDim_nod2D
+          do nz=1,nzmax
+            flux(nz,n)=0.0_WP
+          end do
+        end do
+      end if
     else
-       flux=0.0_WP
+      !$acc parallel loop collapse(2) present(flux)
+      do n=1, myDim_nod2D
+        do nz=1,nzmax
+          flux(nz,n)=0.0_WP
+        end do
+      end do
     end if
 
     ! --------------------------------------------------------------------------
@@ -361,13 +375,16 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    flux             =0.0_WP
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,hnode,hnode_new,flux,area)&
+    !$acc& private(nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x,counter,overshoot_counter)&
+    !$acc& reduction(+:overshoot_counter,counter) vector_length(z_vector_length)
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
         ! calculated on mid depth levels 
         ! nzmax ... number of depth levels at node n
         nzmax=nlevels_nod2D(n)
+
         ! tracer at surface layer
         tv(1)=ttf(1,n)
         ! tracer at surface+1 layer
@@ -382,7 +399,8 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! calc tracer for surface+2 until depth-2 layer
         ! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
         ! loop over layers (segments)
-         do nz=3, nzmax-3
+        !$acc loop vector
+        do nz=3, nzmax-3
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
             ! equation (1.9)
@@ -449,10 +467,13 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
                         + dzjp1*(dzjp1+dzjp2)/(dzj+2._WP*dzjp1)*deltaj &
                         )
                        !tv(nz+1)=max(min(ttf(nz, n), ttf(nz+1, n)), min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz+1)))
-        end do ! --> do nz=2,nzmax-3
-        
-        tvert(1:nzmax)=0._WP
+        end do ! --> do nz=2,nzmax-3        
+        !$acc loop vector
+        do nz=1, nzmax
+            tvert(nz)=0._WP
+        end do
         ! loop over layers (segments)
+        !$acc loop vector
         do nz=1, nzmax-1
             if ((W(nz,n)<=0._WP) .AND. (W(nz+1,n)>=0._WP)) CYCLE
             counter=counter+1
@@ -476,16 +497,12 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
             
             if (W(nz,n)>0._WP) then
                 x=min(W(nz,n)*dt/dzj, 1._WP)
-                tvert(nz  )=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))
-                tvert(nz  )=( tvert(nz)**do_Xmoment ) ! compute 2nd moment for DVD
-                tvert(nz  )=tvert(nz)*area(nz,n)*W(nz,n)
+                tvert(nz  )=( (-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))**do_Xmoment )*area(nz,n)*W(nz,n)
             end if
             
             if (W(nz+1,n)<0._WP) then
                 x=min(-W(nz+1,n)*dt/dzj, 1._WP)
-                tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))
-                tvert(nz+1)=( tvert(nz+1)**do_Xmoment ) ! compute 2nd moment for DVD
-                tvert(nz+1)=tvert(nz+1)*area(nz+1,n)*W(nz+1,n)
+                tvert(nz+1)=( (-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))**do_Xmoment )*area(nz+1,n)*W(nz+1,n)
             end if
         end do
         
@@ -493,8 +510,12 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! Surface flux
         tvert(1)= -( tv(1)**do_Xmoment )*W(1,n)*area(1,n)
         ! Zero bottom flux
-        tvert(nzmax)=0.0_WP        
-        flux(1:nzmax, n)=tvert(1:nzmax)-flux(1:nzmax, n)
+        tvert(nzmax)=0.0_WP
+
+        !$acc loop vector
+        do nz=1, nzmax
+            flux(nz, n)=tvert(nz)-flux(nz, n)
+        end do
     end do ! --> do n=1, myDim_nod2D
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
 end subroutine adv_tra_vert_ppm

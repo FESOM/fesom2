@@ -217,7 +217,7 @@ allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
 del_ttf_advhoriz = 0.0_WP
 del_ttf_advvert  = 0.0_WP
-!$acc enter data copyin(del_ttf,del_ttf_advhoriz,del_ttf_advvert)
+!$acc enter data copyin(Wvel,Wvel_e,del_ttf,del_ttf_advhoriz,del_ttf_advvert)
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
     allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
