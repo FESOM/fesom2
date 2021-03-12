@@ -1859,11 +1859,11 @@ SUBROUTINE mesh_areas(mesh)
     allocate(mesh%area(mesh%nl,myDim_nod2d+eDim_nod2D))
     
     ! "mid" area of scalar cell in case of cavity area \= areasvol, size: nl-1 x node
-    allocate(mesh%areasvol(mesh%nl-1,myDim_nod2d+eDim_nod2D))
+    allocate(mesh%areasvol(mesh%nl,myDim_nod2d+eDim_nod2D))
     
     ! area inverse
     allocate(mesh%area_inv(mesh%nl,myDim_nod2d+eDim_nod2D))
-    allocate(mesh%areasvol_inv(mesh%nl-1,myDim_nod2d+eDim_nod2D))
+    allocate(mesh%areasvol_inv(mesh%nl,myDim_nod2d+eDim_nod2D))
     
     ! resolution at nodes 
     allocate(mesh%mesh_resolution(myDim_nod2d+eDim_nod2D))
@@ -1914,14 +1914,12 @@ SUBROUTINE mesh_areas(mesh)
     ! #############################|       |   :
     ! #############################|_______|___area_k+5
     ! #########################################
-    mesh%area     = 0.0_WP
-    mesh%areasvol = 0.0_WP
-    
     if (use_cavity) then
         allocate(cavity_contribut(mesh%nl,myDim_nod2d+eDim_nod2D))
         cavity_contribut = 0
     end if 
     
+    mesh%area     = 0.0_WP
     do n=1, myDim_nod2D+eDim_nod2D
         do j=1,mesh%nod_in_elem2D_num(n)
             elem=mesh%nod_in_elem2D(j,n)
@@ -1933,7 +1931,7 @@ SUBROUTINE mesh_areas(mesh)
             ! different. Directly under the cavity the area of scalar cell 
             ! corresponds to the area of the lower edge
             nzmin = mesh%ulevels(elem)
-            nzmax = mesh%nlevels(elem)
+            nzmax = mesh%nlevels(elem)-1
             do nz=nzmin,nzmax
                 mesh%area(nz,n)=mesh%area(nz,n)+mesh%elem_area(elem)/3.0_WP
             end do
@@ -1953,6 +1951,7 @@ SUBROUTINE mesh_areas(mesh)
     ! for cavity case: redefine "mid" scalar cell area from upper edge of prism to 
     ! lower edge of prism if a cavity triangle is present at the upper scalar
     ! cell edge 
+    mesh%areasvol = 0.0_WP
     if (use_cavity) then
         do n = 1, myDim_nod2D+eDim_nod2D
             nzmin = mesh%ulevels_nod2d(n)
@@ -1994,12 +1993,12 @@ SUBROUTINE mesh_areas(mesh)
         nzmin = mesh%ulevels_nod2d(n)
         nzmax = mesh%nlevels_nod2d(n)
         do nz=nzmin,nzmax
-            mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
-!!PS             if (mesh%area(nz,n) > 0._WP) then
-!!PS                 mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
-!!PS             else
-!!PS                 mesh%area_inv(nz,n) = 0._WP
-!!PS             end if
+!!PS             mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+            if (mesh%area(nz,n) > 0._WP) then
+                mesh%area_inv(nz,n) = 1._WP/mesh%area(nz,n)
+            else
+                mesh%area_inv(nz,n) = 0._WP
+            end if
         end do
     end do
     
@@ -2009,12 +2008,12 @@ SUBROUTINE mesh_areas(mesh)
             nzmin = mesh%ulevels_nod2d(n)
             nzmax = mesh%nlevels_nod2d(n)-1
             do nz=nzmin,nzmax
-                mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
-!!PS                 if (mesh%areasvol(nz,n) > 0._WP) then
-!!PS                     mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
-!!PS                 else
-!!PS                     mesh%areasvol_inv(nz,n) = 0._WP
-!!PS                 end if
+!!PS                 mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+                if (mesh%areasvol(nz,n) > 0._WP) then
+                    mesh%areasvol_inv(nz,n) = 1._WP/mesh%areasvol(nz,n)
+                else
+                    mesh%areasvol_inv(nz,n) = 0._WP
+                end if
             end do
         end do
     else
