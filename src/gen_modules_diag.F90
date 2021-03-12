@@ -135,7 +135,7 @@ subroutine diag_curl_stress_surf(mode, mesh)
   END DO
   DO n=1, myDim_nod2D+eDim_nod2D
      !!PS curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
-     curl_stress_surf(n)=curl_stress_surf(n)/area(ulevels_nod2D(n),n)
+     curl_stress_surf(n)=curl_stress_surf(n)/areasvol(ulevels_nod2D(n),n)
   END DO
 end subroutine diag_curl_stress_surf
 ! ==============================================================
@@ -210,7 +210,7 @@ subroutine diag_curl_vel3(mode, mesh)
     DO n=1, myDim_nod2D
         !!PS DO nz=1, nlevels_nod2D(n)-1
         DO nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
-            curl_vel3(nz,n)=curl_vel3(nz,n)/area(nz,n)
+            curl_vel3(nz,n)=curl_vel3(nz,n)/areasvol(nz,n)
         END DO
     END DO
 end subroutine diag_curl_vel3
