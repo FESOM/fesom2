@@ -268,29 +268,29 @@ subroutine check_blowup(istep, mesh)
 				write(*,*)
 				write(*,*) 'm_ice = ',m_ice(n),', m_ice_old = ',m_ice_old(n)
 				write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
-				write(*,*) 'thdgr = ',thdgr(n),', thdgr_old = ',thdgr_old(n)
-				write(*,*) 'thdgrsn = ',thdgrsn(n)
+!!PS 				write(*,*) 'thdgr = ',thdgr(n),', thdgr_old = ',thdgr_old(n)
+!!PS 				write(*,*) 'thdgrsn = ',thdgrsn(n)
 				write(*,*)
-				if (lcurt_stress_surf) then
-                    write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
-                    write(*,*)
-				endif 
- 				do el=1,nod_in_elem2d_num(n)
- 					elidx = nod_in_elem2D(el,n)
- 					write(*,*) ' elem#=',el,', elemidx=',elidx
- 					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
- 					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
-! 					write(*,*) ' 	     U =',UV(1,:,elidx)
-! 					write(*,*) ' 	     V =',UV(2,:,elidx)
-                    write(*,*)
- 				enddo
-				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
-				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
+!!PS 				if (lcurt_stress_surf) then
+!!PS                     write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
+!!PS                     write(*,*)
+!!PS 				endif 
+!!PS  				do el=1,nod_in_elem2d_num(n)
+!!PS  					elidx = nod_in_elem2D(el,n)
+!!PS  					write(*,*) ' elem#=',el,', elemidx=',elidx
+!!PS  					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
+!!PS  					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
+!!PS ! 					write(*,*) ' 	     U =',UV(1,:,elidx)
+!!PS ! 					write(*,*) ' 	     V =',UV(2,:,elidx)
+!!PS                     write(*,*)
+!!PS  				enddo
+!!PS 				write(*,*) 'Wvel(1, n)  = ',Wvel(,n)
+				write(*,*) 'Wvel(:, n)  = ',Wvel(ulevels_nod2D(n):nlevels_nod2D(n),n)
 				write(*,*)
-				write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
+				write(*,*) 'CFL_z(:,n)  = ',CFL_z(ulevels_nod2D(n):nlevels_nod2D(n),n)
 				write(*,*)
-				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
-				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
+!!PS 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
+				write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
 				write(*,*)
 			endif
 			
