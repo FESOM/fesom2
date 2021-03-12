@@ -146,19 +146,28 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         ! 1/dz(nz)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
         
+        !!PS a(nz)=0.0_WP
+        !!PS v_adv=zinv*areasvol(nz+1,n)/areasvol(nz,n)
+        !!PS b(nz)= hnode_new(nz,n)+W(nz, n)*zinv-min(0._WP, W(nz+1, n))*v_adv
+        !!PS c(nz)=-max(0._WP, W(nz+1, n))*v_adv
+        
         a(nz)=0.0_WP
-        v_adv=zinv*area(nz+1,n)/area(nz,n)
-        b(nz)= hnode_new(nz,n)+W(nz, n)*zinv-min(0._WP, W(nz+1, n))*v_adv
+        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        b(nz)= hnode_new(nz,n)+W(nz, n)*v_adv
+        
+        v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+        b(nz)= b(nz)-min(0._WP, W(nz+1, n))*v_adv
         c(nz)=-max(0._WP, W(nz+1, n))*v_adv
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
-            a(nz)=min(0._WP, W(nz, n))*zinv
-            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+            v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+            a(nz)=min(0._WP, W(nz, n))*v_adv
+            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
             
-            v_adv=zinv*area(nz+1,n)/area(nz,n)
+            v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv
             c(nz)=     -max(0._WP, W(nz+1, n))*v_adv
         end do ! --> do nz=2, nzmax-2
@@ -167,8 +176,12 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         ! Regular part of coefficients: --> nl-1 layer
         nz=nzmax-1
         ! update from the vertical advection
-        a(nz)=                min(0._WP, W(nz, n))*zinv
-        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+        !!PS a(nz)=                min(0._WP, W(nz, n))*zinv
+        !!PS b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+        !!PS c(nz)=0.0_WP
+        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        a(nz)=                min(0._WP, W(nz, n))*v_adv
+        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
         c(nz)=0.0_WP
         
         !_______________________________________________________________________
