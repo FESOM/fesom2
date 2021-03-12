@@ -324,14 +324,6 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
 !!PS         Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *area_inv(ul1:nl1,n) ! --> TEST_cavity
         Unode_rhs(1,ul1:nl1,n) = Unode_rhs(1,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
         Unode_rhs(2,ul1:nl1,n) = Unode_rhs(2,ul1:nl1,n) *areasvol_inv(ul1:nl1,n)
-        
-        IF (ANY(areasvol_inv(ul1:nl1,n) < 1.e-15)) THEN
-            WRITE(*,*) "BLA, BLA"
-            write(*,*) areasvol_inv(ul1:nl1,n)
-            write(*,*) areasvol(ul1:nl1,n)
-            CALL PAR_EX
-            STOP
-        END IF
     end do !-->do n=1,myDim_nod2d
 
     !___________________________________________________________________________

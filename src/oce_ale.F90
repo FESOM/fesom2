@@ -574,7 +574,7 @@ subroutine init_thickness_ale(mesh)
     ! Fill in ssh_rhs_old
     !!PS ssh_rhs_old=(hbar-hbar_old)*area(1,:)/dt
     do n=1,myDim_nod2D+eDim_nod2D
-        ssh_rhs_old(n)=(hbar(n)-hbar_old(n))*area(ulevels_nod2D(n),n)/dt
+        ssh_rhs_old(n)=(hbar(n)-hbar_old(n))*areasvol(ulevels_nod2D(n),n)/dt  ! --> TEST_cavity
     end do
     
     ! -->see equation (14) FESOM2:from finite elements to finie volume
@@ -1260,9 +1260,12 @@ subroutine init_stiff_mat_ale(mesh)
     ! 2nd do first term of lhs od equation (18) of "FESOM2 from finite element to finite volumes"
     ! Mass matrix part
     do row=1, myDim_nod2D
+        ! if cavity no time derivative for eta in case of rigid lid approximation at
+        ! thee cavity-ocean interface, which means cavity-ocean interface is not allowed 
+        ! to move vertically.
+        if (ulevels_nod2D(row)>1) cycle
         offset = ssh_stiff%rowptr(row)
-        !!PS SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
-        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(ulevels_nod2D(row),row)/dt
+        SSH_stiff%values(offset) = SSH_stiff%values(offset)+ areasvol(ulevels_nod2D(row),row)/dt
     end do
     deallocate(n_pos,n_num)
     
@@ -1551,8 +1554,7 @@ subroutine compute_ssh_rhs_ale(mesh)
     if ( .not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
             nzmin = ulevels_nod2D(n)
-            ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
-            !!PS ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*area(1,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+            ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     else
         do n=1,myDim_nod2D
@@ -1646,7 +1648,7 @@ subroutine compute_hbar_ale(mesh)
 !!PS     end if
     if (.not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
-            ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*area(ulevels_nod2D(n),n)
+            ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
         end do
         call exchange_nod(ssh_rhs_old) 
     end if 
@@ -1658,7 +1660,7 @@ subroutine compute_hbar_ale(mesh)
 !!PS     call exchange_nod(hbar)
     hbar_old=hbar
     do n=1,myDim_nod2D
-        hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/area(ulevels_nod2D(n),n)
+        hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
     end do
     call exchange_nod(hbar)  
         
@@ -1702,7 +1704,7 @@ subroutine vert_vel_ale(mesh)
     use g_forcing_arrays !!PS
     implicit none
     
-    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax
+    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: c1, c2, deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     
     !_______________________________
@@ -1738,7 +1740,7 @@ subroutine vert_vel_ale(mesh)
         ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
         nzmin = ulevels(el(1))
         nzmax = nlevels(el(1))-1
-        !!PS do nz=nlevels(el(1))-1,1,-1
+        
         do nz = nzmax, nzmin, -1
             ! --> h * u_vec * n_vec
             ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
@@ -1754,7 +1756,6 @@ subroutine vert_vel_ale(mesh)
                 fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
                 fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
             end if  
-            
         end do
         
         !_______________________________________________________________________
@@ -1764,8 +1765,8 @@ subroutine vert_vel_ale(mesh)
             deltaX2=edge_cross_dxdy(3,ed)
             deltaY2=edge_cross_dxdy(4,ed)
             nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1
-            !!PS do nz=nlevels(el(2))-1,1,-1
+            nzmax = nlevels(el(2))-1 
+            
             do nz = nzmax, nzmin, -1
                 c2=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                 Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
@@ -1790,7 +1791,7 @@ subroutine vert_vel_ale(mesh)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        !!PS do nz=nl-1,1,-1
+        
         do nz=nzmax,nzmin,-1
             Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
             if (Fer_GM) then 
@@ -1805,11 +1806,11 @@ subroutine vert_vel_ale(mesh)
     do n=1, myDim_nod2D
         nzmin = ulevels_nod2D(n)
         nzmax = nlevels_nod2d(n)-1
-        !!PS do nz=1,nlevels_nod2D(n)-1
+        
         do nz=nzmin,nzmax
             Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
             if (Fer_GM) then 
-                fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)          
+                fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)
             end if
         end do
     end do
@@ -2744,7 +2745,7 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(mesh)
+!!PS     call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
