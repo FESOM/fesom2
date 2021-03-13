@@ -2555,10 +2555,10 @@ subroutine oce_timestep_ale(n, mesh)
 
     t0=MPI_Wtime()
     
-    water_flux = 0.0_WP
-    heat_flux  = 0.0_WP
-    stress_surf= 0.0_WP
-    stress_node_surf= 0.0_WP
+!!PS     water_flux = 0.0_WP
+!!PS     heat_flux  = 0.0_WP
+!!PS     stress_surf= 0.0_WP
+!!PS     stress_node_surf= 0.0_WP
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
@@ -2745,7 +2745,7 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-!!PS     call solve_tracers_ale(mesh)
+    call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
