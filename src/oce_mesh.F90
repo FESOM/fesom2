@@ -90,7 +90,14 @@ module find_levels_min_e2n_interface
     end subroutine
   end interface
 end module
-
+module check_total_volume_interface
+  interface
+    subroutine check_total_volume(mesh)
+      use mod_mesh
+      type(t_mesh), intent(inout)  , target :: mesh
+    end subroutine
+  end interface
+end module
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -2440,9 +2447,9 @@ deallocate(center_y, center_x)
     endif
 
 END SUBROUTINE mesh_auxiliary_arrays
-
-!===================================================================
-
+!
+!
+!_______________________________________________________________________________
 SUBROUTINE check_mesh_consistency(mesh)
 USE MOD_MESH
 USE o_PARAM
@@ -2475,7 +2482,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
    do elem=1, myDim_elem2D
       elnodes=mesh%elem2D_nodes(:, elem)
       if (elnodes(1) > myDim_nod2D) CYCLE
-      do nz=mesh%ulevels(elem), mesh%nlevels(elem)         
+      do nz=mesh%ulevels(elem), mesh%nlevels(elem)-1         
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
@@ -2493,4 +2500,57 @@ end if
 !call par_ex
 !stop
 END SUBROUTINE check_mesh_consistency
-!==================================================================
+!
+!
+!_______________________________________________________________________________
+subroutine check_total_volume(mesh)
+    USE MOD_MESH
+    USE o_PARAM
+    USE g_PARSUP
+    use g_comm_auto
+    use o_ARRAYS
+    
+    IMPLICIT NONE
+    type(t_mesh), intent(inout), target :: mesh
+    integer                     :: nz, n, elem , elnodes(3)
+    real(kind=WP)	            :: vol_n, vol_e, aux
+    
+#include "associate_mesh.h"
+
+    !___________________________________________________________________________
+    vol_n=0._WP
+    vol_e=0._WP
+    !___________________________________________________________________________
+    ! total ocean volume on nodes
+    aux=0._WP
+    do n=1, myDim_nod2D
+        do nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
+            aux=aux+areasvol(nz, n)*hnode(nz,n)
+        end do
+    end do
+    call MPI_AllREDUCE(aux, vol_n, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    !___________________________________________________________________________
+    ! total ocean volume on elements
+    aux=0._WP
+    do elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:, elem)
+        if (elnodes(1) > myDim_nod2D) cycle
+        do nz=ulevels(elem), nlevels(elem)-1         
+            aux=aux+elem_area(elem)*helem(nz,elem)
+        end do
+    end do
+    call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+    !___write mesh statistics___________________________________________________
+    if (mype==0) then
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' --> ocean volume check:', mype
+        write(*,*) '     > Total ocean volume node:', vol_n, ' m^3'
+        write(*,*) '     > Total ocean volume elem:', vol_e, ' m^3'
+        
+    end if
+
+end subroutine check_total_volume
+!
+!
+!_______________________________________________________________________________
