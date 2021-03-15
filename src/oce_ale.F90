@@ -790,6 +790,8 @@ subroutine init_thickness_ale(mesh)
     !___________________________________________________________________________
     hnode_new=hnode  ! Should be initialized, because only variable part is updated.
    
+    !!PS call check_total_volume(mesh)
+    
 end subroutine init_thickness_ale
 !
 !
