@@ -134,6 +134,11 @@ logical                       :: use_windmix   = .false.
 real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
+! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
+logical                       :: smooth_bh_tra = .false.
+real(kind=WP)                 :: gamma0_tra    = 0.0005
+real(kind=WP)                 :: gamma1_tra    = 0.0125
+real(kind=WP)                 :: gamma2_tra    = 0.
 !_______________________________________________________________________________
 ! use non-constant reference density if .false. density_ref=density_0
 logical                       :: use_density_ref   = .false.
@@ -176,7 +181,8 @@ character(20)                  :: which_pgf='shchepetkin'
             tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
-            use_windmix, windmix_kv, windmix_nl
+            use_windmix, windmix_kv, windmix_nl, &
+            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra
             
 END MODULE o_PARAM  
 !==========================================================
