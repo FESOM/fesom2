@@ -3,7 +3,7 @@ name: FESOM2 main test
 
 # Controls when the action will run. Triggers the workflow on push or pull request.
 
-on: [push]
+on: [push, pull_request]
 
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -48,6 +48,16 @@ jobs:
       run: |
         cd work_souf
         fcheck .    
+        
+    - name: Check partitioner compilation
+      run: |
+        cd mesh_part
+        bash -l configure.sh ubuntu
+    - name: Run partitioner
+      run: |
+        cd work_pi
+        cp ../bin/fesom_ini.x .
+        ./fesom_ini.x
         
     
 

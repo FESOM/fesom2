@@ -8,7 +8,7 @@ module io_MEANDATA
   implicit none
 #include "netcdf.inc"
   private
-  public output, finalize_output
+  public :: def_stream2D, def_stream3D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -38,6 +38,7 @@ module io_MEANDATA
     character                                          :: freq_unit='m'
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
+    logical :: flip
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -300,7 +301,30 @@ CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('Av        ')
     call def_stream((/nl,   elem2D/), (/nl,   myDim_elem2D/), 'Av',        'vertical viscosity Av',  'm2/s', Av(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-
+CASE ('u_dis_tend')
+    if(visc_option==8) then
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_dis_tend',    'horizontal velocity viscosity tendency', 'm/s', UV_dis_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('v_dis_tend')
+    if(visc_option==8) then
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_dis_tend',    'meridional velocity viscosity tendency', 'm/s', UV_dis_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) 
+    end if
+CASE ('u_back_tend')
+    if(visc_option==8) then    
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_back_tend',    'horizontal velocity backscatter tendency', 'm2/s2', UV_back_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('v_back_tend') 
+    if(visc_option==8) then
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_back_tend',    'meridional velocity backscatter tendency', 'm2/s2', UV_back_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) 
+    end if
+CASE ('u_total_tend')
+    if(visc_option==8) then
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u_total_tend',    'horizontal velocity total viscosity tendency', 'm/s', UV_total_tend(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('v_total_tend')
+    if(visc_option==8) then
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v_total_tend',    'meridional velocity total viscosity tendency', 'm/s', UV_total_tend(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) 
+    end if
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation
 CASE ('bolus_u   ')
@@ -503,6 +527,9 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
   use mod_mesh
   use g_PARSUP
   use diagnostics
+#if defined (__icepack)
+  use icedrv_main,   only: ncat ! number of ice thickness cathegories
+#endif
   implicit none
   integer       :: size
   type(t_mesh) mesh
@@ -518,6 +545,10 @@ function mesh_dimname_from_dimsize(size, mesh) result(name)
     name='nz1'
   elseif (size==std_dens_N) then
     name='ndens'
+#if defined (__icepack)
+  elseif (size==ncat) then
+    name='ncat'
+#endif
   else
     name='unknown'
     if (mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
@@ -558,6 +589,8 @@ subroutine create_new_file(entry, mesh)
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer interface'),'depth at layer interface'), __LINE__)
      elseif (entry%dimname(1)=='nz1') then
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('depth at layer midpoint'),'depth at layer midpoint'), __LINE__)
+     elseif (entry%dimname(1)=='ncat') then
+       call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
      else
        if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
      end if
@@ -658,10 +691,10 @@ subroutine write_mean(entry, entry_index)
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
-  integer                       :: size1, size2
-  integer                       :: lev
   integer, intent(in) :: entry_index
   integer tag
+  integer                       :: i, size1, size2, size_gen, size_lev, order
+  integer                       :: c, lev
 
 
   ! Serial output implemented so far
@@ -673,8 +706,8 @@ subroutine write_mean(entry, entry_index)
   size1=entry%glsize(1)
   size2=entry%glsize(2)
   tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
-!___________writing 8 byte real_________________________________________
-  if(entry%accuracy == i_real8) then
+!___________writing 8 byte real_________________________________________ 
+  if (entry%accuracy == i_real8) then
      if(mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
@@ -700,7 +733,7 @@ subroutine write_mean(entry, entry_index)
      end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
+         call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        else
          call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm)
        end if
@@ -727,12 +760,19 @@ subroutine update_means
      entry=>io_stream(n)
 !_____________ compute in 8 byte accuracy _________________________
     if (entry%accuracy == i_real8) then
-      entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:size(entry%local_values_r8,dim=1),1:size(entry%local_values_r8,dim=2))
-
+      if (entry%flip) then
+          entry%local_values_r8 = entry%local_values_r8 + transpose(entry%ptr3(1:size(entry%local_values_r8,dim=2),1:size(entry%local_values_r8,dim=1)))
+      else 
+          entry%local_values_r8 = entry%local_values_r8 + entry%ptr3(1:size(entry%local_values_r8,dim=1),1:size(entry%local_values_r8,dim=2))
+      end if
 !_____________ compute in 4 byte accuracy _________________________
     elseif (entry%accuracy == i_real4) then
-      entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:size(entry%local_values_r4,dim=1),1:size(entry%local_values_r4,dim=2)),real32)
-     endif
+      if (entry%flip) then
+          entry%local_values_r4 = entry%local_values_r4 + transpose(real(entry%ptr3(1:size(entry%local_values_r4,dim=2),1:size(entry%local_values_r4,dim=1)),real32))
+      else
+          entry%local_values_r4 = entry%local_values_r4 + real(entry%ptr3(1:size(entry%local_values_r4,dim=1),1:size(entry%local_values_r4,dim=2)),real32)
+      end if
+    endif
 
      entry%addcounter=entry%addcounter+1
   end do
@@ -745,6 +785,10 @@ subroutine output(istep, mesh)
   use mod_mesh
   use g_PARSUP
   use io_gather_module
+#if defined (__icepack)
+  use icedrv_main,    only: init_io_icepack
+#endif
+
   implicit none
 
   integer       :: istep
@@ -758,8 +802,12 @@ subroutine output(istep, mesh)
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-    call ini_mean_io(mesh)
-    call init_io_gather()
+     call ini_mean_io(mesh)
+     call init_io_gather()
+#if defined (__icepack)
+     call init_io_icepack(mesh)
+#endif
+     call init_io_gather()
   end if
 
   call update_means
@@ -845,6 +893,7 @@ end subroutine
 
 subroutine do_output_callback(entry_index)
 use g_PARSUP
+use mod_mesh
   integer, intent(in) :: entry_index
   ! EO args
   type(Meandata), pointer :: entry
@@ -871,7 +920,7 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
+subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
   use mod_mesh
   use g_PARSUP
   implicit none
@@ -884,6 +933,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(Meandata),        allocatable   :: tmparr(:)
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
+  logical, optional, intent(in)        :: flip_array
   integer i
 
   do i = 1, 2 !PGI undeclared: rank(data)
@@ -908,16 +958,26 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   ! 3d specific
   entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
 
-  if (accuracy == i_real8) then
-    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r8(1, lcsize))
-    entry%local_values_r8 = 0._real64
-  elseif (accuracy == i_real4) then
-    allocate(entry%local_values_r4(lcsize(1), lcsize(2)))          !2D! allocate(entry%local_values_r4(1, lcsize))
-    entry%local_values_r4 = 0._real32
+  if (present(flip_array)) then
+      if (flip_array) then
+          entry%flip = .true.
+      else
+          entry%flip = .false.
+      end if
+  else
+      entry%flip = .false.
   end if
 
   entry%ndim=2
   entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
+
+  if (accuracy == i_real8) then
+    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+    entry%local_values_r8 = 0._real64
+  elseif (accuracy == i_real4) then
+    allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
+    entry%local_values_r4 = 0._real32
+  end if
 
   entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
   entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), mesh)     !2D! entry%dimname(2)='unknown'

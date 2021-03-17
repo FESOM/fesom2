@@ -57,13 +57,13 @@ module g_cvmix_idemix
     
     integer       :: idemix_n_hor_iwe_prop_iter = 1
     
-    ! filelocation for idemix surface forcing 
-    character(200):: idemix_surforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
-    
-    ! filelocation for idemix bottom forcing 
-    character(200):: idemix_botforc_file = '/work/ollie/pscholz/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
-    
-    namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, & 
+    ! filelocation for idemix surface forcing
+    character(MAX_PATH):: idemix_surforc_file = './fourier_smooth_2005_cfsr_inert_rgrid.nc'
+
+    ! filelocation for idemix bottom forcing
+    character(MAX_PATH):: idemix_botforc_file = './tidal_energy_gx1v6_20090205_rgrid.nc'
+
+    namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
                             idemix_sforcusage, idemix_surforc_file, idemix_botforc_file
                             
                             
@@ -116,7 +116,7 @@ module g_cvmix_idemix
     ! routine from cvmix library
     subroutine init_cvmix_idemix(mesh)
         implicit none
-        character(len=100)       :: nmlfile
+        character(len=cvmix_strlen) :: nmlfile
         logical                  :: file_exist=.False.
         integer                  :: node_size
 

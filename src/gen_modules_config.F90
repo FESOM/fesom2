@@ -23,10 +23,10 @@ module g_config
   
   !_____________________________________________________________________________
   ! *** Paths for all in and out ***
-  character(100)         :: MeshPath='./mesh/'
-  character(100)         :: ClimateDataPath='./hydrography/'
-  character(100)         :: TideForcingPath='./tide_forcing/'
-  character(1000)        :: ResultPath='./result/'
+  character(MAX_PATH)        :: MeshPath='./mesh/'
+  character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
+  character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
+  character(MAX_PATH)        :: ResultPath='./result/'
   namelist /paths/  MeshPath, ClimateDataPath, &
        TideForcingPath, ResultPath
        

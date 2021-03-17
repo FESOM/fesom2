@@ -1096,7 +1096,7 @@ subroutine init_stiff_mat_ale(mesh)
     integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
     integer, allocatable                :: mapping(:)
     character*10                        :: npes_string
-    character*1000                      :: dist_mesh_dir, file_name
+    character(MAX_PATH)                 :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
     type(t_mesh), intent(inout)            , target :: mesh

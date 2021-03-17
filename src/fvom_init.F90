@@ -71,7 +71,21 @@ interface
    end subroutine communication_ini
 end interface
 
-  character(len=1000)         :: nmlfile  !> name of configuration namelist file
+interface
+   subroutine read_mesh_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_cavity
+end interface
+
+interface
+   subroutine find_levels_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels_cavity
+end interface
+
+  character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
   type(t_mesh), target, save  :: mesh
 
@@ -211,7 +225,7 @@ subroutine read_mesh_cavity(mesh)
 
     type(t_mesh), intent(inout), target :: mesh
     integer                             :: node
-    character(len=1000)                 :: fname
+    character(len=MAX_PATH)                 :: fname
     logical                             :: file_exist=.False.
 #include "associate_mesh_ini.h"
     
@@ -640,7 +654,7 @@ INTEGER :: nodes(3), elems(3), eledges(3)
 integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=111
 real(kind=WP) :: x,dmean
 integer :: thers_lev=5
-character*200 :: file_name
+character(MAX_PATH) :: file_name
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
@@ -830,7 +844,7 @@ subroutine find_levels_cavity(mesh)
     integer        :: elem, node, nz, j
     integer        :: exit_flag, count_iter, count_neighb_open, nneighb, cavity_maxlev
     real(kind=WP)  :: dmean
-    character*200  :: file_name
+    character(MAX_PATH) :: file_name
     type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
@@ -1249,7 +1263,7 @@ subroutine communication_ini(mesh)
 
   integer        :: n
   character*10   :: npes_string
-  character*200  :: dist_mesh_dir
+  character(MAX_PATH)  :: dist_mesh_dir
   LOGICAL        :: L_EXISTS
   type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
@@ -1368,7 +1382,7 @@ subroutine check_partitioning(mesh)
 
   use MOD_MESH
   use g_PARSUP
-  integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
+  integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np, cnt
   integer :: nod_per_partition(2,0:npes-1)
   integer :: max_nod_per_part(2), min_nod_per_part(2)
   integer :: average_nod_per_part(2), node_neighb_part(100)
@@ -1407,13 +1421,14 @@ subroutine check_partitioning(mesh)
   checkloop: do n=1,nod2D
      is = ssh_stiff%rowptr(n)
      ie = ssh_stiff%rowptr(n+1) -1
-
-     node_neighb_part(1:ie-is) = part(ssh_stiff%colind(is:ie))
-     if (count(node_neighb_part(1:ie-is) == part(n)) <= 1) then
+     cnt = ie-is+1
+     
+     node_neighb_part(1:cnt) = part(ssh_stiff%colind(is:ie))
+     if (count(node_neighb_part(1:cnt) == part(n)) <= 1) then
 
         n_iso = n_iso+1
         print *,'Isolated node',n, 'in partition', part(n)
-        print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
+        print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:cnt)
 
         ! count the adjacent nodes of the other PEs
 
@@ -1423,7 +1438,7 @@ subroutine check_partitioning(mesh)
         ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
         ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
 
-        do i=1,ie-is
+        do i=1,cnt
            if (node_neighb_part(i)==part(n)) cycle
            already_counted = .false.
            do k=1,np

@@ -656,6 +656,10 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem) 
         
+        !___________________________________________________________________
+        ! if cavity cycle over
+        if(ulevels(elem)>1) cycle
+        
         do n=1,3
             row=elnodes(n)
             if(row>myDim_nod2D) cycle
@@ -677,6 +681,10 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
   
     ! TEST: area==sum of row entries in mass_matrix:
     DO q=1,myDim_nod2D
+        !___________________________________________________________________
+        ! if cavity cycle over
+        if(ulevels_nod2d(q)>1) cycle
+        
         !_______________________________________________________________________
         offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)

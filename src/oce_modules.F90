@@ -1,3 +1,4 @@
+
 ! Modules of cell-vertex ocean model
 ! S. Danilov, 2012 (sergey.danilov@awi.de)
 ! SI units are used
@@ -5,6 +6,7 @@
 !==========================================================
 MODULE o_PARAM
 integer, parameter            :: WP=8        ! Working precision
+integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
@@ -29,6 +31,14 @@ real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It need
 real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
 integer                       :: visc_option=5
+logical                       :: uke_scaling=.true.
+real(kind=WP)                 :: uke_scaling_factor=1._WP
+real(kind=WP)		          :: rosb_dis=1._WP
+integer                       :: smooth_back=2
+integer                       :: smooth_dis=2
+integer                       :: smooth_back_tend=4
+real(kind=WP)		          :: K_back=600._WP
+real(kind=WP)                 :: c_back=0.1_8
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -157,10 +167,13 @@ character(20)                  :: which_pgf='shchepetkin'
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, &
+                    K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
+                    smooth_back_tend, rosb_dis
 
- NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
+ NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
+            balance_salt_water, clim_relax, ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, &
+            tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl
@@ -201,6 +214,10 @@ IMPLICIT NONE
 real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable         :: UV(:,:,:)
 real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:) 
+real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
+real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
+real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
