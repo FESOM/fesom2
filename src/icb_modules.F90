@@ -85,7 +85,7 @@ save
   !character(100):: height_icb_file='../icb/icb_height.dat' !iceberg height [m]
   !character(100):: scaling_file='../icb/icb_scaling.dat' !scaling factor
   !===== OUTPUT RELATED SETTINGS  =====
-  integer :: icb_outfreq = 120          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
+  integer :: icb_outfreq = 48          ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
   logical :: l_geo_out = .true.         ! output in unrotated (.true.) or rotated coordinates
   logical :: ascii_out = .false.        ! old ascii output (slow, more detailed); false: faster nc output
   !===== NUMERICS (DONT HAVE TO BE CHANGED) =====

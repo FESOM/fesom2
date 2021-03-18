@@ -196,8 +196,13 @@ real(kind=real32) :: runtime_alltimesteps
             t1_icb = MPI_Wtime()
             !call iceberg_calculation(n)
             call icb2fesom
+            write(*,*) '*** MASS BALANCE ***'
+            write(*,*) '*** integrated BV: ',SUM(fwbv_flux_ib)*dt*steps_per_ib_step
+            write(*,*) '*** integrated B: ',SUM(fwb_flux_ib)*dt*steps_per_ib_step
+            write(*,*) '*** integrated L: ',SUM(fwl_flux_ib)*dt*steps_per_ib_step
+            write(*,*) '*** integrated E: ',SUM(fwe_flux_ib)*dt*steps_per_ib_step
+            write(*,*) '*** TOTAL: ',(SUM(fwbv_flux_ib)+SUM(fwb_flux_ib)+SUM(fwl_flux_ib)+SUM(fwe_flux_ib))*dt*steps_per_ib_step
             !alles auf null setzen
-            call reset_ib_fluxes
             t2_icb = MPI_Wtime()
         end if
         t2 = MPI_Wtime()
@@ -209,6 +214,9 @@ real(kind=real32) :: runtime_alltimesteps
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         call output (n)
+        if (use_icebergs) then    
+            call reset_ib_fluxes
+        end if
 
         t5 = MPI_Wtime()
         call restart(n, .false., .false.)
@@ -223,6 +231,7 @@ real(kind=real32) :: runtime_alltimesteps
     if (use_icebergs) then
         t3_icb = MPI_Wtime()
         call iceberg_out
+        !call reset_ib_fluxes
         t4_icb = MPI_Wtime()
     end if
 

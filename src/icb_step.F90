@@ -1111,7 +1111,8 @@ subroutine iceberg_out
  integer :: icbID, icbID_ISM, ib, istep
  
  icbID = 42
- 
+ !icbID_ISM = 43
+
  !calving_day has to be adjusted for restarts because calving_day gives the amount
  !of days (since the model FIRST has been started) after which icebergs are released
  !Criterion for calving is:
@@ -1123,7 +1124,7 @@ subroutine iceberg_out
  
  if(mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
-  open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
+  !open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
   
   do ib=1, ib_num 
   
@@ -1148,7 +1149,7 @@ subroutine iceberg_out
    !end if
 
   end do
-  close(icbID_ISM)
+  !close(icbID_ISM)
   close(icbID)
  end if
 end subroutine iceberg_out
