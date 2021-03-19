@@ -1,8 +1,7 @@
 ##########
 module --force purge    
-module use $OTHERSTAGES
-ml Stages/Devel-2020
 module load StdEnv
+module load CMake
 
 BUILDTYPE=$(echo "${COMPILER:-intel}" | tr '[:upper:]' '[:lower:]')
 
@@ -17,17 +16,17 @@ case "$BUILDTYPE" in
 	module load  NVHPC/21.1-GCC-9.3.0
         ;;
 esac
+export FC=mpifort CC=mpicc CXX=mpicxx
+
+module use /p/scratch/share/dkrz/Dmitry-Modules
 
 module load ParaStationMPI/5.4
-export FC=mpifort CC=mpicc CXX=mpicxx
 
 module load imkl
 module load netCDF
 
-module use /p/scratch/share/dkrz/Dmitry-Modules
-
 module load netCDF-Fortran
-module load CMake
+
 export NETCDF_DIR=$EBROOTNETCDF
 export NETCDFF_DIR=$EBROOTNETCDFMINFORTRAN
 export NETCDF_Fortran_INCLUDE_DIRECTORIES=${NETCDFF_DIR}/include/

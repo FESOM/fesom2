@@ -2131,7 +2131,6 @@ subroutine vert_vel_ale(mesh)
     call exchange_nod(Wvel) 
     call exchange_nod(hnode_new)   ! Or extend cycles above  
     if (Fer_GM) call exchange_nod(fer_Wvel)
-    
     !___________________________________________________________________________
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
     CFL_z(1,:)=0._WP
@@ -2540,6 +2539,7 @@ subroutine oce_timestep_ale(n, mesh)
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
     use oce_ale_interfaces
+    use openacc_params
     
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
@@ -2703,6 +2703,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(mesh)
+    !$acc update device(hnode_new) async(stream_hnode_update)
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2746,7 +2747,7 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
-    
+    !$acc update device(hnode) async(stream_hnode_update)
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq, mesh)
