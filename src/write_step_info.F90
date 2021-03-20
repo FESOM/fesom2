@@ -237,7 +237,8 @@ subroutine check_blowup(istep, mesh)
 			!___________________________________________________________________
 			! check ssh
 			if ( ((eta_n(n) /= eta_n(n)) .or. &
-				eta_n(n)<-50.0 .or. eta_n(n)>50.0)) then
+				eta_n(n)<-50.0 .or. eta_n(n)>50.0 .or. &
+				(d_eta(n) /= d_eta(n)) ) ) then
 !!PS 				eta_n(n)<-10.0 .or. eta_n(n)>10.0)) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
@@ -292,7 +293,8 @@ subroutine check_blowup(istep, mesh)
 !!PS 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
 				write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
 				write(*,*)
-			endif
+				
+            endif
 			
 			!___________________________________________________________________
 			! check surface vertical velocity --> in case of zlevel and zstar 
