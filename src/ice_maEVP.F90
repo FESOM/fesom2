@@ -61,7 +61,7 @@ subroutine stress_tensor_m(mesh)
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
 	 ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
      
      msum=sum(m_ice(elnodes))*val3
@@ -147,7 +147,7 @@ subroutine ssh2rhs(mesh)
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(elem) > 1) cycle
         
         !_______________________________________________________________________
@@ -174,7 +174,7 @@ subroutine ssh2rhs(mesh)
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(elem) > 1) cycle
         
         vol=elem_area(elem)
@@ -224,7 +224,7 @@ subroutine stress2rhs_m(mesh)
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
 
      if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
@@ -325,7 +325,7 @@ subroutine EVPdynamics_m(mesh)
         
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1) cycle
         
         !_______________________________________________________________________
@@ -354,7 +354,7 @@ subroutine EVPdynamics_m(mesh)
         elnodes=elem2D_nodes(:,el)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1)  cycle
         
         vol=elem_area(el)
@@ -401,7 +401,7 @@ subroutine EVPdynamics_m(mesh)
      
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(el) > 1) cycle
      
      msum=sum(m_ice(elnodes))*val3
@@ -434,7 +434,7 @@ subroutine EVPdynamics_m(mesh)
    do el=1,myDim_elem2D
      !__________________________________________________________________________
      if (ulevels(el)>1) cycle
-     
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      !__________________________________________________________________________
      if(ice_el(el)) then
      
@@ -580,7 +580,7 @@ subroutine find_alpha_field_a(mesh)
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
         
      msum=sum(m_ice(elnodes))*val3
@@ -647,7 +647,7 @@ subroutine stress_tensor_a(mesh)
    do elem=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
      
      !__________________________________________________________________________
@@ -798,6 +798,10 @@ type(t_mesh), intent(in)              , target :: mesh
 #include "associate_mesh.h"
 
     DO n=1, myDim_nod2D
+       !_______________________________________________________________________
+       ! if element has any cavity node skip it 
+       if (ulevels_nod2d(n)>1) cycle
+       
        ! ==============
        ! FESOM1.4 and stand-alone FESIM
        ! beta_evp_array(n) =  maxval(alpha_evp_array(nod_in_elem2D(n)%addresses(1:nod_in_elem2D(n)%nmb)))

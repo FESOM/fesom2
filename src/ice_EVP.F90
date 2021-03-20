@@ -458,7 +458,7 @@ if ( .not. trim(which_ALE)=='linfs') then
 		elnodes = elem2D_nodes(:,el)
 		!_______________________________________________________________________
 		! if element has any cavity node skip it 
-		!!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+		if ( any(ulevels_nod2d(elnodes)>1) ) cycle
 		if (ulevels(el) > 1) cycle
 		
 		!_______________________________________________________________________
@@ -508,7 +508,7 @@ else
         elnodes = elem2D_nodes(:,el)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1) cycle
         
         !_______________________________________________________________________

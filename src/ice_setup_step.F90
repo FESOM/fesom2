@@ -216,7 +216,7 @@ subroutine ice_timestep(step, mesh)
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-    call cut_off
+    call cut_off(mesh)
     
     if (use_cavity) call cavity_ice_clean_ma(mesh)
     t2=MPI_Wtime()
@@ -270,7 +270,11 @@ subroutine ice_initial_state(mesh)
     do i=1,myDim_nod2D+eDim_nod2D    
     
         !_______________________________________________________________________
-        if (ulevels_nod2d(i)>1) cycle ! --> if cavity, no sea ice, no initial state
+        if (ulevels_nod2d(i)>1) then
+            !!PS m_ice(i)  = 1.0e15_WP
+            !!PS m_snow(i) = 0.1e15_WP
+            cycle ! --> if cavity, no sea ice, no initial state
+        endif    
         
         !_______________________________________________________________________
         if (tr_arr(1,i,1)< 0.0_WP) then

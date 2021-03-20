@@ -1,13 +1,19 @@
 !===================================================================
-subroutine cut_off()
-use o_param
-use i_arrays
-implicit none
+subroutine cut_off(mesh)
+    use o_param
+    use i_arrays
+    use MOD_MESH
+    use g_parsup
+    implicit none
+    type(t_mesh), intent(in)           , target :: mesh
 
-where(a_ice>1.0_WP)
- a_ice=1.0_WP
-end where
+#include  "associate_mesh.h"
 
+!_______________________________________________________________________________
+! lower cutoff: a_ice
+where(a_ice>1.0_WP)  a_ice=1.0_WP
+
+! upper cutoff: a_ice
 where(a_ice<0.1e-8_WP)
  a_ice=0.0_WP
 #if defined (__oifs)
@@ -17,6 +23,8 @@ where(a_ice<0.1e-8_WP)
 #endif /* (__oifs) */
 end where
 
+!_______________________________________________________________________________
+! lower cutoff: m_ice
 where(m_ice<0.1e-8_WP)
  m_ice=0.0_WP 
 #if defined (__oifs)
@@ -25,17 +33,22 @@ where(m_ice<0.1e-8_WP)
  ice_temp=273.15_WP
 #endif /* (__oifs) */
 end where
+! upper cutoff: m_ice
+where(m_ice>10.0_WP .and. ulevels_nod2d==1) m_ice=10.0_WP 
 
+!_______________________________________________________________________________
+! lower cutoff: m_snow
+where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+! upper cutoff: m_snow
+where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
+
+!_______________________________________________________________________________
 #if defined (__oifs)
-where(ice_temp>273.15_WP)
- ice_temp=273.15_WP
-end where
+where(ice_temp>273.15_WP) ice_temp=273.15_WP
 #endif /* (__oifs) */
 
 #if defined (__oifs)
-where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP)
- ice_temp=271.35_WP
-end where
+where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
 #endif /* (__oifs) */
 
 end subroutine cut_off
