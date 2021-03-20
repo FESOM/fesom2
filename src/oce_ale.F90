@@ -1210,7 +1210,7 @@ subroutine init_stiff_mat_ale(mesh)
             
             if (el(i)<1) cycle ! if el(i)<1, it means its an outer boundary edge this
                             ! has only one triangle element to which it contribute
-            
+                            
             ! which three nodes span up triangle el(i)
             ! elnodes ... node indices 
             elnodes=elem2D_nodes(:,el(i))
@@ -1555,11 +1555,13 @@ subroutine compute_ssh_rhs_ale(mesh)
     ! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
     if ( .not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
+            if (ulevels_nod2D(n)>1) cycle
             nzmin = ulevels_nod2D(n)
             ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     else
         do n=1,myDim_nod2D
+            if (ulevels_nod2D(n)>1) cycle
             ssh_rhs(n)=ssh_rhs(n)+(1.0_WP-alpha)*ssh_rhs_old(n)
         end do
     end if
@@ -1639,15 +1641,10 @@ subroutine compute_hbar_ale(mesh)
         !_______________________________________________________________________
         ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
         ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
-        
     end do
     
     !___________________________________________________________________________
     ! take into account water flux
-!!PS     if (.not. trim(which_ALE)=='linfs') then
-!!PS         ssh_rhs_old(1:myDim_nod2D)=ssh_rhs_old(1:myDim_nod2D)-water_flux(1:myDim_nod2D)*area(1,1:myDim_nod2D)
-!!PS         call exchange_nod(ssh_rhs_old) 
-!!PS     end if
     if (.not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
             ssh_rhs_old(n)=ssh_rhs_old(n)-water_flux(n)*areasvol(ulevels_nod2D(n),n)
@@ -1657,9 +1654,6 @@ subroutine compute_hbar_ale(mesh)
     
     !___________________________________________________________________________
     ! update the thickness
-!!PS     hbar_old=hbar
-!!PS     hbar(1:myDim_nod2D)=hbar_old(1:myDim_nod2D)+ssh_rhs_old(1:myDim_nod2D)*dt/area(1,1:myDim_nod2D)
-!!PS     call exchange_nod(hbar)
     hbar_old=hbar
     do n=1,myDim_nod2D
         hbar(n)=hbar_old(n)+ssh_rhs_old(n)*dt/areasvol(ulevels_nod2D(n),n)
@@ -2669,6 +2663,11 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
+!!PS         if (any(UV_rhs/=UV_rhs)) write(*,*) mype,' --> found NaN UV_rhs before compute_vel_rhs'
+!!PS         if (any(UV/=UV))         write(*,*) mype,' --> found NaN UV before compute_vel_rhs'
+!!PS         if (any(ssh_rhs/=ssh_rhs))write(*,*) mype,' --> found NaN ssh_rhs before compute_ssh_rhs_ale'
+!!PS         if (any(ssh_rhs_old/=ssh_rhs_old))write(*,*) mype,' --> found NaN ssh_rhs_old before compute_ssh_rhs_ale'
+    
     if(mom_adv/=3) then
         call compute_vel_rhs(mesh)
     else
@@ -2676,7 +2675,6 @@ subroutine oce_timestep_ale(n, mesh)
     end if
     
     !___________________________________________________________________________
-    if (any(UV_rhs/=UV_rhs)) write(*,*) ' --> found NaN UV_rhs MARK 2'
     call viscosity_filter(visc_option, mesh)
     
     !___________________________________________________________________________
@@ -2717,7 +2715,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
     ! equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
     ! ...if we do it here we don't need to write hbar_old into a restart file...
-    eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
+    where(ulevels_nod2D==1) eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
 
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
