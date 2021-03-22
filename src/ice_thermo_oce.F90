@@ -9,46 +9,50 @@ subroutine cut_off(mesh)
 
 #include  "associate_mesh.h"
 
-!_______________________________________________________________________________
-! lower cutoff: a_ice
-where(a_ice>1.0_WP)  a_ice=1.0_WP
+    !___________________________________________________________________________
+    ! lower cutoff: a_ice
+    where(a_ice>1.0_WP)  a_ice=1.0_WP
 
-! upper cutoff: a_ice
-where(a_ice<0.1e-8_WP)
- a_ice=0.0_WP
+    ! upper cutoff: a_ice
+    where(a_ice<0.1e-8_WP)
+        a_ice=0.0_WP
 #if defined (__oifs)
- m_ice=0.0_WP
- m_snow=0.0_WP
- ice_temp=273.15_WP
+        m_ice=0.0_WP
+        m_snow=0.0_WP
+        ice_temp=273.15_WP
 #endif /* (__oifs) */
-end where
+    end where
 
-!_______________________________________________________________________________
-! lower cutoff: m_ice
-where(m_ice<0.1e-8_WP)
- m_ice=0.0_WP 
+    !___________________________________________________________________________
+    ! lower cutoff: m_ice
+    where(m_ice<0.1e-8_WP)
+        m_ice=0.0_WP 
 #if defined (__oifs)
- m_snow=0.0_WP
- a_ice=0.0_WP
- ice_temp=273.15_WP
+        m_snow=0.0_WP
+        a_ice=0.0_WP
+        ice_temp=273.15_WP
 #endif /* (__oifs) */
-end where
-! upper cutoff: m_ice
-where(m_ice>10.0_WP .and. ulevels_nod2d==1) m_ice=10.0_WP 
+    end where
+    
+    ! upper cutoff SH: m_ice
+    where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
+    ! upper cutoff NH: m_ice
+    where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
 
-!_______________________________________________________________________________
-! lower cutoff: m_snow
-where(m_snow<0.1e-8_WP) m_snow=0.0_WP
-! upper cutoff: m_snow
-where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
+    !___________________________________________________________________________
+    ! lower cutoff: m_snow
+    where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+    
+    ! upper cutoff: m_snow
+    where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
 
-!_______________________________________________________________________________
+    !___________________________________________________________________________
 #if defined (__oifs)
-where(ice_temp>273.15_WP) ice_temp=273.15_WP
+    where(ice_temp>273.15_WP) ice_temp=273.15_WP
 #endif /* (__oifs) */
 
 #if defined (__oifs)
-where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
+    where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
 #endif /* (__oifs) */
 
 end subroutine cut_off
