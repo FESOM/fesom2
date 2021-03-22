@@ -34,7 +34,7 @@ subroutine oce_adv_tra_fct_init(mesh)
 
 #include "associate_mesh.h"
 ! Copy mesh information to gpu once at initialization
-!$acc enter data copyin(nlevels_nod2D,nl,nlevels,elem2D_nodes,nod_in_elem2D,nod_in_elem2D_num,edges,edge_tri,area)
+!$acc enter data copyin(nlevels_nod2D,nl,nlevels,elem2D_nodes,nod_in_elem2D,nod_in_elem2D_num,edges,edge_tri,area,edge_cross_dxdy)
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(fct_LO(nl-1, my_size))        ! Low-order solution 

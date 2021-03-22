@@ -179,7 +179,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use oce_adv_tra_driver_interfaces
     use openacc_params
     implicit none
-    integer :: tr_num, node, nz
+    integer :: tr_num, node, nz, n
     type(t_mesh), intent(in) , target :: mesh    
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
@@ -199,20 +199,30 @@ subroutine adv_tracers_ale(tr_num, mesh)
     !___________________________________________________________________________
     ! horizontal ale tracer advection 
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-    del_ttf_advhoriz = 0.0_WP
-    del_ttf_advvert  = 0.0_WP
-    !$acc update device(del_ttf_advhoriz, del_ttf_advvert) async(stream_dttf_reset)
+    !$acc parallel loop collapse(2) present(del_ttf_advhoriz,del_ttf_advvert) async(stream_dttf_reset)
+    do n=1,myDim_nod2D+eDim_nod2D
+        do nz=1,mesh%nl
+            del_ttf_advhoriz(nz,n) = 0.0_WP
+            del_ttf_advvert(nz,n)  = 0.0_WP
+        end do
+    end do
     call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !$acc update self(del_ttf_advhoriz, del_ttf_advvert)
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
-    del_ttf=del_ttf+del_ttf_advhoriz+del_ttf_advvert
+    !$acc parallel loop collapse(2) present(del_ttf,del_ttf_advhoriz,del_ttf_advvert)
+    do n=1,myDim_nod2D+eDim_nod2D
+        do nz=1,mesh%nl
+            del_ttf(nz,n)=del_ttf_advhoriz(nz,n) + del_ttf_advvert(nz,n)
+        end do
+    end do
     
     !___________________________________________________________________________
     ! compute discrete variance decay after Burchard and Rennau 2008
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd'//achar(27)//'[0m'
+    !$acc update self(del_ttf_advhoriz,del_ttf_advvert)
         call compute_diag_dvd(tr_num, mesh)
     end if     
     
@@ -248,6 +258,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
+    !$acc update self(del_ttf)
     
     !___________________________________________________________________________
     ! do vertical diffusion: explicite 
@@ -723,6 +734,7 @@ subroutine diff_part_hor_redi(mesh)
     use MOD_MESH
     use o_param
     use g_config
+    use openacc_params
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
@@ -735,6 +747,9 @@ subroutine diff_part_hor_redi(mesh)
 #include "associate_mesh.h"
 
     if (Redi) isredi=1._WP
+!$acc wait(stream_redi) 
+!$acc parallel loop gang present(edge_cross_dxdy,edge_tri,edges,nlevels,elem2d_nodes,helem,tr_z,tr_xy,del_ttf,dt,area)&
+!$acc& private(rhs1,rhs2,deltaX1,deltaY1,deltaX2, deltaY2,el,enodes,nl1,nl2,elnodes,n2,Kh,c,Fx,Fy,Tx,Ty,Tx_z,Ty_z,SxTz,SyTz,Tz)
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP
@@ -757,6 +772,7 @@ subroutine diff_part_hor_redi(mesh)
         !Kh=K_hor*Kh/scale_area
         !_______________________________________________________________________
         n2=min(nl1,nl2)
+        !$acc loop vector
         do nz=1,n2
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=sum(helem(nz, el))/2.0_WP
@@ -773,6 +789,7 @@ subroutine diff_part_hor_redi(mesh)
         enddo
         
         !_______________________________________________________________________
+        !$acc loop vector
         do nz=n2+1,nl1
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(1))
@@ -787,6 +804,7 @@ subroutine diff_part_hor_redi(mesh)
             rhs1(nz) = rhs1(nz) + c
             rhs2(nz) = rhs2(nz) - c
         end do
+        !$acc loop vector
         do nz=n2+1,nl2
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(2))
@@ -804,9 +822,13 @@ subroutine diff_part_hor_redi(mesh)
         
         !_______________________________________________________________________
         n2=max(nl1,nl2)
-        del_ttf(1:n2,enodes(1))=del_ttf(1:n2,enodes(1))+rhs1(1:n2)*dt/area(1:n2,enodes(1))
-        del_ttf(1:n2,enodes(2))=del_ttf(1:n2,enodes(2))+rhs2(1:n2)*dt/area(1:n2,enodes(2))
-        
+        !$acc loop vector
+        do nz=1,n2
+            !$acc atomic
+            del_ttf(nz,enodes(1))=del_ttf(nz,enodes(1))+rhs1(nz)*dt/area(nz,enodes(1))
+            !$acc atomic
+            del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))+rhs2(nz)*dt/area(nz,enodes(2))
+        end do
     end do
 end subroutine diff_part_hor_redi
 !

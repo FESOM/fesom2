@@ -45,6 +45,7 @@ use g_parsup
 use o_arrays
 use g_comm_auto
 use mod_mesh
+use openacc_params
 
 IMPLICIT NONE
 integer                    :: tr_num,n,nz 
@@ -65,13 +66,16 @@ call tracer_gradient_z(tr_arr(:,:,tr_num), mesh)
 call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
 call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
 
+
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
 call fill_up_dn_grad(mesh)
 call exchange_nod_end()       ! tr_z halos should have arrived by now.
+!$acc update device(tr_z) async(stream_redi)
 
 if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 call tracer_gradient_elements(tr_arr(:,:,tr_num), mesh) !redefine tr_arr to the current timestep
 call exchange_elem(tr_xy)
+!$acc update device(tr_xy) async(stream_redi)
 
 END SUBROUTINE init_tracers_AB
 !========================================================================================
