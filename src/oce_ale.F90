@@ -1555,9 +1555,12 @@ subroutine compute_ssh_rhs_ale(mesh)
     ! shown in eq (11) rhs of "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
     if ( .not. trim(which_ALE)=='linfs') then
         do n=1,myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle
             nzmin = ulevels_nod2D(n)
-            ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+            if (ulevels_nod2D(n)>1) then
+                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)
+            else
+                ssh_rhs(n)=ssh_rhs(n)-alpha*water_flux(n)*areasvol(nzmin,n)+(1.0_WP-alpha)*ssh_rhs_old(n)
+            end if 
         end do
     else
         do n=1,myDim_nod2D
