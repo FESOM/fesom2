@@ -1,5 +1,5 @@
 ##########
-module --force purge    
+module --force purge
 module load StdEnv
 module load CMake
 
@@ -18,13 +18,9 @@ case "$BUILDTYPE" in
 esac
 export FC=mpifort CC=mpicc CXX=mpicxx
 
-module use /p/scratch/share/dkrz/Dmitry-Modules
-
 module load ParaStationMPI/5.4
-
 module load imkl
 module load netCDF
-
 module load netCDF-Fortran
 
 export NETCDF_DIR=$EBROOTNETCDF
@@ -33,3 +29,5 @@ export NETCDF_Fortran_INCLUDE_DIRECTORIES=${NETCDFF_DIR}/include/
 export NETCDF_C_INCLUDE_DIRECTORIES=${NETCDF_DIR}/include/
 export NETCDF_CXX_INCLUDE_DIRECTORIES=${NETCDFCXX_DIR}/include/
 
+# for profiling
+module load Nsight-Systems/2021.1.1
