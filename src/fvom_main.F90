@@ -38,6 +38,7 @@ use cpl_driver
   use openacc
 #endif
 #endif
+
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i, provided
@@ -48,7 +49,7 @@ real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
-type(t_mesh),             target, save :: mesh
+type(t_mesh), target, save      :: mesh
 
 #ifdef OPTIM_ACC_SET_DEVICE
 #ifdef _OPENACC

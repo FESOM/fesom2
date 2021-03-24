@@ -75,13 +75,12 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 
 #include "associate_mesh.h"
 
-! Asynchronous copy of ttf to gpu
-!$acc data copyin(ttf, ttfAB) async(1)
-
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
-    if (trim(tra_adv_lim)=='FCT') then
+    ! Asynchronous copy of ttf to gpu
+    !$acc data copyin(ttf, ttfAB) async(1)
+    if (trim(tra_adv_lim)=='FCT') then 
         ! compute the low order upwind horizontal flux
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
@@ -157,8 +156,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
-! Asynchronous copy of adf_h to gpu
-!$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
+    ! Asynchronous copy of adf_h to gpu
+    !$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
    
     if (trim(tra_adv_lim)=='FCT') then
        pwvel=>w
@@ -170,6 +169,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     ! do vertical tracer advection, in case of FCT high order solution
  
     !$acc wait(1)
+    !___________________________________________________________________________
+    ! do vertical tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
@@ -187,10 +188,9 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !     for do_wimpl=.true.
     END SELECT
-
-! Asynchronous copy of adf_v to gpu
-!!$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
-
+    
+    !___________________________________________________________________________
+    !
 !if (mype==0) then
 !   write(*,*) 'check new:'
 !   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
@@ -199,7 +199,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 !end if
     if (trim(tra_adv_lim)=='FCT') then
 !if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
-! Wait for ttf copy to be completed to start routine
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
 !$acc wait(stream_hnode_update)
@@ -241,22 +240,23 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     ! Vertical
     if (present(use_lo)) then
        if (use_lo) then
-            !$acc parallel loop gang present(hnode,hnode_new,dttf_v,LO,ttf,nlevels_nod2D) &
-            !$acc& private(nu1, nl1) &
+            !$acc parallel loop gang present(hnode,hnode_new,dttf_v,LO,ttf,nlevels_nod2D,ulevels_nod2D)&
+            !$acc private(nu1, nl1)&
             !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
-          do n=1, myDim_nod2d
+            do n=1, myDim_nod2d
              nu1 = ulevels_nod2D(n)
              nl1 = nlevels_nod2D(n)
              !!PS do nz=1,nlevels_nod2D(n)-1
-             do nz=nu1, nl1-1
+             !$acc loop vector
+             do nz=nu1, nl1-1  
                 dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
              end do
            end do
        end if
     end if
 
-    !$acc parallel loop gang present(dttf_v,flux_v,nlevels_nod2D,area) &
-    !$acc& private(nu1, nl1) &
+    !$acc parallel loop gang present(dttf_v,flux_v,nlevels_nod2D,ulevels_nod2D,area)&
+    !$acc private(nu1,nl1)&
     !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2d
         nu1 = ulevels_nod2D(n)
@@ -269,8 +269,8 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
 
     ! Horizontal
-    !$acc parallel loop gang present(dttf_h,nlevels,edges,edge_tri,flux_h,area)&
-    !$acc& private(enodes,el,nl1,nl2, nu1, nu2) vector_length(z_vector_length) async(stream_hor_adv_tra)
+    !$acc parallel loop gang present(dttf_h,nlevels,ulevels,edges,edge_tri,flux_h,area)&
+    !$acc& private(enodes,el,nl1,nl2,nu1,nu2) vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)
@@ -289,7 +289,9 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
         if (nu2>0) nu12 = min(nu1,nu2)
 
         !!PS do  nz=1, max(nl1, nl2)
+        !$acc loop vector
         do nz=nu12, nl12
+            !$acc atomic
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/area(nz,enodes(1))
             !$acc atomic
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))

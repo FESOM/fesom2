@@ -923,7 +923,6 @@ end subroutine
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh, flip_array)
   use mod_mesh
   use g_PARSUP
-  implicit none
   integer,               intent(in)    :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(inout) :: data(:,:)
@@ -991,7 +990,6 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, mesh)
   use mod_mesh
   use g_PARSUP
-  implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(inout) :: data(:)

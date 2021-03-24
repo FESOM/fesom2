@@ -76,7 +76,6 @@ nl                 => mesh%nl
 !!$ulevels_nod2D      => mesh%ulevels_nod2D
 !!$ulevels_nod2D_max  => mesh%ulevels_nod2D_max
 
-
 #ifdef __PGI
 coord_nod2D             => mesh%coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)
 geo_coord_nod2D         => mesh%geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)

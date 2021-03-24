@@ -386,6 +386,13 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
       end do
     end if
 
+    !$acc parallel loop collapse(2) present(flux)
+    do n=1, myDim_nod2D
+        do nz=1, mesh%nl
+          flux(nz,n)=0.0_WP
+        end do
+    end do
+
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -396,10 +403,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,hnode,hnode_new,flux,area)&
-    !$acc& private(nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x,counter,overshoot_counter)&
-    !$acc& reduction(+:overshoot_counter,counter) vector_length(z_vector_length)
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,flux,area)&
+    !$acc& private(nzmin,nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x)&
+    !$acc& vector_length(z_vector_length)
     do n=1, myDim_nod2D
+
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
         ! calculated on mid depth levels 
@@ -503,12 +511,12 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         !$acc loop vector
         do nz=nzmin, nzmax-1
             if ((W(nz,n)<=0._WP) .AND. (W(nz+1,n)>=0._WP)) CYCLE
-            counter=counter+1
+            ! counter=counter+1
             aL=tv(nz)
             aR=tv(nz+1)
             if ((aR-ttf(nz, n))*(ttf(nz, n)-aL)<=0._WP) then
                 !   write(*,*) aL, ttf(nz, n), aR
-                overshoot_counter=overshoot_counter+1
+                !   overshoot_counter=overshoot_counter+1
                 aL =ttf(nz, n)
                 aR =ttf(nz, n)
             end if

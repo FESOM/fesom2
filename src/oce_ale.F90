@@ -2578,6 +2578,8 @@ subroutine oce_timestep_ale(n, mesh)
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(mesh)
+
+    !$acc update device(slope_tapered) async(stream_redi)
     
     !___________________________________________________________________________
     call status_check
@@ -2717,6 +2719,7 @@ subroutine oce_timestep_ale(n, mesh)
     
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
+        !$acc update device(Ki) async(stream_redi)
     end if
     
     !___________________________________________________________________________
@@ -2746,8 +2749,10 @@ subroutine oce_timestep_ale(n, mesh)
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
-    t9=MPI_Wtime() 
-    !$acc update device(hnode) async(stream_hnode_update)
+    t9=MPI_Wtime()
+
+    !$acc update device(hnode,helem) async(stream_hnode_update)
+    
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq, mesh)

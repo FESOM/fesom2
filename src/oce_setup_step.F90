@@ -172,7 +172,7 @@ type(t_mesh), intent(inout) , target :: mesh
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
-    !$acc enter data copyin(hnode,hnode_new)
+    !$acc enter data copyin(hnode,hnode_new,helem,slope_tapered,tr_xy,tr_z,Ki)
 end subroutine ocean_setup
 !
 !
