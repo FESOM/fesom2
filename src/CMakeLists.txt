@@ -3,8 +3,8 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
 
-set(PGI_GPU_ARCH "cc80" CACHE STRING "GPU Arch for PGI Compiler (cc35,cc50,cc60,cc70,cc80,...)")
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
+set(PGI_GPU_ARCH "cc80" CACHE STRING "GPU Arch for PGI Compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -90,7 +90,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL PGI)
     if(${FESOM_OPENACC})
 	target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Minline -Mr8 -Munroll -pgf90libs -acc -ta=tesla:${PGI_GPU_ARCH} -Minfo=accel)
-	set(CMAKE_EXE_LINKER_FLAGS "-acc")
+	set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${PGI_GPU_ARCH}")
     else()
         target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Minline -Mr8 -Munroll -pgf90libs)
     endif()
@@ -110,7 +110,7 @@ install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTA
 
 add_library(settings INTERFACE)
 
-option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU in a round robin distribution" ON)
+option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU in a round robin distribution" OFF)
 #target_compile_features(settings INTERFACE cxx_std_17)
 target_compile_definitions(settings
   INTERFACE

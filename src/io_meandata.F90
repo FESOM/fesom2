@@ -50,7 +50,7 @@ module io_MEANDATA
     integer :: mype_workaround
   contains
     final destructor
-  end type  
+  end type
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -134,7 +134,7 @@ subroutine ini_mean_io(mesh)
         EXIT
      end if
   end do
-  
+
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -146,9 +146,9 @@ CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('vve_5     ')
     call def_stream(nod2D, myDim_nod2D, 'vve_5',    'vertical velocity at 5th level', 'm/s',    Wvel(5,:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-    
+
 !___________________________________________________________________________________________________________________________________
-! output sea ice 
+! output sea ice
 CASE ('uice      ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'uice',     'ice velocity x',                 'm/s',    u_ice,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -177,14 +177,14 @@ CASE ('m_snow    ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-    
+
 !___________________________________________________________________________________________________________________________________
-! output mixed layer depth    
+! output mixed layer depth
 CASE ('MLD1      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD1',     'Mixed Layer Depth',               'm',      MLD1(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('MLD2      ')
     call def_stream(nod2D, myDim_nod2D, 'MLD2',     'Mixed Layer Depth',               'm',      MLD2(1:myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-    
+
 !___________________________________________________________________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
@@ -238,7 +238,7 @@ CASE ('vwind ')
     sel_forcvar(2) = 1
     call def_stream(nod2D, myDim_nod2D, 'vwind',    '10m merid. surface wind velocity','m/s',    v_wind(:),               io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
-    
+
 !___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
@@ -263,15 +263,15 @@ CASE ('curl_surf ')
     if (lcurt_stress_surf) then
     call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-    
+
 !___________________________________________________________________________________________________________________________________
-! output Ferrari/GM parameterisation 2D  
+! output Ferrari/GM parameterisation 2D
 CASE ('fer_C     ')
     if (Fer_GM) then
     call def_stream(nod2D,  myDim_nod2D,   'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-    
-!___________________________________________________________________________________________________________________________________    
+
+!___________________________________________________________________________________________________________________________________
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
@@ -332,7 +332,7 @@ CASE ('bolus_u   ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_u',   'GM bolus velocity U','m/s',  fer_uv(1,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('bolus_v   ')
-    if (Fer_GM) then  
+    if (Fer_GM) then
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'bolus_v',   'GM bolus velocity V','m/s',  fer_uv(2,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('bolus_w   ')
@@ -362,11 +362,11 @@ CASE ('dMOC      ')
        call def_stream(elem2D,                                myDim_elem2D  , 'density_flux',   'density'               , 'm',      dens_flux(:),           1, 'y', i_real4, mesh)
     end if
 !___________________________________________________________________________________________________________________________________
-CASE ('pgf_x     ')    
+CASE ('pgf_x     ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_x', 'zonal pressure gradient force'     , 'm/s^2', pgf_x(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-CASE ('pgf_y     ')    
+CASE ('pgf_y     ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm/s^2', pgf_y(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-!___________________________________________________________________________________________________________________________________    
+!___________________________________________________________________________________________________________________________________
 
 #if defined (__oifs)
 CASE ('alb       ')
@@ -408,7 +408,7 @@ END DO
      call def_stream((/nl,   elem2D/), (/nl,     myDim_elem2D/), 'Av',    'Vertical mixing A',         'm2/s',            Av(:,:), 1, 'm', i_real4, mesh)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'unod',  'horizontal velocity at nodes', 'm/s', Unode(1,:,:), 1, 'm', i_real8, mesh)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'vnod',  'meridional velocity at nodes', 'm/s', Unode(2,:,:), 1, 'm', i_real8, mesh)
-    
+
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm', i_real4, mesh)
      call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm', i_real4, mesh)
      call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real8, mesh)
@@ -425,9 +425,9 @@ END DO
      if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D,   'ty_sur',     'meridional wind stress to ocean','m/s2', stress_surf(2, 1:myDim_elem2D),1, 'm', i_real4, mesh) ; sel_forcvar(12)=1
   end if
 
-    
+
     if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
-        ! TKE diagnostic 
+        ! TKE diagnostic
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke'     , 'turbulent kinetic energy'                    , 'm^2/s^2', tke(:,:)     , 1, 'y', i_real4, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Ttot', 'total production of turbulent kinetic energy', 'm^2/s^3', tke_Ttot(:,:), 1, 'y', i_real4, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbpr', 'TKE production by buoyancy'                  , 'm^2/s^3', tke_Tbpr(:,:), 1, 'y', i_real4, mesh)
@@ -439,11 +439,11 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Lmix', 'mixing length scale of TKE'                  , 'm'      , tke_Lmix(:,:), 1, 'y', i_real4, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Pr'  , 'Prantl number'                               , ''       , tke_Pr(:,:)  , 1, 'y', i_real4, mesh)
         if (mix_scheme_nmb==56) then
-            ! TKE-IDEMIX diagnostic 
+            ! TKE-IDEMIX diagnostic
             call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tiwf', 'TKE production by internal waves (IDEMIX)', 'm^2/s^3', tke_Tiwf(:,:), 1, 'y', i_real4, mesh)
-        end if 
-    end if 
-    
+        end if
+    end if
+
     if (mod(mix_scheme_nmb,10)==6) then
         ! IDEMIX Internal-Wave-Energy diagnostics
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe'     , 'internal wave energy'                    , 'm^2/s^2', iwe(:,:)     , 1, 'y', i_real4, mesh)
@@ -455,14 +455,14 @@ END DO
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_c0'  , 'IWE vertical group velocity'             , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'iwe_v0'  , 'IWE horizontal group velocity'           , 'm/s'    , iwe_c0(:,:)  , 1, 'y', i_real4, mesh)
     end if
-    
+
     if (mod(mix_scheme_nmb,10)==7) then
         ! cvmix_TIDAL diagnostics
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tidal_Kv'  , 'tidal diffusivity'           , 'm^2/s'    , tidal_Kv(:,:)  , 1, 'y', i_real4, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tidal_Av'  , 'tidal viscosity'             , 'm^2/s'    , tidal_Av(:,:)  , 1, 'y', i_real4, mesh)
         call def_stream(     nod2D  ,      myDim_nod2D  , 'tidal_forcbot', 'near tidal bottom forcing', 'W/m^2'    , tidal_forc_bottom_2D  , 100, 'y', i_real4, mesh)
     end if
-    
+
   !___________________________________________________________________________________________________________________________________
   ! output Redi parameterisation
   if (Redi) then
@@ -474,7 +474,7 @@ END DO
   if (use_momix) then
      call def_stream(nod2D, myDim_nod2D, 'momix_length',   'Monin-Obukov mixing length', 'm', mixlength(:),    1, 'm', i_real4, mesh)
   end if
-  
+
     !___________________________________________________________________________________________________________________________________
     if (ldiag_curl_vel3) then
         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'curl_u',     'relative vorticity',          '1/s',   vorticity,                   1, 'm', i_real4, mesh)
@@ -483,20 +483,20 @@ END DO
     !___________________________________________________________________________________________________________________________________
     if (whichEVP==1) then
     end if
-    
+
     if (whichEVP==2) then
         call def_stream(elem2D, myDim_elem2D, 'alpha_EVP', 'alpha in EVP', 'n/a', alpha_evp_array,  1, 'd', i_real4, mesh)
         call def_stream(nod2D,  myDim_nod2D,  'beta_EVP',  'beta in EVP',  'n/a', beta_evp_array,   1, 'd', i_real4, mesh)
     end if
-  
+
     !___________________________________________________________________________
     if (ldiag_dvd) then
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_h', 'horiz. dvd of temperature', '°C/s' , tr_dvd_horiz(:,:,1), 1, 'm', i_real4, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_temp_v', 'vert. dvd of temperature' , '°C/s' , tr_dvd_vert(:,:,1) , 1, 'm', i_real4, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_h', 'horiz. dvd of salinity'   , 'psu/s', tr_dvd_horiz(:,:,2), 1, 'm', i_real4, mesh)
         call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'dvd_salt_v', 'vert. dvd of salinity'    , 'psu/s', tr_dvd_vert(:,:,2) , 1, 'm', i_real4, mesh)
-    end if 
-    
+    end if
+
     !___________________________________________________________________________
     if (ldiag_forc) then
         if (sel_forcvar( 1)==0) call def_stream(nod2D , myDim_nod2D , 'uwind' , '10m zonal surface wind velocity', 'm/s'  , u_wind(:)        , 1, 'm', i_real4, mesh)
@@ -506,6 +506,8 @@ END DO
         if (sel_forcvar( 5)==0) call def_stream(nod2D , myDim_nod2D , 'prec'  , 'precicipation rain'             , 'm/s'  , prec_rain(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 6)==0) call def_stream(nod2D , myDim_nod2D , 'snow'  , 'precicipation snow'             , 'm/s'  , prec_snow(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 7)==0) call def_stream(nod2D , myDim_nod2D , 'evap'  , 'evaporation'                    , 'm/s'  , evaporation(:)   , 1, 'm', i_real4, mesh)
+        ! TODO NVFORTRAN-W-0268-Cannot inline subprogram; common block mismatch
+        ! (/home_nfs_robin_ib/bguibertd/work/2018-2021-ESiWACE2/s1-call2-fesom2/code/fesom2/src/io_meandata.F90: 485)
         if (sel_forcvar( 8)==0) call def_stream(nod2D , myDim_nod2D , 'swr'   , 'short wave radiation'           , 'W/m^2', shortwave(:)     , 1, 'm', i_real4, mesh)
         if (sel_forcvar( 9)==0) call def_stream(nod2D , myDim_nod2D , 'lwr'   , 'long wave radiation'            , 'W/m^2', longwave(:)      , 1, 'm', i_real4, mesh)
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
@@ -515,8 +517,8 @@ END DO
         call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
     end if
-    
-    
+
+
 end subroutine
 !
 !--------------------------------------------------------------------------------------------
@@ -567,7 +569,7 @@ subroutine create_new_file(entry, mesh)
   implicit none
   character(2000)               :: att_text
   type(t_mesh) mesh
- 
+
   type(Meandata), intent(inout) :: entry
   character(len=*), parameter :: global_attributes_prefix = "FESOM_"
   ! Serial output implemented so far
@@ -591,11 +593,11 @@ subroutine create_new_file(entry, mesh)
        call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'long_name', len_trim('sea-ice thickness class'),'sea-ice thickness class'), __LINE__)
      else
        if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-     end if 
+     end if
      call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'units', len_trim('m'),'m'), __LINE__)
      call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'positive', len_trim('down'),'down'), __LINE__)
      call assert_nf( nf_put_att_text(entry%ncid, entry%dimvarID(1), 'axis', len_trim('Z'),'Z'), __LINE__)
-     
+
      call assert_nf( nf_def_dim(entry%ncid, entry%dimname(2), entry%glsize(2), entry%dimID(2)), __LINE__)
   end if
 !___Create time related dimensions__________________________________________
@@ -609,18 +611,18 @@ subroutine create_new_file(entry, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'units', len_trim(att_text), trim(att_text)), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
-  
+
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
-  
- 
-!___Global attributes________  
+
+
+!___Global attributes________
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'model', len_trim('FESOM2'),'FESOM2'), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'website', len_trim('fesom.de'), trim('fesom.de')), __LINE__)
- 
+
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'git_SHA', len_trim(fesom_git_sha()), fesom_git_sha()), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'MeshPath', len_trim(MeshPath), trim(MeshPath)), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'mesh_representative_checksum', len(mesh%representative_checksum), mesh%representative_checksum), __LINE__)
@@ -630,8 +632,8 @@ subroutine create_new_file(entry, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_hor', len_trim(tra_adv_hor), trim(tra_adv_hor)), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_ver', len_trim(tra_adv_ver), trim(tra_adv_ver)), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, NF_GLOBAL, global_attributes_prefix//'tra_adv_lim', len_trim(tra_adv_lim), trim(tra_adv_lim)), __LINE__)
- 
- 
+
+
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'force_rotation', NF_INT, 1,  force_rotation), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'include_fleapyear', NF_INT, 1,  include_fleapyear), __LINE__)
@@ -641,10 +643,10 @@ subroutine create_new_file(entry, mesh)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'visc_option', NF_INT, 1,  visc_option), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'w_split', NF_INT, 1,  w_split), __LINE__)
   call assert_nf( nf_put_att_int(entry%ncid, NF_GLOBAL, global_attributes_prefix//'use_partial_cell', NF_INT, 1,  use_partial_cell), __LINE__)
- 
- 
- 
-  
+
+
+
+
 !___This ends definition part of the file, below filling in variables is possible
   call assert_nf( nf_enddef(entry%ncid), __LINE__)
   if (entry%dimname(1)=='nz') then
@@ -653,8 +655,8 @@ subroutine create_new_file(entry, mesh)
       call assert_nf( nf_put_var_double(entry%ncid, entry%dimvarID(1), abs(mesh%Z)), __LINE__)
   else
       if (mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-  end if 
- 
+  end if
+
   call assert_nf( nf_close(entry%ncid), __LINE__)
 end subroutine
 !
@@ -724,7 +726,7 @@ subroutine write_mean(entry, entry_index)
         end if
      end do
 
-!___________writing 4 byte real _________________________________________ 
+!___________writing 4 byte real _________________________________________
   else if (entry%accuracy == i_real4) then
      if(mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
@@ -818,8 +820,8 @@ subroutine output(istep, mesh)
      if (entry%freq_unit.eq.'y') then
         call annual_event(do_output)
 
-     else if (entry%freq_unit == 'm') then 
-        call monthly_event(do_output) 
+     else if (entry%freq_unit == 'm') then
+        call monthly_event(do_output)
 
      else if (entry%freq_unit == 'd') then
         call daily_event(do_output, entry%freq)
@@ -845,7 +847,7 @@ subroutine output(istep, mesh)
         filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
         if(mype == entry%root_rank) then
           if(filepath /= trim(entry%filename)) then
-            if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)   
+            if("" /= trim(entry%filename)) call assert_nf(nf_close(entry%ncid), __LINE__)
             entry%filename = filepath
             ! use any existing file with this name or create a new one
             if( nf_open(entry%filename, nf_write, entry%ncid) /= nf_noerr ) then
@@ -912,7 +914,7 @@ subroutine finalize_output()
   do i=1, io_NSTREAMS
     entry=>io_stream(i)
     if(entry%thread_running) call entry%thread%join()
-    entry%thread_running = .false.    
+    entry%thread_running = .false.
   end do
 end subroutine
 !
@@ -932,15 +934,15 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   type(t_mesh), intent(in), target     :: mesh
   logical, optional, intent(in)        :: flip_array
   integer i
-  
-  do i = 1, size(shape((data)))
+
+  do i = 1, 2 !PGI undeclared: rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (mype==0) then
         write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
         write(*,*) 'upper bound is: ', ubound(data, dim = i)
       end if
       return
-    end if    
+    end if
   end do
 
   if (mype==0) then
@@ -998,15 +1000,15 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   type(Meandata),        pointer       :: entry
   type(t_mesh), intent(in), target     :: mesh
   integer i
-  
-  do i = 1, size(shape((data)))
+
+  do i = 1, 1 !PGI undeclared: rank(data)
     if ((ubound(data, dim = i)<=0)) then
       if (mype==0) then
         write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
         write(*,*) 'upper bound is: ', ubound(data, dim = i)
       end if
       return
-    end if    
+    end if
   end do
 
   if (mype==0) then
@@ -1017,7 +1019,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   io_NSTREAMS = io_NSTREAMS +1
   call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
   entry=>io_stream(io_NSTREAMS)
-  
+
   ! 2d specific
   entry%ptr3(1:1,1:size(data)) => data
 
@@ -1055,9 +1057,9 @@ end subroutine
     integer provided_mpi_thread_support_level
     integer entry_index
     integer err
-    
+
     entry_index = io_NSTREAMS
-    
+
     entry%accuracy = accuracy
 
     if (accuracy == i_real8) then
@@ -1096,20 +1098,20 @@ end subroutine
     end if
 
     ! set up async output
-    
+
     entry%root_rank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
 
     call MPI_Comm_dup(MPI_COMM_FESOM, entry%comm, err)
 
     call entry%thread%initialize(do_output_callback, entry_index)
     if(.not. async_netcdf_allowed) call entry%thread%disable_async()
-  
+
     ! check if we have multi thread support available in the MPI library
     ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
     if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call entry%thread%disable_async()
-    
+
     entry%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
 
@@ -1122,7 +1124,7 @@ end subroutine
     if(status /= NF_NOERR) then
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
-    end if   
+    end if
   end subroutine
 
 

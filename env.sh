@@ -41,9 +41,14 @@ elif [[  $LOGINHOST = ubuntu ]]; then
    STRATEGY="ubuntu"
 elif [[  $LOGINHOST = bsc ]]; then
    STRATEGY="bsc"
-elif [[  $LOGINHOST =~ ^juwels[0-9][0-9].ib.juwels.fzj.de$ ]]; then
+# https://apps.fz-juelich.de/jsc/hps/juwels/access.html#access-login-nodes
+elif [[  $LOGINHOST =~ ^juwels0[0-9].ib.juwels.fzj.de$ ]]; then
    STRATEGY="juwels"
-elif [[  $LOGINHOST =~ ^jwlogin[0-9][0-9].juwels$ ]]; then
+elif [[  $LOGINHOST =~ ^jwlogin0[0-9].juwels$ ]]; then
+   STRATEGY="juwels"
+elif [[  $LOGINHOST =~ ^juwels2[0-9].ib.juwels.fzj.de$ ]]; then
+   STRATEGY="juwels-booster"
+elif [[  $LOGINHOST =~ ^jwlogin2[0-9].juwels$ ]]; then
    STRATEGY="juwels-booster"
 elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
    STRATEGY="ecaccess.ecmwf.int"

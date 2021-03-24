@@ -32,6 +32,7 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #if defined (__oasis)
 use cpl_driver
 #endif
+
 #ifdef OPTIM_ACC_SET_DEVICE
 #ifdef _OPENACC
   use openacc

@@ -5,7 +5,7 @@ module mpi_topology_module
 ! after all ranks have been used up, we will start over at the first host with rank 0
 ! optional second argument will return the number of times this rank has been returned
 
-  implicit none  
+  implicit none
   public mpi_topology
   private
 
@@ -44,7 +44,7 @@ contains
     host_use_count = lap
     COMM = -1
     hostname_strategy => hostname_sys
-    
+
     IS_STATE_INITIALIZED = .true.
   end subroutine
 
@@ -57,7 +57,7 @@ contains
   subroutine hostname_sys(hostname)
     character(len=:), allocatable, intent(out) :: hostname
     integer*4 status, hostnm
-    
+
     allocate(character(32) :: hostname) ! platform dependent length in limits.h or call `getconf HOST_NAME_MAX`
     status = hostnm(hostname)
   end subroutine
@@ -65,10 +65,10 @@ contains
   integer recursive function next_host_head_rank(communicator, rank_use_count) result(result)
     integer, intent(in) :: communicator
     integer, optional, intent(out) :: rank_use_count
-    
+
     if(.not. IS_STATE_INITIALIZED) call reset_state()
     if(communicator .ne. COMM) COMM = learn_topology(communicator)
-    
+
     result = count*STEP + lap-1
     if(result > MAXRANK) then ! start a new lap
       count = 0
@@ -79,7 +79,7 @@ contains
     else
       count = count + 1
     end if
-    
+
     if(present(rank_use_count)) then
       rank_use_count = (host_use_count-1)/STEP +1
     end if
@@ -98,11 +98,11 @@ contains
 
     count = 0
     result = communicator
-  
+
     call MPI_COMM_RANK(communicator, rank, ierror)
     call MPI_COMM_SIZE(communicator, rank_count, ierror)
     MAXRANK = rank_count-1
-    
+
     call hostname_strategy(hostname)
     if(rank==0) then
       allocate(character(len(hostname)) :: names(rank_count))
@@ -118,7 +118,7 @@ contains
           else
             exit
           end if
-        end do    
+        end do
     end if
     deallocate(names)
 

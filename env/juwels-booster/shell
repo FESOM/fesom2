@@ -1,6 +1,7 @@
 ##########
-module --force purge    
+module --force purge
 module load StdEnv
+module load CMake
 
 BUILDTYPE=$(echo "${COMPILER:-intel}" | tr '[:upper:]' '[:lower:]')
 
@@ -12,20 +13,21 @@ case "$BUILDTYPE" in
         module load GCC/9.3.0
         ;;
     pgi)
-        module load NVHPC/20.9-GCC-9.3.0
+	module load  NVHPC/21.1-GCC-9.3.0
         ;;
 esac
-
-module load ParaStationMPI/5.4
 export FC=mpifort CC=mpicc CXX=mpicxx
 
+module load ParaStationMPI/5.4
 module load imkl
 module load netCDF
 module load netCDF-Fortran
-module load CMake
+
 export NETCDF_DIR=$EBROOTNETCDF
 export NETCDFF_DIR=$EBROOTNETCDFMINFORTRAN
 export NETCDF_Fortran_INCLUDE_DIRECTORIES=${NETCDFF_DIR}/include/
 export NETCDF_C_INCLUDE_DIRECTORIES=${NETCDF_DIR}/include/
 export NETCDF_CXX_INCLUDE_DIRECTORIES=${NETCDFCXX_DIR}/include/
 
+# for profiling
+module load Nsight-Systems/2021.1.1
