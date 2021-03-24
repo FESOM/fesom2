@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16.5)
 
-project(fesom2_fortran_tests Fortran)
+project(fesom2_fortran_tests Fortran CXX)
 set(LIB_TARGET ${PROJECT_NAME}-lib)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
@@ -8,12 +8,17 @@ include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNETCDF.cmake)
 find_package(PFUNIT REQUIRED)
 enable_testing()
 
-add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_module.F90
+add_library(${LIB_TARGET} ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_async_module.F90
+                          ${CMAKE_CURRENT_LIST_DIR}/../../src/async_threads_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_provider_netcdf_module.F90
                           ${CMAKE_CURRENT_LIST_DIR}/../../src/forcing_lookahead_reader_module.F90
            )
+
+add_subdirectory(../../src/async_threads_cpp ${PROJECT_BINARY_DIR}/async_threads_cpp)
+
 target_include_directories(${LIB_TARGET} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_LIST_DIR} ${NETCDF_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${LIB_TARGET} ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
+target_link_libraries(${LIB_TARGET} async_threads_cpp)
 set_target_properties(${LIB_TARGET} PROPERTIES Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_pfunit_ctest (${PROJECT_NAME}

@@ -24,10 +24,11 @@ module cpl_driver
 
 #if defined (__oifs)
   integer, parameter         :: nsend = 5
+  integer, parameter         :: nrecv = 13
 #else
   integer, parameter         :: nsend = 4
-#endif
   integer, parameter         :: nrecv = 12
+#endif
   
   integer, dimension(nsend)  :: send_id
   integer, dimension(nrecv)  :: recv_id
@@ -222,7 +223,7 @@ contains
 
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
-    real(kind=WP), allocatable :: all_elem_area(:,:)    
+    real(kind=WP), allocatable :: all_area(:,:)    
 
 #include "associate_mesh.h"
 
@@ -304,11 +305,11 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-      ALLOCATE(all_elem_area(number_of_all_points, 1))
+      ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
-      ALLOCATE(all_elem_area(1, 1))
+      ALLOCATE(all_area(1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -331,7 +332,7 @@ contains
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(elem_area, my_number_of_points, MPI_DOUBLE_PRECISION, all_elem_area,  &
+    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
@@ -358,7 +359,7 @@ contains
           DEALLOCATE(unstr_mask)
 
           print *, 'FESOM before write area'
-          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_elem_area)
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
 
        end if
       print *, 'FESOM before terminate_grids_writing'
@@ -377,12 +378,17 @@ contains
 ! ... Define symbolic names for the transient fields send by the ocean
 !     These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
+    cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
+    cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
+    cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
+    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+#else
+    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
-#if defined (__oifs)
-    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
 #endif
 
 
@@ -391,6 +397,7 @@ contains
 ! ...  Define symbolic names for transient fields received by the ocean.
 !      These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
     cpl_recv(3)  = 'taux_ico'
@@ -403,6 +410,21 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+    cpl_recv(13) = 'enth_oce'
+#else
+    cpl_recv(1)  = 'taux_oce'
+    cpl_recv(2)  = 'tauy_oce'
+    cpl_recv(3)  = 'taux_ico'
+    cpl_recv(4)  = 'tauy_ico'    
+    cpl_recv(5)  = 'prec_oce'
+    cpl_recv(6)  = 'snow_oce'    
+    cpl_recv(7)  = 'evap_oce'
+    cpl_recv(8)  = 'subl_oce'
+    cpl_recv(9)  = 'heat_oce'
+    cpl_recv(10) = 'heat_ico'
+    cpl_recv(11) = 'heat_swo'    
+    cpl_recv(12) = 'hydr_oce'
+#endif
 
     if (mype .eq. 0) then 
        print *, 'FESOM after declaring the transient variables'

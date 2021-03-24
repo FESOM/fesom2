@@ -55,10 +55,12 @@ MODULE io_RESTART
 ! id will keep the IDs of all required dimentions and variables
   type(nc_file), save       :: oid, iid
   integer,       save       :: globalstep=0
+  type(nc_file), save       :: ip_id
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
-  PUBLIC :: restart, oid, iid 
+  PUBLIC :: restart, oid, iid
+  PUBLIC :: ip_id, def_dim, def_variable_1d, def_variable_2d 
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -123,7 +125,11 @@ subroutine ini_ocean_io(year, mesh)
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
         call def_variable(oid, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
   endif 
-
+  if (visc_option==8) then
+        call def_variable(oid, 'uke',      (/nl-1, elem2D/), 'unresolved kinetic energy', 'm2/s2', uke(:,:));
+        call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
+  endif
+  
   do j=1,num_tracers
      SELECT CASE (j) 
        CASE(1)
@@ -181,12 +187,21 @@ subroutine ini_ice_io(year, mesh)
   call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
   call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
   call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+#if defined (__oifs)
+  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
+  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
+#endif /* (__oifs) */
 
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
 subroutine restart(istep, l_write, l_read, mesh)
+
+#if defined(__icepack)
+  use icedrv_main,   only: init_restart_icepack
+#endif
+
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
@@ -202,9 +217,15 @@ subroutine restart(istep, l_write, l_read, mesh)
   if (.not. l_read) then
                call ini_ocean_io(yearnew, mesh)
   if (use_ice) call ini_ice_io  (yearnew, mesh)
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearnew, mesh)
+#endif
   else
                call ini_ocean_io(yearold, mesh)
   if (use_ice) call ini_ice_io  (yearold, mesh)
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearold, mesh)
+#endif
   end if
 
   if (l_read) then
@@ -213,7 +234,11 @@ subroutine restart(istep, l_write, l_read, mesh)
    if (use_ice) then
       call assoc_ids(iid);          call was_error(iid)
       call read_restart(iid, mesh); call was_error(iid)
-   end if
+#if defined(__icepack)
+      call assoc_ids(ip_id);          call was_error(ip_id)
+      call read_restart(ip_id, mesh); call was_error(ip_id)
+#endif
+    end if
   end if
 
   if (istep==0) return
@@ -249,6 +274,10 @@ subroutine restart(istep, l_write, l_read, mesh)
   if (use_ice) then
      call assoc_ids(iid);                  call was_error(iid)  
      call write_restart(iid, istep, mesh); call was_error(iid)
+#if defined(__icepack)
+     call assoc_ids(ip_id);                  call was_error(ip_id)
+     call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+#endif
   end if
   
   ! actualize clock file to latest restart point
@@ -305,10 +334,14 @@ subroutine create_new_file(id)
         do l=1, id%ndim ! list all defined dimensions 
            if (kdim==id%dim(l)%size) dimid(k)=id%dim(l)%code
         end do
-!________write(*,*) kdim, ' -> ', dimid(k)__________________________________
+        !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
-     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, &
-                       (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     !if (n==1) then
+     !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
+     if (n==2) then
+        id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1, id%dim(1)%size/)); ! c=c+1 
+     end if
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
   end do
@@ -426,8 +459,9 @@ subroutine write_restart(id, istep, mesh)
   integer,  intent(in)          :: istep
   type(t_mesh), intent(in)     , target :: mesh
   real(kind=WP), allocatable    :: aux(:), laux(:)
-  integer                       :: i, lev, size1, size2, shape
-  integer                       :: c
+  real(kind=WP)                 :: t0, t1, t2, t3
+  integer                       :: i, lev, size1, size2, size_gen, size_lev, shape
+  integer                       :: c, order
 
 #include  "associate_mesh.h"
 
@@ -449,28 +483,57 @@ subroutine write_restart(id, istep, mesh)
      if (shape==1) then
         size1=id%var(i)%dims(1)
         if (mype==0) allocate(aux(size1))
+        t0=MPI_Wtime()
         if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
         if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
+        t1=MPI_Wtime()
         if (mype==0) then
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
+        t2=MPI_Wtime()
+#ifdef DEBUG
+        ! Timeing information for collecting and writing restart file
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
+#endif
         if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0)       allocate(aux (size2))
-        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
-        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
-        do lev=1, size1
-           laux=id%var(i)%pt2(lev,:)
-!          if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2(lev,:), aux)
-!          if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2(lev,:), aux)
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (laux, aux)
-           if (size1==elem2D .or. size2==elem2D) call gather_elem(laux, aux)
+        ! I assume that the model has always more surface nodes or elements than
+        ! vertical layers => more flexibility in terms of array dimensions
+        if (size1==nod2D .or. size1==elem2D) then
+            size_gen=size1
+            size_lev=size2
+            order=1
+        else if (size2==nod2D .or. size2==elem2D) then
+            size_gen=size2
+            size_lev=size1
+            order=2
+        else
+            if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
+            call par_ex
+            stop
+        end if 
+        if (mype==0)          allocate(aux (size_gen))
+        if (size_gen==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size_gen==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        do lev=1, size_lev
+           if (order==1) laux=id%var(i)%pt2(:,lev)
+           if (order==2) laux=id%var(i)%pt2(lev,:)
+           if (size_gen==nod2D)  call gather_nod (laux, aux)
+           if (size_gen==elem2D) call gather_elem(laux, aux)
            if (mype==0) then
-              id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
+              if (order==1) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
+              if (order==2) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
            end if
+           t2=MPI_Wtime()
+#ifdef DEBUG
+           ! Timeing information for collecting and writing output file
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
+#endif
         end do
         deallocate(laux)
         if (mype==0) deallocate(aux)
@@ -496,8 +559,8 @@ subroutine read_restart(id, mesh, arg)
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
   real(kind=WP), allocatable       :: aux(:), laux(:)
-  integer                          :: i, lev, size1, size2, shape
-  integer                          :: rec2read, c
+  integer                          :: i, lev, size1, size2, size_gen, size_lev, shape
+  integer                          :: rec2read, c, order
   real(kind=WP)                    :: rtime !timestamp of the record
   logical                          :: file_exist=.False.
   type(t_mesh), intent(in)        , target :: mesh
@@ -561,24 +624,39 @@ subroutine read_restart(id, mesh, arg)
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0)       allocate(aux (size2))
-        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
-        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))        
-        do lev=1, size1
+        ! I assume that the model has always more surface nodes or elements than
+        ! vertical layers => more flexibility in terms of array dimensions
+        if (size1==nod2D .or. size1==elem2D) then
+            size_gen=size1
+            size_lev=size2
+            order=1
+        else if (size2==nod2D .or. size2==elem2D) then
+            size_gen=size2
+            size_lev=size1
+            order=2
+        else
+            if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
+            call par_ex
+            stop
+        end if
+        if (mype==0)          allocate(aux (size_gen))
+        if (size_gen==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size_gen==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        do lev=1, size_lev
            if (mype==0) then
-              id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
-!             write(*,*) 'min/max 3D ', lev,'=', minval(aux), maxval(aux)
+              if (order==1) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
+              if (order==2) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
            end if
            id%var(i)%pt2(lev,:)=0.
-!          if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2(lev,:), aux)
-!          if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2(lev,:), aux)
-           if (size2==nod2D)  then
+           if (size_gen==nod2D)  then
               call broadcast_nod (laux, aux)
-              id%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
+              if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_nod2D+eDim_nod2D)
+              if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
            end if
-           if (size2==elem2D) then
+           if (size_gen==elem2D) then
               call broadcast_elem(laux, aux)
-              id%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
+              if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_elem2D+eDim_elem2D)
+              if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
            end if
         end do
         deallocate(laux)

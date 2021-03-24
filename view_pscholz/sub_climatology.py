@@ -11,6 +11,7 @@ import matplotlib.cm as cm
 from mpl_toolkits.basemap import Basemap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from colormap_c2c import colormap_c2c
+from sub_fesom_plot  import fesom_plot_lmask
     
 #+_____________________________________________________________________________+
 #|                                                                             |
@@ -190,7 +191,7 @@ def clim_vinterp(data_in,levels):
 #___DO VERTICAL INTERPOLATE AVERAGE OVER CERTAIN LAYERS_________________________
 #
 #_______________________________________________________________________________
-def clim_plot_anom(clim,figsize=[],do_subplot=[]):
+def clim_plot_anom(mesh, clim,figsize=[],do_subplot=[]):
     from set_inputarray import inputarray
     
     if len(figsize)==0 : figsize=[12,8]
@@ -278,7 +279,7 @@ def clim_plot_anom(clim,figsize=[],do_subplot=[]):
     #| adjustable colormap                                                     |
     #+_________________________________________________________________________+
     cnumb = 20; # minimum number of colors
-    if len(clim.cnumb)!=0: cnumb=clim.cnumb[0]
+    if not clim.cnumb == False: cnumb=clim.cnumb
     cmax  = np.nanmax(clim.anom[idx_box])
     cmin  = np.nanmin(clim.anom[idx_box])
     cref  = 0
@@ -340,8 +341,10 @@ def clim_plot_anom(clim,figsize=[],do_subplot=[]):
                         dashes=[1,1e-10],
                         fontsize=fsize)
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
-    map.drawcoastlines(color='k',linewidth=0.5)
-    map.fillcontinents(color='0.6')
+    
+    #map.drawcoastlines(color='k',linewidth=0.5)
+    #map.fillcontinents(color='0.6')
+    fesom_plot_lmask(map,mesh,ax,'0.6')
 
     #___________________________________________________________________________
     # arange colorbar position and labels

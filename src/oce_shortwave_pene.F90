@@ -16,7 +16,7 @@ subroutine cal_shortwave_rad(mesh)
   use i_therm_param
   IMPLICIT NONE
 
-  integer      :: m, n2, n3, k, nzmax
+  integer      :: m, n2, n3, k, nzmax, nzmin
   real(kind=WP):: swsurf, aux
   real(kind=WP):: c, c2, c3, c4, c5
   real(kind=WP):: v1, v2, sc1, sc2
@@ -25,9 +25,14 @@ subroutine cal_shortwave_rad(mesh)
 #include "associate_mesh.h"
 
   sw_3d=0.0_WP
-
-  do n2=1, myDim_nod2D+eDim_nod2D     
+  !_____________________________________________________________________________
+  do n2=1, myDim_nod2D+eDim_nod2D   
+     
+     !__________________________________________________________________________
+     if (ulevels_nod2D(n2)>1) cycle ! in case of cavity no shortwave pentration
      if (use_ice .and. a_ice(n2)> 0._WP) cycle !assume in ice region no penetration
+     
+     !__________________________________________________________________________
      ! shortwave rad.
      swsurf=(1.0_WP-albw)*shortwave(n2)
      ! the visible part (300nm-750nm)
@@ -57,9 +62,12 @@ subroutine cal_shortwave_rad(mesh)
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
-     nzmax=(nlevels(n2))
-     sw_3d(1, n2)=swsurf
-     do k=2, nzmax
+     nzmax=(nlevels_nod2D(n2))
+     nzmin=(ulevels_nod2D(n2))
+     !!PS sw_3d(1, n2)=swsurf
+     sw_3d(nzmin, n2)=swsurf
+     !!PS do k=2, nzmax
+     do k=nzmin+1, nzmax
         aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
         if (aux < 1.e-5_WP .OR. k==nzmax) then 

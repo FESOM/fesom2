@@ -16,7 +16,7 @@ module g_oce_2_reg
   real(kind=8)		       	::   RegDx=.25, RegDy=.25
   real(kind=8), allocatable     ::   reg_lon(:), reg_lat(:)
   type(sparse_matrix)           ::   oce_2_reg, oce_2_reg_el
-  character*100		        ::   o2r_filename='oce_2_reg.bin_25'
+  character(MAX_PATH)           ::   o2r_filename='oce_2_reg.bin_25'
   logical                  	::   do_mesh=.false.
 namelist /regular_mesh/ LonMin, LonMax, LatMin, LatMax, RegDx, RegDy, o2r_filename, do_mesh
 

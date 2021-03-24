@@ -456,7 +456,8 @@ class fesom_box:
         self.str_dep = box.str_dep
         #_______________________________________________________________________
         for ii in range(0,len(self.box_define)):
-            self.value[ii] = box2.value[ii]-box.value[ii]
+            self.value[ii] = box2.value-box.value
+            #self.value[ii] = box2.value[ii]-box.value[ii]
         self.anom  = True
         self.crange= []
         self.cmap  = 'blue2red'
@@ -469,7 +470,7 @@ class fesom_box:
     #+___PLOT FESOM2.0 DATA IN INDEX BOX OVER DEPTH AND TIME DATA______________+
     #|                                                                         |
     #+_________________________________________________________________________+
-    def plot_index_t_x_z(self,numb=[],figsize=[],do_subplot=[],do_output=True):
+    def plot_index_t_x_z(self,numb=[],figsize=[],do_subplot=[],do_output=True,which_lines=[0,0,0]):
         from set_inputarray import inputarray
         fsize=16
         #_______________________________________________________________________
@@ -495,9 +496,10 @@ class fesom_box:
             fsize = 14
             
             #___________________________________________________________________
-            cnumb= 30
-            cmin = np.nanmin(self.value[ii])
-            cmax = np.nanmax(self.value[ii])
+            cnumb= self.cnumb
+            #cmin = np.nanmin(self.value[ii])
+            #cmax = np.nanmax(self.value[ii])
+            cmin, cmax = np.nanmin(self.value), np.nanmax(self.value)
             cref = cmin + (cmax-cmin)/2
             cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
             #cref =0.0
@@ -505,7 +507,8 @@ class fesom_box:
             #___________________________________________________________________
             # if anomaly data    
             if self.anom==True: 
-                cmax,cmin,cref = np.nanmax(self.value[ii]), np.nanmin(self.value[ii]), 0.0
+                #cmax,cmin,cref = np.nanmax(self.value[ii]), np.nanmin(self.value[ii]), 0.0
+                cmax,cmin,cref = np.nanmax(self.value), np.nanmin(self.value), 0.0
                 self.cmap='blue2red'
             #___________________________________________________________________
             # if predefined color range    
@@ -521,14 +524,14 @@ class fesom_box:
                 else:
                     print(' this colorrange definition is not supported !!!')
                     print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
-            
+                
             if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
             if do_output==True: print('[cnum]=',cnumb)
             cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,self.cmap)
             if do_output==True: print('clevel = ',clevel)
             
             do_drawedges=True
-            if clevel.size>50: do_drawedges=False
+            if clevel.size>40: do_drawedges=False
             
             # overwrite discrete colormap
             #cmap0 = cmocean.cm.balance
@@ -539,12 +542,12 @@ class fesom_box:
             #depth = self.depth[:-1] + (self.depth[1:]-self.depth[:-1])/2.0
             #depth = self.zlev[:-1] + (self.zlev[1:]-self.zlev[:-1])/2.0
             depth = -self.zlev
-            depthlim = np.sum(~np.isnan(self.value[ii][0,:])).max()
+            depthlim = np.sum(~np.isnan(self.value[0,:])).max()
             if depthlim==depth.shape: depthlim=depthlim-1
             yy,xx = np.meshgrid(depth,self.time)
             
             #___________________________________________________________________
-            data_plot = np.copy(self.value[ii])
+            data_plot = np.copy(self.value)
             data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
             data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
             
@@ -558,15 +561,30 @@ class fesom_box:
                             #vmin=np.nanmin(data_plot), vmax=np.nanmax(data_plot))
             else: 
                 hp=ax1.contourf(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel,
-                            antialiased=True,
+                            antialiased=False,
                             cmap=cmap0,
                             vmin=clevel[0], vmax=clevel[-1])
-                ax1.contour(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel,
-                            antialiased=True,
-                            colors='k',
-                            linewidths=[0.25,0.1],
-                            linestyles=['solid'],
-                            vmin=np.nanmin(data_plot), vmax=np.nanmax(data_plot))
+                if which_lines[0]==1:
+                    ax1.contour(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel[clevel<cref],
+                                    antialiased=True,
+                                    colors='k',
+                                    linewidths=0.5,
+                                    linestyles='-',
+                                    vmin=clevel[0], vmax=clevel[-1])
+                if which_lines[1]==1:
+                    ax1.contour(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel[clevel==cref],
+                                    antialiased=True,
+                                    colors='k',
+                                    linewidths=1.0,
+                                    linestyles='-',
+                                    vmin=clevel[0], vmax=clevel[-1])
+                if which_lines[2]==1:
+                    ax1.contour(xx[:,0:depthlim],yy[:,0:depthlim],data_plot[:,0:depthlim],levels=clevel[clevel>cref],
+                                    antialiased=True,
+                                    colors='k',
+                                    linewidths=0.5,
+                                    linestyles='--',
+                                    vmin=clevel[0], vmax=clevel[-1])
             #hp.cmap.set_under([0.4,0.4,0.4])
             
             #___________________________________________________________________
@@ -668,7 +686,7 @@ class fesom_box:
             xmin,xmax,ymin,ymax = np.max([xmin,-180.0]),np.min([xmax,180.0]),np.max([ymin,-90.0]),np.min([ymax,90.0])
             
             #___________________________________________________________________
-            figp, ax = plt.figure(figsize=(13, 13)), plt.gca()
+            figp, ax = plt.figure(figsize=(8, 8)), plt.gca()
             map     = Basemap(projection = 'cyl',resolution = 'c',
                         llcrnrlon = xmin, urcrnrlon = xmax, llcrnrlat = ymin, urcrnrlat = ymax)
             

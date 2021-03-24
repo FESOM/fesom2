@@ -22,6 +22,13 @@ use io_MEANDATA
 use io_mesh_info
 use diagnostics
 use mo_tidal
+use fesom_version_info_module
+
+! Define icepack module
+#if defined (__icepack)
+use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
+#endif
+
 #if defined (__oasis)
 use cpl_driver
 #endif
@@ -30,9 +37,10 @@ use cpl_driver
   use openacc
 #endif
 #endif
+
 IMPLICIT NONE
 
-integer :: n, nsteps, offset, row, i
+integer :: n, nsteps, offset, row, i, provided
 real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
 real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
 real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing
@@ -71,11 +79,10 @@ type(t_mesh), target, save      :: mesh
 #endif
 #endif
 
-
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
-    call MPI_INIT(i)
+    call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
 
     t1 = MPI_Wtime()
@@ -87,6 +94,7 @@ type(t_mesh), target, save      :: mesh
     call par_init
     if(mype==0) then
         write(*,*)
+        print *,"FESOM2 git SHA: "//fesom_git_sha()
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
@@ -129,6 +137,17 @@ type(t_mesh), target, save      :: mesh
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
 
+#if defined (__icepack)
+    !=====================
+    ! Setup icepack
+    !=====================
+    if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
+    call set_icepack
+    call alloc_icepack
+    call init_icepack(mesh)
+    if (mype==0) write(*,*) 'Icepack: setup complete'
+#endif
+    
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
@@ -199,7 +218,8 @@ type(t_mesh), target, save      :: mesh
     if (use_global_tides) then
        call foreph_ini(yearnew, month)
     end if
-    do n=1, nsteps
+
+    do n=1, nsteps        
         if (use_global_tides) then
            call foreph(mesh)
         end if
@@ -269,7 +289,9 @@ type(t_mesh), target, save      :: mesh
         rtime_write_restart = rtime_write_restart + t6 - t5
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
     end do
-
+    
+    call finalize_output()
+    
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
