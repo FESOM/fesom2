@@ -53,6 +53,11 @@ use_windmix   = .false.     ! enhance mixing trough wind only for PP mixing (for
 windmix_kv    = 1.e-3
 windmix_nl    = 2
 
+smooth_bh_tra =.false.     ! use biharmonic diffusion (filter implementation) for tracers
+gamma0_tra    = 0.0005     ! gammaX_tra are analogous to those in the dynamical part
+gamma1_tra    = 0.0125
+gamma2_tra    = 0.
+
 diff_sh_limit=5.0e-3            ! for KPP, max diff due to shear instability
 Kv0_const=.false.
 double_diffusion=.false.               ! for KPP,dd switch
