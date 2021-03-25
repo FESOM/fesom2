@@ -456,8 +456,8 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     if (tr_array_id==4) then
         do row=1, myDim_nod2D
             n=nn_num(row)
-            tmax(row)=max(maxval(m_templ(nn_pos(1:n,row))), maxval(m_temp(nn_pos(1:n,row))))
-            tmin(row)=min(minval(m_templ(nn_pos(1:n,row))), minval(m_temp(nn_pos(1:n,row))))
+            tmax(row)=max(maxval(m_templ(nn_pos(1:n,row))), maxval(ice_temp(nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_templ(nn_pos(1:n,row))), minval(ice_temp(nn_pos(1:n,row))))
             ! Admissible increments
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
