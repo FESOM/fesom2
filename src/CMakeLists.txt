@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.17)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
@@ -111,9 +111,22 @@ install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTA
 add_library(settings INTERFACE)
 
 option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU in a round robin distribution" OFF)
+option(WITH_NVTX "Enable the code annotations defined by NVidia Tools Extension (NVTX)" OFF)
 #target_compile_features(settings INTERFACE cxx_std_17)
+
+if(WITH_NVTX)
+    # https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html
+    find_package(CUDAToolkit REQUIRED)
+  if(CUDAToolkit_FOUND)
+	  target_link_libraries(settings INTERFACE CUDA::nvToolsExt)
+  endif()
+endif()
+
 target_compile_definitions(settings
   INTERFACE
   $<$<BOOL:${OPTIM_ACC_SET_DEVICE}>:OPTIM_ACC_SET_DEVICE>
+  $<$<BOOL:${WITH_NVTX}>:WITH_NVTX>
 )
 target_link_libraries(${PROJECT_NAME} settings)
+
+
