@@ -39,7 +39,7 @@ end module
 !
 !===============================================================================
 subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
-    use MOD_MESH
+    use MOD_MESH 
     use O_MESH
     use o_ARRAYS
     use o_PARAM
@@ -65,7 +65,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     real(kind=WP), intent(in)         :: opth, optv
     real(kind=WP), pointer, dimension (:,:) :: pwvel
 
-    integer       :: el(2), enodes(2), nz, n, e
+    integer       :: el(2), enodes(2), nz, n, e, nzmax
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2, tr_num
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
@@ -79,16 +79,26 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
     ! Asynchronous copy of ttf to gpu
-    !$acc data copyin(ttf, ttfAB) async(1)
+    !$acc data copyin(ttf, ttfAB)
     if (trim(tra_adv_lim)=='FCT') then 
         ! compute the low order upwind horizontal flux
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
         call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
-        !$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
-
+        
         ! update the LO solution for horizontal contribution
-        fct_LO=0.0_WP
+        nzmax=mesh%nl-1
+        
+        !$acc parallel loop collapse(2) present(fct_LO) async(stream_hor_adv_tra)
+        do n=1, myDim_nod2D+eDim_nod2D
+          do nz=1,nzmax
+            fct_LO(nz,n)=0.0_WP
+          end do
+        end do
+
+        !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,fct_LO,adv_flux_hor)&
+        !$acc& private(enodes,el,nu1,nl1,nu2,nl2,nu12,nl12)&
+        !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)
@@ -106,8 +116,11 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (nu2>0) nu12 = min(nu1,nu2)
 
             !!PS do  nz=1, max(nl1, nl2)
+            !$acc loop vector
             do nz=nu12, nl12
+                !$acc atomic update
                 fct_LO(nz, enodes(1))=fct_LO(nz, enodes(1))+adv_flux_hor(nz, e)
+                !$acc atomic update
                 fct_LO(nz, enodes(2))=fct_LO(nz, enodes(2))-adv_flux_hor(nz, e)
             end do
         end do
@@ -115,13 +128,18 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
-        !$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
 
         ! update the LO solution for vertical contribution
+        !$acc wait(stream_hnode_update)
+        !$acc wait(stream_hor_adv_tra)
+        !$acc parallel loop gang present(fct_LO,adv_flux_ver,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,area)&
+        !$acc& private(nu1,nl1)&
+        !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
             !!PS do  nz=1, nlevels_nod2D(n)-1
+            !$acc loop vector
             do  nz= nu1, nl1-1
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/area(nz,n))/hnode_new(nz,n)
             end do
@@ -129,23 +147,26 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 
         if (w_split) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
+            !$acc update device(wi)
+            !$acc wait(stream_hor_adv_tra)
+            !$acc wait(stream_ver_adv_tra)
             call adv_tra_vert_impl(fct_LO, wi, mesh)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
             ! --> compute here low order part of vertical anti diffusive fluxes,
             !     has to be done on the full vertical velocity w
             call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
-            !$acc update device(adv_flux_hor) async(stream_ver_adv_tra)
         end if
-
+        !$acc wait(stream_hor_adv_tra)
+        !$acc wait(stream_ver_adv_tra)
+        !$acc update self(fct_LO)
         call exchange_nod(fct_LO)
-    !$acc update device(fct_LO) async(1)
+        !$acc update device(fct_LO) async(1)
     end if
 
     do_zero_flux=.true.
     if (trim(tra_adv_lim)=='FCT') do_zero_flux=.false.
 
-    !$acc wait(1)
     !___________________________________________________________________________
     ! do horizontal tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tra_adv_hor))
@@ -197,9 +218,9 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 !end if
     if (trim(tra_adv_lim)=='FCT') then
 !if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
-       call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
+        !$acc wait(1)
+        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
-!$acc wait(stream_hnode_update)
        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
     else
         call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
