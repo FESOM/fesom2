@@ -202,7 +202,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use oce_adv_tra_driver_interfaces
     use openacc_params
     implicit none
-    integer :: tr_num, node, nz, n
+    integer :: tr_num, node, nz, n, nl
     type(t_mesh), intent(in) , target :: mesh    
     ! del_ttf ... initialised and setted to zero in call init_tracers_AB(tr_num)
     ! --> del_ttf ... equivalent to R_T^n in Danilov etal FESOM2: "from finite element
@@ -219,24 +219,24 @@ subroutine adv_tracers_ale(tr_num, mesh)
         !!PS call compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num)
     end if    
     
+    nl = mesh%nl
     !___________________________________________________________________________
     ! horizontal ale tracer advection 
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
-    !$acc parallel loop collapse(2) present(del_ttf_advhoriz,del_ttf_advvert) async(stream_dttf_reset)
+    !$acc parallel loop collapse(2) present(del_ttf_advhoriz,del_ttf_advvert)
     do n=1,myDim_nod2D+eDim_nod2D
-        do nz=1,mesh%nl
+        do nz=1,nl
             del_ttf_advhoriz(nz,n) = 0.0_WP
             del_ttf_advvert(nz,n)  = 0.0_WP
         end do
     end do
     call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
-    !$acc update self(del_ttf_advhoriz, del_ttf_advvert)
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
     !$acc parallel loop collapse(2) present(del_ttf,del_ttf_advhoriz,del_ttf_advvert)
     do n=1,myDim_nod2D+eDim_nod2D
-        do nz=1,mesh%nl
+        do nz=1,nl
             del_ttf(nz,n)=del_ttf_advhoriz(nz,n) + del_ttf_advvert(nz,n)
         end do
     end do
@@ -245,7 +245,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! compute discrete variance decay after Burchard and Rennau 2008
     if (ldiag_DVD .and. tr_num <= 2) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call compute_diag_dvd'//achar(27)//'[0m'
-    !$acc update self(del_ttf_advhoriz,del_ttf_advvert)
+        !$acc update self(del_ttf_advhoriz,del_ttf_advvert)
         call compute_diag_dvd(tr_num, mesh)
     end if     
     
@@ -806,7 +806,7 @@ subroutine diff_part_hor_redi(mesh)
 
     if (Redi) isredi=1._WP
 !$acc wait(stream_redi) 
-!$acc parallel loop gang present(edge_cross_dxdy,edge_tri,edges,nlevels,elem2d_nodes,helem,tr_z,tr_xy,del_ttf,dt,area)&
+!$acc parallel loop gang present(edge_cross_dxdy,edge_tri,edges,nlevels,elem2d_nodes,helem,tr_z,tr_xy,del_ttf,dt,area,ulevels,slope_tapered,ki)&
 !$acc& private(rhs1,rhs2,deltaX1,deltaY1,deltaX2, deltaY2,el,enodes,n2,nl1,ul1,nl2,ul2,nl12,ul12,nz,elnodes,n2,Kh,c,Fx,&
 !$acc& Fy,Tx,Ty,Tx_z,Ty_z,SxTz,SyTz,Tz) vector_length(z_vector_length)
     do edge=1, myDim_edge2D

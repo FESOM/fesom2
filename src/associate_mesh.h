@@ -25,7 +25,7 @@ integer,       dimension(:)  , pointer, contiguous :: nlevels, nlevels_nod2D, nl
 real(kind=WP), dimension(:,:), pointer, contiguous :: area, area_inv
 real(kind=WP), dimension(:)  , pointer, contiguous :: mesh_resolution
 real(kind=WP), dimension(:)  , pointer, contiguous :: lump2d_north, lump2d_south
-type(sparse_matrix)          , pointer,            :: ssh_stiff
+type(sparse_matrix)          , pointer             :: ssh_stiff
 !!$integer,       dimension(:)  , pointer :: cavity_lev_nod2D, cavity_lev_elem2D
 integer,       dimension(:)  , pointer, contiguous :: cavity_flag_n, cavity_flag_e
 real(kind=WP), dimension(:)  , pointer, contiguous :: cavity_depth
