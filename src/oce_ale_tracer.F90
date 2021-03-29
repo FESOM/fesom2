@@ -99,6 +99,7 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+    use openacc_params
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -120,7 +121,7 @@ subroutine solve_tracers_ale(mesh)
         Wvel  =Wvel  +fer_Wvel
     end if
 
-    !$acc update device(Wvel, Wvel_e) async(8)
+    !$acc update device(UV, Wvel, Wvel_e) async(stream_hor_adv_tra)
 
     !___________________________________________________________________________
     ! loop over all tracers 

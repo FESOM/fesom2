@@ -220,6 +220,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     use g_PARSUP
     use g_CONFIG
     use g_comm_auto
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh    
     integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -232,20 +233,41 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
     real(kind=WP)                     :: c_lo(2)
     real(kind=WP)                     :: a, vflux
-    integer                           :: el(2), enodes(2), nz, edge
-    integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
+    integer                           :: el(2), enodes(2), nz, edge, nzmax
+    integer                           :: nu12, nl12, nl1, nl2, nu1, nu2, n
 
 #include "associate_mesh.h"
 
+    nzmax = mesh%nl
+
     if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
+        if (init_zero)then
+            !$acc parallel loop collapse(2) present(flux)
+            do n=1, myDim_nod2D
+                do nz=1,nzmax
+                    flux(nz,n)=0.0_WP
+                end do
+            end do
+        end if
     else
-       flux=0.0_WP
+        !$acc parallel loop collapse(2) present(flux)
+        do n=1, myDim_nod2D
+            do nz=1,nzmax
+                flux(nz,n)=0.0_WP
+            end do
+        end do
     end if
 
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
+    !$acc wait(stream_hor_adv_tra)
+    !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,&
+    !$acc& nboundary_lay,ttf,edge_dxdy,edge_up_dn_grad,vel,helem)&
+    !$acc& private(nz,enodes,el,nl1,nl2,nl12,nu1,nu2,nu12,deltaX1,deltaY1,deltaX2,deltaY2,a,c_lo,vflux,&
+    !$acc& Tmean1, Tmean2, cHO)&
+    !$acc& vector_length(z_vector_length)
+    !!$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)          
@@ -293,6 +315,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! (A) goes only into this loop when the edge has only facing element
         ! el(1) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
+        !$acc loop vector
         do nz=nu1, nu12-1
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -320,6 +343,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! el(2) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
         if (nu2 > 0) then 
+            !$acc loop vector
             do nz=nu2, nu12-1
                 c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
                 c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -348,6 +372,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! loop over depth layers from top to n2
         ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than n2=0 so 
         !                     you wont enter in this loop
+        !$acc loop vector
         do nz=nu12, nl12
             c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
             c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -432,6 +457,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         
         !_______________________________________________________________________
         ! (D) remaining segments on the left or on the right
+        !$acc loop vector
         do nz=nl12+1, nl1
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -456,6 +482,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         
         !_______________________________________________________________________
         ! (E) remaining segments on the left or on the right
+        !$acc loop vector
         do nz=nl12+1, nl2
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)

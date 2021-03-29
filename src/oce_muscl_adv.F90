@@ -102,6 +102,7 @@ subroutine muscl_adv_init(mesh)
             nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
         end if
     end do
+	!$acc enter data copyin(nboundary_lay)
     
 !!PS     !___________________________________________________________________________
 !!PS     --> is transfered to oce_mesh.F90 --> subroutine find_levels_min_e2n(mesh)
@@ -278,6 +279,8 @@ deallocate(e_nodes, coord_elem)
 
 edge_up_dn_grad=0.0_WP
 
+!$acc enter data copyin(edge_up_dn_grad,edge_up_dn_tri)
+
 end SUBROUTINE find_up_downwind_triangles
 !
 !
@@ -290,6 +293,7 @@ USE MOD_MESH
 USE O_MESH
 USE o_ARRAYS
 USE g_PARSUP
+use openacc_params
 IMPLICIT NONE
 integer                  :: n, nz, elem, k, edge, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
@@ -444,4 +448,5 @@ type(t_mesh), intent(in) , target :: mesh
 			END DO
 		end if  
 	END DO 
+	!$acc update device(edge_up_dn_grad) async(stream_hor_adv_tra)
 END SUBROUTINE fill_up_dn_grad
