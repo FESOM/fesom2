@@ -35,7 +35,7 @@ subroutine oce_adv_tra_fct_init(mesh)
 #include "associate_mesh.h"
 ! Copy mesh information to gpu once at initialization
 !$acc enter data copyin(nlevels_nod2D,ulevels_nod2D,nl,nlevels,ulevels,elem2D_nodes,nod_in_elem2D,nod_in_elem2D_num,&
-!$acc& edges,edge_tri,area,edge_cross_dxdy,edge_dxdy,elem_cos)
+!$acc& edges,edge_tri,area,edge_cross_dxdy,edge_dxdy,elem_cos,elem_area,nlevels_nod2D_min,ulevels_nod2D_max)
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(fct_LO(nl-1, my_size))        ! Low-order solution
@@ -329,7 +329,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! b2. Limiting factors
 
     ! Double loop over blocks then threads. Transfer fct_plus, fct_minus to cpu for halo exchange
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,fct_ttf_min,fct_ttf_max,area)&
+    !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,fct_plus,fct_minus,fct_ttf_min,fct_ttf_max,area)&
     !$acc& private(nu1,nl1,flux)&
     !$acc& vector_length(z_vector_length)
     do n=1,myDim_nod2D

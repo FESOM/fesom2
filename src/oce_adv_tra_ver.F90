@@ -396,10 +396,9 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    !$acc wait(stream_ver_adv_tra)
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,flux,area)&
     !$acc& private(nzmin,nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x)&
-    !$acc& vector_length(z_vector_length)
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
 
         !_______________________________________________________________________

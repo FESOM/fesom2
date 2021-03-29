@@ -262,12 +262,11 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     ! They are put into flux
     !___________________________________________________________________________
     !$acc wait(stream_hor_adv_tra)
-    !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,&
+    !$acc parallel loop gang present(flux,edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,&
     !$acc& nboundary_lay,ttf,edge_dxdy,edge_up_dn_grad,vel,helem)&
     !$acc& private(nz,enodes,el,nl1,nl2,nl12,nu1,nu2,nu12,deltaX1,deltaY1,deltaX2,deltaY2,a,c_lo,vflux,&
     !$acc& Tmean1, Tmean2, cHO)&
-    !$acc& vector_length(z_vector_length)
-    !!$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)          

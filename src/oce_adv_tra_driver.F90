@@ -85,6 +85,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
         call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
+        !$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
 
         ! update the LO solution for horizontal contribution
         fct_LO=0.0_WP
@@ -114,6 +115,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+        !$acc update device(adv_flux_ver) async(stream_ver_adv_tra)
 
         ! update the LO solution for vertical contribution
         do n=1, myDim_nod2D
@@ -133,6 +135,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             ! --> compute here low order part of vertical anti diffusive fluxes,
             !     has to be done on the full vertical velocity w
             call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+            !$acc update device(adv_flux_hor) async(stream_ver_adv_tra)
         end if
 
         call exchange_nod(fct_LO)
@@ -142,6 +145,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     do_zero_flux=.true.
     if (trim(tra_adv_lim)=='FCT') do_zero_flux=.false.
 
+    !$acc wait(1)
     !___________________________________________________________________________
     ! do horizontal tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tra_adv_hor))
@@ -156,19 +160,13 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
-    ! Asynchronous copy of adf_h to gpu
-    !$acc update device(adv_flux_hor) async(stream_hor_adv_tra)
    
     if (trim(tra_adv_lim)=='FCT') then
        pwvel=>w
     else
        pwvel=>we
     end if
-
-    !___________________________________________________________________________
-    ! do vertical tracer advection, in case of FCT high order solution
  
-    !$acc wait(1)
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tra_adv_ver))
