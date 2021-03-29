@@ -386,13 +386,6 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
       end do
     end if
 
-    !$acc parallel loop collapse(2) present(flux)
-    do n=1, myDim_nod2D
-        do nz=1, mesh%nl
-          flux(nz,n)=0.0_WP
-        end do
-    end do
-
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
