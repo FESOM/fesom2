@@ -99,11 +99,13 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+    use profiling_nvtx
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
     integer                  :: tr_num, node, nzmax, nzmin
     real(kind=WP)            :: aux_tr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+    character(len=6) :: trid_str
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -125,6 +127,8 @@ subroutine solve_tracers_ale(mesh)
     !___________________________________________________________________________
     ! loop over all tracers 
     do tr_num=1,num_tracers
+        write(trid_str, '(i6)') tr_num
+        call nvtxStartRange('solve_tracers_ale '//trim(adjustl(trid_str)))
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -143,6 +147,8 @@ subroutine solve_tracers_ale(mesh)
         call relax_to_clim(tr_num, mesh)
         if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
         call exchange_nod(tr_arr(:,:,tr_num))
+
+        call nvtxEndRange ! solve_tracers_ale
     end do
     
     !___________________________________________________________________________
@@ -201,6 +207,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     use adv_tracers_vert_ppm_ale_interface
     use oce_adv_tra_driver_interfaces
     use openacc_params
+    use profiling_nvtx
     implicit none
     integer :: tr_num, node, nz, n
     type(t_mesh), intent(in) , target :: mesh    
@@ -209,6 +216,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     !     to finite volume". At the end R_T^n should contain all advection therms and 
     !     the terms due to diffusion.
     ! del_ttf=0d0
+    call nvtxStartRange('adv_tracers_ale')
     
     !___________________________________________________________________________
     ! if ldiag_DVD=.true. --> compute tracer second moments for the calcualtion 
@@ -249,6 +257,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
         call compute_diag_dvd(tr_num, mesh)
     end if     
     
+    call nvtxEndRange
 end subroutine adv_tracers_ale
 !
 !
@@ -793,6 +802,7 @@ subroutine diff_part_hor_redi(mesh)
     use o_param
     use g_config
     use openacc_params
+    use profiling_nvtx
     IMPLICIT NONE
     type(t_mesh), intent(in) , target :: mesh
     real(kind=WP)            :: deltaX1,deltaY1,deltaX2,deltaY2
@@ -803,6 +813,7 @@ subroutine diff_part_hor_redi(mesh)
     real(kind=WP)            :: isredi=0._WP
 
 #include "associate_mesh.h"
+    call nvtxStartRange('diff_part_hor_redi')
 
     if (Redi) isredi=1._WP
 !$acc wait(stream_redi) 
@@ -941,6 +952,7 @@ subroutine diff_part_hor_redi(mesh)
             del_ttf(nz,enodes(2))=del_ttf(nz,enodes(2))+rhs2(nz)*dt/area(nz,enodes(2))
         end do
     end do
+    call nvtxEndRange
 end subroutine diff_part_hor_redi
 !
 !

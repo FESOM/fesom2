@@ -51,6 +51,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
     use openacc_params
+    use profiling_nvtx
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -74,6 +75,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     logical       :: do_zero_flux
 
 #include "associate_mesh.h"
+
+    call nvtxStartRange('do_oce_adv_tra')
 
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
@@ -211,6 +214,8 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 !$acc end data
 !$acc wait(stream_ver_adv_tra)
 !$acc wait(stream_hor_adv_tra)
+
+    call nvtxEndRange
 end subroutine do_oce_adv_tra
 !
 !
@@ -224,6 +229,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     use g_CONFIG
     use g_comm_auto
     use openacc_params
+    use profiling_nvtx
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -235,6 +241,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     real(kind=WP), optional           :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nu12, nl12, nu1, nu2, nl1, nl2, edge
 #include "associate_mesh.h"
+    call nvtxStartRange('oce_tra_adv_flux2dtracer')
     !___________________________________________________________________________
     ! c. Update the solution
     ! Vertical
@@ -297,4 +304,5 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
+    call nvtxEndRange
 end subroutine oce_tra_adv_flux2dtracer

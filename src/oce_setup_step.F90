@@ -33,8 +33,11 @@ use Toy_Channel_Soufflet
 use array_setup_interface
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
+use profiling_nvtx
 IMPLICIT NONE
 type(t_mesh), intent(inout) , target :: mesh
+
+    call nvtxStartRange('ocean_setup')
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -173,6 +176,7 @@ type(t_mesh), intent(inout) , target :: mesh
         write(*,*) '******************************************************************************'
     end if
     !$acc enter data copyin(hnode,hnode_new,helem,slope_tapered,tr_xy,tr_z,Ki)
+    call nvtxEndRange
 end subroutine ocean_setup
 !
 !
