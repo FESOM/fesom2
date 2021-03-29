@@ -1866,7 +1866,7 @@ subroutine vert_vel_ale(mesh)
                     ! layer reached already minimum layerthickness)
                     max_dhbar2distr = 0.0_WP
                     !max_dhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
-                    max_dhbar2distr = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin:nzmin+lzstar_lev-1+1))*min_hnode - hnode(nzmin:nzmin+lzstar_lev-1,n);
+                    max_dhbar2distr = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin+1:nzmin+lzstar_lev-1+1))*min_hnode - hnode(nzmin:nzmin+lzstar_lev-1,n);
                     where (max_dhbar2distr>=0.0_WP) max_dhbar2distr=0.0_WP
                     
                     !_______________________________________________________________
