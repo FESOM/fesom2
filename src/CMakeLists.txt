@@ -110,7 +110,14 @@ install(PROGRAMS ${PROJECT_BINARY_DIR}/${PROJECT_NAME} DESTINATION ${FESOM_INSTA
 
 add_library(settings INTERFACE)
 
-option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU in a round robin distribution" OFF)
+option(OPTIM_ACC_SET_DEVICE "Set the ACC Device to the CPU" OFF)
+option(OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT "Set the ACC Device to the CPU: before MPI init" OFF)
+option(OPTIM_ACC_SET_DEVICE_SCATTER "Set the ACC Device to the CPU: scatter distribution of GPUs" OFF)
+option(OPTIM_ACC_SET_DEVICE_COMPACT "Set the ACC Device to the CPU: compact distribution of GPUs" ON)
+if(OPTIM_ACC_SET_DEVICE_SCATTER AND OPTIM_ACC_SET_DEVICE_COMPACT)
+	message(ERROR_FATAL "OPTIM_ACC_SET_DEVICE_SCATTER and OPTIM_ACC_SET_DEVICE_COMPACT are mutually exclussive")
+endif()
+
 option(WITH_NVTX "Enable the code annotations defined by NVidia Tools Extension (NVTX)" OFF)
 #target_compile_features(settings INTERFACE cxx_std_17)
 
@@ -125,6 +132,9 @@ endif()
 target_compile_definitions(settings
   INTERFACE
   $<$<BOOL:${OPTIM_ACC_SET_DEVICE}>:OPTIM_ACC_SET_DEVICE>
+  $<$<AND:$<BOOL:${OPTIM_ACC_SET_DEVICE}>,$<BOOL:${OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT}>>:OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT>
+  $<$<AND:$<BOOL:${OPTIM_ACC_SET_DEVICE}>,$<BOOL:${OPTIM_ACC_SET_DEVICE_SCATTER}>>:OPTIM_ACC_SET_DEVICE_SCATTER>
+  $<$<AND:$<BOOL:${OPTIM_ACC_SET_DEVICE}>,$<BOOL:${OPTIM_ACC_SET_DEVICE_COMPACT}>>:OPTIM_ACC_SET_DEVICE_COMPACT>
   $<$<BOOL:${WITH_NVTX}>:WITH_NVTX>
 )
 target_link_libraries(${PROJECT_NAME} settings)

@@ -54,17 +54,31 @@ type(t_mesh), target, save      :: mesh
 #ifdef OPTIM_ACC_SET_DEVICE
 #ifdef _OPENACC
   integer :: ngpus, gpuId, local_rank, shcomm
+  character(len=256) :: cuda_visible_devices_env
   character(len=6) :: local_rank_env
   integer          :: local_rank_env_status
+  integer          :: local_size
+  character(len=6) :: local_size_env
+  integer          :: local_size_env_status
 #endif
 #endif
 
 #ifdef OPTIM_ACC_SET_DEVICE
 #ifdef _OPENACC
+
+#ifdef OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT
+#ifndef __oifs
+    !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
+    !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
+    call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
+#endif
+#endif
+  
   !! Initialize ACC
   !$acc init
 
   !! http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-mpi-cuda-aware-gpudirect-eng.html
+  call get_environment_variable(name="CUDA_VISIBLE_DEVICES", value=cuda_visible_devices_env, status=local_rank_env_status)
   call get_environment_variable(name="SLURM_LOCALID", value=local_rank_env, status=local_rank_env_status)
   if (local_rank_env_status == 0) then
           read(local_rank_env, *) local_rank
@@ -75,15 +89,33 @@ type(t_mesh), target, save      :: mesh
   end if
 
   ngpus = acc_get_num_devices(acc_device_default)
+#ifdef OPTIM_ACC_SET_DEVICE_SCATTER
   gpuId = mod(local_rank, ngpus)
+#endif
+#ifdef OPTIM_ACC_SET_DEVICE_COMPACT
+  call get_environment_variable(name="SLURM_NTASKS_PER_NODE", value=local_size_env, status=local_size_env_status)
+  if (local_size_env_status == 0) then
+          read(local_size_env, *) local_size
+  else
+          ! TODO: support OMPI_COMM_WORLD_LOCAL_RANK
+          print *, "Error: unable to determine the local rank of the process (only SLURM supported yet)"
+          stop 1
+  end if
+
+  gpuId = local_rank*ngpus/local_size
+  write(*,*) gpuId, local_rank, ngpus, local_size
+#endif
+  write(*,'(a,i7)') 'OPTIM_ACC_SET_DEVICE: CUDA_VISIBLE_DEVICES=' // trim(cuda_visible_devices_env)//' setting gpuId=', gpuId
   call acc_set_device_num(gpuId, acc_get_device_type())
 #endif
 #endif
 
+#ifndef OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
     call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
+#endif
 #endif
 
     t1 = MPI_Wtime()
@@ -96,6 +128,9 @@ type(t_mesh), target, save      :: mesh
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
+#ifdef OPTIM_ACC_SET_DEVICE
+        call system('nvidia-smi')
+#endif
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
