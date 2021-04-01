@@ -113,6 +113,7 @@ module g_config
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt
+  !$acc declare create(dt)
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
   real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0

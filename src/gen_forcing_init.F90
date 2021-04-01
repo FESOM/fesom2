@@ -152,6 +152,7 @@ subroutine forcing_array_setup(mesh)
     allocate(Cd_atm_ice_arr(n2)) 
     Cd_atm_ice_arr=Cd_atm_ice   
   endif
+  !$acc enter data copyin(real_salt_flux,sw_3d)
   if(mype==0) write(*,*) 'forcing arrays have been set up'  
 end subroutine forcing_array_setup
 !

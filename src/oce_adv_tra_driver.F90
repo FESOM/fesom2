@@ -78,8 +78,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order
     ! part of antidiffusive flux
-    ! Asynchronous copy of ttf to gpu
-    !$acc data copyin(ttf, ttfAB)
     if (trim(tra_adv_lim)=='FCT') then 
         ! compute the low order upwind horizontal flux
         ! init_zero=.true.  : zero the horizontal flux before computation
@@ -225,7 +223,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     else
         call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
-!$acc end data
 !$acc wait(stream_ver_adv_tra)
 !$acc wait(stream_hor_adv_tra)
 end subroutine do_oce_adv_tra
@@ -296,7 +293,8 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
         nl2=0
         nu2=0
-        if(el(2)>0) then
+        if(el(2)>0) then!$acc end data
+
             nl2=nlevels(el(2))-1
             nu2=ulevels(el(2))
         end if

@@ -56,6 +56,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
+  !$acc declare create(prec_rain)
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
 
@@ -78,6 +79,7 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn, flice
   real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
+  !$acc declare create(real_salt_flux)
 
   ! drag coefficient Cd_atm_oce and transfer coefficients for evaporation
   ! Ce_atm_oce and sensible heat Ch_atm_oce between atmosphere and ocean

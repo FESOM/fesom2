@@ -2553,6 +2553,8 @@ subroutine oce_timestep_ale(n, mesh)
 !!PS     water_flux = 0.0_WP
 !!PS     heat_flux  = 0.0_WP
 !!PS     stress_surf= 0.0_WP
+
+    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d) async(stream_ver_diff_tra)
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -2579,7 +2581,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(mesh)
 
-    !$acc update device(slope_tapered) async(stream_redi)
+    !$acc update device(slope_tapered) async(stream_hor_diff_tra)
     
     !___________________________________________________________________________
     call status_check
@@ -2658,7 +2660,10 @@ subroutine oce_timestep_ale(n, mesh)
         call calc_cvmix_tidal(mesh)
         
     end if
-    t1=MPI_Wtime()    
+    
+    !$acc update device(Kv) async(stream_ver_diff_tra)
+    
+    t1=MPI_Wtime()
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
@@ -2675,6 +2680,9 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
+    
+    !$acc update device(hnode_new) async(stream_hnode_update)
+    
     t2=MPI_Wtime()
     
     !___________________________________________________________________________
@@ -2719,7 +2727,7 @@ subroutine oce_timestep_ale(n, mesh)
     
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
-        !$acc update device(Ki) async(stream_redi)
+        !$acc update device(Ki) async(stream_hor_diff_tra)
     end if
     
     !___________________________________________________________________________
@@ -2737,11 +2745,13 @@ subroutine oce_timestep_ale(n, mesh)
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
+    !$acc update device(Wvel_i) async(stream_ver_diff_tra)
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
+    !$acc wait(stream_hnode_update)
     call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
     
