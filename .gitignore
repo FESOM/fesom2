@@ -1,4 +1,5 @@
 /build
+/mesh_part/build/
 *.o
 *.mod
 *.x

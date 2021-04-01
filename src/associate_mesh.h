@@ -4,32 +4,32 @@ integer         , pointer :: edge2D
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
 integer         , pointer :: nl
-real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
-integer, dimension(:,:)      , pointer :: elem2D_nodes
-integer, dimension(:,:)      , pointer :: edges
-integer, dimension(:,:)      , pointer :: edge_tri
-integer, dimension(:,:)      , pointer :: elem_edges
-real(kind=WP), dimension(:)  , pointer :: elem_area
-real(kind=WP), dimension(:,:), pointer :: edge_dxdy, edge_cross_dxdy
-real(kind=WP), dimension(:)  , pointer :: elem_cos, metric_factor
-integer,       dimension(:,:), pointer :: elem_neighbors
-integer,       dimension(:,:), pointer :: nod_in_elem2D
-real(kind=WP), dimension(:,:), pointer :: x_corners, y_corners
-integer,       dimension(:)  , pointer :: nod_in_elem2D_num
-real(kind=WP), dimension(:)  , pointer :: depth
-real(kind=WP), dimension(:,:), pointer :: gradient_vec
-real(kind=WP), dimension(:,:), pointer :: gradient_sca
-integer,       dimension(:)  , pointer :: bc_index_nod2D
-real(kind=WP), dimension(:)  , pointer :: zbar, Z, elem_depth
-integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D, nlevels_nod2D_min
-real(kind=WP), dimension(:,:), pointer :: area, area_inv
-real(kind=WP), dimension(:)  , pointer :: mesh_resolution
-real(kind=WP), dimension(:)  , pointer :: lump2d_north, lump2d_south
-type(sparse_matrix)          , pointer :: ssh_stiff
+real(kind=WP), dimension(:,:), pointer, contiguous :: coord_nod2D, geo_coord_nod2D
+integer, dimension(:,:)      , pointer, contiguous :: elem2D_nodes
+integer, dimension(:,:)      , pointer, contiguous :: edges
+integer, dimension(:,:)      , pointer, contiguous :: edge_tri
+integer, dimension(:,:)      , pointer, contiguous :: elem_edges
+real(kind=WP), dimension(:)  , pointer, contiguous :: elem_area
+real(kind=WP), dimension(:,:), pointer, contiguous :: edge_dxdy, edge_cross_dxdy
+real(kind=WP), dimension(:)  , pointer, contiguous :: elem_cos, metric_factor
+integer,       dimension(:,:), pointer, contiguous :: elem_neighbors
+integer,       dimension(:,:), pointer, contiguous :: nod_in_elem2D
+real(kind=WP), dimension(:,:), pointer, contiguous :: x_corners, y_corners
+integer,       dimension(:)  , pointer, contiguous :: nod_in_elem2D_num
+real(kind=WP), dimension(:)  , pointer, contiguous :: depth
+real(kind=WP), dimension(:,:), pointer, contiguous :: gradient_vec
+real(kind=WP), dimension(:,:), pointer, contiguous :: gradient_sca
+integer,       dimension(:)  , pointer, contiguous :: bc_index_nod2D
+real(kind=WP), dimension(:)  , pointer, contiguous :: zbar, Z, elem_depth
+integer,       dimension(:)  , pointer, contiguous :: nlevels, nlevels_nod2D, nlevels_nod2D_min
+real(kind=WP), dimension(:,:), pointer, contiguous :: area, area_inv
+real(kind=WP), dimension(:)  , pointer, contiguous :: mesh_resolution
+real(kind=WP), dimension(:)  , pointer, contiguous :: lump2d_north, lump2d_south
+type(sparse_matrix)          , pointer             :: ssh_stiff
 !!$integer,       dimension(:)  , pointer :: cavity_lev_nod2D, cavity_lev_elem2D
-integer,       dimension(:)  , pointer :: cavity_flag_n, cavity_flag_e
-real(kind=WP), dimension(:)  , pointer :: cavity_depth
-integer,       dimension(:)  , pointer :: ulevels, ulevels_nod2D, ulevels_nod2D_max
+integer,       dimension(:)  , pointer, contiguous :: cavity_flag_n, cavity_flag_e
+real(kind=WP), dimension(:)  , pointer, contiguous :: cavity_depth
+integer,       dimension(:)  , pointer, contiguous :: ulevels, ulevels_nod2D, ulevels_nod2D_max
 
 nod2D              => mesh%nod2D
 elem2D             => mesh%elem2D

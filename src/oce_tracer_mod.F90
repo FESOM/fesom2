@@ -71,6 +71,7 @@ SUBROUTINE init_tracers_AB(tr_num, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
     call tracer_gradient_z(tr_arr(:,:,tr_num), mesh)
     call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
+    !$acc update device(tr_xy) async(stream_hor_adv_tra)
     call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'

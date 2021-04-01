@@ -102,6 +102,7 @@ subroutine muscl_adv_init(mesh)
             nboundary_lay(edges(2,n))=min(nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
         end if
     end do
+	!$acc enter data copyin(nboundary_lay)
     
 !!PS     !___________________________________________________________________________
 !!PS     --> is transfered to oce_mesh.F90 --> subroutine find_levels_min_e2n(mesh)
@@ -278,6 +279,8 @@ deallocate(e_nodes, coord_elem)
 
 edge_up_dn_grad=0.0_WP
 
+!$acc enter data copyin(edge_up_dn_grad,edge_up_dn_tri)
+
 end SUBROUTINE find_up_downwind_triangles
 !
 !
@@ -290,6 +293,7 @@ USE MOD_MESH
 USE O_MESH
 USE o_ARRAYS
 USE g_PARSUP
+use openacc_params
 IMPLICIT NONE
 integer                  :: n, nz, elem, k, edge, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
@@ -299,6 +303,11 @@ type(t_mesh), intent(in) , target :: mesh
 
 	!___________________________________________________________________________
 	! loop over edge segments
+	!$acc parallel loop gang present(edge_up_dn_grad,ulevels,nlevels,edges,edge_up_dn_tri,&
+	!$acc& ulevels_nod2D,nod_in_elem2D_num,elem_area,tr_xy,ulevels_nod2D_max,nlevels_nod2D_min,&
+	!$acc& nod_in_elem2d,nlevels_nod2d)&
+	!$acc& private(ednodes,nzmin,nzmax,tvol,tx,ty,elem)&
+    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
 	DO edge=1,myDim_edge2D
 		ednodes=edges(:,edge)
 		!_______________________________________________________________________
@@ -309,6 +318,7 @@ type(t_mesh), intent(in) , target :: mesh
 			
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 1 (ednodes(1))
+			!$acc loop vector
 			DO nz=ulevels_nod2D(ednodes(1)), nzmin-1
 				tvol=0.0_WP
 				tx=0.0_WP
@@ -330,6 +340,7 @@ type(t_mesh), intent(in) , target :: mesh
 			
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 2 (ednodes(2))
+			!$acc loop vector
 			DO nz=ulevels_nod2D(ednodes(2)),nzmin-1
 				tvol=0.0_WP
 				tx=0.0_WP
@@ -352,6 +363,7 @@ type(t_mesh), intent(in) , target :: mesh
 			!___________________________________________________________________
 			! loop over shared depth levels
 			!!PS DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
+			!$acc loop vector
 			DO nz=nzmin, nzmax-1
 				! tracer gradx for upwind and downwind tri
 				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
@@ -362,6 +374,7 @@ type(t_mesh), intent(in) , target :: mesh
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 1 (ednodes(1))
 			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+			!$acc loop vector
 			DO nz=nzmax, nlevels_nod2D(ednodes(1))-1
 				tvol=0.0_WP
 				tx=0.0_WP
@@ -383,6 +396,7 @@ type(t_mesh), intent(in) , target :: mesh
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 2 (ednodes(2))
 			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+			!$acc loop vector
 			DO nz=nzmax, nlevels_nod2D(ednodes(2))-1
 				tvol=0.0_WP
 				tx=0.0_WP
@@ -409,6 +423,7 @@ type(t_mesh), intent(in) , target :: mesh
 			nzmin = ulevels_nod2D(ednodes(1))
 			nzmax = nlevels_nod2D(ednodes(1))
 			!!PS DO nz=1,nlevels_nod2D(ednodes(1))-1
+			!$acc loop vector
 			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP
@@ -427,6 +442,7 @@ type(t_mesh), intent(in) , target :: mesh
 			nzmin = ulevels_nod2D(ednodes(2))
 			nzmax = nlevels_nod2D(ednodes(2))
 			!!PS DO nz=1,nlevels_nod2D(ednodes(2))-1
+			!$acc loop vector
 			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP

@@ -37,7 +37,8 @@ subroutine oce_adv_tra_fct_init(mesh)
 
     call nvtxStartRange("oce_adv_tra_fct_init")
 ! Copy mesh information to gpu once at initialization
-!$acc enter data copyin(nlevels_nod2D,ulevels_nod2D,nl,nlevels,ulevels,elem2D_nodes,nod_in_elem2D,nod_in_elem2D_num,edges,edge_tri,area,edge_cross_dxdy)
+!$acc enter data copyin(nlevels_nod2D,ulevels_nod2D,nl,nlevels,ulevels,elem2D_nodes,nod_in_elem2D,nod_in_elem2D_num,&
+!$acc& edges,edge_tri,area,edge_cross_dxdy,edge_dxdy,elem_cos,elem_area,nlevels_nod2D_min,ulevels_nod2D_max)
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(fct_LO(nl-1, my_size))        ! Low-order solution
@@ -107,7 +108,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! Double loop over blocks then threads. Copy LO array, rest is either static mesh info or copied in 
     ! calling routine do_oce_adv_tra
     call nvtxStartRange("loop a1")
-    !$acc parallel loop gang present(fct_ttf_max,fct_ttf_min,LO,ttf,nlevels_nod2D)&
+    !$acc parallel loop gang present(fct_ttf_max,fct_ttf_min,LO,ttf,nlevels_nod2D,ulevels_nod2D)&
     !$acc& private(nl1,nu1) vector_length(z_vector_length)
     do n=1,myDim_nod2D + edim_nod2d
         nu1 = ulevels_nod2D(n)
@@ -128,7 +129,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! Double loop over blocks then threads. All arrays are either static mesh info or copied in
     ! calling routine do_oce_adv_tra, enodes are private array
     call nvtxStartRange("loop a2")
-    !$acc parallel loop gang present(UV_rhs,nl,nlevels,elem2D_nodes,fct_ttf_min,fct_ttf_max) &
+    !$acc parallel loop gang present(UV_rhs,nl,ulevels,nlevels,elem2D_nodes,fct_ttf_min,fct_ttf_max) &
     !$acc& private(enodes,nu1,nl1) vector_length(z_vector_length)
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
@@ -160,7 +161,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     if(vlimit==1) then
         !Horizontal
         call nvtxStartRange("loop a1 vlimit=1")
-        !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
+        !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
         !$acc& fct_ttf_min,fct_ttf_max,LO) private(tvert_min,tvert_max)&
         !$acc& private(nu1,nl1) vector_length(z_vector_length)
         do n=1, myDim_nod2D
@@ -205,7 +206,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! local
     if(vlimit==2) then
         call nvtxStartRange("loop a2 vlimit=2")
-        !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
+        !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
         !$acc& fct_ttf_min,fct_ttf_max,LO) private(nu1,nl1,tvert_min,tvert_max)&
         !$acc& vector_length(z_vector_length)
         do n=1, myDim_nod2D
@@ -235,7 +236,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     !            horizontal ones
     if(vlimit==3) then
         call nvtxStartRange("loop a3 vlimit=3")
-        !$acc parallel loop gang present(nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
+        !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,UV_rhs,&
         !$acc& fct_ttf_min,fct_ttf_max,LO) private(nu1,nl1,tvert_min,tvert_max)&
         !$acc& vector_length(z_vector_length)
         do n=1, myDim_nod2D
@@ -271,7 +272,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     call nvtxStartRange("double loop")
     ! Double loop over blocks then threads. All arrays are either static mesh info or copied in
     ! calling routine do_oce_adv_tra, enodes are private array
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus)&
+    !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,fct_plus,fct_minus)&
     !$acc& private(nu1,nl1) vector_length(z_vector_length)
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
@@ -288,7 +289,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     call nvtxStartRange("vertical")
 
     ! Wait for stream copying adf_v onto GPU, then perform kernel
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,adf_v)&
+    !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,fct_plus,fct_minus,adf_v)&
     !$acc& private(nu1,nl1) vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
         nu1 = ulevels_nod2D(n)
@@ -313,7 +314,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     call nvtxStartRange("horizontal")
 
     ! Wait for stream copying adf_h onto GPU, then perform kernel
-    !$acc parallel loop gang present(nlevels,edges,edge_tri,fct_plus,fct_minus,adf_h)&
+    !$acc parallel loop gang present(nlevels,ulevels,edges,edge_tri,fct_plus,fct_minus,adf_h)&
     !$acc& private(enodes,el,nl1,nu1,nl2,nu2,nl12,nu12)&
     !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
@@ -354,7 +355,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
 
     call nvtxStartRange("loop b2")
     ! Double loop over blocks then threads. Transfer fct_plus, fct_minus to cpu for halo exchange
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,fct_ttf_min,fct_ttf_max,area)&
+    !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,fct_plus,fct_minus,fct_ttf_min,fct_ttf_max,area)&
     !$acc& private(nu1,nl1,flux)&
     !$acc& vector_length(z_vector_length)
     do n=1,myDim_nod2D
@@ -384,7 +385,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! Double loop over blocks then threads. Transfer result adf_v back to cpu.
     ! Schedule kernel asynchronously on stream 3, because next one is independent
 
-    !$acc parallel loop gang present(nlevels_nod2D,fct_plus,fct_minus,adf_v)&
+    !$acc parallel loop gang present(ulevels_nod2D,nlevels_nod2D,fct_plus,fct_minus,adf_v)&
     !$acc& private(nz,ae,flux,nu1,nl1)&
     !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
@@ -430,7 +431,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! Double loop over blocks then threads. Transfer result adf_h back to cpu.
     ! Schedule kernel asynchronously on stream 4, because next one is independent
 
-    !$acc parallel loop gang present(nlevels,edges,edge_tri,fct_plus,fct_minus,adf_h)&
+    !$acc parallel loop gang present(nlevels,ulevels,edges,edge_tri,fct_plus,fct_minus,adf_h)&
     !$acc& private(enodes,el,nl1,nl2,nu1,nu2,ae,flux,nl12,nu12) vector_length(z_vector_length) async(stream_hor_adv_tra)
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)

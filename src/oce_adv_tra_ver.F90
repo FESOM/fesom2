@@ -90,6 +90,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     use g_CONFIG
     use g_forcing_arrays
     use o_mixing_KPP_mod !for ghats _GO_        
+    use openacc_params
     
     implicit none
     type(t_mesh),  intent(in) , target :: mesh
@@ -104,18 +105,24 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
 #include "associate_mesh.h"
 
     dt_inv=1.0_WP/dt
+    nzmax = mesh%nl
     
     !___________________________________________________________________________
     ! loop over local nodes
-    do n=1,myDim_nod2D  
-        
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,area,hnode_new,zbar_n_bot)&
+    !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,m,zinv,dz,c1,v_adv,z_n(nzmax),zbar_n(nzmax))&
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+    do n=1,myDim_nod2D
         ! initialise
-        a  = 0.0_WP
-        b  = 0.0_WP
-        c  = 0.0_WP
-        tr = 0.0_WP
-        tp = 0.0_WP
-        cp = 0.0_WP
+        !$acc loop vector
+        do nz=1,nzmax
+            a(nz)  = 0.0_WP
+            b(nz)  = 0.0_WP
+            c(nz)  = 0.0_WP
+            tr(nz) = 0.0_WP
+            tp(nz) = 0.0_WP
+            cp(nz) = 0.0_WP
+        end do
         
         ! max. number of levels at node n
         nzmax=nlevels_nod2D(n)
@@ -133,6 +140,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         Z_n=0.0_WP
         zbar_n(nzmax)=zbar_n_bot(n)
         Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+        !$acc loop vector
         do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
@@ -153,6 +161,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
+        !$acc loop vector
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
             a(nz)=min(0._WP, W(nz, n))*zinv
@@ -176,6 +185,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         
+        !$acc loop vector
         do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
             tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
@@ -190,6 +200,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         tp(nz) = tr(nz)/b(nz)
         
         ! solve for vectors c-prime and t, s-prime
+        !$acc loop vector
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -201,12 +212,14 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         tr(nzmax-1) = tp(nzmax-1)
         
         ! solve for x from the vectors c-prime and d-prime
+        !$acc loop vector
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
         
         !_______________________________________________________________________
         ! update tracer
+        !$acc loop vector
         do nz=nzmin,nzmax-1
             ttf(nz,n)=ttf(nz,n)+tr(nz)
         end do
@@ -222,6 +235,7 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -233,12 +247,28 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     logical, optional                 :: init_zero
 #include "associate_mesh.h"
 
+    nzmax=mesh%nl
     if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
+      if (init_zero)then
+        !$acc parallel loop collapse(2) present(flux)
+        do n=1, myDim_nod2D
+          do nz=1,nzmax
+            flux(nz,n)=0.0_WP
+          end do
+        end do
+      end if
     else
-       flux=0.0_WP
+      !$acc parallel loop collapse(2) present(flux)
+      do n=1, myDim_nod2D
+        do nz=1,nzmax
+          flux(nz,n)=0.0_WP
+        end do
+      end do
     end if
 
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area)&
+    !$acc& private(nzmax,nzmin,nz)&
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)        
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -260,6 +290,7 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels    
+       !$acc loop vector
        do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
                       (ttf(nz  ,n)**do_Xmoment)*(W(nz,n)+abs(W(nz,n)))+ &
@@ -277,6 +308,7 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     integer,       intent(in)    :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -292,12 +324,28 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
 
 #include "associate_mesh.h"
 
+    nzmax=mesh%nl
     if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
+    if (init_zero)then
+        !$acc parallel loop collapse(2) present(flux)
+        do n=1, myDim_nod2D
+        do nz=1,nzmax
+            flux(nz,n)=0.0_WP
+        end do
+        end do
+    end if
     else
-       flux=0.0_WP
+    !$acc parallel loop collapse(2) present(flux)
+    do n=1, myDim_nod2D
+        do nz=1,nzmax
+        flux(nz,n)=0.0_WP
+        end do
+    end do
     end if
 
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area,z_3d_n,zbar_3d_n)&
+    !$acc& private(nzmax,nzmin,nz,qc,qu,qd,Tmean,Tmean1,Tmean2)&
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -327,7 +375,8 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
        ! also horizontal advection is done on old mesh (see helem contains old 
        ! mesh information)
        !_______________________________________________________________________
-       ! vert. flux at remaining levels    
+       ! vert. flux at remaining levels  
+        !$acc loop vector
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
             qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
@@ -367,8 +416,8 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
 
 #include "associate_mesh.h"
 
+    nzmax=mesh%nl
     if (present(init_zero))then
-      nzmax=mesh%nl
       if (init_zero)then
         !$acc parallel loop collapse(2) present(flux)
         do n=1, myDim_nod2D
@@ -386,13 +435,6 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
       end do
     end if
 
-    !$acc parallel loop collapse(2) present(flux)
-    do n=1, myDim_nod2D
-        do nz=1, mesh%nl
-          flux(nz,n)=0.0_WP
-        end do
-    end do
-
     ! --------------------------------------------------------------------------
     ! Vertical advection
     ! --------------------------------------------------------------------------
@@ -405,7 +447,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     counter          =0
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,flux,area)&
     !$acc& private(nzmin,nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x)&
-    !$acc& vector_length(z_vector_length)
+    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
     do n=1, myDim_nod2D
 
         !_______________________________________________________________________
