@@ -16,6 +16,7 @@ real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
+!$acc declare create(vcpw)
 real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
 integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
@@ -225,7 +226,8 @@ real(kind=WP), allocatable         :: stress_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
-real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
+!$acc declare create(heat_flux)
 real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
@@ -233,7 +235,10 @@ real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+!$acc declare create(water_flux)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
+!$acc declare create(virtual_salt)
+!$acc declare create(relax_salt)
 real(kind=WP), allocatable    :: water_flux_old(:), Ssurf_old(:) !PS
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
@@ -271,6 +276,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
 real(kind=WP), allocatable :: Ki(:,:)
+real(kind=WP), allocatable :: tr_xynodes(:,:,:)
 
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
@@ -309,6 +315,7 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
 real(kind=WP)                               :: is_nonlinfs
+!$acc declare create(is_nonlinfs)
 
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation

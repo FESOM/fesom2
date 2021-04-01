@@ -175,9 +175,12 @@ type(t_mesh), intent(inout) , target :: mesh
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
         write(*,*) '******************************************************************************'
     end if
-    !$acc enter data copyin(hnode,hnode_new,helem,slope_tapered,tr_xy,tr_z,Ki,zbar_n_bot)
+    !$acc enter data copyin(UV,Wvel,Wvel_e,Wvel_i,tr_arr,tr_arr_old,del_ttf,del_ttf_advhoriz,&
+    !$acc& del_ttf_advvert,hnode,hnode_new,helem,slope_tapered,tr_xy,tr_z,Ki,Kv,zbar_n_bot,&
+    !$acc& heat_flux,Tsurf,virtual_salt,relax_salt,tr_xynodes,tracer_id)
+
     call nvtxEndRange
-end subroutine ocean_setup
+   end subroutine ocean_setup
 !
 !
 !_______________________________________________________________________________
@@ -239,7 +242,6 @@ allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
 del_ttf_advhoriz = 0.0_WP
 del_ttf_advvert  = 0.0_WP
-!$acc enter data copyin(UV,Wvel,Wvel_e,del_ttf,del_ttf_advhoriz,del_ttf_advvert)
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
     allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
@@ -329,6 +331,7 @@ allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
 ! neutral slope etc. to be used in Redi formulation
 allocate(neutral_slope(3, nl-1, node_size))
 allocate(slope_tapered(3, nl-1, node_size))
+allocate(tr_xynodes(2,nl-1,node_size))
 allocate(Ki(nl-1, node_size))
 
 do n=1, node_size
