@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.4)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
@@ -119,13 +119,16 @@ option(OPTIM_ACC_SET_DEVICE_MPI_BEFORE_ACC_INIT "Set the ACC Device to the CPU: 
 option(OPTIM_ACC_SET_DEVICE_SCATTER "Set the ACC Device to the CPU: scatter distribution of GPUs" OFF)
 option(OPTIM_ACC_SET_DEVICE_COMPACT "Set the ACC Device to the CPU: compact distribution of GPUs" ON)
 if(OPTIM_ACC_SET_DEVICE_SCATTER AND OPTIM_ACC_SET_DEVICE_COMPACT)
-	message(ERROR_FATAL "OPTIM_ACC_SET_DEVICE_SCATTER and OPTIM_ACC_SET_DEVICE_COMPACT are mutually exclussive")
+	message(FATAL_ERROR "OPTIM_ACC_SET_DEVICE_SCATTER and OPTIM_ACC_SET_DEVICE_COMPACT are mutually exclussive")
 endif()
 
 option(WITH_NVTX "Enable the code annotations defined by NVidia Tools Extension (NVTX)" OFF)
 #target_compile_features(settings INTERFACE cxx_std_17)
 
 if(WITH_NVTX)
+  cmake_policy(VERSION 3.17)
+  cmake_policy(SET CMP0074 NEW)
+
     # https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html
     find_package(CUDAToolkit REQUIRED)
   if(CUDAToolkit_FOUND)
