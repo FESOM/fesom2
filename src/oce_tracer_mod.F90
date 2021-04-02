@@ -71,18 +71,30 @@ SUBROUTINE init_tracers_AB(tr_num, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
     call tracer_gradient_z(tr_arr(:,:,tr_num), mesh)
     call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
-    !$acc update device(tr_xy) async(stream_hor_adv_tra)
+    !$acc update device(tr_xy) &
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
     call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
     call fill_up_dn_grad(mesh)
     call exchange_nod_end()       ! tr_z halos should have arrived by now.
-    !$acc update device(tr_z) async(stream_hor_diff_tra)
+    !$acc update device(tr_z)&
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_diff_tra)&
+#endif
+    !$acc
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
     call tracer_gradient_elements(tr_arr(:,:,tr_num), mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy)
-    !$acc update device(tr_xy) async(stream_hor_diff_tra)
+    !$acc update device(tr_xy)&
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_diff_tra)&
+#endif
+    !$acc
 
 
 END SUBROUTINE init_tracers_AB

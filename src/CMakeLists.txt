@@ -135,6 +135,8 @@ if(WITH_NVTX)
 	  target_link_libraries(settings INTERFACE CUDA::nvToolsExt)
   endif()
 endif()
+option(WITH_ACC_VECTOR_LENGTH "Enable ACC VECTOR_LENGTH directive" ON)
+option(WITH_ACC_ASYNC "Enable ACC ASYNC directive" ON)
 
 target_compile_definitions(settings
   INTERFACE
@@ -143,6 +145,9 @@ target_compile_definitions(settings
   $<$<AND:$<BOOL:${OPTIM_ACC_SET_DEVICE}>,$<BOOL:${OPTIM_ACC_SET_DEVICE_SCATTER}>>:OPTIM_ACC_SET_DEVICE_SCATTER>
   $<$<AND:$<BOOL:${OPTIM_ACC_SET_DEVICE}>,$<BOOL:${OPTIM_ACC_SET_DEVICE_COMPACT}>>:OPTIM_ACC_SET_DEVICE_COMPACT>
   $<$<BOOL:${WITH_NVTX}>:WITH_NVTX>
+
+  $<$<BOOL:${WITH_ACC_VECTOR_LENGTH}>:WITH_ACC_VECTOR_LENGTH>
+  $<$<BOOL:${WITH_ACC_ASYNC}>:WITH_ACC_ASYNC>
 )
 target_link_libraries(${PROJECT_NAME} settings)
 

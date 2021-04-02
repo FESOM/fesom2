@@ -2554,7 +2554,11 @@ subroutine oce_timestep_ale(n, mesh)
 !!PS     heat_flux  = 0.0_WP
 !!PS     stress_surf= 0.0_WP
 
-    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d) async(stream_ver_diff_tra)
+    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d) &
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_diff_tra)&
+#endif
+    !$acc
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -2581,7 +2585,12 @@ subroutine oce_timestep_ale(n, mesh)
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(mesh)
 
-    !$acc update device(slope_tapered) async(stream_hor_diff_tra)
+    !$acc update device(slope_tapered) &
+#ifdef WITH_ACC_ASYNC
+    !$acc &async(stream_hor_diff_tra)&
+#endif
+    !$acc
+
     
     !___________________________________________________________________________
     call status_check
@@ -2661,7 +2670,11 @@ subroutine oce_timestep_ale(n, mesh)
         
     end if
     
-    !$acc update device(Kv) async(stream_ver_diff_tra)
+    !$acc update device(Kv) &
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_diff_tra)&
+#endif
+    !$acc
     
     t1=MPI_Wtime()
     
@@ -2681,7 +2694,11 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
     
-    !$acc update device(hnode_new) async(stream_hnode_update)
+    !$acc update device(hnode_new) &
+#ifdef WITH_ACC_ASYNC
+    !$acc &async(stream_hnode_update)&
+#endif
+    !$acc
     
     t2=MPI_Wtime()
     
@@ -2713,7 +2730,11 @@ subroutine oce_timestep_ale(n, mesh)
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(mesh)
-    !$acc update device(hnode_new) async(stream_hnode_update)
+    !$acc update device(hnode_new) &
+#ifdef WITH_ACC_ASYNC
+    !$acc & async(stream_hnode_update)&
+#endif
+    !$acc
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2727,7 +2748,11 @@ subroutine oce_timestep_ale(n, mesh)
     
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
-        !$acc update device(Ki) async(stream_hor_diff_tra)
+        !$acc update device(Ki) &
+#ifdef WITH_ACC_ASYNC
+        !$acc &async(stream_hor_diff_tra)&
+#endif
+        !$acc
     end if
     
     !___________________________________________________________________________
@@ -2745,13 +2770,19 @@ subroutine oce_timestep_ale(n, mesh)
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
-    !$acc update device(Wvel_i) async(stream_ver_diff_tra)
+    !$acc update device(Wvel_i)&
+#ifdef WITH_ACC_ASYNC
+    !$acc & async(stream_ver_diff_tra)&
+#endif
+    !$acc
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
+#ifdef WITH_ACC_ASYNC
     !$acc wait(stream_hnode_update)
+#endif
     call solve_tracers_ale(mesh)
     t8=MPI_Wtime() 
     
@@ -2761,7 +2792,11 @@ subroutine oce_timestep_ale(n, mesh)
     call update_thickness_ale(mesh)
     t9=MPI_Wtime()
 
-    !$acc update device(hnode,helem) async(stream_hnode_update)
+    !$acc update device(hnode,helem) &
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hnode_update)&
+#endif
+    !$acc
     
     !___________________________________________________________________________
     ! write out global fields for debugging

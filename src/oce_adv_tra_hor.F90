@@ -103,7 +103,14 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
     !___________________________________________________________________________
     !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,VEL,helem,flux,ttf)&
     !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12,vflux)&
-    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
+
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)
@@ -288,7 +295,13 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     !$acc& nboundary_lay,ttf,edge_dxdy,edge_up_dn_grad,vel,helem)&
     !$acc& private(nz,enodes,el,nl1,nl2,nl12,nu1,nu2,nu12,deltaX1,deltaY1,deltaX2,deltaY2,a,c_lo,vflux,&
     !$acc& Tmean1, Tmean2, cHO)&
-    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)          
@@ -580,7 +593,13 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
     !___________________________________________________________________________
     !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,VEL,helem,flux,ttf,edge_up_dn_grad)&
     !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12,vflux)&
-    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length) &
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)

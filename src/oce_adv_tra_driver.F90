@@ -90,7 +90,11 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! update the LO solution for horizontal contribution
         nzmax=mesh%nl-1
         
-        !$acc parallel loop collapse(2) present(fct_LO) async(stream_hor_adv_tra)
+        !$acc parallel loop collapse(2) present(fct_LO)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_hor_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D+eDim_nod2D
           do nz=1,nzmax
             fct_LO(nz,n)=0.0_WP
@@ -99,7 +103,13 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 
         !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,fct_LO,adv_flux_hor)&
         !$acc& private(enodes,el,nu1,nl1,nu2,nl2,nu12,nl12)&
-        !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+        !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_hor_adv_tra) &
+#endif
+        !$acc
         do e=1, myDim_edge2D
             enodes=edges(:,e)
             el=edge_tri(:,e)
@@ -131,11 +141,19 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
 
         ! update the LO solution for vertical contribution
+#ifdef WITH_ACC_ASYNC
         !$acc wait(stream_hnode_update)
         !$acc wait(stream_hor_adv_tra)
+#endif
         !$acc parallel loop gang present(fct_LO,adv_flux_ver,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,area)&
         !$acc& private(nu1,nl1)&
-        !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+        !$acc& vector_length(z_vector_length) &
+#endif
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_ver_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
@@ -149,8 +167,10 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         if (w_split) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
             !$acc update device(wi)
+#ifdef WITH_ACC_ASYNC
             !$acc wait(stream_hor_adv_tra)
             !$acc wait(stream_ver_adv_tra)
+#endif
             call adv_tra_vert_impl(fct_LO, wi, mesh)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
@@ -158,11 +178,17 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             !     has to be done on the full vertical velocity w
             call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
         end if
+#ifdef WITH_ACC_ASYNC
         !$acc wait(stream_hor_adv_tra)
         !$acc wait(stream_ver_adv_tra)
+#endif
         !$acc update self(fct_LO)
         call exchange_nod(fct_LO)
-        !$acc update device(fct_LO) async(1)
+        !$acc update device(fct_LO)&
+#ifdef WITH_ACC_ASYNC
+        !$acc &async(1)&
+#endif
+        !$acc
     end if
 
     do_zero_flux=.true.
@@ -226,8 +252,10 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     else
         call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
+#ifdef WITH_ACC_ASYNC
 !$acc wait(stream_ver_adv_tra)
 !$acc wait(stream_hor_adv_tra)
+#endif
 
     call nvtxEndRange
 end subroutine do_oce_adv_tra
@@ -263,7 +291,13 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
        if (use_lo) then
             !$acc parallel loop gang present(hnode,hnode_new,dttf_v,LO,ttf,nlevels_nod2D,ulevels_nod2D)&
             !$acc private(nu1, nl1)&
-            !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+            !$acc& vector_length(z_vector_length) &
+#endif
+#ifdef WITH_ACC_ASYNC
+            !$acc& async(stream_ver_adv_tra)&
+#endif
+            !$acc
             do n=1, myDim_nod2d
              nu1 = ulevels_nod2D(n)
              nl1 = nlevels_nod2D(n)
@@ -278,7 +312,14 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
     !$acc parallel loop gang present(dttf_v,flux_v,nlevels_nod2D,ulevels_nod2D,area)&
     !$acc private(nu1,nl1)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length) &
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
+
     do n=1, myDim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -291,7 +332,14 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
     ! Horizontal
     !$acc parallel loop gang present(dttf_h,nlevels,ulevels,edges,edge_tri,flux_h,area)&
-    !$acc& private(enodes,el,nl1,nl2,nu1,nu2) vector_length(z_vector_length) async(stream_hor_adv_tra)
+    !$acc& private(enodes,el,nl1,nl2,nu1,nu2)&
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
         el=edge_tri(:,edge)

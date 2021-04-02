@@ -307,7 +307,13 @@ type(t_mesh), intent(in) , target :: mesh
 	!$acc& ulevels_nod2D,nod_in_elem2D_num,elem_area,tr_xy,ulevels_nod2D_max,nlevels_nod2D_min,&
 	!$acc& nod_in_elem2d,nlevels_nod2d)&
 	!$acc& private(ednodes,nzmin,nzmax,tvol,tx,ty,elem)&
-    !$acc& vector_length(z_vector_length) async(stream_hor_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_hor_adv_tra)&
+#endif
+    !$acc
 	DO edge=1,myDim_edge2D
 		ednodes=edges(:,edge)
 		!_______________________________________________________________________

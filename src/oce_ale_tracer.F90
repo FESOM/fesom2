@@ -123,7 +123,11 @@ subroutine solve_tracers_ale(mesh)
         Wvel_e=Wvel_e+fer_Wvel
         Wvel  =Wvel  +fer_Wvel
     end if
-    !$acc update device(UV, Wvel, Wvel_e) async(stream_hor_adv_tra)
+    !$acc update device(UV, Wvel, Wvel_e) &
+#ifdef WITH_ACC_ASYNC
+    !$acc &async(stream_hor_adv_tra)&
+#endif
+    !$acc
 
     !___________________________________________________________________________
     ! loop over all tracers 
@@ -367,7 +371,13 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     !$acc parallel loop gang present(del_ttf,nlevels_nod2D,ulevels_nod2D,heat_flux,Tsurf,&
     !$acc& virtual_salt,relax_salt,real_salt_flux,z_3d_n,zbar_3d_n,tr_arr,Kv,area)&
     !$acc& private(nl1,ul1,vd_flux,rdata,flux,rlx,zinv1,Ty)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_diff_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_diff_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
         !$acc loop vector
         do nz=1,nzmax
@@ -495,7 +505,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     ! loop over local nodes
     !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,hnode_new,slope_tapered,Ki,Kv,tr_arr,area,Wvel_i,tracer_id,zbar_n_bot,sw_3d)&
     !$acc& private(a,b,c,tr,tp,cp,nzmax,nzmin,z_n,zbar_n,zinv,zinv2,Ty,Ty1,v_adv)&
-    !$acc& vector_length(z_vector_length)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+    !$acc
     do n=1,myDim_nod2D  
         
         ! initialise
@@ -786,7 +799,13 @@ subroutine diff_ver_part_redi_expl(mesh)
 
     !$acc parallel loop gang present(tr_xynodes,nlevels_nod2D,ulevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,nlevels,ulevels,elem_area,tr_xy,area)&
     !$acc& private(nl1,ul1,Tx,Ty,vd_flux,elem)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_diff_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_diff_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -812,7 +831,13 @@ subroutine diff_ver_part_redi_expl(mesh)
     
     !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,zbar_n_bot,tr_xynodes,area,hnode_new,slope_tapered,Ki,del_ttf)&
     !$acc& private(nl1,ul1,Tx,Ty,vd_flux,elem,zbar_n,z_n)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_diff_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_diff_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
@@ -876,7 +901,14 @@ subroutine diff_part_hor_redi(mesh)
     if (Redi) isredi=1._WP
 !$acc parallel loop gang present(edge_cross_dxdy,edge_tri,edges,nlevels,elem2d_nodes,helem,tr_z,tr_xy,del_ttf,dt,area,ulevels,slope_tapered,ki)&
 !$acc& private(rhs1,rhs2,deltaX1,deltaY1,deltaX2, deltaY2,el,enodes,n2,nl1,ul1,nl2,ul2,nl12,ul12,nz,elnodes,n2,Kh,c,Fx,&
-!$acc& Fy,Tx,Ty,Tx_z,Ty_z,SxTz,SyTz,Tz) vector_length(z_vector_length) async(stream_hor_diff_tra)
+!$acc& Fy,Tx,Ty,Tx_z,Ty_z,SxTz,SyTz,Tz)&
+#ifdef WITH_ACC_VECTOR_LENGTH
+!$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+!$acc& async(stream_hor_diff_tra)&
+#endif
+!$acc
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP

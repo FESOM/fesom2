@@ -111,7 +111,13 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     ! loop over local nodes
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,area,hnode_new,zbar_n_bot)&
     !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,m,zinv,dz,c1,v_adv,z_n(nzmax),zbar_n(nzmax))&
-    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
     do n=1,myDim_nod2D
         ! initialise
         !$acc loop vector
@@ -268,7 +274,13 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area)&
     !$acc& private(nzmax,nzmin,nz)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)        
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -345,7 +357,13 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area,z_3d_n,zbar_3d_n)&
     !$acc& private(nzmax,nzmin,nz,qc,qu,qd,Tmean,Tmean1,Tmean2)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -447,7 +465,13 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     counter          =0
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,flux,area)&
     !$acc& private(nzmin,nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x)&
-    !$acc& vector_length(z_vector_length) async(stream_ver_adv_tra)
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
 
         !_______________________________________________________________________
