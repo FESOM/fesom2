@@ -2,7 +2,7 @@
 module cvmix_idemix
 ! This module contains the main computations of the IDEMIX 1 parameterization (described in "A Global Model for the Diapycnal
 ! Diffusivity Induced by Internal Gravity Waves", Olbers&Eden 2013) of Internal wave energy and its dissipation
-! 
+!
 ! @see
 !
 ! @see
@@ -12,10 +12,7 @@ module cvmix_idemix
 !! @author Hannah Kleppin, MPIMET/University of Hamburg
 !! @author Oliver Gutjahr, MPIMET
 !!
-!! @par Copyright
-!! 2002-2013 by MPI-M
-!! This software is provided for non-commercial use only.
-!! See the LICENSE and the WARRANTY conditions.
+
 
 use cvmix_kinds_and_types,    only : cvmix_r8,                     &
                                       CVMIX_OVERWRITE_OLD_VAL,     &
