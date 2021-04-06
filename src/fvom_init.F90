@@ -149,6 +149,11 @@ INTEGER                             :: i_error
 ! ===================
 ! Surface mesh
 ! ===================
+    if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: read elem2d.out & nod2d.out                           '//achar(27)//'[0m'
+    end if 
+    
   open (20,file=trim(meshpath)//'nod2d.out', status='old')
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
   READ(20,*) mesh%nod2D
@@ -217,8 +222,8 @@ subroutine read_mesh_cavity(mesh)
     
     !___________________________________________________________________________    
     if (mype==0) then
-        write(*,*) '____________________________________________________________'
-        write(*,*) ' --> read cavity depth'
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: read cavity depth                                     '//achar(27)//'[0m'
     end if 
   
     !___________________________________________________________________________
@@ -324,6 +329,10 @@ type(t_mesh), intent(inout), target :: mesh
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
 ! ====================
+if (mype==0) then
+    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+    print *, achar(27)//'[7;1m' //' -->: compute edge connectivity                             '//achar(27)//'[0m'
+end if 
 
 allocate(ne_num(nod2d), ne_pos(MAX_ADJACENT, nod2D), nn_num(nod2D))
 ne_num=0
@@ -632,47 +641,59 @@ END SUBROUTINE find_edges_ini
 !> Fixes rough topography, by converting some oceans cells to ground cell(reflected by changing levels arrays)
 !> Creates 2 files: elvls.out, nlvls.out
 subroutine find_levels(mesh)
-use g_config
-use mod_mesh
-use g_parsup
-implicit none
-INTEGER :: nodes(3), elems(3), eledges(3)
-integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=111
-real(kind=WP) :: x,dmean
-integer :: thers_lev=5
-character*200 :: file_name
-type(t_mesh), intent(inout), target :: mesh
+    use g_config
+    use mod_mesh
+    use g_parsup
+    implicit none
+    INTEGER :: nodes(3), elems(3), eledges(3)
+    integer :: elem, elem1, j, n, nneighb,q , node, i, nz
+    integer :: count_iter, count_neighb_open, exit_flag, fileID=111
+    real(kind=WP) :: x,dmean
+    integer :: max_iter=1000
+    character*200 :: file_name
+    type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
+    if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
+    end if 
+    
+    ALLOCATE(mesh%depth(nod2D))
+    depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
+    file_name=trim(meshpath)//'aux3d.out'
+    open(fileID, file=file_name)
+    read(fileID,*) nl          ! the number of levels 
+    allocate(mesh%zbar(nl))         ! their standard depths
+    
+    zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
+    read(fileID,*) zbar
+    if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
+    
+    allocate(mesh%Z(nl-1))
+    Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
+    Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
+    Z=0.5_WP*Z
+    DO n=1,nod2D
+        read(fileID,*) x
+        if (x>0) x=-x
+        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK threshholding for depth
+        depth(n)=x
+    END DO
+    close(fileID)
+            
+    if(depth(2)>0) depth=-depth  ! depth is negative
 
-ALLOCATE(mesh%depth(nod2D))
-depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
-file_name=trim(meshpath)//'aux3d.out'
-open(fileID, file=file_name)
-read(fileID,*) nl          ! the number of levels 
-allocate(mesh%zbar(nl))         ! their standard depths
-zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
-read(fileID,*) zbar
-if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
-allocate(mesh%Z(nl-1))
-Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
-Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
-Z=0.5_WP*Z
-DO n=1,nod2D
-         read(fileID,*) x
-         if (x>0) x=-x
-         if (x>zbar(thers_lev)) x=zbar(thers_lev) !TODO KK threshholding for depth
-         depth(n)=x
-END DO
-close(fileID)
-        
-if(depth(2)>0) depth=-depth  ! depth is negative
-
-
-allocate(mesh%nlevels(elem2D))
-nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
-allocate(mesh%nlevels_nod2D(nod2D))
-nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
+    !___________________________________________________________________________
+    if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
+    end if 
+    
+    allocate(mesh%nlevels(elem2D))
+    nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
+    allocate(mesh%nlevels_nod2D(nod2D))
+    nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
     !___________________________________________________________________________
     ! Compute the initial number number of elementa levels, based on the vertice
@@ -699,25 +720,38 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
             end if
         end do
         if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
-        if(dmean>=0) nlevels(n)=thers_lev
+        if(dmean>=0) nlevels(n)=thers_zbar_lev
         
         ! set minimum number of levels to --> thers_lev=5
-        if(nlevels(n)<thers_lev) nlevels(n)=thers_lev
+        if(nlevels(n)<thers_zbar_lev) nlevels(n)=thers_zbar_lev
     end do ! --> do n=1, elem2D
+    
+    !___________________________________________________________________________
+    ! write out vertical level indices before iterative geometric adaption to 
+    ! exclude isolated cells 
+    if (mype==0) then
+        !_______________________________________________________________________
+        file_name=trim(meshpath)//'elvls_raw.out'
+        open(fileID, file=file_name)
+        do n=1,elem2D
+            write(fileID,*) nlevels(n)
+        end do
+        close(fileID)
+    endif
 
     !___________________________________________________________________________
     ! check for isolated cells (cells with at least two boundary faces or three 
     ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
     ! of cells 
-    do nz=4,nl
+    do nz=thers_zbar_lev+1,nl
         exit_flag=0
-        count1=0
+        count_iter=0
         
         !_______________________________________________________________________
         ! iteration loop within each layer
-        do while((exit_flag==0).and.(count1<1000))
+        do while((exit_flag==0).and.(count_iter<max_iter))
             exit_flag=1
-            count1=count1+1
+            count_iter=count_iter+1
             
             !___________________________________________________________________
             ! loop over triangles
@@ -725,7 +759,7 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
                 ! merge: result = merge(truesource, falsesource, mask)
                 ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
                 ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
-                q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+                nneighb = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
                 !                       
                 !                         +---isolated bottom cell
                 !   ._______________      |          _______________________.
@@ -736,16 +770,15 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
                 !   |###|###|###|###|###|###|###|###|###|###|###|###|###|###|
                 !
                 if (nlevels(n)>=nz) then
-                    count2=0
+                    count_neighb_open=0
                     elems=elem_neighbors(1:3,n)
-                    
                     !___________________________________________________________
                     ! loop over neighbouring triangles
-                    do i=1,q
+                    do i=1,nneighb
                         if (elems(i)>1) then
                             if (nlevels(elems(i))>=nz) then
                                 !count neighbours
-                                count2=count2+1
+                                count_neighb_open=count_neighb_open+1
                             endif
                         endif
                     enddo
@@ -754,15 +787,18 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
                     ! check how many open faces to neighboring triangles the cell 
                     ! has, if there are less than 2 its isolated (a cell should 
                     ! have at least 2 valid neighbours)
-                    if (count2<2) then
+                    if (count_neighb_open<2) then
                         ! if cell is "isolated", and the one levels shallower bottom 
                         ! cell would be shallower than the minimum vertical level 
                         ! treshhold (thers_lev). --> in this make sorrounding elements 
                         ! one level deeper to reconnect the isolated cell
-                        if (nz-1<thers_lev) then 
-                            do i=1,q
-                                if (elems(i)>1) nlevels(elems(i)) = max(nlevels(elems(i)),nz)
+                        if (nz-1<thers_zbar_lev) then 
+                            do i=1,nneighb
+                                if (elems(i)>0) then
+                                    nlevels(elems(i)) = max(nlevels(elems(i)),nz)
+                                end if     
                             end do    
+                            
                         !if cell is "isolated" convert to one level shallower bottom cell
                         else
                             nlevels(n)=nz-1
@@ -774,6 +810,7 @@ nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise th
                 end if ! --> if (nlevels(n)>=nz) then
             end do ! --> do n=1,elem2D
         end do ! --> do while((exit_flag==0).and.(count1<1000))
+        write(*,*) ' -[iter ]->: nlevel',count_iter,'/',max_iter,', nz=',nz
     end do ! --> do nz=4,nl
 
     !___________________________________________________________________________
@@ -827,8 +864,9 @@ subroutine find_levels_cavity(mesh)
     use g_parsup
     implicit none
     integer        :: nodes(3), elems(3)
-    integer        :: elem, node, nz, j
-    integer        :: exit_flag, count_iter, count_neighb_open, nneighb, cavity_maxlev
+    integer        :: elem, node, nz, j, idx
+    integer        :: count_neighb_open, nneighb, cavity_maxlev, count_isoelem
+    integer        :: exit_flag1, count_iter, max_iter=1000, exit_flag2, count_iter2, max_iter2=10
     real(kind=WP)  :: dmean
     character*200  :: file_name
     integer, allocatable, dimension(:,:) :: numelemtonode, idxelemtonode
@@ -836,13 +874,17 @@ subroutine find_levels_cavity(mesh)
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
 
+    if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: compute elem,vertice cavity depth index               '//achar(27)//'[0m'
+    end if 
+    
     !___________________________________________________________________________
     allocate(mesh%ulevels(elem2D))
     ulevels => mesh%ulevels 
     allocate(mesh%ulevels_nod2D(nod2D))
     ulevels_nod2D  => mesh%ulevels_nod2D 
-    
-    
+        
     !___________________________________________________________________________
     ! Compute level position of ocean-cavity boundary
     cavity_maxlev=0
@@ -859,217 +901,248 @@ subroutine find_levels_cavity(mesh)
         
         !_______________________________________________________________________
         ! vertical elem level index of cavity-ocean boundary
-        exit_flag=0
         ulevels(elem) = 1
+        if (dmean<0.0_WP) ulevels(elem) = 2
+        
         do nz=1,nlevels(elem)-1
-            !!PS if(Z(nz)<dmean) then
             if (Z(nz)<dmean .or. nlevels(elem)-nz<=3) then
-                exit_flag=1              !--> I need 4 valid full depth, 3 valid mid-depth levels
                 ulevels(elem)=nz         !    to compute shechpetkin PGF
                 exit
             end if
         end do
-        if ((exit_flag==0).and.(dmean<0)) ulevels(elem)=nlevels(elem)     
         cavity_maxlev = max(cavity_maxlev,ulevels(elem))
     end do
     
+    !___________________________________________________________________________
+    ! write out cavity mesh files for vertice and elemental position of 
+    ! vertical cavity-ocean boundary before the iterative geometric adaption to 
+    ! eliminate isolated cells
+    if (mype==0) then
+        ! write out elemental cavity-ocean boundary level
+        file_name=trim(meshpath)//'cavity_elvls_raw.out'
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) ulevels(elem)
+        enddo
+        close(20)
+    endif
     
     !___________________________________________________________________________
     ! Eliminate cells that have two cavity boundary faces --> should not be 
     ! possible in FESOM2.0
     ! loop over all cavity levels
     allocate(elemreducelvl(elem2d))
-    do nz=1,cavity_maxlev
-        exit_flag=0
-        count_iter=0
+    allocate(numelemtonode(nl,nod2D),idxelemtonode(nl,nod2D))
+        
+    !___________________________________________________________________________
+    ! outer iteration loop    
+    count_iter2 = 0
+    exit_flag2  = 0
+    do while((exit_flag2==0) .and. (count_iter2<max_iter2))
+        count_iter2=count_iter2+1
         elemreducelvl=0
         !_______________________________________________________________________
-        ! iteration loop within each layer
-        do while((exit_flag==0).and.(count_iter<1000))
-            exit_flag=1
-            count_iter=count_iter+1
-            
+        ! Loop oper cavity occupying levels
+        do nz=1,cavity_maxlev
+            exit_flag1=0
+            count_iter=0
             !___________________________________________________________________
-            ! loop over triangles
-            do elem=1,elem2D
-                ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
-                nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
-                !
-                !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
-                !   |###|###|###|###|###|###|###|
-                !   |#  CAVITY  |###| . |###|###|                    OCEAN
-                !   |###|###|###|    /|\|###| 
-                !   |###|###|         |
-                !   |###|             +-- Not good can lead to isolated cells  
-                !
-                if (nz >= ulevels(elem)) then
-                    count_neighb_open=0
-                    elems=elem_neighbors(1:3,elem)
-                    
-                    !___________________________________________________________
-                    ! loop over neighbouring triangles
-                    do j = 1, nneighb
-                        if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
-                            ! check for isolated cell
-                            if (ulevels(elems(j))<=nz) then
-                                !count the open faces to neighboring cells 
-                                count_neighb_open=count_neighb_open+1
-                            endif
-                        end if 
-                    end do ! --> do i = 1, nneighb
-                    
-!!PS                    if (elem==133438) then
-!!PS                         write(*,*)
-!!PS                         write(*,*) 'nz                 =', nz
-!!PS                         write(*,*) 'elem               =', elem
-!!PS                         write(*,*) 'ulevels(elem)      =', ulevels(elem)
-!!PS                         write(*,*) 'nlevels(elem)      =', nlevels(elem)
-!!PS                         write(*,*) 'elemreducelvl(elem)=',elemreducelvl(elem)
-!!PS                         write(*,*) 'elems              =', elems
-!!PS                         write(*,*) 'ulevels(elems)     =', ulevels(elems)
-!!PS                         write(*,*) 'nlevels(elems)     =', nlevels(elems)
-!!PS                         write(*,*) 'nlvl-ulvl          =', nlevels(elems)-ulevels(elems)
-!!PS                         write(*,*) 'elemreducelvl(elems)=',elemreducelvl(elems)
-!!PS                         write(*,*) 'count_neighb_open  =',count_neighb_open
-!!PS                         write(*,*)                        
-!!PS                     end if 
-                    
-                    !___________________________________________________________
-                    ! check how many open faces to neighboring triangles the cell 
-                    ! has, if there are less than 2 its isolated (a cell should 
-                    ! have at least 2 valid neighbours)
-                    ! --> in this case shift cavity-ocean interface one level down
-                    if (count_neighb_open<2) then
-                        ! if cell is isolated convert it to a deeper ocean levels
-                        ! except when this levels would remain less than 3 valid 
-                        ! bottom levels --> in case make the levels of all sorounding
-                        ! one level shallower
-                        if (nlevels(elem)-(nz+1)<3) then 
-                            do j = 1, nneighb
-                                if (elems(j)>0) then
-                                    if (ulevels(elems(j))>1 .and. ulevels(elems(j))>ulevels(elem) ) then
-                                        ulevels(elems(j)) = min(ulevels(elems(j)),nz)
-                                        elemreducelvl(elems(j))=1
-                                    end if     
-                                end if 
-                            end do   
+            ! iteration loop within each layer
+            do while((exit_flag1==0).and.(count_iter<max_iter))
+                exit_flag1    = 1
+                count_iter    = count_iter+1
+                count_isoelem = 0
+                !_______________________________________________________________
+                ! loop over triangles
+                do elem=1,elem2D
+                    ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
+                    nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+                    elems   = elem_neighbors(1:3,elem)
+                    !
+                    !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    !   |###|###|###|###|###|###|###|
+                    !   |#  CAVITY  |###| . |###|###|                    OCEAN
+                    !   |###|###|###|    /|\|###| 
+                    !   |###|###|         |
+                    !   |###|             +-- Not good can lead to isolated cells  
+                    !
+                    if ( nz >= ulevels(elem) .and. nz<nlevels(elem)) then
+                        count_neighb_open=0
                         
-                        ! if ulevel of element was already made once shalower, do 
-                        ! not allow ti be deepen again
-                        elseif (elemreducelvl(elem)==0) then
-                            ulevels(elem)=nz+1
+                        !_______________________________________________________
+                        ! loop over neighbouring triangles
+                        do j = 1, nneighb
+                            if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
+                                ! check for isolated cell
+                               if ( ulevels(elems(j))<= nz .and. & 
+                                     nlevels(elems(j))> nz ) then
+                                    !count the open faces to neighboring cells 
+                                    count_neighb_open=count_neighb_open+1
+                                endif
+                            end if 
+                        end do ! --> do i = 1, nneighb
+                        
+                        !_______________________________________________________
+                        ! check how many open faces to neighboring triangles the cell 
+                        ! has, if there are less than 2 its isolated (a cell should 
+                        ! have at least 2 valid neighbours)
+                        ! --> in this case shift cavity-ocean interface one level down
+                        if (count_neighb_open<2) then
+                            count_isoelem = count_isoelem+1
+                            ! if cell is isolated convert it to a deeper ocean levels
+                            ! except when this levels would remain less than 3 valid 
+                            ! bottom levels --> in case make the levels of all sorounding
+                            ! triangles shallower
+                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==0 ) then 
+                                ulevels(elem)=nz+1
+                            else    
+                                ! --> can not increase depth anymore to eleminate isolated 
+                                !     cell, otherwise lessthan 3 valid layers
+                                ! --> therefor reduce depth of ONE!!! of the neighbouring 
+                                !     triangles. Choose trinagle whos depth is already closest
+                                !     to nz
+                                idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
+                                ulevels(elems(idx)) = nz-1
+                                elemreducelvl(elems(idx)) = elemreducelvl(elems(idx))+1
+                            end if    
                             
-                        ! if ulevel of element still hasent enough neighbors, can not 
-                        ! be deepend any more (elemreducelvl(elem)==1), so allow 
-                        ! neighbouring elemnts to become shallower
-                        else
-                            do j = 1, nneighb
-                                if (elems(j)>0) then
-                                    if (ulevels(elems(j))>1 .and. ulevels(elems(j))>ulevels(elem) ) then
-                                        ulevels(elems(j)) = min(ulevels(elems(j)),nz)
-                                        elemreducelvl(elems(j))=1
-                                    end if     
-                                end if 
-                            end do
-                        end if     
-                        
-                        !force recheck for all current ocean cells
-                        exit_flag=0
-                    endif ! --> if (count_neighb_open<2) then
-                    
-                end if ! --> if (nz >= ulevels(elem)) then
-            end do ! --> do elem=1,elem2D
-        end do ! --> do while((exit_flag==0).and.(count_iter<1000))
-    end do ! --> do nz=1,cavity_maxlev 
-    deallocate(elemreducelvl)
-    
-    !___________________________________________________________________________
-    ! vertical vertice level index of cavity_ocean boundary
-    ulevels_nod2D = nl
-    do elem=1,elem2D
-        nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+                            !force recheck for all current ocean cells
+                            exit_flag1=0
+                        end if ! --> if (count_neighb_open<2) then
+                    end if ! --> if (nz >= ulevels(elem)) then
+                end do ! --> do elem=1,elem2D
+            end do ! --> do while((exit_flag==0).and.(count_iter<1000))
+            write(*,*) ' -[iter ]->: ulevel',count_iter,'/',max_iter,', nz=',nz
+        end do ! --> do nz=1,cavity_maxlev 
+        
         !_______________________________________________________________________
-        ! loop over neighbouring triangles
-        do j=1,nneighb
-            node=elem2D_nodes(j,elem)
-            ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
-        end do
-    end do
-    
-    !___________________________________________________________________________
-    ! check ulevels if ulevels<nlevels everywhere !
-    do elem=1,elem2D
-        if (ulevels(elem)>=nlevels(elem)) then 
-            if (mype==0) write(*,*) ' ERROR: found element cavity depth deeper or equal bottom depth'
-            call par_ex(0)
-        end if 
-        if (nlevels(elem)-ulevels(elem)<3) then 
-            write(*,*) ' ERROR: found less than three valid element ocean layers'
-            write(*,*) '    ulevels,nlevels = ',ulevels(elem), nlevels(elem)
-            write(*,*) '    ulevels(neighb) = ',ulevels(elem_neighbors(1:3,elem))
-            write(*,*) '    nlevels(neighb) = ',nlevels(elem_neighbors(1:3,elem))
-            call par_ex(0)
-        end if 
-    end do
-    
-    !___________________________________________________________________________
-    ! check ulevels_nod2d if ulevels_nod2d<nlevels_nod2d everywhere !
-    do elem=1,nod2D
-        if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
-            if (mype==0) write(*,*) ' ERROR: found vertice cavity depth deeper or equal bottom depth'
-            call par_ex(0)
-        end if
-        if (nlevels_nod2D(elem)-ulevels_nod2D(elem)<3) then 
-            if (mype==0) write(*,*) ' ERROR: found less than three valid vertice ocean layers'
-        end if
-    end do
-    
-    do elem=1,elem2D
-        if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
-            if (mype==0) then 
-                write(*,*) ' ERROR: found element cavity depth that is shallower than its valid maximum cavity vertice depths'
-                write(*,*) ' ule | uln = ',ulevels(elem),' | ',ulevels_nod2D(elem2D_nodes(:,elem))
-            end if     
-            call par_ex(0)
-        end if 
-    end do
-    
-    !___________________________________________________________________________
-    ! check how many triangle elements contribute to every vertice in every layer
-    ! every vertice in every layer should be connected to at least two triangle 
-    ! elements !
-    allocate(numelemtonode(nl,nod2D),idxelemtonode(nl,nod2D))
-    numelemtonode=0
-    idxelemtonode=0
-    do node=1, nod2D
-        do j=1,nod_in_elem2D_num(node)
-            elem=nod_in_elem2D(j,node)
-            do nz=ulevels(elem),nlevels(elem)-1
-                numelemtonode(nz,node) = numelemtonode(nz,node) + 1
-                idxelemtonode(nz,node) = elem
+        ! vertical vertice level index of cavity_ocean boundary
+        ulevels_nod2D = nl
+        do elem=1,elem2D
+            nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+            !___________________________________________________________________
+            ! loop over neighbouring triangles
+            do j=1,nneighb
+                node=elem2D_nodes(j,elem)
+                ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
             end do
         end do
-    end do
-    
-    exit_flag = 0
-    do node=1, nod2D
-        do nz=1,nl
-            if (numelemtonode(nz,node)== 1) then 
-                write(*,*) 'ERROR: found vertice with just one triangle:', mype, nz, 'node=',node, ulevels_nod2d(node), nlevels_nod2D(node), &
-                'elem=', idxelemtonode(nz,node), ulevels(idxelemtonode(nz,node)), nlevels(idxelemtonode(nz,node))
-                exit_flag = 1
+        
+        !_______________________________________________________________________
+        ! check ulevels if ulevels<nlevels everywhere !
+        exit_flag2 = 1
+        
+        do elem=1,elem2D
+            if (ulevels(elem)>=nlevels(elem)) then 
+                if (mype==0) write(*,*) ' -[check]->: elem cavity depth deeper or equal bottom depth, elem=',elem                
+                exit_flag2 = 0
+                
             end if 
+            
+            if (nlevels(elem)-ulevels(elem)<3) then 
+                write(*,*) ' -[check]->: less than three valid elem ocean layers, elem=',elem    
+                !!PS write(*,*) '               elem = ',elem
+                !!PS write(*,*) '     elem_neighbors = ',elem_neighbors(1:3,elem)
+                !!PS write(*,*) '    ulevels,nlevels = ',ulevels(elem), nlevels(elem)
+                !!PS write(*,*) '    ulevels(neighb) = ',ulevels(elem_neighbors(1:3,elem))
+                !!PS write(*,*) '    nlevels(neighb) = ',nlevels(elem_neighbors(1:3,elem))
+                !!PS write(*,*) '           lon_node = ',mesh%coord_nod2D(1,elem2D_nodes(1:3,elem))/rad
+                !!PS write(*,*) '           lat_node = ',mesh%coord_nod2D(2,elem2D_nodes(1:3,elem))/rad
+                !!PS write(*,*) '           lon_elem = ',sum(mesh%coord_nod2D(1,elem2D_nodes(1:3,elem))/rad)/3.0
+                !!PS write(*,*) '           lat_elem = ',sum(mesh%coord_nod2D(2,elem2D_nodes(1:3,elem))/rad)/3.0
+                exit_flag2 = 0
+                
+            end if 
+        end do
+        
+        !_______________________________________________________________________
+        ! check ulevels_nod2d if ulevels_nod2d<nlevels_nod2d everywhere !
+        do elem=1,nod2D
+            if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
+                if (mype==0) write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', elem2d
+                exit_flag2 = 0
+                
+            end if
+            if (nlevels_nod2D(elem)-ulevels_nod2D(elem)<3) then 
+                if (mype==0) write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', elem2d
+                exit_flag2 = 0
+                
+            end if
+        end do
+        
+        do elem=1,elem2D
+            if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
+                if (mype==0) then 
+                    write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
+                    !!PS write(*,*) ' ule | uln = ',ulevels(elem),' | ',ulevels_nod2D(elem2D_nodes(:,elem))
+                end if     
+                exit_flag2 = 0
+                
+            end if 
+        end do
+        
+        !_______________________________________________________________________
+        ! check how many triangle elements contribute to every vertice in every layer
+        ! every vertice in every layer should be connected to at least two triangle 
+        ! elements !
+        numelemtonode=0
+        idxelemtonode=0
+        do node=1, nod2D
+            do j=1,nod_in_elem2D_num(node)
+                elem=nod_in_elem2D(j,node)
+                do nz=ulevels(elem),nlevels(elem)-1
+                    numelemtonode(nz,node) = numelemtonode(nz,node) + 1
+                    idxelemtonode(nz,node) = elem
+                end do
+            end do
+        end do
+        
+        count_iter=0
+        do node=1, nod2D
+            do nz=1,nl
+                if (numelemtonode(nz,node)== 1) then 
+                    exit_flag2 = 0
+                    count_iter = count_iter+1
+                    write(*,*) ' -[check]->: node has only 1 triangle: n=', node, ',nz=',nz
+!!PS                     write(*,*) '              node=', node, ulevels_nod2d(node), nlevels_nod2D(node)
+!!PS                     write(*,*) '              elem=', idxelemtonode(nz,node), ulevels(idxelemtonode(nz,node)), nlevels(idxelemtonode(nz,node))
+!!PS                     write(*,*) '              lon/lat_n = ',mesh%coord_nod2D(1,node)/rad, mesh%coord_nod2D(2,node)/rad
+!!PS                     write(*,*) '              n_eneighb =', nod_in_elem2D(1:nod_in_elem2D_num(node),node)
+!!PS                     write(*,*) '              ulvls(n_eneighb)=', ulevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
+!!PS                     write(*,*) '              nlvls(n_eneighb)=', nlevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
+!!PS                     write(*,*)
+                    exit
+                end if 
+            end do 
         end do 
-    end do 
+        
+        !_______________________________________________________________________
+        if (exit_flag2 == 0) then 
+            print *, achar(27)//'[33m'  //'____________________________________________________________'//achar(27)//'[0m'
+            print *, ' -['//achar(27)//'[33m'//'WARN'//achar(27)//'[0m'//']->: Cavity geom. not converged yet, do further outer iteration'
+            write(*,*) '           iter step ', count_iter2,' out of ', max_iter2
+            write(*,*)
+        end if     
+        
+        !_______________________________________________________________________
+    end do
+    deallocate(elemreducelvl)
     deallocate(numelemtonode,idxelemtonode)
-    if (exit_flag == 1) call par_ex(0)
     
     !___________________________________________________________________________
-!!PS     ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
-!!PS     cavity_flag = 0
-!!PS     do node=1,nod2D
-!!PS         if (ulevels_nod2D(node)>1) cavity_flag(node)=1
-!!PS     end do
+    if (exit_flag2 == 0) then 
+        write(*,*)
+        print *, achar(27)//'[31m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;31m'//' -[ERROR]->: Cavity geometry constrains did not converge !!!'//achar(27)//'[0m'
+        write(*,*)
+        call par_ex(0)
+    else    
+        write(*,*)
+        print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge!!!'
+        write(*,*)
+    end if     
+ 
 
     !___________________________________________________________________________
     ! write out cavity mesh files for vertice and elemental position of 
@@ -1086,14 +1159,10 @@ subroutine find_levels_cavity(mesh)
         ! write out vertice cavity-ocean boundary level + yes/no cavity flag
         file_name=trim(meshpath)//'cavity_nlvls.out'
         open(20, file=file_name)
-!!PS         file_name=trim(meshpath)//'cavity_flag.out'
-!!PS         open(21, file=file_name)
         do node=1,nod2D
             write(20,*) ulevels_nod2D(node)
-!!PS             write(21,*) cavity_flag(node)
         enddo
         close(20)
-!!PS         close(21)
     endif
 
 end subroutine find_levels_cavity
@@ -1322,6 +1391,10 @@ subroutine communication_ini(mesh)
   type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
+  if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: compute communication arrays                          '//achar(27)//'[0m'
+  end if 
   ! Create the distributed mesh subdirectory
   write(npes_string,"(I10)") npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
@@ -1381,6 +1454,11 @@ end interface
   end interface
 #include "associate_mesh_ini.h"
 
+  if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: compute partitioning                                  '//achar(27)//'[0m'
+  end if 
+  
   ! Construct partitioning vector
   if (n_levels<1 .OR. n_levels>10) then
      print *,'Number of hierarchic partition levels is out of range [1-10]! Aborting...'
@@ -1446,7 +1524,11 @@ subroutine check_partitioning(mesh)
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
   type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
-
+    
+  if (mype==0) then
+        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[7;1m' //' -->: check partitioning                                    '//achar(27)//'[0m'
+  end if   
   ! Check load balancing
   do i=0,npes-1
      nod_per_partition(1,i) = count(part(:) == i)
