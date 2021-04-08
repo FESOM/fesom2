@@ -1811,6 +1811,7 @@ subroutine vert_vel_ale(mesh)
             if (Fer_GM) then 
                 fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)
             end if
+            
         end do
     end do
     ! |
@@ -2400,16 +2401,7 @@ DO elem=1,myDim_elem2D
         
         b(nz)=b(nz)-min(0._WP, wd)*zinv
         c(nz)=c(nz)-max(0._WP, wd)*zinv
-        if (a(nz)/=a(nz) .or. b(nz)/=b(nz) .or. c(nz)/=c(nz)) then 
-            write(*,*) ' --> found a,b,c is NaN'
-            write(*,*) 'mype=',mype
-            write(*,*) 'nz=',nz
-            write(*,*) 'a(nz), b(nz), c(nz)=',a(nz), b(nz), c(nz)
-            write(*,*) 'Av(nz,elem)=',Av(nz,elem)
-            write(*,*) 'Av(nz+1,elem)=',Av(nz+1,elem)
-            write(*,*) 'Z_n(nz-1:nz+1)=',Z_n(nz-1:nz+1)
-            write(*,*) 'zbar_n(nz:nz+1)=',zbar_n(nz:nz+1)
-        endif 
+        
     end do
     ! The last row
     zinv=1.0_WP*dt/(zbar_n(nzmax-1)-zbar_n(nzmax))
@@ -2666,10 +2658,12 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
-!!PS         if (any(UV_rhs/=UV_rhs)) write(*,*) mype,' --> found NaN UV_rhs before compute_vel_rhs'
-!!PS         if (any(UV/=UV))         write(*,*) mype,' --> found NaN UV before compute_vel_rhs'
-!!PS         if (any(ssh_rhs/=ssh_rhs))write(*,*) mype,' --> found NaN ssh_rhs before compute_ssh_rhs_ale'
-!!PS         if (any(ssh_rhs_old/=ssh_rhs_old))write(*,*) mype,' --> found NaN ssh_rhs_old before compute_ssh_rhs_ale'
+    
+!!PS         if (any(UV_rhs/=UV_rhs))           write(*,*) n, mype,' --> found NaN UV_rhs before compute_vel_rhs'
+!!PS         if (any(UV/=UV))                   write(*,*) n, mype,' --> found NaN UV before compute_vel_rhs'
+!!PS         if (any(ssh_rhs/=ssh_rhs))         write(*,*) n, mype,' --> found NaN ssh_rhs before compute_vel_rhs'
+!!PS         if (any(ssh_rhs_old/=ssh_rhs_old)) write(*,*) n, mype,' --> found NaN ssh_rhs_old before compute_vel_rhs'
+!!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
     
     if(mom_adv/=3) then
         call compute_vel_rhs(mesh)
@@ -2684,7 +2678,7 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
     t2=MPI_Wtime()
-    
+        
     !___________________________________________________________________________
     ! >->->->->->->->->->->->->     ALE-part starts     <-<-<-<-<-<-<-<-<-<-<-<-
     !___________________________________________________________________________
@@ -2699,6 +2693,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
     call solve_ssh_ale(mesh)
+    
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(mesh)
     t3=MPI_Wtime() 
 
