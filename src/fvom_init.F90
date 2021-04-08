@@ -810,7 +810,7 @@ subroutine find_levels(mesh)
                 end if ! --> if (nlevels(n)>=nz) then
             end do ! --> do n=1,elem2D
         end do ! --> do while((exit_flag==0).and.(count1<1000))
-        write(*,*) ' -[iter ]->: nlevel',count_iter,'/',max_iter,', nz=',nz
+        write(*,"(A, I5, A, i5, A, I3)") '  -[iter ]->: nlevel, iter/maxiter=',count_iter,'/',max_iter,', nz=',nz
     end do ! --> do nz=4,nl
 
     !___________________________________________________________________________
@@ -854,7 +854,8 @@ subroutine find_levels(mesh)
     endif
 end subroutine find_levels
 
-
+!
+!
 !_______________________________________________________________________________
 ! finds elemental and nodal levels of cavity-ocean boundary.
 ! Creates 2 files: cavity_elvls.out, cavity_nlvls.out
@@ -870,10 +871,10 @@ subroutine find_levels_cavity(mesh)
     real(kind=WP)  :: dmean
     character*200  :: file_name
     integer, allocatable, dimension(:,:) :: numelemtonode, idxelemtonode
-    integer, allocatable, dimension(:)   :: elemreducelvl
+    integer, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
-
+    !___________________________________________________________________________
     if (mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;1m' //' -->: compute elem,vertice cavity depth index               '//achar(27)//'[0m'
@@ -931,21 +932,22 @@ subroutine find_levels_cavity(mesh)
     ! Eliminate cells that have two cavity boundary faces --> should not be 
     ! possible in FESOM2.0
     ! loop over all cavity levels
-    allocate(elemreducelvl(elem2d))
+    allocate(elemreducelvl(elem2d),elemfixlvl(elem2d))
     allocate(numelemtonode(nl,nod2D),idxelemtonode(nl,nod2D))
         
     !___________________________________________________________________________
     ! outer iteration loop    
     count_iter2 = 0
     exit_flag2  = 0
+    elemfixlvl  = 0
     do while((exit_flag2==0) .and. (count_iter2<max_iter2))
-        count_iter2=count_iter2+1
-        elemreducelvl=0
+        count_iter2   = count_iter2+1
+        elemreducelvl = 0
         !_______________________________________________________________________
         ! Loop oper cavity occupying levels
         do nz=1,cavity_maxlev
-            exit_flag1=0
-            count_iter=0
+            exit_flag1 = 0
+            count_iter = 0
             !___________________________________________________________________
             ! iteration loop within each layer
             do while((exit_flag1==0).and.(count_iter<max_iter))
@@ -974,7 +976,7 @@ subroutine find_levels_cavity(mesh)
                         do j = 1, nneighb
                             if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
                                 ! check for isolated cell
-                               if ( ulevels(elems(j))<= nz .and. & 
+                                if ( ulevels(elems(j))<= nz .and. & 
                                      nlevels(elems(j))> nz ) then
                                     !count the open faces to neighboring cells 
                                     count_neighb_open=count_neighb_open+1
@@ -993,7 +995,7 @@ subroutine find_levels_cavity(mesh)
                             ! except when this levels would remain less than 3 valid 
                             ! bottom levels --> in case make the levels of all sorounding
                             ! triangles shallower
-                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==0 ) then 
+                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==0 .and. elemfixlvl(elem)==0) then 
                                 ulevels(elem)=nz+1
                             else    
                                 ! --> can not increase depth anymore to eleminate isolated 
@@ -1009,10 +1011,13 @@ subroutine find_levels_cavity(mesh)
                             !force recheck for all current ocean cells
                             exit_flag1=0
                         end if ! --> if (count_neighb_open<2) then
-                    end if ! --> if (nz >= ulevels(elem)) then
+                        
+                    end if ! --> if ( nz >= ulevels(elem) .and. nz<nlevels(elem)) then
+                    
                 end do ! --> do elem=1,elem2D
+                
             end do ! --> do while((exit_flag==0).and.(count_iter<1000))
-            write(*,*) ' -[iter ]->: ulevel',count_iter,'/',max_iter,', nz=',nz
+            write(*,"(A, I5, A, i5, A, I3)") '  -[iter ]->: ulevel, iter/maxiter=',count_iter,'/',max_iter,', nz=',nz
         end do ! --> do nz=1,cavity_maxlev 
         
         !_______________________________________________________________________
@@ -1026,7 +1031,7 @@ subroutine find_levels_cavity(mesh)
                 node=elem2D_nodes(j,elem)
                 ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
             end do
-        end do
+        end do ! --> do elem=1,elem2D
         
         !_______________________________________________________________________
         ! check ulevels if ulevels<nlevels everywhere !
@@ -1041,50 +1046,36 @@ subroutine find_levels_cavity(mesh)
             
             if (nlevels(elem)-ulevels(elem)<3) then 
                 write(*,*) ' -[check]->: less than three valid elem ocean layers, elem=',elem    
-                !!PS write(*,*) '               elem = ',elem
-                !!PS write(*,*) '     elem_neighbors = ',elem_neighbors(1:3,elem)
-                !!PS write(*,*) '    ulevels,nlevels = ',ulevels(elem), nlevels(elem)
-                !!PS write(*,*) '    ulevels(neighb) = ',ulevels(elem_neighbors(1:3,elem))
-                !!PS write(*,*) '    nlevels(neighb) = ',nlevels(elem_neighbors(1:3,elem))
-                !!PS write(*,*) '           lon_node = ',mesh%coord_nod2D(1,elem2D_nodes(1:3,elem))/rad
-                !!PS write(*,*) '           lat_node = ',mesh%coord_nod2D(2,elem2D_nodes(1:3,elem))/rad
-                !!PS write(*,*) '           lon_elem = ',sum(mesh%coord_nod2D(1,elem2D_nodes(1:3,elem))/rad)/3.0
-                !!PS write(*,*) '           lat_elem = ',sum(mesh%coord_nod2D(2,elem2D_nodes(1:3,elem))/rad)/3.0
                 exit_flag2 = 0
                 
             end if 
-        end do
+        end do ! --> do elem=1,elem2D
         
         !_______________________________________________________________________
         ! check ulevels_nod2d if ulevels_nod2d<nlevels_nod2d everywhere !
-        do elem=1,nod2D
-            if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
-                if (mype==0) write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', elem2d
+        do node=1,nod2D
+            !___________________________________________________________________
+            if (ulevels_nod2D(node)>=nlevels_nod2D(node)) then 
+                if (mype==0) write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', node
                 exit_flag2 = 0
-                
             end if
-            if (nlevels_nod2D(elem)-ulevels_nod2D(elem)<3) then 
-                if (mype==0) write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', elem2d
+            
+            !___________________________________________________________________
+            if (nlevels_nod2D(node)-ulevels_nod2D(node)<3) then 
+                if (mype==0) write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', node
                 exit_flag2 = 0
-                
             end if
-        end do
+        end do ! --> do node=1,nod2D
         
         do elem=1,elem2D
             if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
-                if (mype==0) then 
-                    write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
-                    !!PS write(*,*) ' ule | uln = ',ulevels(elem),' | ',ulevels_nod2D(elem2D_nodes(:,elem))
-                end if     
+                if (mype==0) write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
                 exit_flag2 = 0
-                
             end if 
-        end do
+        end do ! --> do elem=1,elem2D
         
         !_______________________________________________________________________
-        ! check how many triangle elements contribute to every vertice in every layer
-        ! every vertice in every layer should be connected to at least two triangle 
-        ! elements !
+        ! compute how many triangle elements contribute to every vertice in every layer
         numelemtonode=0
         idxelemtonode=0
         do node=1, nod2D
@@ -1095,32 +1086,59 @@ subroutine find_levels_cavity(mesh)
                     idxelemtonode(nz,node) = elem
                 end do
             end do
-        end do
-        
-        count_iter=0
-        do node=1, nod2D
-            do nz=1,nl
-                if (numelemtonode(nz,node)== 1) then 
-                    exit_flag2 = 0
-                    count_iter = count_iter+1
-                    write(*,*) ' -[check]->: node has only 1 triangle: n=', node, ',nz=',nz
-!!PS                     write(*,*) '              node=', node, ulevels_nod2d(node), nlevels_nod2D(node)
-!!PS                     write(*,*) '              elem=', idxelemtonode(nz,node), ulevels(idxelemtonode(nz,node)), nlevels(idxelemtonode(nz,node))
-!!PS                     write(*,*) '              lon/lat_n = ',mesh%coord_nod2D(1,node)/rad, mesh%coord_nod2D(2,node)/rad
-!!PS                     write(*,*) '              n_eneighb =', nod_in_elem2D(1:nod_in_elem2D_num(node),node)
-!!PS                     write(*,*) '              ulvls(n_eneighb)=', ulevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
-!!PS                     write(*,*) '              nlvls(n_eneighb)=', nlevels(nod_in_elem2D(1:nod_in_elem2D_num(node),node))
-!!PS                     write(*,*)
-                    exit
-                end if 
-            end do 
-        end do 
+        end do ! --> do node=1, nod2D
         
         !_______________________________________________________________________
+        ! check if every vertice in every layer should be connected to at least 
+        ! two triangle elements !
+        count_iter=0
+        do node=1, nod2D
+            
+            !___________________________________________________________________
+            do nz = ulevels_nod2D(node), nlevels_nod2D(node)-1
+                
+                !_______________________________________________________________
+                ! nodes has zero neighbouring triangles and is completely isolated
+                ! need to adapt ulevels by hand --> inflicts another outher 
+                ! iteration loop (exit_flag2=0)
+                if (numelemtonode(nz,node)==0) then 
+                    exit_flag2 = 0
+                    count_iter = count_iter+1
+                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz,node) ,' triangle: n=', node, ', nz=',nz
+                    !___________________________________________________________
+                    ! if node has no neighboring triangle somewhere in the middle 
+                    ! of the water column at nz (can happen but seldom) than set 
+                    ! all ulevels(elem) of sorounding trinagles whos ulevel is 
+                    ! depper than nz, equal to nz and fix that value to forbit it
+                    ! to be changed (elemfixlvl > 0)
+                    do j=1,nod_in_elem2D_num(node)
+                        elem=nod_in_elem2D(j,node)
+                        if (ulevels(elem)>nz) then
+                            ulevels(elem) = nz
+                            elemfixlvl(elem) = elemfixlvl(elem)+1
+                        end if     
+                    end do
+                end if
+                
+                !_______________________________________________________________
+                ! nodes has just one neighbouring triangle --> but needs two -->
+                ! inflicts another outher iteration loop (exit_flag2=0)
+                if (numelemtonode(nz,node)==1) then 
+                    exit_flag2 = 0
+                    count_iter = count_iter+1
+                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz,node) ,' triangle: n=', node, ', nz=',nz
+                end if 
+                
+            end do ! --> do nz = ulevels_nod2D(node), nlevels_nod2D(node)-1
+            
+        end do ! --> do node=1, nod2D
+        
+        !_______________________________________________________________________
+        ! check if cavity geometry did converge 
         if (exit_flag2 == 0) then 
             print *, achar(27)//'[33m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, ' -['//achar(27)//'[33m'//'WARN'//achar(27)//'[0m'//']->: Cavity geom. not converged yet, do further outer iteration'
-            write(*,*) '           iter step ', count_iter2,' out of ', max_iter2
+            write(*,"(A, I3, A, I3)") '             iter step ', count_iter2,'/', max_iter2
             write(*,*)
         end if     
         
@@ -1130,6 +1148,8 @@ subroutine find_levels_cavity(mesh)
     deallocate(numelemtonode,idxelemtonode)
     
     !___________________________________________________________________________
+    ! check if cavity geometry totaly converged or failed to converge in the later
+    ! case will break up model
     if (exit_flag2 == 0) then 
         write(*,*)
         print *, achar(27)//'[31m'  //'____________________________________________________________'//achar(27)//'[0m'
@@ -1139,7 +1159,8 @@ subroutine find_levels_cavity(mesh)
     else    
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge!!!'
+        print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge, Yippee-Ki-Yay, Beep!!!'
+
         write(*,*)
     end if     
  
