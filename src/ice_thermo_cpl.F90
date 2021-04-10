@@ -30,16 +30,26 @@ subroutine thermodynamics(mesh)
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
+#ifdef oifs
+  use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
+       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
+#else
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
        , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, S_oc_array, T_oc_array
+#endif
 
   !---- variables from gen_modules_config.F90
   use g_config,         only: dt
 
   !---- variables from gen_modules_forcing.F90
+#ifdef oifs
+  use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
+       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
+       , enthalpyoffuse
+#else
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice
-
+#endif
   !---- variables from gen_modules_rotate_grid.F90
   use g_rotate_grid,    only: r2g
 #endif
@@ -99,7 +109,11 @@ subroutine thermodynamics(mesh)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
+#if defined (__oifs)
+     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+#else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+#endif
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)

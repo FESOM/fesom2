@@ -135,12 +135,13 @@ e_size=myDim_elem2D+eDim_elem2D
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs)
-  allocate(ice_alb(n_size), ice_temp(n_size))
+  allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
   allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
   ice_alb=0.6_WP
   ice_temp=265.15_WP
   rhs_tempdiv=0._WP
   rhs_temp=0._WP
+  enthalpyoffuse=0._WP
 #endif /* (__oifs) */
   oce_heat_flux=0._WP
   ice_heat_flux=0._WP
