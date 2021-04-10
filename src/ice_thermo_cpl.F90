@@ -139,8 +139,8 @@ subroutine thermodynamics(mesh)
         h0min = 1.0
         h0max = 1.0
      else
-        h0min = 0.5
-        h0max = 0.5
+        h0min = 0.3
+        h0max = 0.3
      endif
 #endif /* (__oifs) */
 
@@ -480,15 +480,15 @@ contains
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
 
-  snicecond = con/consn*rhoice/rhosno   ! equivalence fraction thickness of ice/snow
-  zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
-  zicefl=con*TFrezs/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
+  zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
+  zicefl=con*TFrezs/zsniced             ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(TFrezs,t)                      ! Not warmer than freezing please!
+  t=min(TFrezs,t)                       ! Not warmer than freezing please!
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
