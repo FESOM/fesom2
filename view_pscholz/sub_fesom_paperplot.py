@@ -80,7 +80,7 @@ def setup_colorbar(hp, ax, clevel, cref, str_cbar, ncl=6, orientation='horizonta
 #_______________________________________________________________________________
 # plot single moc panel
 def plot_map_xmoc(fig, ax, mesh, lat, data, bottom, clevel, cmap, str_tl=[], \
-                  str_yl=[], str_xl=[], str_txt=[], cbot= [0.5,0.5,0.5],fsize=12):
+                  str_yl=[], str_xl=[], str_txt=[], cbot= [0.5,0.5,0.5],fsize=12,str_enum=[]):
     fig.sca(ax)
     #___________________________________________________________________________
     data_plot = np.copy(data)
@@ -104,6 +104,9 @@ def plot_map_xmoc(fig, ax, mesh, lat, data, bottom, clevel, cmap, str_tl=[], \
     if len(str_txt)!=0:
         txtx, txty = lat[0]+5, mesh.zlev[-1]+100
         ax.text(txtx,txty,str_txt , fontsize=fsize, fontweight='bold',horizontalalignment='left')
+    if len(str_enum)!=0:    
+        txtx, txty = lat[0]+2, bottom.min()+50
+        ax.text(txtx,txty,str_enum , fontsize=fsize, fontweight='normal',horizontalalignment='left',verticalalignment='top')
         
     ax.axes.figure.canvas.draw()    
     return(ax,hp)

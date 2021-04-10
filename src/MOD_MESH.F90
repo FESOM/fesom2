@@ -26,8 +26,8 @@ integer                                     :: elem2D       ! the number of 2D e
 integer, allocatable, dimension(:,:)        :: elem2D_nodes ! elem2D_nodes(:,n) lists; 3 nodes of element n   
 integer, allocatable, dimension(:,:)        :: edges        ! edge(:,n) lists 2 nodes; edge n
 integer, allocatable, dimension(:,:)        :: edge_tri     ! edge_tri(:,n) lists 2 
-				                           ! elements containing edge n: the first one is to left 
-                                                           ! of the line directed to the second node
+                                                            ! elements containing edge n: the first one is to left 
+                                                            ! of the line directed to the second node
 integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) are edges of element n.  
 real(kind=WP), allocatable, dimension(:)    :: elem_area
 real(kind=WP), allocatable, dimension(:,:)  :: edge_dxdy, edge_cross_dxdy
@@ -43,13 +43,47 @@ real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec
 real(kind=WP), allocatable, dimension(:,:)  :: gradient_sca ! Coefficients to compute gradient of scalars
                                                            ! on elements
 INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-                                                           ! vertical structure             
+                                                           ! vertical structure     
+!
+!
+!___vertical mesh info__________________________________________________________                                                           
+! total number of layers
 integer                                     :: nl
+
+! initial layer, mid-depth layer and element depth
 real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
-integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D
+
+! upper boudnary index of all vertical vertice/element loops, default==1 but when 
+! cavity is used becomes index of cavity-ocean boundary at vertices and elements
+integer,       allocatable, dimension(:)    :: ulevels, ulevels_nod2D, ulevels_nod2D_max
+
+! number of levels at elem and vertices considering bottom topography
+integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D, nlevels_nod2D_min
+
+!
+!
+!___horizontal mesh info________________________________________________________
 real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
 real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
-! Elevation stiffness matrix
+
+!
+!
+!___cavity mesh info____________________________________________________________
+! level index of cavity-ocean boundary at vertices and elements
+! --> see: ulevels, ulevels_nod2D (fvom_main) 
+
+! vertice/element yes=1/no=0 flag if cavity exists
+integer,       allocatable, dimension(:)    :: cavity_flag_n, cavity_flag_e
+
+! depth of cavity-ocean interface
+real(kind=WP), allocatable, dimension(:)    :: cavity_depth
+
+
+real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
+
+!
+!
+!___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
 !#if defined (__oasis)

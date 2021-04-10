@@ -42,6 +42,7 @@ contains
   end subroutine
 
 
+  @test
   subroutine test_can_read_netcdf_2d()
     type(netcdf_reader_handle) handle
     real(4), allocatable :: values(:,:)

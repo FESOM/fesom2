@@ -1,6 +1,6 @@
 MODULE gen_bulk
     ! Compute heat and momentum exchange coefficients
-    use o_mesh
+    use mod_mesh
     use i_therm_param
     use i_arrays
     use g_forcing_arrays
@@ -18,7 +18,7 @@ MODULE gen_bulk
 !
 !
 !_______________________________________________________________________________    
-subroutine ncar_ocean_fluxes_mode_fesom14
+subroutine ncar_ocean_fluxes_mode_fesom14(mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! In this routine we assume air temperature and humidity are at the same
@@ -46,7 +46,8 @@ subroutine ncar_ocean_fluxes_mode_fesom14
     real(kind=WP), parameter :: grav = 9.80_WP, vonkarm = 0.40_WP
     real(kind=WP), parameter :: q1=640380._WP, q2=-5107.4_WP    ! for saturated surface specific humidity
     real(kind=WP), parameter :: zz = 10.0_WP
-
+    type(t_mesh), intent(in)     , target :: mesh
+    
     do i=1,myDim_nod2d+eDim_nod2d       
         t=tair(i) + tmelt					      ! degree celcium to Kelvin
         ts=t_oc_array(i) + tmelt				      !
@@ -111,7 +112,7 @@ end subroutine ncar_ocean_fluxes_mode_fesom14
 !
 !
 !_______________________________________________________________________________
-subroutine ncar_ocean_fluxes_mode 
+subroutine ncar_ocean_fluxes_mode(mesh)
     ! Compute drag coefficient and the transfer coefficients for evaporation
     ! and sensible heat according to LY2004.
     ! with updates from Large et al. 2009 for the computation of the wind drag 
@@ -149,8 +150,11 @@ subroutine ncar_ocean_fluxes_mode
     !--> check for convergence
     real(kind=WP) :: test, cd_prev, inc_ratio=1.0e-4 
     real(kind=WP) :: t_prev, q_prev
+    
+    type(t_mesh), intent(in)     , target :: mesh
 
-    do i=1,myDim_nod2d+eDim_nod2d       
+    do i=1,myDim_nod2d+eDim_nod2d   
+        if (mesh%ulevels_nod2d(i)>1) cycle
         ! degree celcium to Kelvin
         t      = tair(i) + tmelt 
         ts     = t_oc_array(i) + tmelt  

@@ -22,7 +22,7 @@ subroutine thermodynamics(mesh)
 #endif
   use g_parsup,         only: myDim_nod2D, eDim_nod2D
 #ifdef use_cavity
-  use o_mesh,           only: coord_nod2D, cavity_flag_nod2d
+  use o_mesh,           only: coord_nod2D, ulevels_nod2D
 #else
   use o_mesh,           only: coord_nod2D
 #endif
@@ -102,7 +102,7 @@ subroutine thermodynamics(mesh)
   do inod=1,myDim_nod2d+eDim_nod2d
 
 #ifdef use_cavity
-     if (cavity_flag_nod2d(inod).eq.1) cycle
+     if (ulevels_nod2D(inod) > 1) cycle
 #endif
 
      A       = a_ice(inod)
@@ -128,21 +128,21 @@ subroutine thermodynamics(mesh)
 
      ehf     = 0._WP
      fw      = 0._WP
-#ifdef use_fullfreesurf
-     rsf     = 0._WP
-#endif
+     if (.not. use_virt_salt) then
+        rsf     = 0._WP
+     end if
 
-!#if defined (__oifs)
-!     !---- different lead closing parameter for NH and SH
-!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-!     if (geolat.lt.0.) then
-!        h0min = 0.75
-!        h0max = 1.0
-!     else
-!        h0min = 0.5
-!        h0max = 0.75
-!     endif
-!#endif /* (__oifs) */
+#if defined (__oifs)
+     !---- different lead closing parameter for NH and SH
+     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+     if (geolat.lt.0.) then
+        h0min = 1.0
+        h0max = 1.0
+     else
+        h0min = 0.3
+        h0max = 0.3
+     endif
+#endif /* (__oifs) */
 
      call ice_growth
 #if defined (__oifs)
@@ -154,7 +154,8 @@ subroutine thermodynamics(mesh)
         call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
         ice_temp(inod) = t
      else
-        ice_temp(inod) = 275.15_WP
+        ! Freezing temp of saltwater in K
+        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
@@ -166,9 +167,9 @@ subroutine thermodynamics(mesh)
      m_snow(inod)        = hsn
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
-#ifdef use_fullfreesurf
-     real_salt_flux(inod)= rsf
-#endif
+     if (.not. use_virt_salt) then
+        real_salt_flux(inod)= rsf
+     end if
      thdgr(inod)         = dhgrowth
      thdgrsn(inod)       = dhsngrowth
      flice(inod)         = dhflice
@@ -399,12 +400,12 @@ contains
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
-#ifdef use_fullfreesurf
-    fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
-    rsf = -dhgrowth*rhoice*Sice
-#else
-    fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
-#endif
+    if (.not. use_virt_salt) then
+       fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
+       rsf = -dhgrowth*rhoice*Sice/rhowat
+    else
+       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+    end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
     !---- NOTE: ehf = -ohf (in case of no cut-off)
@@ -430,18 +431,14 @@ contains
 
     !---- to maintain salt conservation for the current model version
     !---- (a way to avoid producing net salt from snow-type-ice) 
-#ifdef use_fullfreesurf
-    rsf = rsf - dhflice*rhoice*Sice
-#else
-    fw = fw + dhflice*rhoice*Sice/rsss
-#endif
+    if (.not. use_virt_salt) then
+       rsf = rsf - dhflice*rhoice*Sice/rhowat
+    else
+       fw = fw + dhflice*rhoice*Sice/rsss
+    end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw = fw/rhowat
-#ifdef use_fullfreesurf
-    rsf = rsf/rhowat
-#endif
-
     return
   end subroutine ice_growth
 
@@ -477,18 +474,21 @@ contains
   real(kind=WP)  zcprosn
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
-  real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
+  !---- freezing temperature of sea-water [K]
+  real(kind=WP)  :: TFrezs
 
+  !---- compute freezing temperature of sea-water from salinity
+  TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
 
-  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
-  zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
-  zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
+  zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
+  zicefl=con*TFrezs/zsniced             ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
-  zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
+  zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(ctfreez,t)                      ! Not warmer than freezing please!
+  t=min(TFrezs,t)                       ! Not warmer than freezing please!
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
@@ -509,7 +509,7 @@ contains
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (h>0.0_WP) then
-     if (t<273.14_WP) then         ! freezing condition    
+     if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       

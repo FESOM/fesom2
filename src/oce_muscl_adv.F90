@@ -71,7 +71,6 @@ subroutine muscl_adv_init(mesh)
     end do   
     
     !___________________________________________________________________________
-    allocate(nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
     allocate(nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer nboundary_lay(n)
     nboundary_lay=nl-1
     do n=1, myDim_edge2D
@@ -104,16 +103,24 @@ subroutine muscl_adv_init(mesh)
         end if
     end do
     
-    !___________________________________________________________________________
-    do n=1, myDim_nod2d
-        k=nod_in_elem2D_num(n)
-        ! minimum depth in neigbouring nodes around node n
-        nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
-    end do
-    call exchange_nod(nlevels_nod2D_min)
+!!PS     !___________________________________________________________________________
+!!PS     --> is transfered to oce_mesh.F90 --> subroutine find_levels_min_e2n(mesh)
+!!PS     --> can be deleted here!
+!!PS     allocate(mesh%nlevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+!!PS     allocate(mesh%ulevels_nod2D_min(myDim_nod2D+eDim_nod2D))
+!!PS     do n=1, myDim_nod2d
+!!PS         k=nod_in_elem2D_num(n)
+!!PS         ! minimum depth in neigbouring elements around node n
+!!PS         mesh%nlevels_nod2D_min(n)=minval(nlevels(nod_in_elem2D(1:k, n)))
+!!PS         mesh%ulevels_nod2D_max(n)=maxval(ulevels(nod_in_elem2D(1:k, n)))
+!!PS     end do
+!!PS     call exchange_nod(mesh%nlevels_nod2D_min)
+!!PS     call exchange_nod(mesh%ulevels_nod2D_min)
 
 end SUBROUTINE muscl_adv_init
-!=======================================================================
+!
+!
+!_______________________________________________________________________________
 SUBROUTINE find_up_downwind_triangles(mesh)
 USE MOD_MESH
 USE O_MESH
@@ -272,7 +279,9 @@ deallocate(e_nodes, coord_elem)
 edge_up_dn_grad=0.0_WP
 
 end SUBROUTINE find_up_downwind_triangles
-!=======================================================================
+!
+!
+!_______________________________________________________________________________
 SUBROUTINE fill_up_dn_grad(mesh)
 
 ! ttx, tty  elemental gradient of tracer 
@@ -282,7 +291,7 @@ USE O_MESH
 USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE
-integer                  :: n, nz, elem, k, edge, ednodes(2)
+integer                  :: n, nz, elem, k, edge, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
 type(t_mesh), intent(in) , target :: mesh
 
@@ -295,19 +304,12 @@ type(t_mesh), intent(in) , target :: mesh
 		!_______________________________________________________________________
 		! case when edge has upwind and downwind triangle on the surface
 		if((edge_up_dn_tri(1,edge).ne.0.0_WP).and.(edge_up_dn_tri(2,edge).ne.0.0_WP)) then
-			
-			!___________________________________________________________________
-			! loop over shared depth levels
-			DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
-				! tracer gradx for upwind and downwind tri
-				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
-				! tracer grady for upwind and downwind tri
-				edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
-			END DO
+			nzmin = maxval(ulevels_nod2D_max(ednodes))
+			nzmax = minval(nlevels_nod2D_min(ednodes))
 			
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 1 (ednodes(1))
-			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+			DO nz=ulevels_nod2D(ednodes(1)), nzmin-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
@@ -316,7 +318,61 @@ type(t_mesh), intent(in) , target :: mesh
 				!     triangle gradients
 				DO k=1, nod_in_elem2D_num(ednodes(1))
 					elem=nod_in_elem2D(k,ednodes(1))
-					if(nlevels(elem)-1<nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(1,nz,edge)=tx/tvol
+				edge_up_dn_grad(3,nz,edge)=ty/tvol
+			END DO
+			
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 2 (ednodes(2))
+			DO nz=ulevels_nod2D(ednodes(2)),nzmin-1
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
+				! loop over number triangles that share the nodeedge points ednodes(2)
+				! --> calculate mean gradient at ednodes(2) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(2))
+					elem=nod_in_elem2D(k,ednodes(2))
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
+					tvol=tvol+elem_area(elem)
+					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
+					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
+				END DO
+				edge_up_dn_grad(2,nz,edge)=tx/tvol
+				edge_up_dn_grad(4,nz,edge)=ty/tvol
+			END DO
+			
+			!___________________________________________________________________
+			! loop over shared depth levels
+			!!PS DO nz=1, minval(nlevels_nod2D_min(ednodes))-1
+			DO nz=nzmin, nzmax-1
+				! tracer gradx for upwind and downwind tri
+				edge_up_dn_grad(1:2,nz,edge)=tr_xy(1,nz,edge_up_dn_tri(:,edge))
+				! tracer grady for upwind and downwind tri
+				edge_up_dn_grad(3:4,nz,edge)=tr_xy(2,nz,edge_up_dn_tri(:,edge))
+			END DO
+			
+			!___________________________________________________________________
+			! loop over not shared depth levels of edge node 1 (ednodes(1))
+			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(1))-1
+			DO nz=nzmax, nlevels_nod2D(ednodes(1))-1
+				tvol=0.0_WP
+				tx=0.0_WP
+				ty=0.0_WP
+				! loop over number triangles that share the nodeedge points ednodes(1)
+				! --> calculate mean gradient at ednodes(1) over the sorounding 
+				!     triangle gradients
+				DO k=1, nod_in_elem2D_num(ednodes(1))
+					elem=nod_in_elem2D(k,ednodes(1))
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -326,7 +382,8 @@ type(t_mesh), intent(in) , target :: mesh
 			END DO
 			!___________________________________________________________________
 			! loop over not shared depth levels of edge node 2 (ednodes(2))
-			DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+			!!PS DO nz=minval(nlevels_nod2D_min(ednodes)),nlevels_nod2D(ednodes(2))-1
+			DO nz=nzmax, nlevels_nod2D(ednodes(2))-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
@@ -335,7 +392,8 @@ type(t_mesh), intent(in) , target :: mesh
 				!     triangle gradients
 				DO k=1, nod_in_elem2D_num(ednodes(2))
 					elem=nod_in_elem2D(k,ednodes(2))
-					if(nlevels(elem)-1<nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1<nz .or. nz<ulevels(elem)) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -348,13 +406,17 @@ type(t_mesh), intent(in) , target :: mesh
 		! --> surface boundary edge
 		else
 			! Only linear reconstruction part
-			DO nz=1,nlevels_nod2D(ednodes(1))-1
+			nzmin = ulevels_nod2D(ednodes(1))
+			nzmax = nlevels_nod2D(ednodes(1))
+			!!PS DO nz=1,nlevels_nod2D(ednodes(1))-1
+			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(1))
 					elem=nod_in_elem2D(k,ednodes(1))
-					if(nlevels(elem)-1 < nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -362,13 +424,17 @@ type(t_mesh), intent(in) , target :: mesh
 				edge_up_dn_grad(1,nz,edge)=tx/tvol
 				edge_up_dn_grad(3,nz,edge)=ty/tvol
 			END DO
-			DO nz=1,nlevels_nod2D(ednodes(2))-1
+			nzmin = ulevels_nod2D(ednodes(2))
+			nzmax = nlevels_nod2D(ednodes(2))
+			!!PS DO nz=1,nlevels_nod2D(ednodes(2))-1
+			DO nz=nzmin,nzmax-1
 				tvol=0.0_WP
 				tx=0.0_WP
 				ty=0.0_WP
 				DO k=1, nod_in_elem2D_num(ednodes(2))
 					elem=nod_in_elem2D(k,ednodes(2))
-					if(nlevels(elem)-1 < nz) cycle
+					!!PS if(nlevels(elem)-1 < nz) cycle
+					if(nlevels(elem)-1 < nz .or. nz<ulevels(elem) ) cycle
 					tvol=tvol+elem_area(elem)
 					tx=tx+tr_xy(1,nz,elem)*elem_area(elem)
 					ty=ty+tr_xy(2,nz,elem)*elem_area(elem)
@@ -378,5 +444,4 @@ type(t_mesh), intent(in) , target :: mesh
 			END DO
 		end if  
 	END DO 
-
 END SUBROUTINE fill_up_dn_grad
