@@ -1,6 +1,9 @@
 subroutine reset_ib_fluxes()
     use o_param
-    use o_arrays
+
+! kh 18.03.21 not really used here
+!   use o_arrays
+
     use o_mesh
     use g_config
     use g_parsup
@@ -21,7 +24,10 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
     !Lars Ackermann, 17.03.2020
 
     use o_param
-    use o_arrays
+
+! kh 18.03.21 not really used here
+!   use o_arrays
+
     use o_mesh
     use g_config
     use g_parsup
@@ -51,7 +57,10 @@ subroutine icb2fesom
     !Lars Ackermann, 17.03.2020
 
     use o_param
-    use o_arrays
+
+! kh 18.03.21 specification of structure used
+    use o_arrays, only: water_flux
+
     use o_mesh
     use g_config
     use g_parsup

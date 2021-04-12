@@ -33,12 +33,37 @@ subroutine forcing_array_setup
   implicit none
 
   integer    :: n2
+
+! kh 19.02.21  
+  integer    :: i
    
-  n2=myDim_nod2D+eDim_nod2D      
+  n2=myDim_nod2D+eDim_nod2D
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))
   allocate(prec_rain(n2), prec_snow(n2))
-  allocate(u_wind(n2), v_wind(n2))
+
+! kh 19.02.21
+  if (ib_async_mode == 0) then
+      allocate(u_wind(n2), v_wind(n2))
+      allocate(u_wind_ib(n2), v_wind_ib(n2))
+  else
+! kh 19.02.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+      allocate(u_wind(n2), v_wind(n2))
+      do i = 1, n2
+          u_wind(i) = 0._WP
+          v_wind(i) = 0._WP
+      end do
+!$omp section
+      allocate(u_wind_ib(n2), v_wind_ib(n2))
+      do i = 1, n2
+          u_wind_ib(i) = 0._WP
+          v_wind_ib(i) = 0._WP
+      end do
+!$omp end parallel sections
+  end if
+
   allocate(Tair(n2), shum(n2))
   allocate(runoff(n2), evaporation(n2))
 

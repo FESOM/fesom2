@@ -1242,9 +1242,12 @@ real(kind=WP), allocatable :: center_x(:), center_y(:), temp(:)
 real(kind=WP)              :: t0, t1
 integer                    :: i, nn, ns
 
+! kh 16.03.21
+!integer :: i
+
 t0=MPI_Wtime()
 
-!real(kind=WP),allocatable :: arr2Dglobal(:,:) 
+!real(kind=WP),allocatable :: arr2Dglobal(:,:)
 
  allocate(edge_dxdy(2,myDim_edge2D+eDim_edge2D))
  allocate(edge_cross_dxdy(4,myDim_edge2D+eDim_edge2D))
@@ -1252,8 +1255,37 @@ t0=MPI_Wtime()
  allocate(gradient_vec(6,myDim_elem2D))
  allocate(metric_factor(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(elem_cos(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
- allocate(coriolis(myDim_elem2D))
- allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+
+! kh 16.03.21 not modified during overlapping ocean/ice and iceberg computations
+!if (ib_async_mode == 0) then
+    allocate(coriolis(myDim_elem2D))
+    allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+!   allocate(coriolis_ib(myDim_elem2D))
+!   allocate(coriolis_node_ib(myDim_nod2D+eDim_nod2D))
+!else
+! kh 16.03.21 support "first touch" idea
+!!$omp parallel sections num_threads(2)
+!!$omp section
+!   allocate(coriolis(myDim_elem2D))
+!   allocate(coriolis_node(myDim_nod2D+eDim_nod2D))
+!   do i = 1, myDim_elem2D
+!       coriolis(i) = 0._WP
+!   end do
+!   do i = 1, myDim_nod2D+eDim_nod2D
+!       coriolis_node(i) = 0._WP
+!   end do
+!!$omp section
+!   allocate(coriolis_ib(myDim_elem2D))
+!   allocate(coriolis_node_ib(myDim_nod2D+eDim_nod2D))
+!   do i = 1, myDim_elem2D
+!       coriolis_ib(i) = 0._WP
+!   end do
+!   do i = 1, myDim_nod2D+eDim_nod2D
+!       coriolis_node_ib(i) = 0._WP
+!   end do
+!!$omp end parallel sections
+!end if
+
  allocate(geo_coord_nod2D(2,myDim_nod2D+eDim_nod2D))
  allocate(center_x(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
  allocate(center_y(myDim_elem2D+eDim_elem2D+eXDim_elem2D)) 

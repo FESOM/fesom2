@@ -100,6 +100,7 @@ else
      v_w(n)=(v_w(n)*real(ice_steps_since_upd)+vw)/real(ice_steps_since_upd+1,WP)
 endif
      enddo
+
      call exchange_nod(u_w, v_w)
 end subroutine ocean2ice
 !

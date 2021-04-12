@@ -239,29 +239,52 @@ MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
 ! Arrays are described in subroutine array_setup  
+
+! kh 08.03.21
 real(kind=WP), allocatable    :: UV(:,:,:)
+real(kind=WP), allocatable    :: UV_ib(:,:,:) ! kh 08.03.21 additional array for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+
+! kh 18.03.21
 real(kind=WP), allocatable    :: eta_n(:), d_eta(:)
+real(kind=WP), allocatable    :: eta_n_ib(:) ! kh 18.03.21 additional array for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: ssh_rhs(:), Wvel(:,:), hpressure(:,:)
 real(kind=WP), allocatable    :: Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable    :: CFL_z(:,:)
 real(kind=WP), allocatable    :: stress_surf(:,:)
 real(kind=WP), allocatable    :: T_rhs(:,:) 
+
+! kh 15.03.21
 real(kind=WP), allocatable    :: heat_flux(:), Tsurf(:) 
+real(kind=WP), allocatable    :: Tsurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: heat_flux_old(:), Tsurf_old(:)  !PS
 real(kind=WP), allocatable    :: S_rhs(:,:)
+
+! kh 15.03.21
 real(kind=WP), allocatable    :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+real(kind=WP), allocatable    :: tr_arr_ib(:,:,:) ! kh 15.03.21 additional array for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: del_ttf(:,:)
 
+! kh 15.03.21
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
+real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: water_flux_old(:), Ssurf_old(:) !PS
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
 real(kind=WP), allocatable    :: tau_x_t(:,:), tau_y_t(:,:) 
-real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:) 
+real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
+
+! kh 16.03.21 not modified during oberlapping ocean/ice and iceberg calculations
 real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
+!real(kind=WP), allocatable    :: coriolis_ib(:), coriolis_node_ib(:) ! kh 16.03.21 additional arrays for asynchronous iceberg computations
+
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
@@ -296,7 +319,10 @@ real(kind=WP), allocatable :: Ki(:,:)
 !_______________________________________________________________________________
 ! Arrays added for ALE implementation:
 ! --> layer thinkness at node and depthlayer for t=n and t=n+1
+
+! kh 18.03.21
 real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
+real(kind=WP), allocatable,dimension(:,:)   :: zbar_3d_n_ib ! kh 18.03.21 additional array for asynchronous iceberg computations
 
 ! --> layer thinkness at elements, interpolated from hnode
 real(kind=WP), allocatable,dimension(:,:)   :: helem

@@ -57,7 +57,10 @@ save
   logical                   :: ice_update = .true. !
   integer                   :: ice_steps_since_upd = 0 !
   real(kind=WP),allocatable,dimension(:,:)         :: ice_grad_vel
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice  
+
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_ib, V_ice_ib, m_ice_ib, a_ice_ib ! kh 19.02.21 additional arrays for asynchronous iceberg computations
+
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms

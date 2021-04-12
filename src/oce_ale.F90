@@ -19,13 +19,18 @@ subroutine ale_init
     USE o_MESH
     USE g_PARSUP
     USE o_ARRAYS
-    USE g_config, only: which_ale
+
+! kh 18.03.21
+    USE g_config, only: which_ale, ib_async_mode
+
     USE g_forcing_param, only: use_virt_salt
     Implicit NONE
     
     integer             :: n, nzmax
 
-    
+! kh 18.03.21
+    integer             :: i, j
+
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
     allocate(hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
@@ -47,7 +52,30 @@ subroutine ale_init
     
     ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
     allocate(zbar_n(nl))
-    allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+
+! kh 18.03.21
+    if (ib_async_mode == 0) then
+        allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+    else
+! kh 18.03.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+        allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl
+                zbar_3d_n(j, i) = 0._WP
+            end do
+        end do
+!$omp section
+        allocate(zbar_3d_n_ib(nl,myDim_nod2D+eDim_nod2D))
+        do i = 1, myDim_nod2D+eDim_nod2D
+            do j = 1, nl
+                zbar_3d_n_ib(j, i) = 0._WP
+            end do
+        end do
+!$omp end parallel sections
+    end if
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
     allocate(Z_n(nl-1))
@@ -1985,7 +2013,7 @@ subroutine oce_timestep_ale(n)
     else
         call compute_vel_rhs_vinv
     end if
-    
+
     !___________________________________________________________________________
     call viscosity_filter(2)
     
@@ -2007,13 +2035,13 @@ subroutine oce_timestep_ale(n)
     t30=MPI_Wtime() 
     call solve_ssh_ale
     t3=MPI_Wtime() 
-    
+
     ! estimate new horizontal velocity u^(n+1)
     ! u^(n+1) = u* + [-g * tau * theta * grad(eta^(n+1)-eta^(n)) ]
     call update_vel
     ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
     t4=MPI_Wtime() 
-    
+
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     call compute_hbar_ale
     
@@ -2029,7 +2057,7 @@ subroutine oce_timestep_ale(n)
     if (Fer_GM .or. Redi) then
         call init_Redi_GM
     end if
-    
+
     !___________________________________________________________________________
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
@@ -2038,13 +2066,13 @@ subroutine oce_timestep_ale(n)
         call fer_gamma2vel
     end if
     t6=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     !The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     call vert_vel_ale 
     t7=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! solve tracer equation
     call solve_tracers_ale
@@ -2054,7 +2082,7 @@ subroutine oce_timestep_ale(n)
     ! Update hnode=hnode_new, helem
     call update_thickness_ale  
     t9=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! write out global fields for debugging
     call write_step_info(n,logfile_outfreq)

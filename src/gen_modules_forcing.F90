@@ -47,6 +47,8 @@ use o_param
 
   ! forcing arrays
   real(kind=WP), allocatable, dimension(:)         :: u_wind, v_wind 
+  real(kind=WP), allocatable, dimension(:)         :: u_wind_ib, v_wind_ib ! kh 19.02.21 additional arrays for asynchronous iceberg computations
+
   real(kind=WP), allocatable, dimension(:)         :: Tair, shum
   real(kind=WP), allocatable, dimension(:,:)       :: u_wind_t, v_wind_t 
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t

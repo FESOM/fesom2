@@ -17,6 +17,14 @@ subroutine iceberg_calculation(istep)
  implicit none								!=
 									!=
  integer	:: ib, times, istep
+
+! kh 16.03.21
+ integer	:: istep_end_synced
+
+! kh 25.03.21
+ integer:: req, status(MPI_STATUS_SIZE)
+ logical:: completed
+
  real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
@@ -28,6 +36,10 @@ subroutine iceberg_calculation(istep)
  integer,dimension(ib_num):: elem_block_red				!=
  real, dimension(4*ib_num):: vl_block_red				!=
  !==================== MODULES & DECLARATIONS ==========================!= 
+
+! kh 16.03.21 (asynchronous) iceberg computation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+ istep_end_synced = istep + steps_per_ib_step - 1
+
  if(firstcall) then
   !write(*,*) 'ib_num: ', ib_num
   !overwrite icb_modules if restart, initialize netcdf output if no restart:
@@ -66,7 +78,7 @@ subroutine iceberg_calculation(istep)
  
  
  do ib=1, ib_num
- lastsubstep = .false.
+  lastsubstep = .false.
   if( real(istep) > real(step_per_day)*calving_day(ib) ) then !iceberg calved
   
     !substeps don't work anymore with new communication
@@ -96,18 +108,57 @@ subroutine iceberg_calculation(istep)
  !in step2
  !ALLREDUCE: arr_block, elem_block
 
- call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
+!kh 12.02.21 not really needed here
+!call MPI_Barrier(MPI_COMM_FESOM_IB, MPIERR_IB)
+
  arr_block_red = 0.0
  elem_block_red= 0
  vl_block_red = 0.0
- call MPI_AllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
- call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)  
+
+! kh 25.03.21 orig
+! call MPI_AllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
+!       MPI_COMM_FESOM_IB, MPIERR_IB)
+
+!$omp critical 
+ call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+ completed = .false.
+ do while (.not. completed)
+!$omp critical
+  CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+ end do
+
+! kh 25.03.21 orig
+! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
+!       MPI_COMM_FESOM_IB, MPIERR_IB)  
+!$omp critical 
+ call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
+!$omp end critical
+
+ completed = .false.
+ do while (.not. completed)
+!$omp critical
+  CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+ end do
+
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
- call MPI_AllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
-       MPI_COMM_FESOM, MPIerr)
- 
+! kh 25.03.21 orig
+! call MPI_AllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, &
+!       MPI_COMM_FESOM_IB, MPIERR_IB)
+!$omp critical 
+ call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+ completed = .false.
+ do while (.not. completed)
+!$omp critical
+  CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+ end do
+
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
 ! elem_block_red= 0
@@ -174,7 +225,9 @@ end do
  !istep, lon_deg_geo, lat_deg_geo, u_ib_geo, v_ib_geo, volume losses (set to zero)
  !introduce force_last_output(ib)?
 
- if (mod(istep,icb_outfreq)==0 .AND. ascii_out==.false.) then
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+!if (mod(istep,icb_outfreq)==0 .AND. ascii_out==.false.) then
+ if (mod(istep_end_synced,icb_outfreq)==0 .AND. ascii_out==.false.) then
 
    if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf
        
@@ -217,7 +270,10 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
- use o_arrays		!for coriolis_param_elem2D						!=
+ 
+! kh 17.03.21 specification of structure used
+ use o_arrays, only: coriolis
+
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
@@ -246,6 +302,8 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  real,    intent(in)	:: semiimplicit_coeff
  real,    intent(in)	:: AB_coeff
  
+! kh 16.03.21
+integer :: istep_end_synced
  
  integer, dimension(:), save, allocatable :: local_idx_of
  real      			:: depth_ib, volume_ib, mass_ib
@@ -282,6 +340,9 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  
  !t0=MPI_Wtime()
 
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+ istep_end_synced = istep + steps_per_ib_step - 1
+
  depth_ib = -height_ib * rho_icb/rho_h2o
  volume_ib= length_ib * width_ib * height_ib  
  mass_ib = volume_ib * rho_icb	 !less mass 
@@ -290,10 +351,13 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  
  if(volume_ib .le. smallestvol_icb) then
   melted(ib) = .true.
-  if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+! if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
+  if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
    write(*,*) 'iceberg ', ib,' melted'
   end if
-   
+
   return
  end if 
  
@@ -357,6 +421,11 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
   !for AB method
   !f_u_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*u_ib
   !f_v_ib_old = coriolis_param_elem2D(local_idx_of(iceberg_elem))*v_ib
+
+! kh 18.03.21 use coriolis_ib buffered values here, test only
+! f_u_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*u_ib
+! f_v_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*v_ib
+
   f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
   f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
  end if
@@ -390,10 +459,14 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= myDim_nod2D ) then
 
   i_have_element=.true. 
-  l_output =  lastsubstep .and. mod(istep,icb_outfreq)==0
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+! l_output =  lastsubstep .and. mod(istep,icb_outfreq)==0
+  l_output =  lastsubstep .and. mod(istep_end_synced,icb_outfreq)==0
   
   !===========================DYNAMICS===============================
   
+
   call iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon_rad,lat_rad, depth_ib, &
                    height_ib, length_ib, width_ib, local_idx_of(iceberg_elem), &
   		   mass_ib, Ci, Ca, Co, Cda_skin, Cdo_skin, &
@@ -408,7 +481,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !new_v_ib = 0.0
 
   dudt = (new_u_ib-u_ib)/REAL(steps_per_ib_step) / dt
-  dvdt = (new_v_ib-v_ib)/REAL(steps_per_ib_step) / dt		   
+  dvdt = (new_v_ib-v_ib)/REAL(steps_per_ib_step) / dt
 		   
   !new_u_ib = 0.
   !new_v_ib = -0.20
@@ -433,7 +506,10 @@ if( local_idx_of(iceberg_elem) > 0 ) then
     !write(*,*) 'A DEBUG: draft_scale(ib): ',abs(draft_scale(ib)),', depth_ib: ',depth_ib,', Zdepth: ',Zdepth
     old_lon = lon_rad
     old_lat = lat_rad
-    if (mod(istep,logfile_outfreq)==0) then 
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+!   if (mod(istep,logfile_outfreq)==0) then 
+    if (mod(istep_end_synced,logfile_outfreq)==0) then 
         write(*,*) 'iceberg ib ', ib, 'is grounded'
     end if
  	
@@ -476,7 +552,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !values for communication
   arr= (/ height_ib,length_ib,width_ib, u_ib,v_ib, lon_rad,lat_rad, &
           left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib/) 
-	
+
   !save in larger array	  
   arr_block((ib-1)*15+1 : ib*15)=arr
   elem_block(ib)=iceberg_elem
@@ -509,7 +585,10 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  !============================= MODULES & DECLARATIONS =========================================!=
  												!=
  use o_param 		!for rad								!=
- use o_arrays		!for coriolis_param_elem2D						!=
+
+! kh 17.03.21 not really used here
+! use o_arrays		!for coriolis_param_elem2D						!=
+ 
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
@@ -550,6 +629,9 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  real				:: dudt_out, dvdt_out  	     !for unrotated output
  integer   			:: i, iceberg_node, istep 
  real 				:: dudt, dvdt
+
+! kh 16.03.21
+ integer :: istep_end_synced
  
  !iceberg output 
  character 			:: ib_char*10
@@ -583,6 +665,10 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  
  !**** check if iceberg melted in step 1 ****!
  !call com_values(i_have_element, arr, iceberg_elem) 
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+ istep_end_synced = istep + steps_per_ib_step - 1
+
  iceberg_elem= elem_from_block !update element as before in com_values
  old_element = elem_from_block !save if iceberg left model domain
  height_ib= arr(1)
@@ -641,7 +727,10 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
 
  !if(mype==0 .and. lastsubstep .and. mod(istep,icb_outfreq)==0 .and. ascii_out) then
  !if(mype==mod(ib,npes-1) .and. lastsubstep .and. mod(istep,icb_outfreq)==0 .and. ascii_out) then
- if(mype==0 .and. lastsubstep .and. mod(istep,icb_outfreq)==0) then
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+! if(mype==0 .and. lastsubstep .and. mod(istep,icb_outfreq)==0) then
+ if(mype==0 .and. lastsubstep .and. mod(istep_end_synced,icb_outfreq)==0) then
 
    !output in 1. unrotated or 2. rotated coordinates      
    u_ib_out = u_ib
@@ -672,7 +761,11 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  file_track	=  trim(file_track) // trim(ib_char) // '.dat'
    
    open(unit=42,file=file_track,position='append')
-   write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+
+! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+!  write(42,'(I,12e15.7)') 	istep, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
+!  				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
+   write(42,'(I,12e15.7)') 	istep_end_synced, lon_rad_out, lat_rad_out, lon_deg_out, lat_deg_out, &
    				u_ib_out, v_ib_out, frozen_in, P_sill, P_ib, conci_ib, dudt_out, dvdt_out
    close(42)
 
@@ -798,7 +891,9 @@ subroutine depth_bathy(Zdepth3, elem)
   use i_arrays
   use g_parsup
   
-  use o_arrays         
+! kh 17.03.21 not really used here
+! use o_arrays
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -1112,16 +1207,18 @@ subroutine iceberg_out
  
  icbID = 42
  !icbID_ISM = 43
-
+ 
  !calving_day has to be adjusted for restarts because calving_day gives the amount
  !of days (since the model FIRST has been started) after which icebergs are released
  !Criterion for calving is:
  !if( real(istep) > real(step_per_day)*calving_day(ib) -1 ) then !iceberg calved
- calving_day = calving_day - REAL(istep/step_per_day)
+
+! kh 10.02.21 istep is not initialized
+!calving_day = calving_day - REAL(istep/step_per_day)
  where(calving_day <= 0.0)
  calving_day = 0.0	!to avoid negative calving_days
  end where
- 
+
  if(mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace')
   !open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace')
@@ -1689,7 +1786,9 @@ subroutine write_buoy_props_netcdf
  use iceberg_params, only : buoy_props, file_icb_netcdf, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
  !use iceberg_params, only : ib_num, buoy_props, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
   
-  use o_arrays
+! kh 17.03.21 not really used here
+! use o_arrays
+
   use o_mesh
   !use o_passive_tracer_mod
   !use o_age_tracer_mod
@@ -1714,7 +1813,10 @@ subroutine write_buoy_props_netcdf
 !   /gfs1/work/hbkkim15/output/slabt/buoys_track.nc
   
   if (mype==0) then 
-    sec_in_year=dt*istep
+
+! kh 16.03.21 ?! istep is not initialized, intitialize to 0 here
+     istep = 0
+     sec_in_year=dt*istep
 
     ! open files
      status = nf_open(trim(file_icb_netcdf), nf_write, ncid)

@@ -44,15 +44,64 @@ USE g_CONFIG
 
 implicit none
 integer   :: n_size, e_size, mn, k, n, n1, n2
+
+! kh 19.02.21
+integer   :: i
+
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
 
 ! Allocate memory for variables of ice model
- allocate(u_ice(n_size), v_ice(n_size))
+! kh 19.02.21
+  if (ib_async_mode == 0) then
+      allocate(u_ice(n_size), v_ice(n_size))
+      allocate(u_ice_ib(n_size), v_ice_ib(n_size))
+  else
+!$omp parallel sections num_threads(2)
+! kh 19.02.21 support "first touch" idea
+!$omp section
+      allocate(u_ice(n_size), v_ice(n_size))
+      do i = 1, n_size
+          u_ice(i) = 0._WP
+          v_ice(i) = 0._WP
+      end do
+!$omp section
+      allocate(u_ice_ib(n_size), v_ice_ib(n_size))
+      do i = 1, n_size
+          u_ice_ib(i) = 0._WP
+          v_ice_ib(i) = 0._WP
+      end do
+!$omp end parallel sections
+  end if
+
  if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size)) 
- allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
+
+! kh 19.02.21
+  allocate(m_snow(n_size))
+  if (ib_async_mode == 0) then
+!     allocate(m_ice(n_size), a_ice(n_size), m_snow(n_size))
+      allocate(m_ice(n_size), a_ice(n_size))
+      allocate(m_ice_ib(n_size), a_ice_ib(n_size))
+  else
+! kh 19.02.21 support "first touch" idea
+!$omp parallel sections num_threads(2)
+!$omp section
+      allocate(m_ice(n_size), a_ice(n_size))
+      do i = 1, n_size
+          m_ice(i) = 0._WP
+          a_ice(i) = 0._WP
+      end do
+!$omp section
+      allocate(m_ice_ib(n_size), a_ice_ib(n_size))
+      do i = 1, n_size
+          m_ice_ib(i) = 0._WP
+          a_ice_ib(i) = 0._WP
+      end do
+!$omp end parallel sections
+  end if
+
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))

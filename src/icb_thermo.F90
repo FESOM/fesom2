@@ -29,7 +29,9 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   use i_arrays
   use g_parsup
 
-  use o_arrays         
+! kh 18.03.21 not really used here
+! use o_arrays
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -106,8 +108,10 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   use i_param
   use i_arrays
   use g_parsup	!for mype
-  
-  use o_arrays         
+
+! kh 18.03.21 not really used here
+! use o_arrays         
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -126,7 +130,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
   logical		:: force_last_output
   real, dimension(4)	:: arr
   integer               :: istep
-  
+
     !in case the iceberg melts in this step, output has to be written (set to true below)
     force_last_output=.false.
 
@@ -148,7 +152,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     
     lvl_b = dh_bv*2*length_ib*abs(depth_ib) + dh_bv*2*width_ib*abs(depth_ib)    ! at all 4 sides
     fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
-    
+
     lvl_v = dh_v*2*length_ib*abs(depth_ib) + dh_v*2*width_ib*abs(depth_ib)      ! at all 4 sides
     fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)
     !total volume loss
@@ -158,7 +162,7 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
     
     !write(*,*) '*** tvl=',tvl
     volume_before=height_ib*length_ib*width_ib
-    
+
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
     	volume_after=0.0    	
 	depth_ib = 0.0
@@ -209,13 +213,13 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
         end if
 
     end if
-    
+
     !stability criterion: icebergs are allowed to roll over
     if(l_weeksmellor) then
       call weeksmellor(	depth_ib, height_ib, length_ib, width_ib, &
       			rho_h2o, rho_icb, volume_after)
     end if   
-    
+
 
     !OUTPUT of averaged meltrates in [m^3 (ice) per day]
     bvl_mean(ib)=bvl_mean(ib)+(bvl/real(icb_outfreq))
@@ -454,7 +458,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
 
      heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
-     M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
+      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
      !fw = -M_b
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting

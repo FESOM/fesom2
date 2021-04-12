@@ -101,6 +101,25 @@ subroutine read_namelist
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine read_namelist
 ! =================================================================
+subroutine read_namelist_icebergs
+  ! Reads iceberg namelist and overwrite default parameters.
+  !
+  ! kh 31.03.21 Copied by Kai Himstedt (based on read_namelist)
+  !--------------------------------------------------------------
+  use g_parsup
+  use g_config
+  implicit none
+
+  character(len=100)   :: nmlfile
+
+  nmlfile ='namelist.config'    ! name of general configuration namelist file
+  open (20,file=nmlfile)
+  read (20,NML=icebergs)
+!!$  read (20,NML=machine)
+  close (20)
+! if(mype==0) write(*,*) 'icebergs namelist is read in'
+end subroutine read_namelist_icebergs
+! =================================================================
 subroutine get_run_steps(nsteps)
   ! Coded by Qiang Wang
   ! Reviewed by ??

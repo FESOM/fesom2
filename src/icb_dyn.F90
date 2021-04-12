@@ -11,10 +11,17 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 		       file1, file2, P_ib, conci_ib, dt_ib, lastsubstep, &
 		       f_u_ib_old, f_v_ib_old, l_semiimplicit, &
 		       semiimplicit_coeff, AB_coeff, file3, rho_icb)
-		       
- use g_forcing_arrays 	!for u_wind, v_wind
- use i_arrays		!for u_ice , v_ice
- use o_arrays		!for coriolis_param_elem2D, Tsurf, Ssurf
+
+! kh 19.02.21
+ use g_forcing_arrays 	!for u_wind, v_wind or u_wind_ib, v_wind_ib respectively
+
+! kh 19.02.21
+ use i_arrays		!for u_ice , v_ice or u_ice_ib, v_ice_ib respectively
+
+! kh 17.03.21 specification of structures used
+!use o_arrays, only: coriolis_ib, Tsurf_ib, Ssurf_ib
+ use o_arrays, only: coriolis, Tsurf_ib, Ssurf_ib
+
  use o_param		!for dt
  use o_mesh
  use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
@@ -76,32 +83,33 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 
 
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
- call FEM_eval(ua_ib,va_ib,lon,lat,u_wind,v_wind,iceberg_elem)      
- 
- 
+ ! kh 11.02.21
+ call FEM_eval(ua_ib,va_ib,lon,lat,u_wind_ib,v_wind_ib,iceberg_elem)      
+
  !ICE VELOCITY ui_ib, vi_ib
- call FEM_eval(ui_ib,vi_ib,lon,lat,u_ice,v_ice,iceberg_elem)    
- 
- 
+ ! kh 11.02.21
+ call FEM_eval(ui_ib,vi_ib,lon,lat,u_ice_ib,v_ice_ib,iceberg_elem)    
+  
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
  
  ! LA debug
  tmp_arr=elem2D_nodes(:,iceberg_elem)
- 
- hi_ib3    = m_ice(tmp_arr)
- conci_ib3 = a_ice(tmp_arr) 
+
+ hi_ib3    = m_ice_ib(tmp_arr)
+ conci_ib3 = a_ice_ib(tmp_arr) 
  call FEM_3eval(hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  
- 
  call compute_areas(Ao, Aa, Ai, Ad, depth_ib, &
                     height_ib, length_ib, width_ib, hi_ib)
-	
-			 
+
+
  !fcoriolis = coriolis_param_elem2D(iceberg_elem) * coriolis_scale(ib)
+
+! kh 16.03.21 use coriolis_ib buffered values here, test only
+!fcoriolis = coriolis_ib(iceberg_elem) * coriolis_scale(ib)
  fcoriolis = coriolis(iceberg_elem) * coriolis_scale(ib)
-  
-  
+
  call iceberg_acceleration( ib, au_ib, av_ib, Ao, Aa, Ai, Ad, 		&
                             uo_ib,vo_ib, uo_skin_ib, vo_skin_ib,	&
 			    ua_ib,va_ib, ui_ib,vi_ib, 			&
@@ -112,11 +120,13 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 			    lon, lat, lastsubstep, f_u_ib_old, 		&
 			    f_v_ib_old, l_semiimplicit, 		&
 			    semiimplicit_coeff, AB_coeff )
-			    
-    
+
+
  !========================THERMODYNAMICS============================
  if(l_melt) then
-  call FEM_eval(sst_ib,sss_ib,lon,lat,Tsurf,Ssurf,iceberg_elem)
+
+! kh 15.03.21 use Tsurf_ib and Ssurf_ib buffered values here
+  call FEM_eval(sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
 
   !if(ib==3497) then
   ! write(*,*) '#####################################################'
@@ -136,13 +146,13 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 
   call iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M_v,M_e,M_bv, &
 			     rho_h2o, rho_icb, file3)
- end if			    
+
+ end if 
  !====================END OF THERMODYNAMICS=========================
-   
-   
- new_u_ib = u_ib + au_ib * dt_ib
- new_v_ib = v_ib + av_ib * dt_ib
- !write(*,*) 'LA DEBUG 145: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
+
+  new_u_ib = u_ib + au_ib * dt_ib
+  new_v_ib = v_ib + av_ib * dt_ib
+  !write(*,*) 'LA DEBUG 145: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
 
  if (l_semiimplicit) then !a matrix multiplication is to be performed
   			  !for semiimpl. coriolis term and implicit
@@ -194,8 +204,8 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  !write(*,*) 'LA DEBUG 194: u_ib: ',u_ib,', new_u_ib: ',new_u_ib
     
  end if !matrix-multiplication
- 
- 
+
+
  !icebergs may be frozen in: .true. or .false.
  call iceberg_frozen(frozen_in, P_sill, P_ib, conc_sill, conci_ib, ib)
       
@@ -274,7 +284,11 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
 				lon_rad, lat_rad, output, f_u_ib_old, &
 				f_v_ib_old, l_semiimplicit, &
 				semiimplicit_coeff, AB_coeff )
- use o_arrays 	!for ssh
+
+! kh 17.03.21 not really used here
+! use o_arrays 	!for ssh
+
+
  use o_param 	!for g
  use g_config	!for istep
  use g_parsup	!for mype
@@ -332,14 +346,15 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  ! u-components
  ocean_drag_u     = (0.5 * Co * rho_h2o * Ao  &
                    * abs_omib * uo_ib)/mass_ib	!calculate part of it implicitly
+
  
  !ocean_skin_u     = (rho_h2o * Cdo_skin * Ad  &
  ! 	           * abs_omib * uo_ib)/mass_ib !calculate part of it implicitly
  ocean_skin_u     = (rho_h2o * Cdo_skin * Ad  &
-  	           * abs_omib_skin * uo_skin_ib)/mass_ib !calculate part of it implicitly	 
+  	           * abs_omib_skin * uo_skin_ib)/mass_ib !calculate part of it implicitly
 		       
  air_drag_u       = (0.5 * Ca * rho_air * Aa  &
-	           * abs_amib * (ua_ib - u_ib))/mass_ib			   
+	           * abs_amib * (ua_ib - u_ib))/mass_ib
  air_skin_u       = (rho_air * Cda_skin * Ad   &
   	           * abs_amib * (ua_ib - u_ib))/mass_ib 
 	     
@@ -410,7 +425,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  if (l_semiimplicit) then !USE (SEMI-)IMPLICIT SCHEME for coriolis term
  
   if (conci_ib .GT. 0.15) then
-    
+
       au_ib = ocean_drag_u     &
 	    + ocean_skin_u     &
 	    + air_drag_u       &
@@ -419,7 +434,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
 	    + wave_radiation_u &
 	    + surface_slope_u  &
 	    + (1.-semiimplicit_coeff)*fcoriolis*v_ib
- 
+
       av_ib = ocean_drag_v     &
 	    + ocean_skin_v     &
 	    + air_drag_v       &
@@ -429,7 +444,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
 	    + surface_slope_v  &	   
 	    - (1.-semiimplicit_coeff)*fcoriolis*u_ib
   else
-    
+
       au_ib = ocean_drag_u     &
 	    + ocean_skin_u     &
 	    + air_drag_u       &
@@ -460,7 +475,8 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
 	    + wave_radiation_u &
 	    + surface_slope_u  &
 	    + AB_coeff*fcoriolis*v_ib+oneminus_AB*f_v_ib_old
- 
+
+
       av_ib = ocean_drag_v     &
 	    + ocean_skin_v     &
 	    + air_drag_v       &
@@ -598,7 +614,9 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
   use i_arrays
   use g_parsup
   
-  use o_arrays         
+! kh 17.03.21 specification of structures used
+  use o_arrays, only: UV_ib, tr_arr_ib, zbar_3d_n_ib
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -644,8 +662,10 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
 
     !##################################################
     ! *** LA changed to zbar_3d_n ***
-    lev_up  = zbar_3d_n(k-1, n2)
-    lev_low = zbar_3d_n(k, n2)
+
+! kh 18.03.21 use zbar_3d_n_ib buffered values here
+    lev_up  = zbar_3d_n_ib(k-1, n2)
+    lev_low = zbar_3d_n_ib(k, n2)
     dz = abs( lev_low - lev_up )
     
     !if( abs(lev_up)>=abs(depth_ib) ) then
@@ -665,16 +685,18 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
       !  write(*,*) '3 cavity nodes in the same element! Iceberg should not be here!'
       !end if
 
-      uo_dz(m)=UV(1,k-1,n2)*abs(depth_ib)
-      vo_dz(m)=UV(2,k-1,n2)*abs(depth_ib)
-      uo_keel(m)=UV(1,k-1,n2)
-      vo_keel(m)=UV(2,k-1,n2)
+! kh 08.03.21 use UV_ib buffered values here
+      uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
+      vo_dz(m)=UV_ib(2,k-1,n2)*abs(depth_ib)
+      uo_keel(m)=UV_ib(1,k-1,n2)
+      vo_keel(m)=UV_ib(2,k-1,n2)
 
       ! *** LA changed to tr_arr(nl-1,node_size,num_tr) ***
-      T_dz(m)=tr_arr(k-1,n2,1)*abs(depth_ib)
-      S_dz(m)=tr_arr(k-1,n2,2)*abs(depth_ib)
-      T_keel(m)=tr_arr(k-1,n2,1)
-      S_keel(m)=tr_arr(k-1,n2,2) ! check those choices with RT: OK
+! kh 15.03.21 use tr_arr_ib buffered values here
+      T_dz(m)=tr_arr_ib(k-1,n2,1)*abs(depth_ib)
+      S_dz(m)=tr_arr_ib(k-1,n2,2)*abs(depth_ib)
+      T_keel(m)=tr_arr_ib(k-1,n2,1)
+      S_keel(m)=tr_arr_ib(k-1,n2,2) ! check those choices with RT: OK
 
       exit innerloop
 
@@ -688,18 +710,23 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
       dz = abs ( lev_up - depth_ib )
 
       ! *** LA changed to tr_arr(nl-1,node_size,num_tr) ***
-      ufkeel1 = interpol1D(abs(lev_up),UV(1,k-1,n2),abs(lev_low),UV(1,k,n2),abs(depth_ib))
-      ufkeel2 = interpol1D(abs(lev_up),UV(2,k-1,n2),abs(lev_low),UV(2,k,n2),abs(depth_ib))
-      Temkeel = interpol1D(abs(lev_up),tr_arr(k-1,n2,1),abs(lev_low),tr_arr(k,n2,1),abs(depth_ib))
-      Salkeel = interpol1D(abs(lev_up),tr_arr(k-1,n2,2),abs(lev_low),tr_arr(k,n2,2),abs(depth_ib))
+! kh 08.03.21 use UV_ib buffered values here
+      ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
+      ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
 
-      uo_dz(m)=uo_dz(m)+ 0.5*(UV(1,k-1,n2) + ufkeel1)*dz 
-      vo_dz(m)=vo_dz(m)+ 0.5*(UV(2,k-1,n2) + ufkeel2)*dz
+! kh 15.03.21 use tr_arr_ib buffered values here
+      Temkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,1),abs(lev_low),tr_arr_ib(k,n2,1),abs(depth_ib))
+      Salkeel = interpol1D(abs(lev_up),tr_arr_ib(k-1,n2,2),abs(lev_low),tr_arr_ib(k,n2,2),abs(depth_ib))
+
+! kh 08.03.21 use UV_ib buffered values here
+      uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2) + ufkeel1)*dz 
+      vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2) + ufkeel2)*dz
       uo_keel(m)=ufkeel1
       vo_keel(m)=ufkeel2
 
-      T_dz(m)=T_dz(m)+ 0.5*(tr_arr(k-1,n2,1)+ Temkeel)*dz
-      S_dz(m)=S_dz(m)+ 0.5*(tr_arr(k-1,n2,2)+ Salkeel)*dz
+! kh 15.03.21 use tr_arr_ib buffered values here
+      T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ Temkeel)*dz
+      S_dz(m)=S_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,2)+ Salkeel)*dz
       T_keel(m)=Temkeel
       S_keel(m)=Salkeel
 
@@ -708,17 +735,23 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
     else	
 
       ! .. and sum up the layer-integrated velocities ..
-      uo_dz(m)=uo_dz(m)+ 0.5*(UV(1,k-1,n2)+UV(1,k,n2))*dz
-      vo_dz(m)=vo_dz(m)+ 0.5*(UV(2,k-1,n2)+UV(2,k,n2))*dz
+! kh 08.03.21 use UV_ib buffered values here      
+      uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
+      vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
       ! .. and T & S:
-      T_dz(m)=T_dz(m)+ 0.5*(tr_arr(k-1,n2,1)+ tr_arr(k,n2,1))*dz
-      S_dz(m)=S_dz(m)+ 0.5*(tr_arr(k-1,n2,2)+ tr_arr(k,n2,2))*dz
+
+! kh 15.03.21 use tr_arr_ib buffered values here
+      T_dz(m)=T_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,1)+ tr_arr_ib(k,n2,1))*dz
+      S_dz(m)=S_dz(m)+ 0.5*(tr_arr_ib(k-1,n2,2)+ tr_arr_ib(k,n2,2))*dz
 
       ! save the current deepest values; will be overwritten most of the time in lines 707 to 713.
-      uo_keel(m)=UV(1,k,n2)
-      vo_keel(m)=UV(2,k,n2)
-      T_keel(m)=tr_arr(k,n2,1)
-      S_keel(m)=tr_arr(k,n2,2)
+! kh 08.03.21 use UV_ib buffered values here
+      uo_keel(m)=UV_ib(1,k,n2)
+      vo_keel(m)=UV_ib(2,k,n2)
+
+! kh 15.03.21 use tr_arr_ib buffered values here
+      T_keel(m)=tr_arr_ib(k,n2,1)
+      S_keel(m)=tr_arr_ib(k,n2,2)
     end if
 
    end do innerloop
@@ -860,7 +893,9 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   use i_arrays
   use g_parsup
   
-  use o_arrays         
+! kh 17.03.21 specification of structures used
+  use o_arrays, only: UV_ib, tr_arr_ib, zbar_3d_n_ib
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -890,8 +925,10 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
    ! ..consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
    do k=2, nl+1
-    lev_up  = zbar_3d_n(k-1, n2)
-    lev_low = zbar_3d_n(k, n2)
+
+! kh 18.03.21 use zbar_3d_n_ib buffered values here
+    lev_up  = zbar_3d_n_ib(k-1, n2)
+    lev_low = zbar_3d_n_ib(k, n2)
     
     if (lev_up==lev_low) then
         exit
@@ -909,17 +946,20 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   
       dz = abs( lev_up - depth_ib )
 
-      ufkeel1 = interpol1D(abs(lev_up),UV(1,k-1,n2),abs(lev_low),UV(1,k,n2),abs(depth_ib))
-      ufkeel2 = interpol1D(abs(lev_up),UV(2,k-1,n2),abs(lev_low),UV(2,k,n2),abs(depth_ib))
+! kh 08.03.21 use UV_ib buffered values here
+      ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
+      ufkeel2 = interpol1D(abs(lev_up),UV_ib(2,k-1,n2),abs(lev_low),UV_ib(2,k,n2),abs(depth_ib))
 
-      uo_dz(m)=uo_dz(m)+0.5*(UV(1,k-1,n2)+ ufkeel1)*dz 
-      vo_dz(m)=vo_dz(m)+0.5*(UV(2,k-1,n2)+ ufkeel2)*dz
+! kh 08.03.21 use UV_ib buffered values here
+      uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+ ufkeel1)*dz 
+      vo_dz(m)=vo_dz(m)+0.5*(UV_ib(2,k-1,n2)+ ufkeel2)*dz
       exit
 	 
     else	
       ! .. and sum up the layer-integrated velocities:
-      uo_dz(m)=uo_dz(m)+0.5*(UV(1,k-1,n2)+UV(1,k,n2))*dz
-      vo_dz(m)=vo_dz(m)+0.5*(UV(2,k-1,n2)+UV(2,k,n2))*dz
+! kh 08.03.21 use UV_ib buffered values here
+      uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
+      vo_dz(m)=vo_dz(m)+0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
 	 
     end if
    end do

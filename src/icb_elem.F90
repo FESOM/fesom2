@@ -1,6 +1,9 @@
 subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
  use o_mesh
- use o_arrays		!for ssh
+
+ ! kh 18.03.21 specification of structure used
+ use o_arrays, only: eta_n_ib
+ 
  implicit none
  
  integer, intent(IN) :: elem
@@ -27,8 +30,10 @@ subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
   
   !nablaeta(1) = sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
   !nablaeta(2) = sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
-  nablaeta(1) = sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-  nablaeta(2) = sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
+
+! kh 18.03.21 use eta_n_ib buffered values here
+  nablaeta(1) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
+  nablaeta(2) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
  else
   call FEM_3eval(nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
@@ -41,7 +46,10 @@ end subroutine mean_gradient
 
 subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)  
  use o_mesh
- use o_arrays	!for ssh
+
+ ! kh 18.03.21 specification of structure used
+ use o_arrays, only: eta_n_ib
+
  use g_parsup
  implicit none
  
@@ -74,9 +82,11 @@ subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)
      patch= patch + area_
      
      !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) ) 
-     gradientx = gradientx + area_ * sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-     gradienty = gradienty + area_ * sum( eta_n(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
+     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+
+! kh 18.03.21 use eta_n_ib buffered values here
+     gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
+     gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
    end do
  end do
  
@@ -156,8 +166,10 @@ subroutine FEM_eval_old(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use i_param
   use i_arrays
   use g_parsup
-  
-  use o_arrays         
+
+! kh 18.03.21 not really used here
+! use o_arrays
+ 
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -322,7 +334,9 @@ subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   use i_arrays
   use g_parsup
   
-  use o_arrays         
+! kh 18.03.21 not really used here
+! use o_arrays
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -472,7 +486,10 @@ end subroutine iceberg_elem4all
 subroutine find_new_iceberg_elem(old_iceberg_elem, pt, left_mype)
   use o_mesh !for index_nod2d, elem2D_nodes
   use o_param
-  use o_arrays         
+
+! kh 18.03.21 not really used here
+! use o_arrays
+
   use g_parsup
 #ifdef use_cavity
   use iceberg_params, only: reject_elem
@@ -680,21 +697,77 @@ subroutine com_integer(i_have_element, iceberg_element)
  logical:: he_has_element
  integer:: i, sender, status(MPI_STATUS_SIZE)
 
+ integer:: req
+ logical:: completed
+
  if (mype==0) then
     do i=1, npes-1
-       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM, status, MPIerr )		      
-       sender = status(MPI_SOURCE)
-       if (he_has_element) then
-	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM, status, MPIerr )
-       end if
-    end do
+
+! kh 25.03.21 orig
+!     CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM_IB, status, MPIERR_IB)
+
+!$omp critical
+      CALL MPI_IRECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+      completed = .false.
+      do while (.not. completed)
+!$omp critical
+        CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+      end do
+
+      sender = status(MPI_SOURCE)
+      if (he_has_element) then
+
+! kh 25.03.21 orig
+!       CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM_IB, status, MPIERR_IB)
+
+!$omp critical
+        CALL MPI_IRECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+        completed = .false.
+        do while (.not. completed)
+!$omp critical
+          CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+        end do
+      end if
+    end do ! i=1, npes-1
  else
-       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM, MPIerr )
-       if (i_have_element) then
-	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM, MPIerr )
-       end if 
- end if
- 
+! kh 25.03.21 orig
+!   CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM_IB, MPIERR_IB)
+
+!$omp critical
+    CALL MPI_ISEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+    completed = .false.
+    do while (.not. completed)
+!$omp critical
+      CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+    end do
+
+    if (i_have_element) then
+
+! kh 25.03.21 orig
+!      CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM_IB, MPIERR_IB)
+
+!$omp critical
+       CALL MPI_ISEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+       completed = .false.
+       do while (.not. completed)
+!$omp critical
+         CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+       end do
+    end if 
+ end if ! (mype==0)
+
 ! if (mype==0) then
 !    do i=1, npes-1
 !       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
@@ -715,18 +788,33 @@ subroutine com_integer(i_have_element, iceberg_element)
  !1. buffer - Startadresse des Datenpuffers
  !2. count - Anzahl der Elemente im Puffer (integer)
  !3. datatype - Datentyp der Pufferelemente (handle)
- !4. root - Wurzelprozeß; der, welcher sendet (integer)
- !5. comm - Kommunikator (handle) 
- CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
+ !4. root - Wurzelprozeï¿½; der, welcher sendet (integer)
+ !5. comm - Kommunikator (handle)
+
+! kh 25.03.21 orig
+ !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM_IB, MPIERR_IB)
+
+!$omp critical
+  CALL MPI_IBCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM_IB, req, MPIERR_IB)
+!$omp end critical
+
+  completed = .false.
+  do while (.not. completed)
+!$omp critical
+    CALL MPI_TEST(req, completed, status, MPIERR_IB)
+!$omp end critical
+  end do
+
  !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
- 
+
  end subroutine com_integer
- 
- 
+
+
  !***************************************************************************************************************************
  !***************************************************************************************************************************
  
- subroutine com_values(i_have_element, arr, iceberg_element)
+ ! kh 10.02.21
+ subroutine com_values_old_dont_use(i_have_element, arr, iceberg_element)
  use g_parsup !for npes
  implicit none
  
@@ -779,16 +867,17 @@ subroutine com_integer(i_have_element, iceberg_element)
  !1. buffer - Startadresse des Datenpuffers
  !2. count - Anzahl der Elemente im Puffer (integer)
  !3. datatype - Datentyp der Pufferelemente (handle)
- !4. root - Wurzelprozeß; der, welcher sendet (integer)
+ !4. root - Wurzelprozeï¿½; der, welcher sendet (integer)
  !5. comm - Kommunikator (handle) 
  CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
  CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
  !CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, MPIerr)
  !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
  
- end subroutine com_values
- 
- 
+ ! kh 10.02.21
+ end subroutine com_values_old_dont_use
+
+
  !***************************************************************************************************************************
  !***************************************************************************************************************************
  
@@ -804,8 +893,10 @@ SUBROUTINE processor_distr
   use i_param
   use i_arrays
   use g_parsup
-  
-  use o_arrays         
+
+! kh 18.03.21 not really used here
+! use o_arrays
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
@@ -847,7 +938,9 @@ SUBROUTINE tides_distr
   use i_arrays
   use g_parsup
   
-  use o_arrays         
+! kh 18.03.21 not really used here
+! use o_arrays
+
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid

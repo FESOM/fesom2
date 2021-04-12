@@ -12,6 +12,10 @@ save
 #endif
 
  integer                                :: MPI_COMM_FESOM
+
+ ! kh 10.02.21 communicator for async iceberg computations based on OpenMP
+ integer                                :: MPI_COMM_FESOM_IB
+
  integer, parameter   :: MAX_LAENDERECK=8
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
   type com_struct
@@ -53,6 +57,10 @@ save
 
   ! general MPI part
   integer            :: MPIERR
+
+  ! kh 11.02.21
+  integer            :: MPIERR_IB
+
   integer            :: npes
   integer            :: mype
   integer            :: maxPEnum=100
@@ -71,13 +79,18 @@ save
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
-  logical :: elem_full_flag  
+  logical :: elem_full_flag
+
+#ifndef __async_icebergs
+! kh 04.02.21 OpenMP is used for parallel partitioning
 !$OMP threadprivate(com_nod2D,com_elem2D,com_elem2D_full)
 !$OMP threadprivate(mype)
 !$OMP threadprivate(myDim_nod2D, eDim_nod2D, myList_nod2D)
 !$OMP threadprivate(myDim_elem2D, eDim_elem2D, eXDim_elem2D, myList_elem2D)
 !$OMP threadprivate(myDim_edge2D, eDim_edge2D, myList_edge2D)
-  
+!#else
+! kh 04.02.21 OpenMP is used for asynchronous iceberg computations, i.e. a shared access is required
+#endif  
 
 contains
 subroutine par_init    ! initializes MPI

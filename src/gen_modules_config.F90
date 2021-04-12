@@ -21,12 +21,14 @@ module g_config
   namelist /timestep/ step_per_day, run_length, run_length_unit
   
   ! *** Paths for all in and out ***
-  character(100)         :: MeshPath='./mesh/'
-  character(100)         :: OpbndPath='./opbnd/'
-  character(100)         :: ClimateDataPath='./hydrography/'
-  character(100)         :: ForcingDataPath='./forcing/'
-  character(100)         :: TideForcingPath='./tide_forcing/'
-  character(100)         :: ResultPath='./result/'
+! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
+  character(200)         :: MeshPath='./mesh/'
+  character(200)         :: OpbndPath='./opbnd/'
+  character(200)         :: ClimateDataPath='./hydrography/'
+  character(200)         :: ForcingDataPath='./forcing/'
+  character(200)         :: TideForcingPath='./tide_forcing/'
+  character(200)         :: ResultPath='./result/'
+
   namelist /paths/  MeshPath, OpbndPath, ClimateDataPath, ForcingDataPath, &
        TideForcingPath, ResultPath
 
@@ -103,12 +105,21 @@ module g_config
   namelist /run_config/ use_ice, use_floatice, use_sw_pene, toy_ocean
  
   ! *** icebergs ***
-  logical                       :: use_icebergs=.false.  
+  logical                       :: use_icebergs=.false.
+
   logical                       :: use_icesheet_coupling=.false.  
   integer                       :: ib_num=0
+
   integer                       :: steps_per_ib_step=8
 
-  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step
+! kh 02.02.21
+! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
+! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
+! ib_async_mode == 2: OpenMP code active but computations still serialized via spinlock (for testing purposes)
+  integer                       :: ib_async_mode=1
+  integer                       :: thread_support_level_required=2 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
+
+  namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
 
   ! *** others ***
   real(kind=WP)            	:: dt
@@ -119,4 +130,3 @@ module g_config
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
   real(kind=WP)             	:: dummy=1.e10
 end module g_config
-
