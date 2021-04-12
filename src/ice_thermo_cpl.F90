@@ -22,7 +22,7 @@ subroutine thermodynamics(mesh)
 #endif
   use g_parsup,         only: myDim_nod2D, eDim_nod2D
 #ifdef use_cavity
-  use o_mesh,           only: coord_nod2D, cavity_flag_nod2d
+  use o_mesh,           only: coord_nod2D, ulevels_nod2D
 #else
   use o_mesh,           only: coord_nod2D
 #endif
@@ -30,16 +30,26 @@ subroutine thermodynamics(mesh)
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
+#ifdef oifs
+  use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
+       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
+#else
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
        , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, S_oc_array, T_oc_array
+#endif
 
   !---- variables from gen_modules_config.F90
   use g_config,         only: dt
 
   !---- variables from gen_modules_forcing.F90
+#ifdef oifs
+  use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
+       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
+       , enthalpyoffuse
+#else
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice
-
+#endif
   !---- variables from gen_modules_rotate_grid.F90
   use g_rotate_grid,    only: r2g
 #endif
@@ -92,14 +102,18 @@ subroutine thermodynamics(mesh)
   do inod=1,myDim_nod2d+eDim_nod2d
 
 #ifdef use_cavity
-     if (cavity_flag_nod2d(inod).eq.1) cycle
+     if (ulevels_nod2D(inod) > 1) cycle
 #endif
 
      A       = a_ice(inod)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
+#if defined (__oifs)
+     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+#else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+#endif
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)
@@ -114,9 +128,9 @@ subroutine thermodynamics(mesh)
 
      ehf     = 0._WP
      fw      = 0._WP
-#ifdef use_fullfreesurf
-     rsf     = 0._WP
-#endif
+     if (.not. use_virt_salt) then
+        rsf     = 0._WP
+     end if
 
 !#if defined (__oifs)
 !     !---- different lead closing parameter for NH and SH
@@ -152,9 +166,9 @@ subroutine thermodynamics(mesh)
      m_snow(inod)        = hsn
      net_heat_flux(inod) = ehf
      fresh_wa_flux(inod) = fw
-#ifdef use_fullfreesurf
-     real_salt_flux(inod)= rsf
-#endif
+     if (.not. use_virt_salt) then
+        real_salt_flux(inod)= rsf
+     end if
      thdgr(inod)         = dhgrowth
      thdgrsn(inod)       = dhsngrowth
      flice(inod)         = dhflice
@@ -385,12 +399,12 @@ contains
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
-#ifdef use_fullfreesurf
-    fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
-    rsf = -dhgrowth*rhoice*Sice
-#else
-    fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
-#endif
+    if (.not. use_virt_salt) then
+       fw = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno 
+       rsf = -dhgrowth*rhoice*Sice/rhowat
+    else
+       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+    end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
     !---- NOTE: ehf = -ohf (in case of no cut-off)
@@ -416,18 +430,14 @@ contains
 
     !---- to maintain salt conservation for the current model version
     !---- (a way to avoid producing net salt from snow-type-ice) 
-#ifdef use_fullfreesurf
-    rsf = rsf - dhflice*rhoice*Sice
-#else
-    fw = fw + dhflice*rhoice*Sice/rsss
-#endif
+    if (.not. use_virt_salt) then
+       rsf = rsf - dhflice*rhoice*Sice/rhowat
+    else
+       fw = fw + dhflice*rhoice*Sice/rsss
+    end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
     fw = fw/rhowat
-#ifdef use_fullfreesurf
-    rsf = rsf/rhowat
-#endif
-
     return
   end subroutine ice_growth
 

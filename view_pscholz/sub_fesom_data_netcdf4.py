@@ -101,6 +101,11 @@ def fesom_load_data_horiz_netcdf4(mesh,data,             \
         data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
         return data
     
+    elif data.var=='cavity_depth':
+        data.value 	= -mesh.nodes_2d_cg
+        data.sname, data.lname, data.unit, data.cmap = 'depth', 'Cavity Depth', 'm', 'wbgyr'
+        return data
+    
     #___________________________________________________________________________
     # number of years to average 
     nyi         = data.year[1]-data.year[0]+1
@@ -201,7 +206,7 @@ def do_multiyear_fname_list(data, which_files, do_output):
         #_______________________________________________________________________
         # build filename list for data variables
         if any(x in data.var for x in ['norm','vec','ptemp','pdens','sigma']) or \
-                    data.var in ['u','v','uice','vice'] :
+                    data.var in ['u','v','uice','vice','unod','vnod'] :
             if   any(x in data.var for x in ['tuv']):
                 var_list = ['u', 'v', 'temp']
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -262,6 +267,10 @@ def do_multiyear_fname_list(data, which_files, do_output):
                 var_list = ['iceoce_x', 'iceoce_y',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
                 fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))        
+            elif any(x in data.var for x in ['uvnod','unod','vnod']):
+                var_list = ['unod', 'vnod',[]]
+                fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
+                fname_list[1].append(data.path+'/'+do_fname_mask(which_files,var_list[1],data.runid,str(ayi[yi])))
             elif any(x in data.var for x in ['uv','u','v']):
                 var_list = ['u', 'v',[]]
                 fname_list[0].append(data.path+'/'+do_fname_mask(which_files,var_list[0],data.runid,str(ayi[yi])))
@@ -672,7 +681,7 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
     ## do vector rotation from ROT --> GEO in case of vector data   
     if do_vecrot==True:
         if any(x in data.var for x in ['norm','vec']) or \
-        data.var in ['u','v','uice','vice']:
+        data.var in ['u','v','uice','vice','unod','vnod']:
             data.value, data.value2 = fesom_vector_rot(mesh, data.value, data.value2,do_output=do_output)
         
     # compute norm of vector data
@@ -680,8 +689,8 @@ def do_postprocess(mesh, data, do_rescale, do_interp_e2n, do_vecrot, do_output):
         data.value, data.value2 = np.sqrt(data.value**2+data.value2**2),[]
     
     # only single velocity component is choosen
-    if data.var in ['u','uice'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
-    if data.var in ['v','vice']: data.value, data.value2  = data.value2, []
+    if data.var in ['u','uice','unod'] or any(x in data.var for x in ['pdens','sigma']): data.value2 = []
+    if data.var in ['v','vice','vnod']: data.value, data.value2  = data.value2, []
     
     # interpolate elemental values to nodes
     if 'vec' not in data.var and do_interp_e2n==True:
@@ -866,16 +875,17 @@ def do_select_timeidx(data ,nti, nyi, nmi, do_loadloop, do_output):
         # file contains monthly data
         elif nti==12:                   
             sel_timeidx = [x-1 for x in data.month]
-            if data.month.size==12:
+            #if data.month.size==12:
+            if len(data.month)==12:
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([(x-1)/12 + year for x in box.month])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([(x-1)/12 + year for x in data.month])
                 data.time=np.array(aux_time)
             else:
-                aux_mon = np.arange(0,len(box.month),1)
+                aux_mon = np.arange(0,len(data.month),1)
                 aux_time=list()
-                for year in range(box.year[0],box.year[1]+1):
-                    aux_time.extend([x/len(box.month) + year for x in aux_mon])
+                for year in range(data.year[0],data.year[1]+1):
+                    aux_time.extend([x/len(data.month) + year for x in aux_mon])
                 data.time=np.array(aux_time)
             
         # file contains 5 daily data    

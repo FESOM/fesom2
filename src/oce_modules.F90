@@ -1,3 +1,4 @@
+
 ! Modules of cell-vertex ocean model
 ! S. Danilov, 2012 (sergey.danilov@awi.de)
 ! SI units are used
@@ -5,6 +6,7 @@
 !==========================================================
 MODULE o_PARAM
 integer, parameter            :: WP=8        ! Working precision
+integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
@@ -29,6 +31,14 @@ real(kind=WP)                 :: Leith_c=1.0_WP	!Leith viscosity weight. It need
 real(kind=WP)                 :: easy_bs_return=1.0 !backscatter option only (how much to return)
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
 integer                       :: visc_option=5
+logical                       :: uke_scaling=.true.
+real(kind=WP)                 :: uke_scaling_factor=1._WP
+real(kind=WP)		          :: rosb_dis=1._WP
+integer                       :: smooth_back=2
+integer                       :: smooth_dis=2
+integer                       :: smooth_back_tend=4
+real(kind=WP)		          :: K_back=600._WP
+real(kind=WP)                 :: c_back=0.1_8
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8
@@ -124,6 +134,17 @@ logical                       :: use_windmix   = .false.
 real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
+! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
+logical                       :: smooth_bh_tra = .false.
+real(kind=WP)                 :: gamma0_tra    = 0.0005
+real(kind=WP)                 :: gamma1_tra    = 0.0125
+real(kind=WP)                 :: gamma2_tra    = 0.
+!_______________________________________________________________________________
+! use non-constant reference density if .false. density_ref=density_0
+logical                       :: use_density_ref   = .false.
+real(kind=WP)                 :: density_ref_T     = 2.0_WP
+real(kind=WP)                 :: density_ref_S     = 34.0_WP
+
 !_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
@@ -143,6 +164,7 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! linfs, zlevel, zstar:
 ! > 'shchepetkin'  ... based on density jacobian
 ! > 'cubicspline'  ... like in FESOM1.4
+! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin' 
 
 
@@ -150,13 +172,17 @@ character(20)                  :: which_pgf='shchepetkin'
                     scale_area, mom_adv, free_slip, i_vert_visc, w_split, w_max_cfl, SPP,&
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, & 
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, & 
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta
+                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, visc_option, alpha, theta, use_density_ref, &
+                    K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
+                    smooth_back_tend, rosb_dis
 
- NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, balance_salt_water, clim_relax, &
-            ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
+ NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
+            balance_salt_water, clim_relax, ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, &
+            tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
-            use_windmix, windmix_kv, windmix_nl
+            use_windmix, windmix_kv, windmix_nl, &
+            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra
             
 END MODULE o_PARAM  
 !==========================================================
@@ -177,7 +203,7 @@ real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert
 real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
 real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
 ! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nlevels_nod2D_min, nn_num, nboundary_lay
+integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
 real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
 integer,allocatable,dimension(:,:)            :: nn_pos
 ! MUSCL type reconstruction
@@ -194,6 +220,10 @@ IMPLICIT NONE
 real(kind=WP), allocatable, target :: Wvel(:,:), Wvel_e(:,:), Wvel_i(:,:)
 real(kind=WP), allocatable         :: UV(:,:,:)
 real(kind=WP), allocatable         :: UV_rhs(:,:,:), UV_rhsAB(:,:,:)
+real(kind=WP), allocatable         :: uke(:,:), v_back(:,:), uke_back(:,:), uke_dis(:,:), uke_dif(:,:) 
+real(kind=WP), allocatable         :: uke_rhs(:,:), uke_rhs_old(:,:)
+real(kind=WP), allocatable         :: UV_dis_tend(:,:,:), UV_back_tend(:,:,:), UV_total_tend(:,:,:), UV_dis_tend_node(:,:,:)
+real(kind=WP), allocatable         :: UV_dis_posdef_b2(:,:), UV_dis_posdef(:,:), UV_back_posdef(:,:)
 real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
@@ -277,6 +307,10 @@ real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
 real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
 real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
 
+! new depth of cavity-ocean interface at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
 ! --> multiplication factor for surface boundary condition in 
 !     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
 !     (zlevel,zstar...) --> = 1.0
@@ -286,6 +320,7 @@ real(kind=WP)                               :: is_nonlinfs
 ! Arrays added for pressure gradient force calculation
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
+real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc
 real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 

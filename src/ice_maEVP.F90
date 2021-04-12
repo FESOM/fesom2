@@ -42,6 +42,11 @@ subroutine stress_tensor_m(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+
   implicit none
 
   integer         :: elem, elnodes(3)
@@ -59,7 +64,11 @@ subroutine stress_tensor_m(mesh)
   det1=alpha_evp*det2
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
-
+     !_______________________________________________________________________
+	 ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -86,7 +95,11 @@ subroutine stress_tensor_m(mesh)
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
     
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/max(delta,delta_min)
+#else
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/max(delta,delta_min)
+#endif
     
         r1=pressure*(eps1-max(delta,delta_min))
         r2=pressure*eps2*vale
@@ -99,6 +112,12 @@ subroutine stress_tensor_m(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -142,6 +161,11 @@ subroutine ssh2rhs(mesh)
     do elem=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(elem) > 1) cycle
+        
+        !_______________________________________________________________________
         vol=elem_area(elem)
         dx=gradient_sca(1:3,elem)
         dy=gradient_sca(4:6,elem)     
@@ -163,6 +187,11 @@ subroutine ssh2rhs(mesh)
   else
     do elem=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,elem)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(elem) > 1) cycle
+        
         vol=elem_area(elem)
         dx=gradient_sca(1:3,elem)
         dy=gradient_sca(4:6,elem)     
@@ -208,6 +237,11 @@ subroutine stress2rhs_m(mesh)
 
   do elem=1,myDim_elem2d         
      elnodes=elem2D_nodes(:,elem)
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+
      if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
      
      vol=elem_area(elem)
@@ -226,11 +260,15 @@ subroutine stress2rhs_m(mesh)
      end do
   end do
   
-  do row=1, myDim_nod2d               
+  do row=1, myDim_nod2d     
+     !_________________________________________________________________________
+     ! if cavity node skip it 
+     if ( ulevels_nod2d(row)>1 ) cycle
+     
      mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
      mass=mass/(1.0_WP+mass*mass)
-        u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
-        v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
+     u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row) 
+     v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row) 
   end do
 end subroutine stress2rhs_m
 !
@@ -251,6 +289,11 @@ subroutine EVPdynamics_m(mesh)
   use o_arrays
   use g_parsup
   use g_comm_auto
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+  use icedrv_main,   only: icepack_to_fesom
+#endif
 
   implicit none
   integer          :: steps, shortstep, i, ed,n
@@ -284,6 +327,16 @@ subroutine EVPdynamics_m(mesh)
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
 
+#if defined (__icepack)
+  a_ice_old(:)  = a_ice(:)
+  m_ice_old(:)  = a_ice(:)
+  m_snow_old(:) = m_snow(:)
+
+  call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                         aice_out=a_ice,                 &
+                         vice_out=m_ice,                 &
+                         vsno_out=m_snow)
+#endif
 
 !NR inlined, to have all initialization in one place.
 !  call ssh2rhs
@@ -299,6 +352,12 @@ subroutine EVPdynamics_m(mesh)
   if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
     do el=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,el)
+        
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(el) > 1) cycle
+        
         !_______________________________________________________________________
         vol=elem_area(el)
         dx=gradient_sca(1:3,el)
@@ -323,6 +382,11 @@ subroutine EVPdynamics_m(mesh)
   else
     do el=1,myDim_elem2d         
         elnodes=elem2D_nodes(:,el)
+        !_______________________________________________________________________
+        ! if element has any cavity node skip it 
+        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+        if (ulevels(el) > 1)  cycle
+        
         vol=elem_area(el)
         dx=gradient_sca(1:3,el)
         dy=gradient_sca(4:6,el)
@@ -339,7 +403,10 @@ subroutine EVPdynamics_m(mesh)
      inv_thickness(i) = 0._WP
      mass(i) = 0._WP
      ice_nod(i) = .false.
-
+     !_________________________________________________________________________
+     ! if cavity ndoe skip it 
+     if ( ulevels_nod2d(i)>1 ) cycle
+     
      if (a_ice(i) >= 0.01_WP) then
         inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
         inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
@@ -361,11 +428,16 @@ subroutine EVPdynamics_m(mesh)
 
      pressure_fac(el) = 0._WP
      ice_el(el) = .false.
+     
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(el) > 1) cycle
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum > 0.01) then
         ice_el(el) = .true.
-        asum=sum(a_ice(elnodes))*val3     
-     
+        asum=sum(a_ice(elnodes))*val3          
         pressure_fac(el) = det2*pstar*msum*exp(-c_pressure*(1.0_WP-asum))
      endif
   end do
@@ -379,6 +451,11 @@ subroutine EVPdynamics_m(mesh)
 ! Ice EVPdynamics Iteration main loop:
 !=======================================
 
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
+
   do shortstep=1, steps
 
 !NR inlining, to make it easier to have local arrays and fuse loops
@@ -389,7 +466,10 @@ subroutine EVPdynamics_m(mesh)
   !===================================================================
  
    do el=1,myDim_elem2D
-
+     !__________________________________________________________________________
+     if (ulevels(el)>1) cycle
+     
+     !__________________________________________________________________________
      if(ice_el(el)) then
      
         elnodes=elem2D_nodes(:,el)
@@ -421,6 +501,11 @@ subroutine EVPdynamics_m(mesh)
         sigma12(el) = det1*sigma12(el) +       pressure*eps12(el)*vale
         sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
         sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
+
+#if defined (__icepack)
+        rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
+        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
+#endif
 
         !  end do   ! fuse loops
         ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
@@ -456,6 +541,10 @@ subroutine EVPdynamics_m(mesh)
   end do
   
   do i=1, myDim_nod2d 
+     !__________________________________________________________________________
+     if (ulevels_nod2D(i)>1) cycle
+     
+     !__________________________________________________________________________
      if (ice_nod(i)) then                   ! Skip if ice is absent              
 
         u_rhs_ice(i) = u_rhs_ice(i)*mass(i) + rhs_a(i)
@@ -514,6 +603,11 @@ subroutine find_alpha_field_a(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+  use icedrv_main,   only: strength
+#endif
+
   implicit none
 
   integer                  :: elem, elnodes(3)
@@ -528,7 +622,11 @@ subroutine find_alpha_field_a(mesh)
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
-
+     !_______________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+        
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -555,8 +653,12 @@ subroutine find_alpha_field_a(mesh)
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
          
-     pressure=pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
-                                                                    ! with thickness (msum)
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/(delta+delta_min)/msum
+#else
+     pressure = pstar*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min) ! no multiplication
+                                                                       ! with thickness (msum)
+#endif
      !adjust c_aevp such, that alpha_evp_array and beta_evp_array become in acceptable range
      alpha_evp_array(elem)=max(50.0_WP,sqrt(ice_dt*c_aevp*pressure/rhoice/elem_area(elem)))
      ! /voltriangle(elem) for FESOM1.4
@@ -577,6 +679,11 @@ subroutine stress_tensor_a(mesh)
   use g_config
   use i_arrays
   use g_parsup
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+
   implicit none
 
   integer                   :: elem, elnodes(3)
@@ -591,11 +698,17 @@ subroutine stress_tensor_a(mesh)
   val3=1.0_WP/3.0_WP
   vale=1.0_WP/(ellipse**2)
    do elem=1,myDim_elem2D
+     !__________________________________________________________________________
+     ! if element has any cavity node skip it 
+     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
+     if (ulevels(elem) > 1) cycle
+     
+     !__________________________________________________________________________
      det2=1.0_WP/(1.0_WP+alpha_evp_array(elem))     ! Take alpha from array
      det1=alpha_evp_array(elem)*det2
   
      elnodes=elem2D_nodes(:,elem)
-
+     
      msum=sum(m_ice(elnodes))*val3
      if(msum<=0.01_WP) cycle !DS
      asum=sum(a_ice(elnodes))*val3
@@ -621,8 +734,12 @@ subroutine stress_tensor_a(mesh)
       ! ====== moduli:
      delta=eps1**2+vale*(eps2**2+4.0_WP*eps12(elem)**2)
      delta=sqrt(delta)
-    
+   
+#if defined (__icepack)
+     pressure = sum(strength(elnodes))*val3/(delta+delta_min)
+#else
      pressure=pstar*msum*exp(-c_pressure*(1.0_WP-asum))/(delta+delta_min)
+#endif
     
         r1=pressure*(eps1-delta) 
         r2=pressure*eps2*vale
@@ -635,6 +752,12 @@ subroutine stress_tensor_a(mesh)
         sigma12(elem)=det1*sigma12(elem)+det2*r3
         sigma11(elem)=0.5_WP*(si1+si2)
         sigma22(elem)=0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(elem)  = -min((eps11(elem)+eps22(elem)),0.0_WP)
+        rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
+#endif
+
   end do
  ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of 
  ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
@@ -660,7 +783,11 @@ use o_PARAM
 use i_therm_param
 use g_parsup
 use g_comm_auto
-  use ice_maEVP_interfaces
+use ice_maEVP_interfaces
+
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+#endif
 
   implicit none
   integer          :: steps, shortstep, i, ed
@@ -676,11 +803,21 @@ use g_comm_auto
   u_ice_aux=u_ice    ! Initialize solver variables
   v_ice_aux=v_ice
   call ssh2rhs(mesh)
+
+#if defined (__icepack)
+  rdg_conv_elem(:)  = 0.0_WP
+  rdg_shear_elem(:) = 0.0_WP
+#endif
  
   do shortstep=1, steps 
      call stress_tensor_a(mesh)
      call stress2rhs_m(mesh)    ! _m=_a, so no _m version is the only one!
      do i=1,myDim_nod2D 
+     
+         !_______________________________________________________________________
+         ! if element has any cavity node skip it 
+         if (ulevels_nod2d(i)>1) cycle
+        
          thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
          thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
          inv_thickness=1.0_WP/thickness
