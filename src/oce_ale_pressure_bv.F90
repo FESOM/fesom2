@@ -2761,6 +2761,7 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
   use o_arrays
   use g_parsup
   use o_param
+  use g_comm_auto
   implicit none
   !
   type(t_mesh), intent(in) , target :: mesh
@@ -2815,6 +2816,8 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
  end do
+call exchange_nod(sw_alpha)
+call exchange_nod(sw_beta)
 end subroutine sw_alpha_beta
 !
 !
