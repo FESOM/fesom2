@@ -815,6 +815,7 @@ subroutine find_levels(mesh)
 
     !___________________________________________________________________________
     ! vertical vertice level index of ocean bottom boundary
+    write(*,"(A)"                  ) '  -[compu]->: nlevels_nod2D '
     nlevels_nod2D=0
     do n=1,elem2D
         q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
@@ -1022,6 +1023,7 @@ subroutine find_levels_cavity(mesh)
         
         !_______________________________________________________________________
         ! vertical vertice level index of cavity_ocean boundary
+        write(*,"(A)"                  ) '  -[compu]->: ulevels_nod2D '
         ulevels_nod2D = nl
         do elem=1,elem2D
             nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
@@ -1153,13 +1155,13 @@ subroutine find_levels_cavity(mesh)
     if (exit_flag2 == 0) then 
         write(*,*)
         print *, achar(27)//'[31m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;31m'//' -[ERROR]->: Cavity geometry constrains did not converge !!!'//achar(27)//'[0m'
+        print *, achar(27)//'[7;31m'//' -[ERROR]->: Cavity geometry constrains did not converge !!! *\(>︿<)/*'//achar(27)//'[0m'
         write(*,*)
         call par_ex(0)
     else    
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge, Yippee-Ki-Yay, Beep!!!'
+        print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge !!! *\(^o^)/*'
 
         write(*,*)
     end if     
