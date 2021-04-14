@@ -56,11 +56,12 @@ subroutine write_step_info(istep,outfreq, mesh)
 		loc       =0.
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D
-			loc_eta   = loc_eta   + area(1, n)*eta_n(n)
-			loc_hbar  = loc_hbar  + area(1, n)*hbar(n)
-			loc_deta  = loc_deta  + area(1, n)*d_eta(n)
-			loc_dhbar = loc_dhbar + area(1, n)*(hbar(n)-hbar_old(n))
-			loc_wflux = loc_wflux + area(1, n)*water_flux(n)
+            if (ulevels_nod2D(n)>1) cycle
+			loc_eta   = loc_eta   + area(ulevels_nod2D(n), n)*eta_n(n)
+			loc_hbar  = loc_hbar  + area(ulevels_nod2D(n), n)*hbar(n)
+			loc_deta  = loc_deta  + area(ulevels_nod2D(n), n)*d_eta(n)
+			loc_dhbar = loc_dhbar + area(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
+			loc_wflux = loc_wflux + area(ulevels_nod2D(n), n)*water_flux(n)
 !!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
 !!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
 !!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
@@ -75,11 +76,19 @@ subroutine write_step_info(istep,outfreq, mesh)
 !!PS 		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
 		int_eta  = int_eta  /ocean_area
 		int_hbar = int_hbar /ocean_area
 		int_deta = int_deta /ocean_area
 		int_dhbar= int_dhbar/ocean_area
 		int_wflux= int_wflux/ocean_area
+		
+!!PS 		int_eta  = int_eta  /ocean_areawithcav
+!!PS 		int_hbar = int_hbar /ocean_areawithcav
+!!PS 		int_deta = int_deta /ocean_areawithcav
+!!PS 		int_dhbar= int_dhbar/ocean_areawithcav
+!!PS 		int_wflux= int_wflux/ocean_areawithcav
+		
 !!PS 		int_hflux= int_hflux/ocean_area
 !!PS 		int_temp = int_temp /ocean_area
 !!PS 		int_salt = int_salt /ocean_area
@@ -300,18 +309,19 @@ subroutine check_blowup(istep, mesh)
 			! check surface vertical velocity --> in case of zlevel and zstar 
 			! vertical coordinate its indicator if Volume is conserved  for 
 			! Wvel(1,n)~maschine preccision
-			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
+!!PS 			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
+			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  )) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
+				write(*,*) 'uln, nln    = ',ulevels_nod2D(n), nlevels_nod2D(n)
+				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
-				write(*,*)
-				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'hnode(1, n) = ',hnode(1,n)
 				write(*,*) 'hnode(:, n) = ',hnode(:,n)
