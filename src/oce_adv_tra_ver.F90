@@ -382,7 +382,6 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    flux             =0.0_WP
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
