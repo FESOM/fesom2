@@ -1037,6 +1037,7 @@ end subroutine
 
 
   subroutine associate_new_stream(name, entry)
+    use g_PARSUP
     type(Meandata), pointer :: entry
     character(len=*), intent(in) :: name
     integer i
@@ -1046,8 +1047,12 @@ end subroutine
     ! check if we already have this variable
     do i=1, io_NSTREAMS
       if(trim(io_stream(i)%name) .eq. name) then
-        print *,"variable '"//name//"' already exists"
-        call assert(.false., __LINE__)
+          if (mype==0) then
+          print *,"variable '"//name//"' already exists, &
+              check if you define it two times in namelist.io, &
+              namelist.icepack or in the io_meandata.F90."
+          call assert(.false., __LINE__) 
+          end if
       end if
     end do
         
