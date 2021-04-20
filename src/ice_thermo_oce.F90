@@ -3,6 +3,7 @@ subroutine cut_off(mesh)
     use o_param
     use i_arrays
     use MOD_MESH
+    use g_config, only: use_cavity
     use g_parsup
     implicit none
     type(t_mesh), intent(in)           , target :: mesh
@@ -34,18 +35,22 @@ subroutine cut_off(mesh)
 #endif /* (__oifs) */
     end where
     
-    ! upper cutoff SH: m_ice
-    where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
-    ! upper cutoff NH: m_ice
-    where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
 
-    !___________________________________________________________________________
-    ! lower cutoff: m_snow
-    where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+    if (use_cavity) then
+        ! upper cutoff SH: m_ice
+        where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
+        
+        ! upper cutoff NH: m_ice
+        where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
+        
+        ! upper cutoff: m_snow
+        where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
+        
+        !___________________________________________________________________________
+        ! lower cutoff: m_snow
+        !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+    end if 
     
-    ! upper cutoff: m_snow
-    where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
-
     !___________________________________________________________________________
 #if defined (__oifs)
     where(ice_temp>273.15_WP) ice_temp=273.15_WP
