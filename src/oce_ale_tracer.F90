@@ -524,7 +524,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             Ty =Ty *isredi
             Ty1=Ty1*isredi
             ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
-            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv*area(nz  ,n)/areasvol(nz,n)
+!!PS numerics            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv*area(nz  ,n)/areasvol(nz,n)
+            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv !!PS numerics *area(nz  ,n)/areasvol(nz,n)
             c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
