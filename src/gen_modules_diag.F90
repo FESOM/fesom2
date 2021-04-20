@@ -450,8 +450,8 @@ subroutine diag_densMOC(mode, mesh)
      
      ! density flux on elements (although not related to binning it might be usefull for diagnostic and to verify the consistency)
      do jj=1,3
-        dens_flux(elem)= dens_flux(elem) + (sw_alpha(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * heat_flux(elnodes(jj))  / vcpw + &
-                                            sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt(elnodes(jj)) + water_flux(elnodes(jj)) * & 
+        dens_flux(elem)= dens_flux(elem) + (sw_alpha(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * heat_flux_in(elnodes(jj))  / vcpw + &
+                                            sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt  (elnodes(jj)) + water_flux(elnodes(jj)) * & 
                                             tr_arr(ulevels_nod2D(elnodes(jj)),elnodes(jj),2)))
      end do 
      dens_flux(elem) = dens_flux(elem)/3.0_WP
@@ -473,8 +473,8 @@ subroutine diag_densMOC(mode, mesh)
 
      ! heat, freshwater and restoring at density classes
      is=minloc(abs(std_dens-dens(1)),1)
-     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux (elnodes   ))/3./vcpw
-     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt(elnodes   ))/3.
+     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux_in(elnodes   ))/3./vcpw
+     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt  (elnodes   ))/3.
      
      dd = 0.0_WP
      do jj=1,3

@@ -254,8 +254,7 @@ allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 
-allocate(heat_flux_old(node_size),  Tsurf_old(node_size)) !PS
-allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
+allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
 ! Arrays used to organize surface forcing
@@ -383,9 +382,8 @@ end if
 !
     T_rhs=0.0_WP
     heat_flux=0.0_WP
+    heat_flux_in=0.0_WP
     Tsurf=0.0_WP
-    heat_flux_old=0.0_WP !PS
-    Tsurf_old=0.0_WP !PS
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
@@ -393,8 +391,6 @@ end if
     virtual_salt=0.0_WP
 
     Ssurf=0.0_WP
-    water_flux_old=0.0_WP !PS
-    Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
     stress_atmoce_x=0.
