@@ -177,10 +177,7 @@ subroutine oce_fluxes(mesh)
     
     ! ==================
     ! heat and freshwater
-    ! ==================
-    heat_flux_old  = heat_flux !PS
-    water_flux_old = water_flux !PS
-    
+    ! ==================   
     !___________________________________________________________________________
     ! from here on: 
     !    (-)  (+)
@@ -214,6 +211,7 @@ subroutine oce_fluxes(mesh)
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
 #endif 
+    heat_flux_in=heat_flux ! sw_pene will change the heat_flux
    
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)

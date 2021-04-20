@@ -188,7 +188,7 @@ CASE ('MLD2      ')
 !___________________________________________________________________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
-    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('fw        ')
     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('atmice_x  ')
