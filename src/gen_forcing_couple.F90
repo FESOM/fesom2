@@ -1,3 +1,42 @@
+module force_flux_consv_interface
+  interface
+    subroutine force_flux_consv(field2d, mask, n, h, do_stats, mesh)
+      use mod_mesh
+      use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
+      real(kind=WP), intent (inout) :: field2d(myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent (in)    :: mask(myDim_nod2D+eDim_nod2D)
+      integer, intent (in)          :: n, h
+      logical, intent (in)          :: do_stats
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+module compute_residual_interface
+  interface
+    subroutine compute_residual(field2d, mask, n, mesh)
+      use mod_mesh
+      use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
+      real(kind=WP), intent (in) :: field2d(myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent (in) :: mask(myDim_nod2D+eDim_nod2D)
+      integer, intent (in)       :: n
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+module integrate_2D_interface
+  interface
+    subroutine integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, mesh)
+      use mod_mesh
+      use g_parsup !myDim_nod2D, eDim_nod2D, MPI stuff
+      real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
+      real(kind=WP), intent (out) :: eff_vol(2)
+      real(kind=WP), intent (in)  :: field2d(myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent (in)  :: mask(myDim_nod2D   +eDim_nod2D)
+      type(t_mesh), intent(in) , target :: mesh
+    end subroutine
+  end interface
+end module
+
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
 subroutine update_atm_forcing(istep, mesh)
@@ -21,6 +60,7 @@ subroutine update_atm_forcing(istep, mesh)
   use cpl_driver
 #endif
   use gen_bulk
+  use force_flux_consv_interface
 
   implicit none
   type(t_mesh), intent(in) , target :: mesh
@@ -180,11 +220,19 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
-	     runoff(:)            =  exchange(:)        ! runoff + calving
+	     runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
     	     mask=1.
 	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
              end if
-	 end if  	  
+#if defined (__oifs)
+         elseif (i.eq.13) then
+             if (action) then
+	     enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
+    	     mask=1.
+	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
+             end if
+	 end if  
+#endif	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
@@ -312,6 +360,8 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, mesh)
   use mod_mesh
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
   use o_PARAM,           only : mstep, WP
+  use compute_residual_interface
+  use integrate_2D_interface
   IMPLICIT NONE
   
   real(kind=WP), INTENT (INOUT) 	:: field2d(myDim_nod2D+eDim_nod2D)
@@ -427,6 +477,7 @@ SUBROUTINE compute_residual(field2d, mask, n, mesh)
   use g_parsup
   use o_PARAM, only : WP 
   use MOD_MESH
+  use integrate_2D_interface
  
   IMPLICIT NONE
   

@@ -162,8 +162,8 @@ type(t_mesh), intent(inout), target :: mesh
  real(kind=WP)  :: x, y, rx, ry, xp, yp, dbox, offset
  real(kind=WP)  :: t0, t1
  character*10   :: mype_string,npes_string
- character*500  :: file_name
- character*500  :: dist_mesh_dir
+ character(len=MAX_PATH)  :: file_name
+ character(len=MAX_PATH)  :: dist_mesh_dir
  integer        :: flag_wrongaux3d=0
  integer       :: ierror              ! return error code
  integer, allocatable, dimension(:)        :: mapping
@@ -705,7 +705,7 @@ subroutine find_levels(mesh)
     implicit none
     !
     type(t_mesh), intent(inout), target    :: mesh
-    character*1000                         :: file_name
+    character(len=MAX_PATH)                :: file_name
     integer                                :: ierror   ! MPI return error code
     integer                                :: k, n, fileID
     integer                                :: nchunk, chunk_size, ipos, iofs, mesh_check
@@ -907,7 +907,7 @@ subroutine find_levels_cavity(mesh)
     implicit none
     !
     type(t_mesh), intent(inout), target :: mesh
-    character*1000                      :: file_name
+    character(MAX_PATH)                 :: file_name
     integer                             :: ierror   ! MPI return error code
     integer                             :: k, n, fileID
     integer                             :: nchunk, chunk_size, ipos, iofs, mesh_check
@@ -1421,7 +1421,7 @@ USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 type(t_mesh), intent(inout), target   :: mesh
-character*1000                        :: file_name
+character(MAX_PATH)                   :: file_name
 integer                               :: counter, n, m, nn, k, q, fileID
 integer                               :: elems(2), elem
 integer                               :: elnodes(3), ed(2), eledges(3)
@@ -1659,6 +1659,7 @@ USE MOD_MESH
 USE g_PARSUP
 USE g_ROTATE_grid
 use g_comm_auto
+use elem_center_interface
 implicit none
 type(t_mesh), intent(inout), target :: mesh
 integer                     :: elem, eledges(3), elem1, j, n, node, enum,elems(3),count1,count2,exit_flag,i,nz

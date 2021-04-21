@@ -1031,8 +1031,13 @@ subroutine restart_thickness_ale(mesh)
             if (nzmin > 1) cycle
             
             !___________________________________________________________________
-            !!PS do nz=nzmax,1,-1
-            do nz=nzmax,nzmin,-1
+            ! be sure that bottom layerthickness uses partial cell layer thickness
+            ! in case its activated, especially when you make a restart from a non 
+            ! partiall cell runs towards a simulation with partial cells
+            hnode(nzmax,n) = bottom_node_thickness(n)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin,-1
                 zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
                 Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
             end do
@@ -1051,11 +1056,15 @@ subroutine restart_thickness_ale(mesh)
             if (nzmin > 1) cycle
             
             !___________________________________________________________________
-            !!PS do nz=1,nlevels(elem)-2
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
+            
+            !___________________________________________________________________
+            ! be sure elemental bottom thickness has partial cells in it, when 
+            ! its used after restart
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
             
             !___________________________________________________________________
             ! for the first time steps of a restart or initialisation dhe must 
@@ -1101,7 +1110,7 @@ subroutine init_stiff_mat_ale(mesh)
     integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
     integer, allocatable                :: mapping(:)
     character*10                        :: npes_string
-    character*1000                      :: dist_mesh_dir, file_name
+    character(MAX_PATH)                 :: dist_mesh_dir, file_name
     real(kind=WP)                       :: t0, t1
     integer                             :: ierror              ! MPI, return error code
     type(t_mesh), intent(inout)            , target :: mesh

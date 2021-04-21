@@ -23,9 +23,16 @@ use io_mesh_info
 use diagnostics
 use mo_tidal
 use fesom_version_info_module
+
+! Define icepack module
+#if defined (__icepack)
+use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
+#endif
+
 #if defined (__oasis)
 use cpl_driver
 #endif
+
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i, provided
@@ -36,8 +43,7 @@ real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
-type(t_mesh), target, save      :: mesh
-
+type(t_mesh),             target, save :: mesh
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -45,11 +51,11 @@ type(t_mesh), target, save      :: mesh
     call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
-    t1 = MPI_Wtime()
 
 #if defined (__oasis)
     call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
+    t1 = MPI_Wtime()
 
     call par_init 
     if(mype==0) then
@@ -95,6 +101,17 @@ type(t_mesh), target, save      :: mesh
 #if defined (__oasis)
     call cpl_oasis3mct_define_unstr(mesh)
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
+
+#if defined (__icepack)
+    !=====================
+    ! Setup icepack
+    !=====================
+    if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
+    call set_icepack
+    call alloc_icepack
+    call init_icepack(mesh)
+    if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
     
     call clock_newyear                        ! check if it is a new year
@@ -167,6 +184,7 @@ type(t_mesh), target, save      :: mesh
     if (use_global_tides) then
        call foreph_ini(yearnew, month)
     end if
+
     do n=1, nsteps        
         if (use_global_tides) then
            call foreph(mesh)

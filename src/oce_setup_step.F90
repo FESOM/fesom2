@@ -255,8 +255,7 @@ allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 
-allocate(heat_flux_old(node_size),  Tsurf_old(node_size)) !PS
-allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
+allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
 ! Arrays used to organize surface forcing
@@ -285,6 +284,32 @@ if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
    allocate(Kv_double(nl,node_size,num_tracers))
    Kv_double=0.0_WP
    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
+end if
+
+! =================
+! Backscatter arrays
+! =================
+
+if(visc_option==8) then
+
+allocate(uke(nl-1,elem_size)) ! Unresolved kinetic energy for backscatter coefficient
+allocate(v_back(nl-1,elem_size))  ! Backscatter viscosity
+allocate(uke_dis(nl-1,elem_size), uke_back(nl-1,elem_size)) 
+allocate(uke_dif(nl-1,elem_size))
+allocate(uke_rhs(nl-1,elem_size), uke_rhs_old(nl-1,elem_size))
+allocate(UV_dis_tend(2,nl-1,elem_size), UV_back_tend(2,nl-1,elem_size))
+allocate(UV_total_tend(2,nl-1,elem_size))
+
+uke=0.0_8
+v_back=0.0_8
+uke_dis=0.0_8
+uke_dif=0.0_8
+uke_back=0.0_8
+uke_rhs=0.0_8
+uke_rhs_old=0.0_8
+UV_dis_tend=0.0_8
+UV_back_tend=0.0_8
+UV_total_tend=0.0_8
 end if
 
 !Velocities at nodes
@@ -358,9 +383,8 @@ end if
 !
     T_rhs=0.0_WP
     heat_flux=0.0_WP
+    heat_flux_in=0.0_WP
     Tsurf=0.0_WP
-    heat_flux_old=0.0_WP !PS
-    Tsurf_old=0.0_WP !PS
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
@@ -368,8 +392,6 @@ end if
     virtual_salt=0.0_WP
 
     Ssurf=0.0_WP
-    water_flux_old=0.0_WP !PS
-    Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
     

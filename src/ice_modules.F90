@@ -41,8 +41,10 @@ MODULE i_PARAM
   logical                   :: ice_free_slip=.false.
   integer                   :: whichEVP=0 !0=standart; 1=mEVP; 2=aEVP
   real(kind=WP)             :: ice_dt !ice step=ice_ave_steps*oce_step
-NAMELIST /ice_dyn/ whichEVP, Pstar, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
+
+NAMELIST /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, Cd_oce_ice, &
 ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, alpha_evp, beta_evp, c_aevp
+
 END MODULE i_PARAM
 !
 !=============================================================================
@@ -71,12 +73,14 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: net_heat_flux
 #if defined (__oasis)
   real(kind=WP),target, allocatable, dimension(:)  :: ice_alb, ice_temp ! new fields for OIFS coupling
-  real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux  
-  real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux 
+  real(kind=WP),target, allocatable, dimension(:)  :: oce_heat_flux, ice_heat_flux
+  real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
 							!temporary flux fields
 							!(for flux correction)
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
-
+#if defined (__oifs)
+  real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
+#endif
 #endif /* (__oasis) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
