@@ -451,8 +451,8 @@ subroutine diag_densMOC(mode, mesh)
      ! density flux on elements (although not related to binning it might be usefull for diagnostic and to verify the consistency)
      do jj=1,3
         dens_flux(elem)= dens_flux(elem) + (sw_alpha(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * heat_flux(elnodes(jj))  / vcpw + &
-                                           sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt(elnodes(jj)) + water_flux(elnodes(jj)) * & 
-                                           tr_arr(ulevels_nod2D(elnodes(jj)),elnodes(jj),2)))
+                                            sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt(elnodes(jj)) + water_flux(elnodes(jj)) * & 
+                                            tr_arr(ulevels_nod2D(elnodes(jj)),elnodes(jj),2)))
      end do 
      dens_flux(elem) = dens_flux(elem)/3.0_WP
      ! density_dmoc is the sigma_2 density given at nodes. it is computed in oce_ale_pressure_bv
