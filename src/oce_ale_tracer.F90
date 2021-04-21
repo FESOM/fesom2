@@ -516,15 +516,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             !!PS c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
             
             !___________________________________________________________________
-            ! do this here for numerical reasons since area(nz  ,n)/areasvol(nz,n)
-            ! is not exactly 1.0_WP when no cavity is used leads to not binary 
-            ! identical results with github testcase
-            if (.not. use_cavity) then 
-                !!PS v_adv =zinv!!PS numeric *area(nz  ,n)/areasvol(nz,n)
-                v_adv =zinv
-            else
-                v_adv =zinv*area(nz  ,n)/areasvol(nz,n)
-            end if 
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP
+            v_adv =zinv* ( area(nz  ,n)/areasvol(nz,n) )
             b(nz) =b(nz)+Wvel_i(nz, n)*v_adv
             
             v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
@@ -551,15 +546,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             
             ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
             !___________________________________________________________________
-            ! do this here for numerical reasons since area(nz  ,n)/areasvol(nz,n)
-            ! is not exactly 1.0_WP when no cavity is used leads to not binary 
-            ! identical results with github testcase
-            if (.not. use_cavity) then 
-                a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
-            else    
-                a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv*area(nz  ,n)/areasvol(nz,n)
-            end if 
-            
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP   
+            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) ) 
             c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
@@ -568,15 +558,11 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             
             ! update from the vertical advection
             if (do_wimpl) then
-                !___________________________________________________________________
-                ! do this here for numerical reasons since area(nz  ,n)/areasvol(nz,n)
-                ! is not exactly 1.0_WP when no cavity is used leads to not binary 
-                ! identical results with github testcase
-                if (.not. use_cavity) then 
-                    v_adv=zinv
-                else
-                    v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
-                end if 
+                !_______________________________________________________________
+                ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+                ! numerical reasons, to gurante that area/areasvol in case of no 
+                ! cavity is ==1.0_WP   
+                v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
                 !!PS v_adv=v_adv*areasvol(nz+1,n)/areasvol(nz,n)
@@ -599,30 +585,20 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
         
         !___________________________________________________________________
-        ! do this here for numerical reasons since area(nz  ,n)/areasvol(nz,n)
-        ! is not exactly 1.0_WP when no cavity is used leads to not binary 
-        ! identical results with github testcase
-        if (.not. use_cavity) then 
-            a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
-        else
-            a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv*area(nz  ,n)/areasvol(nz,n)
-        end if 
+        ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+        ! numerical reasons, to gurante that area/areasvol in case of no 
+        ! cavity is ==1.0_WP
+        a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) )
         c(nz)=0.0_WP
         b(nz)=-a(nz)+hnode_new(nz,n)
         
         ! update from the vertical advection
         if (do_wimpl) then
-            !!PS v_adv=zinv
             !___________________________________________________________________
-            ! do this here for numerical reasons since area(nz  ,n)/areasvol(nz,n)
-            ! is not exactly 1.0_WP when no cavity is used leads to not binary 
-            ! identical results with github testcase
-            if (.not. use_cavity) then 
-                !!PS v_adv=zinv!!PS numeric *area(nz  ,n)/areasvol(nz,n)
-                v_adv=zinv
-            else
-                v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
-            end if 
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP
+            v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
             a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
             b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
         end if
