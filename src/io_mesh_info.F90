@@ -97,8 +97,8 @@ implicit none
   call my_def_var(ncid, 'edges',           NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges'                       )
   call my_def_var(ncid, 'edge_tri',        NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles'              )
   call my_def_var(ncid, 'edge_cross_dxdy', NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess'       )
-  call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element')
-  call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element')
+  call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_x_id,  'x component of a gradient at nodes of an element')
+  call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_y_id,  'y component of a gradient at nodes of an element')
   call my_nf_enddef(ncid)
 
   ! vercical levels/layers
@@ -155,7 +155,7 @@ implicit none
   DO i=1, N_max
      lbuffer=0
         do k=1, myDim_nod2D
-           if ((nod_in_elem2D(i, k) > 0) .and. (N_max<=nod_in_elem2D_num(k))) then
+           if ((nod_in_elem2D_num(k)>=i)) then
               lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
            end if
         end do
@@ -232,7 +232,7 @@ implicit none
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer)
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer)
+     call my_put_vara(ncid, gradient_sca_x_id, (/4-i, 1/), (/1, elem2D/), rbuffer) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -240,7 +240,7 @@ implicit none
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer)
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer)
+     call my_put_vara(ncid, gradient_sca_y_id, (/4-i, 1/), (/1, elem2D/), rbuffer) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
   
