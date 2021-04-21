@@ -155,7 +155,7 @@ implicit none
   DO i=1, N_max
      lbuffer=0
         do k=1, myDim_nod2D
-           if ((nod_in_elem2D(i, k) > 0) .and. (N_max<=nod_in_elem2D_num(k))) then
+           if ((nod_in_elem2D_num(k)>=i)) then
               lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
            end if
         end do
