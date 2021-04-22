@@ -18,7 +18,7 @@ contains
 !
 !--------------------------------------------------------------------------------------------
 !
-! 1. find_coast_Antc shall be called once to look up the nodes at coast of Antarctic
+! 1. look up the nodes at coast of Antarctic (only vertical walls will be compared with PICO)
 ! 2. allocate arrays
 ! 3. read PICO data
 subroutine init_picocpl(mesh)
@@ -27,6 +27,7 @@ subroutine init_picocpl(mesh)
   integer                                    :: i, ed, nd, el, k
 
 #include "associate_mesh.h"
+  ! this will contain nodes around Antarctic
   allocate(coast_Antc(myDim_nod2D+eDim_nod2D))
   coast_Antc=.FALSE.
 
@@ -34,17 +35,25 @@ subroutine init_picocpl(mesh)
      if (sum(geo_coord_nod2D(2, edges(:,ed)))/2.>-60.*rad) CYCLE
      if (edge_tri(2,ed)<=0) then
          el=edge_tri(1, ed)
-         coast_Antc(edges(:,ed))=.TRUE.         
+         coast_Antc(edges(:,ed))=.TRUE.
      end if
   END DO
 
+  ! do not read but create the synthetic PICO data
+  ! 360 points (longitudes)
   pico_N=360
+  ! PICO data
   allocate(pico_lon(pico_N), pico_z_up(pico_N), pico_z_lo(pico_N), pico_data_t(pico_N), pico_data_s(pico_N))
+  ! modelled data interpolated onto PICo points
   allocate(f2pico_data_t(pico_N), f2pico_data_s(pico_N), f2pico_count(pico_N))
+  ! some temporary array will be required
   allocate(work_array(pico_N))
   pico_lon= (/(i, i=0, 359)/)
+  ! outflow starts at pico_z_up
   pico_z_up=   0.
+  ! outflow ends at pico_z_lo
   pico_z_lo=-500.
+  ! create some data for T & S
   pico_data_t=-1.0
   pico_data_s=34.0
 
@@ -53,6 +62,8 @@ end subroutine init_picocpl
 !--------------------------------------------------------------------------------------------
 !
 ! FESOM 2 PICO
+! here we interpolate FESOM data onto PICO mesh
+! one can do restoring to PICO as well (if required)
 subroutine fesom2pico(mesh)
   IMPLICIT NONE
   type(t_mesh), intent(in), target :: mesh
