@@ -67,11 +67,11 @@ implicit none
   call my_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid)
 
   !Define the dimensions
-  call my_def_dim(ncid, 'nod_n',   nod2D,  nod_n_id)
+  call my_def_dim(ncid, 'nod2',    nod2D,  nod_n_id)
   call my_def_dim(ncid, 'edg_n',   edge2d, edge_n_id)
-  call my_def_dim(ncid, 'elem_n',  elem2d, elem_n_id)
-  call my_def_dim(ncid, 'nl',      nl,     nl_id)
-  call my_def_dim(ncid, 'nl1',     nl-1,   nl1_id)
+  call my_def_dim(ncid, 'elem',    elem2d, elem_n_id)
+  call my_def_dim(ncid, 'nz',      nl,     nl_id)
+  call my_def_dim(ncid, 'nz1',     nl-1,   nl1_id)
   call my_def_dim(ncid, 'n2',      2,      id_2)
   call my_def_dim(ncid, 'n3',      3,      id_3)
   call my_def_dim(ncid, 'n4',      4,      id_4)
@@ -79,8 +79,8 @@ implicit none
 
   !Define the variables
   ! 1D
-  call my_def_var(ncid, 'zbar',              NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels'                       )
-  call my_def_var(ncid, 'Z',                 NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers'                       )
+  call my_def_var(ncid, 'nz',                NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels'                       )
+  call my_def_var(ncid, 'nz1',               NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers'                       )
   call my_def_var(ncid, 'elem_area',         NF_DOUBLE, 1, (/elem_n_id/), elem_area_id,         'element areas'                         )
   call my_def_var(ncid, 'nlevels_nod2D',     NF_INT,    1, (/nod_n_id/),  nlevels_nod2D_id,     'number of levels below nodes'          )
   call my_def_var(ncid, 'nlevels',           NF_INT,    1, (/elem_n_id/), nlevels_id,           'number of levels below elements'       )
