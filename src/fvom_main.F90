@@ -23,6 +23,7 @@ use io_mesh_info
 use diagnostics
 use mo_tidal
 use fesom_version_info_module
+use command_line_options_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -44,6 +45,11 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
+
+  if(command_argument_count() > 0) then
+    call command_line_options%parse()
+    stop
+  end if
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
