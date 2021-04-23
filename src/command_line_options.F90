@@ -14,6 +14,7 @@ module command_line_options_module
 contains
 
   subroutine parse()
+    use info_module
     integer i
     character(len=:), allocatable :: arg
     integer arglength
@@ -25,6 +26,9 @@ contains
       select case (arg)
       case('--smoketest')
         print '(g0)', 'smoketest'
+      case('--info')
+        print '(g0)', '# Definitions'
+        call info%print_definitions()
       case default
         print *, 'unknown option: ', arg
         error stop
