@@ -12,7 +12,7 @@ jobs:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
-    container: koldunovn/fesom2_test:fesom2.1
+    container: koldunovn/fesom2_test:unrot
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
