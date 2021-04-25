@@ -49,5 +49,15 @@ jobs:
         cd work_souf
         fcheck .    
         
+    - name: Check partitioner compilation
+      run: |
+        cd mesh_part
+        bash -l configure.sh ubuntu
+    - name: Run partitioner
+      run: |
+        cd work_pi
+        cp ../bin/fesom_ini.x .
+        ./fesom_ini.x
+        
     
 

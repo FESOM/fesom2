@@ -83,6 +83,16 @@ module bc_surface_interface
     end function
   end interface
 end module
+module diff_part_bh_interface
+  interface
+    subroutine diff_part_bh(ttf, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh) , intent(in),    target :: mesh
+      real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    end subroutine
+  end interface
+end module
 
 !
 !
@@ -246,6 +256,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
     use diff_ver_part_expl_ale_interface
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
+    use diff_part_bh_interface
     implicit none
     
     integer, intent(in)      :: tr_num
@@ -304,6 +315,10 @@ subroutine diff_tracers_ale(tr_num, mesh)
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
+    !init_tracers will set it to zero for the next timestep
+    if (smooth_bh_tra) then
+       call diff_part_bh(tr_arr(:,:,tr_num), mesh) ! alpply biharmonic diffusion (implemented as filter)                                                
+    end if
 end subroutine diff_tracers_ale
 !
 !
@@ -916,6 +931,75 @@ end subroutine diff_part_hor_redi
 !
 !
 !===============================================================================
+SUBROUTINE diff_part_bh(ttf, mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    use O_MESH
+    use o_param
+    use g_config
+    use g_comm_auto
+
+    IMPLICIT NONE
+    type(t_mesh),  intent(in),    target :: mesh
+    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)                        :: u1, v1, len, vi, tt, ww 
+    integer                              :: nz, ed, el(2), en(2), k, elem, nl1
+    real(kind=WP), allocatable           :: temporary_ttf(:,:)
+
+#include "associate_mesh.h"
+
+    ed=myDim_nod2D+eDim_nod2D
+    allocate(temporary_ttf(nl-1, ed))
+
+    temporary_ttf=0.0_8
+    DO ed=1, myDim_edge2D+eDim_edge2D
+       if (myList_edge2D(ed)>edge2D_in) cycle
+       el=edge_tri(:,ed)
+       en=edges(:,ed)
+       len=sqrt(sum(elem_area(el)))
+       nl1=maxval(nlevels_nod2D_min(en))-1
+       DO  nz=1,nl1
+           u1=UV(1, nz,el(1))-UV(1, nz,el(2))
+           v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+           vi=u1*u1+v1*v1
+           tt=ttf(nz,en(1))-ttf(nz,en(2))
+           vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+           !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
+           !vi=sqrt(10.*le)
+           tt=tt*vi
+           temporary_ttf(nz,en(1))=temporary_ttf(nz,en(1))-tt
+           temporary_ttf(nz,en(2))=temporary_ttf(nz,en(2))+tt
+       END DO 
+    END DO
+    call exchange_nod(temporary_ttf)
+    ! ===========
+    ! Second round: 
+    ! ===========
+    DO ed=1, myDim_edge2D+eDim_edge2D
+       if (myList_edge2D(ed)>edge2D_in) cycle
+          el=edge_tri(:,ed)
+          en=edges(:,ed)
+          len=sqrt(sum(elem_area(el)))
+          nl1=maxval(nlevels_nod2D_min(en))-1
+          DO  nz=1,nl1
+              u1=UV(1, nz,el(1))-UV(1, nz,el(2))
+              v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+              vi=u1*u1+v1*v1
+              tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
+              vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+              !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
+              !vi=sqrt(10.*le) 
+              tt=-tt*vi*dt
+              ttf(nz,en(1))=ttf(nz,en(1))-tt/area(nz,en(1))
+              ttf(nz,en(2))=ttf(nz,en(2))+tt/area(nz,en(2))
+          END DO 
+    END DO  
+    deallocate(temporary_ttf)
+end subroutine diff_part_bh
+!
+!
+!===============================================================================
 ! this function returns a boundary conditions for a specified thacer ID and surface node
 ! ID = 0 and 1 are reserved for temperature and salinity
 FUNCTION bc_surface(n, id, mesh)
@@ -927,9 +1011,9 @@ FUNCTION bc_surface(n, id, mesh)
   implicit none
   
   type(t_mesh), intent(in) , target :: mesh  
-  REAL(kind=WP)     :: bc_surface
-  integer           :: n, id
-  character(len=10) :: id_string
+  REAL(kind=WP)       :: bc_surface
+  integer, intent(in) :: n, id
+  character(len=10)   :: id_string
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
   !  --> is_nonlinfs=0.0 for linfs

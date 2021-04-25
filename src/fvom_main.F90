@@ -51,11 +51,11 @@ type(t_mesh),             target, save :: mesh
     call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
-    t1 = MPI_Wtime()
 
 #if defined (__oasis)
     call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
+    t1 = MPI_Wtime()
 
     call par_init 
     if(mype==0) then

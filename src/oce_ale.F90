@@ -1026,8 +1026,13 @@ subroutine restart_thickness_ale(mesh)
             if (nzmin > 1) cycle
             
             !___________________________________________________________________
-            !!PS do nz=nzmax,1,-1
-            do nz=nzmax,nzmin,-1
+            ! be sure that bottom layerthickness uses partial cell layer thickness
+            ! in case its activated, especially when you make a restart from a non 
+            ! partiall cell runs towards a simulation with partial cells
+            hnode(nzmax,n) = bottom_node_thickness(n)
+            
+            !___________________________________________________________________
+            do nz=nzmax-1,nzmin,-1
                 zbar_3d_n(nz,n) =zbar_3d_n(nz+1,n) + hnode(nz,n)
                 Z_3d_n(nz,n)    =zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
             end do
@@ -1046,11 +1051,15 @@ subroutine restart_thickness_ale(mesh)
             if (nzmin > 1) cycle
             
             !___________________________________________________________________
-            !!PS do nz=1,nlevels(elem)-2
             elnodes=elem2D_nodes(:, elem)
             do nz=nzmin,nzmax-1
                 helem(nz,elem)=sum(hnode(nz,elnodes))/3.0_WP
             end do
+            
+            !___________________________________________________________________
+            ! be sure elemental bottom thickness has partial cells in it, when 
+            ! its used after restart
+            helem(nzmax,elem)=bottom_elem_thickness(elem)
             
             !___________________________________________________________________
             ! for the first time steps of a restart or initialisation dhe must 
@@ -1866,7 +1875,7 @@ subroutine vert_vel_ale(mesh)
                     ! layer reached already minimum layerthickness)
                     max_dhbar2distr = 0.0_WP
                     !max_dhbar2distr = (zbar(1:lzstar_lev)-zbar(2:lzstar_lev+1))*min_hnode - hnode(1:lzstar_lev,n);
-                    max_dhbar2distr = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin:nzmin+lzstar_lev-1+1))*min_hnode - hnode(nzmin:nzmin+lzstar_lev-1,n);
+                    max_dhbar2distr = (zbar(nzmin:nzmin+lzstar_lev-1)-zbar(nzmin+1:nzmin+lzstar_lev-1+1))*min_hnode - hnode(nzmin:nzmin+lzstar_lev-1,n);
                     where (max_dhbar2distr>=0.0_WP) max_dhbar2distr=0.0_WP
                     
                     !_______________________________________________________________

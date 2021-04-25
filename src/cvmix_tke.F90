@@ -1,6 +1,6 @@
 
-module cvmix_tke   
-!! This module contains the main computations of diffusivities based on 
+module cvmix_tke
+!! This module contains the main computations of diffusivities based on
 !! TKE (following Gaspar'90)  with the calculation of the mixing length following (Blanke, B., P. Delecluse)
 !!
 !! @see  Gaspar, P., Y. Grégoris, and J.-M. Lefevre
@@ -13,10 +13,6 @@ module cvmix_tke
 !! @author Hannah Kleppin, MPIMET/University of Hamburg
 !! @author Oliver Gutjahr, MPIMET
 !!
-!! @par Copyright
-!! 2002-2013 by MPI-M
-!! This software is provided for non-commercial use only.
-!! See the LICENSE and the WARRANTY conditions.
 !!
 
 use cvmix_kinds_and_types,    only : cvmix_r8,                     &
