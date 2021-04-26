@@ -1011,9 +1011,9 @@ FUNCTION bc_surface(n, id, mesh)
   implicit none
   
   type(t_mesh), intent(in) , target :: mesh  
-  REAL(kind=WP)     :: bc_surface
-  integer           :: n, id
-  character(len=10) :: id_string
+  REAL(kind=WP)       :: bc_surface
+  integer, intent(in) :: n, id
+  character(len=10)   :: id_string
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
   !  --> is_nonlinfs=0.0 for linfs
