@@ -250,7 +250,12 @@ subroutine oce_fluxes(mesh)
         end if    
         virtual_salt=virtual_salt-net/ocean_area
     end if
-    
+
+    where (ulevels_nod2d == 1)
+          dens_flux=sw_alpha(1,:) * heat_flux_in / vcpw + sw_beta(1, :) * (relax_salt + water_flux * tr_arr(1,:,2))
+    elsewhere
+          dens_flux=0.0_WP
+    end where
     !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then 
