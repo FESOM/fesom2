@@ -344,8 +344,10 @@ sigma_xy=0.0_WP
 
 ! alpha and beta in the EoS
 allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
-sw_beta=0.0_WP
-sw_alpha=0.0_WP
+allocate(dens_flux(node_size))
+sw_beta  =0.0_WP
+sw_alpha =0.0_WP
+dens_flux=0.0_WP
 
 if (Fer_GM) then
    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))

@@ -272,6 +272,7 @@ real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
 real(kind=WP), allocatable,dimension(:,:,:) :: slope_tapered
 real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
+real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
