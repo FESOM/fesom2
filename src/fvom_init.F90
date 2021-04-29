@@ -887,7 +887,7 @@ subroutine find_levels_cavity(mesh)
     real(kind=WP)  :: dmean
     character(MAX_PATH) :: file_name
     integer, allocatable, dimension(:,:) :: numelemtonode, idxelemtonode
-    integer, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
+    logical, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
     !___________________________________________________________________________
@@ -955,10 +955,10 @@ subroutine find_levels_cavity(mesh)
     ! outer iteration loop    
     count_iter2 = 0
     exit_flag2  = 0
-    elemfixlvl  = 0
+    elemfixlvl  = .false.
     do while((exit_flag2==0) .and. (count_iter2<max_iter2))
         count_iter2   = count_iter2+1
-        elemreducelvl = 0
+        elemreducelvl = .false.
         !_______________________________________________________________________
         ! Loop oper cavity occupying levels
         do nz=1,cavity_maxlev
@@ -1011,7 +1011,7 @@ subroutine find_levels_cavity(mesh)
                             ! except when this levels would remain less than 3 valid 
                             ! bottom levels --> in case make the levels of all sorounding
                             ! triangles shallower
-                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==0 .and. elemfixlvl(elem)==0) then 
+                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==.false. .and. elemfixlvl(elem)==.false.) then 
                                 ulevels(elem)=nz+1
                             else    
                                 ! --> can not increase depth anymore to eleminate isolated 
@@ -1021,7 +1021,7 @@ subroutine find_levels_cavity(mesh)
                                 !     to nz
                                 idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
                                 ulevels(elems(idx)) = nz-1
-                                elemreducelvl(elems(idx)) = elemreducelvl(elems(idx))+1
+                                elemreducelvl(elems(idx)) = .true.
                             end if    
                             
                             !force recheck for all current ocean cells
@@ -1132,7 +1132,7 @@ subroutine find_levels_cavity(mesh)
                         elem=nod_in_elem2D(j,node)
                         if (ulevels(elem)>nz) then
                             ulevels(elem) = nz
-                            elemfixlvl(elem) = elemfixlvl(elem)+1
+                            elemfixlvl(elem) = .true.
                         end if     
                     end do
                 end if
@@ -1161,7 +1161,7 @@ subroutine find_levels_cavity(mesh)
         
         !_______________________________________________________________________
     end do
-    deallocate(elemreducelvl)
+    deallocate(elemreducelvl,elemfixlvl)
     deallocate(numelemtonode,idxelemtonode)
     
     !___________________________________________________________________________
