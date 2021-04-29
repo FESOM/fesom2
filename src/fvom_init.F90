@@ -886,7 +886,7 @@ subroutine find_levels_cavity(mesh)
     integer        :: exit_flag1, count_iter, max_iter=1000, exit_flag2, count_iter2, max_iter2=10
     real(kind=WP)  :: dmean
     character(MAX_PATH) :: file_name
-    integer, allocatable, dimension(:,:) :: numelemtonode, idxelemtonode
+    integer, allocatable, dimension(:)   :: numelemtonode, idxelemtonode
     logical, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
@@ -949,7 +949,7 @@ subroutine find_levels_cavity(mesh)
     ! possible in FESOM2.0
     ! loop over all cavity levels
     allocate(elemreducelvl(elem2d),elemfixlvl(elem2d))
-    allocate(numelemtonode(nl,nod2D),idxelemtonode(nl,nod2D))
+    allocate(numelemtonode(nl),idxelemtonode(nl))
         
     !___________________________________________________________________________
     ! outer iteration loop    
@@ -1093,35 +1093,35 @@ subroutine find_levels_cavity(mesh)
         
         !_______________________________________________________________________
         ! compute how many triangle elements contribute to every vertice in every layer
-        numelemtonode=0
-        idxelemtonode=0
+        count_iter=0
         do node=1, nod2D
+            !___________________________________________________________________
+            numelemtonode=0
+            idxelemtonode=0
+            
+            !___________________________________________________________________
+            ! compute how many triangle elements contribute to vertice in every layer
             do j=1,nod_in_elem2D_num(node)
                 elem=nod_in_elem2D(j,node)
                 do nz=ulevels(elem),nlevels(elem)-1
-                    numelemtonode(nz,node) = numelemtonode(nz,node) + 1
-                    idxelemtonode(nz,node) = elem
+                    numelemtonode(nz) = numelemtonode(nz) + 1
+                    idxelemtonode(nz) = elem
                 end do
             end do
-        end do ! --> do node=1, nod2D
-        
-        !_______________________________________________________________________
-        ! check if every vertice in every layer should be connected to at least 
-        ! two triangle elements !
-        count_iter=0
-        do node=1, nod2D
             
             !___________________________________________________________________
+            ! check if every vertice in every layer should be connected to at least 
+            ! two triangle elements !
             do nz = ulevels_nod2D(node), nlevels_nod2D(node)-1
                 
                 !_______________________________________________________________
                 ! nodes has zero neighbouring triangles and is completely isolated
                 ! need to adapt ulevels by hand --> inflicts another outher 
                 ! iteration loop (exit_flag2=0)
-                if (numelemtonode(nz,node)==0) then 
+                if (numelemtonode(nz)==0) then 
                     exit_flag2 = 0
                     count_iter = count_iter+1
-                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz,node) ,' triangle: n=', node, ', nz=',nz
+                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz) ,' triangle: n=', node, ', nz=',nz
                     !___________________________________________________________
                     ! if node has no neighboring triangle somewhere in the middle 
                     ! of the water column at nz (can happen but seldom) than set 
@@ -1140,10 +1140,10 @@ subroutine find_levels_cavity(mesh)
                 !_______________________________________________________________
                 ! nodes has just one neighbouring triangle --> but needs two -->
                 ! inflicts another outher iteration loop (exit_flag2=0)
-                if (numelemtonode(nz,node)==1) then 
+                if (numelemtonode(nz)==1) then 
                     exit_flag2 = 0
                     count_iter = count_iter+1
-                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz,node) ,' triangle: n=', node, ', nz=',nz
+                    write(*,"( A, I1, A, I7, A, I3)") '  -[check]->: node has only ', numelemtonode(nz) ,' triangle: n=', node, ', nz=',nz
                 end if 
                 
             end do ! --> do nz = ulevels_nod2D(node), nlevels_nod2D(node)-1
