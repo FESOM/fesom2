@@ -1011,7 +1011,9 @@ subroutine find_levels_cavity(mesh)
                             ! except when this levels would remain less than 3 valid 
                             ! bottom levels --> in case make the levels of all sorounding
                             ! triangles shallower
-                            if ( (nlevels(elem)-(nz+1))>=3 .and.  elemreducelvl(elem)==.false. .and. elemfixlvl(elem)==.false.) then 
+                            if ( (nlevels(elem)-(nz+1))>=3 .and.  &
+                                  elemreducelvl(elem) .eqv. .false. .and. &
+                                  elemfixlvl(elem) .eqv. .false.) then 
                                 ulevels(elem)=nz+1
                             else    
                                 ! --> can not increase depth anymore to eleminate isolated 
