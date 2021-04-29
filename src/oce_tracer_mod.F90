@@ -83,7 +83,7 @@ SUBROUTINE init_tracers_AB(tr_num, mesh)
     call exchange_nod_end()       ! tr_z halos should have arrived by now.
     !$acc update device(tr_z)&
 #ifdef WITH_ACC_ASYNC
-    !$acc& async(stream_hor_diff_tra)&
+    !$acc& async(stream_ver_adv_tra)&
 #endif
     !$acc
 

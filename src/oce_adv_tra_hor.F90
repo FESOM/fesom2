@@ -77,12 +77,15 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
 
 #include "associate_mesh.h"
 
-
     nzmax = mesh%nl
 
     if (present(init_zero))then
         if (init_zero)then
-            !$acc parallel loop collapse(2) present(flux)
+            !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+            !$acc& async(stream_hor_adv_tra)&
+#endif
+            !$acc
             do n=1, myDim_nod2D
                 do nz=1,nzmax
                     flux(nz,n)=0.0_WP
@@ -90,7 +93,11 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
             end do
         end if
     else
-        !$acc parallel loop collapse(2) present(flux)
+        !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_hor_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D
             do nz=1,nzmax
                 flux(nz,n)=0.0_WP
@@ -102,7 +109,7 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
     ! They are put into flux
     !___________________________________________________________________________
     !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,VEL,helem,flux,ttf)&
-    !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12,vflux)&
+    !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -110,7 +117,6 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
     !$acc& async(stream_hor_adv_tra)&
 #endif
     !$acc
-
     do edge=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,edge)
@@ -158,7 +164,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
         ! (A) goes only into this loop when the edge has only facing element
         ! el(1) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(vflux)
         do nz=nu1, nu12-1              
            !____________________________________________________________________
            ! volume flux across the segments
@@ -177,7 +184,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
         ! el(2) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
         if (nu2 > 0) then 
-            !$acc loop vector
+            !$acc loop vector&
+            !$acc& private(vflux)
             do nz=nu2, nu12-1
                 !___________________________________________________________
                 ! volume flux across the segments
@@ -196,7 +204,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
         ! loop over depth layers from top (nu12) to nl12
         ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than nl12=0 so 
         !                     you wont enter in this loop
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(vflux)
         do nz=nu12, nl12
             !___________________________________________________________________
             ! 1st. low order upwind solution
@@ -211,7 +220,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
         
         !_______________________________________________________________________
         ! (D) remaining segments on the left or on the right
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(vflux)
         do nz=nl12+1, nl1              
            !____________________________________________________________________
            ! volume flux across the segments
@@ -226,7 +236,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
         
         !_______________________________________________________________________
         ! (E) remaining segments on the left or on the right
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(vflux)
         do nz=nl12+1, nl2
                 !_______________________________________________________________
                 ! volume flux across the segments
@@ -288,13 +299,14 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         end do
     end if
 
+    !!$acc update device(vel,nboundary_lay,helem,edge_cross_dxdy,elem_cos,edge_dxdy) async(stream_hor_adv_tra)
+
     ! The result is the low-order solution horizontal fluxes
     ! They are put into flux
     !___________________________________________________________________________
     !$acc parallel loop gang present(flux,edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,&
     !$acc& nboundary_lay,ttf,edge_dxdy,edge_up_dn_grad,vel,helem)&
-    !$acc& private(nz,enodes,el,nl1,nl2,nl12,nu1,nu2,nu12,deltaX1,deltaY1,deltaX2,deltaY2,a,c_lo,vflux,&
-    !$acc& Tmean1, Tmean2, cHO)&
+    !$acc& private(nz,enodes,el,nl1,nl2,nl12,nu1,nu2,nu12,deltaX1,deltaY1,deltaX2,deltaY2,a)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -349,7 +361,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! (A) goes only into this loop when the edge has only facing element
         ! el(1) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(c_lo,vflux,Tmean1,Tmean2,cHO)
         do nz=nu1, nu12-1
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -377,7 +390,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! el(2) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
         if (nu2 > 0) then 
-            !$acc loop vector
+            !$acc loop vector&
+            !$acc& private(c_lo,vflux,Tmean1,Tmean2,cHO)
             do nz=nu2, nu12-1
                 c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
                 c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -406,7 +420,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         ! loop over depth layers from top to n2
         ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than n2=0 so 
         !                     you wont enter in this loop
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(c_lo,vflux,Tmean1,Tmean2,cHO)
         do nz=nu12, nl12
             c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
             c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -491,7 +506,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         
         !_______________________________________________________________________
         ! (D) remaining segments on the left or on the right
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(c_lo,vflux,Tmean1,Tmean2,cHO)
         do nz=nl12+1, nl1
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -516,7 +532,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         
         !_______________________________________________________________________
         ! (E) remaining segments on the left or on the right
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(c_lo,vflux,Tmean1, Tmean2,cHO)
         do nz=nl12+1, nl2
            c_lo(1)=real(max(sign(1, nboundary_lay(enodes(1))-nz), 0),WP)
            c_lo(2)=real(max(sign(1, nboundary_lay(enodes(2))-nz), 0),WP)
@@ -592,7 +609,7 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
     ! They are put into flux
     !___________________________________________________________________________
     !$acc parallel loop gang present(edges,edge_tri,nlevels,ulevels,edge_cross_dxdy,elem_cos,VEL,helem,flux,ttf,edge_up_dn_grad)&
-    !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12,vflux)&
+    !$acc& private(enodes,el,nl1,nu1,deltaX1,deltaY1,deltaX2,deltaY2,a,nl2,nu2,nl12,nu12)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length) &
 #endif
@@ -647,6 +664,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         ! (A) goes only into this loop when the edge has only facing element
         ! el(1) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
+        !$acc loop vector&
+        !$acc& private(vflux,Tmean1,Tmean2,cHO)
         do nz=nu1, nu12-1
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
@@ -670,7 +689,9 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         ! (B) goes only into this loop when the edge has only facing elemenmt
         ! el(2) --> so the edge is a boundary edge --> this is for ocean 
         ! surface in case of cavity
-        if (nu2 > 0) then 
+        if (nu2 > 0) then
+            !$acc loop vector&
+            !$acc& private(vflux,Tmean1,Tmean2,cHO)
             do nz=nu2,nu12-1
             !___________________________________________________________________
             Tmean2=ttf(nz, enodes(2))- &
@@ -695,6 +716,9 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         ! loop over depth layers from top to n2
         ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than n2=0 so 
         !                     you wont enter in this loop
+
+        !$acc loop vector&
+        !$acc& private(vflux,Tmean1,Tmean2,cHO)
         do nz=nu12, nl12
            !___________________________________________________________________
            ! MUSCL-type reconstruction
@@ -775,6 +799,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         
         !_______________________________________________________________________
         ! (D) remaining segments on the left or on the right
+        !$acc loop vector&
+        !$acc& private(vflux,Tmean1,Tmean2,cHO)
         do nz=nl12+1, nl1
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &
@@ -796,6 +822,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         
         !_______________________________________________________________________
         ! (E) remaining segments on the left or on the right
+        !$acc loop vector&
+        !$acc& private(vflux,Tmean1,Tmean2,cHO)
         do nz=nl12+1, nl2
            !____________________________________________________________________
            Tmean2=ttf(nz, enodes(2))- &

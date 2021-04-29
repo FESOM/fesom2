@@ -123,7 +123,7 @@ subroutine solve_tracers_ale(mesh)
         Wvel_e=Wvel_e+fer_Wvel
         Wvel  =Wvel  +fer_Wvel
     end if
-    !$acc update device(UV, Wvel, Wvel_e) &
+    !$acc update device(UV,Wvel,Wvel_e)&
 #ifdef WITH_ACC_ASYNC
     !$acc &async(stream_hor_adv_tra)&
 #endif
@@ -141,6 +141,7 @@ subroutine solve_tracers_ale(mesh)
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, mesh)
+        
         !$acc update device(tr_arr_old(:,:,tr_num))
 
         ! advect tracers
@@ -247,7 +248,8 @@ subroutine adv_tracers_ale(tr_num, mesh)
             del_ttf_advvert(nz,n)  = 0.0_WP
         end do
     end do
-    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+    call do_oce_adv_tra(tr_arr(:,:,tr_num), tr_arr_old(:,:,tr_num), UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)
+
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection
@@ -283,17 +285,18 @@ subroutine diff_tracers_ale(tr_num, mesh)
     implicit none
     
     integer, intent(in)      :: tr_num
-    integer                  :: n, nz, nzmax, nzmin
+    integer                  :: n, nz, nzmax
     type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
+    nzmax = mesh%nl-1
     !___________________________________________________________________________
     ! convert tr_arr_old(:,:,tr_num)=ttr_n-0.5   --> prepare to calc ttr_n+0.5
     ! eliminate AB (adams bashfort) interpolates tracer, which is only needed for 
     ! tracer advection. For diffusion only need tracer from previouse time step
     !$acc parallel loop collapse(2) present(tr_arr,tr_arr_old)
     do n=1,myDim_nod2D+eDim_nod2D
-      do nz=1,nl-1
+      do nz=1,nzmax
         tr_arr_old(nz,n,tr_num)=tr_arr(nz,n,tr_num) !DS: check that this is the right place!
       end do
     end do
@@ -317,13 +320,14 @@ subroutine diff_tracers_ale(tr_num, mesh)
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
     ! to finite volume" 
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
+    !$acc wait
     !$acc parallel loop collapse(2) present(ulevels_nod2D,nlevels_nod2D,del_ttf,tr_arr,hnode,hnode_new)
     do n=1, myDim_nod2D 
         !!PS del_ttf(1:nzmax,n)=del_ttf(1:nzmax,n)+tr_arr(1:nzmax,n,tr_num)* &
         !!PS                             (hnode(1:nzmax,n)-hnode_new(1:nzmax,n))
         !!PS tr_arr(1:nzmax,n,tr_num)=tr_arr(1:nzmax,n,tr_num)+ &
         !!PS                             del_ttf(1:nzmax,n)/hnode_new(1:nzmax,n)
-        do nz=1,nl-1
+        do nz=1,nzmax
             if(nz >= ulevels_nod2D(n) .and. nz < nlevels_nod2D(n))then
                 del_ttf(nz,n)=del_ttf(nz,n)+tr_arr(nz,n,tr_num)*(hnode(nz,n)-hnode_new(nz,n))
                 tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num) + del_ttf(nz,n)/hnode_new(nz,n)
@@ -334,12 +338,11 @@ subroutine diff_tracers_ale(tr_num, mesh)
         !tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
-    
+
     !___________________________________________________________________________
     if (i_vert_diff) then
         ! do vertical diffusion: implicite 
         call diff_ver_part_impl_ale(tr_num, mesh)
-        
     end if
     !$acc update self(tr_arr(:,:,tr_num))
     
@@ -370,7 +373,7 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     !___________________________________________________________________________    
     !$acc parallel loop gang present(del_ttf,nlevels_nod2D,ulevels_nod2D,heat_flux,Tsurf,&
     !$acc& virtual_salt,relax_salt,real_salt_flux,z_3d_n,zbar_3d_n,tr_arr,Kv,area)&
-    !$acc& private(nl1,ul1,vd_flux,rdata,flux,rlx,zinv1,Ty)&
+    !$acc& private(nl1,ul1,vd_flux,rdata,flux,rlx,Ty)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -406,7 +409,8 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
         
         !_______________________________________________________________________
         !!PS do nz=2,nl1
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(zinv1)
         do nz=ul1+1,nl1
             !___________________________________________________________________
             zinv1=1.0_WP/(Z_3d_n(nz-1,n)-Z_3d_n(nz,n))
@@ -423,10 +427,8 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
         !!PS do nz=1,nl1-1
         !$acc loop vector
         do nz=ul1,nl1-1
-            !$acc atomic
             del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dt/area(nz,n)
         end do
-        !$acc atomic
         del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
@@ -454,7 +456,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     real(kind=WP)            :: cp(mesh%nl), tp(mesh%nl)
     integer                  :: nz, n, nzmax, nzmin, nzmaxmax, tr_num
     real(kind=WP)            :: m, zinv, dt_inv, dz
-    real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv
+    real(kind=WP)            :: rsss, Ty,Ty1, c1,zinv1,zinv2,v_adv,v_adv_p
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)            :: isredi=0._WP
     logical                  :: do_wimpl=.true.
@@ -503,8 +505,9 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     
     !___________________________________________________________________________
     ! loop over local nodes
-    !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,hnode_new,slope_tapered,Ki,Kv,tr_arr,area,Wvel_i,tracer_id,zbar_n_bot,sw_3d)&
-    !$acc& private(a,b,c,tr,tp,cp,nzmax,nzmin,z_n,zbar_n,zinv,zinv2,Ty,Ty1,v_adv)&
+    !$acc parallel loop gang present(nlevels_nod2D,ulevels_nod2D,hnode_new,slope_tapered,Ki,Kv,tr_arr,&
+    !$acc& area,Wvel_i,tracer_id,zbar_n_bot,sw_3d)&
+    !$acc& private(a,b,c,tr,tp,cp,nzmax,nzmin,z_n,zbar_n,zinv,zinv2,Ty,v_adv)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -573,12 +576,15 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
         end if        
         ! backup zinv2 for next depth level
+#ifndef _OPENACC
         zinv1=zinv2
+#endif
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         !!PS do nz=2, nzmax-2
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(zinv1,zinv2,Ty,Ty1,v_adv_p)
         do nz=nzmin+1, nzmax-2
         
             ! 1/dz(nz)
@@ -605,12 +611,12 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             
             ! update from the vertical advection
             if (do_wimpl) then
-                v_adv=zinv
-                a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
-                b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-                v_adv=v_adv*area(nz+1,n)/area(nz,n)
-                b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
-                c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+                v_adv_p=zinv
+                a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv_p
+                b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv_p
+                v_adv_p=v_adv_p*area(nz+1,n)/area(nz,n)
+                b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv_p
+                c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv_p
             end if
         end do ! --> do nz=2, nzmax-2
 #ifdef _OPENACC
@@ -667,7 +673,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         end if
         
         !!PS do nz=2,nzmax-2
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(dz)
         do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
             tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
@@ -696,7 +703,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tr_num==1) then
             !!PS do nz=1, nzmax-1
-            !$acc loop vector
+            !$acc loop vector&
+            !$acc& private(zinv)
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
@@ -716,6 +724,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !                            v   (+)                        v   (+) 
         !                            
         !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
+
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),tr_arr(ulevels_nod2D(n),n,tr_num)) 
         
         !_______________________________________________________________________
@@ -746,7 +755,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! solve for vectors c-prime and t, s-prime
         !!PS do nz = 2,nzmax-1
-        !$acc loop vector
+        !$acc loop seq
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -758,7 +767,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! solve for x from the vectors c-prime and d-prime
         !!PS do nz = nzmax-2, 1, -1
-        !$acc loop vector
+        !$acc loop seq
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
@@ -796,9 +805,9 @@ subroutine diff_ver_part_redi_expl(mesh)
     real(kind=WP)            :: vd_flux(mesh%nl)
 
 #include "associate_mesh.h"
-
+    !acc update device(tr_xy) async(stream_ver_diff_tra)
     !$acc parallel loop gang present(tr_xynodes,nlevels_nod2D,ulevels_nod2D,nod_in_elem2D,nod_in_elem2D_num,nlevels,ulevels,elem_area,tr_xy,area)&
-    !$acc& private(nl1,ul1,Tx,Ty,vd_flux,elem)&
+    !$acc& private(nl1,ul1,vd_flux)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -810,20 +819,22 @@ subroutine diff_ver_part_redi_expl(mesh)
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
         !!PS do nz=1, nl1
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(Tx,Ty,elem)
         do nz=ul1, nl1
             Tx=0.0_WP
             Ty=0.0_WP
+            !$acc loop seq
             do k=1, nod_in_elem2D_num(n)
-            elem=nod_in_elem2D(k,n)
-            !!PS if(nz.LE.(nlevels(elem)-1)) then
-            if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
-                Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
-                Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
-            endif
-        end do
-        tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
-        tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
+                elem=nod_in_elem2D(k,n)
+                !!PS if(nz.LE.(nlevels(elem)-1)) then
+                if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
+                    Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
+                    Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
+                endif
+            end do
+            tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
+            tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
         end do
     end do
     
@@ -841,8 +852,12 @@ subroutine diff_ver_part_redi_expl(mesh)
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
-        vd_flux=0._WP
-        
+
+        !$acc loop vector
+        do nz=1,nl
+          vd_flux(nz)=0._WP
+        end do
+
         !_______________________________________________________________________
         zbar_n=0.0_WP
         Z_n   =0.0_WP
@@ -850,7 +865,7 @@ subroutine diff_ver_part_redi_expl(mesh)
         zbar_n(nl1+1)=zbar_n_bot(n)
         Z_n(nl1)=zbar_n(nl1+1) + hnode_new(nl1,n)/2.0_WP
         !!PS do nz=nl1, 2, -1
-        !$acc loop vector
+        !$acc loop seq
         do nz=nl1, ul1+1, -1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
@@ -870,7 +885,6 @@ subroutine diff_ver_part_redi_expl(mesh)
         !!PS do nz=1,nl1
         !$acc loop vector
         do nz=ul1,nl1
-            !$acc atomic
             del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
         enddo
     end do
@@ -900,8 +914,7 @@ subroutine diff_part_hor_redi(mesh)
 
     if (Redi) isredi=1._WP
 !$acc parallel loop gang present(edge_cross_dxdy,edge_tri,edges,nlevels,elem2d_nodes,helem,tr_z,tr_xy,del_ttf,dt,area,ulevels,slope_tapered,ki)&
-!$acc& private(rhs1,rhs2,deltaX1,deltaY1,deltaX2, deltaY2,el,enodes,n2,nl1,ul1,nl2,ul2,nl12,ul12,nz,elnodes,n2,Kh,c,Fx,&
-!$acc& Fy,Tx,Ty,Tx_z,Ty_z,SxTz,SyTz,Tz)&
+!$acc& private(rhs1,rhs2,deltaX1,deltaY1,deltaX2, deltaY2,el,enodes,n2,nl1,ul1,nl2,ul2,nl12,ul12,nz,elnodes)&
 #ifdef WITH_ACC_VECTOR_LENGTH
 !$acc& vector_length(z_vector_length)&
 #endif
@@ -938,7 +951,8 @@ subroutine diff_part_hor_redi(mesh)
         
         !_______________________________________________________________________
         ! (A)
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(Kh,dz,c,Fx,Fy,Tx,Ty,SxTz,SyTz,Tz)
         do nz=ul1,ul12-1
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(1))
@@ -957,7 +971,8 @@ subroutine diff_part_hor_redi(mesh)
         !_______________________________________________________________________
         ! (B)
         if (ul2>0) then
-            !$acc loop vector
+            !$acc loop vector&
+            !$acc& private(Kh,dz,c,Fx,Fy,Tx,Ty,SxTz,SyTz,Tz)
             do nz=ul2,ul12-1
                 Kh=sum(Ki(nz, enodes))/2.0_WP
                 dz=helem(nz, el(2))
@@ -977,7 +992,8 @@ subroutine diff_part_hor_redi(mesh)
         !_______________________________________________________________________
         ! (C)
         !!PS do nz=1,nl12
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(Kh,dz,c,Fx,Fy,Tx,Ty,SxTz,SyTz,Tz)
         do nz=ul12,nl12
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=sum(helem(nz, el))/2.0_WP
@@ -995,7 +1011,8 @@ subroutine diff_part_hor_redi(mesh)
         
         !_______________________________________________________________________
         ! (D)
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(Kh,dz,c,Fx,Fy,Tx,Ty,SxTz,SyTz,Tz)
         do nz=nl12+1,nl1
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(1))
@@ -1013,7 +1030,8 @@ subroutine diff_part_hor_redi(mesh)
         
         !_______________________________________________________________________
         ! (E)
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(Kh,dz,c,Fx,Fy,Tx,Ty,SxTz,SyTz,Tz)
         do nz=nl12+1,nl2
             Kh=sum(Ki(nz, enodes))/2.0_WP
             dz=helem(nz, el(2))

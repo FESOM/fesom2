@@ -100,7 +100,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
     integer                            :: nz, n, nzmax, nzmin, tr_num
     real(kind=WP)                      :: m, zinv, dt_inv, dz
-    real(kind=WP)                      :: c1, v_adv
+    real(kind=WP)                      :: c1, v_adv, v_adv_p
 
 #include "associate_mesh.h"
 
@@ -110,7 +110,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     !___________________________________________________________________________
     ! loop over local nodes
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,area,hnode_new,zbar_n_bot)&
-    !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,m,zinv,dz,c1,v_adv,z_n(nzmax),zbar_n(nzmax))&
+    !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,zinv,dz,c1,v_adv,z_n(nzmax),zbar_n(nzmax))&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -167,15 +167,16 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(v_adv_p)
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
             a(nz)=min(0._WP, W(nz, n))*zinv
             b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
             
-            v_adv=zinv*area(nz+1,n)/area(nz,n)
-            b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv
-            c(nz)=     -max(0._WP, W(nz+1, n))*v_adv
+            v_adv_p=zinv*area(nz+1,n)/area(nz,n)
+            b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv_p
+            c(nz)=     -max(0._WP, W(nz+1, n))*v_adv_p
         end do ! --> do nz=2, nzmax-2
         
         !_______________________________________________________________________
@@ -193,8 +194,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         
         !$acc loop vector
         do nz=nzmin+1,nzmax-2
-            dz=hnode_new(nz,n)
-            tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
+            tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-hnode_new(nz,n))*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         end do
         nz=nzmax-1
         dz=hnode_new(nz,n)
@@ -206,7 +206,8 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         tp(nz) = tr(nz)/b(nz)
         
         ! solve for vectors c-prime and t, s-prime
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(m)
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -256,7 +257,11 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)
+        !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_ver_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -264,7 +269,11 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)
+      !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+      !$acc& async(stream_ver_adv_tra)&
+#endif
+      !$acc
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -338,25 +347,33 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
 
     nzmax=mesh%nl
     if (present(init_zero))then
-    if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)
+      if (init_zero)then
+        !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_ver_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D
-        do nz=1,nzmax
+          do nz=1,nzmax
             flux(nz,n)=0.0_WP
+          end do
         end do
-        end do
-    end if
+      end if
     else
-    !$acc parallel loop collapse(2) present(flux)
-    do n=1, myDim_nod2D
+      !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+      !$acc& async(stream_ver_adv_tra)&
+#endif
+      !$acc
+      do n=1, myDim_nod2D
         do nz=1,nzmax
-        flux(nz,n)=0.0_WP
+          flux(nz,n)=0.0_WP
         end do
-    end do
+      end do
     end if
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area,z_3d_n,zbar_3d_n)&
-    !$acc& private(nzmax,nzmin,nz,qc,qu,qd,Tmean,Tmean1,Tmean2)&
+    !$acc& private(nzmax,nzmin,nz)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -394,7 +411,8 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
        ! mesh information)
        !_______________________________________________________________________
        ! vert. flux at remaining levels  
-        !$acc loop vector
+       !$acc loop vector&
+       !$acc& private(qc,qu,qd,Tmean1,Tmean2,Tmean)
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
             qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
@@ -437,7 +455,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)
+        !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_ver_adv_tra)&
+#endif
+        !$acc
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -445,7 +467,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)
+      !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+      !$acc& async(stream_ver_adv_tra)&
+#endif
+      !$acc
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -463,8 +489,8 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,flux,area)&
-    !$acc& private(nzmin,nzmax,tvert,tv,dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1,aL,aR,aj,x)&
+    !$acc parallel loop gang present(flux,W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,area)&
+    !$acc& private(nzmin,nzmax,tvert,tv,aL,aR,aj,x)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
@@ -480,6 +506,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! nzmax ... number of depth levels at node n
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
+
+        !$acc loop vector
+        do nz=1, nzmax
+            tv(nz)=0._WP
+        end do
         
         ! tracer at surface layer
         tv(nzmin)=ttf(nzmin,n)
@@ -496,11 +527,12 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         tv(nzmax)=ttf(nzmax-1,n)
         
         !_______________________________________________________________________
-        ! calc tracer for surface+2 until depth-2 layer
+        ! calc tracer for surface+2 until depth-2 layer;q
         ! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
         ! loop over layers (segments)
         !!PS do nz=3, nzmax-3
-        !$acc loop vector
+        !$acc loop vector&
+        !$acc& private(dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1)
         do nz=nzmin+2, nzmax-2 
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
@@ -569,12 +601,14 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
                         )
                        !tv(nz+1)=max(min(ttf(nz, n), ttf(nz+1, n)), min(max(ttf(nz, n), ttf(nz+1, n)), tv(nz+1)))
         end do ! --> do nz=2,nzmax-3        
+
         !$acc loop vector
         do nz=1, nzmax
             tvert(nz)=0._WP
         end do
+        
         ! loop over layers (segments)
-        !$acc loop vector
+        !$acc loop seq
         do nz=nzmin, nzmax-1
             if ((W(nz,n)<=0._WP) .AND. (W(nz+1,n)>=0._WP)) CYCLE
             ! counter=counter+1
@@ -630,6 +664,7 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use o_PARAM
     use g_PARSUP
     use g_forcing_arrays
+    use openacc_params
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
@@ -641,12 +676,42 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     real(kind=WP)                     :: tvert(mesh%nl), tv
 #include "associate_mesh.h"
 
+    nzmax=mesh%nl
     if (present(init_zero))then
-       if (init_zero) flux=0.0_WP
+      if (init_zero)then
+        !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+        !$acc& async(stream_ver_adv_tra)&
+#endif
+        !$acc
+        do n=1, myDim_nod2D
+          do nz=1,nzmax
+            flux(nz,n)=0.0_WP
+          end do
+        end do
+      end if
     else
-       flux=0.0_WP
+      !$acc parallel loop collapse(2) present(flux)&
+#ifdef WITH_ACC_ASYNC
+      !$acc& async(stream_ver_adv_tra)&
+#endif
+      !$acc
+      do n=1, myDim_nod2D
+        do nz=1,nzmax
+          flux(nz,n)=0.0_WP
+        end do
+      end do
     end if
 
+    !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area)&
+    !$acc& private(nzmin,nzmax,tvert)&
+#ifdef WITH_ACC_VECTOR_LENGTH
+    !$acc& vector_length(z_vector_length)&
+#endif
+#ifdef WITH_ACC_ASYNC
+    !$acc& async(stream_ver_adv_tra)&
+#endif
+    !$acc
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         nzmax=nlevels_nod2D(n)-1
@@ -662,6 +727,8 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
         
         !_______________________________________________________________________
         ! Other levels
+        !$acc loop vector&
+        !$acc& private(tv)
         do nz=nzmin+1, nzmax
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
             tv=tv**do_Xmoment

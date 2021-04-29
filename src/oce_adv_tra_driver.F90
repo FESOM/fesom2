@@ -86,7 +86,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
         call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
-        
+    
         ! update the LO solution for horizontal contribution
         nzmax=mesh%nl-1
         
@@ -166,7 +166,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
 
         if (w_split) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
-            !$acc update device(wi)
 #ifdef WITH_ACC_ASYNC
             !$acc wait(stream_hor_adv_tra)
             !$acc wait(stream_ver_adv_tra)
@@ -234,30 +233,31 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !     for do_wimpl=.true.
     END SELECT
-    
+
     !___________________________________________________________________________
     !
-!if (mype==0) then
+    !if (mype==0) then
 !   write(*,*) 'check new:'
 !   write(*,*) '1:', minval(fct_LO),       maxval(fct_LO),       sum(fct_LO)
 !   write(*,*) '2:', minval(adv_flux_hor), maxval(adv_flux_hor), sum(adv_flux_hor)
 !   write(*,*) '3:', minval(adv_flux_ver), maxval(adv_flux_ver), sum(adv_flux_ver)
 !end if
     if (trim(tra_adv_lim)=='FCT') then
-!if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
+#ifdef WITH_ACC_ASYNC
         !$acc wait(1)
+#endif
         call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
-!if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
-       call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
+        call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
     else
         call oce_tra_adv_flux2dtracer(dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, mesh)
     end if
 #ifdef WITH_ACC_ASYNC
-!$acc wait(stream_ver_adv_tra)
-!$acc wait(stream_hor_adv_tra)
+    !$acc wait(stream_ver_adv_tra)
+    !$acc wait(stream_hor_adv_tra)
 #endif
 
     call nvtxEndRange
+
 end subroutine do_oce_adv_tra
 !
 !
@@ -319,7 +319,6 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
     !$acc& async(stream_ver_adv_tra)&
 #endif
     !$acc
-
     do n=1, myDim_nod2d
         nu1 = ulevels_nod2D(n)
         nl1 = nlevels_nod2D(n)
@@ -348,8 +347,7 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
 
         nl2=0
         nu2=0
-        if(el(2)>0) then!$acc end data
-
+        if(el(2)>0) then
             nl2=nlevels(el(2))-1
             nu2=ulevels(el(2))
         end if
@@ -361,9 +359,9 @@ subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo
         !!PS do  nz=1, max(nl1, nl2)
         !$acc loop vector
         do nz=nu12, nl12
-            !$acc atomic
+            !$acc atomic update
             dttf_h(nz,enodes(1))=dttf_h(nz,enodes(1))+flux_h(nz,edge)*dt/area(nz,enodes(1))
-            !$acc atomic
+            !$acc atomic update
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/area(nz,enodes(2))
         end do
     end do
