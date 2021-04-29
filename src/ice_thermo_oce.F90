@@ -36,20 +36,20 @@ subroutine cut_off(mesh)
     end where
     
 
-    if (use_cavity) then
-        ! upper cutoff SH: m_ice
-        where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
-        
-        ! upper cutoff NH: m_ice
-        where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
-        
-        ! upper cutoff: m_snow
-        where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
-        
-        !___________________________________________________________________________
-        ! lower cutoff: m_snow
-        !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
-    end if 
+!!PS     if (use_cavity) then
+!!PS         ! upper cutoff SH: m_ice
+!!PS         where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
+!!PS         
+!!PS         ! upper cutoff NH: m_ice
+!!PS         where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
+!!PS         
+!!PS         ! upper cutoff: m_snow
+!!PS         where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
+!!PS         
+!!PS         !___________________________________________________________________________
+!!PS         ! lower cutoff: m_snow
+!!PS         !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+!!PS     end if 
     
     !___________________________________________________________________________
 #if defined (__oifs)

@@ -66,8 +66,6 @@ subroutine ice_TG_rhs(mesh)
         !_______________________________________________________________________
         ! if cavity element skip it 
         if (ulevels(elem)>1) cycle
-        if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
-        
         
         !derivatives
         dx=gradient_sca(1:3,elem)
@@ -82,7 +80,6 @@ subroutine ice_TG_rhs(mesh)
         diff=ice_diff*sqrt(elem_area(elem)/scale_area)
         DO n=1,3
             row=elnodes(n)
-!!PS             if (ulevels_nod2D(row)>1) cycle
             DO q = 1,3 
                 !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
                 !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
@@ -375,7 +372,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
-        if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -483,7 +479,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
-        if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -532,7 +527,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         
         !_______________________________________________________________________
         ! if cavity cycle over
-        if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
         if(ulevels(elem)>1) cycle !LK89140
         
         !_______________________________________________________________________
@@ -559,7 +553,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             
             !___________________________________________________________________
             ! if cavity cycle over
-            if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
             do q=1,3
@@ -579,7 +572,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             
             !___________________________________________________________________
             ! if cavity cycle over
-            if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
             do q=1,3
@@ -599,7 +591,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             
             !___________________________________________________________________
             ! if cavity cycle over
-            if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
             do q=1,3
@@ -619,7 +610,6 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             elnodes=elem2D_nodes(:,elem)
             !___________________________________________________________________
             ! if cavity cycle over
-            if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
             if(ulevels(elem)>1) cycle !LK89140
             
             do q=1,3
@@ -759,7 +749,6 @@ subroutine ice_TG_rhs_div(mesh)
      !___________________________________________________________________________
      ! if cavity element skip it 
      if (ulevels(elem)>1) cycle
-     if(any(ulevels_nod2D(elnodes)>1)) cycle !LK89140
      
       !derivatives
      dx=gradient_sca(1:3,elem)
