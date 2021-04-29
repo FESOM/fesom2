@@ -916,7 +916,7 @@ subroutine find_levels_cavity(mesh)
     real(kind=WP)                       :: t0, t1
     logical                             :: file_exist=.False.
     integer                             :: elem, elnodes(3), ule,  uln(3), node, j, nz
-    integer, allocatable, dimension(:,:) :: numelemtonode
+    integer, allocatable, dimension(:) :: numelemtonode
 !NR Cannot include the pointers before the targets are allocated...
 !NR #include "associate_mesh.h"
     
@@ -1297,27 +1297,29 @@ subroutine find_levels_cavity(mesh)
     
     
     !___________________________________________________________________________
-    allocate(numelemtonode(mesh%nl,myDim_nod2d+eDim_nod2D))
-    numelemtonode=0
+    allocate(numelemtonode(mesh%nl))
     do node=1, myDim_nod2D+eDim_nod2D
+        numelemtonode=0
+        !_______________________________________________________________________
         do j=1,mesh%nod_in_elem2D_num(node)
             elem=mesh%nod_in_elem2D(j,node)
             do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
-                numelemtonode(nz,node) = numelemtonode(nz,node) + 1
+                numelemtonode(nz) = numelemtonode(nz) + 1
             end do
         end do
-    end do
-    
-    ! check how many triangle elements contribute to every vertice in every layer
-    ! every vertice in every layer should be connected to at least two triangle 
-    ! elements !
-    do node=1, myDim_nod2D+eDim_nod2D
-        do nz=1,mesh%nl
-            if (numelemtonode(nz,node)== 1) then 
+        
+        !_______________________________________________________________________
+        ! check how many triangle elements contribute to every vertice in every layer
+        ! every vertice in every layer should be connected to at least two triangle 
+        ! elements !
+        do nz=mesh%ulevels_nod2D(node),mesh%nlevels_nod2D(node)-1
+            if (numelemtonode(nz)== 1) then 
                 write(*,*) 'ERROR A: found vertice with just one triangle:', mype, node, nz
             end if 
         end do 
-    end do 
+        
+    end do
+    deallocate(numelemtonode)
     
 end subroutine find_levels_cavity
 !
