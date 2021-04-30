@@ -24,7 +24,9 @@ interface nvtxRangePush
   ! push range with custom label and standard color
   subroutine nvtxRangePushA(name) bind(C, name='nvtxRangePushA')
   use iso_c_binding
-  character(kind=C_CHAR,len=*) :: name
+  type(C_PTR) :: name
+  !!GFORTRAN: Error: Character argument name at (1) must be length 1 because procedure nvtxrangepusha is BIND(C)
+  !character(kind=C_CHAR,len=*) :: name
   end subroutine
 
   ! push range with custom label and custom color
