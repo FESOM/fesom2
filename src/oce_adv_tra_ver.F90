@@ -403,18 +403,16 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
         
-        ! tracer at surface layer
-        tv(nzmin)=ttf(nzmin,n)
-        
-        ! tracer at surface+1 layer
-        !   tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
-        tv(nzmin+1)=0.5*(ttf(nzmin,n)+ttf(nzmin+1,n))
-        
-        ! tacer at bottom-1 layer
-        !tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, W(nzmax-1,n)), 0._WP)
-        tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
-        
-        ! tracer at bottom layer
+        ! tracer at surface level
+        tv(nzmin)=ttf(nzmin,n)        
+        ! tracer at surface+1 level
+!       tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
+!       tv(3)=-ttf(2,n)*min(sign(1.0, W(3,n)), 0._WP)+ttf(3,n)*max(sign(1.0, W(3,n)), 0._WP)
+        tv(nzmin+1)=0.5*(ttf(nzmin,  n)+ttf(nzmin+1,n))
+        ! tacer at bottom-1 level
+        tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, W(nzmax-1,n)), 0._WP)
+!       tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        ! tracer at bottom level
         tv(nzmax)=ttf(nzmax-1,n)
         
         !_______________________________________________________________________
@@ -422,7 +420,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
         ! loop over layers (segments)
         !!PS do nz=3, nzmax-3
-        do nz=nzmin+2, nzmax-2 
+        do nz=nzmin+1, nzmax-3
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
             ! equation (1.9)
@@ -432,10 +430,10 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
             ! for non-uniformity spaced vertical grids --> piecewise parabolic 
             ! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
             ! --> full equation (1.6), (1.7) and (1.8)
-            dzjm1    = hnode_new(nz-2,n)
-            dzj      = hnode_new(nz-1,n)
-            dzjp1    = hnode_new(nz,n)
-            dzjp2    = hnode_new(nz+1,n)
+            dzjm1    = hnode_new(nz-1,n)
+            dzj      = hnode_new(nz  ,n)
+            dzjp1    = hnode_new(nz+1,n)
+            dzjp2    = hnode_new(nz+2,n)
             ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
             
             !___________________________________________________________________
