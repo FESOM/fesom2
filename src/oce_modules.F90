@@ -228,6 +228,7 @@ real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
+real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
@@ -326,7 +327,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
-!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n !, dum_3d_e
 !!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
 
 !_______________________________________________________________________________
