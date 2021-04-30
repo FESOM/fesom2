@@ -49,6 +49,10 @@ subroutine oce_fluxes_mom(mesh)
             stress_iceoce_x(n)=0.0_WP
             stress_iceoce_y(n)=0.0_WP
         end if
+        
+        ! total surface stress (iceoce+atmoce) on nodes 
+        stress_node_surf(1,n) = stress_iceoce_x(n)*a_ice(n) + stress_atmoce_x(n)*(1.0_WP-a_ice(n))
+        stress_node_surf(2,n) = stress_iceoce_y(n)*a_ice(n) + stress_atmoce_y(n)*(1.0_WP-a_ice(n))
     end do
     
     !___________________________________________________________________________
@@ -63,6 +67,8 @@ subroutine oce_fluxes_mom(mesh)
                                 stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
         stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                                 stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
+        !!PS stress_surf(1,elem)=sum(stress_node_surf(1,elnodes))/3.0_WP
+        !!PS stress_surf(2,elem)=sum(stress_node_surf(2,elnodes))/3.0_WP
     END DO
     
     !___________________________________________________________________________
@@ -216,6 +222,9 @@ subroutine oce_fluxes(mesh)
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
+!!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
+!!PS     where(ulevels_nod2D>1) water_flux=0.0_WP
+    
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
 
@@ -312,7 +321,9 @@ subroutine oce_fluxes(mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
-    water_flux=water_flux+net/ocean_area 
+    ! if use_cavity=.false. --> ocean_area == ocean_areawithcav
+    !! water_flux=water_flux+net/ocean_area
+    water_flux=water_flux+net/ocean_areawithcav
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)
