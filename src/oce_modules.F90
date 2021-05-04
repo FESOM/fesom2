@@ -97,6 +97,13 @@ TYPE tracer_source3d_type
 END TYPE tracer_source3d_type
 
 integer	                       :: num_tracers=2
+!!!wiso-code!!! add ice tracers
+integer                        :: num_tracers_ice=3
+integer                        :: ih2o18_ice=1
+integer                        :: ihDo16_ice=2
+integer                        :: ih2o16_ice=3
+!!!wiso-code!!! add ice tracers
+
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
 type(tracer_source3d_type), &
@@ -235,11 +242,13 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
+real(kind=WP), allocatable         :: tr_arr_ice(:,:) !!!wiso-code!!! add ice tracers
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
+real(kind=WP), allocatable    :: o16_flux(:), o18_flux(:), hdo_flux(:) !!!wiso-code!!! add isotope fluxes
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)

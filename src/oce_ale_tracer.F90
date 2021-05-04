@@ -1025,8 +1025,14 @@ FUNCTION bc_surface(n, id, mesh)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-    CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!!!wiso-code!!!
+    CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
+        bc_surface = dt*o18_flux(n)
+    CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
+        bc_surface = dt*hdo_flux(n)
+    CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
+        bc_surface = dt*o16_flux(n)
+!!!wiso-code-end!!!
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)

@@ -53,13 +53,13 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
-  type(nc_file), save       :: oid, iid
+  type(nc_file), save       :: oid, iid, wid !wiso-code! add wid
   integer,       save       :: globalstep=0
   type(nc_file), save       :: ip_id
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
-  PUBLIC :: restart, oid, iid
+  PUBLIC :: restart, oid, iid, wid !wiso-code! add wid
   PUBLIC :: ip_id, def_dim, def_variable_1d, def_variable_2d 
 !
 !--------------------------------------------------------------------------------------------
@@ -130,7 +130,7 @@ subroutine ini_ocean_io(year, mesh)
         call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
   endif
   
-  do j=1,num_tracers
+  do j=1,2 !wiso-code! num_tracers->2
      SELECT CASE (j) 
        CASE(1)
          trname='temp'
@@ -153,6 +153,80 @@ subroutine ini_ocean_io(year, mesh)
   call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
   call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
 end subroutine ini_ocean_io
+
+!!!!wiso-code!!!
+subroutine ini_wiso_io(year,mesh)
+  implicit none
+
+  integer, intent(in)       :: year
+  integer                   :: ncid, j
+  integer                   :: varid
+  character(500)            :: longname
+  character(500)            :: filename
+  character(500)            :: trname, units
+  character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+
+  write(cyear,'(i4)') year
+  ! create a wiso restart file; serial output implemented so far
+  wid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.wiso.restart.nc'
+  if (wid%is_in_use) return
+  wid%is_in_use=.true.
+  call def_dim(wid, 'node', nod2d)
+  call def_dim(wid, 'elem', elem2d)
+  call def_dim(wid, 'nz_1', nl-1)
+  call def_dim(wid, 'nz',   nl)
+  do j=3,num_tracers
+     SELECT CASE (j)
+       CASE(3)
+         trname='h2o18'
+         longname='h2o18 concentration'
+         units='kmol/m**3'
+       CASE(4)
+         trname='hDo16'
+         longname='hDo16 concentration'
+         units='kmol/m**3'
+       CASE(5)
+         trname='h2o16'
+         longname='h2o16 concentration'
+         units='kmol/m**3'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'tra_', j
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     call def_variable(wid, trim(trname),       (/nl-1, nod2D/),trim(longname),trim(units), tr_arr(:,:,j));
+     longname=trim(longname)//', Adams–Bashforth'
+     call def_variable(wid, trim(trname)//'_AB',(/nl-1, nod2D/),trim(longname),trim(units), tr_arr_old(:,:,j));
+  end do
+  do j=1,num_tracers_ice
+     SELECT CASE (j)
+       CASE(1)
+         trname='h2o18_ice'
+         longname='h2o18 concentration in sea ice'
+         units='kmol/m**3'
+       CASE(2)
+         trname='hDo16_ice'
+         longname='hDo16 concentration in sea ice'
+         units='kmol/m**3'
+       CASE(3)
+         trname='h2o16_ice'
+         longname='h2o16 concentration in sea ice'
+         units='kmol/m**3'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'tra_', j
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     call def_variable(wid, trim(trname), (/nod2D/),trim(longname),trim(units), tr_arr_ice(:,j));
+  end do
+
+end subroutine ini_wiso_io
+!!!!wiso-code!!!
+
+
 !
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
@@ -216,12 +290,18 @@ subroutine restart(istep, l_write, l_read, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                call ini_ocean_io(yearnew, mesh)
+!!wiso-code!!!
+  if (lwiso)   call ini_wiso_io(yearnew, mesh)
+!!wiso-code!!!
   if (use_ice) call ini_ice_io  (yearnew, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearnew, mesh)
 #endif
   else
                call ini_ocean_io(yearold, mesh)
+!!wiso-code!!!
+  if (lwiso)   call ini_wiso_io(yearold, mesh)
+!!wiso-code!!!
   if (use_ice) call ini_ice_io  (yearold, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearold, mesh)
@@ -239,6 +319,12 @@ subroutine restart(istep, l_write, l_read, mesh)
       call read_restart(ip_id, mesh); call was_error(ip_id)
 #endif
     end if
+!!wiso-code!!!
+   if (lwiso) then
+      call assoc_ids(wid);    call was_error(wid)
+      call read_restart(wid, mesh); call was_error(wid)
+   end if
+!!wiso-code!!!
   end if
 
   if (istep==0) return
@@ -279,6 +365,13 @@ subroutine restart(istep, l_write, l_read, mesh)
      call write_restart(ip_id, istep, mesh); call was_error(ip_id)
 #endif
   end if
+!!!wiso-code!!!!
+  if (lwiso) then
+     call assoc_ids(wid);            call was_error(wid)
+     call write_restart(wid, istep, mesh); call was_error(wid)
+  end if
+!!!wiso-code!!!!
+
   
   ! actualize clock file to latest restart point
   if (mype==0) then

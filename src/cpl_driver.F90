@@ -13,7 +13,7 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt
+  use g_config, only : dt, lwiso !wiso-code add lwiso
   use o_param,  only : rad
   use g_PARSUP
   implicit none
@@ -23,11 +23,11 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 5
-  integer, parameter         :: nrecv = 13
+  integer, parameter         :: nsend = 8 !wiso-code 5->8
+  integer, parameter         :: nrecv = 19 !wiso-code 13->19
 #else
-  integer, parameter         :: nsend = 4
-  integer, parameter         :: nrecv = 12
+  integer, parameter         :: nsend = 7 !wiso-code 4->7
+  integer, parameter         :: nrecv = 18 !wiso-code 12->18
 #endif
   
   integer, dimension(nsend)  :: send_id
@@ -384,11 +384,19 @@ contains
     cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
     cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 6)='o18_feom' !                 -> h2o18
+    cpl_send( 7)='hdo_feom' !                 -> hdo16
+    cpl_send( 8)='o16_feom' !                 -> h2o16
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 5)='o18_feom' !                 -> h2o18
+    cpl_send( 6)='hdo_feom' !                 -> hdo16
+    cpl_send( 7)='o16_feom' !                 -> h2o16
 #endif
 
 
@@ -411,6 +419,13 @@ contains
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
     cpl_recv(13) = 'enth_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(14) = 'w1_oce'
+    cpl_recv(15) = 'w2_oce'
+    cpl_recv(16) = 'w3_oce'
+    cpl_recv(17) = 'i1_oce'
+    cpl_recv(18) = 'i2_oce'
+    cpl_recv(19) = 'i3_oce'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -424,6 +439,13 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(13) = 'w1_oce'
+    cpl_recv(14) = 'w2_oce'
+    cpl_recv(15) = 'w3_oce'
+    cpl_recv(16) = 'i1_oce'
+    cpl_recv(17) = 'i2_oce'
+    cpl_recv(18) = 'i3_oce'
 #endif
 
     if (mype .eq. 0) then 

@@ -229,6 +229,7 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
+allocate(tr_arr_ice(node_size,num_tracers_ice)) !!!wiso-code!!! add ice tracers
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
@@ -253,7 +254,8 @@ allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
-
+!!!wiso-code!!! allocate isotope fluxes
+allocate(o16_flux(node_size), o18_flux(node_size), hdo_flux(node_size))
 allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
@@ -390,6 +392,12 @@ end if
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 
+!!!wiso-code!!!
+    o16_flux=0.0_WP
+    o18_flux=0.0_WP
+    hdo_flux=0.0_WP
+!!!wiso-code!!!
+
     Ssurf=0.0_WP
     
     real_salt_flux=0.0_WP
@@ -497,13 +505,30 @@ USE g_ic3d
   DO i=3, num_tracers
      id=tracer_ID(i)
      SELECT CASE (id)
-       CASE (101)       ! initialize tracer ID=101
-         tr_arr(:,:,i)=0.0_WP
+  !wiso-code for tracers 101, 102, 103
+       CASE (101)       ! initialize tracer ID=101 h2o18 ysun
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
          end if
+       CASE (102)       ! initialize tracer ID=102 hDo16 ysun
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
+         end if
+       CASE (103)       ! initialize tracer ID=103 h2o16 ysun
+         if (mype==0) then
+            write (i_string,  "(I3)") i
+            write (id_string, "(I3)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            write (*,*) tr_arr(1,1,i)
+         end if
+  !wiso-code for tracers 101, 102, 103
+
        CASE (301) !Fram Strait 3d restored passive tracer
          tr_arr(:,:,i)=0.0_WP
          rcounter3    =rcounter3+1
