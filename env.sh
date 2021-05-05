@@ -37,16 +37,8 @@ elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"
 elif [[  $LOGINHOST =~ \.jureca$ ]]; then
    STRATEGY="jureca"
-elif [[  $LOGINHOST = ubuntu ]]; then
-   STRATEGY="ubuntu"
-elif [[  $LOGINHOST = bsc ]]; then
-   STRATEGY="bsc"
-elif [[  $LOGINHOST =~ ^juwels[0-9][0-9].ib.juwels.fzj.de$ ]]; then
+elif [[  $LOGINHOST =~ ^juwels[0-9]+\.fz\-juelich\.de$ ]]; then
    STRATEGY="juwels"
-elif [[  $LOGINHOST =~ ^jwlogin[0-9][0-9].juwels$ ]]; then
-   STRATEGY="juwels"
-elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
-   STRATEGY="ecaccess.ecmwf.int"
 else
    echo "can not determine environment for host: "$LOGINHOST
    [ $BEING_EXECUTED = true ] && exit 1

@@ -6,12 +6,12 @@ module g_config
   ! *** Modelname ***
   character(5)             	:: runid='fesom'                ! a model/setup name
   integer                  	:: year_start=1948, year_end=1953, snap_per_year=12
-  CHARACTER(MAX_PATH) :: datapath ='/home/h/hbkdsido/fvom/results/core2_sw_chl0.1/'
-  CHARACTER(MAX_PATH) :: outpath  ='/home/h/hbkdsido/fvom/results/'
+  CHARACTER*100	:: datapath ='/home/h/hbkdsido/fvom/results/core2_sw_chl0.1/'
+  CHARACTER*100	:: outpath  ='/home/h/hbkdsido/fvom/results/'
 namelist /config/ runid, datapath, outpath, year_start, year_end, snap_per_year
 
   logical                                       :: use_mask=.false.
-  character(MAX_PATH)                                :: mask_file='/uv/user/dsidoren/mask_NA.dat'
+  character(500)                                :: mask_file='/uv/user/dsidoren/mask_NA.dat'
   real(kind=8), dimension(:),   allocatable     :: mask_n2
 namelist /mask/ use_mask, mask_file
 
@@ -31,6 +31,6 @@ namelist /todo/ do_UVcurl, do_UVnorm, do_MOC, do_TS3
   real(kind=8)             	:: alphaEuler=50. 		![grad] Euler angles, convention:
   real(kind=8)             	:: betaEuler=15.  		![grad] first around z, then around new x,
   real(kind=8)			:: gammaEuler=-90.		![grad] then around new z.
-  CHARACTER(MAX_PATH)        :: meshpath ='/gfs2/work/hbkdsido/input/mesh/mesh_CORE2_final/'
+  CHARACTER*100	                :: meshpath ='/gfs2/work/hbkdsido/input/mesh/mesh_CORE2_final/'
 namelist /fesom_mesh/ meshpath, rotated_grid, rotated_rslt, alphaEuler, betaEuler, gammaEuler
 end module g_config

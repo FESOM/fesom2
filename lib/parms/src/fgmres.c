@@ -144,23 +144,19 @@ int parms_fgmres(parms_Solver self, FLOAT *y, FLOAT *x)
         {
             for(j=0; j<i1; j++)
             {
-	      hh[ptih+j]  = 0.;
-	      for (i=0;i<nloc;i++) hh[ptih+j] += vv[i+j*nloc] * vv[pti1+i];
-
+                 hh[ptih+j] = GDOTC(nloc, &vv[j*nloc], one, &vv[pti1], one);
                  alpha = -hh[ptih+j];
-		 for (i=0; i<nloc; i++) vv[pti1+i] += alpha * vv[j*nloc+i];
+      	         GAXPY(nloc, alpha, &vv[j*nloc], one, &vv[pti1], one);
       	    }
       	 }
       	 else /*-------------- parallel case -------*/
       	 {
             for(j=0; j<i1; j++)
-	      {
-		t1 = 0.;
-                for (i=0;i<nloc;i++) t1 += vv[i+j*nloc] * vv[pti1+i];
+            {
+                t1 = GDOTC(nloc, &vv[j*nloc], one, &vv[pti1], one);
                 MPI_Allreduce(&t1, &hh[ptih+j], one, MPI_CMPLX, MPI_CMPLX_SUM, comm);
                 alpha = -hh[ptih+j];
-		for (i=0; i<nloc; i++) vv[pti1+i] += alpha * vv[j*nloc+i];
-
+      	        GAXPY(nloc, alpha, &vv[j*nloc], one, &vv[pti1], one);
       	    }
       	}       	           	 
 #else
@@ -169,23 +165,19 @@ int parms_fgmres(parms_Solver self, FLOAT *y, FLOAT *x)
         {
             for(j=0; j<i1; j++)
             {
-              hh[ptih+j]  = 0.;
-              for (i=0;i<nloc;i++) hh[ptih+j] += vv[i+j*nloc] * vv[pti1+i];
+                 hh[ptih+j] = GDOT(nloc, &vv[j*nloc], one, &vv[pti1], one);
                  alpha = -hh[ptih+j];
-                 for (i=0; i<nloc; i++) vv[pti1+i] += alpha * vv[j*nloc+i];
+      	         GAXPY(nloc, alpha, &vv[j*nloc], one, &vv[pti1], one);
       	    }
       	 }
       	 else /*-------------- parallel case -------*/
       	 {
             for(j=0; j<i1; j++)
             {
-              t1 = 0.;
-	      for (i=0;i<nloc;i++) t1 += vv[i+j*nloc] * vv[pti1+i];
-
+                t1 = GDOT(nloc, &vv[j*nloc], one, &vv[pti1], one);
                 MPI_Allreduce(&t1, &hh[ptih+j], one, MPI_DOUBLE, MPI_SUM, comm);
                 alpha = -hh[ptih+j];
-		for (i=0; i<nloc; i++) vv[pti1+i] += alpha * vv[j*nloc+i];
-
+      	        GAXPY(nloc, alpha, &vv[j*nloc], one, &vv[pti1], one);
       	    }
       	}  
 #endif  

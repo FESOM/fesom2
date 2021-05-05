@@ -285,8 +285,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
 
   parms_OperatorLsol(op, y, x);
 
-  /* GCOPY(nrow, &x[schur_start], incx, wk, incx); */
-  for (i = 0; i<nrow; i++) wk[i] = x[schur_start+i];
+  GCOPY(nrow, &x[schur_start], incx, wk, incx);
   parms_OperatorInvS(op, &x[schur_start], vv[0]);
 
   for (i = 0; i < nrow; i++) {
@@ -299,13 +298,11 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
   its = 0;
 
   while(if_out_continue) {
-#if defined(DBL_CMPLX)
-    t1 = 0.;
-    for (i=0; i<nrow; i++) t1 += vv[0][i]*vv[0][i];
+#if defined(DBL_CMPLX)  
+    t1 = GDOTC(nrow, vv[0], incx, vv[0], incx);
     t = creal(t1);
 #else
-    t = 0.;
-    for (i=0; i<nrow; i++) t += vv[0][i] * vv[0][i];
+    t = GDOT(nrow, vv[0], incx, vv[0], incx);
 #endif
     MPI_Allreduce(&t, &ro, 1, MPI_DOUBLE, MPI_SUM, comm);
     ro = sqrt(ro);
@@ -316,8 +313,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
 
     t1 = 1.0/ro;
 
-    /* GSCAL(nrow, t1, vv[0], incx); */
-    for (i=0; i<nrow;  i++) vv[0][i] *= t1;
+    GSCAL(nrow, t1, vv[0], incx);
 
     if(its == 0) eps1 = eps*ro;
     /* initialize 1-st term of rhs of hessenberg system. */
@@ -349,30 +345,25 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
       /* modified gram - schmidt .. */
 #if defined(DBL_CMPLX)      
       for(j = 0; j <= i; j++) {
-	hcol[j] = 0.;
-	for (i=0; i<nrow; i++) hcol[j] += vv[j][i]*vv[i1][i];
+	hcol[j] = GDOTC(nrow, vv[j], incx, vv[i1], incx);
       }
       MPI_Allreduce(hcol, hh[i], i+1, MPI_CMPLX, MPI_CMPLX_SUM, comm);      
 #else
       for(j = 0; j <= i; j++) {
-	hcol[j] = 0.;
-        for (i=0; i<nrow; i++) hcol[j] += vv[j][i]*vv[i1][i];
+	hcol[j] = GDOT(nrow, vv[j], incx, vv[i1], incx);
       }
       MPI_Allreduce(hcol, hh[i], i+1, MPI_DOUBLE, MPI_SUM, comm);      
 #endif
 
       for(j = 0; j <= i; j++) {
 	alpha = -hh[i][j];
-	for (i=0; i<nrow; i++) vv[i1][i] += alpha * vv[j][i];
+	GAXPY(nrow, alpha, vv[j], incx, vv[i1], incx);
       }
 #if defined(DBL_CMPLX)
-      t1 = 0.;
-      for (i=0; i<nrow; i++) t1 += vv[i1][i] * vv[i1][i];
+      t1 = GDOTC(nrow, vv[i1], incx, vv[i1], incx);
       tloc = creal(t1);
 #else
-      tloc = 0.;
-      for (i=0; i<nrow; i++) tloc += vv[i1][i] * vv[i1][i];
-
+      tloc = GDOT(nrow, vv[i1], incx, vv[i1], incx);
 #endif
       MPI_Allreduce(&tloc, &t, 1, MPI_DOUBLE, MPI_SUM, comm);
       t = sqrt(t);
@@ -383,8 +374,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
 #endif
       if(fabs(t - ZERO) > EPSILON) {
 	t1 = 1.0/t;
-	/* GSCAL(nrow, t1, vv[i1], incx); */
-	for (i = 0; i < nrow; i++) vv[i1][i] *= t1;
+	GSCAL(nrow, t1, vv[i1], incx);
       }
       /* 
 	 done with modified gram Schmidt and Arnoldi step..
@@ -449,7 +439,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
 
     /* form linear combination of v(*,i)'s to update solution */
     for(j = 0; j < i+1; j++) {
-      for (i=0; i<nrow; i++) x[schur_start+i] += rs[j]*vv[j][i];
+      GAXPY(nrow, rs[j], vv[j], incx, &x[schur_start], incx);
     }
     /* restart outer loop when necessary */
     if(ro <= eps1) {
@@ -478,8 +468,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
       for(j = 0; j <= i1; j++) {
 	t1 = rs[j];
 	if(j == 0) t1 = t1-1.0;
-	/* GAXPY(nrow, t1, vv[j], incx, vv[0], incx); */
-	for (i = 0; i < nrow; i++) vv[0][i] += t1 * vv[j][i];
+	GAXPY(nrow, t1, vv[j], incx, vv[0], incx);
       }
     }
   }
@@ -490,8 +479,7 @@ static int pc_schur_apply(parms_PC self, FLOAT *y, FLOAT *x)
   */
   parms_MatVecOffDiag(A, &x[schur_start], z2, schur_start); 
 
-  /*  GCOPY(nrow, wk, incx, &x[schur_start], incx); */
-  for (i = 0; i < nrow; i++) x[schur_start+i] = wk[i];
+  GCOPY(nrow, wk, incx, &x[schur_start], incx); 
   for (i = 0; i < is->ninf; i++) {
     x[i+is->nint] -= z2[i+is->nint-schur_start]; 
   }

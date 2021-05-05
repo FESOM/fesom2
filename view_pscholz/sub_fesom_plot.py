@@ -1,6 +1,5 @@
 # Patrick Scholz, 23.01.2018
 import os
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -15,19 +14,11 @@ from matplotlib.patches import Polygon
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False,do_cavity=True, 
-                      which_orient='vertical', nmax_cbar_l=8 ):
+def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=False ):
     if do_output==True:
         print('')
         print('___PLOT 2D DATA____________________________________________')
     from set_inputarray import inputarray
-    if (data.value.min() == data.value.max() ):
-        print(' --> can\'t plot data are everywhere ', data.value.min())
-        sys.exit(' --> STOP HERE!')
-    elif (len(np.unique(data.value[~np.isnan(data.value)]))==1 ) :   
-        print(' --> can\'t plot data are everywhere ', np.unique(data.value[~np.isnan(data.value)]) )
-        sys.exit(' --> STOP HERE!')
-        
     
     if len(figsize)==0 : figsize=[13,13]
     #___________________________________________________________________________
@@ -38,7 +29,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     else:
         fig=do_subplot[0]
         ax =do_subplot[1]
-        fig.sca(ax)
     resolution = 'c'
     fsize = 14
     
@@ -70,7 +60,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         xlabels=[1,1,1,1]
         xticks = np.arange(0.,360.,20.)
         yticks = np.arange(-90.,90.+1,10.)
-    else:   
+    else:    
         map = Basemap(projection = data.proj,resolution = resolution,
                 llcrnrlon  = inputarray['which_box'][0], urcrnrlon  = inputarray['which_box'][1],
                 llcrnrlat  = inputarray['which_box'][2], urcrnrlat  = inputarray['which_box'][3],
@@ -78,14 +68,16 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         ylabels=[1,0,0,0]
         xlabels=[0,0,0,1]
         ticknr   = 8
-        tickstep = np.array([0.5,1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
+        tickstep = np.array([1.0,2.0,2.5,5.0,10.0,15.0,20.0,30.0])
         idx      = (inputarray['which_box'][1]-inputarray['which_box'][0])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
+        
         if idx1.size==0 : 
             xticks   = np.arange(-180.+tickstep[-1],180.-tickstep[-1]+1,tickstep[-1])
         else:
             xticks   = np.arange(-180.+tickstep[idx1[0,0]],180.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
         del idx, idx1
+        
         idx      = (inputarray['which_box'][3]-inputarray['which_box'][2])/ticknr
         idx1      = np.array(np.where(tickstep>=idx))
         if idx1.size==0 : 
@@ -93,6 +85,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         else:    
             yticks   = np.arange(-90.+tickstep[idx1[0,0]],90.-tickstep[idx1[0,0]]+1,tickstep[idx1[0,0]])
         del idx, idx1    
+            
     #___________________________________________________________________________
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
@@ -111,10 +104,10 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     
     # case of node data
     if data.value.size ==mesh.n2dna:
-        idx_box = np.ones((mesh.n2dna,),dtype='bool') 
+        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
     elif data.value.size ==mesh.n2dea:
         idx_box = np.ones((mesh.n2dea,),dtype='bool')
-    
+        
     if data.value.size ==mesh.n2dna:
         idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
         idxbox_n  = np.array(idxbox_n).squeeze()
@@ -131,7 +124,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #___________________________________________________________________________
     # make triangle mask arrays from flat triangles and nan trinagles
     mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
-    
     if np.any(np.isnan(data.value)):
         if data.value.size ==mesh.n2dna:
             mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
@@ -157,8 +149,8 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
         cmax,cmin,cref = 100.0, 0.0, 50.0
         data.cmap='wbgyr'
     elif data.sname=='m_ice':
-            cmax = np.nanmax(data.value[idx_box])
-            cmin = np.nanmin(data.value[idx_box])
+            cmax = np.max(data.value[idx_box])
+            cmin = np.min(data.value[idx_box])
             cref = cmin + (cmax-cmin)/2
             cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1) ) 
             data.cmap='wbgyr'    
@@ -224,33 +216,29 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     #___________________________________________________________________________
     # make custom colormap
     if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
-    print(cmin,cmax,cref,cnumb,data.cmap)
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
     if do_output==True:print('clevel = ',clevel)
     do_drawedges=True
     if clevel.size>50: do_drawedges=False
     
-    #if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
-    if 'MLD' in data.var:
+    if data.sname=='a_ice' or data.sname=='m_ice' or data.sname.find('MLD')==0:
         if data.anom==False:
             # make no sea ice transparent
             from matplotlib.colors import ListedColormap
             auxcmap = cmap0(np.arange(cmap0.N))
-            #if data.sname=='a_ice' or data.sname=='m_ice' :
-                ##auxcmap[0,-1]=0.0
-            #elif data.sname.find('MLD')==0 :
-            if data.sname.find('MLD')==0 :    
+            if data.sname=='a_ice' or data.sname=='m_ice' :
+                auxcmap[0,-1]=0.0
+            elif data.sname.find('MLD')==0 :
                 #auxcmap[-1,-1]=0.0
                 auxcmap[0,-1]=0.0
             cmap0 = ListedColormap(auxcmap)
-    
+
     #___________________________________________________________________________
     # limit minimum and maximum of data vector to setted colorrange avoid holes 
     # in the plot
     data_plot = np.copy(data.value)
     data_plot[data_plot<clevel[0]]  = clevel[0]+np.finfo(np.float32).eps
     data_plot[data_plot>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
-    
     data.levels = clevel
     #+_________________________________________________________________________+
     #| plot data on triangluar grid                                            |
@@ -262,19 +250,19 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 antialiased=False,
                 edgecolors='None',
                 cmap=cmap0,
-                shading='gouraud',
+                shading='flat',
                 clim=[clevel[0],clevel[-1]],
                 vmin=clevel[0],vmax=clevel[-1])
                 #shading='flat')
                 #shading='gouraud')
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.25)        
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)        
         elif data.which_plot=='contourf':
             hp1=ax.tricontourf(tri,data_plot,
                 levels=clevel, 
                 antialiased=False,
                 extend='both',
                 cmap=cmap0)
-            if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.25)
+            if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.25)
     # plot data defined on elements
     elif data.value.size==mesh.n2dea:
         hp1=ax.tripcolor(tri,data_plot,                          
@@ -282,14 +270,25 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                     cmap=cmap0,
                     clim=[clevel[0],clevel[-1]],
                     vmin=clevel[0],vmax=clevel[-1])
-        
-        if do_grid==True: ax.triplot(tri,color='k',linewidth=.5,alpha=0.15)
+    
+        if do_grid==True: ax.triplot(tri,color='k',linewidth=.15,alpha=0.15)
+    
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
+    map.drawparallels(yticks,#np.arange(-90.,90.,30.),
+            labels=ylabels,
+            linewidth=0.25,
+            dashes=[1,1e-10],
+            fontsize=fsize)
+    map.drawmeridians(xticks,#np.arange(0.,360.,30.),
+            linewidth=0.25,
+            labels=xlabels,
+            dashes=[1,1e-10],
+            fontsize=fsize)
     map.drawmapboundary(fill_color='0.9',linewidth=1.0)
     
     # label lon lat grid for ortho projection 
-    if data.proj in ['ortho','stere']:
+    if (data.proj=='ortho'   or data.proj=='stere'):
         map.drawparallels([0.0],
                 linewidth=1.0,
                 dashes=[1,1e-10],
@@ -298,7 +297,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
                 linewidth=1.0,
                 dashes=[1,1e-10],
                 fontsize=fsize)
-        
         for i in np.arange(len(xticks)):
             xt,yt=xy=map(xticks[i],0)
             if xticks[i]>0 :
@@ -315,27 +313,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
             elif yticks[i]<0: 
                 plt.text(xt,yt,' {:.1f}$^{{\\circ}}$S'.format(yticks[i]),fontsize=12,fontweight='bold',verticalalignment='center',horizontalalignment='left')
                 plt.plot(xt,yt,'o',linestyle='None',color='k')    
-    # label lon lat grid for cycl projection             
-    else:
-        map.drawparallels(yticks,#np.arange(-90.,90.,30.),
-            labels=ylabels,
-            linewidth=0.25,
-            dashes=[1,1e-10],
-            fontsize=fsize)
-        meridians = map.drawmeridians(xticks,#np.arange(0.,360.,30.),
-            linewidth=0.25,
-            labels=xlabels,
-            dashes=[1,1e-10],
-            fontsize=fsize)
-            
-        # try to rotate meridian labels
-        if data.proj=='cyl':
-            for m in meridians:
-                try:
-                    meridians[m][1][0].set_rotation(25)
-                except:
-                    pass
-        
     #___________________________________________________________________________
     # draw land mask patch
     if inputarray['which_mask'] == 'fesom':
@@ -346,19 +323,6 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     elif inputarray['which_mask'] == 'etopo':
         map.etopo()
         fesom_plot_lmask(map,mesh,ax,'none')
-    
-    #___________________________________________________________________________
-    if (data.use_cavity and do_cavity):
-        cav_aux = np.abs(mesh.nodes_2d_cg)
-        cav_levels=np.concatenate((np.array([1.0]),np.arange(50.0,1100.0,150.0)))
-        cav_lwidth=np.linspace(0.5,0.1,cav_levels.size)
-        cav_mx,cav_my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
-        cav_cmap = cm.get_cmap(name='YlGnBu_r')
-        ax.tricontour(cav_mx,cav_my,mesh.elem_2d_i,cav_aux,
-                levels=cav_levels,
-                linewidths=cav_lwidth,
-                antialiased=True,
-                cmap=cav_cmap)
     
     #___________________________________________________________________________
     # arange colorbar position and labels
@@ -376,9 +340,7 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     for im in ax.get_images():
         im.set_clim(clevel[0],clevel[-1])
     
-    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges, \
-                        extend='neither',extendrect=False,extendfrac=None,\
-                        orientation=which_orient)
+    cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=do_drawedges,extend='neither',extendrect=True,extendfrac='auto')
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
     plt.setp(cl, fontsize=fsize)
@@ -388,41 +350,20 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
     idx_cref = np.where(clevel==cref)[0]
     idx_cref = np.asscalar(idx_cref)
     
-    #nmax_cbar_l = 12
+    nmax_cbar_l = 10
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
-    
-    fig.canvas.draw() # this is need so cbar.ax.get_yticklabels() always finds the labels
-    if cbar.orientation=='vertical':
-        tickl = cbar.ax.get_yticklabels()
-    else:
-        tickl = cbar.ax.get_xticklabels()
-    
-    idx = np.arange(0,len(tickl),1)
-    idxb = np.ones((len(tickl),), dtype=bool)                
-    idxb[idx_cref::nstep]  = False
-    idxb[idx_cref::-nstep] = False
-    idx = idx[idxb==True]
-    for ii in list(idx):
-        tickl[ii]=''
-    if cbar.orientation=='vertical':    
-        cbar.ax.set_yticklabels(tickl)
-    else:    
-        cbar.ax.set_xticklabels(tickl)
+    plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+    #plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
+    plt.setp(cbar.ax.get_yticklabels()[idx_cref::nstep], visible=True)
+    plt.setp(cbar.ax.get_yticklabels()[idx_cref::-nstep], visible=True)
     #___________________________________________________________________________
     ax.tick_params(axis='both', direction='out')
     #ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
     #ax.get_yaxis().tick_left()
     plt.sca(ax)
-    
-    if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
-        plt.title(data.descript+'\n',fontdict= dict(fontsize=20),verticalalignment='baseline')
-    else:    
-        plt.title(data.descript,fontdict= dict(fontsize=20),verticalalignment='center')
-#         plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
-    #ax.set_xlabel(' ',fontsize=20,verticalalignment='top')
-    #ax.set_ylabel(' ',fontsize=30,verticalalignment='bottom')
+    plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='bottom')
     #+_________________________________________________________________________+
     #| SAVE FIGURE                                                             |
     #+_________________________________________________________________________+
@@ -451,23 +392,17 @@ def fesom_plot2d_data(mesh,data,figsize=[],do_subplot=[],do_output=True,do_grid=
 # input : data dictionary: data.value, data.sname, data.lname, data.unit
 #               data['levels']
 #_______________________________________________________________________________
-def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_fac=1.0, nmax_cbar_l=8):
-    if do_output==True: 
-        print('')
-        print('___PLOT 2D VECTOR DATA____________________________________________')
+def fesom_plot2dvec_data(mesh,data,figsize=[]):
+    print('')
+    print('___PLOT 2D VECTOR DATA____________________________________________')
     from set_inputarray import inputarray
     
     if len(figsize)==0 : figsize=[13,13]
     #___________________________________________________________________________
-    # plot is not part of subplot
-    if len(do_subplot)==0:
-        fig = plt.figure(figsize=figsize)
-        ax  = plt.gca()
-    else:
-        fig=do_subplot[0]
-        ax =do_subplot[1]
-        plt.sca(ax)
-    resolution = 'l'
+    fig = plt.figure(figsize=figsize)
+    #fig.patch.set_alpha(0.0)
+    ax  = plt.gca()
+    resolution = 'c'
     fsize = 14
     
     #+_________________________________________________________________________+
@@ -533,98 +468,56 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     # go from geo coord. to projection coord.
     mx,my = map(mesh.nodes_2d_xg, mesh.nodes_2d_yg)
     tri = Triangulation(mx,my,mesh.elem_2d_i)
-    
-    #___________________________________________________________________________
-    # calculate index of which data points are within boi
-    idxbox_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1])
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2])
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
-    idxbox_e = idxbox_e==False # true  index for triangles that are within box 
-    
-    # case of node data
-    if data.value.size ==mesh.n2dna:
-        idx_box = np.ones((mesh.n2dna,),dtype='bool')   
-    elif data.value.size ==mesh.n2dea:
-        idx_box = np.ones((mesh.n2dea,),dtype='bool')
-        
-    if data.value.size ==mesh.n2dna:
-        idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
-        idxbox_n  = np.array(idxbox_n).squeeze()
-        idxbox_n  = np.unique(idxbox_n)
-        idx_box   = np.zeros((mesh.n2dna,), dtype=bool)
-        idx_box[idxbox_n]=True
-        del idxbox_n 
-        del idxbox_e
-    # case of element data
-    elif data.value.size ==mesh.n2dea:
-        idx_box   = idxbox_e
-        del idxbox_e
-    
-    #___________________________________________________________________________
-    # make triangle mask arrays from flat triangles and nan trinagles
-    mask_tri = TriAnalyzer(tri).get_flat_tri_mask(0.00001)
-    if np.any(np.isnan(data.value)):
-        if data.value.size ==mesh.n2dna:
-            mask_tri = np.logical_or(mask_tri,np.isnan(np.sum(data.value[mesh.elem_2d_i],axis=1)))
-        elif data.value.size ==mesh.n2dea:    
-            mask_tri = np.logical_or(mask_tri,np.isnan(data.value))
-        idx_box = np.logical_and(idx_box,np.isnan(data.value)==False)
-    
-    if data.proj=='npstere':
-        mask_tri = np.logical_or(mask_tri,np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3<setbndlat)
-    elif data.proj=='spstere':    
-        mask_tri = np.logical_or(mask_tri,np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3>setbndlat)
-    tri.set_mask(mask_tri)
-    
-    #___________________________________________________________________________
-    plt.sca(ax)
-    #ax.tricontourf(tri,mesh.nodes_2d_zg,levels=np.array([-6000,-5500,-5000,-4500,-4000,-3500,-3000,-2500,-2000,-1500,-1000,-750,-500,-250,-150,-80,-40,-20]),\
-                    #cmap=cm.gray,alpha=0.75,antialiased=False,extend='both',edgealpha=.75)
+    plt.tricontourf(tri,mesh.nodes_2d_z,levels=np.array([-6000,-5500,-5000,-4500,-4000,-3500,-3000,-2500,-2000,-1500,-1000,-750,-500,-250,-150,-80,-40,-20]),\
+                    cmap=cm.gray,alpha=0.75,antialiased=True,extend='both',edgealpha=.75)
     data_plotu = np.copy(data.value)
     data_plotv = np.copy(data.value2)
     
     #___________________________________________________________________________
-    if data_plotu.size==mesh.n2dea:
-        mx_in = np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3
-        my_in = np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3
-    else:
-        mx_in = mesh.nodes_2d_xg
-        my_in = mesh.nodes_2d_yg
-    mx_in = mx_in[idx_box]    
-    my_in = my_in[idx_box]
-    data_plotu = data_plotu[idx_box]    
-    data_plotv = data_plotv[idx_box]
+    # limit value range to plotable box
+    mask_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]-1.5
+    mask_e = np.logical_or(mask_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1]+1.5)
+    mask_e = np.logical_or(mask_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2]-0.5)
+    mask_e = np.logical_or(mask_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3]+0.5)
+    if data.value.size ==mesh.n2dna:
+        idx_e  = mesh.elem_2d_i[mask_e,:].flatten().transpose()
+        idx_e  = np.array(idx_e).squeeze()
+        idx_e  = np.unique(idx_e)
+        data_plotu[idx_e]=np.nan
+        data_plotv[idx_e]=np.nan
+    elif data.value.size ==mesh.n2dea:
+        data_plotu[mask_e]=np.nan
+        data_plotv[mask_e]=np.nan
     
     #___________________________________________________________________________
-    data_plotu,data_plotv,mx,my = map.rotate_vector(data_plotu,data_plotv, mx_in, my_in, returnxy=True)
-    if data.proj=='spstere': data_plotu,data_plotv = -data_plotu, -data_plotv
+    # calc triangle mid points in case of data on elements
+    if data_plotu.size==mesh.n2dea:
+        mx = np.sum(mx[mesh.elem_2d_i],axis=1)/3
+        my = np.sum(my[mesh.elem_2d_i],axis=1)/3
     
     #___________________________________________________________________________
     # limit all arrays to plotable box 
-    idx      = ~np.isnan(data_plotu)
+    idx     = ~np.isnan(data_plotu)
     mx         = mx[idx]
     my         = my[idx]
     data_plotu  = data_plotu[idx]
     data_plotv  = data_plotv[idx]
-    
-    idx      = np.where(data_plotu!=0.0)
-    mx         = mx[idx]
-    my         = my[idx]
-    data_plotu  = data_plotu[idx]
-    data_plotv  = data_plotv[idx]
-    
     norm        = np.sqrt(data_plotu**2.0+data_plotv**2.0)
-    norm_orig   = np.copy(norm)
     
+    #idx = np.arange(0,norm.size,2)
+    #mx         = mx[idx]
+    #my         = my[idx]
+    #data_plotu  = data_plotu[idx]
+    #data_plotv  = data_plotv[idx]
+    #norm        = norm[idx]
     #___________________________________________________________________________
-    cnumb    = 10; #minimum number of colors
-    data.cmap = 'wbgyr'
+    cnumb    = 20; #minimum number of colors
     cmin     = 0 ; 
     cmax     = np.max(norm)
     #cmax     = 0.25
     cref     = cmin + (cmax-cmin)/2
     cref     = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))) ) 
+    data.cmap = 'wbgyr'
     
     #___________________________________________________________________________
     # if predefined color range --> data.crange
@@ -640,10 +533,10 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
         else:
             print(' this colorrange definition is not supported !!!')
             print('data.crange=[cmin,cmax] or data.crange=[cmin,cmax,cref]')
-    cnumb = data.cnumb    
-    if do_output==True: print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
+    
+    print('[cmin,cmax,cref] = ['+str(cmin)+', '+str(cmax)+', '+str(cref)+']')
     cmap0,clevel = colormap_c2c(cmin,cmax,cref,cnumb,data.cmap)
-    if do_output==True: print('clevel = ',clevel)
+    print('clevel = ',clevel)
     
     #___________________________________________________________________________
     # limit minimum and maximum of vector norm
@@ -651,92 +544,41 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     norm[norm>clevel[-1]] = clevel[-1]-np.finfo(np.float32).eps
     
     #___________________________________________________________________________
-    # shrink all vectors that are originaly longer than norm to the norm length
-    data_plotu = data_plotu*norm/norm_orig
-    data_plotv = data_plotv*norm/norm_orig
-    
-    #___________________________________________________________________________
     # eliminate all vectors that are close to 0
-    #idx     = norm>=clevel[-1]*0.01
-    #idx     = norm>=clevel[1]*0.5
-    #mx         = mx[idx]
-    #my         = my[idx]
-    #data_plotu  = data_plotu[idx]
-    #data_plotv  = data_plotv[idx]
-    #norm        = norm[idx]
-    #del idx 
+    idx     = norm>=clevel[-1]*0.01
+    mx         = mx[idx]
+    my         = my[idx]
+    data_plotu  = data_plotu[idx]
+    data_plotv  = data_plotv[idx]
+    norm        = norm[idx]
+    del idx 
     
     # normalize vector components
-    #data_plotu  = data_plotu/clevel[-1]
-    #data_plotv  = data_plotv/clevel[-1]
+    data_plotu  = data_plotu/clevel[-1]
+    data_plotv  = data_plotv/clevel[-1]
     
     # limit smalles size of vectors
-    
     #limit = cmax/5
     #limit = cmax/10
-    limit = clevel[-1]*0.15
+    limit = cmax*0.75
     aux = (data_plotu**2.0+data_plotv**2.0)**0.5
     data_plotu[aux<limit]=data_plotu[aux<limit]/aux[aux<limit]*limit
     data_plotv[aux<limit]=data_plotv[aux<limit]/aux[aux<limit]*limit
     del aux
     
     #___________________________________________________________________________
-    #hp1=ax.quiver(mx,my,data_plotu,data_plotv,norm,#  
-    #hp1=map.quiver(mx,my,data_plotu,data_plotv,norm,#    
-                    #scale_units='xy',scale=None, #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
-                    #edgecolor='k',
-                    #linewidth=0.1,
-                    #cmap = cmap0,#alpha=0.9,
-                    #pivot='middle', #'middle',
-                    #antialiased=True,
-                    #minlength=0.0,
-                    #width=0.005,
-                    #headlength=3,
-                    #headaxislength=3,
-                    #headwidth=2.5)
-    
-    aux = np.sqrt((mx.max()-mx.min())**2 + (my.max()-my.min())**2)
-    print(norm.max())
-    
-    
-    
-    #hp1=ax.quiver(mx,my,data_plotu,data_plotv,norm,#  
-                    #scale_units='inches',scale=0.6, #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
-                    #edgecolor='k',
-                    #linewidth=0.1,
-                    #cmap = cmap0,#alpha=0.9,
-                    #pivot='middle', #'middle',
-                    #antialiased=True,
-                    #minlength=0.0,
-                    #width=0.005,
-                    #headlength=2.5,
-                    #headaxislength=2.5,
-                    #headwidth=1.5)
-    
-    mx,my,data_plotu,data_plotv,norm = mx[::2], my[::2], data_plotu[::2], data_plotv[::2], norm[::2]
-    
-    hp1=map.quiver(mx,my,data_plotu,data_plotv,norm,#  
-                    scale_units='xy',scale=1/aux*50*scal_fac*clevel[-1], #scale=1/aux*80*scal_fac*clevel[-1], #np.max(norm)*0.01,#scale=np.max(norm)*1.15, #25,#scale_units='xy'/'width',scale=clevel[-1],
+    hp1=plt.quiver(mx,my,data_plotu,data_plotv,norm,#    
+                    scale_units='xy',scale=cmax*3, #25,#scale_units='xy'/'width',scale=clevel[-1],
                     edgecolor='k',
                     linewidth=0.1,
                     cmap = cmap0,#alpha=0.9,
-                    pivot='middle', #'middle',
+                    pivot='middle',
                     antialiased=True,
-                    minlength=0.0,
-                    width=0.005,
-                    headlength=3,
-                    headaxislength=3,
-                    headwidth=2.0)
+                    minlength=0.0)
     
-    hp1.set_clim([clevel[0],clevel[-1]])
     # draw reference vector in corner
-    #hpref = plt.quiverkey(hp1, 0.85, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
-            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
-    #hpref = plt.quiverkey(hp1, 0.1, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
-            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
-    
-    #hpref = ax.quiverkey(hp1, 0.05, 0.05,clevel[-1],'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
-            #coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
+    hpref = plt.quiverkey(hp1, 0.90, 0.05,1.0 ,'${:.2f}\\ \\frac{{m}}{{s}}$'.format(clevel[-1]), labelpos='E',
+            coordinates='axes',fontproperties={"size":20, "weight":"extra bold"})
     
     #___________________________________________________________________________
     # arange zonal & meriodional gridlines and labels
@@ -779,16 +621,9 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     else:
         divider = make_axes_locatable(ax)
         cax     = divider.append_axes("right", size="2.5%", pad=0.1)
-    # give each subplot its own colorrange
-    #plt.clim(clevel[0],clevel[-1])
-  
+    plt.clim(clevel[0],clevel[-1])
     cbar = plt.colorbar(hp1,cax=cax,ticks=clevel,drawedges=True,
-            extend='neither',extendrect=True,extendfrac='auto')
-    
-    him = ax.get_images()
-    for im in ax.get_images():
-        im.set_clim(clevel[0],clevel[-1])
-    
+            extend='both')
     
     cbar.set_label(data.lname+' '+data.unit+'\n'+data.str_time+data.str_dep, size=fsize+2)
     cl = plt.getp(cbar.ax, 'ymajorticklabels')
@@ -796,39 +631,21 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     
     # kickout some colormap labels if there are to many
     ncbar_l=len(cbar.ax.get_yticklabels()[:])
-    idx_cref = np.where(clevel==cref)[0]
-    idx_cref = np.asscalar(idx_cref)
     
-    #nmax_cbar_l = 12
+    
+    #print(cbar_ticks)
+    nmax_cbar_l = 15
     nstep = ncbar_l/nmax_cbar_l
     nstep = np.int(np.floor(nstep))
     if nstep==0:nstep=1
+    plt.setp(cbar.ax.get_yticklabels()[:], visible=False)
+    plt.setp(cbar.ax.get_yticklabels()[::nstep], visible=True)
     
-    fig.canvas.draw() # this is need so cbar.ax.get_yticklabels() always finds the labels
-    if cbar.orientation=='vertical':
-        tickl = cbar.ax.get_yticklabels()
-    else:
-        tickl = cbar.ax.get_xticklabels()
-    idx = np.arange(0,len(tickl),1)
-    idxb = np.ones((len(tickl),), dtype=bool)                
-    idxb[idx_cref::nstep]  = False
-    idxb[idx_cref::-nstep] = False
-    idx = idx[idxb==True]
-    for ii in list(idx):
-        tickl[ii]=''
-    if cbar.orientation=='vertical':    
-        cbar.ax.set_yticklabels(tickl)
-    else:    
-        cbar.ax.set_xticklabels(tickl)
     #___________________________________________________________________________
     ax.tick_params(axis='both', direction='out')
-    plt.sca(ax)
+    ax.get_xaxis().tick_bottom()   # remove unneeded ticks 
+    ax.get_yaxis().tick_left()
     
-    #plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
-    if data.proj=='npstere' or data.proj=='spstere' or data.proj=='ortho':
-        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='baseline')
-    else:    
-        plt.title(data.descript+'\n',fontdict= dict(fontsize=24),verticalalignment='center')
     #___________________________________________________________________________
     if inputarray['save_fig']==True:
         print(' --> save figure: png')
@@ -844,7 +661,7 @@ def fesom_plot2dvec_data(mesh,data,figsize=[],do_subplot=[],do_output=True,scal_
     plt.show(block=False)
     
     #___________________________________________________________________________
-    return(fig,ax,cbar,hp1)
+    return(fig,ax,cbar)
     
     
 #___PLOT 2D FESOM MESH IN GEO COORDINATES_______________________________________
@@ -1522,94 +1339,3 @@ def plot_3d_lmaskline(mlab,mesh):
     mlab.pipeline.surface(lines, color=(0,0,0), line_width=1, opacity=.5)
     
     return mlab
-
-
-#_______________________________________________________________________________
-#
-#_______________________________________________________________________________
-def fesom_idxinbox(mesh,data1,inputarray):
-    #___________________________________________________________________________
-    # calculate index of which data points are within boi
-    idxbox_e = mesh.nodes_2d_xg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][0]
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_xg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][1])
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].max(axis=1)<inputarray['which_box'][2])
-    idxbox_e = np.logical_or(idxbox_e,mesh.nodes_2d_yg[mesh.elem_2d_i].min(axis=1)>inputarray['which_box'][3])
-    idxbox_e = idxbox_e==False # true index for triangles that are within box 
-    
-    # case of node data
-    if mesh.n2dna in data1.value.shape:
-        idxbox_n  = mesh.elem_2d_i[idxbox_e,:].flatten().transpose()
-        idxbox_n  = np.array(idxbox_n).squeeze()
-        idxbox_n  = np.unique(idxbox_n)
-        idx_box   = np.zeros((mesh.n2dna,), dtype='bool')
-        idx_box[idxbox_n]=True
-        del idxbox_n 
-        del idxbox_e
-    # case of element data
-    elif mesh.n2dea in data1.value.shape:
-        idx_box = idxbox_e
-        del idxbox_e
-    
-    #___________________________________________________________________________
-    # make triangle mask arrays from flat triangles and nan trinagles
-    if np.any(np.isnan(data1.value)):
-        idx_box = np.logical_and(idx_box,np.isnan(data1.value)==False)
-    
-    return(idx_box)
-
-
-#_______________________________________________________________________________
-# select optimal color range by histogramm
-#_______________________________________________________________________________
-def fesom_choose_best_crange(in_data,in_weights,limit=0.99,fac=1.0,do_output=False,increace_dezimal=0):
-    cmin, cmax = np.nanmin(in_data), np.nanmax(in_data)
-    if do_output:print(' --> orig cmin,cmax:',cmin,cmax)
-    
-    in_data = in_data*fac
-    
-    binrange=[cmin, cmax];
-    if cmin<0.0 and cmax>0.0 : binrange=[-max(np.abs(cmin),cmax),max(np.abs(cmin),cmax)]
-    if len(in_weights)!=0:
-        hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000, weights=in_weights,density=True, normed=True) 
-    else:
-        hist, binedge = np.histogram(in_data,range=(binrange[0], binrange[1]), bins=10000,density=True, normed=True) 
-        
-    binedge_mid, cumsum, limit = binedge[:-1]+(binedge[1:]-binedge[:-1])/2, np.cumsum(hist*(binedge[1:]-binedge[:-1])), limit
-    
-    idx_min = np.where(cumsum<=1-limit)[0]
-    if len(idx_min)==0: 
-        idx_min=0
-    else: 
-        idx_min=idx_min[-1]
-    
-    idx_max = np.where(cumsum>=limit)[0]
-    if len(idx_max)==0: 
-        idx_max=len(binedge_mid)
-    else:    
-        idx_max=idx_max[0]
-    cmin, cmax = binedge_mid[idx_min], binedge_mid[idx_max]
-    
-    if cmax!=0.0: cmax = np.around(cmax, -np.int32(np.floor(np.log10(np.abs(cmax)))-1+increace_dezimal) ) 
-    if cmin!=0.0: cmin = np.around(cmin, -np.int32(np.floor(np.log10(np.abs(cmin)))-1+increace_dezimal) ) 
-    
-    if do_output:print(' --> best cmin,cmax:',cmin,cmax)
-    
-    return(cmin,cmax)
-
-#_______________________________________________________________________________
-# select optimal color range by histogramm
-#_______________________________________________________________________________
-def fesom_choose_best_cref(cmin,cmax,varname,do_rescale='auto',fac=0):
-    cref = cmin + (cmax-cmin)/2
-    if cref!=0.0 : cref = np.around(cref, -np.int32(np.floor(np.log10(np.abs(cref)))-1+fac)) 
-    if varname in ['u','v','w','fw','fh'] or \
-       any(x in varname for x in ['vec','anom','dvd']):
-       if not do_rescale=='log10': cref=0.0
-    if varname in ['shh']: 
-        if (cmin<0 and cmax<0) or (cmin>0 and cmax>0):
-            cref = cmin+(cmax-cmin)/2
-            cref = np.around(cref,0)
-        else :
-            cref = 0.0
-    if varname in ['Kv']: cref = np.around(cref,0)
-    return(cref)    

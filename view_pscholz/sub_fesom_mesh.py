@@ -5,7 +5,6 @@ import pandas as pa
 import math
 from numpy.linalg import inv
 from set_inputarray import *
-import copy as cp
 
 #+___INITIALISE/LOAD FESOM2.0 MESH CLASS IN MAIN PROGRAMM______________________+
 #| IMPORTANT!!!:                                                               |                                         
@@ -14,7 +13,7 @@ import copy as cp
 #| and not to load it again !!!                                                |                    |
 #+_____________________________________________________________________________+
 def fesom_init_mesh(inputarray):
-#     global mesh
+    global mesh
     mesh = fesom_mesh(inputarray)
     return(mesh)
     
@@ -34,7 +33,6 @@ class fesom_mesh:
     #____mesh euler angles_______________________
     alpha, beta, gamma        = 0, 0, 0
     focus                     = 0
-    focus_old                 = 0
     rotate_grid               = True
     
     #____mesh vertical info______________________
@@ -55,13 +53,6 @@ class fesom_mesh:
     nodes_2d_zg, nodes_2d_izg = [], []
     nodes_2d_ig               = []
     
-    # cavity info 
-    use_cavity                = False
-    nodes_2d_cg, nodes_2d_icg = [], []
-    nodes_2d_c,  nodes_2d_ic  = [], []
-    elem0_2d_ic               = []
-    
-    # rotated coordiantes
     nodes_2d_xr, nodes_2d_yr  = [], []
         
     pbndn_2d_i                = []
@@ -69,7 +60,6 @@ class fesom_mesh:
     #____mesh elem info__________________________
     elem0_2d_i, elem_2d_i     = [], []
     elem0_2d_iz,pbndtri_2d_i  = [], []
-    
     abnormtri_2d_i            = []
     
     #____fesom lsmask polygon____________________
@@ -96,7 +86,6 @@ class fesom_mesh:
         self.beta        = inputarray['mesh_beta' ]
         self.gamma       = inputarray['mesh_gamma']
         self.focus       = inputarray['mesh_focus']
-        self.focus_old   = self.focus    
         self.rotate_grid = inputarray['mesh_rotate'	 ]
         
         print('')
@@ -106,23 +95,17 @@ class fesom_mesh:
         # load mesh from file
         self.fesom_load_mesh()
         
-        if (inputarray['use_cavity']==True):
-            self.use_cavity = True
-            self.fesom_load_cavity()
-        
         #_______________________________________________________________________
         # rotate mesh from rot to geo coordinates
         if (inputarray['mesh_rotate'     ]==True):
             self.fesom_grid_rot_r2g('r2g')
         else:
-            self.nodes_2d_xg  = self.nodes_2d_x
-            self.nodes_2d_yg  = self.nodes_2d_y
-            self.nodes_2d_zg  = self.nodes_2d_z
+            self.nodes_2d_xg = self.nodes_2d_x
+            self.nodes_2d_yg = self.nodes_2d_y
+            self.nodes_2d_zg = self.nodes_2d_z
             self.nodes_2d_izg = self.nodes_2d_iz
-            self.nodes_2d_ig  = self.nodes_2d_i
-            if (inputarray['use_cavity']==True):
-                self.nodes_2d_cg  = self.nodes_2d_c
-                self.nodes_2d_icg = self.nodes_2d_ic
+            self.nodes_2d_ig = self.nodes_2d_i
+        
         #_______________________________________________________________________
         # change grid focus from -180...180 to e.g. 0...360
         if (inputarray['mesh_focus']!=0):
@@ -155,67 +138,61 @@ class fesom_mesh:
         
         #____load 2d node matrix________________________________________________
         print('     > nod2d.out',end='')
-        file_content    = pa.read_csv(self.path+'nod2d.out', delim_whitespace=True, skiprows=1, \
-                                      names=['node_number','x','y','flag'] )
-        self.nodes_2d_x = file_content.x.values.astype('float32')
-        self.nodes_2d_y = file_content.y.values.astype('float32')
-        self.nodes_2d_i = file_content.flag.values.astype('uint16')   
-        self.n2dn       = len(self.nodes_2d_x)
+        fid_n2d          = open(self.path+'nod2d.out', 'r')
+        self.n2dn        = np.uint32(fid_n2d.readline().strip())
+        dum              = np.matrix(pa.read_table(fid_n2d, header=-1,delim_whitespace=True))
+        fid_n2d.close()
+        del fid_n2d
+        self.nodes_2d_x  = np.float32(np.array(dum[:,1]).reshape(self.n2dn))
+        self.nodes_2d_y  = np.float32(np.array(dum[:,2]).reshape(self.n2dn))
+        self.nodes_2d_i  = np.uint16( np.array(dum[:,3]).reshape(self.n2dn))
+        del dum
         print('  : #2dn={:d}'.format(self.n2dn))
         
         #____load 2d element matrix_____________________________________________
         print('     > elem2d.out',end='')
-        file_content    = pa.read_csv(self.path+'elem2d.out', delim_whitespace=True, skiprows=1, \
-                                       names=['1st_node_in_elem','2nd_node_in_elem','3rd_node_in_elem'])
-        self.elem0_2d_i = file_content.values.astype('uint32') - 1
-        self.n2de       = np.shape(self.elem0_2d_i)[0]
+        fid_e2d          = open(self.path+'elem2d.out', 'r')
+        self.n2de           = np.int64(fid_e2d.readline().strip())
+        ## pandas module fastest option but not everywherre available
+        self.elem0_2d_i  = np.matrix(pa.read_table(fid_e2d, header=-1,delim_whitespace=True),dtype='uint32')-1
+        fid_e2d.close()
         print(' : #2de={:d}'.format(self.n2de))
         
         #____load 3d nodes alligned under 2d nodes______________________________
         print('     > aux3d.out') 
-        with open(self.path+'aux3d.out') as f:
-            self.nlev = int(next(f))
-            self.zlev = np.array([next(f).rstrip() for x in range(self.nlev)]).astype(float)
-        self.zmid     = (self.zlev[:-1]+self.zlev[1:])/2.
+        fid_aux3d        = open(self.path+'aux3d.out', 'r')
+        self.nlev        = np.uint16(fid_aux3d.readline().strip())
+        dum                 = np.array(pa.read_table(fid_aux3d, 
+                                                    header=-1,
+                                                    delim_whitespace=True),
+                                        dtype='int16')
+        self.zlev        = dum[0:self.nlev].squeeze()
+        self.zmid         = (self.zlev[:-1]+self.zlev[1:])/2.
+        
+        fid_aux3d.close()
+        del fid_aux3d
+        del dum
         
         #____load number of levels at each node_________________________________
         print('     > nlvls.out') 
-        file_content    = pa.read_csv(self.path+'nlvls.out', delim_whitespace=True, skiprows=0, \
-                                       names=['numb_of_lev'])
-        self.nodes_2d_iz= file_content.values.astype('uint16') - 1
-        self.nodes_2d_iz= self.nodes_2d_iz.squeeze()
-        self.nodes_2d_z = np.float32(self.zlev[self.nodes_2d_iz])
+        fid                 = open(self.path+'nlvls.out', 'r')
+        self.nodes_2d_iz = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
+        # which starts with zeros --> thats why minus 1
+        self.nodes_2d_iz = self.nodes_2d_iz.squeeze()-1
+        self.nodes_2d_z  = np.float32(self.zlev[self.nodes_2d_iz])
+        fid.close()
         
         #____load number of levels at each elem_________________________________
         print('     > elvls.out') 
-        file_content    = pa.read_csv(self.path+'elvls.out', delim_whitespace=True, skiprows=0, \
-                                       names=['numb_of_lev'])
-        self.elem0_2d_iz= file_content.values.astype('uint16') - 1
-        self.elem0_2d_iz= self.elem0_2d_iz.squeeze()
-        
-    #+___LOAD FESOM CAVITY INFORMATION FROM FILE_______________________________+
-    #|                                                                         |
-    #+_________________________________________________________________________+
-    def fesom_load_cavity(self):
-        
-        print(' --> read cavity files')
-        
-        #____load number of levels at each node_________________________________
-        print('     > cavity_nlvls.out') 
-        file_content    = pa.read_csv(self.path+'cavity_nlvls.out', delim_whitespace=True, skiprows=0, \
-                                       names=['numb_of_lev'])
-        self.nodes_2d_ic= file_content.values.astype('uint16') - 1
-        self.nodes_2d_ic= self.nodes_2d_ic.squeeze()
-        self.nodes_2d_c = np.float32(self.zlev[self.nodes_2d_ic])
-        
-        #____load number of levels at each elem_________________________________
-        print('     > cavity_elvls.out') 
-        file_content    = pa.read_csv(self.path+'cavity_elvls.out', delim_whitespace=True, skiprows=0, \
-                                       names=['numb_of_lev'])
-        self.elem0_2d_ic= file_content.values.astype('uint16') - 1
-        self.elem0_2d_ic= self.elem0_2d_ic.squeeze()
-        
-        
+        fid                 = open(self.path+'elvls.out', 'r')
+        self.elem0_2d_iz  = np.array(pa.read_table(fid, header=-1,delim_whitespace=True))
+        # go from fesom vertical indexing which starts with 1 to python vertical indexing 
+        # which starts with zeros --> thats why minus 1
+        self.elem0_2d_iz  = self.elem0_2d_iz.squeeze()-1
+        fid.close()
+    
+    
     #+___ROTATE GRID ROT-->GEO_________________________________________________+
     #| input : r2g (default) change coordinate from rotated-->geo              |
     #|         g2r           change coordinate from geo-->rotated              |
@@ -321,14 +298,8 @@ class fesom_mesh:
             self.nodes_2d_zg = self.nodes_2d_z
             self.nodes_2d_izg = self.nodes_2d_iz
             self.nodes_2d_ig = self.nodes_2d_i
-            if (self.use_cavity == True):
-                self.nodes_2d_cg = self.nodes_2d_c
-                self.nodes_2d_icg = self.nodes_2d_ic
-                
-            if (str_mode == 'focus') and self.focus!=self.focus_old:
+            if (str_mode == 'focus'):
                 self.fesom_remove_pbnd()
-                self.focus_old = self.focus
-                
         elif (str_mode == 'g2r'):
             self.nodes_2d_yr=np.degrees(np.arcsin(zg));
             self.nodes_2d_xr=np.degrees(np.arctan2(yg,xg));
@@ -390,10 +361,6 @@ class fesom_mesh:
         self.nodes_2d_zg  = np.concatenate((self.nodes_2d_z,self.nodes_2d_z[self.pbndn_2d_i  ]))
         self.nodes_2d_ig  = np.concatenate((self.nodes_2d_i,self.nodes_2d_i[self.pbndn_2d_i  ]))
         self.nodes_2d_izg = np.concatenate((self.nodes_2d_iz,self.nodes_2d_iz[self.pbndn_2d_i]))
-        if (self.use_cavity==True):
-            self.nodes_2d_cg  = np.concatenate((self.nodes_2d_c,self.nodes_2d_c[self.pbndn_2d_i  ]))
-            self.nodes_2d_icg = np.concatenate((self.nodes_2d_ic,self.nodes_2d_ic[self.pbndn_2d_i]))
-            
         self.n2dna=self.n2dn+self.pbndn_2d_i.size # new (augmented) n2d
         
         #____loop over all periodic bnd. segments___________________________________
@@ -490,7 +457,7 @@ class fesom_mesh:
         nodes_2d_y     = np.concatenate((self.nodes_2d_yg[:self.n2dn] , \
                                       self.nodes_2d_yg[self.pbndn_2d_i]))
         elem_2d_x      = nodes_2d_x[self.elem_2d_i]
-        elem_2d_y      = nodes_2d_y[self.elem_2d_i]
+        elem_2d_y      =  nodes_2d_y[self.elem_2d_i]
         elem_2d_xy     = np.array([elem_2d_x,elem_2d_y])
         del nodes_2d_x
         del nodes_2d_y
@@ -503,7 +470,7 @@ class fesom_mesh:
         # | dx_31 dy_31 |_i , i=1....n2dea
         jacobian     = elem_2d_xy[:,:,1]-elem_2d_xy[:,:,0]
         jacobian     = np.array([jacobian,elem_2d_xy[:,:,2]-elem_2d_xy[:,:,1],\
-                                          elem_2d_xy[:,:,0]-elem_2d_xy[:,:,2] ])
+                                elem_2d_xy[:,:,0]-elem_2d_xy[:,:,2] ])
         
         # account for triangles with periodic bounaries
         for ii in range(3):
@@ -514,8 +481,8 @@ class fesom_mesh:
             del idx
         
         # calc from geocoord to cartesian coord
-        R_earth       = 12735/2;
-        jacobian      = jacobian*R_earth*2*np.pi/360
+        R_earth        = 12735/2;
+        jacobian     = jacobian*R_earth*2*np.pi/360
         cos_theta     = np.cos(np.radians(elem_2d_y)).mean(axis=1)
         del elem_2d_y
         for ii in range(3):    
@@ -531,20 +498,8 @@ class fesom_mesh:
         #_______________________________________________________________________
         # mean resolutiuon per element
         self.elem_2d_resol = jacobian.mean(axis=1)
-        #self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
-    
-    
-    #+___CALCULATE MESH RESOLUTION_____________________________________________+
-    #| calculate mean length of the three triangle sides                       |
-    #|                                                                         |
-    #+_________________________________________________________________________+
-    def fesom_calc_noderesol(self):
-        
-        #_______________________________________________________________________
-        print(' --> calc. node resolution in km')
-        if len(self.elem_2d_resol)==0: self.fesom_calc_triresol()
         self.nodes_2d_resol= self.fesom_interp_e2n(self.elem_2d_resol)
-        
+    
     
     #___CALCULATE TRIANGLE AREA("volume")_______________________________________
     # calculate TRIANGLE AREA IN M^2
@@ -638,59 +593,18 @@ class fesom_mesh:
     #+_________________________________________________________________________+
     def fesom_interp_e2n(self,data_e):
         if len(self.elem0_2d_area)==0: self.fesom_calc_triarea()
-        #if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
-        print(' --> calc. compute e2n interpolation',end='')
-        t1 = time.time()
-        #_______________________________________________________________________
-        # case of one dimensional elemental data
-        if data_e.ndim==1:
-            if data_e.size==self.n2de:
-                data_e=data_e*self.elem0_2d_area
-                # elemental area of non bottom element
-                data_e_area = self.elem0_2d_area*np.invert(np.isnan(data_e))
-                data_e[np.isnan(data_e)]=0
-                
-            elif data_e.size==self.n2dea:
-                data_e=data_e*np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
-                # elemental area of non bottom element
-                data_e_area = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))*np.invert(np.isnan(data_e))
-                data_e[np.isnan(data_e)]=0
-            
-            data_n     =np.zeros((self.n2dna,))
-            data_n_area=np.zeros((self.n2dna,))
-            for ii in range(self.n2de):     
-                data_n[     self.elem0_2d_i[ii,:]] = data_n[     self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e[ii]
-                data_n_area[self.elem0_2d_i[ii,:]] = data_n_area[self.elem0_2d_i[ii,:]] + np.array([1,1,1])*data_e_area[ii] 
-            data_n[        0:self.n2dn ] = data_n[0:self.n2dn]/data_n_area[0:self.n2dn]
-            data_n[self.n2dn:self.n2dna] = data_n[self.pbndn_2d_i]
+        if len(self.nodes_2d_area)==0: self.fesom_calc_nodearea()
         
-        #_______________________________________________________________________
-        # case of two dimensional elemental data
-        elif data_e.ndim==2:
-            nd1 = data_e.shape[0]
-            nd2 = data_e.shape[1]
-            
-            if data_e.shape[0]==self.n2de:
-                data_e      = data_e*np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()
-                data_e_area = np.matlib.repmat(self.elem0_2d_area,nd2,1).transpose()*np.invert(data_e==0)
-                
-            elif data_e.shape[0]==self.n2dea:
-                area_di     = np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
-                data_e      = data_e*np.matlib.repmat(area_di,nd2,1).transpose()
-                data_e_area = np.matlib.repmat(area_di,nd2,1).transpose()*np.invert(data_e==0)
-                del area_di
-            
-            data_n      = np.zeros((self.n2dna,nd2))
-            data_n_area = np.zeros((self.n2dna,nd2))
-            for ii in range(self.n2de):     
-                data_n[     self.elem0_2d_i[ii,:], :] = data_n[     self.elem0_2d_i[ii,:], :] + np.matlib.repmat(     data_e[ii,:], 3, 1)
-                data_n_area[self.elem0_2d_i[ii,:], :] = data_n_area[self.elem0_2d_i[ii,:], :] + np.matlib.repmat(data_e_area[ii,:], 3, 1)  
-            #print(np.matlib.repmat(self.nodes_2d_area[0:self.n2dn]/3.,nd2,1).transpose())    
-            data_n[        0:self.n2dn ,:] = data_n[0:self.n2dn,:]/data_n_area[0:self.n2dn,:]
-            data_n[self.n2dn:self.n2dna,:] = data_n[self.pbndn_2d_i,:]
-            
-        t2 = time.time()
-        print(' >> time:{:.3f} s'.format(t2-t1))
+        if data_e.size==self.n2de:
+            data_e=data_e*self.elem0_2d_area
+        elif data_e.size==self.n2dea:
+            data_e=data_e*np.concatenate((self.elem0_2d_area,self.elem0_2d_area[self.pbndtri_2d_i]))
+        
+        data_n=np.zeros((self.n2dna,))
+        for ii in range(self.n2de):     
+            data_n[self.elem0_2d_i[ii,:]]=data_n[self.elem0_2d_i[ii,:]]+np.array([1,1,1])*data_e[ii] 
+        data_n[0:self.n2dn]=data_n[0:self.n2dn]/self.nodes_2d_area[0:self.n2dn]/3. 
+        data_n[self.n2dn:self.n2dna] = data_n[mesh.pbndn_2d_i]
         
         return data_n
     
@@ -782,22 +696,20 @@ class fesom_mesh:
                 # find land mnask points on either the left or right
                 # side of pbnd
                 aux2_i = np.argmin(P1_y-self.nodes_2d_yg[lonly_p[aux_i]])
-                
             else:
                 # antarctica land mask points 
                 if P1_x == xmin:
-                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmax)[0])
-                    
+                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmax))
                 else:
-                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmin)[0])
+                    aux_i = np.array(np.where(self.nodes_2d_xg[lonly_p]==xmin))
+                
                 aux2_i = np.array(np.argmin(np.abs(P1_y-self.nodes_2d_yg[lonly_p[aux_i]])))
                 
             P2_i      = lonly_p[aux_i[aux2_i]]
             addp_edge.append([P1_i,P2_i])
-            #print(lonly_p) 
             lonly_p   = np.array(lonly_p[np.where(lonly_p!=P1_i)])
             lonly_p   = np.array(lonly_p[np.where(lonly_p!=P2_i)])
-        
+            
         #____END WHILE LOOP_____________________________________________________
         addp_edge = np.array(addp_edge)
         addp_edge = np.sort(addp_edge,axis=1)
@@ -963,17 +875,16 @@ class fesom_mesh:
 #+___ROTATE VECTOR GRID ROT-->GEO______________________________________________+
 #|                                                                             |
 #+_____________________________________________________________________________+
-def fesom_vector_rot(mesh,u,v,do_output=True):
+def fesom_vector_rot(mesh,u,v):
     
-    if do_output==True: print(' --> do vector rotation rot2geo')
+    print(' --> do vector rotation rot2geo')
     #___________________________________________________________________________
     alpha = mesh.alpha
     beta  = mesh.beta
     gamma = mesh.gamma
     
     #___________________________________________________________________________
-    if len(mesh.nodes_2d_yr)==0:
-        mesh.fesom_grid_rot_g2r()
+    #mesh = fesom_grid_rot_g2r()
     
     #___________________________________________________________________________
     # build euler rotation matrix
@@ -1025,49 +936,26 @@ def fesom_vector_rot(mesh,u,v,do_output=True):
     u = np.squeeze(np.array(u))
     v = np.squeeze(np.array(v))
     #___________________________________________________________________________
-    #if u.shape[0]==mesh.n2dna:
-    if any(x in u.shape for x in [mesh.n2dna]):
-        which_size = mesh.n2dna
+    if u.shape[0]==mesh.n2dna:
         rlat = np.radians(mesh.nodes_2d_yr)
         rlon = np.radians(mesh.nodes_2d_xr)
         lat  = np.radians(mesh.nodes_2d_yg)
         lon  = np.radians(mesh.nodes_2d_xg)
-        
-    #elif u.shape[0]==mesh.n2dn:
-    elif any(x in u.shape for x in [mesh.n2dn]):
-        which_size = mesh.n2dn
+    elif u.shape[0]==mesh.n2dn:
         rlat = np.radians(mesh.nodes_2d_yr[0:mesh.n2dn])
         rlon = np.radians(mesh.nodes_2d_xr[0:mesh.n2dn])
         lat  = np.radians(mesh.nodes_2d_yg[0:mesh.n2dn])
         lon  = np.radians(mesh.nodes_2d_xg[0:mesh.n2dn])
-        
-    #elif u.shape[0]==mesh.n2dea:
-    elif any(x in u.shape for x in [mesh.n2dea]):
-        which_size = mesh.n2dea
-        rlat = mesh.nodes_2d_yr[mesh.elem_2d_i]
-        rlon = mesh.nodes_2d_xr[mesh.elem_2d_i]
-        aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
-        for ii in aux:
-            for jj in range(0,3):
-                if rlon[ii,jj]<rlon[ii,:].max()-180: rlon[ii,jj] = rlon[ii,jj]+360
-        rlat = np.radians(rlat.sum(axis=1)/3.0)
-        rlon = np.radians(rlon.sum(axis=1)/3.0)
-        lat  = np.radians(mesh.nodes_2d_yg[mesh.elem_2d_i].sum(axis=1)/3.0)
-        lon  = np.radians(mesh.nodes_2d_xg[mesh.elem_2d_i].sum(axis=1)/3.0)
-        
-    #elif u.shape[0]==mesh.n2de:
-    elif any(x in u.shape for x in [mesh.n2de]):
-        which_size = mesh.n2de
-        rlat = mesh.nodes_2d_yr[mesh.elem0_2d_i]
-        rlon = mesh.nodes_2d_xr[mesh.elem0_2d_i]
-        aux  =np.where( mesh.nodes_2d_x[mesh.elem0_2d_i].max(axis=1)-mesh.nodes_2d_x[mesh.elem0_2d_i].min(axis=1)>=180)[0]
-        for ii in aux:
-            for jj in range(0,3):
-                if rlon[ii,jj]<rlon[ii,:].max()-180: rlon[ii,jj] = rlon[ii,jj]+360
-        rlat = np.radians(rlat.sum(axis=1)/3.0)
-        rlon = np.radians(rlon.sum(axis=1)/3.0)
-        lat  = np.radians(mesh.nodes_2d_yg[mesh.elem0_2d_i].sum(axis=1)/3.0)
-        lon  = np.radians(mesh.nodes_2d_xg[mesh.elem0_2d_i].sum(axis=1)/3.0)
+    elif u.shape[0]==mesh.n2dea:
+        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem_2d_i],axis=1)/3)
+        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem_2d_i],axis=1)/3)
+        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem_2d_i],axis=1)/3)
+        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem_2d_i],axis=1)/3)
+    elif u.shape[0]==mesh.n2de:
+        rlat = np.radians(np.sum(mesh.nodes_2d_yr[mesh.elem0_2d_i],axis=1)/3)
+        rlon = np.radians(np.sum(mesh.nodes_2d_xr[mesh.elem0_2d_i],axis=1)/3)
+        lat  = np.radians(np.sum(mesh.nodes_2d_yg[mesh.elem0_2d_i],axis=1)/3)
+        lon  = np.radians(np.sum(mesh.nodes_2d_xg[mesh.elem0_2d_i],axis=1)/3)
         
     ndims = u.shape
     if len(ndims)==1:
@@ -1089,45 +977,24 @@ def fesom_vector_rot(mesh,u,v,do_output=True):
         v = np.transpose(np.array(v,ndmin=2)).squeeze();
     elif len(ndims)    == 2:
         
-        which_index = list(u.shape).index(which_size)
+        #___________________________________________________________________________
         txg,tyg,tzg = np.zeros(u.shape), np.zeros(u.shape), np.zeros(u.shape)
-            
-        if which_index==0:
-            #___________________________________________________________________________
-            for ii in range(0,u.shape[1]):
-                txg[:,ii] = -v[:,ii]*np.sin(rlat)*np.cos(rlon) - u[:,ii]*np.sin(rlon)
-                tyg[:,ii] = -v[:,ii]*np.sin(rlat)*np.sin(rlon) + u[:,ii]*np.cos(rlon)
-                tzg[:,ii] =  v[:,ii]*np.cos(rlat)
-            
-            txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
-            tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
-            tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
-            
-            #___________________________________________________________________________
-            for ii in range(0,u.shape[1]):
-                v[:,ii] = txr[:,ii]*(-np.sin(lat))*np.cos(lon) - \
-                          tyr[:,ii]*np.sin(lat)*np.sin(lon) + \
-                          tzr[:,ii]*np.cos(lat)
-                u[:,ii] = txr[:,ii]*(-np.sin(lon)) + tyr[:,ii]*np.cos(lon)
-                
-        elif which_index==1:
-            #___________________________________________________________________________
-            for ii in range(0,u.shape[0]):
-                txg[ii,:] = -v[ii,:]*np.sin(rlat)*np.cos(rlon) - u[ii,:]*np.sin(rlon)
-                tyg[ii,:] = -v[ii,:]*np.sin(rlat)*np.sin(rlon) + u[ii,:]*np.cos(rlon)
-                tzg[ii,:] =  v[ii,:]*np.cos(rlat)
-            
-            txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
-            tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
-            tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
-            
-            #___________________________________________________________________________
-            for ii in range(0,u.shape[0]):
-                v[ii,:] = txr[ii,:]*(-np.sin(lat))*np.cos(lon) - \
-                         tyr[ii,:]*np.sin(lat)*np.sin(lon) + \
-                         tzr[ii,:]*np.cos(lat)
-                u[ii,:] = txr[ii,:]*(-np.sin(lon)) + tyr[ii,:]*np.cos(lon)
-            
+        for ii in range(0,u.shape[1]):
+            txg[:,ii] = -v[:,ii]*np.sin(rlat)*np.cos(rlon) - u[:,ii]*np.sin(rlon)
+            tyg[:,ii] = -v[:,ii]*np.sin(rlat)*np.sin(rlon) + u[:,ii]*np.cos(rlon)
+            tzg[:,ii] =  v[:,ii]*np.cos(rlat)
+        
+        txr = rotate_matrix[0,0]*txg + rotate_matrix[0,1]*tyg + rotate_matrix[0,2]*tzg;
+        tyr = rotate_matrix[1,0]*txg + rotate_matrix[1,1]*tyg + rotate_matrix[1,2]*tzg;
+        tzr = rotate_matrix[2,0]*txg + rotate_matrix[2,1]*tyg + rotate_matrix[2,2]*tzg;
+        
+        #___________________________________________________________________________
+        for ii in range(0,u.shape[1]):
+            v[:,ii] = txr[:,ii]*(-np.sin(lat))*np.cos(lon) - \
+                      tyr[:,ii]*np.sin(lat)*np.sin(lon) + \
+                      tzr[:,ii]*np.cos(lat)
+            u[:,ii] = txr[:,ii]*(-np.sin(lon)) + tyr[:,ii]*np.cos(lon)
+        
     return(u,v)
     
     

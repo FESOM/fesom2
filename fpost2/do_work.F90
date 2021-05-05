@@ -16,7 +16,7 @@ IMPLICIT NONE
 
 INTEGER                                    :: year, io, ncid
 real, allocatable, dimension(:)            :: temp, salt, ssh
-character(len=MAX_PATH)                         :: nmlfile
+character(len=100)                         :: nmlfile
 
 nmlfile ='namelist.interp'    ! name of general configuration namelist file
 open (20,file=nmlfile)
