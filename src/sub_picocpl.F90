@@ -25,6 +25,7 @@ subroutine init_picocpl(mesh)
   IMPLICIT NONE
   type(t_mesh), intent(in)          , target :: mesh
   integer                                    :: i, ed, nd, el, k
+  integer                                    :: fileID, ierror
 
 #include "associate_mesh.h"
   ! this will contain nodes around Antarctic
@@ -47,17 +48,29 @@ subroutine init_picocpl(mesh)
   !0.   10. 500. -1. 34.
   !...
   !359. 10. 500. -1. 34.
-  pico_N=360
+
+  if (mype==0) then
+     open(fileID, file='test.dat')
+     read(fileID,*) pico_N
+     write (*,*) 'start reading ', pico_N, ' data points!'
+  end if
+
+  call MPI_BCast(pico_N, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)  
   allocate(pico_lon(pico_N), pico_z_up(pico_N), pico_z_lo(pico_N), pico_data_t(pico_N), pico_data_s(pico_N))
-  pico_lon= (/(i, i=0, 359)/)
-  ! outflow starts at pico_z_up
-  pico_z_up=  10.
-  ! outflow ends at pico_z_lo
-  pico_z_lo= -500.
-  ! create some data for T & S
-  pico_data_t=-1.0
-  pico_data_s=34.0
-  !end reading PICO
+
+  if (mype==0) then
+     do i=1, pico_N
+        read(fileID,*) pico_lon(i), pico_data_s(i), pico_data_t(i), pico_z_up(i), pico_z_lo(i)
+     end do
+     pico_data_t=pico_data_t-273.
+  end if
+
+  call MPI_BCast(pico_lon,    pico_N, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(pico_data_s, pico_N, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(pico_data_t, pico_N, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(pico_z_up,   pico_N, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(pico_z_lo,   pico_N, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+
   !!!
   ! modelled data interpolated onto PICo points
   allocate(f2pico_data_t(pico_N), f2pico_data_s(pico_N), f2pico_count(pico_N))
@@ -121,9 +134,16 @@ subroutine fesom2pico(mesh)
   ! f2pico_data_s<->pico_data_s
   ! do comparison with PICO & output
   if (mype==0) then
+     if (mod(mstep, 10)==1) then
+     OPEN(UNIT=2010, FILE='fesom.dat', POSITION='APPEND') 
+     write(2010,*)'****************** ', mstep, ' ******************'
      do n=1, pico_N
-        write(*,*) pico_lon(n), nint(f2pico_count(n)), f2pico_data_t(n), f2pico_data_s(n)
+        if (f2pico_count(n) > 0.1) then
+           write(2010,*) INT(pico_lon(n)), nint(f2pico_count(n)), pico_data_t(n), f2pico_data_t(n), pico_data_s(n), f2pico_data_s(n)
+        end if     
      end do
+     CLOSE(2010)
+     end if
   end if
 end subroutine fesom2pico
 
