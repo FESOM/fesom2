@@ -114,10 +114,7 @@ subroutine fesom2pico(mesh)
         END DO
      END IF
   END DO
-  where (f2pico_count>0.1)
-         f2pico_data_t=f2pico_data_t/f2pico_count
-         f2pico_data_s=f2pico_data_s/f2pico_count
-  end where
+
   work_array=0.
   call MPI_AllREDUCE(f2pico_data_t , work_array , pico_N, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
   f2pico_data_t=work_array
@@ -129,6 +126,11 @@ subroutine fesom2pico(mesh)
   work_array=0.
   call MPI_AllREDUCE(f2pico_count , work_array , pico_N, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
   f2pico_count=work_array
+
+  where (f2pico_count>0.1)
+         f2pico_data_t=f2pico_data_t/f2pico_count
+         f2pico_data_s=f2pico_data_s/f2pico_count
+  end where
 
   ! f2pico_data_t<->pico_data_t
   ! f2pico_data_s<->pico_data_s
