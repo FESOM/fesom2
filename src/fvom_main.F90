@@ -45,6 +45,9 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
+character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
+integer mpi_version_len
+
 
   if(command_argument_count() > 0) then
     call command_line_options%parse()
@@ -67,6 +70,8 @@ type(t_mesh),             target, save :: mesh
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
+        call MPI_Get_library_version(mpi_version_txt, mpi_version_len, MPIERR)
+        print *,"MPI library version: "//trim(mpi_version_txt)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
