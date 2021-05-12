@@ -88,7 +88,7 @@ subroutine fesom2pico(mesh)
   type(t_mesh), intent(in), target :: mesh
   integer                          :: n, k, ipico
   real(kind=WP)                    :: x
-
+  real(kind=WP)                    :: gammaT=1.e-4, gammaS=1.e-4
 #include "associate_mesh.h"
   f2pico_data_t=0.
   f2pico_data_s=0.
@@ -105,15 +105,24 @@ subroutine fesom2pico(mesh)
         end where
         ipico=minloc(abs(work_array), 1)
         DO k=1, nlevels_nod2D(n)-1
-           if ((zbar_3d_n(k,   n) <= pico_z_up(ipico)) .AND. &
-               (zbar_3d_n(k+1, n) >= pico_z_lo(ipico))) then
-               f2pico_data_t(ipico)=f2pico_data_t(ipico)+tr_arr(k, n, 1) ! here one could do the restoring: (tr_arr(k, n, 1)=tr_arr(k, n, 1)+gamma(pico_data_t-tr_arr(k, n, 1)))
+           if (((zbar_3d_n(k,   n) <= pico_z_up(ipico)) .AND. & !FESOM segment within the PICO segment
+               (zbar_3d_n(k+1, n) >= pico_z_lo(ipico))) .OR.  &!PICO segment within the FESOM segment
+               ((zbar_3d_n(k,   n) <= pico_z_up(ipico)) .AND. &
+               (zbar_3d_n(k+1, n) <= pico_z_lo(ipico)))) then
+               if (pico_data_s(ipico) < 1.) CYCLE !SKIP 
+               tr_arr(k, n, 1)=tr_arr(k, n, 1)+gammaT*(pico_data_t(ipico)-tr_arr(k, n, 1)) !apply nudging
+               tr_arr(k, n, 2)=tr_arr(k, n, 2)+gammaS*(pico_data_s(ipico)-tr_arr(k, n, 2)) !apply nudging
+               f2pico_data_t(ipico)=f2pico_data_t(ipico)+tr_arr(k, n, 1)
                f2pico_data_s(ipico)=f2pico_data_s(ipico)+tr_arr(k, n, 2)
                f2pico_count (ipico)=f2pico_count (ipico)+1.
            end if
         END DO
      END IF
   END DO
+
+  !in case of nudging
+  call exchange_nod(tr_arr(:,:,1))
+  call exchange_nod(tr_arr(:,:,2))
 
   work_array=0.
   call MPI_AllREDUCE(f2pico_data_t , work_array , pico_N, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
