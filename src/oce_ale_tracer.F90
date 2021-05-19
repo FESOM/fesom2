@@ -545,7 +545,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
         a(nz)=0.0_WP
-        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * (area(nz+1,n)/areasvol(nz,n))
+        !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * (area(nz+1,n)/areasvol(nz,n))
+        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n) 
         b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
         
         ! update from the vertical advection --> comes from splitting of vert 
@@ -558,7 +559,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             v_adv =zinv * ( area(nz  ,n)/areasvol(nz,n) )
             b(nz) =b(nz)+Wvel_i(nz, n)*v_adv
             
-            v_adv =zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            !!PS v_adv =zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            v_adv =zinv * area(nz+1,n)/areasvol(nz,n)
             b(nz) =b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
             c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
         end if        
@@ -585,7 +587,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             ! numerical reasons, to gurante that area/areasvol in case of no 
             ! cavity is ==1.0_WP   
             a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv * ( area(nz  ,n)/areasvol(nz,n) ) 
-            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
             ! backup zinv2 for next depth level
@@ -601,7 +604,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
                 !!PS v_adv=v_adv*areasvol(nz+1,n)/areasvol(nz,n)
-                v_adv=zinv * ( area(nz+1,n)/areasvol(nz,n) )
+                !!PS v_adv=zinv * ( area(nz+1,n)/areasvol(nz,n) )
+                v_adv=zinv * area(nz+1,n)/areasvol(nz,n) 
                 b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
                 c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
             end if
@@ -775,7 +779,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         if (use_sw_pene .and. tr_num==1) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
+                !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
+                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv
             end do
         end if
         
