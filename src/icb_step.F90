@@ -275,6 +275,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
  use o_arrays, only: coriolis
 
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
+ USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step
@@ -590,6 +591,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
 ! use o_arrays		!for coriolis_param_elem2D						!=
  
  use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
+ USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
  use g_config, only: steps_per_ib_step
@@ -885,6 +887,7 @@ end subroutine trajectory
 
 subroutine depth_bathy(Zdepth3, elem)  
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -932,6 +935,7 @@ end subroutine depth_bathy
 
 subroutine parallel2coast(u, v, lon,lat, elem)
  use o_mesh		!for index_nod2D, (cavities: for cavity_flag_nod2d)
+ USE MOD_MESH
  use g_parsup		!for myDim_nod2D
 #ifdef use_cavity
  use iceberg_params, only: coastal_nodes
@@ -1047,6 +1051,7 @@ end subroutine parallel2coast
 
 subroutine projection(velocity, n1, n2)
  use o_mesh		!for coord_nod2D
+ USE MOD_MESH
  implicit none
  
  real, dimension(2), intent(inout) :: velocity
@@ -1790,6 +1795,7 @@ subroutine write_buoy_props_netcdf
 ! use o_arrays
 
   use o_mesh
+  USE MOD_MESH
   !use o_passive_tracer_mod
   !use o_age_tracer_mod
   use i_arrays

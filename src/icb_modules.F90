@@ -129,6 +129,7 @@ save
  ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
  logical function reject_elem(elem)
  use o_mesh
+ USE MOD_MESH
  implicit none
  integer, intent(in) :: elem
 
@@ -139,6 +140,7 @@ save
  ! either "real" model boundary nodes or shelf nodes
  integer function coastal_nodes(elem)
  use o_mesh
+ USE MOD_MESH
  implicit none
  integer, intent(in) :: elem
 

@@ -25,7 +25,9 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  use o_param		!for dt
  use o_mesh
  use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
- 
+
+ USE MOD_MESH
+
  implicit none
  
  integer, intent(IN) 	:: ib !current iceberg's index
@@ -608,6 +610,7 @@ end subroutine compute_areas
 
 subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -887,6 +890,7 @@ end subroutine iceberg_average_andkeel
 
 subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param

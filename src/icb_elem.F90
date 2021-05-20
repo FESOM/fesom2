@@ -1,5 +1,6 @@
 subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
  use o_mesh
+ USE MOD_MESH
 
  ! kh 18.03.21 specification of structure used
  use o_arrays, only: eta_n_ib
@@ -46,6 +47,7 @@ end subroutine mean_gradient
 
 subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)  
  use o_mesh
+ USE MOD_MESH
 
  ! kh 18.03.21 specification of structure used
  use o_arrays, only: eta_n_ib
@@ -110,6 +112,7 @@ subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use g_parsup !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
   use o_mesh
+  USE MOD_MESH
 
   implicit none
   real, intent(in)			:: lon, lat 
@@ -161,6 +164,7 @@ end subroutine FEM_eval
 !=================================================================
 subroutine FEM_eval_old(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -328,6 +332,7 @@ end subroutine FEM_3eval
 !=================================================================
 subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -436,6 +441,7 @@ end subroutine FEM_3eval_old
 
 subroutine iceberg_elem4all(elem, lon_deg, lat_deg) 
  use o_mesh		!for index_nod2d, elem2D_nodes
+ USE MOD_MESH
  use g_parsup		!for myDim_nod2D, myList_elem2D
 #ifdef use_cavity
  use iceberg_params, only: reject_elem
@@ -485,6 +491,7 @@ end subroutine iceberg_elem4all
 
 subroutine find_new_iceberg_elem(old_iceberg_elem, pt, left_mype)
   use o_mesh !for index_nod2d, elem2D_nodes
+  USE MOD_MESH
   use o_param
 
 ! kh 18.03.21 not really used here
@@ -554,6 +561,7 @@ SUBROUTINE point_in_triangle(el2D,   pt)
   
   USE o_param
   USE o_mesh
+  USE MOD_MESH
   USE g_parsup !for myDim_elem2D
   IMPLICIT NONE
   
@@ -587,6 +595,7 @@ END SUBROUTINE point_in_triangle
 !position 'coords' are returned
 SUBROUTINE locbafu_2D(values, elem, coords)
   USE o_mesh
+  USE MOD_MESH
   USE o_param
   
   IMPLICIT NONE
@@ -672,6 +681,7 @@ END SUBROUTINE stdbafu_2D
 subroutine global2local(aux)
  use g_parsup !for myDim_elem2D, myList_elem2D
  use o_mesh
+ USE MOD_MESH
  implicit none
  
  integer, dimension(elem2D), intent(out):: aux
@@ -888,6 +898,7 @@ subroutine com_integer(i_have_element, iceberg_element)
 !==============================================================================
 SUBROUTINE processor_distr
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -932,6 +943,7 @@ END SUBROUTINE processor_distr
 !==============================================================================
 SUBROUTINE tides_distr
   use o_mesh
+  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param

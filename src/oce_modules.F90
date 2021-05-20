@@ -203,92 +203,92 @@ USE, intrinsic :: ISO_FORTRAN_ENV
 ! of open boundaries and advection schemes
 ! 
 
-integer, parameter                         :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
-integer                                    ::   nod2D      ! the number of 2D nodes
-real(kind=WP)                              ::   ocean_area
-real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
-integer                                    ::   edge2D     ! the number of 2D edges
-integer                                    ::   edge2D_in  
-                                              ! the number of internal 2D edges
-type addresstype
-    integer                                 :: nmb
-    integer(KIND=8), dimension(:), pointer  :: addresses
-end type addresstype
-
-type(addresstype), allocatable, dimension(:)         ::   nghbr_nod2D !LA for iceberg coupling
-integer                                    ::   elem2D     ! the number of 2D elements
-integer, allocatable, dimension(:,:)       ::   elem2D_nodes
-                                              ! elem2D_nodes(:,n) lists
-				              ! 3 nodes of element n   
-integer, allocatable, dimension(:,:)       ::   edges
-                                              ! edge(:,n) lists 2 nodes
-				              ! edge n
-integer, allocatable, dimension(:,:)       ::   edge_tri
-                                              ! edge_tri(:,n) lists 2 
-				              ! elements containing edge n
-				              ! The first one is to left 
-				              ! of the line directed
-				              ! to the second node
-integer, allocatable, dimension(:,:)       ::   elem_edges
-                                              ! elem_edges(:,n) are edges of 
-                                              ! element n.  
-real(kind=WP), allocatable, dimension(:)   ::   elem_area
-real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
-real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
-integer,allocatable,dimension(:,:)         ::   elem_neighbors
-integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
-real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
-integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
-real(kind=WP),allocatable,dimension(:)     ::   depth
-                                              ! depth(n) is the depths at 
-				              ! node n 
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec 
-                                              ! Coefficients of linear reconstruction
-					      ! of velocities on elements
-real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
-                                              ! Coefficients to compute
-					      ! gradient of scalars on elements
-! LA from FESOM-1.4
-integer, allocatable, dimension(:)          :: index_nod2D
-INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
-! Vertical structure             
-integer                                    :: nl
-real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
-integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
-real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
-real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
-
-
-  type sparse_matrix 
-     integer :: nza
-     integer :: dim
-     real(kind=WP), allocatable, dimension(:)      :: values
-     integer(int32), allocatable,   dimension(:) :: colind
-     integer(int32), allocatable,   dimension(:) :: rowptr
-     integer(int32), allocatable,   dimension(:) :: colind_loc
-     integer(int32), allocatable,   dimension(:) :: rowptr_loc
-  end type sparse_matrix
-! Elevation stiffness matrix
-type(sparse_matrix)                           :: ssh_stiff
-
-! Auxiliary arrays. They are not related to mesh structure, but are 
-! kept here because they are just used for temporary storage in computations
-
-! Open boundary:
-integer                                       :: ob_num  ! number of OB fragments
-
-TYPE ob_type
-    integer      :: len
-    integer, allocatable, dimension(:)       :: list
-END TYPE ob_type
-
-TYPE ob_rhs_type
-    integer      :: len
-    real(kind=WP), allocatable, dimension(:) :: list
-END TYPE ob_rhs_type
-
-type(ob_type), allocatable                    ::  ob_info(:)
-type(ob_rhs_type), allocatable                ::  ob_2rhs(:)
+!integer, parameter                         :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
+!integer                                    ::   nod2D      ! the number of 2D nodes
+!real(kind=WP)                              ::   ocean_area
+!real(kind=WP), allocatable, dimension(:,:) ::   coord_nod2D, geo_coord_nod2D
+!integer                                    ::   edge2D     ! the number of 2D edges
+!integer                                    ::   edge2D_in  
+!                                              ! the number of internal 2D edges
+!type addresstype
+!    integer                                 :: nmb
+!    integer(KIND=8), dimension(:), pointer  :: addresses
+!end type addresstype
+!
+!type(addresstype), allocatable, dimension(:)         ::   nghbr_nod2D !LA for iceberg coupling
+!integer                                    ::   elem2D     ! the number of 2D elements
+!integer, allocatable, dimension(:,:)       ::   elem2D_nodes
+!                                              ! elem2D_nodes(:,n) lists
+!				              ! 3 nodes of element n   
+!integer, allocatable, dimension(:,:)       ::   edges
+!                                              ! edge(:,n) lists 2 nodes
+!				              ! edge n
+!integer, allocatable, dimension(:,:)       ::   edge_tri
+!                                              ! edge_tri(:,n) lists 2 
+!				              ! elements containing edge n
+!				              ! The first one is to left 
+!				              ! of the line directed
+!				              ! to the second node
+!integer, allocatable, dimension(:,:)       ::   elem_edges
+!                                              ! elem_edges(:,n) are edges of 
+!                                              ! element n.  
+!real(kind=WP), allocatable, dimension(:)   ::   elem_area
+!real(kind=WP), allocatable, dimension(:,:) ::   edge_dxdy, edge_cross_dxdy
+!real(kind=WP), allocatable, dimension(:)   ::   elem_cos, metric_factor
+!integer,allocatable,dimension(:,:)         ::   elem_neighbors
+!integer,allocatable,dimension(:,:)         ::   nod_in_elem2D
+!real(kind=WP),allocatable,dimension(:,:)   ::   x_corners, y_corners ! cornes for the scalar points
+!integer,allocatable,dimension(:)           ::   nod_in_elem2D_num
+!real(kind=WP),allocatable,dimension(:)     ::   depth
+!                                              ! depth(n) is the depths at 
+!				              ! node n 
+!real(kind=WP),allocatable,dimension(:,:)    ::   gradient_vec 
+!                                              ! Coefficients of linear reconstruction
+!					      ! of velocities on elements
+!real(kind=WP),allocatable,dimension(:,:)    ::   gradient_sca
+!                                              ! Coefficients to compute
+!					      ! gradient of scalars on elements
+!! LA from FESOM-1.4
+!integer, allocatable, dimension(:)          :: index_nod2D
+!INTEGER,       ALLOCATABLE, DIMENSION(:)    :: bc_index_nod2D(:)
+!! Vertical structure             
+!integer                                    :: nl
+!real(kind=WP), allocatable, dimension(:)    :: zbar, Z,elem_depth
+!integer, allocatable, dimension(:)         :: nlevels, nlevels_nod2D
+!real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
+!real(kind=WP), allocatable, dimension(:)   :: mesh_resolution
+!
+!
+!  type sparse_matrix 
+!     integer :: nza
+!     integer :: dim
+!     real(kind=WP), allocatable, dimension(:)      :: values
+!     integer(int32), allocatable,   dimension(:) :: colind
+!     integer(int32), allocatable,   dimension(:) :: rowptr
+!     integer(int32), allocatable,   dimension(:) :: colind_loc
+!     integer(int32), allocatable,   dimension(:) :: rowptr_loc
+!  end type sparse_matrix
+!! Elevation stiffness matrix
+!type(sparse_matrix)                           :: ssh_stiff
+!
+!! Auxiliary arrays. They are not related to mesh structure, but are 
+!! kept here because they are just used for temporary storage in computations
+!
+!! Open boundary:
+!integer                                       :: ob_num  ! number of OB fragments
+!
+!TYPE ob_type
+!    integer      :: len
+!    integer, allocatable, dimension(:)       :: list
+!END TYPE ob_type
+!
+!TYPE ob_rhs_type
+!    integer      :: len
+!    real(kind=WP), allocatable, dimension(:) :: list
+!END TYPE ob_rhs_type
+!
+!type(ob_type), allocatable                    ::  ob_info(:)
+!type(ob_rhs_type), allocatable                ::  ob_2rhs(:)
 !
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution

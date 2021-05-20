@@ -5,6 +5,7 @@ subroutine reset_ib_fluxes()
 !   use o_arrays
 
     use o_mesh
+    USE MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
@@ -29,6 +30,7 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
 !   use o_arrays
 
     use o_mesh
+    USE MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
@@ -62,6 +64,7 @@ subroutine icb2fesom
     use o_arrays, only: water_flux
 
     use o_mesh
+    USE MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
