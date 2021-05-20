@@ -23,23 +23,12 @@ module g_config
   
   !_____________________________________________________________________________
   ! *** Paths for all in and out ***
-<<<<<<< HEAD
 ! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
-  character(200)         :: MeshPath='./mesh/'
-  character(200)         :: OpbndPath='./opbnd/'
-  character(200)         :: ClimateDataPath='./hydrography/'
-  character(200)         :: ForcingDataPath='./forcing/'
-  character(200)         :: TideForcingPath='./tide_forcing/'
-  character(200)         :: ResultPath='./result/'
-
-  namelist /paths/  MeshPath, OpbndPath, ClimateDataPath, ForcingDataPath, &
-=======
   character(MAX_PATH)        :: MeshPath='./mesh/'
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
   namelist /paths/  MeshPath, ClimateDataPath, &
->>>>>>> wiso
        TideForcingPath, ResultPath
        
   !_____________________________________________________________________________
@@ -111,18 +100,11 @@ module g_config
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
-<<<<<<< HEAD
-  logical                       :: use_floatice = .false.
-  logical                       :: toy_ocean=.false. ! Ersatz forcing has
                                                    ! to be supplied
-  namelist /run_config/ use_ice, use_floatice, use_sw_pene, toy_ocean
- 
   ! *** icebergs ***
   logical                       :: use_icebergs=.false.
-
   logical                       :: use_icesheet_coupling=.false.  
   integer                       :: ib_num=0
-
   integer                       :: steps_per_ib_step=8
 
 ! kh 02.02.21
@@ -134,7 +116,6 @@ module g_config
 
   namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
 
-=======
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
 !wiso-code!!!
@@ -150,7 +131,6 @@ module g_config
                         use_cavity_partial_cell, cavity_partial_cell_thresh, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso !wiso-code add lwiso
   
   !_____________________________________________________________________________
->>>>>>> wiso
   ! *** others ***
   real(kind=WP)                 :: dt
   integer                       :: save_count_mean, save_count_restart

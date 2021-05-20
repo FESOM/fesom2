@@ -168,8 +168,8 @@ type(t_mesh),             target, save :: mesh
     call setup_model          ! Read Namelists, always before clock_init
     call clock_init           ! read the clock file 
     call get_run_steps(nsteps)
-    call mesh_setup
-    !call mesh_setup(mesh)
+    !call mesh_setup
+    call mesh_setup(mesh)
 
     if (mype==0) write(*,*) 'FESOM mesh_setup... complete'
 
