@@ -95,7 +95,7 @@ e_size=myDim_elem2D+eDim_elem2D
 !$omp end parallel sections
   end if
 
- if (use_means) allocate(u_ice_mean(n_size), v_ice_mean(n_size))
+ allocate(u_ice_mean(n_size), v_ice_mean(n_size))
  allocate(U_rhs_ice(n_size), V_rhs_ice(n_size))
  allocate(sigma11(e_size), sigma12(e_size), sigma22(e_size)) 
 
@@ -123,7 +123,7 @@ e_size=myDim_elem2D+eDim_elem2D
 !$omp end parallel sections
   end if
 
- if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
+ allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
  allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))

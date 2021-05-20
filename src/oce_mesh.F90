@@ -255,7 +255,7 @@ type(t_mesh), intent(inout), target :: mesh
   !nod2D=part(npes+1)-1
   !allocate(coord_nod2D(2,myDim_nod2D+eDim_nod2D))
   !! LA from FESOM-1.4
-  allocate(index_nod2D(myDim_nod2D+eDim_nod2D))
+  !allocate(index_nod2D(myDim_nod2D+eDim_nod2D))
   !==========================================================
   mesh%nod2D=part(npes+1)-1
   allocate(mesh%coord_nod2D(2,myDim_nod2D+eDim_nod2D))
@@ -349,7 +349,7 @@ type(t_mesh), intent(inout), target :: mesh
            !coord_nod2D(1,mapping(n))=x
            !coord_nod2D(2,mapping(n))=y
            !! LA from FESOM-1.4
-           index_nod2D(mapping(n))=ibuff(n,2)
+           !index_nod2D(mapping(n))=ibuff(n,2)
            !==========================================
            mesh%coord_nod2D(1,mapping(n))=x
            mesh%coord_nod2D(2,mapping(n))=y
