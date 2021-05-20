@@ -9,17 +9,17 @@
 
 ! ===============================================================
 !=======================================================================
-subroutine communication_nodn
-  use o_MESH
+subroutine communication_nodn(mesh)
+  use MOD_MESH
   use g_PARSUP
   implicit none
-
-  integer                :: n, np, prank, el, r_count, s_count, q, i, j, nod, k, l
-  integer                :: num_send(0:npes-1), num_recv(0:npes-1), nd_count
-  integer, allocatable   :: recv_from_pe(:), send_to_pes(:,:)
-  logical                :: max_laendereck_too_small=.false.
-  integer                :: IERR
-
+  type(t_mesh), intent(in), target :: mesh
+  integer                  :: n, np, prank, el, r_count, s_count, q, i, j, nod, k, l
+  integer                  :: num_send(0:npes-1), num_recv(0:npes-1), nd_count
+  integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
+  logical                  :: max_laendereck_too_small=.false.
+  integer                  :: IERR
+#include "associate_mesh_ini.h"
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
 
@@ -212,24 +212,22 @@ subroutine communication_nodn
   ! comm_nod2D%list(:)
 
   deallocate(recv_from_pe, send_to_pes)
-
-   end subroutine communication_nodn
+end subroutine communication_nodn
 
 !==========================================================================
-subroutine communication_elemn
- 
-  use o_MESH
+subroutine communication_elemn(mesh)
+  use MOD_MESH
   use g_PARSUP
   implicit none
 
-  integer, allocatable  :: recv_from_pe(:), send_to_pes(:,:)
-  logical               :: max_laendereck_too_small=.false.
-  integer               :: n, k, ep, np, prank, el, nod
-  integer               :: p, q, j, elem, i, l, r_count, s_count, el_count
-  integer               :: num_send(0:npes-1), num_recv(0:npes-1)
-  integer               :: IERR
-
-  
+  type(t_mesh), intent(in), target :: mesh
+  integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
+  logical                  :: max_laendereck_too_small=.false.
+  integer                  :: n, k, ep, np, prank, el, nod
+  integer                  :: p, q, j, elem, i, l, r_count, s_count, el_count
+  integer                  :: num_send(0:npes-1), num_recv(0:npes-1)
+  integer                  :: IERR
+#include "associate_mesh_ini.h"
   ! Assume we have 2D partitioning vector in part. Find communication
   ! rules. An elem is external to element n if neither of its nodes 
   ! belongs to PE, but it is among the neighbors. Element n belongs to PE if 
@@ -334,17 +332,6 @@ subroutine communication_elemn
   endif
     
 ! Now, build the send and recv communication data structure
-!!$  com_elem2D%rPEnum = count(num_recv(0:npes-1) > 0)
-!!$  com_elem2D%sPEnum = count(num_send(0:npes-1) > 0)
-
-!!$  if (com_elem2D%rPEnum > MAX_NEIGHBOR_PARTITIONS .or.  &
-!!$       com_elem2D%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
-!!$     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
-!!$     stop
-!!$  endif
-!!$  allocate(com_elem2D%rPE(com_elem2D%rPEnum))
-!!$  allocate(com_elem2D%sPE(com_elem2D%sPEnum))
-
   r_count = 0
   s_count = 0
   com_elem2D%rptr(1) = 1
@@ -370,23 +357,6 @@ subroutine communication_elemn
      print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
      stop
   endif
-
-!!$  r_count = 0
-!!$  s_count = 0
-!!$  allocate(com_elem2D%rptr(com_elem2D%rPEnum+1)) 
-!!$  allocate(com_elem2D%sptr(com_elem2D%sPEnum+1))
-  
-!!$  com_elem2D%rptr(1) = 1
-!!$  com_elem2D%sptr(1) = 1
-!!$  
-!!$  do r_count = 1, com_elem2D%rPEnum
-!!$     np = com_elem2D%rPE(r_count)
-!!$     com_elem2D%rptr(r_count+1) =  com_elem2D%rptr(r_count)+ num_recv(np)
-!!$  enddo
-!!$  do s_count = 1, com_elem2D%sPEnum
-!!$     np = com_elem2D%sPE(s_count)
-!!$     com_elem2D%sptr(s_count+1) =  com_elem2D%sptr(s_count)+ num_send(np)
-!!$  enddo
 
   ! Lists themselves
 
@@ -415,9 +385,6 @@ subroutine communication_elemn
         end if
      end do
   end do
-
-
-
   
   !===========================================
   !  com_elem2D_full
@@ -446,8 +413,6 @@ subroutine communication_elemn
            ! Loop over all elements that belong to node nod 
            do j = 1, nod_in_elem2D_num(nod)  ! and for each node, through its patch
               elem = nod_in_elem2D(j,nod)
-
-!!$              if (elem < 1) cycle  ! boundary, "ghost element"
 
               ! Check for elements to be received
               if (all(part(elem2D_nodes(1:4,elem)) /= mype) .and. recv_from_pe(elem)==-1) then
@@ -497,29 +462,6 @@ subroutine communication_elemn
   endif
 
   ! Now, build the send and recv communication data structure
-!!$  com_elem2D_full%rPEnum = count(num_recv(0:npes-1) > 0)
-!!$  com_elem2D_full%sPEnum = count(num_send(0:npes-1) > 0)
-!!$
-!!$  if (com_elem2D_full%rPEnum > MAX_NEIGHBOR_PARTITIONS .or.  &
-!!$       com_elem2D_full%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
-!!$     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
-!!$     stop
-!!$  endif
-!!$  allocate(com_elem2D_full%rPE(com_elem2D_full%rPEnum))
-!!$  allocate(com_elem2D_full%sPE(com_elem2D_full%sPEnum))
-
-!!$  r_count = 0
-!!$  s_count = 0
-!!$  do np = 0, npes-1
-!!$     if(num_recv(np) /= 0) then
-!!$        r_count = r_count+1
-!!$        com_elem2D_full%rPE(r_count) = np
-!!$     end if
-!!$     if(num_send(np) /= 0) then
-!!$        s_count = s_count+1
-!!$        com_elem2D_full%sPE(s_count) = np
-!!$     end if
-!!$  enddo
 
   r_count = 0
   s_count = 0
@@ -541,23 +483,6 @@ subroutine communication_elemn
 
   com_elem2D_full%rPEnum = r_count
   com_elem2D_full%sPEnum = s_count
-
-!!$  r_count = 0
-!!$  s_count = 0
-!!$  allocate(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1)) 
-!!$  allocate(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1))
-
-!!$  com_elem2D_full%rptr(1) = 1
-!!$  com_elem2D_full%sptr(1) = 1
-!!$
-!!$  do r_count = 1, com_elem2D_full%rPEnum
-!!$     np = com_elem2D_full%rPE(r_count)
-!!$     com_elem2D_full%rptr(r_count+1) =  com_elem2D_full%rptr(r_count)+ num_recv(np)
-!!$  enddo
-!!$  do s_count = 1, com_elem2D_full%sPEnum
-!!$     np = com_elem2D_full%sPE(s_count)
-!!$     com_elem2D_full%sptr(s_count+1) =  com_elem2D_full%sptr(s_count)+ num_send(np)
-!!$  enddo
 
   ! Lists themselves
 
@@ -586,26 +511,18 @@ subroutine communication_elemn
      end do
   end do
 
-  ! mype sends its data to
-  ! comm_elem2D_full%sPEnum external PEs
-  ! Their ranks (numbers) are in array
-  ! comm_elem2D_full%sPE(:)
-  ! Pointers to external node numbers are in
-  ! comm_elem2D_full%sptr(:)
-  ! The node numbers are in 
-  ! comm_elem2D_full%list(:)
-
   deallocate(recv_from_pe, send_to_pes)
-
 end subroutine communication_elemn
 !==========================================================================
-subroutine mymesh
-  use o_MESH
+subroutine mymesh(mesh)
+  use MOD_MESH
   use g_PARSUP 
   implicit none
-  integer                :: n, counter, q, k, elem, q2, eledges(4)
-  integer, allocatable   :: aux(:)
 
+  type(t_mesh), intent(in), target :: mesh
+  integer                  :: n, counter, q, k, elem, q2, eledges(4)
+  integer, allocatable     :: aux(:)
+#include "associate_mesh.h"
   !======= NODES 
 
   ! Owned nodes + external nodes which I need:
@@ -721,7 +638,6 @@ subroutine mymesh
   ! contains external edges which mype needs;    
   ! myList_edge2D(1:myDim_edge2D) contains owned edges +
   ! shared edges which mype updates
-
 end subroutine mymesh
 !=================================================================
 #ifndef FVOM_INIT

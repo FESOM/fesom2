@@ -34,16 +34,16 @@ MODULE g_sbf
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
    USE o_ARRAYS
-   USE o_MESH
+   USE MOD_MESH
    USE o_PARAM
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
    USE g_config, only: dummy, ClimateDataPath, dt
-   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew
+   USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff
-   USE g_read_other_NetCDF, only: read_other_NetCDF
+   USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -82,15 +82,17 @@ MODULE g_sbf
    logical :: l_snow  = .false.
 
    character(10),      save   :: runoff_data_source='CORE2'
-   character(len=256), save   :: nm_runoff_file    ='runoff.nc'
+   character(len=MAX_PATH), save   :: nm_runoff_file    ='runoff.nc'
 
    character(10),      save   :: sss_data_source   ='CORE2'
-   character(len=256), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+   character(len=MAX_PATH), save   :: nm_sss_data_file  ='PHC2_salx.nc'
+
+   logical :: runoff_climatology =.false.
 
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
-   real(wp), allocatable, dimension(:,:),     public     :: sbcdata1,sbcdata2
+   real(4), allocatable, dimension(:,:),     private, save, target     :: sbcdata1_,sbcdata2_
 !   real(wp), allocatable, save, dimension(:), public     :: qns_2   ! downward non solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: qsr_2   ! downward solar heat over the ocean [W/m2]
 !   real(wp), allocatable, save, dimension(:), public     :: emp_2   ! evaporation minus precipitation        [kg/m2/s]
@@ -107,7 +109,7 @@ MODULE g_sbf
 
 
    ! namelists
-   integer, save  :: nm_sbc_unit     = 101       ! unit to open namelist file
+   integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
    integer, save  :: nm_sbc       = 1        ! data  1= constant, 2=from file
@@ -139,6 +141,7 @@ MODULE g_sbf
    integer, save :: nm_nc_idd   = 1       ! initial day of time axis in netCDF
    real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
    integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
+   logical, save :: y_perpetual=.false.
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
@@ -148,8 +151,9 @@ MODULE g_sbf
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
    type, public ::   flfi_type    !flux file informations
-      character(len = 256)                 :: file_name ! file name
+      character(len = MAX_PATH)                 :: file_name ! file name
       character(len = 34)                  :: var_name  ! variable name in the NetCDF file
+      character(len = 34)                  :: calendar  ! variable name in the NetCDF file
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
@@ -157,6 +161,12 @@ MODULE g_sbf
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
+      integer read_forcing_rootrank
+      logical async_netcdf_allowed
+      real(4), allocatable, dimension(:,:)     :: sbcdata_a
+      integer sbcdata_a_t_index
+      real(4), allocatable, dimension(:,:)     :: sbcdata_b
+      integer sbcdata_b_t_index
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -186,6 +196,8 @@ CONTAINS
       integer                      :: nf_start(4)
       integer                      :: nf_edges(4)         
       integer                      :: ierror              ! return error code
+      character(len=20)            :: aux_calendar
+      integer                      :: aux_len
 
       !open file
       if (mype==0) then
@@ -198,30 +210,41 @@ CONTAINS
       ! get dimensions
       if (mype==0) then
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)  
+
       if (mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
-         if      (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+         end if
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name) 
+
       if (mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
          if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time", id_timed)
+                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -230,11 +253,14 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid,    "LAT",      id_lat)
-         if     (iost .ne. NF_NOERR) then
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lat",      id_lat)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "latitude", id_lat)
+         end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -247,24 +273,30 @@ CONTAINS
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lon",       id_lon)
          end if
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,flf%file_name)
+
       if (mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "time", id_time)
          end if
+         if      (iost .ne. NF_NOERR) then
+                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)   
-      
       ! get dimensions size
       if (mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,flf%file_name)
       if (mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
@@ -287,9 +319,10 @@ CONTAINS
       ! only the temporal axis is allowed to vary between the files
          deallocate(flf%nc_time)
            allocate(flf%nc_time(flf%nc_Ntime))
-      end if
-   !read variables from file
-   ! coordinates
+      end if  
+    !____________________________________________________________________________   
+    !read variables from file
+    ! read lat
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlat
@@ -297,6 +330,8 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+    ! read lon  
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlon-2
@@ -306,30 +341,110 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,flf%file_name)
-   ! time
+    !____________________________________________________________________________
+    ! read time axis from file
       if (mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
+         ! digg for calendar attribute in time axis variable         
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name)
+      
+      ! digg for calendar attribute in time axis variable
+      if (mype==0) then
+         iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
+         iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+         aux_calendar = aux_calendar(1:aux_len)
+         
+         if (iost .ne. NF_NOERR) then
+            flf%calendar='none'
+            write(*,*) ' --> could not find/read calendar attribute in the time axis'
+            write(*,*) '     of the forcing file (Is this right?). I assume there is'
+            write(*,*) '     none and proceed in CORE2 style without leap years!'
+         else
+            flf%calendar=lowercase(aux_calendar)
+            write(*,*) ' --> found calendar attr. in time axis: |',trim(flf%calendar),'|' 
+         end if 
+         
+         ! check for calendar and include_fleapyear consistency
+         if ((trim(flf%calendar).eq.'none')   .or. &
+             (trim(flf%calendar).eq.'noleap') .or. &
+             (trim(flf%calendar).eq.'365_days')) then
+            if (include_fleapyear .eqv. .true.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
+                write(*,*) '          but setted include_fleapyear=.true.. CORE forcing '
+                write(*,*) '          does not contain any leap years or particular '
+                write(*,*) '          calender option (julian, gregorian). So if im right,'
+                write(*,*) '          please go to namelist.config and set '
+                write(*,*) '          include_fleapyear=.false. otherwise comment this '
+                write(*,*) '          message block in gen_surface_forcing.F90.'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if
+         elseif ((trim(flf%calendar).eq.'julian')    .or. &
+                 (trim(flf%calendar).eq.'gregorian') .or. &
+                 (trim(flf%calendar).eq.'proleptic_gregorian') .or. &
+                 (trim(flf%calendar).eq.'standard')) then
+            if (include_fleapyear .eqv. .false.) then
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
+                write(*,*) '          NCEP or a similar forcing, Right?, but setted '
+                write(*,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
+                write(*,*) '          all fleapyears and use a specific calendar option '
+                write(*,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
+                write(*,*) '          work properly, when using these forcings '
+                write(*,*) '          include_fleapyear must be true. So if im right, please go'
+                write(*,*) '          to namelist.config and set include_fleapyear=.true. '
+                write(*,*) '          otherwise comment this message block in'
+                write(*,*) '          gen_surface_forcing.F90'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
+                call par_ex(0)
+            end if 
+         else
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' ERROR: I am not familiar with the found calendar option,'
+            write(*,*) '        dont know what to do. Either talk to the FESOM2 developers'
+            write(*,*) '        or add the calendar option by your self in ...'
+            write(*,*) '        gen_surface_forcing.F90, line:364-367'
+            write(*,*) '                                                            '
+            write(*,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
+            write(*,*) '                (trim(flf%calendar).eq."standard")) then    '
+            write(*,*) '                                                            '
+            write(*,*) '        The time axis calendar attribute can be checked for '
+            write(*,*) '        example with ncdump -h forcing_file.nc '
+            write(*,*) '____________________________________________________________'
+            print *, achar(27)//'[0m'
+            call par_ex(0)
+         end if 
+      end if
+      
+    ! transform time axis accorcing to calendar and include_fleapyear=.true./.false. flag  
       flf%nc_time = flf%nc_time / nm_nc_freq + julday(nm_nc_iyear,nm_nc_imm,nm_nc_idd)
       if (nm_nc_tmid/=1) then
          if (flf%nc_Ntime > 1) then
             do i = 1, flf%nc_Ntime-1
-               flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0
+               flf%nc_time(i) = (flf%nc_time(i+1) + flf%nc_time(i))/2.0_WP
             end do
            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
          end if
       end if
       call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
-      !flip lat and data in case of lat from -90 to 90
-      !!!! WARNING this is temporal solution, needs some more checks
+    
+    !___________________________________________________________________________
+    !flip lat and data in case of lat from -90 to 90
+    !!!! WARNING this is temporal solution, needs some more checks
       flip_lat = 0
       if ( flf%nc_Nlat > 1 ) then
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
@@ -346,8 +461,8 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
 
       if (ic_cyclic) then
-         flf%nc_lon(1)      =flf%nc_lon(1)-360.
-         flf%nc_lon(flf%nc_Nlon)=flf%nc_lon(flf%nc_Nlon)+360.
+         flf%nc_lon(1)      =flf%nc_lon(1)-360._WP
+         flf%nc_lon(flf%nc_Nlon)=flf%nc_lon(flf%nc_Nlon)+360._WP
       end if 
    END SUBROUTINE nc_readTimeGrid
 
@@ -356,20 +471,21 @@ CONTAINS
       character(len=4)            :: yyear
 
       write(yyear,"(I4)") yyyy
+      if (y_perpetual)    yyear = ''
 
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name,*) trim(nm_xwind_file),yyear,'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name,*) trim(nm_ywind_file),yyear,'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file),yyear,'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file),yyear,'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file),yyear,'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file),yyear,'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file),yyear,'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file),yyear,'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file),yyear,'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),yyear,'.nc'
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -394,7 +510,7 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   SUBROUTINE nc_sbc_ini(rdate)
+   SUBROUTINE nc_sbc_ini(rdate, mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : initialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
@@ -412,7 +528,9 @@ CONTAINS
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
       type(flfi_type), pointer :: flf
+      type(t_mesh), intent(in)              , target :: mesh
 
+#include "associate_mesh.h"
 
 ! used for interpolate on elements
 !      ALLOCATE( bilin_indx_i(elem2D),bilin_indx_j(elem2D), &
@@ -436,7 +554,7 @@ CONTAINS
          ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
          do i = 1, myDim_nod2D+eDim_nod2D
             x  = geo_coord_nod2D(1,i)/rad
-            if (x < 0) x=x+360.
+            if (x < 0) x=x+360._WP
             y  = geo_coord_nod2D(2,i)/rad
 
             ! find nearest
@@ -471,13 +589,15 @@ CONTAINS
       end if
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
-         call getcoeffld(fld_idx, rdate)
+         call getcoeffld(fld_idx, rdate, mesh)
       end do
          ! interpolate in time
       call data_timeinterp(rdate)
    END SUBROUTINE nc_sbc_ini
 
-   SUBROUTINE getcoeffld(fld_idx, rdate)
+   SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
+      use forcing_provider_async_module
+      use io_netcdf_workaround_module
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!
@@ -511,10 +631,17 @@ CONTAINS
       integer              :: yyyy,mm,dd
       integer              :: ierror              ! return error code
       integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
-      character(len=256), pointer   :: file_name
+      character(len=MAX_PATH), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
+      type(t_mesh), intent(in) , target :: mesh
+      real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
+      logical sbcdata1_from_cache, sbcdata2_from_cache
+      integer rootrank
 
+#include  "associate_mesh.h"
+
+      ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
       nc_Nlon  =>sbc_flfi(fld_idx)%nc_Nlon
       nc_Nlat  =>sbc_flfi(fld_idx)%nc_Nlat
@@ -526,9 +653,16 @@ CONTAINS
       nc_lon   =>sbc_flfi(fld_idx)%nc_lon
       nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
-      ALLOCATE (sbcdata1(nc_Nlon,nc_Nlat), &
-                sbcdata2(nc_Nlon,nc_Nlat), STAT=sbc_alloc )
-      if( sbc_alloc /= 0 )   STOP 'getcoeffld: failed to allocate arrays'
+      if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
+        allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
+        allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
+        sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
+        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed)
+      end if
+      rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
+
+      ! no initialization of sbcdata required, the whole array will be overwritten anyway
 
       ! find time index in files
       now_date = rdate
@@ -555,49 +689,94 @@ CONTAINS
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
+
+
+      ! determine if we can use the broadcast cache
+      if(yearold == yearnew) then ! todo: simplify if clause
+        if(sbc_flfi(fld_idx)%sbcdata_a_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+        else if(sbc_flfi(fld_idx)%sbcdata_b_t_index == t_indx) then
+          sbcdata1_from_cache = .true.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_b
+        
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_a ! 
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx_p1
+        else
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+        end if
+      else
+          sbcdata1_from_cache = .false.
+          sbcdata1 => sbc_flfi(fld_idx)%sbcdata_a
+          sbc_flfi(fld_idx)%sbcdata_a_t_index = t_indx
+
+          sbcdata2_from_cache = .false.
+          sbcdata2 => sbc_flfi(fld_idx)%sbcdata_b
+          sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
+      end if
+      sbcdata2_from_cache = .false.         
+
+      iost = 0
       !open file sbc_flfi
       if (mype==0) then
          !write(*,*) 'check: ', trim(file_name)
-         iost = nf_open(trim(file_name),NF_NOWRITE,ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-      ! get variable id
-      if (mype==0) then
-          iost = nf_inq_varid(ncid, var_name, id_data)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
+
       !read data from file
-      if (mype==0) then
+      if (mype==rootrank) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
          nf_edges(2)=nc_Nlat
          nf_start(3)=t_indx
          nf_edges(3)=1
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+         if(.not. sbcdata1_from_cache) then
+           call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
+         end if
+         iost = 0
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,file_name)
-      if (mype==0) then
-         sbcdata1(1,1:nc_Nlat)       =sbcdata1(nc_Nlon-1,1:nc_Nlat)
-         sbcdata1(nc_Nlon,1:nc_Nlat) =sbcdata1(2,1:nc_Nlat)
+
+      if(mype == rootrank) then
+        if(.not. sbcdata1_from_cache) then
+           sbcdata1(1, 1:nc_Nlat)       = sbcdata1(nc_Nlon-1, 1:nc_Nlat)
+           sbcdata1(nc_Nlon,1:nc_Nlat) = sbcdata1(2, 1:nc_Nlat)
+        end if
       end if
-      call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      if(sbcdata1_from_cache) then ! use the cache instead of bcast
+      else
+        call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+     end if
+
        ! read next time step in file (check for +1 done before)
-      if (mype==0) then
-         nf_start(3)=t_indx_p1
-         nf_edges(3)=1
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
+      if (mype==rootrank) then
+        nf_start(3)=t_indx_p1
+        nf_edges(3)=1
+        if(.not. sbcdata2_from_cache) then
+        call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx_p1, sbcdata2(2:nc_Nlon-1,1:nc_Nlat))
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost, file_name)
-      if (mype==0) then
-         sbcdata2(1, 1:nc_Nlat)       =sbcdata2(nc_Nlon-1,1:nc_Nlat)
-         sbcdata2(nc_Nlon, 1:nc_Nlat) =sbcdata2(2,1:nc_Nlat)
+      iost = 0
       end if
-      call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+
+      if (mype==rootrank) then
+        if(.not. sbcdata2_from_cache) then
+         sbcdata2(1, 1:nc_Nlat)       = sbcdata2(nc_Nlon-1, 1:nc_Nlat)
+         sbcdata2(nc_Nlon, 1:nc_Nlat) = sbcdata2(2, 1:nc_Nlat)
+        end if
+      end if
+     if(sbcdata2_from_cache) then ! use the cache instead of bcast
+      !
+     else
+       call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+     end if
+
 !      !flip data in case of lat from -90 to 90
 !      !!!! WARNING
 !      if ( flip_lat == 1 ) then
@@ -614,7 +793,7 @@ CONTAINS
          ip1 = i + 1
          jp1 = j + 1
          x  = geo_coord_nod2D(1,ii)/rad
-         if (x < 0) x=x+360.
+         if (x < 0.0_WP) x=x+360._WP
          y  = geo_coord_nod2D(2,ii)/rad
          extrp = 0
          if ( i == 0 ) then
@@ -667,12 +846,6 @@ CONTAINS
       end do !ii
 !!$OMP END DO
 !!$OMP END PARALLEL
-      if (mype==0) then
-         iost = nf_close(ncid)
-      end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost, file_name)
-      DEALLOCATE( sbcdata2, sbcdata1 )
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate)
@@ -693,15 +866,15 @@ CONTAINS
 !!$OMP DO
       do fld_idx = 1, i_totfl
          do i = 1, myDim_nod2D+eDim_nod2D
+            ! store processed forcing data for fesom computation
             atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
          end do !nod2D
       end do !fld_idx
 !!$OMP END DO
 !!$OMP END PARALLEL
-
    END SUBROUTINE data_timeinterp
 
-   SUBROUTINE sbc_ini
+   SUBROUTINE sbc_ini(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_ini ***
       !!
@@ -717,14 +890,15 @@ CONTAINS
       integer            :: sbc_alloc                   !: allocation status
 
       real(wp)           :: tx, ty
+      type(t_mesh), intent(in)   , target :: mesh
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
-                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, &
+                        nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
-                        nm_runoff_file, runoff_data_source, nm_sss_data_file, sss_data_source
+                        nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
@@ -736,9 +910,10 @@ CONTAINS
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
+      
       if (mype==0) write(*,*) "Start: Ocean forcing inizialization."
       rdate = real(julday(yearnew,1,1))
-      rdate = rdate+real(daynew-1)+timenew/86400.
+      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP
       idate = int(rdate)
 
       if (mype==0) then
@@ -835,28 +1010,34 @@ CONTAINS
       ALLOCATE( coef_a(i_totfl,myDim_nod2D+eDim_nod2D), coef_b(i_totfl,myDim_nod2D+eDim_nod2D), &
               & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), &
                    &      STAT=sbc_alloc )
+      coef_a       = 0.0_WP             
+      coef_b       = 0.0_WP
+      atmdata      = 0.0_WP
 
       ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
               & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
                    &      STAT=sbc_alloc )
-
+      bilin_indx_i = 0.0_WP
+      bilin_indx_j = 0.0_WP
+      qns          = 0.0_WP
+      emp          = 0.0_WP
+      qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
-
-      call nc_sbc_ini(rdate)
+      call nc_sbc_ini(rdate, mesh)
       !==========================================================================
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false.) 
-         runoff=runoff/1000.0  ! Kg/s/m2 --> m/s
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
+         runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
       if (mype==0) write(*,*) "DONE:  Ocean forcing inizialization."
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
 
-   SUBROUTINE sbc_do
+   SUBROUTINE sbc_do(mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -869,17 +1050,20 @@ CONTAINS
 
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
-      logical      :: do_rotation, force_newcoeff
+      logical      :: do_rotation, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-
-     
+      character(len=MAX_PATH)   :: filename
+      type(t_mesh), intent(in) , target :: mesh
+      
+#include  "associate_mesh.h"
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
-         rdate = real(julday(yearnew,1,1))
+         rdate = real(julday(yearnew,1,1),WP)
          call calendar_date(int(rdate),yyyy,dd,mm)
+         ! use next set of forcing files
          call nc_sbc_ini_fillnames(yyyy)
          ! we assume that all NetCDF files have identical grid and time variable
          do fld_idx = 1, i_totfl
@@ -889,8 +1073,8 @@ CONTAINS
       end if
       
 
-      rdate = real(julday(yearnew,1,1))
-      rdate = rdate+real(daynew-1)+timenew/86400.-dt/86400./2.
+      rdate = real(julday(yearnew,1,1),WP)
+      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
       do_rotation=.false.
 
       do fld_idx = 1, i_totfl
@@ -900,7 +1084,7 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
-            call getcoeffld(fld_idx, rdate)
+            call getcoeffld(fld_idx, rdate, mesh)
             if (fld_idx==i_xwind) do_rotation=.true.
          endif
       end do
@@ -912,16 +1096,55 @@ CONTAINS
          end do
       end if
       
-      if (surf_relax_S > 0.) then
+      !==========================================================================
+
+      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+
+      ! read in SSS for applying SSS restoring
+      if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
-            if ((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400.)) then
+            if (update_monthly_flag) then
                i=month+1
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true.) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
             end if
          end if
       end if
+
+     ! runoff  
+     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+       
+       if(update_monthly_flag) then
+         if(runoff_climatology) then
+           !climatology monthly mean
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+           filename=trim(nm_runoff_file)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         else
+           !monthly data
+
+           i=month+1
+           if (i > 12) i=1
+           if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
+           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+
+           !kg/m2/s -> m/s
+           runoff=runoff/1000.0_WP
+
+         end if
+       end if
+
+     end if
+
 
       ! interpolate in time
       call data_timeinterp(rdate)
@@ -938,7 +1161,7 @@ CONTAINS
       !!----------------------------------------------------------------------
    IMPLICIT NONE
       integer, intent(in)            :: iost
-      character(len=256), intent(in) :: fname
+      character(len=MAX_PATH), intent(in) :: fname
       write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
       STOP 'ERROR:  stop'
 
@@ -951,11 +1174,15 @@ CONTAINS
       integer, INTENT(IN) :: mm, dd, yyyy
       integer             :: julday
       ! In this routine julday returns the Julian Day Number that begins at noon of the calendar     
-      !    date specified by month mm , day dd , and year yyyy , all integer variables. Positive year
+      !    date specified by month mm, day dd , and year yyyy, all integer variables. Positive year
       !    signifies A.D.; negative, B.C. Remember that the year after 1 B.C. was 1 A.D. (from Num. Rec.)
       integer, PARAMETER  :: IGREG=15+31*(10+12*1582)
       ! Gregorian Calendar adopted Oct. 15, 1582.
       integer             :: ja,jm,jy
+      if (y_perpetual) then !to work with COREI forcing
+         julday=0
+         return
+      end if
       if (include_fleapyear) then
          jy = yyyy
          if (jy == 0) STOP 'julday: there is no year zero'
@@ -966,10 +1193,10 @@ CONTAINS
             jy=jy-1
             jm=mm+13
          endif
-         julday=int(365.25_wp*jy)+int(30.6001_wp*jm)+dd+1720995
+         julday=int(365.25_WP*jy)+int(30.6001_WP*jm)+dd+1720995
          !Test whether to change to Gregorian Calendar.
          if (dd+31*(mm+12*yyyy) >= IGREG) then
-            ja=int(0.01*jy)
+            ja=int(0.01_WP*jy)
             julday=julday+2-ja+int(0.25_wp*ja)
          end if
        else
@@ -993,25 +1220,25 @@ CONTAINS
       !-----------------------------------------------------------------------
       if (include_fleapyear) then
          if (julian >= IGREG ) then
-            x = ((julian-1867216)-0.25)/36524.25
+            x = ((julian-1867216)-0.25_WP)/36524.25_WP
             ja = julian+1+int(x)-int(0.25*x)
          else
             ja = julian
          end if
 
          jb = ja+1524
-         jc = int(6680 + ((jb-2439870)-122.1)/365.25)
-         jd = int(365*jc+(0.25*jc))
-         je = int((jb-jd)/30.6001)
+         jc = int(6680 + ((jb-2439870)-122.1_WP)/365.25_WP)
+         jd = int(365*jc+(0.25_WP*jc))
+         je = int((jb-jd)/30.6001_WP)
 
-         dd = jb-jd-int(30.6001*je)
+         dd = jb-jd-int(30.6001_WP*je)
          mm = je-1
          if (mm > 12) mm = mm-12
          yyyy = jc - 4715
          if (mm > 2) yyyy = yyyy-1
          if (yyyy <= 0) yyyy = yyyy-1
       else
-         yyyy=int((real(julian)+1.e-12)/365.)
+         yyyy=int((real(julian)+1.e-12_WP)/365._WP)
          mm=-1 !not supported (no need so far)
          dd=-1 !not supported (no need so far)
       end if
@@ -1019,7 +1246,6 @@ CONTAINS
    END SUBROUTINE calendar_date
 
    SUBROUTINE sbc_end
-
       IMPLICIT NONE
       integer      :: fld_idx      
       do fld_idx = 1, i_totfl     
@@ -1029,14 +1255,11 @@ CONTAINS
       DEALLOCATE( coef_a, coef_b, atmdata, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
-
-
-
    END SUBROUTINE sbc_end
 
    SUBROUTINE check_nferr(iost,fname)
    IMPLICIT NONE
-      character(len=256), intent(in) :: fname
+      character(len=MAX_PATH), intent(in) :: fname
       integer, intent(in) :: iost
 
       if (iost .ne. NF_NOERR) then
@@ -1044,7 +1267,7 @@ CONTAINS
          call par_ex
          stop
       endif
-   END SUBROUTINE
+   END SUBROUTINE check_nferr
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
@@ -1071,7 +1294,7 @@ CONTAINS
    !   if (present(delta) .eqv. .true.) then
    !      d = delta
    !   else
-      d = 1e-9
+      d = 1e-9_WP
    !   endif
       left = 1
       right = length
@@ -1079,7 +1302,7 @@ CONTAINS
          if (left > right) then
             exit
          endif
-         middle = nint((left+right) / 2.0)
+         middle = nint((left+right) / 2.0_WP)
          if ( abs(array(middle) - value) <= d) then
             ind = middle
             return
@@ -1228,7 +1451,7 @@ CONTAINS
    evap = 0.0_wp
    w = sqrt(u10*u10+v10*v10)
 
-   if (sst .lt. 100.) then
+   if (sst .lt. 100._WP) then
       tw  = sst
       tw_k= sst+kelvin
    else
@@ -1236,7 +1459,7 @@ CONTAINS
       tw_k= sst
    end if
 
-   if (airt .lt. 100.) then
+   if (airt .lt. 100._WP) then
       ta_k  = airt + kelvin
       ta = airt
    else
@@ -1252,17 +1475,17 @@ CONTAINS
    taux = 0.0_wp
    tauy = 0.0_wp
    delw=sqrt(w*w+wgust*wgust)
-   if (delw .ne. 0.0) then
+   if (delw .ne. 0.0_WP) then
 !-----------------------------------------------------------------------
 !     Compute Monin-Obukhov similarity parameters for wind (Wstar),
 !     heat (Tstar), and moisture (Qstar), Liu et al. (1979).
 !-----------------------------------------------------------------------
 
 !     Kinematic viscosity of dry air (m2/s), Andreas (1989).
-      vis_air=1.326e-5*(1.0+ta*(6.542e-3+ta*(8.301e-6-4.84e-9*ta)))
+      vis_air=1.326e-5_WP*(1.0_WP+ta*(6.542e-3_WP+ta*(8.301e-6_WP-4.84e-9_WP*ta)))
 
 !     Compute latent heat of vaporization (J/kg) at sea surface
-      L = (2.501-0.00237*tw)*1.e6
+      L = (2.501_WP-0.00237_WP*tw)*1.e6_WP
 !
 !     Assume that wind is measured relative to sea surface and include
 !     gustiness.
@@ -1272,24 +1495,24 @@ CONTAINS
       delt=ta-tw
 
 !     Initial guesses for Monin-Obukhov similarity scales.
-      ZWoL=0.0
-      ZoW=0.0005
-      Wstar=0.04*delw
-      Tstar=0.04*delt
-      Qstar=0.04*delq
-      TVstar=Tstar*(1.0+0.61*qa)+0.61*ta_k*Qstar
+      ZWoL=0.0_WP
+      ZoW=0.0005_WP
+      Wstar=0.04_WP*delw
+      Tstar=0.04_WP*delt
+      Qstar=0.04_WP*delq
+      TVstar=Tstar*(1.0_WP+0.61_WP*qa)+0.61_WP*ta_k*Qstar
 
 !     Compute Richardson number.
-      ri=g*zw*(delt+0.61*ta_k*delq)/(ta_k*delw*delw)
+      ri=g*zw*(delt+0.61_WP*ta_k*delq)/(ta_k*delw*delw)
 
 !     Fairall computes turbulent fluxes only if Ri< 0.25
-      if ( ri .le. 0.25) then
+      if ( ri .le. 0.25_WP) then
 !        Iterate until convergence or when IER is negative.  It usually
 !        converges within four iterations.
          do iter=1,itermax
             if ( ier .ge. 0 ) then
 !              Compute Monin-Obukhov stability parameter, Z/L.
-               oL=g*kappa*TVstar/(ta_k*(1.0+0.61*qa)*Wstar*Wstar)
+               oL=g*kappa*TVstar/(ta_k*(1.0_WP+0.61_WP*qa)*Wstar*Wstar)
                ZWoL=zw*oL
                ZToL=zt*oL
                ZQoL=zq*oL
@@ -1300,14 +1523,14 @@ CONTAINS
                qpsi=psi(2,ZQoL)
 
 !              Compute wind scaling parameters, Wstar.
-               ZoW=0.011*Wstar*Wstar/g+0.11*vis_air/Wstar
+               ZoW=0.011_WP*Wstar*Wstar/g+0.11_WP*vis_air/Wstar
                Wstar=delw*kappa/(log(zw/ZoW)-wpsi)
 
 !              Computes roughness Reynolds number for wind (Rr), heat (Rt),
 !              and moisture (Rq). Use Liu et al. (1976) look-up table to
 !              compute "Rt" and "Rq" as function of "Rr".
                rr=ZoW*Wstar/vis_air
-               if ((rr .ge. 0.0).and.(rr .lt. 1000.0)) then
+               if ((rr .ge. 0.0_WP).and.(rr .lt. 1000.0_WP)) then
                   do k=1,8
                      if ((liu_rr(k).le.rr).and.(rr .lt. liu_rr(k+1))) then
                         rt=liu_a(k,1)*rr**liu_b(k,1)
@@ -1325,7 +1548,7 @@ CONTAINS
                   Qstar=(delq)*cff/(log(zq/ZoQ)-qpsi)
 
 !                 Compute gustiness in wind speed.
-                  TVstar=Tstar*(1.0+0.61*qa)+0.61*ta_k*Qstar
+                  TVstar=Tstar*(1.0_WP+0.61_WP*qa)+0.61_WP*ta_k*Qstar
                   bf=-g/ta_k*Wstar*TVstar
                   if (bf .gt. 0) then
                      wgus=beta*(bf*Zabl)**r3
@@ -1352,11 +1575,11 @@ CONTAINS
 !           compute sensible heatflux due to rain fall
             if (rain_impact) then
 !              units of qs and qa - should be kg/kg
-               rainfall=precip * 1000. ! (convert from m/s to kg/m2/s)
-               x1 = 2.11e-5*(ta_k/kelvin)**1.94
-               x2 = 0.02411*(1.0+ta*(3.309e-3-1.44e-6*ta))/(rhoa*cpa)
+               rainfall=precip * 1000._WP ! (convert from m/s to kg/m2/s)
+               x1 = 2.11e-5_WP*(ta_k/kelvin)**1.94_WP
+               x2 = 0.02411_WP*(1.0_WP+ta*(3.309e-3_WP-1.44e-6_WP*ta))/(rhoa*cpa)
                x3 = qa * L /(rgas * ta_K * ta_K)
-               cd_rain = 1.0/(1.0+const06*(x3*L*x1)/(cpa*x2))
+               cd_rain = 1.0_WP/(1.0_WP+const06*(x3*L*x1)/(cpa*x2))
                cd_rain = cd_rain*cpw*((tw-ta) + (qs-qa)*L/cpa)
                qe = qe - rainfall * cd_rain
             end if
@@ -1365,14 +1588,14 @@ CONTAINS
             qh=L*rhoa*Wstar*Qstar
 
 !           Compute Webb correction (Webb effect) to latent heat flux
-            upvel=-1.61*Wstar*Qstar-(1.0+1.61*qa)*Wstar*Tstar/ta_k
+            upvel=-1.61_WP*Wstar*Qstar-(1.0_WP+1.61_WP*qa)*Wstar*Tstar/ta_k
             qh=qh-rhoa*L*upvel*qa
 
 !           calculation of evaporation/condensation in m/s
             if (rain_impact .and. calc_evaporation) then
                evap = rhoa/rho_0*Wstar*Qstar
             else
-               evap = 0.0_wp
+               evap = 0.0_WP
             end if
 
 !           Compute wind stress components (N/m2), Tau.
@@ -1383,7 +1606,7 @@ CONTAINS
 !           Compute momentum flux (N/m2) due to rainfall (kg/m2/s).
 !           according to Caldwell and Elliott (1971, JPO)
             if ( rain_impact ) then
-               tmp  = 0.85d0 * rainfall
+               tmp  = 0.85_WP * rainfall
                taux  = taux + tmp * u10
                tauy  = tauy + tmp * v10
             end if
@@ -1451,32 +1674,32 @@ CONTAINS
 !BOC
 !  saturation vapor pressure - using SST
    es = a1 +tw*(a2+tw*(a3+tw*(a4+tw*(a5+tw*(a6+tw*a7)))))
-   es = es * 100.0 ! Conversion millibar --> Pascal
+   es = es * 100.0_WP ! Conversion millibar --> Pascal
 
 !  correction for seawater, following Kraus 1972
 !  correcting for salt water assuming 98% RH
-   es=0.98 * es
+   es=0.98_WP * es
 !  saturation specific humidity
-   qs = const06*es/(airp-0.377*es)
+   qs = const06*es/(airp-0.377_WP*es)
 
 !  must be also calcuated for airtemperature, depending on humidity input
 !  see ../ncdf/ncdf_meteo.F90 for defined constants
    select case (hum_method)
       case (1) ! relative humidity in % given
-         rh = 0.01 * hum
+         rh = 0.01_WP * hum
 !        saturation vapor pressure at that air temperature
          ea = a1 +ta*(a2+ta*(a3+ta*(a4+ta*(a5+ta*(a6+ta*a7)))))
-         ea = ea * 100.0 ! Conversion millibar --> Pascal
+         ea = ea * 100.0_WP ! Conversion millibar --> Pascal
 !        get actual vapor pressure
          ea = rh * ea
 !        convert to specific humidity
-         qa = const06*ea/(airp-0.377*ea)
+         qa = const06*ea/(airp-0.377_WP*ea)
       case (2)  ! Specific humidity from wet bulb temperature
 !        calculate the SVP at wet bulb temp then
 !        use the psychrometer formula to get vapour pressure
 !        See Smithsonian Met tables 6th Edition pg 366 eqn 3
 !        Make sure this is in degC
-         if (hum .lt. 100 ) then
+         if (hum .lt. 100.0_WP ) then
             twet_k=hum + kelvin
             twet=hum
          else
@@ -1485,13 +1708,13 @@ CONTAINS
          end if
 !        saturation vapor pressure at wet bulb temperature
          ea = a1 +twet*(a2+twet*(a3+twet*(a4+twet*(a5+twet*(a6+twet*a7)))))
-         ea = ea * 100.0 ! Conversion millibar --> Pascal
+         ea = ea * 100.0_WP ! Conversion millibar --> Pascal
 !        actual vapor pressure
-         ea = ea - 6.6e-4*(1+1.15e-3*twet)*airp*(ta-twet)
+         ea = ea - 6.6e-4_WP*(1+1.15e-3_WP*twet)*airp*(ta-twet)
 !        specific humidity in kg/kg
-         qa = const06*ea/(airp-0.377*ea)
+         qa = const06*ea/(airp-0.377_WP*ea)
       case (3)  ! Specific humidity from dew point temperature
-         if (hum .lt. 100.) then
+         if (hum .lt. 100._WP) then
             dew = hum
             dew_k = hum + kelvin
          else
@@ -1499,18 +1722,18 @@ CONTAINS
             dew_k = hum
          end if
          ea = a1 +dew*(a2+dew*(a3+dew*(a4+dew*(a5+dew*(a6+dew*a7)))))
-         ea = ea * 100.0 ! Conversion millibar --> Pascal
-         qa = const06*ea/(airp-0.377*ea)
+         ea = ea * 100.0_WP ! Conversion millibar --> Pascal
+         qa = const06*ea/(airp-0.377_WP*ea)
       case (4)
 !        specific humidity in kg/kg is given
          qa = hum
 !        actual water vapor pressure in Pascal
-         ea = qa *airp/(const06+0.378*qa)
+         ea = qa *airp/(const06+0.378_WP*qa)
       case default
          stop 'not a valid hum_method bulk_fluxes()'
    end select
 
-   rhoa = airp/(rgas*(ta+kelvin)*(1.0+const06*qa))
+   rhoa = airp/(rgas*(ta+kelvin)*(1.0_WP+const06*qa))
 
    return
    end subroutine humidity
@@ -1553,34 +1776,34 @@ CONTAINS
 
 !  Initialize for the zero "ZoL" case.
 !
-   psi=0.0
+   psi=0.0_WP
 !
 !  Unstable conditions.
 !
-   if (ZoL .lt. 0.0) then
-      chik=(1.0-16.0*ZoL)**0.25
+   if (ZoL .lt. 0.0_WP) then
+      chik=(1.0_WP-16.0_WP*ZoL)**0.25_WP
       if (iflag .eq. 1) then
-         psik=2.0*LOG(0.5*(1.0+chik))+LOG(0.5*(1.0+chik*chik))-   &
-              2.0*ATAN(chik)+ 0.5*pi
+         psik=2.0_WP*LOG(0.5_WP*(1.0_WP+chik))+LOG(0.5_WP*(1.0_WP+chik*chik))-   &
+              2.0_WP*ATAN(chik)+ 0.5_WP*pi
       else if (iflag .eq. 2) then
-            psik=2.0*LOG(0.5*(1.0+chik*chik))
+            psik=2.0_WP*LOG(0.5_WP*(1.0_WP+chik*chik))
       end if
 !
 !  For very unstable conditions, use free-convection (Fairall).
 !
-      chic=(1.0-12.87*ZoL)**r3
-      psic=1.5*LOG(r3*(1.0+chic+chic*chic))-                    &
-         sqr3*ATAN((1.0+2.0*chic)/sqr3)+ pi/sqr3
+      chic=(1.0_WP-12.87_WP*ZoL)**r3
+      psic=1.5_WP*LOG(r3*(1.0_WP+chic+chic*chic))-                    &
+         sqr3*ATAN((1.0_WP+2.0_WP*chic)/sqr3)+ pi/sqr3
 !
 !  Match Kansas and free-convection forms with weighting Fw.
 !
-      Fw=1.0/(1.0+ZoL*ZoL)
-      psi=Fw*psik+(1.0-Fw)*psic
+      Fw=1.0_WP/(1.0_WP+ZoL*ZoL)
+      psi=Fw*psik+(1.0_WP-Fw)*psic
 !
 !  Stable conditions.
 !
-   else if (ZoL .gt. 0.0) then
-      psi=-4.7*ZoL
+   else if (ZoL .gt. 0.0_WP) then
+      psi=-4.7_WP*ZoL
    end if
 
    return
@@ -1672,30 +1895,30 @@ CONTAINS
 !        Clark et al. (1974) formula.
 !        unit of ea is Pascal, must hPa
 !        Black body defect term, clouds, water vapor correction
-         x1=(1.0-ccf*cloud*cloud)*(tw**4)
-         x2=(0.39-0.05*sqrt(ea*0.01))
+         x1=(1.0_WP-ccf*cloud*cloud)*(tw**4)
+         x2=(0.39_WP-0.05_WP*sqrt(ea*0.01_WP))
 !        temperature jump term
-         x3=4.0*(tw**3)*(tw-ta)
+         x3=4.0_WP*(tw**3)*(tw-ta)
          qb=-emiss*bolz*(x1*x2+x3)
       case(hastenrath) ! qa in g(water)/kg(wet air)
 !        Hastenrath and Lamb (1978) formula.
-         x1=(1.0-ccf*cloud*cloud)*(tw**4)
-         x2=(0.39-0.056*sqrt(1000.0*qa))
-         x3=4.0*(tw**3)*(tw-ta)
+         x1=(1.0_WP-ccf*cloud*cloud)*(tw**4)
+         x2=(0.39_WP-0.056_WP*sqrt(1000.0_WP*qa))
+         x3=4.0_WP*(tw**3)*(tw-ta)
          qb=-emiss*bolz*(x1*x2+x3)
       case(bignami)
 !        Bignami et al. (1995) formula (Med Sea).
 !        unit of ea is Pascal, must hPa
-         ccf=0.1762
-         x1=(1.0+ccf*cloud*cloud)*ta**4
-         x2=(0.653+0.00535*(ea*0.01))
+         ccf=0.1762_WP
+         x1=(1.0_WP+ccf*cloud*cloud)*ta**4
+         x2=(0.653_WP+0.00535_WP*(ea*0.01_WP))
          x3= emiss*(tw**4)
          qb=-bolz*(-x1*x2+x3)
       case(berliand)
 !        Berliand & Berliand (1952) formula (ROMS).
-         x1=(1.0-0.6823*cloud*cloud)*ta**4
-         x2=(0.39-0.05*sqrt(0.01*ea))
-         x3=4.0*ta**3*(tw-ta)
+         x1=(1.0_WP-0.6823_WP*cloud*cloud)*ta**4
+         x2=(0.39_WP-0.05_WP*sqrt(0.01_WP*ea))
+         x3=4.0_WP*ta**3*(tw-ta)
          qb=-emiss*bolz*(x1*x2+x3)
       case default
    end select
@@ -1748,17 +1971,17 @@ CONTAINS
    rlon = deg2rad*dlon
    rlat = deg2rad*dlat
 
-   yrdays=365.25
+   yrdays=365.25_WP
 
-   th0 = 2.*pi*yday/yrdays
-   th02 = 2.*th0
-   th03 = 3.*th0
+   th0 = 2._WP*pi*yday/yrdays
+   th02 = 2._WP*th0
+   th03 = 3._WP*th0
 !  sun declination :
-   sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
-           - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
-           - 0.002697*cos(th03) + 0.001480*sin(th03)
+   sundec = 0.006918_WP - 0.399912_WP*cos(th0) + 0.070257_WP*sin(th0)         &
+           - 0.006758_WP*cos(th02) + 0.000907_WP*sin(th02)                 &
+           - 0.002697_WP*cos(th03) + 0.001480_WP*sin(th03)
 !  sun hour angle :
-   thsun = (hh-12.)*15.*deg2rad + rlon
+   thsun = (hh-12._WP)*15._WP*deg2rad + rlon
 
 !  cosine of the solar zenith angle :
    coszen =sin(rlat)*sin(sundec)+cos(rlat)*cos(sundec)*cos(thsun)
@@ -1833,24 +2056,24 @@ CONTAINS
 !-----------------------------------------------------------------------
 !BOC
    coszen = cos(deg2rad*zenith_angle)
-   if (coszen .le. 0.0) then
-      coszen = 0.0
-      qatten = 0.0
+   if (coszen .le. 0.0_WP) then
+      coszen = 0.0_WP
+      qatten = 0.0_WP
    else
       qatten = tau**(1.0_wp/coszen)
    end if
 
    qzer  = coszen * solar
    qdir  = qzer * qatten
-   qdiff = ((1.0_wp-aozone)*qzer - qdir) * 0.5
+   qdiff = ((1.0_wp-aozone)*qzer - qdir) * 0.5_WP
    qtot  =  qdir + qdiff
 
 !  from now on everything in radians
    rlon = deg2rad*dlon
    rlat = deg2rad*dlat
 
-   yrdays=365.
-   eqnx = (yday-81.)/yrdays*2.*pi
+   yrdays=365._WP
+   eqnx = (yday-81._WP)/yrdays*2._WP*pi
 !  sin of the solar noon altitude in radians :
    sunbet=sin(rlat)*sin(eclips*sin(eqnx))+cos(rlat)*cos(eclips*sin(eqnx))
 !  solar noon altitude in degrees :
@@ -1861,7 +2084,7 @@ CONTAINS
 !  Rosati,Miyakoda 1988 ; eq. 3.8
 !  clouds from COADS perpetual data set
 !#if 1
-   qshort  = qtot*(1-0.62*cloud + .0019*sunbet)
+   qshort  = qtot*(1.0_WP-0.62_WP*cloud + .0019_WP*sunbet)
    if(qshort .gt. qtot ) then
       qshort  = qtot
    end if
@@ -1878,6 +2101,45 @@ CONTAINS
    return
    end function short_wave_radiation
 !EOC
+
+    !___________________________________________________________________________
+    ! make inserted string all in lower case and kick out weired mystery characters
+    ! --> replaces 'space', '-' character with '_'
+    function lowercase(string)
+        implicit none
+        character(len=:),allocatable :: lowercase, aux_string
+        character(len=*)             :: string 
+        character(len=48)            :: aux_string_end=''
+        character(len=26)            :: cap  ='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        character(len=38)            :: small='abcdefghijklmnopqrstuvwxyz1234567890_'
+        character(len=2)             :: replace='- '
+        integer                      :: i, i1 ,pos_c, pos_s, pos_r
+        i1 = 0
+        aux_string = trim(string)
+        do i=1,len_trim(aux_string)
+            pos_c = index(cap,string(i:i))
+            pos_s = index(small,string(i:i))
+            pos_r = index(replace,string(i:i))
+            ! there is problem in the JRA55 calendar attribut string, at the end of
+            ! that string there is a character which is not seeable, which is no letter 
+            ! and also no whitespace and which can not be removed with trim() --> 
+            ! to get rid of that lowercase will use only character that are 
+            ! found in either cap or small otherwise the sring comparison fails 
+            if (pos_r .ne. 0) then
+                ! replaces 'space', '-' character with '_'
+                i1=i1+1
+                aux_string_end(i1:i1)='_'
+            elseif (pos_c .ne. 0 .and. pos_s .eq. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=small(pos_c:pos_c)
+            elseif (pos_c .eq. 0 .and. pos_s .ne. 0) then
+                i1=i1+1
+                aux_string_end(i1:i1)=aux_string(i:i)
+            end if
+        end do
+        lowercase=trim(aux_string_end)
+        return
+    end function lowercase 
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org

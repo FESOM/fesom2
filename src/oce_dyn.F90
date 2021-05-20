@@ -1,761 +1,189 @@
+
+! A set of routines for computing the horizonlal viscosity
+! the control parameters (their default values) are:
+! gamma0 (0.01 [m/s]), gamma1 (0.1 [no dim.]), gamma2 (10.[s/m]), Div_c [1.], Leith_c[1.?]
+! 1. gamma0 has the dimension of velocity. It should be as small as possible, but in any case smaller than 0.01 m/s. 
+!    All major ocean circulation models are stable with harmonic viscosity 0.01*len.
+! 2. gamma1 is nondimensional. In commonly used Leith or Smagorinsky parameterizations it is C/pi^2=0.1 (C is about 1). 
+!    We therefore try to follow this, allowing some adjustments (because our mesh is triangular, our resolution is different, etc.). 
+!    We however, try to keep gamma1<0.1
+! 3. gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
+!    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
+! 4. Div_c  =1.    should be default
+! 5. Leith_c=?    (need to be adjusted)
+module h_viscosity_leith_interface
+  interface
+    subroutine h_viscosity_leith(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_harmon_interface
+  interface
+    subroutine visc_filt_harmon(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_hbhmix_interface
+  interface
+    subroutine visc_filt_hbhmix(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_biharm_interface
+  interface
+    subroutine visc_filt_biharm(option, mesh)
+      use mod_mesh
+      integer       :: option
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_bcksct_interface
+  interface
+    subroutine visc_filt_bcksct(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_bilapl_interface
+  interface
+    subroutine visc_filt_bilapl(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_bidiff_interface
+  interface
+    subroutine visc_filt_bidiff(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module visc_filt_dbcksc_interface
+  interface
+    subroutine visc_filt_dbcksc(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module backscatter_coef_interface
+  interface
+    subroutine backscatter_coef(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+module uke_update_interface
+  interface
+    subroutine uke_update(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
+
 ! ===================================================================
 ! Contains routines needed for computations of dynamics.
-! includes: solve_ssh, vert_vel, update_vel, compute_vel_nodes, compute_ssh_rhs, stiff_mat, 
-!           test_ssh_rhs, impl_vert_visc, viscosity_filt2x
+! includes: update_vel, compute_vel_nodes
 ! ===================================================================
-subroutine solve_ssh
-use o_PARAM
-use o_MESH
-use o_ARRAYS
-use g_PARSUP
-use g_comm_auto
-!
-#ifdef PETSC
-implicit none
-#include "petscf.h"
-integer                         :: myrows
-integer                         :: Pmode
-real(kind=WP)                   :: rinfo(20,20)
-integer                         :: maxiter=2000
-integer                         :: restarts=15
-integer                         :: fillin=3
-integer                         :: lutype=2
-integer                         :: nrhs=1
-real(kind=WP)                   :: droptol=1.e-7
-real(kind=WP)                   :: soltol =1e-10  !1.e-10
-logical, save                   :: lfirst=.true.
-real(kind=WP), allocatable      :: arr_nod2D(:),arr_nod2D2(:,:),arr_nod2D3(:)
-real(kind=WP)                   :: cssh1,cssh2,crhs
-integer                         :: i
-Pmode = PET_BLOCKP+PET_SOLVE + PET_BICGSTAB +PET_REPORT + PET_QUIET+ PET_RCM+PET_PCBJ
-if (lfirst) then   
-   Pmode = Pmode+PET_STRUCT+PET_PMVALS + PET_PCASM+PET_OVL_2 !+PET_PCBJ+PET_ILU
-   lfirst=.false.
-end if
-call PETSC_S(Pmode, 1, ssh_stiff%dim, ssh_stiff%nza, myrows, &
-     maxiter,  & 
-     restarts, &
-     fillin,   &
-     droptol,  &  
-     soltol,   &
-     part, ssh_stiff%rowptr, ssh_stiff%colind, ssh_stiff%values, &
-     ssh_rhs, d_eta, &
-     rinfo, MPI_COMM_FESOM)
+SUBROUTINE update_vel(mesh)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    IMPLICIT NONE
+    integer       :: elem, elnodes(3), nz, m, nzmax, nzmin
+    real(kind=WP) :: eta(3) 
+    real(kind=WP) :: Fx, Fy
+    type(t_mesh), intent(in) , target :: mesh
 
-#elif defined(PARMS)
+#include "associate_mesh.h"
 
-  use iso_c_binding, only: C_INT, C_DOUBLE
-  implicit none
-#include "fparms.h"
-logical, save        :: lfirst=.true.
-integer(kind=C_INT)  :: ident
-integer(kind=C_INT)  :: n3, reuse, new_values, temp
-integer(kind=C_INT)  :: maxiter, restart, lutype, fillin
-real(kind=C_DOUBLE)  :: droptol, soltol
-integer :: n
-
-interface
-   subroutine psolver_init(ident, SOL, PCGLOB, PCLOC, lutype, &
-        fillin, droptol, maxiter, restart, soltol, &
-        part, rowptr, colind, values, reuse, MPI_COMM) bind(C)
-     use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, SOL, PCGLOB, PCLOC, lutype, &
-                            fillin,  maxiter, restart, &
-                            part(*), rowptr(*), colind(*), reuse, MPI_COMM
-     real(kind=C_DOUBLE) :: droptol,  soltol, values(*)
-   end subroutine psolver_init
-end interface
-interface
-   subroutine psolve(ident, ssh_rhs, values, d_eta, newvalues) bind(C)
-
-     use iso_c_binding, only: C_INT, C_DOUBLE
-     integer(kind=C_INT) :: ident, newvalues
-     real(kind=C_DOUBLE) :: values(*), ssh_rhs(*), d_eta(*)
-
-   end subroutine psolve
-end interface
-
-ident=1
-maxiter=2000
-restart=15
-fillin=3
-lutype=2
-droptol=1.e-8
-soltol=1.e-10
-reuse=0      ! For varying coefficients, set reuse=1
-new_values=0 ! and new_values=1, as soon as the coefficients have changed
-
-! reuse=0: matrix remains static
-! reuse=1: keeps a copy of the matrix structure to apply scaling of the matrix fast
-
-! new_values=0: matrix coefficients unchanged (compared to the last call of psolve) 
-! new_values=1: replaces the matrix values (keeps the structure and the preconditioner) 
-! new_values=2: replaces the matrix values and recomputes the preconditioner (keeps the structure)
-
-! new_values>0 requires reuse=1 in psolver_init!
-
-if (lfirst) then
-   ! Set SOLCG for CG solver (symmetric, positiv definit matrices only!!)
-   !     SOLBICGS for BiCGstab solver (arbitrary matrices)
-   ! call psolver_init(ident, SOLCG, PCRAS, PCILUK, lutype, &
-! C-numbering (avoid temporary array in function call)
-   temp = ssh_stiff%rowptr(1)
-   ssh_stiff%rowptr(:) = ssh_stiff%rowptr(:) - temp
-   ssh_stiff%colind(:) = ssh_stiff%colind(:) - 1
-   part(:)             = part(:) - 1
-
-   call psolver_init(ident, SOLBICGS, PCRAS, PCILUK, lutype, &
-        fillin, droptol, maxiter, restart, soltol, &
-        part, ssh_stiff%rowptr, &
-        ssh_stiff%colind, ssh_stiff%values, reuse, MPI_COMM_FESOM)
-   lfirst=.false.
-
-! Back to Fortran numbering
-   
-   ssh_stiff%rowptr(:) = ssh_stiff%rowptr(:) + temp
-   ssh_stiff%colind(:) = ssh_stiff%colind(:) + 1
-   part(:)             = part(:) + 1
-
-end if
-
-   call psolve(ident, ssh_rhs, ssh_stiff%values, d_eta, new_values)
-
-#endif
-
-call exchange_nod(d_eta)
-
-end subroutine solve_ssh
-! ===================================================================================
-SUBROUTINE vert_vel
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-use g_comm_auto
-IMPLICIT NONE
-integer       :: el(2), enodes(2), n, nz, edge
-real(kind=WP) :: ff, c1, c2, deltaX1, deltaY1, deltaX2, deltaY2 
-! =================
-! Set w to zero    ???? This is seemingly not needed
-! =================
-Do n=1, myDim_nod2D
-   DO nz=1, nl
-      wvel(nz,n)=0.0_WP
-      if (Fer_GM) then
-         fer_wvel(nz,n)=0.0_WP
-      end if
-   END DO
-END DO
-! =================
-! Contributions from levels in divergence
-! =================
-DO edge=1, myDim_edge2D
-   enodes=edges(:,edge)   
-   el=edge_tri(:,edge)
-   c1=0.0_WP
-   c2=0.0_WP
-   deltaX1=edge_cross_dxdy(1,edge)
-   deltaY1=edge_cross_dxdy(2,edge)
-   if (el(2)>0) then
-      deltaX2=edge_cross_dxdy(3,edge)
-      deltaY2=edge_cross_dxdy(4,edge)
-   end if     
-   DO nz=nlevels(el(1))-1,1,-1
-      c1=(UV(2,nz,el(1))*deltaX1- &
-         UV(1,nz,el(1))*deltaY1)*(zbar(nz)-zbar(nz+1))      
-      Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c1
-      Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c1
-      if (Fer_GM) then
-         c1=(fer_UV(2,nz,el(1))*deltaX1- &
-            fer_UV(1,nz,el(1))*deltaY1)*(zbar(nz)-zbar(nz+1))      
-         fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c1
-         fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c1
-      end if   
-   END DO
-
-   if (el(2)>0) then
-      DO nz=nlevels(el(2))-1,1,-1
-         c2=-(UV(2,nz,el(2))*deltaX2- &
-         UV(1,nz,el(2))*deltaY2)*(zbar(nz)-zbar(nz+1))
-         Wvel(nz,enodes(1))=Wvel(nz,enodes(1))+c2
-         Wvel(nz,enodes(2))=Wvel(nz,enodes(2))-c2
-         if (Fer_GM) then
-            c2=-(fer_UV(2,nz,el(2))*deltaX2- &
-            fer_UV(1,nz,el(2))*deltaY2)*(zbar(nz)-zbar(nz+1))
-            fer_Wvel(nz,enodes(1))=fer_Wvel(nz,enodes(1))+c2
-            fer_Wvel(nz,enodes(2))=fer_Wvel(nz,enodes(2))-c2
-         end if   
-      END DO
-   end if
-END DO
-
-! ===================
-! Sum up to get W
-! ===================
-Do n=1, myDim_nod2D
-   DO nz=nl-1,1,-1
-      Wvel(nz,n)=Wvel(nz,n)+Wvel(nz+1,n)
-      if (Fer_GM) then 
-         fer_Wvel(nz,n)=fer_Wvel(nz,n)+fer_Wvel(nz+1,n)
-      end if
-   END DO
-END DO
-
-Do n=1, myDim_nod2D
-   DO nz=1,nlevels_nod2D(n)-1
-      Wvel(nz,n)=Wvel(nz,n)/area(nz,n)
-      if (Fer_GM) then 
-         fer_Wvel(nz,n)=fer_Wvel(nz,n)/area(nz,n)          
-      end if
-   END DO
-END DO
-
-call exchange_nod(Wvel)
-if (Fer_GM) call exchange_nod(fer_Wvel)
-
-! Split implicit vertical velocity onto implicit and explicit components
-if (w_split) then
-   Do n=1, myDim_nod2D+eDim_nod2D
-      DO nz=1,nlevels_nod2D(n)-1
-         Wvel_e(nz,n)=min(max(Wvel(nz,n), -w_exp_max), w_exp_max)
-      END DO
-   END DO
-else
-   Wvel_e=Wvel
-end if
-Wvel_i=Wvel-Wvel_e
-end subroutine vert_vel
-!==========================================================================
-SUBROUTINE update_vel
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE g_CONFIG
-use g_comm_auto
-IMPLICIT NONE
-integer       :: elem, elnodes(3), nz, m
-real(kind=WP) :: eta(3) 
-real(kind=WP) :: Fx, Fy
-
- DO elem=1, myDim_elem2D
-    elnodes=elem2D_nodes(:,elem)
-    eta=-g*theta*dt*d_eta(elnodes)
-    Fx=sum(gradient_sca(1:3,elem)*eta)
-    Fy=sum(gradient_sca(4:6,elem)*eta)
-    DO nz=1, nlevels(elem)-1
-     UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
-     UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
+    DO elem=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,elem)
+        eta=-g*theta*dt*d_eta(elnodes)
+        Fx=sum(gradient_sca(1:3,elem)*eta)
+        Fy=sum(gradient_sca(4:6,elem)*eta)
+        nzmin = ulevels(elem)
+        nzmax = nlevels(elem)
+        !!PS DO nz=1, nlevels(elem)-1
+        DO nz=nzmin, nzmax-1
+            UV(1,nz,elem)= UV(1,nz,elem) + UV_rhs(1,nz,elem) + Fx
+            UV(2,nz,elem)= UV(2,nz,elem) + UV_rhs(2,nz,elem) + Fy
+        END DO
     END DO
- END DO
-eta_n=eta_n+d_eta
-call exchange_elem(UV)
+    eta_n=eta_n+d_eta
+    call exchange_elem(UV)
 end subroutine update_vel
 !==========================================================================
-subroutine compute_vel_nodes
-USE o_MESH
-USE o_PARAM
-USE o_ARRAYS
-USE g_PARSUP
-use g_comm_auto
+subroutine compute_vel_nodes(mesh)
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_PARSUP
+    use g_comm_auto
+    IMPLICIT NONE
+    integer            :: n, nz, k, elem, nln, uln, nle, ule
+    real(kind=WP)      :: tx, ty, tvol
+    type(t_mesh), intent(in) , target :: mesh
 
-IMPLICIT NONE
-integer            :: n, nz, k, elem
-real(kind=WP)      :: tx, ty, tvol
-DO n=1, myDim_nod2D 
-   DO nz=1, nlevels_nod2D(n)-1
-      tvol=0.0_WP
-      tx=0.0_WP
-      ty=0.0_WP
-      DO k=1, nod_in_elem2D_num(n)
-         elem=nod_in_elem2D(k,n)
-         if (nlevels(elem)-1<nz) cycle
-            tvol=tvol+elem_area(elem)
-            tx=tx+UV(1,nz,elem)*elem_area(elem)
-            ty=ty+UV(2,nz,elem)*elem_area(elem)
-      END DO
-      Unode(1,nz,n)=tx/tvol
-      Unode(2,nz,n)=ty/tvol
-   END DO
-END DO
-call exchange_nod(Unode)
+#include "associate_mesh.h"
+
+    DO n=1, myDim_nod2D 
+        uln = ulevels_nod2D(n)
+        nln = nlevels_nod2D(n) 
+        !!PS DO nz=1, nlevels_nod2D(n)-1
+        DO nz=uln, nln-1
+            tvol=0.0_WP
+            tx  =0.0_WP
+            ty  =0.0_WP
+            DO k=1, nod_in_elem2D_num(n)
+                elem=nod_in_elem2D(k,n)
+                ule = ulevels(elem)
+                nle = nlevels(elem)
+                !!PS if (nlevels(elem)-1<nz) cycle
+                if (nle-1<nz .or. nz<ule) cycle
+                tvol=tvol+elem_area(elem)
+                tx=tx+UV(1,nz,elem)*elem_area(elem)
+                ty=ty+UV(2,nz,elem)*elem_area(elem)
+            END DO
+            Unode(1,nz,n)=tx/tvol
+            Unode(2,nz,n)=ty/tvol
+        END DO
+    END DO
+    call exchange_nod(Unode)
 end subroutine compute_vel_nodes
 !===========================================================================
-SUBROUTINE compute_ssh_rhs
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-use g_comm_auto
-IMPLICIT NONE
-
-! In the semiimplicit method: 
-! ssh_rhs=-\nabla\int(U_n+alpha*U_rhs) dz
-
-integer       :: ed, el(2), enodes(2),  nz
-real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
-
-ssh_rhs=0.0_WP
-DO ed=1, myDim_edge2D
-   enodes=edges(:,ed)
-   el=edge_tri(:,ed)   
-   c1=0.0_WP
-   c2=0.0_WP
-   deltaX1=edge_cross_dxdy(1,ed)
-   deltaY1=edge_cross_dxdy(2,ed)
-   if (el(2)>0)  then
-      deltaX2=edge_cross_dxdy(3,ed)
-      deltaY2=edge_cross_dxdy(4,ed)
-   end if
-   DO nz=1, nlevels(el(1))-1
-      c1=c1+((UV(2,nz,el(1))+alpha*UV_rhs(2,nz,el(1)))*deltaX1- &
-         (UV(1,nz,el(1))+alpha*UV_rhs(1,nz,el(1)))*deltaY1)*(zbar(nz)-zbar(nz+1))
-   END DO
- 
-   if (el(2)>0) then
-      DO nz=1, nlevels(el(2))-1
-      c2=c2-((UV(2,nz,el(2))+alpha*UV_rhs(2,nz,el(2)))*deltaX2- &
-         (UV(1,nz,el(2))+alpha*UV_rhs(1,nz,el(2)))*deltaY2)*(zbar(nz)-zbar(nz+1))
-      END DO
-   end if
-   ssh_rhs(enodes(1))=ssh_rhs(enodes(1))+(c1+c2)
-   ssh_rhs(enodes(2))=ssh_rhs(enodes(2))-(c1+c2)   
-END DO
-
-! The rhs is the total transport into the column
-! associated with the scalar cell  
-! ssh_rhs(1:myDim_nod2D)=eta_n(1:myDim_nod2D)*area(1,:)/dt+ssh_rhs(1:myDim_nod2D)
-!! P-E should be just added as it is to the rhs.  
-! call exchange_nod(ssh_rhs)
-! call test_ssh_rhs ! delete me
-END subroutine compute_ssh_rhs
-! ===================================================================
-! Stiffness matrix for the elevation
-! 
-! We first use local numbering and assemble the matrix
-! Having completed this step we substitute global contiguous numbers.
-!
-! Our colind cannot be used to access local node neighbors
-! This is a reminder from FESOM
-!        do q=1, nghbr_nod2D(row)%nmb
-!           col_pos(nghbr_nod2D(row)%addresses(q)) = q
-!        enddo
-!       ipos=sshstiff%rowptr(row)+col_pos(col)-sshstiff%rowptr(1)
-! 
-! To achive it we should use global arrays n_num and n_pos.
-! Reserved for future. 
-subroutine stiff_mat
-use o_PARAM
-use o_MESH
-use g_PARSUP
-use g_CONFIG
-implicit none
-
-integer                             :: n, n1, n2, i, j,  row, ed
-integer                             :: elnodes(3), el(2)
-integer                             :: npos(3), offset, nini, nend
-real(kind=WP)                       :: dmean, ff, factor, a 
-real(kind=WP)                       :: fx(3), fy(3), ax, ay
-integer, allocatable                :: n_num(:), n_pos(:,:), pnza(:), rpnza(:)
-integer, allocatable                :: mapping(:)
-logical                             :: flag
-character*10                        :: mype_string,npes_string
-character*200                       :: dist_mesh_dir,file_name
-!
-! a)
-ssh_stiff%dim=nod2D
-allocate(ssh_stiff%rowptr(myDim_nod2D+1))
-ssh_stiff%rowptr(1)=1               ! This has to be updated as
-                                    ! contiguous numbering is required
-  
-allocate(n_num(myDim_nod2D+eDim_nod2D),n_pos(12,myDim_nod2D))
-n_pos=0
- 
-! b) Neighbourhood information
-DO n=1,myDim_nod2d
-   n_num(n)=1
-   n_pos(1,n)=n
-end do   
-Do n=1, myDim_edge2D
-   n1=edges(1,n)
-   n2=edges(2,n)
-   if (n1<=myDim_nod2D) then
-      n_pos(n_num(n1)+1,n1)=n2
-      n_num(n1)=n_num(n1)+1
-   end if
-   if (n2<=myDim_nod2D) then
-      n_pos(n_num(n2)+1,n2)=n1
-      n_num(n2)=n_num(n2)+1
-   end if
-END DO 
-  
-   ! n_num contains the number of neighbors
-   ! n_pos -- their indices 
-do n=1,myDim_nod2D
-   ssh_stiff%rowptr(n+1) = ssh_stiff%rowptr(n)+n_num(n)
-end do
-ssh_stiff%nza = ssh_stiff%rowptr(myDim_nod2D+1)-1								 
-! c) 
-allocate(ssh_stiff%colind(ssh_stiff%nza))
-allocate(ssh_stiff%values(ssh_stiff%nza))
-ssh_stiff%values=0.0_WP  
-! d) 
-do n=1,myDim_nod2D
-   nini = ssh_stiff%rowptr(n) 
-   nend = ssh_stiff%rowptr(n+1)- 1
-
-   ssh_stiff%colind(nini:nend) = n_pos(1:n_num(n),n)
-end do
-! Thus far everything is in local numbering.
-! We will update it later when the values are 
-! filled in 
-!
-! e) fill in 
-!M/dt-alpha*theta*g*dt*\nabla(H\nabla\eta))
-!  
-n_num=0
-factor = g*dt*alpha*theta
-DO ed=1,myDim_edge2D   !! Attention
-
-   el=edge_tri(:,ed)
-   ! ==========
-   DO i=1,2  ! Two elements related to the edge
-      ! It should be just grad on elements 
-
-      if (el(i)<1) cycle
-
-      elnodes=elem2D_nodes(:,el(i))
-
-      fy(1:3) = zbar(nlevels(el(i)))* &
-               (gradient_sca(1:3,el(i)) * edge_cross_dxdy(2*i  ,ed)  &
-              - gradient_sca(4:6,el(i)) * edge_cross_dxdy(2*i-1,ed))
-
-      if(i==2) fy=-fy
-
-      row=edges(1,ed)
-      if (row <= myDim_nod2D) then
-         DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
-            n_num(SSH_stiff%colind(n)) = n
-         END DO
-         npos = n_num(elnodes)
-         SSH_stiff%values(npos) = SSH_stiff%values(npos) + fy*factor
-      endif
-      row=edges(2,ed)
-      if (row <= myDim_nod2D) then
-         DO n = SSH_stiff%rowptr(row), SSH_stiff%rowptr(row+1)-1
-            n_num(SSH_stiff%colind(n)) = n
-         END DO
-         npos = n_num(elnodes)
-         SSH_stiff%values(npos) = SSH_stiff%values(npos) - fy*factor
-      endif
-
-
-
-   END DO
-END DO
-
-
-! Mass matrix part
-DO row=1, myDim_nod2D
-   offset = ssh_stiff%rowptr(row)
-   SSH_stiff%values(offset) = SSH_stiff%values(offset)+ area(1,row)/dt
-END DO
-deallocate(n_pos,n_num)
-
-! =================================
-! Global contiguous numbers:
-! =================================
-! Now we need to exchange between PE to know their 
-! numbers of non-zero entries (nza):
-! ================================= 
-allocate(pnza(npes), rpnza(npes))    
-pnza(1:npes)=0
-rpnza=0
-  
-pnza(mype+1)=ssh_stiff%nza
-call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
-call MPI_AllREDUCE( pnza, rpnza, &
-     npes, MPI_INTEGER,MPI_SUM, &
-     MPI_COMM_FESOM, MPIerr)
-       
-if (mype==0) then
-   offset=0
-else
-   offset=sum(rpnza(1:mype))  ! This is offset for mype 
-end if
-ssh_stiff%rowptr=ssh_stiff%rowptr+offset   ! pointers are global
-  
-! =================================
-! replace local nza with a global one
-! =================================
-ssh_stiff%nza=sum(rpnza(1:npes))
-deallocate(rpnza, pnza)
-
-! ==================================
-! colindices are now local to PE. We need to make them local
-! contiguous
-! ==================================
-allocate(mapping(nod2d))
-write(npes_string,"(I10)") npes
-dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
-file_name=trim(dist_mesh_dir)//'rpart.out'
-open(10,file=trim(dist_mesh_dir)//'rpart.out')
-read(10,*) n
-read(10,*) mapping(1:npes)
-read(10,*) mapping
-close(10) 
-! (i) global natural: 
-do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
-   ssh_stiff%colind(n)=myList_nod2D(ssh_stiff%colind(n))    
-end do
-! (ii) global PE contiguous: 
-do n=1,ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)  
-   ssh_stiff%colind(n)=mapping(ssh_stiff%colind(n))    
-end do
-! ==================================
-deallocate(mapping)
-end subroutine stiff_mat
-! =================================================================
-subroutine test_ssh_rhs
-USE g_PARSUP
-use o_MESH
-use o_ARRAYS
-IMPLICIT NONE
-
-real(kind=WP) :: c1,c2
-c1=sum(ssh_rhs(1:mydim_nod2d))
-c2=0d0
-call MPI_Allreduce (c1, c2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-if (mype==0) write(*,*) 'DBG:sum(ssh_rhs)=',c2
-end subroutine test_ssh_rhs
-! ===================================================================================
-subroutine impl_vert_visc
-USE o_MESH
-USE o_PARAM
-USE o_ARRAYS
-USE g_PARSUP
-USE g_CONFIG,only: dt
-IMPLICIT NONE
-
-real(kind=WP)              ::  a(nl-1), b(nl-1), c(nl-1), ur(nl-1), vr(nl-1)
-real(kind=WP)              ::  cp(nl-1), up(nl-1), vp(nl-1)
-integer                    ::  nz, elem, nzmax, elnodes(3)
-real(kind=WP)              ::  zinv, m, friction, wu, wd
-DO elem=1,myDim_elem2D
-   elnodes=elem2D_nodes(:,elem)
-   nzmax=nlevels(elem)
-   ! ==========================
-   ! Operator
-   ! ==========================
-   ! Regular part of coefficients:
-   DO nz=2, nzmax-2
-      zinv=1.0_WP*dt/(zbar(nz)-zbar(nz+1))
-      a(nz)=-Av(nz,elem)/(Z(nz-1)-Z(nz))*zinv
-      c(nz)=-Av(nz+1,elem)/(Z(nz)-Z(nz+1))*zinv
-      b(nz)=-a(nz)-c(nz)+1.0_WP
-   ! Update from the vertical advection
-      wu=sum(Wvel_i(nz,   elnodes))/3.
-      wd=sum(Wvel_i(nz+1, elnodes))/3.
-      a(nz)=a(nz)+min(0._WP, wu)*zinv
-      b(nz)=b(nz)+max(0._WP, wu)*zinv
-
-      b(nz)=b(nz)-min(0._WP, wd)*zinv
-      c(nz)=c(nz)-max(0._WP, wd)*zinv
-   END DO
-! The last row
-   zinv=1.0_WP*dt/(zbar(nzmax-1)-zbar(nzmax))
-   a(nzmax-1)=-Av(nzmax-1,elem)/(Z(nzmax-2)-Z(nzmax-1))*zinv
-   b(nzmax-1)=-a(nzmax-1)+1.0_WP
-   c(nzmax-1)=0.0_WP
-
-! Update from the vertical advection
-   wu=sum(Wvel_i(nzmax-1, elnodes))/3.
-   a(nzmax-1)=a(nzmax-1)+min(0._WP, wu)*zinv
-   b(nzmax-1)=b(nzmax-1)+max(0._WP, wu)*zinv
-
-! The first row
-   zinv=1.0_WP*dt/(zbar(1)-zbar(2))
-   c(1)=-Av(2,elem)/(Z(1)-Z(2))*zinv
-   a(1)=0.0_WP
-   b(1)=-c(1)+1.0_WP
-! Update from the vertical advection
-   wu=sum(Wvel_i(1, elnodes))/3.
-   wd=sum(Wvel_i(2, elnodes))/3.
-
-   b(1)=b(1)+wu*zinv
-   b(1)=b(1)-min(0._WP, wd)*zinv
-   c(1)=c(1)-max(0._WP, wd)*zinv
-! ===========================
-! The rhs:
-! ===========================
-   ur(1:nzmax-1)=UV_rhs(1,1:nzmax-1,elem)
-   vr(1:nzmax-1)=UV_rhs(2,1:nzmax-1,elem)
-! The first row contains surface forcing
-   ur(1)= ur(1)+zinv*stress_surf(1,elem)/density_0
-   vr(1)= vr(1)+zinv*stress_surf(2,elem)/density_0
-! The last row contains bottom friction
-   zinv=1.0_WP*dt/(zbar(nzmax-1)-zbar(nzmax))
-   friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
-            UV(2,nlevels(elem)-1,elem)**2)
-   ur(nzmax-1)=ur(nzmax-1)+zinv*friction*UV(1,nzmax-1,elem)
-   vr(nzmax-1)=vr(nzmax-1)+zinv*friction*UV(2,nzmax-1,elem)
-! Model solves for the difference to the timestep N and therefore we need to 
-! update the RHS for advective and diffusive contributions at the previous time step
-   DO nz=2, nzmax-2
-      ur(nz)=ur(nz)-a(nz)*UV(1,nz-1,elem)-(b(nz)-1.0_WP)*UV(1,nz,elem)-c(nz)*UV(1,nz+1,elem)
-      vr(nz)=vr(nz)-a(nz)*UV(2,nz-1,elem)-(b(nz)-1.0_WP)*UV(2,nz,elem)-c(nz)*UV(2,nz+1,elem)
-   END DO
-   ur(1)=ur(1)-(b(1)-1.0_WP)*UV(1,1,elem)-c(1)*UV(1,2,elem)
-   vr(1)=vr(1)-(b(1)-1.0_WP)*UV(2,1,elem)-c(1)*UV(2,2,elem)
-
-   ur(nzmax-1)=ur(nzmax-1)-a(nzmax-1)*UV(1,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(1,nzmax-1,elem)
-   vr(nzmax-1)=vr(nzmax-1)-a(nzmax-1)*UV(2,nzmax-2,elem)-(b(nzmax-1)-1.0_WP)*UV(2,nzmax-1,elem)
-! ===========================
-! The sweep algorithm
-! ===========================
-! initialize c-prime and s,t-prime
-   cp(1) = c(1)/b(1)
-   up(1) = ur(1)/b(1)
-   vp(1) = vr(1)/b(1)
-! solve for vectors c-prime and t, s-prime
-   do nz = 2,nzmax-1
-      m = b(nz)-cp(nz-1)*a(nz)
-      cp(nz) = c(nz)/m
-      up(nz) = (ur(nz)-up(nz-1)*a(nz))/m
-      vp(nz) = (vr(nz)-vp(nz-1)*a(nz))/m
-   enddo
-! initialize x
-   ur(nzmax-1) = up(nzmax-1)
-   vr(nzmax-1) = vp(nzmax-1)
-! solve for x from the vectors c-prime and d-prime
-   do nz = nzmax-2, 1, -1
-      ur(nz) = up(nz)-cp(nz)*ur(nz+1)
-      vr(nz) = vp(nz)-cp(nz)*vr(nz+1)
-   end do
-! ===========================
-! RHS update
-! ===========================
-   DO nz=1,nzmax-1
-      UV_rhs(1,nz,elem)=ur(nz)
-      UV_rhs(2,nz,elem)=vr(nz)
-   END DO
-END DO   !!! cycle over elements
-END subroutine impl_vert_visc
-!===========================================================================
-SUBROUTINE viscosity_filt2x
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE g_config
-USE g_comm_auto
-IMPLICIT NONE
-
-real(kind=WP) :: u1, v1, tau_inv, s, factor, factor1, factor2
-integer       :: ed, el(2), nz, elem
-real(kind=WP) :: UV_c(2,nl-1,myDim_elem2D+eDim_elem2D), UV_f(2,nl-1,myDim_elem2D+eDim_elem2D)
- 
-! Filter is applied twice. It should be approximately 
-! equivalent to biharmonic operator with the coefficient
-! (tau_c/day)a^3/9. Scaling inside is found to help 
-! with smoothness in places of mesh transition. *(it makes a^3 from a^4) 
-
-
-UV_c=0.0_WP
-!NR UV_f=0.0_WP
-tau_inv=dt*tau_c/3600.0/24.0     ! SET IT experimentally 
-  
-DO ed=1, myDim_edge2D+eDim_edge2D
-   if(myList_edge2D(ed)>edge2D_in) cycle
-   el=edge_tri(:,ed)
-
-   factor1 = -tau_inv*sqrt(scale_area/elem_area(el(1)))
-   factor2 = -tau_inv*sqrt(scale_area/elem_area(el(2)))
-
-   DO nz=1,min(nlevels(el(1)),nlevels(el(2)))-1
-      u1 = UV(1,nz,el(1)) - UV(1,nz,el(2))
-      v1 = UV(2,nz,el(1)) - UV(2,nz,el(2))
-
-      UV_c(1,nz,el(1)) = UV_c(1,nz,el(1)) - u1*factor1
-      UV_c(2,nz,el(1)) = UV_c(2,nz,el(1)) - v1*factor1
-      UV_c(1,nz,el(2)) = UV_c(1,nz,el(2)) + u1*factor2
-      UV_c(2,nz,el(2)) = UV_c(2,nz,el(2)) + v1*factor2
-   END DO 
-END DO
- 
-! ============ 
-! Contribution from boundary edges (Dirichlet boundary conditions)
-! ============
-!NR If it should be used again, please integrate into the loop above.
-!NR if (inner edge) then [...] else [Dirichlet] endif
-! DO ed=1, myDim_edge2D+eDim_edge2D
-!    if(myList_edge2D(ed)<=edge2D_in) cycle
-!    el=edge_tri(:, ed)
-!    DO  nz=1, nlevels(el(1))-1
-!        UV_c(1,nz,el(1))=UV_c(1,nz,el(1))-2.0_WP*UV(1,nz,el(1))
-!        UV_c(2,nz,el(1))=UV_c(2,nz,el(1))-2.0_WP*UV(2,nz,el(1))
-!    END DO
-! END DO
-
-!NR  moved this factor to the edge loop. If the commented Dirichlet
-!NR boundary condition shall be reactivated, do not forget the factor.
-!NR do elem=1,myDim_elem2D
-!NR   factor = tau_inv*sqrt(scale_area/elem_area(elem))
-!NR   Do nz=1,nlevels(elem)-1
-!NR       UV_c(1,nz,elem) = -UV_c(1,nz,elem)*factor
-!NR       UV_c(2,nz,elem) = -UV_c(2,nz,elem)*factor
-!NR   END DO
-!NR end do
-
-call exchange_elem(UV_c)
-
-
-DO ed=1, myDim_edge2D+eDim_edge2D
-   if(myList_edge2D(ed)>edge2D_in) cycle
-   el=edge_tri(:,ed)
-   DO nz=1,min(nlevels(el(1)),nlevels(el(2)))-1 
-      u1 = UV_c(1,nz,el(1)) - UV_c(1,nz,el(2))
-      v1 = UV_c(2,nz,el(1)) - UV_c(2,nz,el(2))
-
-     !NR UV_f(1,nz,el(1)) = UV_f(1,nz,el(1)) - u1
-     !NR UV_f(2,nz,el(1)) = UV_f(2,nz,el(1)) - v1
-     !NR UV_f(1,nz,el(2)) = UV_f(1,nz,el(2)) + u1
-     !NR UV_f(2,nz,el(2)) = UV_f(2,nz,el(2)) + v1
-     !NR As UV_f is simply added to UV_rhs, we can skip this intermediate field
-     !NR and add to UV_rhs directly.
-     !NR However, if the limit to the contribution of the filter is to be applied,
-     !NR this does not work any more. At the time of my optimizations, the limit
-     !NR was commented.
-     !NR If UV_f is to be used again, please remember to initialize it with UV_f=0. 
-     UV_rhs(1,nz,el(1)) = UV_rhs(1,nz,el(1)) - u1
-     UV_rhs(2,nz,el(1)) = UV_rhs(2,nz,el(1)) - v1
-     UV_rhs(1,nz,el(2)) = UV_rhs(1,nz,el(2)) + u1
-     UV_rhs(2,nz,el(2)) = UV_rhs(2,nz,el(2)) + v1
-
-   END DO 
-END DO
- 
-!NR DO elem=1, myDim_elem2D
-!NR   DO nz=1, nlevels(elem)-1 
-!NR !      u1 = sqrt(UV_f(1,nz,elem)**2+UV_f(2,nz,elem)**2)+tiny(u1)
-!NR !      v1 = sqrt(UV(1,nz,elem)**2+UV(2,nz,elem)**2)
-!NR    ! we limit the maximum contribution from the filter such, that the update is less than the N (N=2 currently) times velocity
-!NR    ! this is done to force the CFL, which is otherwise exceeded in some points
-!NR    ! some other criteria is welcome (i.e. like computing the eigenvalues from filtering)
-!NR       UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+UV_f(1,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
-!NR       UV_rhs(2,nz,elem) = UV_rhs(2,nz,elem)+UV_f(2,nz,elem)!*min(1.0_WP, 2.0_WP*v1/u1)
-!NR    END DO 
-!NR END DO
-
-
-end subroutine viscosity_filt2x
-!===========================================================================
-subroutine viscosity_filter(option)
+subroutine viscosity_filter(option, mesh)
 use o_PARAM
 use g_PARSUP
+use MOD_MESH
+use h_viscosity_leith_interface
+use visc_filt_harmon_interface
+use visc_filt_hbhmix_interface
+use visc_filt_biharm_interface
+use visc_filt_bcksct_interface
+use visc_filt_bilapl_interface
+use visc_filt_bidiff_interface
+use visc_filt_dbcksc_interface
+use backscatter_coef_interface
 IMPLICIT NONE 
-integer      ::  option
-
+integer                  :: option
+type(t_mesh), intent(in) , target :: mesh
 ! Driving routine 
 ! Background viscosity is selected in terms of Vl, where V is 
 ! background velocity scale and l is the resolution. V is 0.005 
@@ -764,330 +192,963 @@ integer      ::  option
 ! h_viscosity_leiht needs vorticity, so vorticity array should be 
 ! allocated. At present, there are two rounds of smoothing in 
 ! h_viscosity. 
- 
-if(option>4) then
-option=2    ! default
-if(mype==0) write(*,*) 'Default horizontal viscosity option is used'  
-endif
 
-if(option==1) then 
-! ====
-! Laplacian+Leith parameterization + harmonic background
-! ====
-call h_viscosity_leith
-call viscosity_filtxx
-end if
-if(option==2) then
-! ===
-! Laplacian+Leith+biharmonic background
-! ===
-call h_viscosity_leith
-call viscosity_filtxxx
-end if
-if(option==3) then
-! ===
-! Biharmonic+Leith+ background 
-! ===
-call h_viscosity_leith
-call viscosity_filt2xx(2)
-end if
-if(option==4) then
-! ===
-! Biharmonic+upwind-type+ background 
-! ===
-call viscosity_filt2xx(1)
-end if
-
+SELECT CASE (option)
+CASE (1)
+     ! ====
+     ! Harmonic Leith parameterization
+     ! ====
+     call h_viscosity_leith(mesh)
+     call visc_filt_harmon(mesh)
+CASE (2)
+     ! ===
+     ! Laplacian+Leith+biharmonic background
+     ! ===
+     call h_viscosity_leith(mesh)
+     call visc_filt_hbhmix(mesh)
+CASE (3)
+     ! ===
+     ! Biharmonic Leith parameterization
+     ! ===
+     call h_viscosity_leith(mesh)
+     call visc_filt_biharm(2, mesh)
+CASE (4)
+     ! ===
+     ! Biharmonic+upwind-type
+     ! ===
+     call visc_filt_biharm(1, mesh)
+CASE (5)
+     call visc_filt_bcksct(mesh)
+CASE (6)
+     call visc_filt_bilapl(mesh)
+CASE (7)
+     call visc_filt_bidiff(mesh)
+CASE (8)
+     call backscatter_coef(mesh)
+     call visc_filt_dbcksc(mesh) 
+CASE DEFAULT
+     if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
+     call par_ex
+     stop
+END SELECT
 end subroutine viscosity_filter  
 ! ===================================================================
-SUBROUTINE viscosity_filtxx
-USE o_MESH
+SUBROUTINE visc_filt_harmon(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 
-real(kind=WP) :: u1, v1, le(2), len, crosslen, vi 
-integer       :: nz, ed, el(2)
+real(kind=WP) :: u1, v1, le(2), len, vi
+integer       :: nz, ed, el(2) , nzmin,nzmax
+type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
  ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
  ! The contribution from boundary edges is neglected (free slip). 
- 
- 
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
-    le=edge_dxdy(:,ed)
-    le(1)=le(1)*sum(elem_cos(el))*0.25_WP
-    len=sqrt(le(1)**2+le(2)**2)*r_earth
-    le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
-    le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
-    crosslen=sqrt(le(1)**2+le(2)**2) 
-    DO  nz=1,minval(nlevels(el))-1
-     vi=dt*len*(Visc(nz,el(1))+Visc(nz,el(2)))/crosslen
-     vi=max(vi,0.005*len*dt) ! This helps to reduce noise in places where 
-                              ! Visc is small and decoupling might happen 
-     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))*vi
-     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
-     
+    len=sqrt(sum(elem_area(el(1:2))))
+    nzmax = minval(nlevels(el))
+    nzmin = maxval(ulevels(el))
+    !!PS DO  nz=1,minval(nlevels(el))-1
+    DO  nz=nzmin,nzmax-1
+        vi=0.5_WP*(Visc(nz,el(1))+Visc(nz,el(2)))
+        vi=max(vi, gamma0*len)*dt ! limited from below by backgroung
+        u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))*vi
+        v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
+
+        UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+        UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+        UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+        UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+    END DO
+ END DO
+end subroutine visc_filt_harmon
+! ===================================================================
+SUBROUTINE visc_filt_biharm(option, mesh)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    IMPLICIT NONE
+    ! An energy conserving version
+    ! Also, we use the Leith viscosity
+    !
+    real(kind=WP) :: u1, v1, vi, len
+    integer       :: ed, el(2), nz, option, nzmin, nzmax
+    real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
+    type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+    ! Filter is applied twice. 
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        nzmax = minval(nlevels(el))
+        nzmin = maxval(ulevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            U_c(nz,el(1))=U_c(nz,el(1))-u1
+            U_c(nz,el(2))=U_c(nz,el(2))+u1
+            V_c(nz,el(1))=V_c(nz,el(1))-v1
+            V_c(nz,el(2))=V_c(nz,el(2))+v1
+        END DO 
+    END DO
+    
+    if(option==1) then
+        Do ed=1,myDim_elem2D
+            len=sqrt(elem_area(ed))
+            nzmin = ulevels(ed)
+            nzmax = nlevels(ed)
+            !!PS Do nz=1,nlevels(ed)-1
+            Do nz=nzmin,nzmax-1
+                ! vi has the sense of harmonic viscosity coefficient because of 
+                ! the division by area in the end 
+                ! ====
+                ! Case 1 -- an analog to the third-order upwind (vi=gamma1 * |u| * l)
+                ! ====
+                vi=max(gamma0, gamma1*sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len*dt
+                U_c(nz,ed)=-U_c(nz,ed)*vi                             
+                V_c(nz,ed)=-V_c(nz,ed)*vi
+            END DO
+        end do
+    end if
+    
+    if(option==2) then
+        Do ed=1,myDim_elem2D
+            len=sqrt(elem_area(ed))   
+            nzmin = ulevels(ed)
+            nzmax = nlevels(ed)
+            !!PS Do nz=1,nlevels(ed)-1
+            Do nz=nzmin,nzmax-1
+                ! vi has the sense of harmonic viscosity coefficient because of 
+                ! the division by area in the end 
+                ! ===   
+                ! Case 2 -- Leith +background (do not forget to call h_viscosity_leith before using this option)
+                ! ===
+                vi=max(Visc(nz,ed), gamma0*len)*dt ! limited from below by backgroung
+                !    
+                U_c(nz,ed)=-U_c(nz,ed)*vi                             
+                V_c(nz,ed)=-V_c(nz,ed)*vi
+            END DO
+        end do
+    end if
+
+ call exchange_elem(U_c)
+ call exchange_elem(V_c)
+ DO ed=1, myDim_edge2D+eDim_edge2D
+     ! check if its a boudnary edge
+    if(myList_edge2D(ed)>edge2D_in) cycle
+     el=edge_tri(:,ed)
+     nzmin = maxval(ulevels(el))
+     nzmax = minval(nlevels(el))
+     !!PS DO  nz=1,minval(nlevels(el))-1
+     DO  nz=nzmin,nzmax-1
+     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
      UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
      UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
      UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
      UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
     END DO 
  END DO
-end subroutine viscosity_filtxx
+     
+ deallocate(V_c,U_c)
+ 
+end subroutine visc_filt_biharm
 ! ===================================================================
-SUBROUTINE viscosity_filt2xx(option)
-USE o_MESH
+SUBROUTINE visc_filt_hbhmix(mesh)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    IMPLICIT NONE
+
+    ! An energy and momentum conserving version.
+    ! We use the harmonic Leith viscosity + biharmonic background viscosity
+    !
+
+    real(kind=WP)                      :: u1, v1, vi, len, crosslen, le(2)
+    integer                            :: ed, el(2), nz, nzmin, nzmax
+    real(kind=WP), allocatable         :: U_c(:,:), V_c(:,:) 
+    type(t_mesh),  intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+    ! Filter is applied twice. 
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        ! check if its a boudnary edge
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            vi=dt*0.5_WP*(Visc(nz,el(1))+Visc(nz,el(2)))
+            ! backgroung is added later (biharmonically)
+            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            U_c(nz,el(1))=U_c(nz,el(1))-u1
+            U_c(nz,el(2))=U_c(nz,el(2))+u1
+            V_c(nz,el(1))=V_c(nz,el(1))-v1
+            V_c(nz,el(2))=V_c(nz,el(2))+v1
+            u1=u1*vi
+            v1=v1*vi
+            UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+            UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+            UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))    
+        END DO 
+    END DO
+ 
+    Do ed=1,myDim_elem2D
+        len=sqrt(elem_area(ed))
+        nzmin = ulevels(ed)
+        nzmax = nlevels(ed)
+        !!PS Do nz=1,nlevels(ed)-1
+        Do nz=nzmin,nzmax-1
+            vi=dt*gamma0*len ! add biharmonic backgroung
+            U_c(nz,ed)=-U_c(nz,ed)*vi                             
+            V_c(nz,ed)=-V_c(nz,ed)*vi
+        END DO
+    end do
+    call exchange_elem(U_c)
+    call exchange_elem(V_c)
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        ! check if its a boudnary edge
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+            v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+            UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+            UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+            UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        END DO 
+    END DO
+     
+    deallocate(V_c,U_c)
+
+end subroutine visc_filt_hbhmix
+
+! ===================================================================
+SUBROUTINE h_viscosity_leith(mesh)
+    !
+    ! Coefficient of horizontal viscosity is a combination of the Leith (with Leith_c) and modified Leith (with Div_c)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    IMPLICIT NONE
+    real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
+    integer        :: elem, nl1, nz, elnodes(3), n, k, nt, ul1
+    real(kind=WP)  :: leithx, leithy
+    real(kind=WP), allocatable :: aux(:,:) 
+    type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+    !  
+    if(mom_adv<4) call relative_vorticity(mesh)  !!! vorticity array should be allocated
+    ! Fill in viscosity:
+    Visc = 0.0_WP
+    DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
+                                    !! elem=myList_elem2D(m)
+        !_______________________________________________________________________
+        ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
+        ! they run over elements here 
+        nl1 =nlevels(elem)-1
+        ul1 =ulevels(elem)
+        
+        zbar_n=0.0_WP
+        ! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
+        ! zbar_n(nzmax) is now zbar_e_bot(elem), 
+        zbar_n(nl1+1)=zbar_e_bot(elem)
+        !!PS do nz=nl1,2,-1
+        do nz=nl1,ul1+1,-1
+            zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
+        end do
+        !!PS zbar_n(1) = zbar_n(2) + helem(1,elem)
+        zbar_n(ul1) = zbar_n(ul1+1) + helem(ul1,elem)
+        
+        !_______________________________________________________________________
+        elnodes=elem2D_nodes(:,elem)
+        !!PS do nz=1,nl1
+        do nz=ul1,nl1
+            dz=zbar_n(nz)-zbar_n(nz+1)
+            div_elem=(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/dz
+            xe=sum(gradient_sca(1:3,elem)*div_elem)
+            ye=sum(gradient_sca(4:6,elem)*div_elem)
+            div_elem=vorticity(nz,elnodes)
+            leithx=sum(gradient_sca(1:3,elem)*div_elem)
+            leithy=sum(gradient_sca(4:6,elem)*div_elem)
+            Visc(nz,elem)=min(gamma1*elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
+                    + Leith_c*(leithx**2+leithy**2))*elem_area(elem)), elem_area(elem)/dt)
+        end do            !! 0.1 here comes from (2S)^{3/2}/pi^3
+        do nz=nl1+1, nl-1
+            Visc(nz, elem)=0.0_WP
+        end do
+        do nz=1,ul1-1
+            Visc(nz, elem)=0.0_WP
+        end do
+    END DO 
+    
+    allocate(aux(nl-1,myDim_nod2D+eDim_nod2D))
+    aux = 0.0_WP
+    DO nt=1,2 
+        DO n=1, myDim_nod2D 
+            nl1 = nlevels_nod2D(n)
+            ul1 = ulevels_nod2D(n)
+            !!PS DO nz=1, nlevels_nod2D(n)-1
+            DO nz=ul1, nl1-1
+                dz=0.0_WP
+                vi=0.0_WP
+                DO k=1, nod_in_elem2D_num(n)
+                    elem=nod_in_elem2D(k,n)
+                    dz=dz+elem_area(elem)
+                    vi=vi+Visc(nz,elem)*elem_area(elem)
+                END DO
+                aux(nz,n)=vi/dz
+           END DO
+        END DO 
+        call exchange_nod(aux)
+        do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            nl1=nlevels(elem)-1
+            ul1=ulevels(elem)
+            !!!PS Do nz=1, nl1 
+            Do nz=ul1, nl1
+                Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_WP
+            END DO
+            DO nz=nl1+1, nl-1
+                Visc(nz,elem)=0.0_WP
+            END Do
+            DO nz=1, ul1-1
+                Visc(nz,elem)=0.0_WP
+            END Do
+        end do
+    end do
+    call exchange_elem(Visc)
+    deallocate(aux)
+END subroutine h_viscosity_leith
+! =======================================================================
+SUBROUTINE visc_filt_bcksct(mesh)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+
+    real(kind=8)  :: u1, v1, len, vi 
+    integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
+    real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
+    type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
+    ! An analog of harmonic viscosity operator.
+    ! Same as visc_filt_h, but with the backscatter. 
+    ! Here the contribution from squared velocities is added to the viscosity.    
+    ! The contribution from boundary edges is neglected (free slip). 
+
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_b(nl-1,ed), V_b(nl-1, ed))
+    ed=myDim_nod2D+eDim_nod2D
+    allocate(U_c(nl-1,ed), V_c(nl-1,ed))
+    U_b=0.0_WP
+    V_b=0.0_WP
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        len=sqrt(sum(elem_area(el)))
+        nzmax = minval(nlevels(el))
+        nzmin = maxval(ulevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+            vi=dt*max(gamma0, max(gamma1*sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len
+!            vi=dt*max(gamma0, gamma1*max(sqrt(u1*u1+v1*v1), gamma2*(u1*u1+v1*v1)))*len 
+            !here gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on.
+            u1=u1*vi
+            v1=v1*vi
+            U_b(nz,el(1))=U_b(nz,el(1))-u1/elem_area(el(1))
+            U_b(nz,el(2))=U_b(nz,el(2))+u1/elem_area(el(2))
+            V_b(nz,el(1))=V_b(nz,el(1))-v1/elem_area(el(1))
+            V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
+        END DO 
+    END DO
+    call exchange_elem(U_b)
+    call exchange_elem(V_b)
+    ! ===========
+    ! Compute smoothed viscous term: 
+    ! ===========
+    DO ed=1, myDim_nod2D 
+        nzmin = ulevels_nod2D(ed)
+        nzmax = nlevels_nod2D(ed)
+        !!PS DO nz=1, nlevels_nod2D(ed)-1
+        DO nz=nzmin, nzmax-1
+            vi=0.0_WP
+            u1=0.0_WP
+            v1=0.0_WP
+            DO k=1, nod_in_elem2D_num(ed)
+                elem=nod_in_elem2D(k,ed)
+                vi=vi+elem_area(elem)
+                u1=u1+U_b(nz,elem)*elem_area(elem)
+                v1=v1+V_b(nz,elem)*elem_area(elem)
+            END DO
+            U_c(nz,ed)=u1/vi
+            V_c(nz,ed)=v1/vi
+        END DO
+    END DO
+    call exchange_nod(U_c)
+    call exchange_nod(V_c)
+    do ed=1, myDim_elem2D
+        nelem=elem2D_nodes(:,ed)
+        nzmin = ulevels(ed)
+        nzmax = nlevels(ed)
+        !!PS Do nz=1, nlevels(ed)-1
+        Do nz=nzmin, nzmax-1
+            UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+U_b(nz,ed) -easy_bs_return*sum(U_c(nz,nelem))/3.0_WP
+            UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+V_b(nz,ed) -easy_bs_return*sum(V_c(nz,nelem))/3.0_WP
+        END DO
+    end do
+    deallocate(V_c,U_c,V_b,U_b)
+end subroutine visc_filt_bcksct
+
+! ===================================================================
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity Laplacian, i.e., on an analog of
+! the Leith viscosity (Lapl==second derivatives)
+! \nu=|3u_c-u_n1-u_n2-u_n3|*sqrt(S_c)/100. There is an additional term
+! in viscosity that is proportional to the velocity amplitude squared.
+! The coefficient has to be selected experimentally.
+SUBROUTINE visc_filt_bilapl(mesh)
+    USE MOD_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    real(kind=8)  :: u1, v1, vi, len
+    integer       :: ed, el(2), nz, nzmin, nzmax
+    real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+!
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            U_c(nz,el(1))=U_c(nz,el(1))-u1
+            U_c(nz,el(2))=U_c(nz,el(2))+u1
+            V_c(nz,el(1))=V_c(nz,el(1))-v1
+            V_c(nz,el(2))=V_c(nz,el(2))+v1
+        END DO 
+    END DO
+ 
+    Do ed=1,myDim_elem2D
+        len=sqrt(elem_area(ed))
+        nzmin = ulevels(ed)
+        nzmax = nlevels(ed)
+        !!PS Do nz=1,nlevels(ed)-1
+        Do nz=nzmin,nzmax-1
+            ! vi has the sense of harmonic viscosity coef. because of 
+            ! division by area in the end 
+            u1=U_c(nz,ed)**2+V_c(nz,ed)**2
+            vi=max(gamma0, max(gamma1*sqrt(u1), gamma2*u1))*len*dt
+            U_c(nz,ed)=-U_c(nz,ed)*vi                             
+            V_c(nz,ed)=-V_c(nz,ed)*vi
+        END DO
+    end do
+    
+    call exchange_elem(U_c)
+    call exchange_elem(V_c)
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+            v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+            UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+            UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+            UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        END DO 
+    END DO  
+    deallocate(V_c,U_c)
+
+end subroutine visc_filt_bilapl
+! ===================================================================
+! Strictly energy dissipative and momentum conserving version
+! Viscosity depends on velocity differences, and is introduced symmetrically 
+! into both stages of biharmonic operator
+! On each edge, \nu=sqrt(|u_c1-u_c2|*sqrt(S_c1+S_c2)/100)
+! The effect is \nu^2
+! Quadratic in velocity term can be introduced if needed.
+SUBROUTINE visc_filt_bidiff(mesh)
+    USE MOD_MESH
+    USE o_MESH
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_PARSUP
+    USE g_CONFIG
+    USE g_comm_auto
+    IMPLICIT NONE
+    real(kind=8)  :: u1, v1, vi, len
+    integer       :: ed, el(2), nz, nzmin, nzmax
+    real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
+    type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
+    !
+    ed=myDim_elem2D+eDim_elem2D
+    allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
+    U_c=0.0_WP
+    V_c=0.0_WP
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        len=sqrt(sum(elem_area(el)))
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            vi=u1*u1+v1*v1
+            vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+            ! vi=sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+            u1=u1*vi
+            v1=v1*vi
+            U_c(nz,el(1))=U_c(nz,el(1))-u1
+            U_c(nz,el(2))=U_c(nz,el(2))+u1
+            V_c(nz,el(1))=V_c(nz,el(1))-v1
+            V_c(nz,el(2))=V_c(nz,el(2))+v1
+        END DO 
+    END DO
+    
+    call exchange_elem(U_c)
+    call exchange_elem(V_c)
+    DO ed=1, myDim_edge2D+eDim_edge2D
+        if(myList_edge2D(ed)>edge2D_in) cycle
+        el=edge_tri(:,ed)
+        len=sqrt(sum(elem_area(el)))
+        nzmin = maxval(ulevels(el))
+        nzmax = minval(nlevels(el))
+        !!PS DO  nz=1,minval(nlevels(el))-1
+        DO  nz=nzmin,nzmax-1
+            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            vi=u1*u1+v1*v1
+            vi=-dt*sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+            ! vi=-dt*sqrt(max(gamma0, gamma1*max(sqrt(vi), gamma2*vi))*len)
+            u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
+            v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+            UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
+            UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
+            UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
+            UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+        END DO 
+    END DO
+    deallocate(V_c, U_c)
+
+end subroutine visc_filt_bidiff
+! ===================================================================
+
+
+! ===================================================================
+SUBROUTINE visc_filt_dbcksc(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
-use g_comm_auto
+USE g_comm_auto
+USE g_support
+USE uke_update_interface
 IMPLICIT NONE
-! An energy conserving version
-! Also, we use the Leith viscosity
-!
 
-real(kind=WP) :: u1, v1, vi, len
-integer       :: ed, el(2), nz, option
-real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
-
+real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1 
+integer       :: nz, ed, el(2)
+real(kind=8), allocatable  :: U_c(:,:), V_c(:,:), UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
+real(kind=8), allocatable  :: uuu(:)
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+ ! An analog of harmonic viscosity operator.  
+ ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
+ ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
+ ! The contribution from boundary edges is neglected (free slip). 
  ! Filter is applied twice. 
+
 ed=myDim_elem2D+eDim_elem2D
 allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_WP
- V_c=0.0_WP
+allocate(UV_back(2,nl-1,ed), UV_dis(2,nl-1, ed)) 
+allocate(uke_d(nl-1,ed)) 
+allocate(uuu(ed))
+ 
+ U_c=0.0_8
+ V_c=0.0_8
+ UV_back=0.0_8
+ UV_dis=0.0_8
+ uke_d=0.0_8
+
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
     DO  nz=1,minval(nlevels(el))-1
      u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
      v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+     
      U_c(nz,el(1))=U_c(nz,el(1))-u1
      U_c(nz,el(2))=U_c(nz,el(2))+u1
      V_c(nz,el(1))=V_c(nz,el(1))-v1
      V_c(nz,el(2))=V_c(nz,el(2))+v1
     END DO 
  END DO
- if(option==1) then
+ 
+
  Do ed=1,myDim_elem2D
     len=sqrt(elem_area(ed))                     
-    len=dt*len/30.0_WP
+    len=dt*len/30.0_8
     Do nz=1,nlevels(ed)-1
      ! vi has the sense of harmonic viscosity coefficient because of 
      ! the division by area in the end 
      ! ====
      ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
      ! ====
-     vi=max(0.2,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
+     vi=max(0.2_8,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
      U_c(nz,ed)=-U_c(nz,ed)*vi                             
      V_c(nz,ed)=-V_c(nz,ed)*vi
     END DO
  end do
- end if
-if(option==2) then
- Do ed=1,myDim_elem2D
-    len=sqrt(elem_area(ed))                     
-    len=dt*len/30.0_WP
-    Do nz=1,nlevels(ed)-1
-     ! vi has the sense of harmonic viscosity coefficient because of 
-     ! the division by area in the end 
-     ! ===   
-     ! Case 2 -- Leith +background (call h_viscosity_leith)
-     ! ===
-     vi=max(Visc(nz,ed),0.15*len)
-     !    
-     U_c(nz,ed)=-U_c(nz,ed)*vi                             
-     V_c(nz,ed)=-V_c(nz,ed)*vi
-    END DO
- end do
- end if
+
 
  call exchange_elem(U_c)
- call exchange_elem(V_c)
- DO ed=1, myDim_edge2D+eDim_edge2D
-    if(myList_edge2D(ed)>edge2D_in) cycle
-     el=edge_tri(:,ed)
-    DO  nz=1,minval(nlevels(el))-1
-     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
-     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
-     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
-     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-    END DO 
- END DO
-     
- deallocate(V_c,U_c)
-   
-end subroutine viscosity_filt2xx
-! ===================================================================
-SUBROUTINE viscosity_filtxxx
-USE o_MESH
-USE o_ARRAYS
-USE o_PARAM
-USE g_PARSUP
-USE g_CONFIG
-use g_comm_auto
-IMPLICIT NONE
-! An energy and momentum conserving version.
-! We use the harmonic Leith viscosity + 
-! biharmonic background viscosity
-!
+ call exchange_elem(V_c) 
 
-real(kind=WP) :: u1, v1, vi, len, crosslen, le(2)
-integer       :: ed, el(2), nz
-real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
- ! Filter is applied twice. 
-ed=myDim_elem2D+eDim_elem2D
-allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
- U_c=0.0_WP
- V_c=0.0_WP
-  DO ed=1, myDim_edge2D+eDim_edge2D
+ DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
     el=edge_tri(:,ed)
     le=edge_dxdy(:,ed)
-    le(1)=le(1)*sum(elem_cos(el))*0.25_WP
+    le(1)=le(1)*sum(elem_cos(el))*0.25_8
     len=sqrt(le(1)**2+le(2)**2)*r_earth
     le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
     le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
     crosslen=sqrt(le(1)**2+le(2)**2) 
     DO  nz=1,minval(nlevels(el))-1
-     vi=dt*len*(Visc(nz,el(1))+Visc(nz,el(2)))/crosslen
-     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
-     U_c(nz,el(1))=U_c(nz,el(1))-u1
-     U_c(nz,el(2))=U_c(nz,el(2))+u1
-     V_c(nz,el(1))=V_c(nz,el(1))-v1
-     V_c(nz,el(2))=V_c(nz,el(2))+v1
-     u1=u1*vi
-     v1=v1*vi
-     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
-     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
+     vi=dt*len*(v_back(nz,el(1))+v_back(nz,el(2)))/crosslen
+     !if(mype==0) write(*,*) 'vi ', vi , ' and ed' , ed
+     !if(mype==0) write(*,*) 'dt*len/crosslen ', dt*len/crosslen, ' and ed' , ed
+     !vi=max(vi,0.005*len*dt) ! This helps to reduce noise in places where 
+                              ! Visc is small and decoupling might happen 
+     !Backscatter contribution
+     u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))*vi
+     v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
+     
+     !UKE diffusion
+     vi=dt*len*(K_back*sqrt(elem_area(el(1))/scale_area)+K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
+
+     uke1=(uke(nz,el(1))-uke(nz,el(2)))*vi
+
+     
+     UV_back(1,nz,el(1))=UV_back(1,nz,el(1))-u1/elem_area(el(1))
+     UV_back(1,nz,el(2))=UV_back(1,nz,el(2))+u1/elem_area(el(2))
+     UV_back(2,nz,el(1))=UV_back(2,nz,el(1))-v1/elem_area(el(1))
+     UV_back(2,nz,el(2))=UV_back(2,nz,el(2))+v1/elem_area(el(2))  
+     
+     !Correct scaling for the diffusion?
+     uke_d(nz,el(1))=uke_d(nz,el(1))-uke1/elem_area(el(1))
+     uke_d(nz,el(2))=uke_d(nz,el(2))+uke1/elem_area(el(2))
+     
+     
+     
+     !Biharmonic contribution
+     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
+     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+
+     UV_dis(1,nz,el(1))=UV_dis(1,nz,el(1))-u1/elem_area(el(1))
+     UV_dis(1,nz,el(2))=UV_dis(1,nz,el(2))+u1/elem_area(el(2))
+     UV_dis(2,nz,el(1))=UV_dis(2,nz,el(1))-v1/elem_area(el(1))
+     UV_dis(2,nz,el(2))=UV_dis(2,nz,el(2))+v1/elem_area(el(2))
+     
     END DO 
  END DO
  
- Do ed=1,myDim_elem2D
-    len=0.01*sqrt(elem_area(ed))                     
-    Do nz=1,nlevels(ed)-1
-     vi=dt*abs(min(Visc(nz,ed)-len,0.0))    
-     U_c(nz,ed)=-U_c(nz,ed)*vi                             
-     V_c(nz,ed)=-V_c(nz,ed)*vi
-    END DO
- end do
- call exchange_elem(U_c)
- call exchange_elem(V_c)
- DO ed=1, myDim_edge2D+eDim_edge2D
-    if(myList_edge2D(ed)>edge2D_in) cycle
-     el=edge_tri(:,ed)
-    DO  nz=1,minval(nlevels(el))-1
-     u1=(U_c(nz,el(1))-U_c(nz,el(2)))
-     v1=(V_c(nz,el(1))-V_c(nz,el(2)))
-     UV_rhs(1,nz,el(1))=UV_rhs(1,nz,el(1))-u1/elem_area(el(1))
-     UV_rhs(1,nz,el(2))=UV_rhs(1,nz,el(2))+u1/elem_area(el(2))
-     UV_rhs(2,nz,el(1))=UV_rhs(2,nz,el(1))-v1/elem_area(el(1))
-     UV_rhs(2,nz,el(2))=UV_rhs(2,nz,el(2))+v1/elem_area(el(2))
-    END DO 
+call exchange_elem(UV_back)
+
+DO  nz=1, nl-1
+    uuu=0.0_8
+    uuu=UV_back(1,nz,:)
+    call smooth_elem(uuu,smooth_back_tend, mesh)
+    UV_back(1,nz,:)=uuu
+    uuu=0.0_8
+    uuu=UV_back(2,nz,:)
+    call smooth_elem(uuu,smooth_back_tend, mesh)
+    UV_back(2,nz,:)=uuu 
+END DO
+
+ DO ed=1, myDim_elem2D
+     DO  nz=1,nlevels(ed)-1
+     UV_rhs(1,nz,ed)=UV_rhs(1,nz,ed)+UV_dis(1,nz,ed)+UV_back(1,nz,ed)
+     UV_rhs(2,nz,ed)=UV_rhs(2,nz,ed)+UV_dis(2,nz,ed)+UV_back(2,nz,ed)               
+     END DO 
  END DO
-     
+
+ UV_dis_tend=UV_dis!+UV_back
+ UV_total_tend=UV_dis+UV_back
+ UV_back_tend=UV_back
+ uke_dif=uke_d
+ 
+ call uke_update(mesh)
  deallocate(V_c,U_c)
-   
-end subroutine viscosity_filtxxx
+ deallocate(UV_dis,UV_back) 
+ deallocate(uke_d)
+ deallocate(uuu)
 
-! ===================================================================
+end subroutine visc_filt_dbcksc
+!===========================================================================
 
-SUBROUTINE h_viscosity_leith
-!
-! Coefficient of horizontal viscosity is a combination of 
-! the Leith and modified Leith (with Div_c)
-! and background (with A_hor)
-! Background is scaled as sqrt(A/A_0), others are scaled
-! in natural way by construction
-! Can only be used with the  momentum invariant 
-! form
-!
-USE o_MESH
+SUBROUTINE backscatter_coef(mesh)
+USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
-real(kind=WP)  ::  dz, div_elem(3), xe, ye, vi
-integer        :: elem, nl1, nz, elnodes(3),n,k, nt
-real(kind=WP)  :: leithx, leithy
-real(kind=WP), allocatable :: aux(:,:) 
-	!  
-	if(mom_adv<4) call relative_vorticity  !!! vorticity array should be allocated
-	! Fill in viscosity:
-	DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
-									!! elem=myList_elem2D(m)
-		!_______________________________________________________________________
-		! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because 
-		! they run over elements here 
-		nl1 =nlevels(elem)-1
-		zbar_n=0.0_WP
-		! in case of partial cells zbar_n(nzmax) is not any more at zbar(nzmax), 
-		! zbar_n(nzmax) is now zbar_e_bot(elem), 
-		zbar_n(nl1+1)=zbar_e_bot(elem)
-		do nz=nl1,2,-1
-			zbar_n(nz) = zbar_n(nz+1) + helem(nz,elem)
-		end do
-		zbar_n(1) = zbar_n(2) + helem(1,elem)
-		
-		!_______________________________________________________________________
-		elnodes=elem2D_nodes(:,elem)
-		do nz=1,nl1
-			dz=zbar_n(nz)-zbar_n(nz+1)
-			div_elem=(Wvel(nz,elnodes)-Wvel(nz+1,elnodes))/dz
-			xe=sum(gradient_sca(1:3,elem)*div_elem)
-			ye=sum(gradient_sca(4:6,elem)*div_elem)
-			div_elem=vorticity(nz,elnodes)
-			leithx=sum(gradient_sca(1:3,elem)*div_elem)
-			leithy=sum(gradient_sca(4:6,elem)*div_elem)
-			vi=A_hor*sqrt(elem_area(elem)/scale_area)
-			Visc(nz,elem)=0.2*min(elem_area(elem)*sqrt((Div_c*(xe**2+ye**2) &
-				+ Leith_c*(leithx**2+leithy**2))*elem_area(elem)) &
-				+ vi, elem_area(elem)/dt)
-		end do                        !! 0.1 here comes from (2S)^{3/2}/pi^3
-		do nz=nl1+1, nl-1
-			Visc(nz, elem)=0.0_WP
-		end do		    
-	END DO 
+type(t_mesh), intent(in) , target :: mesh
+integer                 :: elem, nz
+#include "associate_mesh.h"
+
+!Potentially add the Rossby number scaling to the script...
+!check if sign is right! Different in the Jansen paper
+!Also check with the normalization by area; as before we use element length sqrt(2*elem_area(ed))
+
+v_back=0.0_8
+DO  elem=1, myDim_elem2D 
+     DO  nz=1,nlevels(elem)-1
+!v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
+!v_back(nz,elem)=-c_back*sqrt(4._8/sqrt(3.0_8)*elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)) !Is the scaling correct
+v_back(nz,elem)=min(-c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
+!Scaling by sqrt(2*elem_area) or sqrt(elem_area)?
+     END DO
+END DO
+
+call exchange_elem(v_back)
+
+end subroutine backscatter_coef
+!===========================================================================
+
+SUBROUTINE uke_update(mesh)
+USE MOD_MESH
+USE o_ARRAYS
+USE o_PARAM
+USE g_PARSUP
+USE g_CONFIG
+use g_comm_auto
+USE g_support
+USE g_rotate_grid
+IMPLICIT NONE
+
+!I had to change uke(:) to uke(:,:) to make output and restart work!!
+
+!Why is it necessary to implement the length of the array? It doesn't work without!
+!integer, intent(in)        :: t_levels
+type(t_mesh), intent(in) , target :: mesh
+!real(kind=8), dimension(:,:,:), intent(in)   :: UV_dis, UV_back
+!real(kind=8), dimension(:,:), intent(in)   :: UV_dif
+!real(kind=8), intent(in)   :: UV_dis(nl-1,myDim_elem2D+eDim_elem2D), UV_back(nl-1, myDim_elem2D+eDim_elem2D)
+!real(kind=8), intent(in)   :: UV_dif(nl-1,myDim_elem2D+eDim_elem2D)
+real(kind=8)		   :: hall, h1_eta, hnz, vol
+integer			   :: elnodes(3), nz, ed, edi, node, j, elem, q
+real(kind=8), allocatable  :: uuu(:), work_array(:), U_work(:,:), V_work(:,:), rosb_array(:,:), work_uv(:)
+integer			   :: kk, nzmax, el
+real(kind=8)       :: c1, rosb, vel_u, vel_v, vel_uv, scaling, reso
+real*8             :: c_min=0.5, f_min=1.e-6, r_max=200000., ex, ey, a1, a2, len_reg, dist_reg(2) ! Are those values still correct?
+#include "associate_mesh.h"
+!rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
+!rossby_num=2
+
+ed=myDim_elem2D+eDim_elem2D
+allocate(uuu(ed)) 
+
+uke_back=0.0_8
+uke_dis=0.0_8
+DO ed=1, myDim_elem2D
+DO nz=1, nlevels(ed)-1  
+   uke_dis(nz,ed)=(UV(1,nz,ed)*UV_dis_tend(1,nz,ed)+UV(2,nz,ed)*UV_dis_tend(2,nz,ed))   
+   uke_back(nz,ed)=(UV(1,nz,ed)*UV_back_tend(1,nz,ed)+UV(2,nz,ed)*UV_back_tend(2,nz,ed))
+END DO
+END DO
+
+DO  nz=1,nl-1
+    uuu=0.0_8
+    uuu=uke_back(nz,:)
+    call smooth_elem(uuu,smooth_back, mesh) !3) ?
+    uke_back(nz,:)=uuu
+END DO
+
+
+
+!Timestepping use simple backward timestepping; all components should have dt in it, unless they need it twice
+!Amplitudes should be right given the correction of the viscosities; check for all, also for biharmonic
+!uke(1,ed)=uke(1,ed)-uke_dis(1,ed)-uke_back(1,ed)+uke_dif(1,ed)
+ed=myDim_elem2D+eDim_elem2D
+allocate(U_work(nl-1,myDim_nod2D+eDim_nod2D),V_work(nl-1,myDim_nod2D+eDim_nod2D))
+allocate(work_uv(myDim_nod2D+eDim_nod2D))
+allocate(rosb_array(nl-1,ed))
+call exchange_elem(UV)
+rosb_array=0._8
+DO nz=1, nl-1
+    work_uv=0._WP
+    DO node=1, myDim_nod2D
+       vol=0._WP
+       U_work(nz,node)=0._WP 
+       V_work(nz,node)=0._WP 
+       DO j=1, nod_in_elem2D_num(node)
+           elem=nod_in_elem2D(j, node)
+           U_work(nz,node)=U_work(nz,node)+UV(1,nz,elem)*elem_area(elem)
+           V_work(nz,node)=V_work(nz,node)+UV(2,nz,elem)*elem_area(elem)
+           vol=vol+elem_area(elem)
+       END DO
+       U_work(nz,node)=U_work(nz,node)/vol
+       V_work(nz,node)=U_work(nz,node)/vol
+    END DO
+    work_uv=U_work(nz,:)
+    call exchange_nod(work_uv)
+    U_work(nz,:)=work_uv
+    work_uv=V_work(nz,:)
+    call exchange_nod(work_uv)
+    V_work(nz,:)=work_uv    
+END DO
+
+    DO el=1,myDim_elem2D
+     DO nz=1, nlevels(el)-1     
+        rosb_array(nz,el)=sqrt((sum(gradient_sca(1:3,el)*U_work(nz,elem2D_nodes(1:3,el)))-&
+              sum(gradient_sca(4:6, el)*V_work(nz,elem2D_nodes(1:3,el))))**2+&
+              (sum(gradient_sca(4:6, el)*U_work(nz,elem2D_nodes(1:3,el)))+&
+              sum(gradient_sca(1:3, el)*V_work(nz,elem2D_nodes(1:3,el))))**2)
+!        hall=hall+hnz
+     END DO
+!     rosb_array(el)=rosb_array(el)/hall
+    END DO
+DO ed=1, myDim_elem2D
+    scaling=1._WP
+    IF(uke_scaling) then
+      reso=sqrt(elem_area(ed)*4._wp/sqrt(3._wp))
+      rosb=0._wp
+      elnodes=elem2D_nodes(:, ed)   
+      DO kk=1,3
+        c1=0._wp
+        nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(elnodes(kk)), elnodes(kk))), 1)
+        !Vertical average; same scaling in the vertical
+        DO nz=1, nzmax-1
+         c1=c1+hnode_new(nz,elnodes(kk))*(sqrt(max(bvfreq(nz,elnodes(kk)), 0._WP))+sqrt(max(bvfreq(nz+1,elnodes(kk)), 0._WP)))/2.
+        END DO
+        c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
+        !Cutoff K_GM depending on (Resolution/Rossby radius) ratio
+        rosb=rosb+min(c1/max(abs(coriolis_node(elnodes(kk))), f_min), r_max)
+      END DO
+      rosb=rosb/3._8
+      scaling=1._WP/(1._WP+(uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
+    END IF
     
-	allocate(aux(nl-1,myDim_nod2D+eDim_nod2D))
-	DO nt=1,2 
-		DO n=1, myDim_nod2D 
-			DO nz=1, nlevels_nod2D(n)-1
-				dz=0.0_WP
-				vi=0.0_WP
-				DO k=1, nod_in_elem2D_num(n)
-					elem=nod_in_elem2D(k,n)
-					dz=dz+elem_area(elem)
-					vi=vi+Visc(nz,elem)*elem_area(elem)
-				END DO
-				aux(nz,n)=vi/dz
-			END DO
-		END DO 
-		call exchange_nod(aux)
-		do elem=1, myDim_elem2D
-			elnodes=elem2D_nodes(:,elem)
-			nl1=nlevels(elem)-1
-			Do nz=1, nl1 
-				Visc(nz,elem)=sum(aux(nz,elnodes))/3.0_WP
-			END DO
-			DO nz=nl1+1, nl-1
-				Visc(nz,elem)=0.0_WP
-			END Do
-		end do
-	end do
-	call exchange_elem(Visc)  
-	deallocate(aux)
-END subroutine h_viscosity_leith
-! =======================================================================
+    DO nz=1, nlevels(ed)-1  
+    elnodes=elem2D_nodes(:,ed)
+    
+    !Taking out that one place where it is always weird (Pacific Southern Ocean)
+    !Should not really be used later on, once we fix the issue with the 1/4 degree grid
+    if(.not. (TRIM(which_toy)=="soufflet")) then
+      call elem_center(ed, ex, ey)
+      !a1=-104.*rad
+      !a2=-49.*rad
+      call g2r(-104.*rad, -49.*rad, a1, a2)
+      dist_reg(1)=ex-a1
+      dist_reg(2)=ey-a2
+      call trim_cyclic(dist_reg(1))
+      dist_reg(1)=dist_reg(1)*elem_cos(ed)
+      dist_reg=dist_reg*r_earth
+      len_reg=sqrt(dist_reg(1)**2+dist_reg(2)**2)
+    
+    
+      !if(mype==0) write(*,*) 'len_reg ', len_reg , ' and dist_reg' , dist_reg, ' and ex, ey', ex, ey, ' and a ', a1, a2
+      rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+      !uke_dif(nz, ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
+      uke_dis(nz,ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
+    else
+      rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(coriolis_node(elnodes(:)))), f_min)
+      !uke_dif(nz, ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
+      uke_dis(nz,ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
+    end if
+    
+    END DO
+END DO
+deallocate(U_work, V_work)
+deallocate(rosb_array)
+deallocate(work_uv)
+call exchange_elem(uke_dis)
+!call exchange_elem(uke_dif)
+DO nz=1, nl-1  
+    uuu=uke_dis(nz,:)
+    call smooth_elem(uuu,smooth_dis, mesh)
+    uke_dis(nz,:)=uuu
+END DO
+DO ed=1, myDim_elem2D
+    DO  nz=1,nlevels(ed)-1
+    uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+    uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
+    uke(nz,ed)=uke(nz,ed)+1.5_8*uke_rhs(nz,ed)-0.5_8*uke_rhs_old(nz,ed)
+    END DO
+END DO
+call exchange_elem(uke)
+
+deallocate(uuu)
+end subroutine uke_update
+
+! ===================================================================

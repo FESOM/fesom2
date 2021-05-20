@@ -13,7 +13,7 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt
+  use g_config, only : dt, lwiso !wiso-code add lwiso
   use o_param,  only : rad
   use g_PARSUP
   implicit none
@@ -23,11 +23,12 @@ module cpl_driver
   !
 
 #if defined (__oifs)
-  integer, parameter         :: nsend = 6
+  integer, parameter         :: nsend = 8 !wiso-code 5->8
+  integer, parameter         :: nrecv = 19 !wiso-code 13->19
 #else
-  integer, parameter         :: nsend = 4
+  integer, parameter         :: nsend = 7 !wiso-code 4->7
+  integer, parameter         :: nrecv = 18 !wiso-code 12->18
 #endif
-  integer, parameter         :: nrecv = 12
   
   integer, dimension(nsend)  :: send_id
   integer, dimension(nrecv)  :: recv_id
@@ -157,19 +158,19 @@ contains
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_define_unstr
+  subroutine cpl_oasis3mct_define_unstr(mesh)
    
 #ifdef __oifs
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
 #else
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
 #endif
-    use o_mesh
+    use mod_mesh
     use g_rotate_grid
-    
+    use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-
+    type(t_mesh), intent(in), target :: mesh
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
     ! exchange between FESOM, ECHAM6 and OASIS3-MCT.
@@ -212,8 +213,8 @@ contains
     integer                    :: my_displacement
 
     integer,allocatable        :: unstr_mask(:,:)
-    real(kind=WP)               :: this_x_coord     ! longitude coordinates
-    real(kind=WP)               :: this_y_coord     ! latitude coordinates
+    real(kind=WP)              :: this_x_coord          ! longitude coordinates
+    real(kind=WP)              :: this_y_coord          ! latitude coordinates
     !
     ! Corner data structure for a OASIS3-MCT Reglonlatvrt grid
     !
@@ -222,6 +223,9 @@ contains
 
     real(kind=WP), allocatable :: all_x_coords(:, :)     ! longitude coordinates
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
+    real(kind=WP), allocatable :: all_area(:,:)    
+
+#include "associate_mesh.h"
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -301,10 +305,11 @@ contains
     if (mype .eq. localroot) then
       ALLOCATE(all_x_coords(number_of_all_points, 1))
       ALLOCATE(all_y_coords(number_of_all_points, 1))
-
+      ALLOCATE(all_area(number_of_all_points, 1))
     else 
       ALLOCATE(all_x_coords(1, 1))
       ALLOCATE(all_y_coords(1, 1))
+      ALLOCATE(all_area(1, 1))
     endif
 
     displs_from_all_pes(1) = 0
@@ -318,18 +323,24 @@ contains
     CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
     CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
                     counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
 
-    if (mype .eq. 1) then 
-      print *, 'FESOM after 2nd GatherV'
+    if (mype .eq. 0) then 
+      print *, 'FESOM before 3rd GatherV'
+    endif
+    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+
+    if (mype .eq. 0) then 
+      print *, 'FESOM after 3rd GatherV'
     endif
 
     CALL MPI_Barrier(MPI_COMM_FESOM, ierror)
-    if (mype .eq. 1) then 
+    if (mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
 
@@ -337,13 +348,19 @@ contains
       print *, 'FESOM before start_grids_writing'
        CALL oasis_start_grids_writing(il_flag)
        IF (il_flag .NE. 0) THEN
-       print *, 'FESOM before write grid'
+
+          print *, 'FESOM before write grid'
           CALL oasis_write_grid (grid_name, number_of_all_points, 1, all_x_coords(:,:), all_y_coords(:,:))
+
           ALLOCATE(unstr_mask(number_of_all_points, 1))
           unstr_mask=0
-       print *, 'FESOM before write mask'
+          print *, 'FESOM before write mask'
           CALL oasis_write_mask(grid_name, number_of_all_points, 1, unstr_mask)
           DEALLOCATE(unstr_mask)
+
+          print *, 'FESOM before write area'
+          CALL oasis_write_area(grid_name, number_of_all_points, 1, all_area)
+
        end if
       print *, 'FESOM before terminate_grids_writing'
       call oasis_terminate_grids_writing()
@@ -361,13 +378,25 @@ contains
 ! ... Define symbolic names for the transient fields send by the ocean
 !     These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
+    cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
+    cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
+    cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
+    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 6)='o18_feom' !                 -> h2o18
+    cpl_send( 7)='hdo_feom' !                 -> hdo16
+    cpl_send( 8)='o16_feom' !                 -> h2o16
+#else
+    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
     cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
     cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
-#if defined (__oifs)
-    cpl_send( 5)='ste_feom' ! 5. sea ice temperature [K]           ->
-    cpl_send( 6)='sia_feom' ! 6. sea ice albedo [%-100]            ->
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_send( 5)='o18_feom' !                 -> h2o18
+    cpl_send( 6)='hdo_feom' !                 -> hdo16
+    cpl_send( 7)='o16_feom' !                 -> h2o16
 #endif
 
 
@@ -376,6 +405,7 @@ contains
 ! ...  Define symbolic names for transient fields received by the ocean.
 !      These must be identical to the names specified in the SMIOC file.
 !
+#if defined (__oifs)
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
     cpl_recv(3)  = 'taux_ico'
@@ -388,6 +418,35 @@ contains
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
+    cpl_recv(13) = 'enth_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(14) = 'w1_oce'
+    cpl_recv(15) = 'w2_oce'
+    cpl_recv(16) = 'w3_oce'
+    cpl_recv(17) = 'i1_oce'
+    cpl_recv(18) = 'i2_oce'
+    cpl_recv(19) = 'i3_oce'
+#else
+    cpl_recv(1)  = 'taux_oce'
+    cpl_recv(2)  = 'tauy_oce'
+    cpl_recv(3)  = 'taux_ico'
+    cpl_recv(4)  = 'tauy_ico'    
+    cpl_recv(5)  = 'prec_oce'
+    cpl_recv(6)  = 'snow_oce'    
+    cpl_recv(7)  = 'evap_oce'
+    cpl_recv(8)  = 'subl_oce'
+    cpl_recv(9)  = 'heat_oce'
+    cpl_recv(10) = 'heat_ico'
+    cpl_recv(11) = 'heat_swo'    
+    cpl_recv(12) = 'hydr_oce'
+!!!!!!wiso-code!!!!!!! add more coupling fields
+    cpl_recv(13) = 'w1_oce'
+    cpl_recv(14) = 'w2_oce'
+    cpl_recv(15) = 'w3_oce'
+    cpl_recv(16) = 'i1_oce'
+    cpl_recv(17) = 'i2_oce'
+    cpl_recv(18) = 'i3_oce'
+#endif
 
     if (mype .eq. 0) then 
        print *, 'FESOM after declaring the transient variables'

@@ -2,7 +2,14 @@
 *.o
 *.mod
 *.x
-*.out
+#*.out
 *~
+<<<<<<< HEAD
 *.old
 *.bak
+=======
+*.swp
+src/icepack_drivers/Icepack
+/work_*
+Makefile.in
+>>>>>>> wiso

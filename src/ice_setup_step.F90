@@ -1,52 +1,73 @@
+module ice_setup_step_interfaces
+  interface
+    subroutine ice_array_setup(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+
+    subroutine ice_initial_state(mesh)
+      use mod_mesh
+      type(t_mesh), intent(in)  , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
+!
+!_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
-!
-!==============================================================================
-subroutine ice_setup
-use o_param
-use g_parsup
-use o_mesh
-use i_param
-use i_arrays
-use g_CONFIG
-implicit none 
-  ! ================ DO not change
-  ice_dt=ice_ave_steps*dt
- ! ice_dt=dt
-  Tevp_inv=3.0/ice_dt 
-  Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
-                                                      ! it always enters 
-  ! ================
-  call ice_array_setup
-  call ice_fct_init 
-  ! ================
-  ! Initialization routine, user input is required 
-  ! ================
-  !call ice_init_fields_test
-  call ice_initial_state     ! Use it unless running test example
-  if(mype==0) write(*,*) 'Ice is initialized'
+subroutine ice_setup(mesh)
+    use o_param
+    use g_parsup
+    use i_param
+    use i_arrays
+    use g_CONFIG
+    use mod_mesh
+    use ice_setup_step_interfaces
+    implicit none 
+    type(t_mesh), intent(in)           , target :: mesh
+    
+    ! ================ DO not change
+    ice_dt=real(ice_ave_steps,WP)*dt
+    ! ice_dt=dt
+    Tevp_inv=3.0_WP/ice_dt 
+    Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
+                                                            ! it always enters
+
+    ! ================
+    call ice_array_setup(mesh)
+    call ice_fct_init(mesh)
+    ! ================
+    ! Initialization routine, user input is required 
+    ! ================
+    !call ice_init_fields_test
+    call ice_initial_state(mesh)   ! Use it unless running test example
+    if(mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
-! ============================================================================
-subroutine ice_array_setup
+!
+!
+!_______________________________________________________________________________
+subroutine ice_array_setup(mesh)
 !
 ! inializing sea ice model 
 !
 ! Variables that serve for exchange with atmosphere are nodal, to keep 
 ! back compatibility with FESOM input routines
  
-
 use o_param
 use i_param
-use o_mesh
+use MOD_MESH
 use i_arrays
 use g_parsup
 USE g_CONFIG
 
 implicit none
+type(t_mesh), intent(in)           , target :: mesh
 integer   :: n_size, e_size, mn, k, n, n1, n2
 
 ! kh 19.02.21
 integer   :: i
+#include  "associate_mesh.h"
 
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
@@ -103,6 +124,7 @@ e_size=myDim_elem2D+eDim_elem2D
   end if
 
  if (use_means) allocate(m_ice_mean(n_size), a_ice_mean(n_size), m_snow_mean(n_size))
+ allocate(eps11(e_size),     eps12(e_size),   eps22(e_size))
  allocate(rhs_m(n_size), rhs_a(n_size), rhs_ms(n_size))
  allocate(t_skin(n_size))
  allocate(U_ice_old(n_size), V_ice_old(n_size)) !PS
@@ -140,133 +162,199 @@ e_size=myDim_elem2D+eDim_elem2D
  sigma11=0.0_WP
  sigma22=0.0_WP
  sigma12=0.0_WP
+ eps11=0.0_WP
+ eps12=0.0_WP
+ eps22=0.0_WP
  t_skin=0.0_WP
  rhs_mdiv=0.0_WP
  rhs_adiv=0.0_WP
  rhs_msdiv=0.0_WP
-if (use_means) then
- m_ice_mean=0.0_WP
- a_ice_mean=0.0_WP
- m_snow_mean=0.0_WP
- U_ice_mean=0.0_WP
- V_ice_mean=0.0_WP
-endif
+
 
 ! Allocate memory for arrays used in coupling 
 ! with ocean and atmosphere
  allocate(S_oc_array(n_size), T_oc_array(n_size))  ! copies of ocean T ans S
+ S_oc_array = 0.0_WP
+ T_oc_array = 0.0_WP
  allocate(fresh_wa_flux(n_size), net_heat_flux(n_size))
+ fresh_wa_flux = 0.0_WP
+ net_heat_flux = 0.0_WP
  allocate(stress_atmice_x(n_size), stress_atmice_y(n_size))    
- allocate(stress_atmoce_x(n_size), stress_atmoce_y(n_size))    
+ stress_atmice_x = 0.0_WP
+ stress_atmice_y = 0.0_WP
  allocate(elevation(n_size))           ! =ssh  of ocean        
+ elevation = 0.0_WP
  allocate(stress_iceoce_x(n_size), stress_iceoce_y(n_size))    
+ stress_iceoce_x = 0.0_WP
+ stress_iceoce_y = 0.0_WP
  allocate(U_w(n_size), V_w(n_size))   ! =uf and vf of ocean at surface nodes
 #if defined (__oasis)
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs)
-  allocate(ice_alb(n_size), ice_temp(n_size))
-  ice_alb=0.
-  ice_temp=0.
+  allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
+  allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
+  ice_alb=0.6_WP
+  ice_temp=265.15_WP
+  rhs_tempdiv=0._WP
+  rhs_temp=0._WP
+  enthalpyoffuse=0._WP
 #endif /* (__oifs) */
-  oce_heat_flux=0.
-  ice_heat_flux=0.
-  tmp_oce_heat_flux=0.
-  tmp_ice_heat_flux=0.
+  oce_heat_flux=0._WP
+  ice_heat_flux=0._WP
+  tmp_oce_heat_flux=0._WP
+  tmp_ice_heat_flux=0._WP
 #endif /* (__oasis) */
 end subroutine ice_array_setup
-!==========================================================================
-subroutine ice_timestep(step)
-! 
-! Sea ice model step
 !
+!
+!
+!_______________________________________________________________________________
+! Sea ice model step
+subroutine ice_timestep(step, mesh)
+use i_arrays
 use o_param
 use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
-implicit none
-integer       :: step 
-REAL(kind=WP) :: t0,t1, t2, t3
+use mod_mesh
+
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack 
+#endif
+
+implicit none 
+type(t_mesh), intent(in)   , target :: mesh
+integer                    :: step,i
+REAL(kind=WP)              :: t0,t1, t2, t3
+
+#if defined (__icepack)
+real(kind=WP)              :: time_evp, time_advec, time_therm
+#endif
+
 t0=MPI_Wtime()
- ! ===== Dynamics
-SELECT CASE (whichEVP)
-   CASE (0)
-      call EVPdynamics
-   CASE (1)
-      call EVPdynamics_m
-   CASE (2)
-      call EVPdynamics_a
-   CASE DEFAULT
-      if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
-      call par_ex
-      stop
-END SELECT
- t1=MPI_Wtime()     
- ! ===== Advection part
 
-! old FCT routines
-! call ice_TG_rhs
-! call ice_fct_solve
-! call cut_off
-! new FCT routines from Sergey Danilov 08.05.2018
- call ice_TG_rhs_div   
- call ice_fct_solve
- call ice_update_for_div
- call cut_off
-
- t2=MPI_Wtime()
- ! ===== Thermodynamic part
- call thermodynamics
- t3=MPI_Wtime()
- rtime_ice = rtime_ice + (t3-t0)
- rtime_tot = rtime_tot + (t3-t0)
-
-if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
+#if defined (__icepack)
+    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+#else     
+    
+    !___________________________________________________________________________
+    ! ===== Dynamics
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
+    SELECT CASE (whichEVP)
+    CASE (0)
+        call EVPdynamics(mesh)
+    CASE (1)
+        call EVPdynamics_m(mesh)
+    CASE (2)
+        call EVPdynamics_a(mesh)
+    CASE DEFAULT
+        if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
+        call par_ex
+        stop
+    END SELECT
+    
+    if (use_cavity) call cavity_ice_clean_vel(mesh)
+    t1=MPI_Wtime()   
+    
+    !___________________________________________________________________________
+    ! ===== Advection part
+    ! old FCT routines
+    ! call ice_TG_rhs
+    ! call ice_fct_solve
+    ! call cut_off
+    ! new FCT routines from Sergey Danilov 08.05.2018
+#if defined (__oifs)
+    do i=1,myDim_nod2D+eDim_nod2D
+        ice_temp(i) = ice_temp(i)*a_ice(i)
+    end do
+#endif /* (__oifs) */
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
+    call ice_TG_rhs_div(mesh)   
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
+    call ice_fct_solve(mesh)
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
+    call ice_update_for_div(mesh)
+#if defined (__oifs)
+    do i=1,myDim_nod2D+eDim_nod2D
+        if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
+    end do
+#endif /* (__oifs) */
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
+    call cut_off
+    
+    if (use_cavity) call cavity_ice_clean_ma(mesh)
+    t2=MPI_Wtime()
+    
+    !___________________________________________________________________________
+    ! ===== Thermodynamic part
+    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+    call thermodynamics(mesh)
+#endif /* (__icepack) */
+    t3=MPI_Wtime()
+    rtime_ice = rtime_ice + (t3-t0)
+    rtime_tot = rtime_tot + (t3-t0)
+    if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
 		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
+#if defined (__icepack)
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
+                write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
+                write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
+#else
 		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
 		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
 		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+#endif /* (__icepack) */
 		write(*,*) '   _______________________________'
 		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
 		write(*,*)
-endif
+     endif
 
 end subroutine ice_timestep
-!==============================================================================
+!
+!
+!_______________________________________________________________________________
+! sets inital values or reads restart file for ice model
+subroutine ice_initial_state(mesh)
+    use i_ARRAYs
+    use MOD_MESH
+    use o_PARAM   
+    use o_arrays        
+    use g_parsup 
+    use g_CONFIG
+    implicit none
+    !
+    type(t_mesh), intent(in)           , target :: mesh
+    integer                            :: i
+    character(MAX_PATH)                      :: filename
+    real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
-subroutine ice_initial_state
-  !sets inital values or reads restart file for ice model
-  use i_ARRAYs
-  use o_MESH    
-  use o_PARAM   
-  use o_arrays        
-  use g_parsup 
-  USE g_CONFIG
-  implicit none
-  !
-  integer        :: i
-  character*100  :: filename
-  real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
-  m_ice =0.
-  a_ice =0.
-  u_ice =0.
-  v_ice =0.
-  m_snow=0.
-  if(mype==0) write(*,*) 'initialize the sea ice'
+#include  "associate_mesh.h"
 
-  do i=1,myDim_nod2D+eDim_nod2D                           
-     if (tr_arr(1,i,1)< 0.0_WP) then
-	if (geo_coord_nod2D(2,i)>0.) then
-            m_ice(i) = 1.0_WP
-            m_snow(i)= 0.1_WP 
-        else
-            m_ice(i) = 2.0_WP
-            m_snow(i)= 0.5_WP 
-        end if
-
-        a_ice(i) = 0.9_WP
-        u_ice(i) = 0.0_WP
-        v_ice(i) = 0.0_WP
-     endif
-  enddo
+    m_ice =0._WP
+    a_ice =0._WP
+    u_ice =0._WP
+    v_ice =0._WP
+    m_snow=0._WP
+    if(mype==0) write(*,*) 'initialize the sea ice'
+    !___________________________________________________________________________
+    do i=1,myDim_nod2D+eDim_nod2D    
+    
+        !_______________________________________________________________________
+        if (ulevels_nod2d(i)>1) cycle ! --> if cavity, no sea ice, no initial state
+        
+        !_______________________________________________________________________
+        if (tr_arr(1,i,1)< 0.0_WP) then
+            if (geo_coord_nod2D(2,i)>0._WP) then
+                m_ice(i) = 1.0_WP
+                m_snow(i)= 0.1_WP 
+            else
+                m_ice(i) = 2.0_WP
+                m_snow(i)= 0.5_WP 
+            end if
+            a_ice(i) = 0.9_WP
+            u_ice(i) = 0.0_WP
+            v_ice(i) = 0.0_WP
+        endif
+    enddo
 end subroutine ice_initial_state

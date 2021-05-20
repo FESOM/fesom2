@@ -1,22 +1,39 @@
+module write_step_info_interface
+  interface
+    subroutine write_step_info(istep,outfreq, mesh)
+      use MOD_MESH
+      integer								:: istep,outfreq
+      type(t_mesh), intent(in)                               , target :: mesh
+    end subroutine
+  end interface
+end module
+
 !
 !
 !===============================================================================
-subroutine write_step_info(istep,outfreq)
-	use g_config, only: dt
-	use o_MESH
+subroutine write_step_info(istep,outfreq, mesh)
+	use g_config, only: dt, use_ice
+	use MOD_MESH
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
+	use i_ARRAYS
 	use g_comm_auto
 	implicit none
 	
 	integer								:: n, istep,outfreq
 	real(kind=WP)						:: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
-	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2,max_cfl_z, max_pgfx, max_pgfy
-	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, max_wvel,max_hnode,max_deta,max_wvel2,max_hnode2
+	real(kind=WP)						:: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, &
+                                           min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2, &
+                                           min_vvel, min_vvel2, min_uvel, min_uvel2
+	real(kind=WP)						:: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
+                                           max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
+                                           max_vvel, max_vvel2, max_uvel, max_uvel2, &
+                                           max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-	
+    type(t_mesh), intent(in)                               , target :: mesh
+#include "associate_mesh.h"
 	if (mod(istep,outfreq)==0) then
 		
 		!_______________________________________________________________________
@@ -33,9 +50,9 @@ subroutine write_step_info(istep,outfreq)
 		loc_deta  =0.
 		loc_dhbar =0.
 		loc_wflux =0.
-		loc_hflux =0.
-		loc_temp  =0.
-		loc_salt  =0.
+!!PS 		loc_hflux =0.
+!!PS 		loc_temp  =0.
+!!PS 		loc_salt  =0.
 		loc       =0.
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D
@@ -44,9 +61,9 @@ subroutine write_step_info(istep,outfreq)
 			loc_deta  = loc_deta  + area(1, n)*d_eta(n)
 			loc_dhbar = loc_dhbar + area(1, n)*(hbar(n)-hbar_old(n))
 			loc_wflux = loc_wflux + area(1, n)*water_flux(n)
-			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
-			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
-			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
+!!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
+!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
+!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
 		end do
 		
 		!_______________________________________________________________________
@@ -55,17 +72,17 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc_deta , int_deta , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!!PS 		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		int_eta  = int_eta  /ocean_area
 		int_hbar = int_hbar /ocean_area
 		int_deta = int_deta /ocean_area
 		int_dhbar= int_dhbar/ocean_area
 		int_wflux= int_wflux/ocean_area
-		int_hflux= int_hflux/ocean_area
-		int_temp = int_temp /ocean_area
-		int_salt = int_salt /ocean_area
+!!PS 		int_hflux= int_hflux/ocean_area
+!!PS 		int_temp = int_temp /ocean_area
+!!PS 		int_salt = int_salt /ocean_area
 		
 		!_______________________________________________________________________
 		loc = minval(eta_n(1:myDim_nod2D))
@@ -84,6 +101,14 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , min_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(1,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(1,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(2,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+		loc = minval(Unode(2,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , min_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(hnode(1,1:myDim_nod2D),MASK=(hnode(1,1:myDim_nod2D)/=0.0))
@@ -108,6 +133,14 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(Wvel(2,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_wvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(1,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_uvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(1,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_uvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(2,1,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_vvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(Unode(2,2,1:myDim_nod2D))
+		call MPI_AllREDUCE(loc , max_vvel2 , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(d_eta(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(hnode(1,1:myDim_nod2D),MASK=(hnode(1,1:myDim_nod2D)/=0.0))
@@ -120,7 +153,14 @@ subroutine write_step_info(istep,outfreq)
 		call MPI_AllREDUCE(loc , max_pgfx , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(abs(pgf_y(:,1:myDim_nod2D)))
 		call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		
+                if (use_ice) then
+                   loc = maxval(m_ice(1:myDim_nod2D))
+                   call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+                end if
+		loc = maxval(abs(Av(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_av , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+		loc = maxval(abs(Kv(:,1:myDim_nod2D)))
+		call MPI_AllREDUCE(loc , max_kv , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		!_______________________________________________________________________
 		if (mype==0) then
 			write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
@@ -149,11 +189,18 @@ subroutine write_step_info(istep,outfreq)
 			write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") ' 	      salt= ', min_salt ,' | ',max_salt ,' | ',int_salt
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 wvel(1,:)= ', min_wvel ,' | ',max_wvel ,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 uvel(1,:)= ', min_uvel ,' | ',max_uvel ,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 uvel(2,:)= ', min_uvel2,' | ',max_uvel2,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 vvel(1,:)= ', min_vvel ,' | ',max_vvel ,' | ','N.A.'
+			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	 vvel(2,:)= ', min_vvel2,' | ',max_vvel2,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
 			write(*,"(A, ES10.3, A, ES10.3, A, A     )") ' 	hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
 			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Av= ',' N.A.     ',' | ',max_av    ,' | ','N.A.'
+			write(*,"(A, A     , A, ES10.3, A, A     )") ' 	        Kv= ',' N.A.     ',' | ',max_kv    ,' | ','N.A.'
+	if (use_ice)    write(*,"(A, A     , A, ES10.3, A, A     )") ' 	     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
 			write(*,*)
 		endif
 	endif ! --> if (mod(istep,logfile_outfreq)==0) then
@@ -161,9 +208,9 @@ end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep)
+subroutine check_blowup(istep, mesh)
 	use g_config, only: logfile_outfreq, which_ALE
-	use o_MESH
+	use MOD_MESH
 	use o_PARAM
 	use g_PARSUP
 	use o_ARRAYS
@@ -172,10 +219,13 @@ subroutine check_blowup(istep)
 	use io_BLOWUP
 	use g_forcing_arrays
 	use diagnostics
+	use write_step_info_interface
 	implicit none
 	
 	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
 	integer 		  :: el, elidx
+        type(t_mesh), intent(in), target :: mesh
+#include "associate_mesh.h"
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
 ! ! 		if (mype==0) then 
@@ -187,13 +237,16 @@ subroutine check_blowup(istep)
 			!___________________________________________________________________
 			! check ssh
 			if ( ((eta_n(n) /= eta_n(n)) .or. &
-				eta_n(n)<-10.0 .or. eta_n(n)>10.0)) then
+				eta_n(n)<-50.0 .or. eta_n(n)>50.0)) then
+!!PS 				eta_n(n)<-10.0 .or. eta_n(n)>10.0)) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 				write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
+				write(*,*) 'uln, nln    = ',ulevels_nod2D(n), nlevels_nod2D(n)
+				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 				write(*,*) 'eta_n(n)    = ',eta_n(n)
 				write(*,*) 'd_eta(n)    = ',d_eta(n)
@@ -205,7 +258,7 @@ subroutine check_blowup(istep)
 				write(*,*)
 				write(*,*) 'hbar = ',hbar(n),', hbar_old = ',hbar_old(n)
 				write(*,*)
-				write(*,*) 'wflux = ',water_flux(n),', wflux_old = ',water_flux_old(n)
+				write(*,*) 'wflux = ',water_flux(n)
 				write(*,*)
 				write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
 				write(*,*)
@@ -222,13 +275,15 @@ subroutine check_blowup(istep)
                     write(*,*) 'curl_stress_surf = ',curl_stress_surf(n)
                     write(*,*)
 				endif 
-! 				do el=1,nod_in_elem2d_num(n)
-! 					elidx = nod_in_elem2D(el,n)
-! 					write(*,*) ' elem#=',el,', elemidx=',elidx
-! 					write(*,*) ' 	 helem =',helem(:,elidx)
+ 				do el=1,nod_in_elem2d_num(n)
+ 					elidx = nod_in_elem2D(el,n)
+ 					write(*,*) ' elem#=',el,', elemidx=',elidx
+ 					write(*,*) ' 	 pgf_x =',pgf_x(:,elidx)
+ 					write(*,*) ' 	 pgf_y =',pgf_y(:,elidx)
 ! 					write(*,*) ' 	     U =',UV(1,:,elidx)
 ! 					write(*,*) ' 	     V =',UV(2,:,elidx)
-! 				enddo
+                    write(*,*)
+ 				enddo
 				write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
 				write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
 				write(*,*)
@@ -236,7 +291,6 @@ subroutine check_blowup(istep)
 				write(*,*)
 				write(*,*) 'hnode(1, n)  = ',hnode(1,n)
 				write(*,*) 'hnode(:, n)  = ',hnode(:,n)
-				write(*,*) ' glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
 			endif
 			
@@ -244,10 +298,10 @@ subroutine check_blowup(istep)
 			! check surface vertical velocity --> in case of zlevel and zstar 
 			! vertical coordinate its indicator if Volume is conserved  for 
 			! Wvel(1,n)~maschine preccision
-			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-15 )) then
+			if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  .or. abs(Wvel(1,n))>1e-12 )) then
 				found_blowup_loc=1
 				write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
-				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-15'
+				write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
 				write(*,*) 'mype        = ',mype
 				write(*,*) 'mstep       = ',istep
 				write(*,*) 'node        = ',n
@@ -257,6 +311,21 @@ subroutine check_blowup(istep)
 				write(*,*)
 				write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 				write(*,*)
+				write(*,*) 'hnode(1, n) = ',hnode(1,n)
+				write(*,*) 'hnode(:, n) = ',hnode(:,n)
+				write(*,*) 'hflux       = ',heat_flux(n)
+                write(*,*) 'wflux       = ',water_flux(n)
+                write(*,*)
+                write(*,*) 'eta_n       = ',eta_n(n)
+                write(*,*) 'd_eta(n)    = ',d_eta(n)
+                write(*,*) 'hbar        = ',hbar(n)
+                write(*,*) 'hbar_old    = ',hbar_old(n)
+                write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
+                write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
+                write(*,*)
+                write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
+                write(*,*)
+                
 			end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
 				
 			!___________________________________________________________________
@@ -288,7 +357,9 @@ subroutine check_blowup(istep)
 					write(*,*) 'mype        = ',mype
 					write(*,*) 'mstep       = ',istep
 					write(*,*) 'node        = ',n
+					write(*,*) 'lon,lat     = ',geo_coord_nod2D(:,n)/rad
 					write(*,*) 'nz          = ',nz
+					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'temp(nz, n) = ',tr_arr(nz, n,1)
@@ -297,9 +368,7 @@ subroutine check_blowup(istep)
 					write(*,*) 'temp_old(: ,n)= ',tr_arr_old(:, n,1)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
-					write(*,*) 'hflux_old   = ',heat_flux_old(n)
 					write(*,*) 'wflux       = ',water_flux(n)
-					write(*,*) 'wflux_old   = ',water_flux_old(n)
 					write(*,*)
 					write(*,*) 'eta_n       = ',eta_n(n)
 					write(*,*) 'd_eta(n)    = ',d_eta(n)
@@ -310,6 +379,8 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'm_ice       = ',m_ice(n)
 					write(*,*) 'm_ice_old   = ',m_ice_old(n)
+					write(*,*) 'm_snow      = ',m_snow(n)
+					write(*,*) 'm_snow_old  = ',m_snow_old(n)
 					write(*,*)
 					write(*,*) 'hnode       = ',hnode(:,n)
 					write(*,*) 'hnode_new   = ',hnode_new(:,n)
@@ -328,7 +399,7 @@ subroutine check_blowup(istep)
 ! 						write(*,*) ' 	     V =',UV(2,:,elidx)
 ! 					enddo
 					write(*,*)
-					write(*,*) ' lon,lat    = ',geo_coord_nod2D(:,n)/rad
+					
 				endif ! --> if ( (tr_arr(nz, n,1) /= tr_arr(nz, n,1)) .or. & ...
 				
 				!_______________________________________________________________
@@ -342,6 +413,7 @@ subroutine check_blowup(istep)
 					write(*,*) 'mstep       = ',istep
 					write(*,*) 'node        = ',n
 					write(*,*) 'nz          = ',nz
+					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
 					write(*,*) 'salt(nz, n) = ',tr_arr(nz, n,2)
@@ -351,9 +423,8 @@ subroutine check_blowup(istep)
 					write(*,*) 'temp(: , n) = ',tr_arr(:, n,1)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
-					write(*,*) 'wflux       = ',water_flux(n)
 					write(*,*)
-					
+                                        write(*,*) 'wflux       = ',water_flux(n)
 					write(*,*) 'eta_n       = ',eta_n(n)
 					write(*,*) 'd_eta(n)    = ',d_eta(n)
 					write(*,*) 'hbar        = ',hbar(n)
@@ -369,13 +440,14 @@ subroutine check_blowup(istep)
 					write(*,*)
 					write(*,*) 'Kv          = ',Kv(:,n)
 					write(*,*)
-! 					do el=1,nod_in_elem2d_num(n)
-! 						elidx = nod_in_elem2D(el,n)
-! 						write(*,*) ' elem#=',el,', elemidx=',elidx
+ 					do el=1,nod_in_elem2d_num(n)
+ 						elidx = nod_in_elem2D(el,n)
+ 						write(*,*) ' elem#=',el,', elemidx=',elidx
+ 						write(*,*) ' 	 Av =',Av(:,elidx)
 ! 						write(*,*) ' 	 helem =',helem(:,elidx)
 ! 						write(*,*) ' 	     U =',UV(1,:,elidx)
 ! 						write(*,*) ' 	     V =',UV(2,:,elidx)
-! 					enddo
+ 					enddo
 					write(*,*) 'Wvel        = ',Wvel(:,n)
 					write(*,*)
 					write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
@@ -393,7 +465,7 @@ subroutine check_blowup(istep)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1)
+			call write_step_info(istep,1,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)
@@ -413,9 +485,8 @@ subroutine check_blowup(istep)
 				write(*,*) '                  _____.,-#%&$@%#&#~,._____'
 				write(*,*)
 			end if
-			call blowup(istep)
+			call blowup(istep, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
 			call par_ex
 		endif 
-		
 end subroutine

@@ -11,14 +11,84 @@
 !> @brief
 !> Main driver routine for initialization
 program MAIN
+
   use o_PARAM
+  use MOD_MESH
   use o_MESH
   use g_PARSUP
   use g_CONFIG
   use g_rotate_grid
+  
   implicit none
-  character(len=1000)   :: nmlfile  !> name of configuration namelist file
-  integer               :: start_t, interm_t, finish_t, rate_t
+
+interface
+   subroutine read_mesh_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_ini
+end interface
+
+interface
+   subroutine test_tri_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine test_tri_ini
+end interface
+interface
+   subroutine find_edges_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_edges_ini
+end interface
+interface
+   subroutine find_elem_neighbors_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_elem_neighbors_ini
+end interface
+interface
+   subroutine find_levels(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels
+end interface
+interface
+   subroutine stiff_mat_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine stiff_mat_ini
+end interface
+interface
+   subroutine set_par_support_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine set_par_support_ini
+end interface
+interface
+   subroutine communication_ini(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine communication_ini
+end interface
+
+interface
+   subroutine read_mesh_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine read_mesh_cavity
+end interface
+
+interface
+   subroutine find_levels_cavity(mesh)
+     use mod_mesh
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine find_levels_cavity
+end interface
+
+  character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
+  integer                     :: start_t, interm_t, finish_t, rate_t
+  type(t_mesh), target, save  :: mesh
+
   call system_clock(start_t, rate_t)
   interm_t = start_t
   
@@ -26,37 +96,43 @@ program MAIN
   open (20,file=nmlfile)
   read (20,NML=paths)         ! We need MeshPath
   read (20,NML=geometry)      ! We need cyclic_length and cartesian
+  read (20,NML=run_config)    ! We need use_cavity=true/false
   read (20,NML=machine)       ! We need partitioning hierarchy
   close (20)
   cyclic_length=cyclic_length*rad 
+  alphaEuler=alphaEuler*rad 	
+  betaEuler=betaEuler*rad
+  gammaEuler=gammaEuler*rad
   call set_mesh_transform_matrix  !(rotated grid) 
-!!$  call par_init
-  call read_mesh_ini
+  call read_mesh_ini(mesh)
+  if (use_cavity) call read_mesh_cavity(mesh)
+  
   call system_clock(finish_t)
   print '("**** Reading initial mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
-  call test_tri_ini
-  call find_edges_ini
-  call find_elem_neighbors_ini
-  call find_levels
-
+  call test_tri_ini(mesh)
+  call find_edges_ini(mesh)
+  call find_elem_neighbors_ini(mesh)
+  call find_levels(mesh)
+  if (use_cavity) call find_levels_cavity(mesh)
+    
 ! NR Some arrays are not needed for partitioning, after setting up the grid
-  deallocate(coord_nod2D)
-  deallocate(edge_tri)
-  deallocate(zbar,Z,nlevels,depth)
+  deallocate(mesh%coord_nod2D)
+  deallocate(mesh%edge_tri)
+  deallocate(mesh%zbar,mesh%Z,mesh%nlevels,mesh%depth)
   call system_clock(finish_t)
   print '("**** Checking and initializing mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
 
-  call stiff_mat_ini
-  call set_par_support_ini
+  call stiff_mat_ini(mesh)
+  call set_par_support_ini(mesh)
   call system_clock(finish_t)
   print '("**** Partitioning time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
-  call communication_ini
+  call communication_ini(mesh)
   call system_clock(finish_t)
   print '("**** Storing partitioned mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
@@ -66,8 +142,8 @@ end program MAIN
 !=============================================================================
 !> @brief
 !> Reads mesh files 
-subroutine read_mesh_ini
-USE o_MESH
+subroutine read_mesh_ini(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE g_PARSUP
 use g_CONFIG
@@ -75,47 +151,52 @@ use g_rotate_grid
 !
 IMPLICIT NONE
 !
-INTEGER               :: nq
-INTEGER               :: n1,n2,n3
-INTEGER               :: n, nz, exit_flag
-REAL(kind=WP)         :: x1, x2
-INTEGER	              :: tag
-INTEGER, allocatable  :: elem_data(:)
-INTEGER               :: i_error
+type(t_mesh), intent(inout), target :: mesh
+INTEGER                             :: nq
+INTEGER                             :: n1,n2,n3
+INTEGER                             :: n, nz, exit_flag
+REAL(kind=WP)                       :: x1, x2, gx1, gx2
+INTEGER	                            :: tag
+INTEGER, allocatable                :: elem_data(:)
+INTEGER                             :: i_error
+#include "associate_mesh_ini.h"
 ! ===================
 ! Surface mesh
 ! ===================
   open (20,file=trim(meshpath)//'nod2d.out', status='old')
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
-  READ(20,*) nod2D
-  ALLOCATE(coord_nod2D(2,nod2D))
+  READ(20,*) mesh%nod2D
+  ALLOCATE(mesh%coord_nod2D(2,mesh%nod2D)) 
+  coord_nod2D => mesh%coord_nod2D !required after the allocation, otherwise the pointer remains undefined
     
-  do n=1,nod2D
+  do n=1, mesh%nod2D
      read(20,*) nq, x1, x2, tag
+     x1=x1*rad
+     x2=x2*rad
      if (force_rotation) then
-        call g2r(x1*rad, x2*rad, x1, x2)
-        x1=x1/rad
-        x2=x2/rad
+        gx1=x1
+        gx2=x2
+        call g2r(gx1, gx2, x1, x2)
      end if      
-     coord_nod2D(1,nq)=x1*rad
-     coord_nod2D(2,nq)=x2*rad
+     mesh%coord_nod2D(1,n)=x1
+     mesh%coord_nod2D(2,n)=x2
   end do
-  CLOSE(20) 
-      
-  READ(21,*)  elem2D    
-  ALLOCATE(elem2D_nodes(4,elem2D))
-  ALLOCATE(elem_data(4*elem2D))
+  CLOSE(20)
+  READ(21,*)  mesh%elem2D    
+  ALLOCATE(mesh%elem2D_nodes(4,mesh%elem2D))
+  elem2D_nodes => mesh%elem2D_nodes !required after the allocation, otherwise the pointer remains undefined
+  ALLOCATE(elem_data(4*mesh%elem2D))
   elem_data(:)=-1
   
   ! meshes with quads have 4 columns, but TsunAWI grids may be
   ! purely triangular, with 3 columns each. Test, how many
   ! columns there are!  
-  read(21,*,iostat=i_error) elem_data(1:4*elem2D)
+  read(21,*,iostat=i_error) elem_data(1:4*mesh%elem2D)
   if (i_error == 0) then      ! There is a fourth column => quad or mixed mesh (not working yet!)
-     elem2D_nodes = reshape(elem_data, shape(elem2D_nodes))
+     mesh%elem2D_nodes = reshape(elem_data, shape(mesh%elem2D_nodes))
   else     ! No fourth column => triangles only
-     elem2D_nodes(1:3,:) = reshape(elem_data, shape(elem2D_nodes(1:3,:)))
-     elem2D_nodes(4,:) = elem2D_nodes(1,:)
+     mesh%elem2D_nodes(1:3,:) = reshape(elem_data, shape(mesh%elem2D_nodes(1:3,:)))
+     mesh%elem2D_nodes(4,:)   = mesh%elem2D_nodes(1,:)
   end if
      
   deallocate(elem_data)
@@ -132,18 +213,71 @@ write(*,*) '========================='
 write(*,*) 'Mesh is read'
 write(*,*) '========================='
 END SUBROUTINE read_mesh_ini
+!=============================================================================
+!> @brief
+!> Reads mesh files 
+subroutine read_mesh_cavity(mesh)
+    use mod_mesh
+    use o_PARAM
+    use g_PARSUP
+    use g_CONFIG
+    implicit none
+
+    type(t_mesh), intent(inout), target :: mesh
+    integer                             :: node
+    character(len=MAX_PATH)                 :: fname
+    logical                             :: file_exist=.False.
+#include "associate_mesh_ini.h"
+    
+    !___________________________________________________________________________    
+    if (mype==0) then
+        write(*,*) '____________________________________________________________'
+        write(*,*) ' --> read cavity depth'
+    end if 
+  
+    !___________________________________________________________________________
+    ! read depth of cavity-ocean boundary
+    fname = trim(meshpath)//'cavity_depth.out'
+    file_exist=.False.
+    inquire(file=trim(fname),exist=file_exist) 
+    if (file_exist) then
+        open (21,file=fname, status='old')
+        allocate(mesh%cavity_depth(mesh%nod2D))
+        cavity_depth => mesh%cavity_depth 
+    else
+        if (mype==0) then
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
+            write(*,*) '        --> stop partitioning here !'
+            write(*,*) '____________________________________________________________________'    
+        end if 
+        stop 
+    end if
+    
+    !___________________________________________________________________________
+    do node=1, mesh%nod2D
+        read(21,*) mesh%cavity_depth(node)
+    end do
+    
+    !___________________________________________________________________________
+    close(21)
+    
+end subroutine read_mesh_cavity
+
 !=======================================================================
 !> @brief 
 !> Check the order of nodes in triangles; correct it if necessary to make
 !! it same sense (clockwise) 
-SUBROUTINE test_tri_ini
-USE o_MESH
+SUBROUTINE test_tri_ini(mesh)
+USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
-real(kind=WP)   ::  a(2), b(2), c(2),  r
-integer         ::  n, nx, elnodes(3)
 
+real(kind=WP)                       ::  a(2), b(2), c(2),  r
+integer                             ::  n, nx, elnodes(3)
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
    
    DO n=1, elem2D
       elnodes=elem2D_nodes(1:3,n)
@@ -169,24 +303,37 @@ integer         ::  n, nx, elnodes(3)
 	  elem2D_nodes(1:3,n)=elnodes
       end if
    END DO
-
 END SUBROUTINE  test_tri_ini
 !=========================================================================
 !> @brief
 !> Finds edges. Creates 3 files: edgenum.out, edges.out, edge_tri.out
-SUBROUTINE find_edges_ini
+SUBROUTINE find_edges_ini(mesh)
+USE MOD_MESH
 USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
+use g_rotate_grid
 IMPLICIT NONE
+
+interface
+   subroutine elem_center(elem, x, y, mesh)
+     USE MOD_MESH
+     USE g_CONFIG
+     integer, intent(in)        :: elem
+     real(kind=WP), intent(out) :: x, y
+     type(t_mesh), intent(in), target   :: mesh
+   end subroutine elem_center
+end interface
+
 integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:)
-!!$integer, allocatable, dimension(:,:)  :: auxne, auxnn
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
 integer                               :: elnodes(4), ed(2), flag, eledges(4)
 integer                               :: temp(100), node 
 real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 ! ====================
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
@@ -215,7 +362,7 @@ END DO                 ! neighbor elements are found
 ! connected by edges!
 allocate(aux1(nod2D))                   
 aux1=0
- 
+
 DO n=1, nod2D
     counter=0
     DO k=1, ne_num(n)
@@ -300,7 +447,7 @@ deallocate(aux1)
 ! (b) Find edges and elements containing them.
 !     Write information to auxiliary file
 ! ====================
- open(10, file='edges.out')
+! open(10, file='edges.out')
 
  ! Count edges: 
  ! ==================== 
@@ -314,8 +461,12 @@ deallocate(aux1)
  end do
  edge2D=counter
 
- allocate(edges(2,edge2D), edge_tri(2, edge2D))
+ allocate(mesh%edges   (2, edge2D))
+ allocate(mesh%edge_tri(2, edge2D))
+ edges    => mesh%edges    !required after the allocation, otherwise the pointer remains undefined
+ edge_tri => mesh%edge_tri !required after the allocation, otherwise the pointer remains undefined
  counter_in=0 
+
  DO n=1,nod2D
     DO q=2,nn_num(n)
        node=nn_pos(q,n)
@@ -341,16 +492,16 @@ deallocate(aux1)
           edges(1,counter_in)=n
           edges(2,counter_in)=node
           edge_tri(:,counter_in)=elems
-          write(10,'(4I10)') n, node, elems
-       else if (flag==1) then
-          write(10,'(4I10)') n, node, elems(1), -999
-       else
-          write(*,*) 'flag'
+!          write(10,'(4I10)') n, node, elems
+!       else if (flag==1) then
+!          write(10,'(4I10)') n, node, elems(1), -999
+!       else
+!          write(*,*) 'flag'
        end if
     END DO
  END DO
  edge2D_in=counter_in
- 
+
  ! Repeat to collect boundary edges:   
  counter=0
  DO n=1,nod2D
@@ -382,7 +533,7 @@ deallocate(aux1)
        end if
     END DO
  END DO
- close(10)
+ !close(10)
  ! Edges from edge2D_in+1 to edge2D lie on the horizontal boundary
  ! The rest (1:edge2D_in) are internal edges
 
@@ -401,15 +552,12 @@ deallocate(aux1)
        edge_tri(1,n)=elem1
        edge_tri(2,n)=elem
     endif
-    call elem_center(edge_tri(1,n), xc(1), xc(2))
+    call elem_center(edge_tri(1,n), xc(1), xc(2), mesh)
     xc=xc-coord_nod2D(:,ed(1))
     xe=coord_nod2D(:,ed(2))-coord_nod2D(:,ed(1))
-    if(xe(1)>=cyclic_length/2.) xe(1)=xe(1)-cyclic_length
-    if(xe(1)<-cyclic_length/2.) xe(1)=xe(1)+cyclic_length
-    if(xc(1)>=cyclic_length/2.) xc(1)=xc(1)-cyclic_length
-    if(xc(1)<-cyclic_length/2.) xc(1)=xc(1)+cyclic_length
-
-    if(xc(1)*xe(2)-xc(2)*xe(1)>0) then
+    call trim_cyclic(xe(1))
+    call trim_cyclic(xc(1))
+    if(xc(1)*xe(2)-xc(2)*xe(1)>0.0_WP) then
        ! Vector drawn to the center of the first triangle is to the right
        ! of the edge vector. Triangles have to be exchanged:
        elem=edge_tri(1,n)
@@ -430,7 +578,8 @@ deallocate(aux1)
  ! (e) We need an array inverse to edge_tri listing edges
  ! of a given triangle 
  ! ====================
- allocate(elem_edges(4,elem2D))
+ allocate(mesh%elem_edges(4,elem2D))
+ elem_edges => mesh%elem_edges !required after the allocation, otherwise the pointer remains undefined
  allocate(aux1(elem2D))
  aux1=0
  DO n=1, edge2D
@@ -496,25 +645,31 @@ END SUBROUTINE find_edges_ini
 !> Does some thresholding: if (depth>zbar(4)) x=zbar(4)
 !> Fixes rough topography, by converting some oceans cells to ground cell(reflected by changing levels arrays)
 !> Creates 2 files: elvls.out, nlvls.out
-subroutine find_levels
+subroutine find_levels(mesh)
 use g_config
-use o_mesh
+use mod_mesh
 use g_parsup
 implicit none
 INTEGER :: nodes(3), elems(3), eledges(3)
 integer :: elem, elem1, j, n, q, node, enum,count1,count2,exit_flag,i,nz,fileID=111
 real(kind=WP) :: x,dmean
 integer :: thers_lev=5
-character*200 :: file_name
-ALLOCATE(depth(nod2D))
-        
+character(MAX_PATH) :: file_name
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+
+ALLOCATE(mesh%depth(nod2D))
+depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
 file_name=trim(meshpath)//'aux3d.out'
 open(fileID, file=file_name)
 read(fileID,*) nl          ! the number of levels 
-allocate(zbar(nl))         ! their standard depths
+allocate(mesh%zbar(nl))         ! their standard depths
+zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
 read(fileID,*) zbar
 if(zbar(2)>0) zbar=-zbar   ! zbar is negative 
-allocate(Z(nl-1))
+allocate(mesh%Z(nl-1))
+Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
 Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
 Z=0.5_WP*Z
 DO n=1,nod2D
@@ -528,103 +683,372 @@ close(fileID)
 if(depth(2)>0) depth=-depth  ! depth is negative
 
 
-allocate(nlevels(elem2D))
-allocate(nlevels_nod2D(nod2D))
+allocate(mesh%nlevels(elem2D))
+nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
+allocate(mesh%nlevels_nod2D(nod2D))
+nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
+    !___________________________________________________________________________
+    ! Compute the initial number number of elementa levels, based on the vertice
+    ! depth information 
+    do n=1, elem2D
+        nodes=elem2D_nodes(1:3,n)
+        
+        !_________________________________________________________________________
+        ! depth of element is  shallowest depth of sorounding vertices
+        if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
+        ! depth of element is deepest depth of sorounding vertices    
+        elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+        ! DEFAULT: depth of element is  mean depth of sorounding vertices
+        elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
+        end if 
+        
+        !_________________________________________________________________________
+        exit_flag=0
+        do nz=1,nl-1
+            if(Z(nz)<dmean) then
+                exit_flag=1
+                nlevels(n)=nz
+                exit
+            end if
+        end do
+        if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
+        if(dmean>=0) nlevels(n)=thers_lev
+        
+        ! set minimum number of levels to --> thers_lev=5
+        if(nlevels(n)<thers_lev) nlevels(n)=thers_lev
+    end do ! --> do n=1, elem2D
 
-! ===================
-! Compute the number of levels
-! ===================
-   DO n=1, elem2D
-      nodes=elem2D_nodes(1:3,n)
-      
-      !dmean=maxval(depth(nodes))
-      !dmean=minval(depth(nodes))
-      dmean=sum(depth(nodes))/3.0
-      exit_flag=0
-          DO nz=1,nl-1
-                 if(Z(nz)<dmean) then
-                        exit_flag=1
-                    nlevels(n)=nz
-                    exit
-                 end if
-          END DO
-          if((exit_flag==0).and.(dmean<0)) nlevels(n)=nl
-          if(dmean>=0) nlevels(n)=thers_lev
-          if(nlevels(n)<thers_lev) nlevels(n)=thers_lev
-    END DO
-
-
+    !___________________________________________________________________________
+    ! check for isolated cells (cells with at least two boundary faces or three 
+    ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
+    ! of cells 
     do nz=4,nl
-       exit_flag=0
-       count1=0
-       do while((exit_flag==0).and.(count1<1000))
-          exit_flag=1
-          count1=count1+1
-          do n=1,elem2D
-             q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
-             !find ocean cell
-             if (nlevels(n)>=nz) then
-                count2=0
-                elems=elem_neighbors(1:3,n)
-                do i=1,q
-                   if (elems(i)>1) then
-                      if (nlevels(elems(i))>=nz) then
-                         !count neighbours
-                         count2=count2+1
-                      endif
-                   endif
-                enddo
-                if (count2<2) then
-                   !if cell is "bad" convert to bottom cell
-                   nlevels(n)=nz-1
-                   !force recheck for all current ocean cells
-                   exit_flag=0
-                endif
-             endif
-          enddo
-       enddo
-    enddo
+        exit_flag=0
+        count1=0
+        
+        !_______________________________________________________________________
+        ! iteration loop within each layer
+        do while((exit_flag==0).and.(count1<1000))
+            exit_flag=1
+            count1=count1+1
+            
+            !___________________________________________________________________
+            ! loop over triangles
+            do n=1,elem2D
+                ! merge: result = merge(truesource, falsesource, mask)
+                ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): True  --> q=3 --> triangular mesh
+                ! --> if elem2D_nodes(1,n) == elem2D_nodes(4,n): False --> q=4 --> quad mesh
+                q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+                !                       
+                !                         +---isolated bottom cell
+                !   ._______________      |          _______________________.
+                !   |###|###|###|###|___  |      ___|###|###|###|###|###|###|
+                !   |###|###|###|###|###| |  ___|###|###|###|###|###|###|###|
+                !   |###|###|###|###|###| | |###|###|###|###|  BOTTOM   |###|
+                !   |###|###|###|###|###|_v_|###|###|###|###|###|###|###|###|
+                !   |###|###|###|###|###|###|###|###|###|###|###|###|###|###|
+                !
+                if (nlevels(n)>=nz) then
+                    count2=0
+                    elems=elem_neighbors(1:3,n)
+                    
+                    !___________________________________________________________
+                    ! loop over neighbouring triangles
+                    do i=1,q
+                        if (elems(i)>1) then
+                            if (nlevels(elems(i))>=nz) then
+                                !count neighbours
+                                count2=count2+1
+                            endif
+                        endif
+                    enddo
+                    
+                    !___________________________________________________________
+                    ! check how many open faces to neighboring triangles the cell 
+                    ! has, if there are less than 2 its isolated (a cell should 
+                    ! have at least 2 valid neighbours)
+                    if (count2<2) then
+                        ! if cell is "isolated", and the one levels shallower bottom 
+                        ! cell would be shallower than the minimum vertical level 
+                        ! treshhold (thers_lev). --> in this make sorrounding elements 
+                        ! one level deeper to reconnect the isolated cell
+                        if (nz-1<thers_lev) then 
+                            do i=1,q
+                                if (elems(i)>1) nlevels(elems(i)) = max(nlevels(elems(i)),nz)
+                            end do    
+                        !if cell is "isolated" convert to one level shallower bottom cell
+                        else
+                            nlevels(n)=nz-1
+                        end if  
+                        !force recheck for all current ocean cells
+                        exit_flag=0
+                        
+                    end if
+                end if ! --> if (nlevels(n)>=nz) then
+            end do ! --> do n=1,elem2D
+        end do ! --> do while((exit_flag==0).and.(count1<1000))
+    end do ! --> do nz=4,nl
 
-  nlevels_nod2D=0
-  DO n=1,elem2D
-     q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
-     DO j=1,q
-        node=elem2D_nodes(j,n)
-        if(nlevels_nod2D(node)<nlevels(n)) then
-           nlevels_nod2D(node)=nlevels(n)
-        end if
-     END DO
-  END DO
+    !___________________________________________________________________________
+    ! vertical vertice level index of ocean bottom boundary
+    nlevels_nod2D=0
+    do n=1,elem2D
+        q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+        do j=1,q
+            node=elem2D_nodes(j,n)
+            if(nlevels_nod2D(node)<nlevels(n)) then
+            nlevels_nod2D(node)=nlevels(n)
+            end if
+        end do
+    end do
 
-if (mype==0) then
-   file_name=trim(meshpath)//'elvls.out'
-   open(fileID, file=file_name)
-   do n=1,elem2D
-      write(fileID,*) nlevels(n)
-   enddo
-   close(fileID)
-
-   file_name=trim(meshpath)//'nlvls.out'
-   open(fileID, file=file_name)
-   do n=1,nod2D
-      write(fileID,*) nlevels_nod2D(n)
-   enddo
-   close(fileID)
-
-   write(*,*) '========================='
-   write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-   write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-   write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
-   write(*,*) '========================='
-endif
-
-
+    !___________________________________________________________________________
+    ! write vertical level indices into file
+    if (mype==0) then
+        !_______________________________________________________________________
+        file_name=trim(meshpath)//'elvls.out'
+        open(fileID, file=file_name)
+        do n=1,elem2D
+            write(fileID,*) nlevels(n)
+        end do
+        close(fileID)
+        
+        !_______________________________________________________________________
+        file_name=trim(meshpath)//'nlvls.out'
+        open(fileID, file=file_name)
+        do n=1,nod2D
+            write(fileID,*) nlevels_nod2D(n)
+        end do
+        close(fileID)
+        
+        !_______________________________________________________________________
+        write(*,*) '========================='
+        write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
+        write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+        write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
+        write(*,*) '========================='
+    endif
 end subroutine find_levels
+
+
+!_______________________________________________________________________________
+! finds elemental and nodal levels of cavity-ocean boundary.
+! Creates 2 files: cavity_elvls.out, cavity_nlvls.out
+subroutine find_levels_cavity(mesh)
+    use mod_mesh
+    use g_config
+    use g_parsup
+    implicit none
+    integer        :: nodes(3), elems(3)
+    integer        :: elem, node, nz, j
+    integer        :: exit_flag, count_iter, count_neighb_open, nneighb, cavity_maxlev
+    real(kind=WP)  :: dmean
+    character(MAX_PATH) :: file_name
+    type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+    !___________________________________________________________________________
+    allocate(mesh%ulevels(elem2D))
+    ulevels => mesh%ulevels 
+    allocate(mesh%ulevels_nod2D(nod2D))
+    ulevels_nod2D  => mesh%ulevels_nod2D 
+!!PS     allocate(mesh%cavity_flag_n(nod2D))
+!!PS     cavity_flag_n       => mesh%cavity_flag_n
+    
+    !___________________________________________________________________________
+    ! Compute level position of ocean-cavity boundary
+    cavity_maxlev=0
+    do elem=1, elem2D
+        nodes=elem2D_nodes(1:3,elem)
+        !_______________________________________________________________________
+        ! depth of element is  shallowest depth of sorounding vertices
+        if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
+        ! depth of element is deepest depth of sorounding vertices    
+        elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
+        ! DEFAULT: depth of element is  mean depth of sorounding vertices
+        elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+        end if 
+        
+        !_______________________________________________________________________
+        ! vertical elem level index of cavity-ocean boundary
+        exit_flag=0
+        ulevels(elem) = 1
+        do nz=1,nlevels(elem)-1
+            !!PS if(Z(nz)<dmean) then
+            if(Z(nz)<dmean .or. nlevels(elem)-nz<=3) then
+                exit_flag=1
+                ulevels(elem)=nz
+                exit
+            end if
+        end do
+        if ((exit_flag==0).and.(dmean<0)) ulevels(elem)=nlevels(elem)     
+        cavity_maxlev = max(cavity_maxlev,ulevels(elem))
+    end do
+    
+    !___________________________________________________________________________
+    ! Eliminate cells that have two cavity boundary faces --> should not be 
+    ! possible in FESOM2.0
+    ! loop over all cavity levels
+    do nz=1,cavity_maxlev
+        exit_flag=0
+        count_iter=0
+        
+        !_______________________________________________________________________
+        ! iteration loop within each layer
+        do while((exit_flag==0).and.(count_iter<1000))
+            exit_flag=1
+            count_iter=count_iter+1
+            
+            !___________________________________________________________________
+            ! loop over triangles
+            do elem=1,elem2D
+                ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
+                nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+                !
+                !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
+                !   |###|###|###|###|###|###|###|
+                !   |#  CAVITY  |###| . |###|###|                    OCEAN
+                !   |###|###|###|    /|\|###| 
+                !   |###|###|         |
+                !   |###|             +-- Not good can lead to isolated cells  
+                !
+                if (nz >= ulevels(elem)) then
+                    count_neighb_open=0
+                    elems=elem_neighbors(1:3,elem)
+                    
+                    !___________________________________________________________
+                    ! loop over neighbouring triangles
+                    do j = 1, nneighb
+                        if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
+                            ! check for isolated cell
+                            if (ulevels(elems(j))<=nz) then
+                                !count the open faces to neighboring cells 
+                                count_neighb_open=count_neighb_open+1
+                            endif
+                        end if 
+                    end do ! --> do i = 1, nneighb
+                    
+                    !___________________________________________________________
+                    ! check how many open faces to neighboring triangles the cell 
+                    ! has, if there are less than 2 its isolated (a cell should 
+                    ! have at least 2 valid neighbours)
+                    ! --> in this case shift cavity-ocean interface one level down
+                    if (count_neighb_open<2) then
+                        ! if cell is isolated convert it to a deeper ocean levels
+                        ! except when this levels would remain less than 3 valid 
+                        ! bottom levels --> in case make the levels of all sorounding
+                        ! one level shallower
+                        if (nlevels(elem)-(nz+1)<=3) then 
+                            do j = 1, nneighb
+                                if (elems(j)>0 .and. ulevels(elems(j))>1 ) ulevels(elems(j)) = min(ulevels(elems(j)),nz)
+                            end do   
+                        else
+                            ulevels(elem)=nz+1
+                            
+                        end if     
+                        
+                        !force recheck for all current ocean cells
+                        exit_flag=0
+                    endif ! --> if (count_neighb_open<2) then
+                    
+                end if ! --> if (nz >= ulevels(elem)) then
+            end do ! --> do elem=1,elem2D
+        end do ! --> do while((exit_flag==0).and.(count_iter<1000))
+    end do ! --> do nz=1,cavity_maxlev 
+    
+    !___________________________________________________________________________
+    ! vertical vertice level index of cavity_ocean boundary
+    ulevels_nod2D = nl
+    do elem=1,elem2D
+        nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+        !_______________________________________________________________________
+        ! loop over neighbouring triangles
+        do j=1,nneighb
+            node=elem2D_nodes(j,elem)
+!!PS             if(ulevels_nod2D(node)<=ulevels(elem)) then
+!!PS                 ulevels_nod2D(node)=ulevels(elem)
+!!PS             end if
+            ulevels_nod2D(node)=min(ulevels_nod2D(node),ulevels(elem))
+            
+        end do
+    end do
+    
+    !___________________________________________________________________________
+    ! check ulevels if ulevels<nlevels everywhere !
+    do elem=1,elem2D
+        if (ulevels(elem)>=nlevels(elem)) then 
+            if (mype==0) write(*,*) ' ERROR: found element cavity depth deeper or equal bottom depth'
+            call par_ex(0)
+        end if 
+        if (nlevels(elem)-ulevels(elem)<3) then 
+            write(*,*) ' ERROR: found less than three valid element ocean layers'
+            write(*,*) '    ulevels,nlevels = ',ulevels(elem), nlevels(elem)
+            write(*,*) '    ulevels(neighb) = ',ulevels(elem_neighbors(1:3,elem))
+            write(*,*) '    nlevels(neighb) = ',nlevels(elem_neighbors(1:3,elem))
+        end if 
+    end do
+    
+    !___________________________________________________________________________
+    ! check ulevels_nod2d if ulevels_nod2d<nlevels_nod2d everywhere !
+    do elem=1,nod2D
+        if (ulevels_nod2D(elem)>=nlevels_nod2D(elem)) then 
+            if (mype==0) write(*,*) ' ERROR: found vertice cavity depth deeper or equal bottom depth'
+            call par_ex(0)
+        end if
+        if (nlevels_nod2D(elem)-ulevels_nod2D(elem)<3) then 
+            if (mype==0) write(*,*) ' ERROR: found less than three valid vertice ocean layers'
+        end if
+    end do
+    
+    do elem=1,elem2D
+        if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
+            if (mype==0) then 
+                write(*,*) ' ERROR: found element cavity depth that is shallower than its valid maximum cavity vertice depths'
+                write(*,*) ' ule | uln = ',ulevels(elem),' | ',ulevels_nod2D(elem2D_nodes(:,elem))
+            end if     
+            call par_ex(0)
+        end if 
+    end do
+!!PS     !___________________________________________________________________________
+!!PS     ! compute nodal cavity flag: 1 yes cavity/ 0 no cavity 
+!!PS     cavity_flag = 0
+!!PS     do node=1,nod2D
+!!PS         if (ulevels_nod2D(node)>1) cavity_flag(node)=1
+!!PS     end do
+
+    !___________________________________________________________________________
+    ! write out cavity mesh files for vertice and elemental position of 
+    ! vertical cavity-ocean boundary
+    if (mype==0) then
+        ! write out elemental cavity-ocean boundary level
+        file_name=trim(meshpath)//'cavity_elvls.out'
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) ulevels(elem)
+        enddo
+        close(20)
+        
+        ! write out vertice cavity-ocean boundary level + yes/no cavity flag
+        file_name=trim(meshpath)//'cavity_nlvls.out'
+        open(20, file=file_name)
+!!PS         file_name=trim(meshpath)//'cavity_flag.out'
+!!PS         open(21, file=file_name)
+        do node=1,nod2D
+            write(20,*) ulevels_nod2D(node)
+!!PS             write(21,*) cavity_flag(node)
+        enddo
+        close(20)
+!!PS         close(21)
+    endif
+
+end subroutine find_levels_cavity
+
+
 !===================================================================
 
-subroutine edge_center(n1, n2, x, y)
-USE o_MESH
+subroutine edge_center(n1, n2, x, y, mesh)
+USE MOD_MESH
 USE g_CONFIG
 !
 ! Returns coordinates of edge center in x and y
@@ -632,6 +1056,8 @@ USE g_CONFIG
 implicit none
 integer       :: n1, n2   ! nodes of the edge
 real(kind=WP) :: x, y, a(2), b(2)
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
 a=coord_nod2D(:,n1)
 b=coord_nod2D(:,n2)
@@ -641,15 +1067,19 @@ x=0.5_WP*(a(1)+b(1))
 y=0.5_WP*(a(2)+b(2))
 end subroutine edge_center
 !====================================================================
-subroutine elem_center(elem, x, y)
+subroutine elem_center(elem, x, y, mesh)
 !
 ! Returns coordinates of elem center in x and y
 !
-USE o_MESH
+USE MOD_MESH
 USE g_CONFIG
 implicit none
-integer       :: elem, elnodes(3), k    
-real(kind=WP) :: x, y, ax(3), amin
+integer, intent(in)  :: elem
+integer              ::  elnodes(3), k    
+real(kind=WP), intent(out) :: x, y
+real(kind=WP)        ::  ax(3), amin
+type(t_mesh), intent(in), target :: mesh
+#include "associate_mesh_ini.h"
 
    elnodes=elem2D_nodes(1:3,elem)
    ax=coord_nod2D(1, elnodes)
@@ -662,13 +1092,17 @@ real(kind=WP) :: x, y, ax(3), amin
    
 end subroutine elem_center
 !=======================================================================
-SUBROUTINE find_elem_neighbors_ini
+SUBROUTINE find_elem_neighbors_ini(mesh)
 ! For each element three its element neighbors are found
-USE o_MESH
+USE MOD_MESH
 USE g_PARSUP
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
-allocate(elem_neighbors(4,elem2D))
+type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
+
+allocate(mesh%elem_neighbors(4,elem2D))
+elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
 elem_neighbors=0
 DO elem=1,elem2D
    
@@ -692,8 +1126,31 @@ DO elem=1,elem2D
    if(elem_neighbors(j,elem)>0) elem1=elem1+1
    END DO
    if (elem1<2) then
-   write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
-   write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
+    write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
+    write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
+    if (mype==0) then 
+    write(*,*) '____________________________________________________________________'
+    write(*,*) ' ERROR: The mesh you want to partitioning contains triangles that'
+    write(*,*) '        have just one neighbor, this was OK for FESOM1.4 but not'
+    write(*,*) '        for FESOM2.0.                                           '
+    write(*,*) '                                                                '
+    write(*,*) '          #########################################             '
+    write(*,*) '          ################### o ###################             '
+    write(*,*) '          ################# ./|\. #################             '
+    write(*,*) '              Land    ### ./|||||\. ###    Land                 '
+    write(*,*) '          ############## /|||||||||\ ##############             '
+    write(*,*) '          --o-----------o-----------o-----------o--             '
+    write(*,*) '          ./ \.       ./ \.       ./ \.       ./ \.             '
+    write(*,*) '               \.   ./     \.   ./     \.   ./                  '
+    write(*,*) '                 \ /         \ /         \ /                    '
+    write(*,*) '            ------o-----------o-----------o-------              '
+    write(*,*) '                ./ \.       ./ \.       ./ \.                   '
+    write(*,*) '                                                                '
+    write(*,*) '        Take a programm of your choice (Python, Matlab ...) and '
+    write(*,*) '        eliminate these triangles and the corresponding         '
+    write(*,*) '        unconnected vertice and try to re-partitioning again    '
+    write(*,*) '____________________________________________________________________'
+    end if 
    STOP
    end if
 END DO    
@@ -705,13 +1162,15 @@ END DO
  ! To facilitate computations the neibourhood
  ! information is assembled
  ! =============	 
- allocate(nod_in_elem2D_num(nod2D))
+ allocate(mesh%nod_in_elem2D_num(nod2D))
+ nod_in_elem2D_num => mesh%nod_in_elem2D_num !required after the allocation, otherwise the pointer remains undefined
  nod_in_elem2D_num=0
  do n=1,elem2D
     elnodes=elem2D_nodes(1:3,n)
     nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
  end do
- allocate(nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
+ nod_in_elem2D => mesh%nod_in_elem2D
  nod_in_elem2D=0
  
  nod_in_elem2D_num=0
@@ -725,17 +1184,20 @@ END DO
 END SUBROUTINE find_elem_neighbors_ini
 !===================================================================
 ! Stiffness matrix for the elevation
-subroutine stiff_mat_ini
-  use o_MESH
+subroutine stiff_mat_ini(mesh)
+  use MOD_MESH
   
   !
   implicit none
   integer                :: i, j, n, q, el, elem_nodes_max, nod(4)
   integer, allocatable   :: num_ne(:), ne(:,:)
   !
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ssh_stiff%dim = nod2D   
-  allocate(ssh_stiff%rowptr(nod2D+1))
+  allocate(mesh%ssh_stiff%rowptr(nod2D+1))
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
 
   allocate(num_ne(nod2D), ne(MAX_ADJACENT,nod2D))
   num_ne(:)           = 0
@@ -779,6 +1241,9 @@ subroutine stiff_mat_ini
   end do
 
   allocate(ssh_stiff%colind(ssh_stiff%rowptr(nod2D+1)-1))  
+  ssh_stiff => mesh%ssh_stiff !required after the allocation, otherwise the pointer remains undefined
+
+  !required after the allocation, otherwise the pointer remains undefined
   do n=1,nod2D
      ssh_stiff%colind(ssh_stiff%rowptr(n):ssh_stiff%rowptr(n+1)-1) = ne(1:num_ne(n),n)
   end do
@@ -789,8 +1254,8 @@ end subroutine stiff_mat_ini
 
 !===================================================================
 ! Setup of communication arrays
-subroutine communication_ini
-  use o_MESH
+subroutine communication_ini(mesh)
+  use MOD_MESH
   USE g_CONFIG
   USE g_PARSUP
   use omp_lib
@@ -798,8 +1263,10 @@ subroutine communication_ini
 
   integer        :: n
   character*10   :: npes_string
-  character*200  :: dist_mesh_dir
+  character(MAX_PATH)  :: dist_mesh_dir
   LOGICAL        :: L_EXISTS
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ! Create the distributed mesh subdirectory
   write(npes_string,"(I10)") npes
@@ -820,29 +1287,36 @@ subroutine communication_ini
 !$OMP DO
   do n = 0, npes-1
      mype = n ! mype is threadprivate and must not be iterator
-     call communication_nodn
-     call communication_elemn
-
-     call save_dist_mesh         ! Write out communication file com_infoxxxxx.out
+     call communication_nodn(mesh)
+     call communication_elemn(mesh)
+     call save_dist_mesh(mesh)         ! Write out communication file com_infoxxxxx.out
   end do
 !$OMP END DO
 !$OMP END PARALLEL
 
-  deallocate(elem_neighbors)
-  deallocate(elem_edges)
+  deallocate(mesh%elem_neighbors)
+  deallocate(mesh%elem_edges)
   deallocate(part)
   write(*,*) 'Communication arrays have been set up'   
 end subroutine communication_ini
 !=================================================================
-subroutine set_par_support_ini
+subroutine set_par_support_ini(mesh)
   use g_PARSUP
   use iso_c_binding, only: idx_t=>C_INT32_T
-  use o_MESH
+  use MOD_MESH
   use g_config
   implicit none
 
+interface 
+   subroutine check_partitioning(mesh)
+     use MOD_MESH
+     type(t_mesh), intent(inout)  , target :: mesh
+   end subroutine check_partitioning
+end interface
+
   integer         :: n, j, k, nini, nend, ierr
   integer(idx_t)  :: np(10)
+  type(t_mesh), intent(inout), target :: mesh
 
   interface 
      subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
@@ -851,6 +1325,7 @@ subroutine set_par_support_ini
        integer(idx_t), intent(out) :: part(*)
      end subroutine partit
   end interface
+#include "associate_mesh_ini.h"
 
   ! Construct partitioning vector
   if (n_levels<1 .OR. n_levels>10) then
@@ -876,23 +1351,23 @@ subroutine set_par_support_ini
      stop
   end if
   
-  write(*,*) 'Calling partit'
+  write(*,*) 'Calling partit for npes=', np
   call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-  call check_partitioning
+  call check_partitioning(mesh)
 
   write(*,*) 'Partitioning is done.'
 
 ! The stiffness matrix is no longer needed. 
-  deallocate(ssh_stiff%rowptr)
-  deallocate(ssh_stiff%colind)
+  deallocate(mesh%ssh_stiff%rowptr)
+  deallocate(mesh%ssh_stiff%colind)
         
   !NR No longer needed - last use was as weight for partitioning
-  deallocate(nlevels_nod2D)
+  deallocate(mesh%nlevels_nod2D)
 end subroutine set_par_support_ini
 !=======================================================================
-subroutine check_partitioning
+subroutine check_partitioning(mesh)
 
   ! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
   !   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
@@ -905,9 +1380,9 @@ subroutine check_partitioning
   ! This routine checks for isolated nodes and moves them to an adjacent partition,
   ! trying not to spoil the load balance.
 
-  use o_MESH
+  use MOD_MESH
   use g_PARSUP
-  integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np
+  integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np, cnt
   integer :: nod_per_partition(2,0:npes-1)
   integer :: max_nod_per_part(2), min_nod_per_part(2)
   integer :: average_nod_per_part(2), node_neighb_part(100)
@@ -915,6 +1390,8 @@ subroutine check_partitioning
 
   integer :: max_adjacent_nodes
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
+  type(t_mesh), intent(inout), target :: mesh
+#include "associate_mesh_ini.h"
 
   ! Check load balancing
   do i=0,npes-1
@@ -944,13 +1421,14 @@ subroutine check_partitioning
   checkloop: do n=1,nod2D
      is = ssh_stiff%rowptr(n)
      ie = ssh_stiff%rowptr(n+1) -1
-
-     node_neighb_part(1:ie-is) = part(ssh_stiff%colind(is:ie))
-     if (count(node_neighb_part(1:ie-is) == part(n)) <= 1) then
+     cnt = ie-is+1
+     
+     node_neighb_part(1:cnt) = part(ssh_stiff%colind(is:ie))
+     if (count(node_neighb_part(1:cnt) == part(n)) <= 1) then
 
         n_iso = n_iso+1
         print *,'Isolated node',n, 'in partition', part(n)
-        print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:ie-is)
+        print *,'Neighbouring nodes are in partitions',  node_neighb_part(1:cnt)
 
         ! count the adjacent nodes of the other PEs
 
@@ -960,7 +1438,7 @@ subroutine check_partitioning
         ne_part_load(1,1) = nod_per_partition(1,ne_part(1)) + 1
         ne_part_load(2,1) = nod_per_partition(2,ne_part(1)) + nlevels_nod2D(n)
 
-        do i=1,ie-is
+        do i=1,cnt
            if (node_neighb_part(i)==part(n)) cycle
            already_counted = .false.
            do k=1,np
@@ -1050,4 +1528,5 @@ subroutine check_partitioning
        100.*real(max_nod_per_part(2)) / real(average_nod_per_part(2))
 
 end subroutine check_partitioning
+
 

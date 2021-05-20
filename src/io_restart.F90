@@ -3,9 +3,11 @@ MODULE io_RESTART
   use g_clock
   use g_parsup
   use g_comm_auto
-  use o_mesh
+  use mod_mesh
   use o_arrays
   use i_arrays
+  use g_cvmix_tke
+  use g_cvmix_idemix
   implicit none
 #include "netcdf.inc"
 !
@@ -39,7 +41,7 @@ MODULE io_RESTART
     integer :: rec, Tid, Iid
     integer :: ncid
     integer :: rec_count=0
-    integer :: error_status(200), error_count
+    integer :: error_status(250), error_count
     logical :: is_in_use=.false.
   end type nc_file
 !
@@ -51,12 +53,14 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 ! id will keep the IDs of all required dimentions and variables
-  type(nc_file), save       :: oid, iid
+  type(nc_file), save       :: oid, iid, wid !wiso-code! add wid
   integer,       save       :: globalstep=0
+  type(nc_file), save       :: ip_id
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
-  PUBLIC :: restart, oid, iid 
+  PUBLIC :: restart, oid, iid, wid !wiso-code! add wid
+  PUBLIC :: ip_id, def_dim, def_variable_1d, def_variable_2d 
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -72,7 +76,7 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year)
+subroutine ini_ocean_io(year, mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -82,6 +86,9 @@ subroutine ini_ocean_io(year)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -98,20 +105,32 @@ subroutine ini_ocean_io(year)
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call def_variable(oid, 'ssh',         (/nod2D/),  'sea surface elevation', 'm', eta_n);
+  call def_variable(oid, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n);
   !___ALE related fields______________________________________________________
-  call def_variable(oid, 'hbar',        (/nod2D/), 'ALE surface elevation hbar_n+0.5', 'm', hbar);
-  call def_variable(oid, 'hbar_old',    (/nod2D/), 'ALE surface elevation hbar_n-0.5', 'm', hbar_old);
-  call def_variable(oid, 'ssh_rhs',     (/nod2D/), 'RHS for the elevation', '?', ssh_rhs);
-  call def_variable(oid, 'ssh_rhs_old', (/nod2D/), 'RHS for the elevation', '?', ssh_rhs_old);
+  call def_variable(oid, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar);
+!!PS   call def_variable(oid, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs);
+  call def_variable(oid, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old);
+  call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
+  
   !___Define the netCDF variables for 3D fields_______________________________
-  call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'ALE stuff', '?', hnode);
-  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity', 'm/s', UV(1,:,:));
-  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity', 'm/s', UV(2,:,:));
+  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:));
+  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
   call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
   call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
-
-  do j=1,num_tracers
+  
+  !___Save restart variables for TKE and IDEMIX_________________________________
+  if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        call def_variable(oid, 'tke',  (/nl, nod2d/), 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:));
+  endif
+  if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+        call def_variable(oid, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:));
+  endif 
+  if (visc_option==8) then
+        call def_variable(oid, 'uke',      (/nl-1, elem2D/), 'unresolved kinetic energy', 'm2/s2', uke(:,:));
+        call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
+  endif
+  
+  do j=1,2 !wiso-code! num_tracers->2
      SELECT CASE (j) 
        CASE(1)
          trname='temp'
@@ -134,11 +153,9 @@ subroutine ini_ocean_io(year)
   call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
   call def_variable(oid, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i);
 end subroutine ini_ocean_io
-!
-!--------------------------------------------------------------------------------------------
-! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
-! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year)
+
+!!!!wiso-code!!!
+subroutine ini_wiso_io(year,mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -148,6 +165,85 @@ subroutine ini_ice_io(year)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
+
+  write(cyear,'(i4)') year
+  ! create a wiso restart file; serial output implemented so far
+  wid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.wiso.restart.nc'
+  if (wid%is_in_use) return
+  wid%is_in_use=.true.
+  call def_dim(wid, 'node', nod2d)
+  call def_dim(wid, 'elem', elem2d)
+  call def_dim(wid, 'nz_1', nl-1)
+  call def_dim(wid, 'nz',   nl)
+  do j=3,num_tracers
+     SELECT CASE (j)
+       CASE(3)
+         trname='h2o18'
+         longname='h2o18 concentration'
+         units='kmol/m**3'
+       CASE(4)
+         trname='hDo16'
+         longname='hDo16 concentration'
+         units='kmol/m**3'
+       CASE(5)
+         trname='h2o16'
+         longname='h2o16 concentration'
+         units='kmol/m**3'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'tra_', j
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     call def_variable(wid, trim(trname),       (/nl-1, nod2D/),trim(longname),trim(units), tr_arr(:,:,j));
+     longname=trim(longname)//', Adams–Bashforth'
+     call def_variable(wid, trim(trname)//'_AB',(/nl-1, nod2D/),trim(longname),trim(units), tr_arr_old(:,:,j));
+  end do
+  do j=1,num_tracers_ice
+     SELECT CASE (j)
+       CASE(1)
+         trname='h2o18_ice'
+         longname='h2o18 concentration in sea ice'
+         units='kmol/m**3'
+       CASE(2)
+         trname='hDo16_ice'
+         longname='hDo16 concentration in sea ice'
+         units='kmol/m**3'
+       CASE(3)
+         trname='h2o16_ice'
+         longname='h2o16 concentration in sea ice'
+         units='kmol/m**3'
+       CASE DEFAULT
+         write(trname,'(A3,i1)') 'tra_', j
+         write(longname,'(A15,i1)') 'passive tracer ', j
+         units='none'
+     END SELECT
+     call def_variable(wid, trim(trname), (/nod2D/),trim(longname),trim(units), tr_arr_ice(:,j));
+  end do
+
+end subroutine ini_wiso_io
+!!!!wiso-code!!!
+
+
+!
+!--------------------------------------------------------------------------------------------
+! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
+! the ice restart file. This is the only place need to be modified if a new variable is added!
+subroutine ini_ice_io(year, mesh)
+  implicit none
+
+  integer,      intent(in)  :: year
+  integer                   :: ncid, j
+  integer                   :: varid
+  character(500)            :: longname
+  character(500)            :: filename
+  character(500)            :: trname, units
+  character(4)              :: cyear
+  type(t_mesh), intent(in) , target :: mesh
+
+#include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -160,26 +256,26 @@ subroutine ini_ice_io(year)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  !___SSH_____________________________________________________________________
-  call def_variable(iid, 'area',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice);
-  call def_variable(iid, 'hice',         (/nod2D/),  'effective ice thickness',    'm', m_ice);
-  call def_variable(iid, 'hsnow',        (/nod2D/),  'effective snow thickness',   'm', m_snow);
-  call def_variable(iid, 'uice',         (/nod2D/),  'zonal velocity',    'm/s', u_ice);
-  call def_variable(iid, 'vice',         (/nod2D/),  'meridional velocity', 'm', v_ice);
-  call def_variable(iid, 'area_old',         (/nod2D/),  'ice concentration [0 to 1]', '%', a_ice_old); !PS
-  call def_variable(iid, 'hice_old',         (/nod2D/),  'effective ice thickness',    'm', m_ice_old); !PS
-  call def_variable(iid, 'hsnow_old',        (/nod2D/),  'effective snow thickness',   'm', m_snow_old); !PS
-  call def_variable(iid, 'uice_old',         (/nod2D/),  'zonal velocity',    'm/s', u_ice_old);
-  call def_variable(iid, 'vice_old',         (/nod2D/),  'meridional velocity', 'm', v_ice_old);
-  call def_variable(iid, 'heat_flux',         (/nod2D/),  'heat flux ',    '?', heat_flux); !PS
-  call def_variable(iid, 'heat_flux_old',         (/nod2D/),  'heat flux old',    '?', heat_flux_old); !PS
-  call def_variable(iid, 'water_flux',         (/nod2D/),  'water flux ',    '?', water_flux); !PS
-  call def_variable(iid, 'water_flux_old',         (/nod2D/),  'water flux old',    '?', water_flux_old); !PS
+  call def_variable(iid, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice);
+  call def_variable(iid, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice);
+  call def_variable(iid, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow);
+  call def_variable(iid, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice);
+  call def_variable(iid, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice);
+#if defined (__oifs)
+  call def_variable(iid, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb);
+  call def_variable(iid, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp);
+#endif /* (__oifs) */
+
 end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read)
+subroutine restart(istep, l_write, l_read, mesh)
+
+#if defined(__icepack)
+  use icedrv_main,   only: init_restart_icepack
+#endif
+
   implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
@@ -189,23 +285,46 @@ subroutine restart(istep, l_write, l_read)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
+  type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew)
-  if (use_ice) call ini_ice_io(yearnew)
+               call ini_ocean_io(yearnew, mesh)
+!!wiso-code!!!
+  if (lwiso)   call ini_wiso_io(yearnew, mesh)
+!!wiso-code!!!
+  if (use_ice) call ini_ice_io  (yearnew, mesh)
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearnew, mesh)
+#endif
   else
-               call ini_ocean_io(yearold)
-  if (use_ice) call ini_ice_io(yearold)
+               call ini_ocean_io(yearold, mesh)
+!!wiso-code!!!
+  if (lwiso)   call ini_wiso_io(yearold, mesh)
+!!wiso-code!!!
+  if (use_ice) call ini_ice_io  (yearold, mesh)
+#if defined(__icepack)
+  if (use_ice) call init_restart_icepack(yearold, mesh)
+#endif
   end if
 
   if (l_read) then
-   call assoc_ids(oid);    call was_error(oid)
-   call read_restart(oid); call was_error(oid)
+   call assoc_ids(oid);          call was_error(oid)
+   call read_restart(oid, mesh); call was_error(oid)
    if (use_ice) then
-      call assoc_ids(iid);    call was_error(iid)
-      call read_restart(iid); call was_error(iid)
+      call assoc_ids(iid);          call was_error(iid)
+      call read_restart(iid, mesh); call was_error(iid)
+#if defined(__icepack)
+      call assoc_ids(ip_id);          call was_error(ip_id)
+      call read_restart(ip_id, mesh); call was_error(ip_id)
+#endif
+    end if
+!!wiso-code!!!
+   if (lwiso) then
+      call assoc_ids(wid);    call was_error(wid)
+      call read_restart(wid, mesh); call was_error(wid)
    end if
+!!wiso-code!!!
   end if
 
   if (istep==0) return
@@ -236,12 +355,23 @@ subroutine restart(istep, l_write, l_read)
 
   ! write restart
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);            call was_error(oid)  
-  call write_restart(oid, istep); call was_error(oid)
+  call assoc_ids(oid);                  call was_error(oid)  
+  call write_restart(oid, istep, mesh); call was_error(oid)
   if (use_ice) then
-     call assoc_ids(iid);            call was_error(iid)  
-     call write_restart(iid, istep); call was_error(iid)
+     call assoc_ids(iid);                  call was_error(iid)  
+     call write_restart(iid, istep, mesh); call was_error(iid)
+#if defined(__icepack)
+     call assoc_ids(ip_id);                  call was_error(ip_id)
+     call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+#endif
   end if
+!!!wiso-code!!!!
+  if (lwiso) then
+     call assoc_ids(wid);            call was_error(wid)
+     call write_restart(wid, istep, mesh); call was_error(wid)
+  end if
+!!!wiso-code!!!!
+
   
   ! actualize clock file to latest restart point
   if (mype==0) then
@@ -283,7 +413,7 @@ subroutine create_new_file(id)
 
   att_text='time'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'long_name', len_trim(att_text), trim(att_text)); c=c+1
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)'), 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', yearold, '-', 1, '-', 1, ' 0:0:0'
   id%error_status(c) = nf_put_att_text(id%ncid, id%tID, 'units', len_trim(att_text), trim(att_text)); c=c+1
 
   att_text='iteration_count'
@@ -298,10 +428,14 @@ subroutine create_new_file(id)
         do l=1, id%ndim ! list all defined dimensions 
            if (kdim==id%dim(l)%size) dimid(k)=id%dim(l)%code
         end do
-!________write(*,*) kdim, ' -> ', dimid(k)__________________________________
+        !write(*,*) "j",j,kdim, ' -> ', dimid(k)
      end do
-     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, &
-                       (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     id%error_status(c) = nf_def_var(id%ncid, trim(id%var(j)%name), NF_DOUBLE, id%var(j)%ndim+1, (/dimid(1:n), id%rec/), id%var(j)%code); c=c+1
+     !if (n==1) then
+     !   id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1/)); c=c+1 
+     if (n==2) then
+        id%error_status(c)=nf_def_var_chunking(id%ncid, id%var(j)%code, NF_CHUNKED, (/1, id%dim(1)%size/)); ! c=c+1 
+     end if
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'description', len_trim(id%var(j)%longname), id%var(j)%longname); c=c+1
      id%error_status(c)=nf_put_att_text(id%ncid, id%var(j)%code, 'units',       len_trim(id%var(j)%units),    id%var(j)%units);    c=c+1
   end do
@@ -413,13 +547,18 @@ end subroutine def_variable_2d
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine write_restart(id, istep)
+subroutine write_restart(id, istep, mesh)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
-  real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
-  integer                       :: i, size1, size2, shape
-  integer                       :: c
+  type(t_mesh), intent(in)     , target :: mesh
+  real(kind=WP), allocatable    :: aux(:), laux(:)
+  real(kind=WP)                 :: t0, t1, t2, t3
+  integer                       :: i, lev, size1, size2, size_gen, size_lev, shape
+  integer                       :: c, order
+
+#include  "associate_mesh.h"
+
   ! Serial output implemented so far
   if (mype==0) then
      c=1
@@ -430,34 +569,74 @@ subroutine write_restart(id, istep)
      id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
+  call was_error(id); c=1
+
   do i=1, id%nvar
      shape=id%var(i)%ndim
 !_______writing 2D fields________________________________________________
      if (shape==1) then
         size1=id%var(i)%dims(1)
-        if (mype==0) allocate(aux1(size1))
-        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1)
-        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1)
+        if (mype==0) allocate(aux(size1))
+        t0=MPI_Wtime()
+        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
+        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
+        t1=MPI_Wtime()
         if (mype==0) then
-           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
         end if
-        if (mype==0) deallocate(aux1)
+        t2=MPI_Wtime()
+#ifdef DEBUG
+        ! Timeing information for collecting and writing restart file
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
+        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
+#endif
+        if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0) allocate(aux2(size1, size2))
-        if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2)
-        if (mype==0) then
-           id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
-        end if
-        if (mype==0) deallocate(aux2)
+        ! I assume that the model has always more surface nodes or elements than
+        ! vertical layers => more flexibility in terms of array dimensions
+        if (size1==nod2D .or. size1==elem2D) then
+            size_gen=size1
+            size_lev=size2
+            order=1
+        else if (size2==nod2D .or. size2==elem2D) then
+            size_gen=size2
+            size_lev=size1
+            order=2
+        else
+            if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
+            call par_ex
+            stop
+        end if 
+        if (mype==0)          allocate(aux (size_gen))
+        if (size_gen==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size_gen==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        do lev=1, size_lev
+           if (order==1) laux=id%var(i)%pt2(:,lev)
+           if (order==2) laux=id%var(i)%pt2(lev,:)
+           if (size_gen==nod2D)  call gather_nod (laux, aux)
+           if (size_gen==elem2D) call gather_elem(laux, aux)
+           if (mype==0) then
+              if (order==1) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
+              if (order==2) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
+           end if
+           t2=MPI_Wtime()
+#ifdef DEBUG
+           ! Timeing information for collecting and writing output file
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
+           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
+#endif
+        end do
+        deallocate(laux)
+        if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file'
            call par_ex
            stop
      end if
+     call was_error(id); c=1
   end do
 
   if (mype==0) id%error_count=c-1
@@ -469,22 +648,41 @@ end subroutine write_restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine read_restart(id, arg)
+subroutine read_restart(id, mesh, arg)
   implicit none
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
-  real(kind=WP), allocatable        :: aux1(:), aux2(:,:) 
-  integer                          :: i, size1, size2, shape
-  integer                          :: rec2read, c
+  real(kind=WP), allocatable       :: aux(:), laux(:)
+  integer                          :: i, lev, size1, size2, size_gen, size_lev, shape
+  integer                          :: rec2read, c, order
   real(kind=WP)                    :: rtime !timestamp of the record
+  logical                          :: file_exist=.False.
+  type(t_mesh), intent(in)        , target :: mesh
+
+#include  "associate_mesh.h"
+
+  ! laux=0.
   ! Serial output implemented so far
   c=1
   if (mype==0) then
-     write(*,*) 'reading restart file ', trim(id%filename)
-     id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
-     id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
-     id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
-
+     file_exist=.False.
+     inquire(file=id%filename,exist=file_exist) 
+     if (file_exist) then
+        write(*,*) '     reading restart file:  ', trim(id%filename)
+        id%error_status(c)=nf_open(id%filename, nf_nowrite, id%ncid);                           c=c+1
+        id%error_status(c)=nf_get_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep, 1); c=c+1
+        id%error_status(c)=nf_get_vara_double(id%ncid, id%tID, id%rec_count, 1, rtime, 1);      c=c+1
+     else
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: could not find restart_file:',trim(id%filename),'!'    
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex
+     end if 
+     
      if (.not. present(arg)) then
         rec2read=id%rec_count
      else
@@ -509,32 +707,62 @@ subroutine read_restart(id, arg)
      if (shape==1) then
         size1=id%var(i)%dims(1)
         if (mype==0) then
-           allocate(aux1(size1))
-           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
+           allocate(aux(size1))
+           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
+!          write(*,*) 'min/max 2D =', minval(aux), maxval(aux)
         end if
-        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux1)
-        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux1)
-        if (mype==0) deallocate(aux1)
+        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux)
+        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux)
+        if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
         size1=id%var(i)%dims(1)
         size2=id%var(i)%dims(2)
-        if (mype==0) then
-           allocate(aux2(size1, size2))
-           id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
+        ! I assume that the model has always more surface nodes or elements than
+        ! vertical layers => more flexibility in terms of array dimensions
+        if (size1==nod2D .or. size1==elem2D) then
+            size_gen=size1
+            size_lev=size2
+            order=1
+        else if (size2==nod2D .or. size2==elem2D) then
+            size_gen=size2
+            size_lev=size1
+            order=2
+        else
+            if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
+            call par_ex
+            stop
         end if
-        if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (id%var(i)%pt2, aux2)
-        if (size1==elem2D .or. size2==elem2D) call broadcast_elem(id%var(i)%pt2, aux2)
-        if (mype==0) deallocate(aux2)
+        if (mype==0)          allocate(aux (size_gen))
+        if (size_gen==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
+        if (size_gen==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        do lev=1, size_lev
+           if (mype==0) then
+              if (order==1) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
+              if (order==2) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
+           end if
+           id%var(i)%pt2(lev,:)=0.
+           if (size_gen==nod2D)  then
+              call broadcast_nod (laux, aux)
+              if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_nod2D+eDim_nod2D)
+              if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
+           end if
+           if (size_gen==elem2D) then
+              call broadcast_elem(laux, aux)
+              if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_elem2D+eDim_elem2D)
+              if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
+           end if
+        end do
+        deallocate(laux)
+        if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
            call par_ex
            stop
      end if
+     call was_error(id); c=1
   end do
 
-  id%error_count=c-1
-  call was_error(id)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
   call was_error(id)

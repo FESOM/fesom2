@@ -7,7 +7,7 @@ MODULE o_mixing_KPP_mod
   ! checked by ??
   !---------------------------------------------------------------  
   USE o_PARAM
-  USE o_MESH
+  USE MOD_MESH
   USE o_ARRAYS
   USE g_PARSUP
   USE g_config
@@ -92,7 +92,7 @@ contains
 !     PP:  Kv(nl,node_size) and Av(nl,elem_size)
 !      *******************************************************************
 
-  subroutine oce_mixing_kpp_init
+  subroutine oce_mixing_kpp_init(mesh)
 
      IMPLICIT NONE
 
@@ -111,9 +111,15 @@ contains
      real(KIND=WP) :: usta
 
      integer :: i, j
-    
+
+     type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
      allocate ( ghats     ( nl-1,    myDim_nod2D+eDim_nod2D         ))   ! nonlocal transport (s/m^2)
      allocate ( hbl       (    myDim_nod2D+eDim_nod2D         ))   ! boundary layer depth
+     ghats = 0.0_WP
+     hbl   = 0.0_WP
 
      allocate (    bfsfc       (       myDim_nod2D+eDim_nod2D        ))   ! surface buoyancy forcing    (m^2/s^3)
      allocate (    caseA    (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in case A; =0 in case B
@@ -125,9 +131,17 @@ contains
      allocate (    dVsq     ( nl,   myDim_nod2D+eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
      allocate (    dbsfc    ( nl,   myDim_nod2D+eDim_nod2D        ))   ! buoyancy re sfc
      allocate (    kbl      (     myDim_nod2D+eDim_nod2D        ))   ! index of first grid level below hbl
-     ghats       = 0.0
-     hbl         = 0.0
 
+     bfsfc = 0.0_WP
+     caseA = 0.0_WP
+     stable= 0.0_WP
+     dkm1  = 0.0_WP
+     blmc  = 0.0_WP
+     ustar = 0.0_WP
+     Bo    = 0.0_WP
+     dVsq  = 0.0_WP
+     dbsfc = 0.0_WP
+     kbl   = 0.0_WP
 !      *******************************************************************
 !       Initialize some constants for kmix subroutines, and initialize
 !       for kmix subroutine "wscale" the 2D-lookup table for wm and ws
@@ -150,7 +164,7 @@ contains
 !       cg = cs in eqn. 20
 !      *******************************************************************
 
-     cg = cstar * vonk * (concs * vonk * epsilon_kpp)**(1./3.)
+     cg = cstar * vonk * (concs * vonk * epsilon_kpp)**(1._WP/3._WP)
 
 !      *******************************************************************
 !       Construct the wm and ws lookup tables (eqn. 13 & B1)
@@ -170,19 +184,18 @@ contains
              wst(i,j) = wmt(i,j)
           else
              if(zeta > zetam) then
-                wmt(i,j) = vonk* usta * (1.-conc2*zeta)**(1./4.)
+                wmt(i,j) = vonk* usta * (1._WP-conc2*zeta)**(1._WP/4._WP)
              else
-                wmt(i,j) = vonk* (conam*usta**3-concm*zehat)**(1./3.)
+                wmt(i,j) = vonk* (conam*usta**3-concm*zehat)**(1._WP/3._WP)
              endif
              if(zeta > zetas) then
-                wst(i,j) = vonk* usta * (1.-conc3*zeta)**(1./2.)
+                wst(i,j) = vonk* usta * (1._WP-conc3*zeta)**(1._WP/2._WP)
              else
-                wst(i,j) = vonk* (conas*usta**3-concs*zehat)**(1./3.)
+                wst(i,j) = vonk* (conas*usta**3-concs*zehat)**(1._WP/3._WP)
              endif
           endif
        enddo
     enddo
-
   end subroutine oce_mixing_kpp_init
 
   !#######################################################################
@@ -222,7 +235,7 @@ contains
   !  diffK = diffusion coefficient (m^2/s) 
   !
   !---------------------------------------------------------------  
-  subroutine oce_mixing_KPP(viscAE, diffK)
+  subroutine oce_mixing_KPP(viscAE, diffK, mesh)
 
      IMPLICIT NONE
 
@@ -230,22 +243,27 @@ contains
 !     Define allocatble arrays under oce_modules.F90
 !     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
-
+     type(t_mesh), intent(in)   , target :: mesh
      integer                    :: node, kn, elem, elnodes(3)
-     integer                    :: nz, ns, j, q, lay, lay_mi
+     integer                    :: nz, ns, j, q, lay, lay_mi, nzmin, nzmax
      real(KIND=WP)              :: smftu, smftv, aux, vol
      real(KIND=WP)              :: dens_up, minmix
      real(KIND=WP)              :: u_loc, v_loc
-     real(kind=WP)              :: tsurf, ssurf, t, s
+!!PS      real(kind=WP)              :: tsurf, ssurf, t, s
      real(kind=WP)              :: usurf, vsurf
      real(kind=WP)              :: rhopot, bulk, pz
      real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
      real(kind=WP)              :: rho_surf, rho_insitu
-     real(KIND=WP), dimension(nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
+
+#include "associate_mesh.h"
+
   ViscA=0.0_WP
-  DO node=1, myDim_nod2D+eDim_nod2D
+  DO node=1, myDim_nod2D !+eDim_nod2D
+     nzmin = ulevels_nod2D(node)
+     nzmax = nlevels_nod2D(node)
 
 !      *******************************************************************
 !       Eqn. 21
@@ -264,17 +282,24 @@ contains
 !      *******************************************************************
 
 ! Surface layer is our reference dVsq(m2/s2) & dbsfc(m/s2)
-     dVsq (1,node) = 0.0_WP  
-     dbsfc(1,node) = 0.0_WP 
+     !!PS dVsq (1,node) = 0.0_WP  
+     !!PS dbsfc(1,node) = 0.0_WP
+     dVsq (nzmin,node) = 0.0_WP  
+     dbsfc(nzmin,node) = 0.0_WP 
 
 ! Surface temperature and salinity
-     tsurf = tr_arr(1,node,1)   
-     ssurf = tr_arr(1,node,2)
+     !!PS tsurf = tr_arr(1,node,1)   
+     !!PS ssurf = tr_arr(1,node,2)
+!!PS      tsurf = tr_arr(nzmin,node,1)   
+!!PS      ssurf = tr_arr(nzmin,node,2)
 ! Surface velocity
-     usurf = Unode(1,1,node)   
-     vsurf = Unode(2,1,node)
+     !!PS usurf = Unode(1,1,node)   
+     !!PS vsurf = Unode(2,1,node)
+     usurf = Unode(1,nzmin,node)   
+     vsurf = Unode(2,nzmin,node)
 
-     DO nz=2, nlevels_nod2d(node)-1
+     !!PS DO nz=2, nlevels_nod2d(node)-1
+     DO nz=nzmin+1, nzmax-1
 
 !    Squared velocity shear referenced to surface (@ Z)
         u_loc = 0.5_WP * ( Unode(1,nz-1,node) + Unode(1,nz,node) )
@@ -284,7 +309,8 @@ contains
 
 !    dbsfc (buoyancy difference with respect to the surface (m/s2)) is now computed in oce_ale_pressure_bv.F90
      END DO
-     dVsq ( nlevels_nod2d(node), node ) = dVsq  ( nlevels_nod2d(node)-1, node )
+     !!PS dVsq ( nlevels_nod2d(node), node ) = dVsq  ( nlevels_nod2d(node)-1, node )
+     dVsq ( nzmax, node ) = dVsq  ( nzmax-1, node )
   END DO
 
 !      *******************************************************************
@@ -308,73 +334,101 @@ contains
 !       bo =  -g * ( Talpha*heat_flux/vcpw + Sbeta * salinity*water_flux ) (m^2/s^3)
 !      *******************************************************************
 
-  DO node=1, myDim_nod2D+eDim_nod2D
+  DO node=1, myDim_nod2D !+eDim_nod2D
+     nzmin = ulevels_nod2D(node)
      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
-
+    
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
-     Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2)) 
+     !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
+     !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
+     Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
+                      + sw_beta (nzmin,node) * water_flux(node) * tr_arr(nzmin,node,2)) 
   END DO
-
+      
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
-    CALL ri_iwmix(viscA, diffK)
+    CALL ri_iwmix(viscA, diffK, mesh)
 ! add double diffusion
     IF (double_diffusion) then
-       CALL ddmix(diffK)
+       CALL ddmix(diffK, mesh)
     END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
-    CALL bldepth
-
+    CALL bldepth(mesh)
+   
 ! boundary layer diffusivities
-    CALL blmix_kpp(viscA, diffK)
+    CALL blmix_kpp(viscA, diffK, mesh)
 
 ! enhance diffusivity at interface kbl - 1
-    CALL enhance(viscA, diffK) 
-
+    CALL enhance(viscA, diffK, mesh)
+    
     if (smooth_blmc) then
+       call exchange_nod(blmc(:,:,1))
+       call exchange_nod(blmc(:,:,2))
+       call exchange_nod(blmc(:,:,3))
        do j=1, 3
-          call smooth_nod(blmc(:,:,j), 3)
+          !_____________________________________________________________________  
+          ! all loops go over myDim_nod2D so no halo information --> for smoothing 
+          ! haloinfo is required --> therefor exchange_nod
+          call smooth_nod(blmc(:,:,j), 3, mesh)
        end do
     end if
-
+    
 ! then combine blmc and viscA/diffK
 
   DO node=1, myDim_nod2D
-     DO nz=2,nlevels_nod2d(node)-1
+     nzmin = ulevels_nod2D(node)
+     nzmax = nlevels_nod2D(node)
+     !!PS DO nz=2,nlevels_nod2d(node)-1
+     DO nz=nzmin+1,nzmax-1
           IF (nz < kbl(node)) then ! within the bounday layer
              viscA(nz,node  ) = MAX(viscA(nz,node  ), blmc(nz,node,1))
              diffK(nz,node,1) = MAX(diffK(nz,node,1), blmc(nz,node,2))
              diffK(nz,node,2) = MAX(diffK(nz,node,2), blmc(nz,node,3))                    
           ELSE
-             ghats(nz,node)=0.0    ! outside the boundary layer set nonlocal terms to zero
+             ghats(nz,node)=0.0_WP    ! outside the boundary layer set nonlocal terms to zero
           ENDIF
      END DO
   END DO    
+  
+  !_____________________________________________________________________________
+  ! do all node loops only over myDim_nod2D --> therefore do an halo exchange 
+  ! only at the end should save some time
+  call exchange_nod(diffK(:,:,1))
+  call exchange_nod(diffK(:,:,2))
 
 ! OVER ELEMENTS 
   call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
+  minmix=3.0e-3_WP
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
-     DO nz=1,nlevels(elem)-1
+     nzmin = ulevels(elem)
+     nzmax = nlevels(elem)
+     !!PS DO nz=1,nlevels(elem)-1
+     DO nz=nzmin,nzmax-1
         viscAE(nz,elem) = SUM(viscA(nz,elnodes))/3.0_WP    ! (elementwise)                
      END DO
      viscAE( nlevels(elem), elem ) = viscAE( nlevels(elem)-1, elem )
+     
+     ! Set the mixing coeff. in the first layer above some limiting value
+    ! this is very helpful to avoid huge surface velocity when vertical
+    ! viscosity is very small derived from the KPP scheme.
+    ! I strongly recommend this trick, at least in the current FESOM version.    
+    if (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
+    
   END DO    
 
-! Set the mixing coeff. in the first layer above some limiting value
-! this is very helpful to avoid huge surface velocity when vertical
-! viscosity is very small derived from the KPP scheme.
-! I strongly recommend this trick, at least in the current FESOM version.    
-  minmix=3.0e-3
-  WHERE(viscAE(1,:) < minmix) 
-     viscAE(1,:) = minmix
-  END WHERE
+!!PS ! Set the mixing coeff. in the first layer above some limiting value
+!!PS ! this is very helpful to avoid huge surface velocity when vertical
+!!PS ! viscosity is very small derived from the KPP scheme.
+!!PS ! I strongly recommend this trick, at least in the current FESOM version.    
+!!PS   minmix=3.0e-3_WP
+!!PS   WHERE(viscAE(nzmin,:) < minmix) 
+!!PS      viscAE(nzmin,:) = minmix
+!!PS   END WHERE
     
 ! non-local contribution will be added to oce_tracer_mod directly
-
   END SUBROUTINE oce_mixing_kpp
 
 
@@ -418,7 +472,7 @@ contains
   !      real caseA(t2d)      ! =1 in case A, =0 in case B                
   !      integer kbl(t2d)     ! index of first grid level below hbl        
   !
-  SUBROUTINE bldepth
+  SUBROUTINE bldepth(mesh)
 
      IMPLICIT NONE
 
@@ -426,37 +480,45 @@ contains
      real(KIND=WP)            :: hekman, hmonob, hlimit
      real(KIND=WP)            :: Rib_km1, Rib_k, coeff_sw, zk, zkm1
      real(KIND=WP)            :: sigma, zehat, wm, ws, dzup, dzupE(3)
-     integer                  :: node, nk, nz, elem, elnodes(3)
+     integer                  :: node, nk, nz, elem, elnodes(3), nzmin, nzmax
 
      real(KIND=WP), parameter :: cekman = 0.7_WP  ! constant for Ekman depth
      real(KIND=WP), parameter :: cmonob = 1.0_WP  ! constant for Monin-Obukhov depth
 
+     type(t_mesh), intent(in) , target :: mesh
+
+#include "associate_mesh.h"
+
 ! Initialize hbl and kbl to bottomed out values
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
 ! Index of first grid level below hbl
         kbl(node) = nlevels_nod2D(node)      
 ! Boundary layer depth
         hbl(node) = ABS( zbar_3d_n( nlevels_nod2d(node),node ) )
      END DO
 
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
 
         IF (use_sw_pene)  THEN                
-           coeff_sw = g * sw_alpha(1,node)  ! @ the surface @ Z (m/s2/K)
+           !!PS coeff_sw = g * sw_alpha(1,node)  ! @ the surface @ Z (m/s2/K)
+           coeff_sw = g * sw_alpha(nzmin,node)  ! @ the surface @ Z (m/s2/K)
         END IF
  
         Rib_km1 = 0.0_WP
-        nk = nlevels_nod2D(node)
+        !!PS nk = nlevels_nod2D(node)
         bfsfc(node) = Bo(node)
-
-        DO nz=2,nk 
+        
+        !!PS DO nz=2,nk
+        DO nz=nzmin+1,nzmax
 
            zk   = ABS( zbar_3d_n(nz,node) )  
            zkm1 = ABS( zbar_3d_n(nz-1,node) ) 
 
           ! bfsfc = Bo + sw contribution
            IF (use_sw_pene)  THEN     
-              bfsfc(node) = Bo(node) + coeff_sw * ( sw_3d(1,node) - sw_3d(nz,node) )  ! coeff_sw [m/s2/K] sw_3d: [K m/s], positive downward
+              bfsfc(node) = Bo(node) + coeff_sw * ( sw_3d(nzmin,node) - sw_3d(nz,node) )  ! coeff_sw [m/s2/K] sw_3d: [K m/s], positive downward
            END IF 
 
            stable(node) = 0.5_WP + SIGN( 0.5_WP, bfsfc(node) )
@@ -508,7 +570,7 @@ contains
        ! Linear interpolation of sw_3d to depth of hbl
               bfsfc(node) = Bo(node) + & 
                             coeff_sw * &
-                            ( sw_3d(1,node) - &
+                            ( sw_3d(nzmin,node) - &
                                             ( sw_3d(nz-1,node) + &
                                                                ( sw_3d(nz,node) - sw_3d(nz-1,node) ) * ( hbl(node) - zkm1 ) / dzup &
                                             ) &
@@ -522,7 +584,9 @@ contains
        !        eqn. (24)
        !-----------------------------------------------------------------------
 
-        IF (bfsfc(node) > 0.0) THEN
+        !!PS IF (bfsfc(node) > 0.0_WP) THEN
+        IF (bfsfc(node) > 0.0_WP .and. nzmin==1) THEN
+                                          !-> no ekman or monin-obukov when there is cavity  
            hekman = cekman * ustar(node) / MAX( ABS (coriolis_node(node) ), epsln)
            hmonob = cmonob * ustar(node) * ustar(node) * ustar(node)     &
                 /vonk / (bfsfc(node) + epsln) 
@@ -532,15 +596,22 @@ contains
         END IF
   END DO
 
-  if (smooth_hbl) call smooth_nod(hbl, 3)
+  if (smooth_hbl) then
+    call exchange_nod(hbl)
+    call smooth_nod(hbl, 3, mesh)
+  end if
 
-  DO node=1, myDim_nod2D+eDim_nod2D
-       nk = nlevels_nod2D(node)
+  DO node=1, myDim_nod2D !+eDim_nod2D
+       !!PS nk = nlevels_nod2D(node)
+       nzmax = nlevels_nod2D(node)
+       nzmin = ulevels_nod2D(node)
        !-----------------------------------------------------------------------
        !     find new kbl 
        !-----------------------------------------------------------------------
-        kbl(node) = nk
-        DO nz=2,nk  
+        !!PS kbl(node) = nk
+        kbl(node) = nzmax
+        !!PS DO nz=2,nk
+        DO nz=nzmin+1,nzmax
            IF (ABS(zbar_3d_n(nz,node)) > hbl(node)) THEN
               kbl(node) = nz
               EXIT
@@ -553,7 +624,7 @@ contains
        ! Linear interpolation of sw_3d to depth of hbl
            bfsfc(node) = Bo(node) + & 
                          coeff_sw * &
-                         ( sw_3d(1,node) - &
+                         ( sw_3d(nzmin,node) - &
                                          ( sw_3d(kbl(node)-1, node) + &
                                                                     ( sw_3d(kbl(node), node) - sw_3d(kbl(node)-1, node) ) &
                                                                     * ( hbl(node) + zbar_3d_n( kbl(node)-1,node) ) &
@@ -572,7 +643,6 @@ contains
         caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
 
   END DO 
-
   END SUBROUTINE bldepth
 
 
@@ -620,21 +690,21 @@ contains
         izp1  = iz + 1
 
         udiff = us-umin
-        ju    = INT( MIN(udiff/deltau,FLOAT(nnj)))
+        ju    = INT( MIN(udiff/deltau,real(nnj,WP)))
         ju    = MAX( ju , 0  )
         jup1  = ju+1
 
-        zfrac = zdiff/deltaz - FLOAT(iz)
-        ufrac = udiff/deltau - FLOAT(ju)
+        zfrac = zdiff/deltaz - real(iz,WP)
+        ufrac = udiff/deltau - real(ju,WP)
 
-        fzfrac= 1.-zfrac
+        fzfrac= 1._WP-zfrac
         wam   = (fzfrac)  * wmt(iz,jup1) + zfrac * wmt(izp1,jup1)
         wbm   = (fzfrac)  * wmt(iz,ju  ) + zfrac * wmt(izp1,ju  )
-        wm    = (1.-ufrac)* wbm          + ufrac * wam
+        wm    = (1._WP-ufrac)* wbm          + ufrac * wam
 
         was   = (fzfrac)  * wst(iz,jup1) + zfrac * wst(izp1,jup1)
         wbs   = (fzfrac)  * wst(iz,ju  ) + zfrac * wst(izp1,ju  )
-        ws    = (1.-ufrac)* wbs          + ufrac * was
+        ws    = (1._WP-ufrac)* wbs          + ufrac * was
 
      ELSE
         u3    = us*us*us
@@ -655,30 +725,35 @@ contains
   !    visc = viscosity coefficient (m**2/s)       
   !    diff = diffusion coefficient (m**2/s)     
   !
-  subroutine ri_iwmix(viscA, diffK)
+  subroutine ri_iwmix(viscA, diffK, mesh)
      IMPLICIT NONE
-
-     integer                     :: node, nz, mr
+     type(t_mesh), intent(in)    , target :: mesh
+     integer                     :: node, nz, mr, nzmin, nzmax
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
      real(KIND=WP)               :: Rigg, ratio, frit
      real(KIND=WP)               :: dz_inv, shear, aux, dep, lat, Kv0_b
 
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D             ), intent(inout) :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D ,num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D             ), intent(inout) :: viscA !for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D ,num_tracers), intent(inout) :: diffK !for T and S
 
 ! Put them under the namelist.oce
      logical                     :: smooth_richardson_number = .false.
      integer                     :: num_smoothings = 1              ! for vertical smoothing of Richardson number
 
+#include "associate_mesh.h"
+
 ! Compute Richardson number and store it as diffK to save memory
-     DO node=1, myDim_nod2D+eDim_nod2D
-        DO nz=2,nlevels_nod2d(node)-1
+     DO node=1, myDim_nod2D! +eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
+        !!PS DO nz=2,nlevels_nod2d(node)-1
+        DO nz=nzmin+1,nzmax-1
            dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
            shear  = ( Unode(1, nz-1, node) - Unode(1, nz, node) )**2 + &
                 ( Unode(2, nz-1, node) - Unode(2, nz, node) )**2 
            shear  = shear * dz_inv * dz_inv
-       diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)  ! To avoid NaNs at start
+           diffK(nz,node,1) = MAX( bvfreq(nz,node), 0.0_WP ) / (shear + epsln)  ! To avoid NaNs at start
         END DO                                                                  ! minimum Richardson number is 0
 
 !      *******************************************************************
@@ -686,14 +761,18 @@ contains
 !       diffK @ zbar. Model do not use these levels !!!!!!!       
 !      *******************************************************************
  
-        diffK(1,node,1)=diffK(2,node,1)
-        diffK(nlevels_nod2d(node),node,1)=diffK(nlevels_nod2d(node)-1,node,1)
+        !!PS diffK(1,node,1)=diffK(2,node,1)
+        !!PS diffK(nlevels_nod2d(node),node,1)=diffK(nlevels_nod2d(node)-1,node,1)
+        diffK(nzmin,node,1)=diffK(nzmin+1,node,1)
+        diffK(nzmax,node,1)=diffK(nzmax-1,node,1)
 
 ! smooth Richardson number in the vertical using a 1-2-1 filter
-        IF(smooth_richardson_number .and. nlevels_nod2d(node)>2) then
+        !!PS IF(smooth_richardson_number .and. nlevels_nod2d(node)>2) then
+        IF(smooth_richardson_number .and. nzmax>2) then
            DO mr=1,num_smoothings
               ri_prev = 0.25_WP * diffK(1, node, 1)
-              DO nz=2,nlevels_nod2d(node)-1
+              !!PS DO nz=2,nlevels_nod2d(node)-1
+              DO nz=nzmin+1,nzmax-1
                 tmp = diffK(nz,node,1)
                 diffK(nz,node,1) = ri_prev + 0.5_WP * diffK(nz,node,1) + 0.25_WP * diffK(nz+1,node,1)
                 ri_prev = 0.25_WP * tmp
@@ -703,13 +782,16 @@ contains
      END DO
 
     if (smooth_Ri) then
-       call smooth_nod(diffK(:,:,1), 3)
+       call smooth_nod(diffK(:,:,1), 3, mesh)
     end if
 
     !___________________________________________________________________________
     ! compute viscA and diffK
-    do node=1, myDim_nod2D+eDim_nod2D
-        do nz=2,nlevels_nod2d(node)-1
+    do node=1, myDim_nod2D !+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
+        !!PS do nz=2,nlevels_nod2d(node)-1
+        do nz=nzmin+1,nzmax-1
             !___________________________________________________________________
             ! evaluate function of Ri# for shear instability eqn. (28b&c)
             Rigg  = AMAX1( diffK(nz,node,1) , 0.0_WP)
@@ -741,15 +823,20 @@ contains
         !_______________________________________________________________________
         !!! No need to set surface and bottom diffusivity. diffK @ zbar      !!!
         !!! Model do not use these levels !!!!!!!                            !!!
-        viscA( 1, node    ) = viscA(2, node   )
-        diffK( 1, node, 1 ) = diffK(2, node, 1)
-        diffK( 1, node, 2 ) = diffK(2, node, 2)
-        viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
-        diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
-        diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+        !!PS viscA( 1, node    ) = viscA(2, node   )
+        !!PS diffK( 1, node, 1 ) = diffK(2, node, 1)
+        !!PS diffK( 1, node, 2 ) = diffK(2, node, 2)
+        viscA( nzmin, node    ) = viscA(nzmin+1, node   )
+        diffK( nzmin, node, 1 ) = diffK(nzmin+1, node, 1)
+        diffK( nzmin, node, 2 ) = diffK(nzmin+1, node, 2)
+        !!PS viscA( nlevels_nod2d(node), node    ) = viscA( nlevels_nod2d(node)-1, node    )  
+        !!PS diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
+        !!PS diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+        viscA( nzmax, node    ) = viscA( nzmax-1, node    )  
+        diffK( nzmax, node, 1 ) = diffK( nzmax-1, node, 1 )
+        diffK( nzmax, node, 2 ) = diffK( nzmax-1, node, 2 )
         
     end do !-->do node=1, myDim_nod2D+eDim_nod2D
-
   end subroutine ri_iwmix
 
  !#######################################################################
@@ -763,22 +850,27 @@ contains
   !
   ! output: update diffu
   !
-  subroutine ddmix(diffK)
+  subroutine ddmix(diffK, mesh)
 
      IMPLICIT NONE
-
+     type(t_mesh), intent(in)       , target :: mesh
      real(KIND=WP), parameter       :: Rrho0               = 1.9_WP          ! limit for double diffusive density ratio
      real(KIND=WP), parameter       :: dsfmax              = 1.e-4_WP        ! (m^2/s) max diffusivity in case of salt fingering
      real(KIND=WP), parameter       :: viscosity_molecular = 1.5e-6_WP       ! (m^2/s)
 
-     integer                        :: node, nz
+     integer                        :: node, nz, nzmin, nzmax
      real(KIND=WP)                  :: alphaDT, betaDS
      real(KIND=WP)                  :: diffdd, Rrho, prandtl
 
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
 
-     DO node=1, myDim_nod2D+eDim_nod2D
-        DO nz=2,nlevels_nod2d(node)-1
+#include "associate_mesh.h"
+
+     DO node=1, myDim_nod2D!+eDim_nod2D
+        nzmin = ulevels_nod2D(node)
+        nzmax = nlevels_nod2D(node)
+        !!PS DO nz=2,nlevels_nod2d(node)-1
+        DO nz=nzmin+1,nzmax-1
 
        ! alphaDT and betaDS @Z 
            alphaDT = sw_alpha(nz-1,node) * tr_arr(nz-1,node,1)
@@ -825,10 +917,14 @@ contains
 !       Model do not use these levels !!!!!!!       
 !      *******************************************************************
   
-        diffK( 1, node, 1 ) = diffK( 2, node, 1 )
-        diffK( 1, node, 2 ) = diffK( 2, node, 2 )
-        diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
-        diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+        !!PS diffK( 1, node, 1 ) = diffK( 2, node, 1 )
+        !!PS diffK( 1, node, 2 ) = diffK( 2, node, 2 )
+        diffK( nzmin, node, 1 ) = diffK( nzmin+1, node, 1 )
+        diffK( nzmin, node, 2 ) = diffK( nzmin+1, node, 2 )
+        !!PS diffK( nlevels_nod2d(node), node, 1 ) = diffK( nlevels_nod2d(node)-1, node, 1 )
+        !!PS diffK( nlevels_nod2d(node), node, 2 ) = diffK( nlevels_nod2d(node)-1, node, 2 )
+        diffK( nzmax, node, 1 ) = diffK( nzmax-1, node, 1 )
+        diffK( nzmax, node, 2 ) = diffK( nzmax-1, node, 2 )
 
      END DO
   end subroutine ddmix
@@ -855,39 +951,50 @@ contains
   !      real blmc(3d,3) = boundary layer mixing coeff.(m**2/s)   
   !      real ghats(3d)  = nonlocal scalar transport              
   !
-  subroutine blmix_kpp(viscA,diffK)
+  subroutine blmix_kpp(viscA,diffK, mesh)
 
      IMPLICIT NONE
-
-     integer  :: node, nz, kn, elem, elnodes(3), knm1, knp1, nl1
+     type(t_mesh), intent(in) , target :: mesh
+     integer           :: node, nz, kn, elem, elnodes(3), knm1, knp1, nl1, nu1
      real(KIND=WP)     :: delhat, R, dvdzup, dvdzdn
      real(KIND=WP)     :: viscp, difsp, diftp, visch, difsh, difth, f1
      real(KIND=WP)     :: sig, a1, a2, a3, Gm, Gs, Gt
      real(KIND=WP)     :: sigma, zehat, wm, ws 
      real(KIND=WP)     :: gat1m, gat1t, gat1s, dat1m, dat1s, dat1t
 
-     real(KIND=WP)     :: dthick(nl), diff_col(nl,3), diff_colE(nl)
+     real(KIND=WP)     :: dthick(mesh%nl), diff_col(mesh%nl,3), diff_colE(mesh%nl)
 
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
+
+#include "associate_mesh.h"
 
      blmc = 0.0_WP
 
 !      *******************************************************************
 !       Kv over the NODE 
 !      *******************************************************************
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, myDim_nod2D !+eDim_nod2D
         nl1=nlevels_nod2d(node)
+        nu1=ulevels_nod2d(node)
 
         if(nl1<3) cycle  ! a temporary solution
+        if(nl1-nu1 < 2) cycle
 
       ! level thickness
-        dthick(2:nl1-1)=0.5*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
-        dthick(1)=dthick(2)
-        dthick(nl1)=dthick(nl1-1)
-
-        diff_col(1:nl1-1,1)=viscA(1:nl1-1,node)
-        diff_col(1:nl1-1,2:3)=diffK(1:nl1-1,node,:)
+        !!PS dthick(2:nl1-1)=0.5_WP*(ABS(zbar_3d_n(3:nl1,node))-ABS(zbar_3d_n(1:nl1-2,node)))
+        !!PS dthick(1)=dthick(2)
+        !!PS dthick(nu1+1:nl1-1)=0.5_WP*(ABS(zbar_3d_n(nu1+2:nl1,node))-ABS(zbar_3d_n(nu1:nl1-2,node)))
+        !!PS dthick(nu1)=dthick(nu1+1)
+        !!PS dthick(nl1)=dthick(nl1-1)
+        dthick(nu1+1:nl1-1)=0.5_WP*(hnode(nu1:nl1-2,node)+hnode(nu1+1:nl1-1,node) )
+        dthick(nu1)=hnode(nu1,node)*0.5_WP
+        dthick(nl1)=hnode(nl1-1,node)*0.5_WP
+        
+        !!PS diff_col(1:nl1-1,1)=viscA(1:nl1-1,node)
+        !!PS diff_col(1:nl1-1,2:3)=diffK(1:nl1-1,node,:)
+        diff_col(nu1:nl1-1,1)=viscA(nu1:nl1-1,node)
+        diff_col(nu1:nl1-1,2:3)=diffK(nu1:nl1-1,node,:)
         diff_col(nl1,:)=diff_col(nl1-1,:)
 
 !      *******************************************************************
@@ -897,11 +1004,12 @@ contains
         sigma = stable(node) * 1.0_WP + (1.0_WP-stable(node)) * epsilon_kpp
         zehat= vonk * sigma * hbl(node) * bfsfc(node)
         call wscale(zehat, ustar(node), wm, ws)
-
+        
         kn = INT(caseA(node)+epsln) *(kbl(node) -1) +   &
              (1-INT(caseA(node)+epsln)) * kbl(node)
-
-        knm1 = MAX(kn-1,1)
+        kn   = min(kn,nl1-1)
+        !!PS knm1 = MAX(kn-1,1)
+        knm1 = MAX(kn-1,nu1)
         knp1 = MIN(kn+1,nl1)
 
 !      *******************************************************************
@@ -909,14 +1017,16 @@ contains
 !       eqn. (18)
 !      *******************************************************************
 
-        delhat = ABS(Z(kn))-hbl(node)
+!!PS         delhat = ABS(Z(kn))-hbl(node)
+        delhat = ABS(Z_3d_n(kn,node))-hbl(node)
         R      = 1.0_WP - delhat / dthick(kn)
 
-       dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
-       dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
-       viscp  = 0.5 * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
+        dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
+        dvdzdn = (diff_col(kn,1) - diff_col(knp1,1))/dthick(knp1)
+        viscp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
             R  * (dvdzdn + abs(dvdzdn)) )
-
+        
+        
         dvdzup = (diff_col(knm1,3) - diff_col(kn,3))/dthick(kn)
         dvdzdn = (diff_col(kn,3) - diff_col(knp1,3))/dthick(knp1)     
         difsp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
@@ -924,6 +1034,7 @@ contains
 
         dvdzup = (diff_col(knm1,2) - diff_col(kn,2))/dthick(kn)
         dvdzdn = (diff_col(kn,2) - diff_col(knp1,2))/dthick(knp1)
+        
         diftp  = 0.5_WP * ( (1.0_WP - R) * (dvdzup + ABS(dvdzup))+         &
              R  * (dvdzdn + ABS(dvdzdn)) )
 
@@ -944,8 +1055,9 @@ contains
         gat1t = difth /  (hbl(node) + epsln) / (ws + epsln)
         dat1t = -diftp / (ws+epsln) + f1 * difth 
         dat1t = min(dat1t, 0.0_WP) 
-
-        DO nz=2,nlevels_nod2d(node)-1
+        
+        !!PS DO nz=2,nlevels_nod2d(node)-1
+        DO nz=nu1+1,nl1-1
 
            if (nz >= kbl(node)) exit
 
@@ -953,7 +1065,8 @@ contains
 !       Compute turbulent velocity scales on the interfaces
 !      *******************************************************************
 
-           sig   = ABS(Z(nz)) / (hbl(node)+epsln)
+!!PS            sig   = ABS(Z(nz)) / (hbl(node)+epsln)
+           sig   = ABS(Z_3d_n(nz,node)) / (hbl(node)+epsln)
            sigma = stable(node) * sig                          &
                 + (1.0_WP - stable(node)) * AMIN1(sig, epsilon_kpp)
            zehat= vonk * sigma * hbl(node) * bfsfc(node)
@@ -980,7 +1093,7 @@ contains
            blmc(nz,node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm) 
            blmc(nz,node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt) 
            blmc(nz,node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs) 
-
+        
 !      *******************************************************************
 !       Nonlocal transport term = ghats * <ws>o (eqn. 20)
 !      *******************************************************************
@@ -1007,12 +1120,12 @@ contains
         Gm = a1 + a2 * gat1m + a3 * dat1m
         Gs = a1 + a2 * gat1s + a3 * dat1s
         Gt = a1 + a2 * gat1t + a3 * dat1t
+        
         dkm1(node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm)
         dkm1(node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt)
         dkm1(node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs)
 
      END DO
-
   end subroutine blmix_kpp
 
   !#######################################################################
@@ -1032,16 +1145,18 @@ contains
   ! output
   !      real blmc(n3,3) = enhanced boundary layer mixing coefficient
   !
-  subroutine enhance(viscA, diffK)
+  subroutine enhance(viscA, diffK, mesh)
      IMPLICIT NONE
-
-     real(KIND=WP), dimension(nl, myDim_nod2D+eDim_nod2D), intent(inout) :: viscA !for momentum (nodes)
-     real(kind=WP), dimension(nl, myDim_nod2D+eDim_nod2D,2), intent(inout)        :: diffK !for T and S
+     type(t_mesh), intent(in)                                                   , target :: mesh
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D),   intent(inout) :: viscA !for momentum (nodes)
+     real(kind=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D,2), intent(inout) :: diffK !for T and S
 
      integer           :: nz, node, k
      real(kind=WP)     :: delta, dkmp5, dstar
 
-     DO node=1, myDim_nod2D+eDim_nod2D
+#include "associate_mesh.h"
+
+     DO node=1, myDim_nod2D !+eDim_nod2D
 
         k     = kbl(node) - 1
         delta = (hbl(node) + zbar_3d_n(k,node)) / (zbar_3d_n(k,node) - zbar_3d_n(k+1,node))
@@ -1052,24 +1167,23 @@ contains
         dstar = ( 1.0_WP - delta )**2 * dkm1( node, 1 ) + delta**2 * dkmp5
         blmc( k, node, 1 ) = (1.0_WP - delta) * viscA(k,node)  &
               + delta * dstar
-
+        
        ! temperature:
         dkmp5 = caseA(node) * diffK(k,node,1)  &
               + ( 1.0_WP - caseA(node) ) * blmc( k, node, 2 )
         dstar = ( 1.0_WP - delta )**2 * dkm1( node, 2 ) + delta**2 * dkmp5    
         blmc( k, node, 2 ) = ( 1.0_WP - delta ) * diffK( k, node, 1)  &
              + delta * dstar
-
+             
        ! salinity:   
         dkmp5 = caseA(node) * diffK(k,node,2)  &
               + ( 1.0_WP - caseA(node) ) * blmc( k, node, 3 )
         dstar = ( 1.0_WP - delta )**2 * dkm1( node, 3 ) + delta**2 * dkmp5
         blmc( k, node, 3 ) = ( 1.0_WP - delta ) * diffK( k, node, 2 )  &
              + delta * dstar
-
+             
         ghats(k,node) = (1.0_WP-caseA(node)) * ghats(k,node) ! plot ghats
      END DO
-
   end subroutine enhance
 
 END MODULE o_mixing_KPP_mod

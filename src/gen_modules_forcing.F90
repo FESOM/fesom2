@@ -17,9 +17,10 @@ real(kind=WP)  :: Cd_atm_oce=1.0e-3  ! drag coeff. between atmosphere and water
 real(kind=WP)  :: Ce_atm_ice=1.75e-3 ! exch. coeff. of latent heat over ice
 real(kind=WP)  :: Ch_atm_ice=1.75e-3 ! exch. coeff. of sensible heat over ice
 real(kind=WP)  :: Cd_atm_ice=1.32e-3 ! drag coeff. between atmosphere and ice 
+real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feedback after Renault et al. 2019; varies from 0 (not parameterized) to 1 (no ocean contribution to wind stress)
 
   namelist /forcing_exchange_coeff/ Ce_atm_oce, Ch_atm_oce, Cd_atm_oce, &
-       Ce_atm_ice, Ch_atm_ice, Cd_atm_ice
+       Ce_atm_ice, Ch_atm_ice, Cd_atm_ice, Swind
 
 
   ! *** forcing source and type ***
@@ -28,8 +29,11 @@ real(kind=WP)  :: Cd_atm_ice=1.32e-3 ! drag coeff. between atmosphere and ice
   ! *** coefficients in bulk formulae ***
   logical                       :: AOMIP_drag_coeff=.false.
   logical                       :: ncar_bulk_formulae=.false.
+  real(kind=WP)                 :: ncar_bulk_z_wind=10.0_WP
+  real(kind=WP)                 :: ncar_bulk_z_tair=10.0_WP
+  real(kind=WP)                 :: ncar_bulk_z_shum=10.0_WP
 
-  namelist /forcing_bulk/ AOMIP_drag_coeff, ncar_bulk_formulae
+  namelist /forcing_bulk/ AOMIP_drag_coeff, ncar_bulk_formulae, ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
 
   ! *** add land ice melt water ***
   logical                       :: use_landice_water=.false.
@@ -54,8 +58,12 @@ use o_param
   real(kind=WP), allocatable, dimension(:,:)       :: Tair_t, shum_t
   real(kind=WP), allocatable, dimension(:)         :: shortwave, longwave
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
-  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation
-  real(kind=WP), allocatable, dimension(:)         :: cloudiness, Pair
+  real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
+  real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
+  !wiso-code!!!
+  real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
+  real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
+  !wiso-code!!!
 
 #if defined (__oasis)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac

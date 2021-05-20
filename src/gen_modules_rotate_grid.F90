@@ -76,8 +76,8 @@ module g_rotate_grid
 
     ! Geographical lon-lat coordinates:
     glat=asin(zg)
-    if(yg==0. .and. xg==0.) then
-       glon=0.0     ! exactly at the poles
+    if(yg==0. .and. xg==0._WP) then
+       glon=0.0_WP     ! exactly at the poles
     else
        glon=atan2(yg,xg)
     end if
@@ -107,8 +107,8 @@ module g_rotate_grid
 
     ! rotated coordinates:
     rlat=asin(zr)
-    if(yr==0. .and. xr==0.) then
-       rlon=0.0     ! exactly at the poles
+    if(yr==0._WP .and. xr==0._WP) then
+       rlon=0.0_WP     ! exactly at the poles
     else
        rlon=atan2(yr,xr)
     end if
@@ -199,5 +199,15 @@ module g_rotate_grid
    tlat=-sin(glat)*cos(glon)*txr - sin(glat)*sin(glon)*tyr + cos(glat)*tzr
    tlon=-sin(glon)*txr + cos(glon)*tyr
   end subroutine vector_r2g
-!  
+!===================================================================
+  subroutine trim_cyclic(b)
+    use o_PARAM
+    use g_config
+    implicit none
+    real(kind=WP) :: b
+    if(b> cyclic_length/2.0_WP) b=b-cyclic_length
+    if(b<-cyclic_length/2.0_WP) b=b+cyclic_length
+  end subroutine trim_cyclic
 end module g_rotate_grid
+!===================================================================
+
