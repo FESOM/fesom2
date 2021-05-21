@@ -24,6 +24,7 @@ use diagnostics
 use mo_tidal
 use fesom_version_info_module
 
+
 ! Define icepack module
 #if defined (__icepack)
 use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
@@ -31,6 +32,14 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 
 #if defined (__oasis)
 use cpl_driver
+#endif
+
+#if defined(__recom)
+  use REcoM_GloVar
+  use recom_config
+  use recom_diag
+! for diagnosing si mass balance:
+  use g_support                                                                                               
 #endif
 
 IMPLICIT NONE
@@ -42,6 +51,13 @@ real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
+#if defined(__recom)
+real(kind=WP),  save,  target                 :: intDSi
+real(kind=WP),  save,  target                 :: intDiaSi
+real(kind=WP),  save,  target                 :: intDetSi
+real(kind=WP),  save,  target                 :: intBenSi
+real(kind=WP),  save,  target                 :: sumSi1, sumSi2
+#endif
 
 type(t_mesh),             target, save :: mesh
 
@@ -88,6 +104,10 @@ type(t_mesh),             target, save :: mesh
        write(*,*) 'FESOM ocean_setup... complete'
        t3=MPI_Wtime()
     endif
+#if defined (__recom)
+       call recom_init(mesh)
+       if (mype==0) write(*,*) 'RECOM recom_init... complete'
+#endif    
     call forcing_setup(mesh)
     if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
@@ -96,6 +116,10 @@ type(t_mesh),             target, save :: mesh
         ice_update=.true.
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
     endif
+#if defined(__recom)
+        call compute_recom_diagnostics(0, mesh) ! allocate arrays for recom diagnostic
+#endif
+
     if (mype==0) t5=MPI_Wtime()
     call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
@@ -232,6 +256,33 @@ type(t_mesh),             target, save :: mesh
             call oce_fluxes(mesh)
         end if
         call before_oce_step(mesh) ! prepare the things if required
+#if defined (__recom)
+        if (use_REcoM) then
+           call recom(mesh)
+
+
+
+       ! for silicate mass balance:
+!        if (mype==0) print *, '2) si tracer global integral in fvom_main before oce_timestep_ale:'
+!        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+!        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+!        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+!        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        !if (mype==0) print *, 'intDSi: ', intDSi
+        !if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        !if (mype==0) print *, 'intDetSi: ', intDetSi
+        !if (mype==0) print *, 'intBenSi: ', intBenSi
+!        sumSi1 = intDSi + intDiaSi + intDetSi + intBenSi
+!        if (mype==0 .and. (sumSi1-sumSi8)<0) print *, 'sumSi8, sumSi1, fvom before oce_step: ', sumSi8, sumSi1
+!        if (mype==0) print *, 'sumSi1: ', sumSi1
+!        if (mype==0) print *, ''
+!        if (mype==0) print *, ''
+
+           if (mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call RECOM         '//achar(27)//'[0m'
+           call compute_recom_diagnostics(1, mesh)
+        end if
+#endif
+
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________

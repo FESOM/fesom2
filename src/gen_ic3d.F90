@@ -18,7 +18,8 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
-   
+   USE recom_config
+
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -476,6 +477,8 @@ CONTAINS
       integer                       :: n, i
       type(t_mesh), intent(in)     , target :: mesh
       real(kind=WP)                 :: locTmax, locTmin, locSmax, locSmin, glo
+      real(kind=WP)                 :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax
+      real(kind=WP)                 :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
@@ -544,6 +547,23 @@ CONTAINS
       locTmin = 6666
       locSmax = locTmax
       locSmin = locTmin
+
+#if defined(__recom)
+    if(use_REcoM) then
+        locDINmax = -66666
+        locDINmin = 66666
+        locDICmax = locDINmax
+        locDICmin = locDINmin
+        locAlkmax = locDINmax
+        locAlkmin = locDINmin
+        locDSimax = locDINmax
+        locDSimin = locDINmin
+        locDFemax = locDINmax
+        locDFemin = locDINmin
+    end if
+#endif
+
+
       do n=1,myDim_nod2d
 !!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)>0.99_WP*dummy)) then
 !!PS             write(*,*) '____________________________________________________________'
@@ -570,6 +590,21 @@ CONTAINS
         locTmin = min(locTmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
         locSmax = max(locSmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
         locSmin = min(locSmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
+
+#if defined(__recom)
+    if(use_REcoM) then
+        locDINmax = max(locDINmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,3)) )
+        locDINmin = min(locDINmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,3)) )
+        locDICmax = max(locDICmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,4)) )
+        locDICmin = min(locDICmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,4)) )
+        locAlkmax = max(locAlkmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,5)) )
+        locAlkmin = min(locAlkmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,5)) )
+        locDSimax = max(locDSimax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,20)) )
+        locDSimin = min(locDSimin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,20)) )
+        locDFemax = max(locDFemax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,21)) )
+        locDFemin = min(locDFemin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,21)) )
+    end if
+#endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
@@ -579,7 +614,31 @@ CONTAINS
       if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
-      
+#if defined(__recom)
+    if(use_REcoM) then
+      if (mype==0) write(*,*) "Sanity check for REcoM variables"
+      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
+      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
+      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
+      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
+      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
+      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
+      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
+      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
+      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+      if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+    end if 
+#endif
   
    END SUBROUTINE do_ic3d
    

@@ -33,7 +33,7 @@ MODULE io_BLOWUP
 		integer :: rec, Tid, Iid
 		integer :: ncid
 		integer :: rec_count=0
-		integer :: error_status(200), error_count
+		integer :: error_status(2000), error_count
 		logical :: is_in_use=.false.
 	end type nc_file
 	!___________________________________________________________________________
