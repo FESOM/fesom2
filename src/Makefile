@@ -29,6 +29,8 @@ OBJ_INI =  fvom_init.o \
 # objects
 
 MODULES = oce_modules.o \
+          info_module.o \
+          command_line_options.o \
           MOD_MESH.o \
           ice_modules.o \
           gen_modules_config.o \
@@ -78,7 +80,7 @@ MODULES = oce_modules.o \
           gen_ic3d.o \
           gen_surface_forcing.o \
           gen_modules_gpot.o \
-          toy_channel_soufflet.o
+          toy_channel_soufflet.o 
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\
