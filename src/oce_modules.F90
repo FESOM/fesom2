@@ -97,12 +97,10 @@ TYPE tracer_source3d_type
 END TYPE tracer_source3d_type
 
 integer	                       :: num_tracers=2
-!!!wiso-code!!! add ice tracers
-integer                        :: num_tracers_ice=3
-integer                        :: ih2o18_ice=1
-integer                        :: ihDo16_ice=2
-integer                        :: ih2o16_ice=3
-!!!wiso-code!!! add ice tracers
+!!!wiso-code!!! add water isotope parameters
+real, dimension(3)             :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/) 
+integer                        :: num_wiso_tracers = 3      ! number of wiso tracers
+!!!wiso-code!!!
 
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
@@ -248,7 +246,8 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
-real(kind=WP), allocatable    :: o16_flux(:), o18_flux(:), hdo_flux(:) !!!wiso-code!!! add isotope fluxes
+real(kind=WP), allocatable    :: wiso_flux_oce(:,:) !!!wiso-code!!! add isotope fluxes over open water
+real(kind=WP), allocatable    :: wiso_flux_ice(:,:) !!!wiso-code!!! add isotope fluxes over sea ice
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)

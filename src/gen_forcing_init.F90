@@ -60,7 +60,7 @@ subroutine forcing_array_setup(mesh)
   Tair=0.0_WP
   shum=0.0_WP
   allocate(runoff(n2), evaporation(n2),ice_sublimation(n2))
-  !wiso-code!!!
+  !!!wiso-code!!!
   allocate(www1(n2), www2(n2),www3(n2), iii1(n2), iii2(n2), iii3(n2))
   www1=0.0_WP
   www2=0.0_WP
@@ -68,7 +68,7 @@ subroutine forcing_array_setup(mesh)
   iii1=0.0_WP
   iii2=0.0_WP
   iii3=0.0_WP
-  !wiso-code!!!
+  !!!wiso-code!!!
 
   runoff=0.0_WP
   evaporation = 0.0_WP
@@ -93,12 +93,12 @@ subroutine forcing_array_setup(mesh)
   flux_correction_total=0.0_WP  
   evap_no_ifrac=0.0_WP
   sublimation=0.0_WP
-  !wiso-code!!!
+  !!!wiso-code!!!
   allocate(tmp_iii1(n2), tmp_iii2(n2), tmp_iii3(n2))
   tmp_iii1=0.0_WP
   tmp_iii2=0.0_WP
   tmp_iii3=0.0_WP
-  !wiso-code!!!
+  !!!wiso-code!!!
 
 #endif 
 

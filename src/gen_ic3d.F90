@@ -513,10 +513,6 @@ CONTAINS
       where (tr_arr(:,:,1) > 100._WP)
          tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
       end where
-    !!!wiso-code!!! ice tracers
-    tr_arr_ice=0.
-    !!!wiso-code!!! ice tracers
-
       
       !_________________________________________________________________________
       ! eliminate values within cavity that result from the extrapolation of 

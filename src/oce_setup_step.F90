@@ -190,6 +190,10 @@ use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
+!!!wiso-code!!!
+integer     :: nt
+!!!wiso-code!!!
+
 type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
@@ -229,7 +233,7 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
-allocate(tr_arr_ice(node_size,num_tracers_ice)) !!!wiso-code!!! add ice tracers
+allocate(tr_arr_ice(node_size,num_wiso_tracers)) !!!wiso-code!!! add ice tracers
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
@@ -255,7 +259,9 @@ allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 !!!wiso-code!!! allocate isotope fluxes
-allocate(o16_flux(node_size), o18_flux(node_size), hdo_flux(node_size))
+allocate(wiso_flux_oce(node_size,num_wiso_tracers))
+allocate(wiso_flux_ice(node_size,num_wiso_tracers))
+!!!wiso-code!!!
 allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
@@ -393,9 +399,9 @@ end if
     virtual_salt=0.0_WP
 
 !!!wiso-code!!!
-    o16_flux=0.0_WP
-    o18_flux=0.0_WP
-    hdo_flux=0.0_WP
+    ! initialize atmospheric fluxes over open ocean and sea ice
+    wiso_flux_oce=0.0_WP
+    wiso_flux_ice=0.0_WP
 !!!wiso-code!!!
 
     Ssurf=0.0_WP
@@ -406,6 +412,15 @@ end if
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
+    
+!!!wiso-code!!!
+    ! initialize sea ice isotopes with 0. permill
+    ! absolute tracer values are increased by factor 1000. for numerical reasons
+    ! (see also routine oce_fluxes in ice_oce_coupling.F90)
+    do nt = 1, num_wiso_tracers
+       tr_arr_ice(:,nt)=wiso_smow(nt) * 1000.0_WP
+    end do
+!!!wiso-code!!!
 
     bvfreq=0.0_WP
     mixlay_dep=0.0_WP

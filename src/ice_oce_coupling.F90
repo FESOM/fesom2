@@ -158,7 +158,10 @@ subroutine oce_fluxes(mesh)
   use g_PARSUP
   use g_support
   use i_therm_param
-
+!!!wiso-code
+  use o_PARAM, only: num_wiso_tracers
+!!!wiso-code
+  
 #if defined (__icepack)
   use icedrv_main,   only: icepack_to_fesom,    &
                            init_flux_atm_ocn
@@ -171,9 +174,13 @@ subroutine oce_fluxes(mesh)
   real(kind=WP), allocatable :: flux(:)
 
   !!!wiso-code
+  integer                    :: nt
+  real, dimension(3)         :: zfrac_freezing
   real(kind=WP)              :: zwisomin, zwisosec
-  real(kind=WP), allocatable :: o16_atm(:), o18_atm(:), hdo_atm(:)
-  real(kind=WP), allocatable :: zdelta(:)
+  real(kind=WP), allocatable :: snmelt(:), icemelt(:)
+  real(kind=WP), allocatable :: wiso_prec_o16(:)
+  real(kind=WP), allocatable :: wiso_rain(:,:), wiso_snow(:,:), wiso_melt(:,:)
+  real(kind=WP), allocatable :: wiso_delta_rain(:,:),wiso_delta_snow(:,:),wiso_delta_ocean(:,:),wiso_delta_seaice(:,:)
   !!!wiso-code
 
 #include  "associate_mesh.h"
@@ -182,12 +189,18 @@ subroutine oce_fluxes(mesh)
     flux = 0.0_WP
 
   !!!wiso-code
-  allocate(o16_atm(myDim_nod2D+eDim_nod2D))
-  allocate(o18_atm(myDim_nod2D+eDim_nod2D))
-  allocate(hdo_atm(myDim_nod2D+eDim_nod2D))
-  allocate(zdelta(myDim_nod2D+eDim_nod2D))
-  zwisomin= 1.e-6_wp
-  zwisosec= 1.e-8_wp
+  allocate(snmelt(myDim_nod2D+eDim_nod2D))
+  allocate(icemelt(myDim_nod2D+eDim_nod2D))
+  allocate(wiso_prec_o16(myDim_nod2D+eDim_nod2D))
+  allocate(wiso_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_melt(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_delta_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_delta_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_delta_ocean(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  allocate(wiso_delta_seaice(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+  zwisomin= 1.e-6_WP
+  zwisosec= 1.e-8_WP
   !!!wiso-code
 
     
@@ -295,6 +308,14 @@ subroutine oce_fluxes(mesh)
             +prec_rain                       &
             +prec_snow*(1.0_WP-a_ice_old)    &
             +runoff    
+    
+!!!wiso-code  
+    ! calculate snow melt (> 0.) and sea ice melt/growth (melt: > 0.; growth < 0.) as fraction of freshwater flux into the ocean
+    snmelt = 0.
+    icemelt = 0.
+    where (abs(flux) > zwisomin) snmelt = -(thdgrsn*rhosno*inv_rhowat)/abs(flux)
+    where (abs(flux) > zwisomin) icemelt = -(thdgr*rhoice*inv_rhowat)/abs(flux)
+!!!wiso-code
             
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
@@ -325,33 +346,100 @@ subroutine oce_fluxes(mesh)
     ! have there original sign
     water_flux=water_flux+net/ocean_area 
     
-  !!!wiso-code
+!!!wiso-code
 
-  ! atmospheric H216O flux =  total flux over open water + flux over sea ice
-  o16_atm = (www3+iii3)*1000.
-  ! H216O flux into ocean: enforce total flux to be zero
-  call integrate_nod(o16_atm, net, mesh)
-  o16_flux=o16_atm-net/ocean_area
+    ! *** Important ***: The following wiso tracer order is assumed: nt=1: H218O, nt=2: HDO, nt=3: H216O
+    
 
-  ! atmospheric H218O flux =  total flux over open water + flux over sea ice
-  ! apply correction factor for different SMOW values used in ECHAM6 vs. FESOM
-  o18_atm = (www1+iii1)*1000/((20./18.)*100.) 
-  ! H218O flux into ocean: assume same ratio 18O/16O as for atmospheric fluxes
-  ! SMOWO18 = 2005.2e-6
-  zdelta=2005.2e-6
-  where (abs(o16_atm).gt.zwisomin) zdelta = o18_atm/o16_atm
-  where (abs(1.-zdelta).lt.zwisosec) zdelta = 1.  ! cut off rounding errors
-  o18_flux = zdelta * o16_flux
+    ! (i) calculate isotope fluxes (received from coupled atmosphere model) into open water and onto sea ice
 
-  ! atmospheric HDO flux =  total flux over open water + flux over sea ice
-  ! apply correction factor for different SMOW values used in ECHAM6 vs. FESOM
-  hdo_atm = (www2+iii2)*1000/((19./18.)*2.*1000.) 
-  ! HDO flux into ocean: assume same ratio HDO/16O as for atmospheric fluxes
-  ! SMOWHDO = 155.76e-6
-  zdelta=155.76e-6
-  where (abs(o16_atm).gt.zwisomin) zdelta = hdo_atm/o16_atm
-  where (abs(1.-zdelta).lt.zwisosec) zdelta = 1.  ! cut off rounding errors
-  hdo_flux = zdelta * o16_flux
+    ! atmospheric total H216O flux over open water and sea ice
+    wiso_prec_o16 = (www3+iii3)*1000.
+    ! integrate total H2O fluxes over all nodes for following flux corrections
+    call integrate_nod(wiso_prec_o16, net, mesh)
+
+    nt=3
+    wiso_rain(:,nt)=www3*1000.                             ! atmospheric H216O flux over open water
+    wiso_flux_oce(:,nt)=wiso_rain(:,nt)-net/ocean_area     ! correction to enforce total H216O flux be zero
+        
+    do nt=1,2
+      if (nt .EQ. 1) wiso_rain(:,nt)=www1*1000./((20./18.)*100.)       ! atmospheric H218O flux over open water
+      if (nt .EQ. 2) wiso_rain(:,nt)=www2*1000./((19./18.)*2.*1000.)   ! atmospheric HDO flux over open water
+      wiso_delta_rain(:,nt)=wiso_smow(nt)
+      where (abs(wiso_rain(:,3)).gt.zwisomin) wiso_delta_rain(:,nt) = wiso_rain(:,nt)/wiso_rain(:,3)
+      where (abs(1.-wiso_delta_rain(:,nt)).lt.zwisosec) wiso_delta_rain(:,nt) = 1.  ! cut off rounding errors
+      wiso_flux_oce(:,nt) = wiso_delta_rain(:,nt) * wiso_flux_oce(:,3) ! flux into ocean: assume same delta as atmospheric flux 
+    end do
+    
+    nt=3
+    wiso_snow(:,nt)=iii3*1000.                             ! atmospheric H216O flux over sea ice
+    wiso_flux_ice(:,nt)=wiso_snow(:,nt)-net/ocean_area     ! correction to enforce total H216O flux be zero
+        
+    do nt=1,2
+      if (nt .EQ. 1) wiso_snow(:,nt)=iii1*1000./((20./18.)*100.)       ! atmospheric H218O flux over sea ice
+      if (nt .EQ. 2) wiso_snow(:,nt)=iii2*1000./((19./18.)*2.*1000.)   ! atmospheric HDO flux over sea ice
+      wiso_delta_snow(:,nt)=wiso_smow(nt)
+      where (abs(wiso_snow(:,3)).gt.zwisomin) wiso_delta_snow(:,nt) = wiso_snow(:,nt)/wiso_snow(:,3)
+      where (abs(1.-wiso_delta_snow(:,nt)).lt.zwisosec) wiso_delta_snow(:,nt) = 1.  ! cut off rounding errors
+      wiso_flux_ice(:,nt) = wiso_delta_snow(:,nt) * wiso_flux_ice(:,3) ! flux onto sea ice: assume same delta as atmospheric flux
+    end do
+   
+   
+    ! (ii) balance isotope fluxes for growing/melting of sea ice and melting of snow on sea ice
+    
+    ! set delta values of various H216O water masses to SMOW(O16) (=1.)
+    nt=3
+    wiso_delta_ocean(:,nt)=wiso_smow(nt)
+    wiso_delta_seaice(:,nt)=wiso_smow(nt)
+    wiso_delta_snow(:,nt)=wiso_smow(nt)
+
+    ! calculate delta values of ocean surface water and sea ice for H218O and HDO    
+    do n=1, myDim_nod2D+eDim_nod2D
+      do nt=1,2
+        ! calculate delta of open water (top ocean level)
+        wiso_delta_ocean(n,nt)=wiso_smow(nt)
+        if (tr_arr(1,n,nt+2).gt.zwisomin) wiso_delta_ocean(n,nt) = tr_arr(1,n,nt+2)/tr_arr(1,n,3+2)
+        if (abs(1.-wiso_delta_ocean(n,nt)).lt.zwisosec) wiso_delta_ocean(n,nt) = 1.  ! cut off rounding errors
+        !calculate delta of sea ice
+        wiso_delta_seaice(n,nt)=wiso_smow(nt)
+        if (tr_arr_ice(n,nt).gt.zwisomin) wiso_delta_seaice(n,nt) = tr_arr_ice(n,nt)/tr_arr_ice(n,3)
+        if (abs(1.-wiso_delta_seaice(n,nt)).lt.zwisosec) wiso_delta_seaice(n,nt) = 1.  ! cut off rounding errors
+      end do
+    end do
+
+    ! for melting of snow on seaice (snmelt > 0.): assume no fractionation during melting process
+    wiso_melt(:,:) = 0.0_WP
+    nt=3
+    wiso_melt(:,nt) = snmelt(:) * abs(wiso_flux_oce(:,nt))                      ! H216O melt amount = snow melt fraction x H216O freshwater flux over ocean
+    wiso_melt(:,nt) = max(min(wiso_melt(:,nt),wiso_flux_ice(:,nt)),0._WP)       ! limit snow melt amount to range (0...wiso_flux_ice) 
+    do nt=1,2
+       ! H218O and HDO meltwater has the same isotope ratio as snow on sea ice; no fractionation during melting
+       where (wiso_melt(:,3) > zwisomin) wiso_melt(:,nt) = wiso_delta_snow(:,nt) * wiso_melt(:,3)
+    end do
+    wiso_flux_oce(:,:)= wiso_flux_oce(:,:) + wiso_melt(:,:)
+    wiso_flux_ice(:,:)= wiso_flux_ice(:,:) - wiso_melt(:,:)
+    
+    ! for melting of seaice (icemelt > 0.): assume no fractionation during melting process
+    ! for growing of seaice (icemelt < 0.): assume fractionation during freezing process
+    ! (use equilibrium fractionation factors by Lehmann & Siegenthaler, JofGlaciology, 1991)
+    wiso_melt(:,:) = 0.0_WP
+    zfrac_freezing = (/1.00291_WP, 1.0212_WP, 1.0_WP/)
+    nt=3
+    wiso_melt(:,nt) = icemelt(:) * abs(wiso_flux_oce(:,nt))                     ! H216O melt (or growth) amount = sea ice melt fraction x H216O freshwater flux over ocean
+    do nt=1,2
+       ! H218O and HDO meltwater has the same isotope ratio as sea ice; no fractionation during melting
+       where (wiso_melt(:,3) > zwisomin) wiso_melt(:,nt) = wiso_delta_seaice(:,nt) * wiso_melt(:,3)
+       ! newly formed H218O and HDO sea ice has isotope ratio of ocean water; fractionation during growing considered
+       where (wiso_melt(:,3) < -zwisomin) wiso_melt(:,nt) = wiso_delta_ocean(:,nt)  * wiso_melt(:,3) * zfrac_freezing(nt)
+    end do
+    wiso_flux_oce(:,:)= wiso_flux_oce(:,:) + wiso_melt(:,:)
+    wiso_flux_ice(:,:)= wiso_flux_ice(:,:) - wiso_melt(:,:)
+    
+   ! here: update sea ice isotope tracer concentration, only
+   ! (ocean water isotope tracers are updated in routine *oce_ale_tracer*)
+    do n=1, myDim_nod2D+eDim_nod2D
+       tr_arr_ice(n,:) = tr_arr_ice(n,:) + dt*wiso_flux_ice(n,:)
+    end do
 
   !!!wiso-code
 

@@ -201,7 +201,7 @@ subroutine ini_wiso_io(year,mesh)
      longname=trim(longname)//', Adams–Bashforth'
      call def_variable(wid, trim(trname)//'_AB',(/nl-1, nod2D/),trim(longname),trim(units), tr_arr_old(:,:,j));
   end do
-  do j=1,num_tracers_ice
+  do j=1,num_wiso_tracers
      SELECT CASE (j)
        CASE(1)
          trname='h2o18_ice'
