@@ -536,7 +536,7 @@ end function pttmpr
 real(kind=WP) function adlprt(salz,temp,pres)
   
   use o_PARAM , only: WP
-  real(kind=WP) :: salz,temp,pres
+  real(kind=WP) :: salz,temp,pres, ds
   real(kind=WP), parameter :: s0 = 35.0
   real(kind=WP), parameter :: a0 =  3.5803E-5
   real(kind=WP), parameter :: a1 =  8.5258E-6
