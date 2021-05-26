@@ -42,7 +42,7 @@ subroutine read_namelist
   ! compute dt
   ! ========== 
   dt=86400._WP/real(step_per_day,WP)
-  
+  !$acc update device(dt) 
   ! ==========
   ! degree2radian
   ! ==========

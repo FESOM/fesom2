@@ -191,6 +191,8 @@ subroutine init_ale(mesh)
         
     end do
 
+    !$acc enter data copyin(z_3d_n,zbar_3d_n)
+
 end subroutine init_ale
 !
 !
@@ -2694,11 +2696,11 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call impl_vert_visc_ale'//achar(27)//'[0m'
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
     
-    !$acc update device(hnode_new) &
-#ifdef WITH_ACC_ASYNC
-    !$acc &async(stream_hnode_update)&
-#endif
-    !$acc
+    !!$acc update device(hnode_new) &
+!#ifdef WITH_ACC_ASYNC
+    !!$acc &async(stream_hnode_update)&
+!#endif
+    !!$acc
     
     t2=MPI_Wtime()
     
@@ -2792,7 +2794,7 @@ subroutine oce_timestep_ale(n, mesh)
     call update_thickness_ale(mesh)
     t9=MPI_Wtime()
 
-    !$acc update device(hnode,helem) &
+    !$acc update device(hnode,helem,z_3d_n,zbar_3d_n) &
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_hnode_update)&
 #endif
