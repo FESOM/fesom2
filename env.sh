@@ -48,7 +48,7 @@ elif [[  $LOGINHOST =~ ^jwlogin0[0-9].juwels$ ]]; then
    STRATEGY="juwels"
 elif [[  $LOGINHOST =~ ^juwels2[0-9].ib.juwels.fzj.de$ ]]; then
    STRATEGY="juwels-booster"
-elif [[  $LOGINHOST =~ ^jwlogin2[0-9].juwels$ ]]; then
+elif [[  $LOGINHOST =~ ^jwlogin2[0-9].juwels$ ]] || [[ $LOGINHOST =~ ^jwb[0-9]{4}.juwels$ ]]; then
    STRATEGY="juwels-booster"
 elif [[ $LOGINHOST =~ ^cc[a-b]+-login[0-9]+\.ecmwf\.int$ ]]; then
    STRATEGY="ecaccess.ecmwf.int"
