@@ -922,8 +922,7 @@ submodule (icedrv_main) icedrv_step
              sst       , & ! sea surface temperature (C)
              sss       , & ! sea surface salinity
              frain     , & ! rainfall rate (kg/m^2/s)
-             fsnow     , & ! snowfall rate (kg/m^2/s)
-             fsalt         ! salt flux from ice to the ocean (kg/m^2/s) 
+             fsnow         ! snowfall rate (kg/m^2/s)
 
           real (kind=dbl_kind), intent(inout) :: &
              flwout_ocn, & ! outgoing longwave radiation (W/m^2)
@@ -934,7 +933,8 @@ submodule (icedrv_main) icedrv_step
              fresh     , & ! fresh water flux to ocean (kg/m^2/s)
              frzmlt    , & ! freezing/melting potential (W/m^2)
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
-             fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
+             fresh_tot , & ! fresh total water flux to ocean (kg/m^2/s)
+             fsalt         ! salt flux from ice to the ocean (kg/m^2/s) 
              
 
           real (kind=dbl_kind), parameter :: &
@@ -948,14 +948,15 @@ submodule (icedrv_main) icedrv_step
              Lvap,     & 
              lfs_corr, &  ! fresh water correction for linear free surface      
              stefan_boltzmann, &
-             ice_ref_salinity
+             ice_ref_salinity, &
+             rhow
 
           character(len=*),parameter :: subname='(icepack_ocn_mixed_layer)'
 
           call icepack_query_parameters( Tffresh_out=Tffresh, Lfresh_out=Lfresh, &
                                          stefan_boltzmann_out=stefan_boltzmann,  &
                                          ice_ref_salinity_out=ice_ref_salinity,  &
-                                         Lvap_out=Lvap                           )
+                                         Lvap_out=Lvap, rhow_out=rhow            )
 
           ! shortwave radiative flux ! Visible is absorbed by clorophil
           ! afterwards
@@ -984,6 +985,8 @@ submodule (icedrv_main) icedrv_step
           if (use_virt_salt) then
              lfs_corr = fsalt/ice_ref_salinity/p001
              fresh = fresh - lfs_corr * ice_ref_salinity / sss
+          else
+             fsalt = fsalt / p001 / rhow        
           endif
 
           fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
@@ -1175,11 +1178,11 @@ submodule (icedrv_main) icedrv_step
           call fesom_to_icepack(mesh)
 
           !-----------------------------------------------------------------
-          ! tendencies needed by fesom
+          ! initialize tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = vice(:)
-          dhs_dt(:) = vsno(:)
+          dhi_t_dt(:) = vice(:)
+          dhs_t_dt(:) = vsno(:)
 
           !-----------------------------------------------------------------
           ! initialize diagnostics
@@ -1201,17 +1204,19 @@ submodule (icedrv_main) icedrv_step
           call step_therm1     (dt) ! vertical thermodynamics
           call step_therm2     (dt) ! ice thickness distribution thermo
     
+          !-----------------------------------------------------------------         
+          ! clean up, update tendency diagnostics
+          !-----------------------------------------------------------------
+
+          offset = dt
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
-         
-          ! clean up, update tendency diagnostics
-    
-          offset = dt
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+          dhi_t_dt(:) = ( vice(:) - dhi_t_dt(:) ) / dt
+          dhs_t_dt(:) = ( vsno(:) - dhs_t_dt(:) ) / dt
     
           !-----------------------------------------------------------------
           ! dynamics, transport, ridging
@@ -1240,11 +1245,11 @@ submodule (icedrv_main) icedrv_step
 
              select case (whichEVP)
                 case (0)
-                   call EVPdynamics(mesh)
+                   !call EVPdynamics(mesh)
                 case (1)
-                   call EVPdynamics_m(mesh)
+                   !call EVPdynamics_m(mesh)
                 case (2)
-                   call EVPdynamics_a(mesh)
+                   !call EVPdynamics_a(mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
                    call par_ex
@@ -1266,10 +1271,17 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             call tracer_advection_icepack(mesh)
+             !call tracer_advection_icepack(mesh)
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2
+
+             !-----------------------------------------------------------------
+             ! initialize tendencies needed by fesom
+             !-----------------------------------------------------------------
+
+             dhi_r_dt(:) = vice(:)
+             dhs_r_dt(:) = vsno(:)
 
              !-----------------------------------------------------------------
              ! ridging
@@ -1280,8 +1292,18 @@ submodule (icedrv_main) icedrv_step
              ! clean up, update tendency diagnostics
              offset = c0
              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
+
+             !-----------------------------------------------------------------
+             ! tendencies needed by fesom
+             !-----------------------------------------------------------------
+
+             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
     
           enddo
+
+          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
     
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation

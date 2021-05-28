@@ -200,15 +200,16 @@ subroutine oce_fluxes(mesh)
                            fhocn_tot_out=net_heat_flux,    &
                            fresh_tot_out=fresh_wa_flux,    &
                            fsalt_out=real_salt_flux,       &
-                           dhi_dt_out=thdgrsn,             &
-                           dhs_dt_out=thdgr,               &
-                           evap_ocn_out=evaporation        )
+                           dhs_dt_out=thdgrsn,             &
+                           dhi_dt_out=thdgr,               &
+                           evap_ocn_out=evaporation,       &
+                           evap_out=ice_sublimation        )
 
     heat_flux(:)   = - net_heat_flux(:)
-    water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+    water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
 
     ! Evaporation
-    evaporation(:) = - evaporation(:) / 1000.0_WP
+    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
     ice_sublimation(:) = 0.0_WP
 
     call init_flux_atm_ocn()
