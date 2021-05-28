@@ -2421,49 +2421,49 @@ end subroutine trim_cyclic
 
 
 
-subroutine build_nghbr_arrays
-  ! Assembles additional arrays which list for each node the elements 
-  ! containing the node and node neighbours
-  !
-  ! Coded by Sergey Danilov
-  ! Reviewed by Qiang Wang
-  !-------------------------------------------------------------
-
-  use o_MESH
-  use g_parsup
-  implicit none
-
-  integer                            :: j,k,m,a,tr(3),tet(4), counter, el,ml(1)
-  integer, allocatable, dimension(:) :: ind
-  integer, dimension(100)            :: AUX=0
-
-  !--------------- 2D mesh:
-  ! Builds nghbr_nod2D
-  allocate(nghbr_nod2D(myDim_nod2D))
-  ind=0
-  do j=1, myDim_nod2D
-     counter=0
-     do m=1,nod_in_elem2D_num(j)
-        el=nod_in_elem2D(m,j)
-        do k=1, 3
-           a=elem2D_nodes(k,el)       
-           if (ind(a)==0) then  
-              ind(a)=1 
-              counter=counter+1         
-              aux(counter)=a
-           end if
-        end do
-     end do
-     nghbr_nod2D(j)%nmb=counter
-     allocate(nghbr_nod2D(j)%addresses(counter))
-
-     ! we need to sort array aux(1:counter)
-     do m=counter,1,-1
-        ml=maxloc(aux(1:counter))
-        a=ml(1)
-        nghbr_nod2D(j)%addresses(m)=aux(a)
-        ind(aux(a))=0
-        aux(a)=-999
-     end do
-  end do
-end subroutine build_nghbr_arrays
+!subroutine build_nghbr_arrays
+!  ! Assembles additional arrays which list for each node the elements 
+!  ! containing the node and node neighbours
+!  !
+!  ! Coded by Sergey Danilov
+!  ! Reviewed by Qiang Wang
+!  !-------------------------------------------------------------
+!
+!  use o_MESH
+!  use g_parsup
+!  implicit none
+!
+!  integer                            :: j,k,m,a,tr(3),tet(4), counter, el,ml(1)
+!  integer, allocatable, dimension(:) :: ind
+!  integer, dimension(100)            :: AUX=0
+!
+!  !--------------- 2D mesh:
+!  ! Builds nghbr_nod2D
+!  allocate(nghbr_nod2D(myDim_nod2D))
+!  ind=0
+!  do j=1, myDim_nod2D
+!     counter=0
+!     do m=1,nod_in_elem2D_num(j)
+!        el=nod_in_elem2D(m,j)
+!        do k=1, 3
+!           a=elem2D_nodes(k,el)       
+!           if (ind(a)==0) then  
+!              ind(a)=1 
+!              counter=counter+1         
+!              aux(counter)=a
+!           end if
+!        end do
+!     end do
+!     nghbr_nod2D(j)%nmb=counter
+!     allocate(nghbr_nod2D(j)%addresses(counter))
+!
+!     ! we need to sort array aux(1:counter)
+!     do m=counter,1,-1
+!        ml=maxloc(aux(1:counter))
+!        a=ml(1)
+!        nghbr_nod2D(j)%addresses(m)=aux(a)
+!        ind(aux(a))=0
+!        aux(a)=-999
+!     end do
+!  end do
+!end subroutine build_nghbr_arrays

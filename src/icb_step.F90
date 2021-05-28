@@ -1,4 +1,4 @@
-subroutine iceberg_calculation(istep) 
+subroutine iceberg_calculation(mesh, istep) 
  !======================================================================!
  !									!
  !                     ICEBERG MODULE FOR FESOM				!
@@ -13,7 +13,10 @@ subroutine iceberg_calculation(istep)
  use g_config		!for istep, step_per_day, logfile_outfreq	!=
  use g_parsup		!for mype					!=
  use iceberg_params	!for ..all others				!=
- 									!=
+
+use MOD_MESH
+use g_parsup
+!=
  implicit none								!=
 									!=
  integer	:: ib, times, istep
@@ -35,7 +38,10 @@ subroutine iceberg_calculation(istep)
  real,dimension(15*ib_num):: arr_block_red				!=
  integer,dimension(ib_num):: elem_block_red				!=
  real, dimension(4*ib_num):: vl_block_red				!=
- !==================== MODULES & DECLARATIONS ==========================!= 
+
+type(t_mesh), intent(in) , target :: mesh
+!==================== MODULES & DECLARATIONS ==========================!= 
+#include "associate_mesh.h"
 
 ! kh 16.03.21 (asynchronous) iceberg computation starts with the content in common arrays at istep and will merge its results at istep_end_synced
  istep_end_synced = istep + steps_per_ib_step - 1
@@ -87,7 +93,7 @@ subroutine iceberg_calculation(istep)
     lastsubstep = .true. !do output every timestep
 
     if( melted(ib) == .false. ) then
-        call iceberg_step1(	ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
+        call iceberg_step1(mesh, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
@@ -202,7 +208,7 @@ subroutine iceberg_calculation(istep)
     lastsubstep = .true. !do output every timestep
    
     if( melted(ib) == .false. ) then
-        call iceberg_step2(arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
+        call iceberg_step2(mesh, arr_from_block, elem_from_block, ib, height_ib(ib),length_ib(ib),width_ib(ib), lon_deg(ib),lat_deg(ib),&
                             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
                             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
@@ -259,7 +265,7 @@ end subroutine iceberg_calculation
 !****************************************************************************************************************************
 
 
-subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
+subroutine iceberg_step1(mesh, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 			Co,Ca,Ci, Cdo_skin,Cda_skin, rho_icb, 		   &
 			conc_sill,P_sill, rho_h2o,rho_air,rho_ice,	   & 
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
@@ -274,7 +280,7 @@ subroutine iceberg_step1(ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 ! kh 17.03.21 specification of structure used
  use o_arrays, only: coriolis
 
- use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
+ !use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
@@ -336,7 +342,10 @@ integer :: istep_end_synced
  real, dimension(3)		:: Zdepth3						!=
  real				:: Zdepth						!=
  											!=
- !========================= MODULES & DECLARATIONS =====================================!=
+
+type(t_mesh), intent(in) , target :: mesh
+!========================= MODULES & DECLARATIONS =====================================!=
+#include "associate_mesh.h"
  
  
  !t0=MPI_Wtime()
@@ -366,7 +375,7 @@ integer :: istep_end_synced
   if(mype==0) write(*,*) 'Preparing local_idx_of array...'
   allocate(local_idx_of(elem2D))
   !creates mapping
-  call global2local(local_idx_of)
+  call global2local(mesh, local_idx_of)
   firstcall=.false.
   if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
  end if 
@@ -380,13 +389,13 @@ integer :: istep_end_synced
   lon_deg=lon_rad/rad !rotated lon in degree   
   
   !find LOCAL element where the iceberg starts:
-  call point_in_triangle(iceberg_elem, (/lon_deg, lat_deg/))
+  call point_in_triangle(mesh, iceberg_elem, (/lon_deg, lat_deg/))
   i_have_element= (iceberg_elem .ne. 0) !up to 3 PEs possible
   
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,iceberg_elem) <= myDim_nod2D !1 PE still .true.
 #ifdef use_cavity
-   if(reject_elem(iceberg_elem)) then
+   if(reject_elem(mesh, iceberg_elem)) then
     iceberg_elem=0 !reject element
     i_have_element=.false.
    else 
@@ -414,7 +423,7 @@ integer :: istep_end_synced
   end if
   
   ! initialize the iceberg velocity
-  call initialize_velo(i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
+  call initialize_velo(mesh, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
 
   !iceberg elem of ib is found
   find_iceberg_elem = .false.
@@ -468,7 +477,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !===========================DYNAMICS===============================
   
 
-  call iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon_rad,lat_rad, depth_ib, &
+  call iceberg_dyn(mesh, ib, new_u_ib, new_v_ib, u_ib, v_ib, lon_rad,lat_rad, depth_ib, &
                    height_ib, length_ib, width_ib, local_idx_of(iceberg_elem), &
   		   mass_ib, Ci, Ca, Co, Cda_skin, Cdo_skin, &
   		   rho_ice, rho_air, rho_h2o, P_sill,conc_sill, frozen_in, &
@@ -491,9 +500,9 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   
   !=======================END OF DYNAMICS============================
   
-  call depth_bathy(Zdepth3, local_idx_of(iceberg_elem))
+  call depth_bathy(mesh, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
-  call FEM_3eval(Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
+  call FEM_3eval(mesh, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
@@ -525,7 +534,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   iceberg_elem=local_idx_of(iceberg_elem)  	!local
   
  t2=MPI_Wtime()
-  call find_new_iceberg_elem(iceberg_elem, (/lon_deg, lat_deg/), left_mype)
+  call find_new_iceberg_elem(mesh, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
  t3=MPI_Wtime()
   iceberg_elem=myList_elem2D(iceberg_elem)  	!global
   
@@ -533,7 +542,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
    lon_rad = old_lon
    lat_rad = old_lat
  t4=MPI_Wtime()
-   call parallel2coast(new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
+   call parallel2coast(mesh, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
  t5=MPI_Wtime()
    call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -543,7 +552,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   
    iceberg_elem=local_idx_of(iceberg_elem)  	!local
  t7=MPI_Wtime()
-   call find_new_iceberg_elem(iceberg_elem, (/lon_deg, lat_deg/), left_mype)
+   call find_new_iceberg_elem(mesh, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
  t8=MPI_Wtime()
    iceberg_elem=myList_elem2D(iceberg_elem)  	!global
   end if		   
@@ -575,7 +584,7 @@ end if !... and first node belongs to processor?
  end subroutine iceberg_step1
  
  
-subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
+subroutine iceberg_step2(mesh, arr, elem_from_block, ib, height_ib,length_ib,width_ib, lon_deg,lat_deg, &
 			Co,Ca,Ci, Cdo_skin,Cda_skin, rho_icb, 		   &
 			conc_sill,P_sill, rho_h2o,rho_air,rho_ice,	   & 
 			u_ib,v_ib, iceberg_elem, find_iceberg_elem, 	   &
@@ -590,7 +599,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
 ! kh 17.03.21 not really used here
 ! use o_arrays		!for coriolis_param_elem2D						!=
  
- use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
+ !use o_mesh		!for nod2D, (cavities: for cavity_flag_nod2d)				!=
  USE MOD_MESH
  use g_parsup		!for myDim_elem2D, myList_nod2D						!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
@@ -654,8 +663,10 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  !for grounding										!=
  real, dimension(3)		:: Zdepth3						!=
  real				:: Zdepth						!=
- 											!=
+
+type(t_mesh), intent(in) , target :: mesh
  !========================= MODULES & DECLARATIONS =====================================!=
+#include "associate_mesh.h"
  
  !all PEs enter here with identical array arr
   
@@ -702,7 +713,7 @@ subroutine iceberg_step2(arr, elem_from_block, ib, height_ib,length_ib,width_ib,
  t2=MPI_Wtime()
  
  if(left_mype > 0.) then
- call iceberg_elem4all(iceberg_elem, lon_deg, lat_deg) !Just PE changed?
+ call iceberg_elem4all(mesh, iceberg_elem, lon_deg, lat_deg) !Just PE changed?
  
   if(iceberg_elem == 0) then !IB left model domain
    !if (mod(istep,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) write(*,*) 'iceberg ',ib, ' left model domain'
@@ -805,11 +816,14 @@ end subroutine iceberg_step2
 !****************************************************************************************************************************
 !****************************************************************************************************************************
 
-subroutine initialize_velo(i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, localelem)			
+subroutine initialize_velo(mesh,i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, localelem)			
  
  use g_rotate_grid,  only: vector_g2r
  use iceberg_params, only: l_initial, l_iniuser, ini_u, ini_v
- implicit none
+
+use MOD_MESH
+use g_parsup
+implicit none
  
  logical, intent(in)	:: i_have_element
  integer, intent(in)	:: ib
@@ -819,7 +833,12 @@ subroutine initialize_velo(i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, dep
  
  real, dimension(3)	:: startu, startv
  real 			:: ini_u_rot, ini_v_rot	
- 
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
+
+
  !initialize ZERO for all PEs
  u_ib=0.
  v_ib=0. 
@@ -835,8 +854,8 @@ subroutine initialize_velo(i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, dep
 		v_ib = ini_v_rot	
 	else
    		!OCEAN VELOCITY uo_ib, voib is start velocity
-   		call iceberg_avvelo(startu,startv,depth_ib,localelem)
-   		call FEM_3eval(u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
+   		call iceberg_avvelo(mesh,startu,startv,depth_ib,localelem)
+   		call FEM_3eval(mesh, u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
 	end if
  end if
  
@@ -885,8 +904,8 @@ end subroutine trajectory
 !****************************************************************************************************************************
 !****************************************************************************************************************************
 
-subroutine depth_bathy(Zdepth3, elem)  
-  use o_mesh
+subroutine depth_bathy(mesh, Zdepth3, elem)  
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -907,6 +926,8 @@ subroutine depth_bathy(Zdepth3, elem)
   integer, intent(IN)			:: elem	  !local element
   integer				:: m, n2, k, n_low
   
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   Zdepth3=0.0
   
@@ -933,8 +954,8 @@ end subroutine depth_bathy
 !****************************************************************************************************************************
 !****************************************************************************************************************************
 
-subroutine parallel2coast(u, v, lon,lat, elem)
- use o_mesh		!for index_nod2D, (cavities: for cavity_flag_nod2d)
+subroutine parallel2coast(mesh, u, v, lon,lat, elem)
+ !use o_mesh		!for index_nod2D, (cavities: for cavity_flag_nod2d)
  USE MOD_MESH
  use g_parsup		!for myDim_nod2D
 #ifdef use_cavity
@@ -951,10 +972,13 @@ subroutine parallel2coast(u, v, lon,lat, elem)
  real, dimension(2) :: velocity, velocity1, velocity2
  real :: d1, d2
  
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
 #ifdef use_cavity
-  SELECT CASE ( coastal_nodes(elem) ) !num of "coastal" points
+  SELECT CASE ( coastal_nodes(mesh, elem) ) !num of "coastal" points
 #else
-  SELECT CASE ( sum( index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
+  SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
   !SELECT CASE ( sum( bc_index_nod2D(elem2D_nodes(:,elem)) ) ) !num of coastal points
 #endif
    CASE (0) !...coastal points: do nothing
@@ -968,9 +992,9 @@ subroutine parallel2coast(u, v, lon,lat, elem)
       node = elem2D_nodes(m,elem)
       !write(*,*) 'index ', m, ':', index_nod2D(node)
 #ifdef use_cavity
-      if( index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
+      if( bc_index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
 #else
-      if( index_nod2D(node)==1 ) then
+      if( bc_index_nod2D(node)==1 ) then
 #endif
        n(i) = node
        exit
@@ -1003,9 +1027,9 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     !write(*,*) 'distances :' , d1, d2
     !write(*,*) 'velocity vor :' , velocity
     if (d1 < d2) then
-      call projection(velocity, n(2), n(1))
+      call projection(mesh, velocity, n(2), n(1))
     else
-      call projection(velocity, n(3), n(1))
+      call projection(mesh, velocity, n(3), n(1))
     end if
     !write(*,*) 'velocity nach:', velocity
     !call projection(velocity, n(3), n(2))
@@ -1023,15 +1047,15 @@ subroutine parallel2coast(u, v, lon,lat, elem)
     do m = 1, 3
       node = elem2D_nodes(m,elem) 
 #ifdef use_cavity
-      if( (index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
+      if( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
 #else
-      if( index_nod2D(node)==1 ) then
+      if( bc_index_nod2D(node)==1 ) then
 #endif
        n(i) = node
        i = i+1
       end if
     end do   
-    call projection(velocity, n(1), n(2))
+    call projection(mesh, velocity, n(1), n(2))
     
    
    CASE DEFAULT 
@@ -1049,17 +1073,21 @@ end subroutine parallel2coast
 !****************************************************************************************************************************
 
 
-subroutine projection(velocity, n1, n2)
- use o_mesh		!for coord_nod2D
+subroutine projection(mesh, velocity, n1, n2)
+ !use o_mesh		!for coord_nod2D
  USE MOD_MESH
- implicit none
+ use g_parsup
+implicit none
  
  real, dimension(2), intent(inout) :: velocity
  integer, intent(in) :: n1, n2  
  
  real, dimension(2) :: direction
  real :: length, sp  
- 
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
  ! direction: node1 - node2 (pointing from 2 to 1)
  direction(1) = coord_nod2D(1, n1) - coord_nod2D(1, n2)
  direction(2) = coord_nod2D(2, n1) - coord_nod2D(2, n2)
@@ -1795,7 +1823,6 @@ subroutine write_buoy_props_netcdf
 ! use o_arrays
 
   use o_mesh
-  USE MOD_MESH
   !use o_passive_tracer_mod
   !use o_age_tracer_mod
   use i_arrays

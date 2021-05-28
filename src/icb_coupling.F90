@@ -5,12 +5,11 @@ subroutine reset_ib_fluxes()
 !   use o_arrays
 
     use o_mesh
-    USE MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
     use iceberg_params
-    
+
     !alles wieder auf null setzen
     ibfwbv = 0
     ibfwb = 0
@@ -29,8 +28,7 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
 ! kh 18.03.21 not really used here
 !   use o_arrays
 
-    use o_mesh
-    USE MOD_MESH
+    !use o_mesh
     use g_config
     use g_parsup
     use i_arrays
@@ -63,8 +61,7 @@ subroutine icb2fesom
 ! kh 18.03.21 specification of structure used
     use o_arrays, only: water_flux
 
-    use o_mesh
-    USE MOD_MESH
+    !use o_mesh
     use g_config
     use g_parsup
     use i_arrays

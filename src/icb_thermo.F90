@@ -23,7 +23,6 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
 				T_ave_ib, S_ave_ib, ib)
   
   use o_mesh
-  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
@@ -104,7 +103,6 @@ subroutine iceberg_newdimensions(ib, depth_ib,height_ib,length_ib,width_ib,M_b,M
 				 rho_h2o, rho_icb, file_meltrates)
   
   use o_mesh
-  USE MOD_MESH
   use o_param !for step_per_day
   use i_therm_param
   use i_param

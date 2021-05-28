@@ -96,7 +96,6 @@ logical             :: bIcbCalcCycleCompleted
 
 
 ! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
-    call read_namelist_icebergs
 IMPLICIT NONE
 
 integer :: n, nsteps, offset, row, i, provided
@@ -109,6 +108,7 @@ real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
 
+    call read_namelist_icebergs
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
@@ -429,7 +429,7 @@ type(t_mesh),             target, save :: mesh
             if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
                 if (mype==0) write(*,*) '*** step n=',n
                 t1_icb = MPI_Wtime()
-                call iceberg_calculation(n)
+                call iceberg_calculation(mesh,n)
                 t2_icb = MPI_Wtime()
             end if
             !___model sea-ice step__________________________________________________
@@ -683,7 +683,7 @@ type(t_mesh),             target, save :: mesh
                 t1_icb = MPI_Wtime()
 
 ! kh 09.03.21
-                call iceberg_calculation(n_ib)
+                call iceberg_calculation(mesh,n_ib)
 !               call icb2fesom
 !               t2_icb = MPI_Wtime()
             end if

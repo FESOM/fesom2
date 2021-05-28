@@ -4,7 +4,7 @@
 !
 !   Thomas Rackow, 29.06.2010
 !==============================================================================
-subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
+subroutine iceberg_dyn(mesh, ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
                        height_ib, length_ib, width_ib, iceberg_elem, &
 		       mass_ib, Ci, Ca, Co, Cda_skin, Cdo_skin, &
 		       rho_ice, rho_air, rho_h2o, P_sill, conc_sill, frozen_in, &
@@ -23,13 +23,14 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  use o_arrays, only: coriolis, Tsurf_ib, Ssurf_ib
 
  use o_param		!for dt
- use o_mesh
+ !use o_mesh
  use iceberg_params,only: l_melt, coriolis_scale !are icebergs allowed to melt?
 
  USE MOD_MESH
+ use g_parsup
 
  implicit none
- 
+
  integer, intent(IN) 	:: ib !current iceberg's index
  real,    intent(OUT)	:: new_u_ib, new_v_ib
  real,    intent(IN)    :: u_ib, v_ib
@@ -65,32 +66,34 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  character,  intent(IN)	:: file3*80
  real, intent(IN)	:: rho_icb
  
-
  integer, dimension(3)  :: tmp_arr
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
  
  !OCEAN VELOCITIES: 
  ! - (uo_ib, vo_ib)		: integrated mean velocity at location of iceberg
  ! - (uo_skin_ib, vo_skin_ib)	: velocity below the draft of the iceberg
  ! call iceberg_avvelo_ufkeel(uo_dz,vo_dz, uo_keel,vo_keel, depth_ib,iceberg_elem)
- call iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
- call FEM_3eval(uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
- call FEM_3eval(uo_skin_ib,vo_skin_ib,lon,lat,uo_keel,vo_keel,iceberg_elem)
+ call iceberg_average_andkeel(mesh, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
+ call FEM_3eval(mesh, uo_ib,vo_ib,lon,lat,uo_dz,vo_dz,iceberg_elem)
+ call FEM_3eval(mesh, uo_skin_ib,vo_skin_ib,lon,lat,uo_keel,vo_keel,iceberg_elem)
  
 
  !TEMPERATURE AND SALINITY:
  ! - T_ave_ib, S_ave_ib		: Mean T & S (integrated) at location of iceberg
  ! - T_keel_ib, S_keel_ib	: T & S below the draft of the iceberg (depth_ib)
- call FEM_3eval(T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
- call FEM_3eval(T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
+ call FEM_3eval(mesh, T_ave_ib,S_ave_ib,lon,lat,T_dz,S_dz,iceberg_elem)
+ call FEM_3eval(mesh, T_keel_ib,S_keel_ib,lon,lat,T_keel,S_keel,iceberg_elem)
 
 
  !ATMOSPHERIC VELOCITY ua_ib, va_ib
  ! kh 11.02.21
- call FEM_eval(ua_ib,va_ib,lon,lat,u_wind_ib,v_wind_ib,iceberg_elem)      
+ call FEM_eval(mesh, ua_ib,va_ib,lon,lat,u_wind_ib,v_wind_ib,iceberg_elem)      
 
  !ICE VELOCITY ui_ib, vi_ib
  ! kh 11.02.21
- call FEM_eval(ui_ib,vi_ib,lon,lat,u_ice_ib,v_ice_ib,iceberg_elem)    
+ call FEM_eval(mesh, ui_ib,vi_ib,lon,lat,u_ice_ib,v_ice_ib,iceberg_elem)    
   
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
  
@@ -99,7 +102,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 
  hi_ib3    = m_ice_ib(tmp_arr)
  conci_ib3 = a_ice_ib(tmp_arr) 
- call FEM_3eval(hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
+ call FEM_3eval(mesh, hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  
  call compute_areas(Ao, Aa, Ai, Ad, depth_ib, &
@@ -112,7 +115,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
 !fcoriolis = coriolis_ib(iceberg_elem) * coriolis_scale(ib)
  fcoriolis = coriolis(iceberg_elem) * coriolis_scale(ib)
 
- call iceberg_acceleration( ib, au_ib, av_ib, Ao, Aa, Ai, Ad, 		&
+ call iceberg_acceleration( mesh, ib, au_ib, av_ib, Ao, Aa, Ai, Ad, 		&
                             uo_ib,vo_ib, uo_skin_ib, vo_skin_ib,	&
 			    ua_ib,va_ib, ui_ib,vi_ib, 			&
 		            u_ib, v_ib, mass_ib, fcoriolis, 		&
@@ -128,7 +131,7 @@ subroutine iceberg_dyn(ib, new_u_ib, new_v_ib, u_ib, v_ib, lon,lat, depth_ib, &
  if(l_melt) then
 
 ! kh 15.03.21 use Tsurf_ib and Ssurf_ib buffered values here
-  call FEM_eval(sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
+  call FEM_eval(mesh, sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
 
   !if(ib==3497) then
   ! write(*,*) '#####################################################'
@@ -276,7 +279,7 @@ end subroutine iceberg_frozen
  !***************************************************************************************************************************
 
 
-subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
+subroutine iceberg_acceleration(mesh, ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
                                 uo_ib,vo_ib, uo_skin_ib, vo_skin_ib,  &
 				ua_ib,va_ib, ui_ib,vi_ib, &
 				u_ib, v_ib, mass_ib, fcoriolis, &
@@ -296,7 +299,9 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  use g_parsup	!for mype
  use g_rotate_grid,  only: vector_r2g, vector_g2r
  use iceberg_params, only: l_wave, l_tides, l_geo_out, surfslop_scale, ascii_out
- 
+
+use MOD_MESH
+
  implicit none
  
  integer,   intent(IN)	:: ib
@@ -327,8 +332,10 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  real 			:: oneminus_AB !, test1, test2
  integer 		:: icbID, i, istep
  
- 
- icbID = mype+10
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
+icbID = mype+10
  
  !estimate wave height at the icebergs location (Bigg et al., 1997),
  !so wave_amplitude = 0.5 * wave_height = 0.5 * const. * abs(atm velo)**2
@@ -371,7 +378,7 @@ subroutine iceberg_acceleration(ib, au_ib, av_ib, Ao, Aa, Ai, Ad, &
  end if
  
  !use gradient smoothing for surface slope term
- call mean_gradient(iceberg_elem, lon_rad, lat_rad, nablaeta)
+ call mean_gradient(mesh, iceberg_elem, lon_rad, lat_rad, nablaeta)
  
  !additional surface slope due to tides
  if(l_tides) then
@@ -608,8 +615,8 @@ end subroutine compute_areas
  !***************************************************************************************************************************
 
 
-subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
-  use o_mesh
+subroutine iceberg_average_andkeel(mesh, uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_keel,S_keel, depth_ib,iceberg_elem, ib)
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -625,7 +632,7 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
   use g_rotate_grid
   
   implicit none
-  
+
   REAL, DIMENSION(3), INTENT(OUT) :: uo_dz
   REAL, DIMENSION(3), INTENT(OUT) :: vo_dz
   REAL, DIMENSION(3), INTENT(OUT) :: uo_keel
@@ -641,7 +648,10 @@ subroutine iceberg_average_andkeel(uo_dz,vo_dz, uo_keel,vo_keel, T_dz,S_dz, T_ke
   integer        :: m, k, n2, n_up, n_low, cavity_count
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
-  
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+
   cavity_count=0
 
   !LOOP: over all nodes of the iceberg element
@@ -792,7 +802,7 @@ end subroutine iceberg_average_andkeel
 
 !subroutine iceberg_avvelo_layer3(uo_dz,vo_dz,depth_ib,iceberg_elem)
 !  use g_parsup 		!for myDim_nod3D, eDim_nod3D
-!  use o_mesh		!for coord_nod3D
+!  !use o_mesh		!for coord_nod3D
 !  use o_arrays		!for uf
 !  implicit none
 !  
@@ -888,8 +898,8 @@ end subroutine iceberg_average_andkeel
  !***************************************************************************************************************************
 
 
-subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
-  use o_mesh
+subroutine iceberg_avvelo(mesh, uo_dz,vo_dz,depth_ib,iceberg_elem)
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -905,7 +915,7 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   use g_rotate_grid
   
   implicit none
-  
+
   REAL, DIMENSION(3), INTENT(OUT) :: uo_dz
   REAL, DIMENSION(3), INTENT(OUT) :: vo_dz
   REAl,               INTENT(IN)  :: depth_ib
@@ -917,6 +927,9 @@ subroutine iceberg_avvelo(uo_dz,vo_dz,depth_ib,iceberg_elem)
   real           :: dz, ufkeel1, ufkeel2
   ! variables for velocity correction
   real           :: delta_depth, u_bottom_x, u_bottom_y
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   
   ! loop over all nodes of the iceberg element
@@ -993,7 +1006,7 @@ end subroutine iceberg_avvelo
 
 
 !subroutine iceberg_avvelo_ufkeel(uo_dz,vo_dz, uo_keel,vo_keel, depth_ib,iceberg_elem)
-!  use o_mesh
+!  !use o_mesh
 !  use o_param
 !  use i_therm_param
 !  use i_param
@@ -1112,7 +1125,7 @@ end subroutine iceberg_avvelo
 !  !
 !  use o_param
 !  use o_arrays
-!  use o_mesh
+!  !use o_mesh
 !  use g_rotate_grid
 !  use g_parsup
 !  implicit none
@@ -1374,7 +1387,7 @@ end subroutine iceberg_avvelo
 !  use o_param
 !  use o_arrays
 !  use g_config !for istep
-!  use o_mesh
+!  !use o_mesh
 !  implicit none
 !  integer		:: n
 !  real(kind=8)		:: aux

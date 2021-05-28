@@ -1,7 +1,7 @@
-subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
- use o_mesh
+subroutine mean_gradient(mesh, elem, lon_rad, lat_rad, nablaeta)
+ !!use o_mesh
+ use g_parsup
  USE MOD_MESH
-
  ! kh 18.03.21 specification of structure used
  use o_arrays, only: eta_n_ib
  
@@ -14,6 +14,9 @@ subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
  integer :: m, node
  real, dimension(3) :: gradientx, gradienty
  logical :: notmynode
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
  
  nablaeta = 0.
  gradientx= 0.
@@ -22,7 +25,7 @@ subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
  
  do m = 1, 3
   node = elem2D_nodes(m,elem)
-  call nodal_average(node, gradientx(m), gradienty(m), notmynode) 
+  call nodal_average(mesh, node, gradientx(m), gradienty(m), notmynode) 
   if (notmynode) exit
  end do
  
@@ -36,7 +39,7 @@ subroutine mean_gradient(elem, lon_rad, lat_rad, nablaeta)
   nablaeta(1) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
   nablaeta(2) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
  else
-  call FEM_3eval(nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
+  call FEM_3eval(mesh, nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
   
 end subroutine mean_gradient
@@ -45,10 +48,10 @@ end subroutine mean_gradient
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)  
- use o_mesh
+subroutine nodal_average(mesh, local_idx, gradientx, gradienty, notmynode)  
+ !use o_mesh
+ use g_parsup
  USE MOD_MESH
-
  ! kh 18.03.21 specification of structure used
  use o_arrays, only: eta_n_ib
 
@@ -61,6 +64,9 @@ subroutine nodal_average(local_idx, gradientx, gradienty, notmynode)
  
  integer :: k, node, idx_elem, elem
  real :: area_, patch
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
  
  area_ = 0.
  patch = 0.
@@ -108,10 +114,10 @@ end subroutine nodal_average
 !      field_u, field_v (u and v components of vector field)
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
-subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
+subroutine FEM_eval(mesh, u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   use g_parsup !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-  use o_mesh
+  !use o_mesh
   USE MOD_MESH
 
   implicit none
@@ -123,6 +129,9 @@ subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   real, intent(out) 			:: v_at_ib
   real, DIMENSION(3)			:: phi, values_u, values_v
   real					:: lon_deg, lat_deg
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   !convert to deg
   lon_deg = lon/rad
@@ -130,7 +139,7 @@ subroutine FEM_eval(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   
   !values of the 3 local basisfunctions at the 
   !position 'coords'
-  call locbafu_2D(phi,elem,(/lon_deg,lat_deg/))
+  call locbafu_2D(mesh, phi,elem,(/lon_deg,lat_deg/))
 
   values_u = field_u(elem2D_nodes(:,elem))
   values_v = field_v(elem2D_nodes(:,elem))
@@ -162,8 +171,8 @@ end subroutine FEM_eval
 !      field_u, field_v (u and v components of vector field)
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
-subroutine FEM_eval_old(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
-  use o_mesh
+subroutine FEM_eval_old(mesh, u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -194,6 +203,9 @@ subroutine FEM_eval_old(u_at_ib,v_at_ib,lon,lat,field_u,field_v,elem)
   real, dimension(2,2) 			:: inv_matrix
   real, dimension(2)			:: alphabeta
   real					:: maxlon, minlon, maxlat, minlat
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   !location of iceberg
   x = lon
@@ -280,10 +292,12 @@ end subroutine FEM_eval_old
 !                        elem2D_nodes(m,iceberg_elem), m=1,2,3 )
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
-subroutine FEM_3eval(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
+subroutine FEM_3eval(mesh, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   use g_parsup !for myDim_nod2D, eDim_nod2D
   use o_param !for rad
-  
+
+use MOD_MESH
+
   implicit none
   real, intent(in)			:: lon, lat 
   real, dimension(3), intent(in)  	:: ocean_u
@@ -294,13 +308,16 @@ subroutine FEM_3eval(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   real, DIMENSION(3)			:: phi
   real					:: lon_deg, lat_deg
   
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
+  
   !convert to deg
   lon_deg = lon/rad
   lat_deg = lat/rad
   
   !values of the 3 local basisfunctions at the 
   !position 'coords'
-  call locbafu_2D(phi,elem,(/lon_deg,lat_deg/))
+  call locbafu_2D(mesh, phi,elem,(/lon_deg,lat_deg/))
   
   u_at_ib = sum( ocean_u(:) * phi(:))
   v_at_ib = sum( ocean_v(:) * phi(:))
@@ -330,8 +347,8 @@ end subroutine FEM_3eval
 !                        elem2D_nodes(m,iceberg_elem), m=1,2,3 )
 !      elem	(the LOCAL element the iceberg lies in)
 !=================================================================
-subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
-  use o_mesh
+subroutine FEM_3eval_old(mesh, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -348,7 +365,7 @@ subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   
   !use iceberg module
   !use iceberg_params
-  
+
   implicit none
   real, intent(in)			:: lon, lat 
   real, dimension(3), intent(in)  	:: ocean_u
@@ -362,6 +379,9 @@ subroutine FEM_3eval_old(u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   real, dimension(2,2) 			:: inv_matrix
   real, dimension(2)			:: alphabeta 
   real					:: maxlon, minlon, maxlat, minlat
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   !location of iceberg
   x = lon
@@ -439,8 +459,8 @@ end subroutine FEM_3eval_old
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine iceberg_elem4all(elem, lon_deg, lat_deg) 
- use o_mesh		!for index_nod2d, elem2D_nodes
+subroutine iceberg_elem4all(mesh, elem, lon_deg, lat_deg) 
+ !use o_mesh		!for index_nod2d, elem2D_nodes
  USE MOD_MESH
  use g_parsup		!for myDim_nod2D, myList_elem2D
 #ifdef use_cavity
@@ -452,14 +472,17 @@ subroutine iceberg_elem4all(elem, lon_deg, lat_deg)
  integer, intent(INOUT) :: elem
  real, intent(IN) :: lon_deg, lat_deg
  logical :: i_have_element
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
  
-  call point_in_triangle(elem, (/lon_deg, lat_deg/)) !all PEs search here
+  call point_in_triangle(mesh, elem, (/lon_deg, lat_deg/)) !all PEs search here
   i_have_element= (elem .ne. 0) !up to 3 PEs .true.
   
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
 #ifdef use_cavity
-   if( reject_elem(elem) ) then
+   if( reject_elem(mesh, elem) ) then
     elem=0 !reject element
     i_have_element=.false.
     !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
@@ -489,8 +512,8 @@ end subroutine iceberg_elem4all
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine find_new_iceberg_elem(old_iceberg_elem, pt, left_mype)
-  use o_mesh !for index_nod2d, elem2D_nodes
+subroutine find_new_iceberg_elem(mesh, old_iceberg_elem, pt, left_mype)
+  !use o_mesh !for index_nod2d, elem2D_nodes
   USE MOD_MESH
   use o_param
 
@@ -510,6 +533,9 @@ subroutine find_new_iceberg_elem(old_iceberg_elem, pt, left_mype)
   
   INTEGER :: m, n2, idx_elem_containing_n2, elem_containing_n2, ibelem_tmp
   REAL, DIMENSION(3) :: werte2D
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
 
 ibelem_tmp=old_iceberg_elem
@@ -528,13 +554,13 @@ do m=1, 3
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
   elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
     
-  call locbafu_2D(werte2D, elem_containing_n2, pt)
+  call locbafu_2D(mesh, werte2D, elem_containing_n2, pt)
    
   if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
    old_iceberg_elem=elem_containing_n2
    
 #ifdef use_cavity
-   if( reject_elem(old_iceberg_elem) ) then
+   if( reject_elem(mesh, old_iceberg_elem) ) then
       left_mype=1.0
       !write(*,*) 'iceberg found in shelf region: left_mype = 1'
       old_iceberg_elem=ibelem_tmp
@@ -555,14 +581,15 @@ end subroutine find_new_iceberg_elem
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-SUBROUTINE point_in_triangle(el2D,   pt)
+SUBROUTINE point_in_triangle(mesh, el2D, pt)
   !  returns triangle containing the point pt
   !  lon, lat in deg
   
   USE o_param
-  USE o_mesh
+  !use o_mesh
   USE MOD_MESH
   USE g_parsup !for myDim_elem2D
+  
   IMPLICIT NONE
   
   REAL, DIMENSION(2), INTENT(IN) :: pt
@@ -571,12 +598,15 @@ SUBROUTINE point_in_triangle(el2D,   pt)
   INTEGER :: i, k, l
   REAL, DIMENSION(3) :: werte2D
   REAL               :: xdiff, ydiff
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
  
   el2D=0
   !DO l=1,elem2D
   DO l=1,myDim_elem2D
  
-     call locbafu_2D(werte2D, l, pt)
+     call locbafu_2D(mesh, werte2D, l, pt)
      
      if (ALL(werte2D <= 1.+ 1.0e-07) .AND. ALL(werte2D >= 0.0- 1.0e-07) ) then
         el2D=l
@@ -593,11 +623,12 @@ END SUBROUTINE point_in_triangle
 !coords in deg, elem is LOCAL element; 
 !values of the 3 local basisfunctions at the 
 !position 'coords' are returned
-SUBROUTINE locbafu_2D(values, elem, coords)
-  USE o_mesh
+SUBROUTINE locbafu_2D(mesh, values, elem, coords)
+  !use o_mesh
   USE MOD_MESH
+  use g_parsup
   USE o_param
-  
+
   IMPLICIT NONE
   
   REAL, DIMENSION(3), INTENT(OUT) :: values
@@ -612,6 +643,9 @@ SUBROUTINE locbafu_2D(values, elem, coords)
   REAL :: DET
   REAL, DIMENSION(2) :: x, x_cart, stdel_coords
   REAL, DIMENSION(2) :: vec
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   x(1)=coords(1)*rad
   x(2)=coords(2)*rad
@@ -678,15 +712,19 @@ END SUBROUTINE stdbafu_2D
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine global2local(aux)
+subroutine global2local(mesh, aux)
  use g_parsup !for myDim_elem2D, myList_elem2D
- use o_mesh
+ !use o_mesh
  USE MOD_MESH
  implicit none
  
- integer, dimension(elem2D), intent(out):: aux
+ integer, dimension(:), allocatable, intent(out):: aux
  integer:: n
- 
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h", only: myDim_elem2D,myList_elem2D
+ allocate(aux(elem2D))
+
  aux = 0
  do n = 1, myDim_elem2D
   aux(myList_elem2D(n)) = n
@@ -896,8 +934,8 @@ subroutine com_integer(i_have_element, iceberg_element)
 !
 !   Thomas Rackow, 30.07.2010
 !==============================================================================
-SUBROUTINE processor_distr
-  use o_mesh
+SUBROUTINE processor_distr(mesh)
+  !use o_mesh
   USE MOD_MESH
   use o_param
   use i_therm_param
@@ -911,13 +949,14 @@ SUBROUTINE processor_distr
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  
+
   IMPLICIT NONE
   
   character			:: mype_char*3
   INTEGER			:: m, row
-  
-  
+
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
   
   write(mype_char,*) mype
   !left-adjust the string..
@@ -943,13 +982,11 @@ END SUBROUTINE processor_distr
 !==============================================================================
 SUBROUTINE tides_distr
   use o_mesh
-  USE MOD_MESH
   use o_param
   use i_therm_param
   use i_param
   use i_arrays
   use g_parsup
-  
 ! kh 18.03.21 not really used here
 ! use o_arrays
 

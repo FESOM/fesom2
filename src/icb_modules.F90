@@ -127,22 +127,28 @@ save
 #ifdef use_cavity
  contains
  ! true if all nodes of the element are either "real" model boundary nodes or shelf nodes
- logical function reject_elem(elem)
+ logical function reject_elem(mesh, elem)
  use o_mesh
  USE MOD_MESH
+ use g_parsup
  implicit none
  integer, intent(in) :: elem
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
  reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
  end function reject_elem
  
  ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
  ! either "real" model boundary nodes or shelf nodes
- integer function coastal_nodes(elem)
+ integer function coastal_nodes(mesh, elem)
  use o_mesh
  USE MOD_MESH
+ use g_parsup
  implicit none
  integer, intent(in) :: elem
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
  coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
  end function coastal_nodes

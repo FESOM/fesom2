@@ -78,13 +78,11 @@ subroutine forcing_array_setup(mesh)
 !$omp end parallel sections
   end if
 
-=======
   prec_rain=0.0_WP
   prec_snow=0.0_WP
   allocate(u_wind(n2), v_wind(n2))
   u_wind=0.0_WP
   v_wind=0.0_WP
->>>>>>> wiso
   allocate(Tair(n2), shum(n2))
   Tair=0.0_WP
   shum=0.0_WP

@@ -83,12 +83,6 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine ini_mean_io
-  use iceberg_params
-  
-  implicit none
-  integer           :: i
-  character(len=10) :: id_string
 
   subroutine destructor(this)
     type(Meandata), intent(inout) :: this
@@ -98,6 +92,7 @@ subroutine ini_mean_io
 
 
 subroutine ini_mean_io(mesh)
+  use iceberg_params
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -388,14 +383,8 @@ CASE ('pgf_y     ')
     call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'pgf_y', 'meridional pressure gradient force', 'm/s^2', pgf_y(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 !___________________________________________________________________________________________________________________________________    
 
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_x','neutral slope X',   'none',slope_tapered(1,:,:), 1, 'y', i_real4)
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_y','neutral slope Y',   'none',slope_tapered(2,:,:), 1, 'y', i_real4)
-  call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'slope_z','neutral slope Z',   'none',slope_tapered(3,:,:), 1, 'y', i_real4)
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'N2',   'brunt väisälä',       '1/s2',bvfreq(:,:),   1, 'y', i_real4)
-  call def_stream((/nl,   nod2D/),  (/nl,   myDim_nod2D/),  'Kv',   'Vertical mixing K',   'm2/s',Kv(:,:),       1, 'y', i_real4)
 
 !2D
-  call def_stream(nod2D, myDim_nod2D, 'ssh',   'sea surface elevation',   'm',      eta_n,                         1, 'm', i_real4)
 !DS for frontier run
 !  call def_stream(nod2D,  myDim_nod2D,  't100',  'temperature at 100m',                'C',    tr_arr(12,1:myDim_nod2D,1),   1, 'm', i_real4)
 !  call def_stream(elem2D, myDim_elem2D, 'u100',  'horizontal velocity at 100m',      'm/s',    uv(1,12,1:myDim_elem2D),      1, 'm', i_real4)
@@ -405,31 +394,7 @@ CASE ('pgf_y     ')
 !  call def_stream(elem2D, myDim_elem2D,  'v30',  'meridional velocity at 30m',       'm/s',    uv(2,5,1:myDim_elem2D),       1, 'm', i_real4)
 !DS
 
-  call def_stream(nod2D, myDim_nod2D, 'sst',   'sea surface temperature', 'C',      tr_arr(1,1:myDim_nod2D,1),     1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'sss',   'sea surface salinity',    'psu',    tr_arr(1,1:myDim_nod2D,2),     1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'vve',   'vertical velocity',       'm/s',    Wvel(5,:),                     1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'uice',  'ice velocity x',          'm/s',    u_ice,                         1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'vice',  'ice velocity y',          'm/s',    v_ice,                         1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'a_ice', 'ice concentration',       '%',      a_ice(1:myDim_nod2D),          1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'm_ice', 'ice height',              'm',      m_ice(1:myDim_nod2D),          1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'm_snow','snow height',             'm',      m_snow(1:myDim_nod2D),         1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'MLD1',   'Mixed Layer Depth',      'm',      MLD1(1:myDim_nod2D),           1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'MLD2',   'Mixed Layer Depth',      'm',      MLD2(1:myDim_nod2D),           1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'fh',     'heat flux',              'W',      heat_flux(:),                  1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'fw',     'fresh water flux',       'm/s',    water_flux(:),                 1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',      'N/m2',   stress_atmice_x(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'atmice_y', 'stress atmice y',      'N/m2',   stress_atmice_y(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'atmoce_x', 'stress atmoce x',      'N/m2',   stress_atmoce_x(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'atmoce_y', 'stress atmoce y',      'N/m2',   stress_atmoce_y(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'iceoce_x', 'stress iceoce x',      'N/m2',   stress_iceoce_x(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'iceoce_y', 'stress iceoce y',      'N/m2',   stress_iceoce_y(:),            1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'alpha',  'thermal expansion',      'none',   sw_alpha(1,:),                 1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'beta',   'saline contraction',     'none',   sw_beta (1,:),                 1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'runoff', 'river runoff',           'none',   runoff(:),                     1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'evap',   'evaporation',            'm/s',    evaporation(:),                1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'prec',   'precicipation rain',     'm/s',    prec_rain(:),                  1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'snow',   'precicipation snow',     'm/s',    prec_snow(:),                  1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'subli',  'sublimation',            'm/s',    sublimation(:),                1, 'm', i_real4)
+  !call def_stream(nod2D, myDim_nod2D, 'subli',  'sublimation',            'm/s',    sublimation(:),                1, 'm', i_real4)
 #if defined (__oifs)
 CASE ('alb       ')
   call def_stream(nod2D, myDim_nod2D, 'alb',    'ice albedo',              'none',   ice_alb(:),                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -440,16 +405,13 @@ CASE ('qsi       ')
 CASE ('qso       ')
   call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  oce_heat_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 #endif
-if (use_icebergs) then
-  call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',   'm/s',    ibfwb(:),                1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',   'm/s',    ibfwbv(:),                1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting', 'm/s',    ibfwl(:),                  1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',         'm/s',    ibfwe(:),                  1, 'm', i_real4)
-  call def_stream(nod2D, myDim_nod2D, 'ibhf',  'heat flux from iceberg melting','m/s',    ibhf(:),                1, 'm', i_real4)
-end if
-  if (trim(mix_scheme)=='KPP') then
-     call def_stream(nod2D, myDim_nod2D, 'hbl',    'HBL KPP',                'none',   hbl(:),                        1, 'm', i_real4)
-     call def_stream(nod2D, myDim_nod2D, 'Bo',     'surface boyancy flux',   'm2/s3',  Bo(:),                         1, 'm', i_real4)
+CASE ('icb       ')
+  if (use_icebergs) then
+    call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',   'm/s',    ibfwb(:),                1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',   'm/s',    ibfwbv(:),                1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting', 'm/s',    ibfwl(:),                  1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',         'm/s',    ibfwe(:),                  1, 'm', i_real4, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'ibhf',  'heat flux from iceberg melting','m/s',    ibhf(:),                1, 'm', i_real4, mesh)
   end if
 
 CASE DEFAULT
