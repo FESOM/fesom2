@@ -147,8 +147,11 @@ subroutine solve_tracers_ale(mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        call relax_to_clim(tr_num, mesh)
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+            call relax_zonal_temp(mesh)
+        else
+            call relax_to_clim(tr_num, mesh)
+        end if 
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
