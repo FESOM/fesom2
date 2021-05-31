@@ -71,6 +71,8 @@ subroutine relax_zonal_vel(mesh)
         UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+dt*tau_inv*(Uclim(nz,elem)-Uzon)
      END DO
   END DO
+  call exchange_elem(UV_rhs)
+   
 end subroutine relax_zonal_vel
 !==========================================================================
 subroutine relax_zonal_temp(mesh)
@@ -232,7 +234,7 @@ subroutine initial_state_soufflet(mesh)
   stress_surf   = 0.0_WP
   heat_flux     = 0.0_WP
   tr_arr(:,:,2) = 35.0_WP
-  Ssurf         = tr_arr(1,:,1)
+  Ssurf         = tr_arr(1,:,2)
   water_flux    = 0.0_WP
   relax2clim    = 0.0_WP
 
@@ -327,13 +329,16 @@ do n=1, myDim_nod2D+eDim_nod2D
   allocate(Uclim(nl-1,myDim_elem2D+eDim_elem2D))
   Uclim=UV(1,:,:)
   
-!   UV=0.0_WP
-!   UV(1,:,:) = 0.01_WP
-! !   tr_arr(:,:,1) = 16.0_WP
-! !   tr_arr(:,:,2) = 35.0_WP
-!   
-!   Tclim=tr_arr(:,:,1)
-!   Uclim=UV(1,:,:)
+!!PS  tr_arr(:,:,1) = 16.0_WP
+!!PS  tr_arr(:,:,2) = 35.0_WP
+!!PS  Ssurf         = tr_arr(1,:,2)
+!!PS  Tsurf         = tr_arr(1,:,1)
+!!PS  Tclim         = tr_arr(:,:,1)
+  
+!!PS  UV            = 0.0_WP
+!!PS  UV(1,:,:)     = 0.01_WP
+!!PS  Uclim         = UV(1,:,:)
+  
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================
