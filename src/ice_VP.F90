@@ -77,12 +77,12 @@ subroutine VP_init(mesh)
 use g_parsup
 use mod_mesh
 use i_ARRAYS
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VP_init
 IMPLICIT NONE 
 type(t_mesh), intent(in), target  :: mesh
 #include "associate_mesh.h"
 
-allocate(ice_stiff_values(ssh_stiff%nza))
+allocate(ice_stiff_values(ssh_stiff%rowptr_loc(myDim_nod2D+1)-1))
 allocate(rhs_u(myDim_nod2D+eDim_nod2D), rhs_v(myDim_nod2D+eDim_nod2D))
 ice_stiff_values=0.
 rhs_u=0.0_WP
@@ -99,7 +99,7 @@ use i_PARAM
 use i_ARRAYS
 USE o_ARRAYS
 use i_therm_param
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VPmatrix_rhs
 IMPLICIT NONE 
 
 REAL(kind=8)                  :: m_e, a_e, drag
@@ -275,7 +275,7 @@ subroutine VPsolve(mesh, new_values)
 use g_parsup
 use mod_mesh
 use i_ARRAYS
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VPsolve
 use g_comm_auto
 use iso_c_binding, only: C_INT, C_DOUBLE
 implicit none
@@ -329,7 +329,7 @@ if (lfirst) then
     lfirst=.false.
 end if
     call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
-    call psolve(ident, rhs_v, ice_stiff_values, v_ice, new_values)
+    call psolve(ident, rhs_v, ice_stiff_values, v_ice, 0)  ! values remain constant
 end subroutine VPsolve 
 ! ============================================================================
 subroutine VPdynamics(mesh)
@@ -337,7 +337,7 @@ use g_parsup
 use mod_mesh
 use i_PARAM
 use i_ARRAYS
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VPdynamics
 ! Driving routine of VP rheology
 IMPLICIT NONE
 integer        :: n, row, is, ie
@@ -421,7 +421,7 @@ USE o_ARRAYS
 use i_PARAM
 use i_ARRAYS
 use i_therm_param
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VPmake_implicit
 IMPLICIT NONE 
 real(kind=8)     ::  as, ac, drag, inv_mass, c1, c2, r1, r2, d
 integer          ::  n, row
@@ -461,7 +461,7 @@ use g_parsup
 use mod_mesh
 use i_PARAM
 use i_ARRAYS
-use ice_VP_interfaces
+use ice_VP_interfaces, except_this_one => VPbc
 IMPLICIT NONE 
 
 integer                          :: row, j, is, ie
