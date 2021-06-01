@@ -164,10 +164,10 @@ contains
   end subroutine
   
   
-  subroutine read_and_scatter_variables(f)
+  subroutine read_and_scatter_variables(this)
     use g_PARSUP
     use io_scatter_module
-    class(fesom_file_type), target :: f
+    class(fesom_file_type), target :: this
     ! EO parameters
     integer i,lvl, nlvl
     logical is_2d
@@ -175,16 +175,16 @@ contains
     type(var_info), pointer :: var
     real(kind=8), allocatable :: laux(:)
 
-    last_rec_idx = f%rec_count()
+    last_rec_idx = this%rec_count()
     
-    do i=1, f%nvar_infos
-      var => f%var_infos(i)
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
     
       nlvl = size(var%external_local_data_ptr,dim=1)
       is_2d = (nlvl == 1)
       allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
-      if(mype == f%iorank) then
+      if(mype == this%iorank) then
         ! todo: choose how many levels we read at once
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
       else
@@ -192,19 +192,19 @@ contains
       end if
 
       do lvl=1, nlvl
-        if(mype == f%iorank) then
+        if(mype == this%iorank) then
           if(is_2d) then
-            call f%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
+            call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
           else
             ! z,nod,time
-            call f%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
+            call this%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
           end if
         end if
 
         if(var%is_elem_based) then
-          call scatter_elem2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
+          call scatter_elem2D(var%global_level_data, laux, this%iorank, MPI_comm_fesom)
         else
-          call scatter_nod2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
+          call scatter_nod2D(var%global_level_data, laux, this%iorank, MPI_comm_fesom)
         end if
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
@@ -214,26 +214,26 @@ contains
   end subroutine
 
 
-  subroutine gather_and_write_variables(f)
+  subroutine gather_and_write_variables(this)
     use g_PARSUP
     use io_gather_module
-    class(fesom_file_type), target :: f
+    class(fesom_file_type), target :: this
     ! EO parameters
     integer i,lvl, nlvl
     logical is_2d
     real(kind=8), allocatable :: laux(:)
     type(var_info), pointer :: var
 
-    if(mype == f%iorank) f%rec_cnt = f%rec_count()+1
+    if(mype == this%iorank) this%rec_cnt = this%rec_count()+1
     
-    do i=1, f%nvar_infos
-      var => f%var_infos(i)
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
 
       nlvl = size(var%local_data_copy,dim=1)
       is_2d = (nlvl == 1)
       allocate(laux( size(var%local_data_copy,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
-      if(mype == f%iorank) then
+      if(mype == this%iorank) then
         ! todo: choose how many levels we write at once
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
       else
@@ -245,65 +245,65 @@ contains
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 
         if(var%is_elem_based) then
-          call gather_elem2D(laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
+          call gather_elem2D(laux, var%global_level_data, this%iorank, 42, MPI_comm_fesom)
         else
-          call gather_nod2D (laux, var%global_level_data, f%iorank, 42, MPI_comm_fesom)
+          call gather_nod2D (laux, var%global_level_data, this%iorank, 42, MPI_comm_fesom)
         end if
 
-        if(mype == f%iorank) then
+        if(mype == this%iorank) then
           if(is_2d) then
-            call f%write_var(var%var_index, [1,f%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
+            call this%write_var(var%var_index, [1,this%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
           else
             ! z,nod,time
-            call f%write_var(var%var_index, [lvl,1,f%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
+            call this%write_var(var%var_index, [lvl,1,this%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
           end if
         end if
       end do
       deallocate(laux)
     end do
     
-    if(mype == f%iorank) call f%flush_file() ! flush the file to disk after each write
+    if(mype == this%iorank) call this%flush_file() ! flush the file to disk after each write
   end subroutine
 
 
-  subroutine join(f)
-    class(fesom_file_type) f
+  subroutine join(this)
+    class(fesom_file_type) this
     ! EO parameters
     
-    if(f%thread_running) call f%thread%join()
-    f%thread_running = .false.    
+    if(this%thread_running) call this%thread%join()
+    this%thread_running = .false.    
   end subroutine
 
 
-  subroutine async_read_and_scatter_variables(f)
-    class(fesom_file_type), target :: f
+  subroutine async_read_and_scatter_variables(this)
+    class(fesom_file_type), target :: this
 
-    call assert(.not. f%thread_running, __LINE__)
+    call assert(.not. this%thread_running, __LINE__)
 
-    f%gather_and_write = .false.
-    call f%thread%run()
-    f%thread_running = .true.
+    this%gather_and_write = .false.
+    call this%thread%run()
+    this%thread_running = .true.
   end subroutine
 
 
-  subroutine async_gather_and_write_variables(f)
-    class(fesom_file_type), target :: f
+  subroutine async_gather_and_write_variables(this)
+    class(fesom_file_type), target :: this
     ! EO parameters
     integer i
     type(var_info), pointer :: var
     
-    call assert(.not. f%thread_running, __LINE__)
+    call assert(.not. this%thread_running, __LINE__)
 
     ! copy data so we can write the current values asynchronously
-    do i=1, f%nvar_infos
-      var => f%var_infos(i)
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
       var%local_data_copy = var%external_local_data_ptr
     end do
     
-    f%gather_and_write = .true.
-    call f%thread%run()
-    f%thread_running = .true.
+    this%gather_and_write = .true.
+    call this%thread%run()
+    this%thread_running = .true.
   end subroutine
 
 
@@ -324,10 +324,10 @@ contains
   end subroutine
 
 
-  subroutine specify_node_var_2d(f, name, longname, units, local_data)
+  subroutine specify_node_var_2d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
@@ -335,34 +335,34 @@ contains
     real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
-    level_diminfo = obtain_diminfo(f, m_nod2d)
+    level_diminfo = obtain_diminfo(this, m_nod2d)
    
     external_local_data_ptr(1:1,1:size(local_data)) => local_data
-    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
+    call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .false., longname, units)    
   end subroutine
 
 
-  subroutine specify_node_var_3d(f, name, longname, units, local_data)
+  subroutine specify_node_var_3d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
 
-    level_diminfo = obtain_diminfo(f, m_nod2d)    
-    depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
+    level_diminfo = obtain_diminfo(this, m_nod2d)    
+    depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
 
-    call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
+    call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
   end subroutine
 
 
-  subroutine specify_elem_var_2d(f, name, longname, units, local_data)
+  subroutine specify_elem_var_2d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
@@ -370,54 +370,54 @@ contains
     real(8), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
-    level_diminfo = obtain_diminfo(f, m_elem2d)
+    level_diminfo = obtain_diminfo(this, m_elem2d)
 
     external_local_data_ptr(1:1,1:size(local_data)) => local_data
-    call specify_variable(f, name, [level_diminfo%idx, f%time_dimidx], level_diminfo%len, external_local_data_ptr, .true., longname, units)    
+    call specify_variable(this, name, [level_diminfo%idx, this%time_dimidx], level_diminfo%len, external_local_data_ptr, .true., longname, units)    
   end subroutine
 
 
-  subroutine specify_elem_var_3d(f, name, longname, units, local_data)
+  subroutine specify_elem_var_3d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
-    class(fesom_file_type), intent(inout) :: f
+    class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
     real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
 
-    level_diminfo = obtain_diminfo(f, m_elem2d)
-    depth_diminfo = obtain_diminfo(f, size(local_data, dim=1))
+    level_diminfo = obtain_diminfo(this, m_elem2d)
+    depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
     
-    call specify_variable(f, name, [depth_diminfo%idx, level_diminfo%idx, f%time_dimidx], level_diminfo%len, local_data, .true., longname, units)
+    call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .true., longname, units)
   end subroutine
   
   
-  function obtain_diminfo(f, len) result(info)
-    type(fesom_file_type), intent(inout) :: f
+  function obtain_diminfo(this, len) result(info)
+    type(fesom_file_type), intent(inout) :: this
     type(dim_info) info
     integer len
     ! EO parameters
     integer i
     type(dim_info), allocatable :: tmparr(:)
     
-    do i=1, size(f%used_mesh_dims)
-      if(f%used_mesh_dims(i)%len == len) then
-        info = f%used_mesh_dims(i)
+    do i=1, size(this%used_mesh_dims)
+      if(this%used_mesh_dims(i)%len == len) then
+        info = this%used_mesh_dims(i)
         return
       end if
     end do
     
     ! the dim has not been added yet, see if it is one of our allowed mesh related dims
     if(len == m_nod2d) then
-      info = dim_info( idx=f%add_dim('node', len), len=len)
+      info = dim_info( idx=this%add_dim('node', len), len=len)
     else if(len == m_elem2d) then
-      info = dim_info( idx=f%add_dim('elem', len), len=len)
+      info = dim_info( idx=this%add_dim('elem', len), len=len)
     else if(len == m_nl-1) then
-      info = dim_info( idx=f%add_dim('nz_1', len), len=len)
+      info = dim_info( idx=this%add_dim('nz_1', len), len=len)
     else if(len == m_nl) then
-      info = dim_info( idx=f%add_dim('nz', len), len=len)
+      info = dim_info( idx=this%add_dim('nz', len), len=len)
     else
       print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
       stop 1
@@ -425,16 +425,16 @@ contains
     
     ! append the new dim to our list of used dims, i.e. the dims we use for the mesh based variables created via #specify_variable
     ! assume the used_mesh_dims array is allocated
-    allocate( tmparr(size(f%used_mesh_dims)+1) )
-    tmparr(1:size(f%used_mesh_dims)) = f%used_mesh_dims
-    deallocate(f%used_mesh_dims)
-    call move_alloc(tmparr, f%used_mesh_dims)
-    f%used_mesh_dims( size(f%used_mesh_dims) ) = info
+    allocate( tmparr(size(this%used_mesh_dims)+1) )
+    tmparr(1:size(this%used_mesh_dims)) = this%used_mesh_dims
+    deallocate(this%used_mesh_dims)
+    call move_alloc(tmparr, this%used_mesh_dims)
+    this%used_mesh_dims( size(this%used_mesh_dims) ) = info
   end function
 
 
-  subroutine specify_variable(f, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
-    type(fesom_file_type), intent(inout) :: f
+  subroutine specify_variable(this, name, dim_indices, global_level_data_size, local_data, is_elem_based, longname, units)
+    type(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: dim_indices(:)
     integer global_level_data_size
@@ -444,16 +444,16 @@ contains
     ! EO parameters
     integer var_index
 
-    var_index = f%add_var_double(name, dim_indices)
-    call f%add_var_att(var_index, "units", units)
-    call f%add_var_att(var_index, "long_name", longname)
+    var_index = this%add_var_double(name, dim_indices)
+    call this%add_var_att(var_index, "units", units)
+    call this%add_var_att(var_index, "long_name", longname)
     
-    call assert(f%nvar_infos < size(f%var_infos), __LINE__)
-    f%nvar_infos = f%nvar_infos+1
-    f%var_infos(f%nvar_infos)%var_index = var_index
-    f%var_infos(f%nvar_infos)%external_local_data_ptr => local_data
-    f%var_infos(f%nvar_infos)%global_level_data_size = global_level_data_size
-    f%var_infos(f%nvar_infos)%is_elem_based = is_elem_based
+    call assert(this%nvar_infos < size(this%var_infos), __LINE__)
+    this%nvar_infos = this%nvar_infos+1
+    this%var_infos(this%nvar_infos)%var_index = var_index
+    this%var_infos(this%nvar_infos)%external_local_data_ptr => local_data
+    this%var_infos(this%nvar_infos)%global_level_data_size = global_level_data_size
+    this%var_infos(this%nvar_infos)%is_elem_based = is_elem_based
   end subroutine
   
   
