@@ -104,11 +104,11 @@ contains
   end function
   
   
-  subroutine init(f, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
+  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use g_PARSUP
     use io_netcdf_workaround_module
     use io_gather_module
-    class(fesom_file_type), target, intent(inout) :: f
+    class(fesom_file_type), target, intent(inout) :: this
     integer mesh_nod2d
     integer mesh_elem2d
     integer mesh_nl
@@ -124,13 +124,13 @@ contains
     m_nod2d = mesh_nod2d
     m_elem2d = mesh_elem2d
     m_nl = mesh_nl
-    call f%netcdf_file_type%initialize()
+    call this%netcdf_file_type%initialize()
 
-    allocate(f%used_mesh_dims(0))
+    allocate(this%used_mesh_dims(0))
 
-    f%time_dimidx = f%add_dim_unlimited('time')
+    this%time_dimidx = this%add_dim_unlimited('time')
 
-    f%time_varidx = f%add_var_double('time', [f%time_dimidx])
+    this%time_varidx = this%add_var_double('time', [this%time_dimidx])
 
     ! add this instance to global array
     ! the array is being used to identify the instance in an async call
@@ -142,25 +142,25 @@ contains
       deallocate(all_fesom_files)
       call move_alloc(tmparr, all_fesom_files)
     end if
-    all_fesom_files(size(all_fesom_files))%ptr => f
-    f%fesom_file_index = size(all_fesom_files)
+    all_fesom_files(size(all_fesom_files))%ptr => this
+    this%fesom_file_index = size(all_fesom_files)
 
     ! set up async output
     
-    f%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
+    this%iorank = next_io_rank(MPI_COMM_FESOM, async_netcdf_allowed)
 
-    call MPI_Comm_dup(MPI_COMM_FESOM, f%comm, err)
+    call MPI_Comm_dup(MPI_COMM_FESOM, this%comm, err)
 
-    call f%thread%initialize(async_worker, f%fesom_file_index)
-    if(.not. async_netcdf_allowed) call f%thread%disable_async()
+    call this%thread%initialize(async_worker, this%fesom_file_index)
+    if(.not. async_netcdf_allowed) call this%thread%disable_async()
   
     ! check if we have multi thread support available in the MPI library
     ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
-    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call f%thread%disable_async()
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()
     
-    f%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
+    this%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
   end subroutine
   
   
@@ -174,7 +174,7 @@ contains
     integer last_rec_idx
     type(var_info), pointer :: var
     real(kind=8), allocatable :: laux(:)
-  
+
     last_rec_idx = f%rec_count()
     
     do i=1, f%nvar_infos
@@ -207,7 +207,7 @@ contains
           call scatter_nod2D(var%global_level_data, laux, f%iorank, MPI_comm_fesom)
         end if
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
-        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
+       var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
       end do
       deallocate(laux)
     end do
@@ -277,7 +277,7 @@ contains
 
   subroutine async_read_and_scatter_variables(f)
     class(fesom_file_type), target :: f
-  
+
     call assert(.not. f%thread_running, __LINE__)
 
     f%gather_and_write = .false.
