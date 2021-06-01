@@ -294,7 +294,7 @@ contains
     
     call assert(.not. f%thread_running, __LINE__)
 
-    ! copy data so we can write the current values asynchonously
+    ! copy data so we can write the current values asynchronously
     do i=1, f%nvar_infos
       var => f%var_infos(i)
       if(.not. allocated(var%local_data_copy)) allocate( var%local_data_copy(size(var%external_local_data_ptr,dim=1), size(var%external_local_data_ptr,dim=2)) )
