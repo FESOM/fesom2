@@ -147,8 +147,11 @@ subroutine solve_tracers_ale(mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        call relax_to_clim(tr_num, mesh)
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+            call relax_zonal_temp(mesh)
+        else
+            call relax_to_clim(tr_num, mesh)
+        end if 
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
@@ -974,7 +977,7 @@ SUBROUTINE diff_part_bh(ttf, mesh)
     type(t_mesh),  intent(in),    target :: mesh
     real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP)                        :: u1, v1, len, vi, tt, ww 
-    integer                              :: nz, ed, el(2), en(2), k, elem, nl1
+    integer                              :: nz, ed, el(2), en(2), k, elem, nl1, ul1
     real(kind=WP), allocatable           :: temporary_ttf(:,:)
 
 #include "associate_mesh.h"
@@ -988,8 +991,9 @@ SUBROUTINE diff_part_bh(ttf, mesh)
        el=edge_tri(:,ed)
        en=edges(:,ed)
        len=sqrt(sum(elem_area(el)))
+       ul1=minval(ulevels_nod2D_max(en))
        nl1=maxval(nlevels_nod2D_min(en))-1
-       DO  nz=1,nl1
+       DO  nz=ul1,nl1
            u1=UV(1, nz,el(1))-UV(1, nz,el(2))
            v1=UV(2, nz,el(1))-UV(2, nz,el(2))
            vi=u1*u1+v1*v1
@@ -1011,8 +1015,9 @@ SUBROUTINE diff_part_bh(ttf, mesh)
           el=edge_tri(:,ed)
           en=edges(:,ed)
           len=sqrt(sum(elem_area(el)))
+          ul1=minval(ulevels_nod2D_max(en))
           nl1=maxval(nlevels_nod2D_min(en))-1
-          DO  nz=1,nl1
+          DO  nz=ul1,nl1
               u1=UV(1, nz,el(1))-UV(1, nz,el(2))
               v1=UV(2, nz,el(1))-UV(2, nz,el(2))
               vi=u1*u1+v1*v1
