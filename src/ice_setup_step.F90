@@ -243,20 +243,6 @@ t0=MPI_Wtime()
     call thermodynamics(mesh)
 #endif /* (__icepack) */
 
-
-    do i=1,myDim_nod2D+eDim_nod2D
-        if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
-            write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
-            write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)
-            write(*,*) " U_ice(n) = ", U_ice(i)
-            write(*,*) " V_ice(n) = ", V_ice(i)
-            write(*,*)
-        end if 
-    end do
-
-
-
-
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
