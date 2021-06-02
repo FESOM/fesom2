@@ -146,6 +146,10 @@ real(kind=WP)                 :: density_ref_T     = 2.0_WP
 real(kind=WP)                 :: density_ref_S     = 34.0_WP
 
 !_______________________________________________________________________________
+! use k-profile nonlocal fluxes
+logical                       :: use_kpp_nonlclflx = .false.
+
+!_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
@@ -182,7 +186,8 @@ character(20)                  :: which_pgf='shchepetkin'
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl, &
-            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra
+            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, &
+            use_kpp_nonlclflx
             
 END MODULE o_PARAM  
 !==========================================================
