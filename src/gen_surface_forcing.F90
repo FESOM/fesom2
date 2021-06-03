@@ -676,7 +676,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then
             write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
@@ -685,7 +685,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then 
             write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
@@ -1263,7 +1263,7 @@ CONTAINS
       integer, intent(in) :: iost
 
       if (iost .ne. NF_NOERR) then
-         write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
+         write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',trim(fname)
          call par_ex
          stop
       endif
