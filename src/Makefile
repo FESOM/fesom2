@@ -95,6 +95,7 @@ OBJECTS=  fvom_main.o 		\
           oce_ale.o 		\
           oce_ale_tracer.o 	\
           cavity_param.o        \
+          ice_VP.o             \
           ice_EVP.o             \
           ice_maEVP.o 		\
           ice_setup_step.o 	\
