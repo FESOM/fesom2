@@ -26,8 +26,6 @@ contains
 
 
   subroutine def_node_var_2d(this, name, longname, units, local_data, mesh)
-    use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     use mod_mesh
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in) :: name
@@ -42,8 +40,6 @@ contains
 
 
   subroutine def_node_var_3d(this, name, longname, units, local_data, mesh)
-    use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
@@ -58,8 +54,6 @@ contains
 
 
   subroutine def_elem_var_2d(this, name, longname, units, local_data, mesh)
-    use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
@@ -74,8 +68,6 @@ contains
 
 
   subroutine def_elem_var_3d(this, name, longname, units, local_data, mesh)
-    use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     use mod_mesh
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
