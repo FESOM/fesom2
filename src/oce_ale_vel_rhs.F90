@@ -243,7 +243,7 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
         !                 ./  el1  \.   
         !               ./     x     \. 
         !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
-        !            /         |->n_vec  \                  
+        !            /         |->n_vec  \
         !    nod(1) o----------O----------o nod(2)   
         !            \.        |->n_vec ./
         !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
