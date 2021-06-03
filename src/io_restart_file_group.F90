@@ -16,9 +16,77 @@ module restart_file_group_module
     private
     type(restart_file_type) files(20); integer :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains
+    generic, public :: def_node_var => def_node_var_2d, def_node_var_3d
+    generic, public :: def_elem_var => def_elem_var_2d, def_elem_var_3d
+    procedure, private :: def_node_var_2d, def_node_var_3d
+    procedure, private :: def_elem_var_2d, def_elem_var_3d
   end type
-
+  
 contains
+
+
+  subroutine def_node_var_2d(this, name, longname, units, local_data, mesh)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    use mod_mesh
+    class(restart_file_group), target, intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_node_var_3d(this, name, longname, units, local_data, mesh)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_elem_var_2d(this, name, longname, units, local_data, mesh)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_elem_var_3d(this, name, longname, units, local_data, mesh)
+    use, intrinsic :: ISO_C_BINDING
+    use g_PARSUP
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
+  end subroutine
 
 
   subroutine add_file(g, name, mesh_nod2d, mesh_elem2d, mesh_nl)
