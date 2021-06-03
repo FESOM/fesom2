@@ -21,5 +21,33 @@ module restart_file_group_module
 contains
 
 
+  subroutine add_file(g, name, mesh_nod2d, mesh_elem2d, mesh_nl)
+    class(restart_file_group), target, intent(inout) :: g
+    character(len=*), intent(in) :: name
+    integer mesh_nod2d, mesh_elem2d, mesh_nl
+    ! EO parameters
+    type(restart_file_type), pointer :: f
+
+    call assert(g%nfiles < size(g%files), __LINE__)
+    g%nfiles = g%nfiles+1
+    f => g%files(g%nfiles)
+    
+    f%path = ""
+    f%varname = name
+    call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl)
+    ! this is specific for a restart file
+    f%iter_varindex = f%add_var_int('iter', [f%time_dimindex()])    
+  end subroutine
+
+
+  subroutine assert(val, line)
+    logical, intent(in) :: val
+    integer, intent(in) :: line
+    ! EO parameters
+    if(.not. val) then
+      print *, "error in line ",line, __FILE__
+      stop 1
+    end if
+  end subroutine
 
 end module
