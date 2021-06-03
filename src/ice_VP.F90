@@ -320,16 +320,28 @@ lutype=2
 droptol=1.e-8
 soltol=1.e-12
 
+!NR  As the matrix changes so much between the steps, the preconditioner
+!NR  must be recomputed. However, also the nonzero-pattern of the matrix
+!NR  changes, as non-ice-nodes have only zeros on the off-diagonal.
+!NR  Best choice is therefor no preconditioner at all: SOLBICGS_NOPC
+!NR  The preconditioner settings are (basically) ignored, i.e., the
+!NR  preconditioner is set up, but never used.
+!NR  Yes, the solution is a bit hacky, but it is only intermediate, hopefully.
+!NR
+!NR  Remark: The wrapper to parms does employ diagonal scaling to the matrix
+!NR  and rhs, which already helps a lot!
 
 if (lfirst) then
-    call psolver_init(ident, SOLBICGS_RAS, PCRAS, PCILUK, lutype, &
+    call psolver_init(ident, SOLBICGS_NOPC, PCRAS, PCILUK, lutype, &
         fillin, droptol, maxiter, restart, soltol, &
         part-1, ssh_stiff%rowptr(:)-ssh_stiff%rowptr(1), &
         ssh_stiff%colind-1, ice_stiff_values, 1, MPI_COMM_FESOM)
     lfirst=.false.
-end if
+ end if
+
     call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
     call psolve(ident, rhs_v, ice_stiff_values, v_ice, 0)  ! values remain constant
+   
 end subroutine VPsolve 
 ! ============================================================================
 subroutine VPdynamics(mesh)
