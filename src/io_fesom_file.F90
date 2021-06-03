@@ -324,6 +324,9 @@ contains
   end subroutine
 
 
+  ! use separate procedures to specify node based or element based variables
+  ! if we would otherwise specify the vars only via the sizes of their dimensions,
+  ! we have to assign the corresponding dimindx somewhere else, which would be error prone
   subroutine specify_node_var_2d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
     use g_PARSUP
