@@ -32,6 +32,7 @@ OBJ1	=    ./src/parms_comm.o  \
              ./src/parms_vec.o ./src/parms_viewer.o \
 	     ./src/fgmres.o ./src/bicgstab.o ./src/cg.o ./src/pbicgstab.o \
 	     ./src/pbicgstab_ras.o ./src/bicgstab_ras.o\
+             ./src/bicgstab_nopc.o\
              ./src/gmres.o ./src/parms_complex.o 
 #$(HYPRE_OBJ) \
 
