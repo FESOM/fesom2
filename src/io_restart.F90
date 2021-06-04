@@ -103,25 +103,25 @@ subroutine ini_ocean_io(year, mesh)
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
   !___SSH_____________________________________________________________________
-  call def_variable(ocean_file, 'ssh',             (/nod2D/), 'sea surface elevation', 'm',   eta_n)
+  call oce_files%def_node_var('ssh', 'sea surface elevation', 'm',   eta_n, mesh)
   !___ALE related fields______________________________________________________
-  call def_variable(ocean_file, 'hbar',            (/nod2D/), 'ALE surface elevation', 'm',   hbar)
-!!PS   call def_variable(ocean_file, 'ssh_rhs',         (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs)
-  call def_variable(ocean_file, 'ssh_rhs_old',     (/nod2D/), 'RHS for the elevation', '?',   ssh_rhs_old)
-  call def_variable(ocean_file, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode)
+  call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   hbar, mesh)
+!!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh)
+  call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   ssh_rhs_old, mesh)
+  call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   hnode, mesh)
   
   !___Define the netCDF variables for 3D fields_______________________________
-  call def_variable(ocean_file, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:))
-  call def_variable(ocean_file, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:))
-  call def_variable(ocean_file, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:))
-  call def_variable(ocean_file, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:))
+  call oce_files%def_elem_var('u', 'zonal velocity',        'm/s', UV(1,:,:), mesh)
+  call oce_files%def_elem_var('v', 'meridional velocity',   'm/s', UV(2,:,:), mesh)
+  call oce_files%def_elem_var('urhs_AB', 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:), mesh)
+  call oce_files%def_elem_var('vrhs_AB', 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:), mesh)
   
   !___Save restart variables for TKE and IDEMIX_________________________________
   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call def_variable(ocean_file, 'tke',  (/nl, nod2d/), 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:))
+        call oce_files%def_node_var('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh)
   endif
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
-        call def_variable(ocean_file, 'iwe',  (/nl, nod2d/), 'Internal Wave eneryy', 'm2/s2', tke(:,:))
+        call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh)
   endif 
 
   do j=1,num_tracers
@@ -139,13 +139,13 @@ subroutine ini_ocean_io(year, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call def_variable(ocean_file, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j))
+     call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tr_arr(:,:,j), mesh)
      longname=trim(longname)//', Adams–Bashforth'
-     call def_variable(ocean_file, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j))
+     call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tr_arr_old(:,:,j), mesh)
   end do
-  call def_variable(ocean_file, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel)
-  call def_variable(ocean_file, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e)
-  call def_variable(ocean_file, 'w_impl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_i)
+  call oce_files%def_node_var('w', 'vertical velocity', 'm/s', Wvel, mesh)
+  call oce_files%def_node_var('w_expl', 'vertical velocity', 'm/s', Wvel_e, mesh)
+  call oce_files%def_node_var('w_impl', 'vertical velocity', 'm/s', Wvel_i, mesh)
 end subroutine ini_ocean_io
 !
 !--------------------------------------------------------------------------------------------
@@ -176,14 +176,14 @@ subroutine ini_ice_io(year, mesh)
   !===================== Definition part =====================================
   !===========================================================================
   !___Define the netCDF variables for 2D fields_______________________________
-  call def_variable(ice_file, 'area',       (/nod2D/), 'ice concentration [0 to 1]', '%',   a_ice)
-  call def_variable(ice_file, 'hice',       (/nod2D/), 'effective ice thickness',    'm',   m_ice)
-  call def_variable(ice_file, 'hsnow',      (/nod2D/), 'effective snow thickness',   'm',   m_snow)
-  call def_variable(ice_file, 'uice',       (/nod2D/), 'zonal velocity',             'm/s', u_ice)
-  call def_variable(ice_file, 'vice',       (/nod2D/), 'meridional velocity',        'm',   v_ice)
+  call ice_files%def_node_var('area', 'ice concentration [0 to 1]', '%',   a_ice, mesh)
+  call ice_files%def_node_var('hice', 'effective ice thickness',    'm',   m_ice, mesh)
+  call ice_files%def_node_var('hsnow', 'effective snow thickness',   'm',   m_snow, mesh)
+  call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', u_ice, mesh)
+  call ice_files%def_node_var('vice', 'meridional velocity',        'm',   v_ice, mesh)
 #if defined (__oifs)
-  call def_variable(ice_file, 'ice_albedo', (/nod2D/), 'ice albedo',                 '-',   ice_alb)
-  call def_variable(ice_file, 'ice_temp',(/nod2D/), 'ice surface temperature',  'K',   ice_temp)
+  call ice_files%def_node_var('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
+  call ice_files%def_node_var('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
