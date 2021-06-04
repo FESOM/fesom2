@@ -1,4 +1,5 @@
 MODULE io_RESTART
+  use restart_file_group_module
   use g_config
   use g_clock
   use g_parsup
@@ -62,6 +63,12 @@ MODULE io_RESTART
 !
 !--------------------------------------------------------------------------------------------
 !
+
+
+  type(restart_file_group), save, target :: oce_files
+  type(restart_file_group), save, target :: ice_files
+
+
   contains
 !
 !--------------------------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 module restart_file_group_module
   use io_fesom_file_module
   implicit none
+  public restart_file_group
   private
 
   
