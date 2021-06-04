@@ -76,11 +76,13 @@ subroutine ini_ocean_io(year, mesh)
   character(500)            :: trname, units
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
-
+  logical, save :: has_been_called = .false.
+  
   write(cyear,'(i4)') year
   oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
-  if (ocean_file%is_in_use) return
-  ocean_file%is_in_use=.true.
+
+  if(has_been_called) return
+  has_been_called = .true.
 
   !===========================================================================
   !===================== Definition part =====================================
@@ -146,11 +148,13 @@ subroutine ini_ice_io(year, mesh)
   character(500)            :: trname, units
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
+  logical, save :: has_been_called = .false.
 
   write(cyear,'(i4)') year
   ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
-  if (ice_file%is_in_use) return
-  ice_file%is_in_use=.true.
+
+  if(has_been_called) return
+  has_been_called = .true.
 
   !===========================================================================
   !===================== Definition part =====================================
