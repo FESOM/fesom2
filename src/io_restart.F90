@@ -77,16 +77,10 @@ subroutine ini_ocean_io(year, mesh)
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
 
-#include  "associate_mesh.h"
-
   write(cyear,'(i4)') year
   oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
   if (ocean_file%is_in_use) return
   ocean_file%is_in_use=.true.
-  call def_dim(ocean_file, 'node', nod2d)
-  call def_dim(ocean_file, 'elem', elem2d)
-  call def_dim(ocean_file, 'nz_1', nl-1)
-  call def_dim(ocean_file, 'nz',   nl)
 
   !===========================================================================
   !===================== Definition part =====================================
@@ -153,13 +147,10 @@ subroutine ini_ice_io(year, mesh)
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
 
-#include  "associate_mesh.h"
-
   write(cyear,'(i4)') year
   ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
   if (ice_file%is_in_use) return
   ice_file%is_in_use=.true.
-  call def_dim(ice_file, 'node', nod2d)
 
   !===========================================================================
   !===================== Definition part =====================================
