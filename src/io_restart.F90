@@ -65,8 +65,8 @@ MODULE io_RESTART
 !
 
 
-  type(restart_file_group), save, target :: oce_files
-  type(restart_file_group), save, target :: ice_files
+  type(restart_file_group), save :: oce_files
+  type(restart_file_group), save :: ice_files
 
 
   contains
