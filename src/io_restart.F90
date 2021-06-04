@@ -56,6 +56,8 @@ MODULE io_RESTART
   
   type(restart_file_group), save :: oce_files
   type(restart_file_group), save :: ice_files
+  character(:), allocatable, save :: oce_path
+  character(:), allocatable, save :: ice_path
 
 
   contains
@@ -78,8 +80,7 @@ subroutine ini_ocean_io(year, mesh)
 #include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
-  ! create an ocean restart file; serial output implemented so far
-  ocean_file%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
+  oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
   if (ocean_file%is_in_use) return
   ocean_file%is_in_use=.true.
   call def_dim(ocean_file, 'node', nod2d)
@@ -155,8 +156,7 @@ subroutine ini_ice_io(year, mesh)
 #include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
-  ! create an ocean restart file; serial output implemented so far
-  ice_file%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
+  ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
   if (ice_file%is_in_use) return
   ice_file%is_in_use=.true.
   call def_dim(ice_file, 'node', nod2d)
