@@ -110,6 +110,7 @@ INTEGER                       :: col, elem, elnodes(3), n2, offset
 INTEGER                       :: ipos, row, q, n, i,nini, nend
 real(kind=8)                  :: ac, as, ue, ve
 integer, allocatable          :: n_num(:)
+integer                       :: is, ie 
 
 type(t_mesh), intent(in), target  :: mesh
 
@@ -139,14 +140,21 @@ as=sin(theta_io)
 !    DO q=2,ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(row)
 !       ice_stiff_values(offset+q)=0.0_8                      ! Initialize with 0.0
 !    END DO
-   
-    DO q=ssh_stiff%rowptr_loc(row), ssh_stiff%rowptr_loc(row+1)-1
-       if (ssh_stiff%colind_loc(q)==row) then
-          ice_stiff_values(q)=area(1, row)*(1.0/ice_dt+drag*ac)
-       else
-          ice_stiff_values(q)=0.0_8
-       end if
-    END DO
+
+    !NR By construction, the first entry for each row is the diagonal one.
+    !NR We can replace the loop with the if and colind_loc by a simple
+    !NR direct statement.by a simple direct statement.
+!!$    DO q=ssh_stiff%rowptr_loc(row), ssh_stiff%rowptr_loc(row+1)-1
+!!$       if (ssh_stiff%colind_loc(q)==row) then
+!!$          ice_stiff_values(q)=area(1, row)*(1.0/ice_dt+drag*ac)
+!!$       else
+!!$          ice_stiff_values(q)=0.0_8
+!!$       end if
+!!$    END DO
+    is = ssh_stiff%rowptr_loc(row)
+    ie = ssh_stiff%rowptr_loc(row+1)-1
+    ice_stiff_values(is)      = area(1, row)*(1.0/ice_dt+drag*ac)
+    ice_stiff_values(is+1:ie) = 0. 
 
     ! =========
      rhs_u(row)=area(1, row)*(rhs_m(row)/ice_dt+drag*ac*u_w(row) &
@@ -198,8 +206,9 @@ as=sin(theta_io)
      ve=sum(v_ice(elnodes))/3.0
      DO i=1,3  ! Cycle over rows elem contributes to
 	row=elnodes(i)
-	if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
-        DO q=SSH_stiff%rowptr_loc(row), SSH_stiff%rowptr_loc(row+1)-1
+        if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
+
+        DO q=SSH_stiff%rowptr_loc(row)+1, SSH_stiff%rowptr_loc(row+1)-1
            n2=SSH_stiff%colind_loc(q)
            n_num(n2)=q
         END DO
@@ -322,7 +331,7 @@ soltol=1.e-12
 
 !NR  As the matrix changes so much between the steps, the preconditioner
 !NR  must be recomputed. However, also the nonzero-pattern of the matrix
-!NR  changes, as non-ice-nodes have only zeros on the off-diagonal.
+!NR  changes, as non-ice-nodes have zeros on the off-diagonal.
 !NR  Best choice is therefor no preconditioner at all: SOLBICGS_NOPC
 !NR  The preconditioner settings are (basically) ignored, i.e., the
 !NR  preconditioner is set up, but never used.
@@ -488,12 +497,19 @@ DO row=1,myDim_nod2D
      is=ssh_stiff%rowptr_loc(row)
      ie=ssh_stiff%rowptr_loc(row+1)-1
 
-     where (ssh_stiff%colind_loc(is:ie)==row)
-           ice_stiff_values(is:ie)=1.0_8
-     elsewhere
-           ice_stiff_values(is:ie)=0.0_8
-     end where
-
+     !NR By construction, the first entry for each row is the diagonal one.
+     !NR We can replace the loop with the if and colind_loc by a simple
+     !NR direct statement.
+!!$     where (ssh_stiff%colind_loc(is:ie)==row)
+!!$           ice_stiff_values(is:ie)=1.0_8
+!!$     elsewhere
+!!$           ice_stiff_values(is:ie)=0.0_8
+!!$     end where
+     is = ssh_stiff%rowptr_loc(row)
+     ie = ssh_stiff%rowptr_loc(row+1)-1
+     ice_stiff_values(is)      = 1.
+     ice_stiff_values(is+1:ie) = 0.
+    
      rhs_u(row)=0._8
      rhs_v(row)=0._8
    end if   
