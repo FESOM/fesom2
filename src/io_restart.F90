@@ -309,34 +309,6 @@ subroutine create_new_file(file)
 end subroutine create_new_file
 
 
-subroutine def_dim(file, name, ndim)
-  implicit none
-  type(nc_file),    intent(inout) :: file
-  character(len=*), intent(in)    :: name
-  integer,          intent(in)    :: ndim
-  type(nc_dims), allocatable, dimension(:) :: temp
-
-  if (file%ndim > 0) then
-     ! create temporal dimension
-     allocate(temp(file%ndim)); temp=file%dim
-     ! deallocate the input data array
-     deallocate(file%dim)
-     ! then reallocate
-     file%ndim=file%ndim+1
-     allocate(file%dim(file%ndim))
-     ! restore the original data
-     file%dim(1:file%ndim-1)=temp  
-     deallocate(temp)
-   else
-     ! first dimension in a file
-     file%ndim=1
-     allocate(file%dim(file%ndim))
-   end if
-   file%dim(file%ndim)%name=trim(name)
-   file%dim(file%ndim)%size=ndim
-end subroutine def_dim
-
-
 subroutine write_restart(file, istep, mesh)
   implicit none
   type(nc_file),  intent(inout) :: file
