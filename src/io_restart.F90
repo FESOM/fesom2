@@ -53,18 +53,7 @@ MODULE io_RESTART
 
   PRIVATE
   PUBLIC :: restart 
-!
-!--------------------------------------------------------------------------------------------
-! generic interface was required to associate variables of unknown rank with the pointers of the same rank
-! this allows for automatic streaming of associated variables into the netcdf file
-  INTERFACE def_variable
-            MODULE PROCEDURE def_variable_1d, def_variable_2d
-  END INTERFACE
-!
-!--------------------------------------------------------------------------------------------
-!
-
-
+  
   type(restart_file_group), save :: oce_files
   type(restart_file_group), save :: ice_files
 
@@ -351,76 +340,6 @@ subroutine def_dim(file, name, ndim)
    file%dim(file%ndim)%name=trim(name)
    file%dim(file%ndim)%size=ndim
 end subroutine def_dim
-
-
-subroutine def_variable_1d(file, name, global_shape, longname, units, local_data)
-  implicit none
-  type(nc_file),    intent(inout)        :: file
-  character(len=*), intent(in)           :: name
-  integer, intent(in)                    :: global_shape(1)
-  character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout)        :: local_data(:)
-  integer                                :: c
-  type(nc_vars), allocatable, dimension(:) :: temp
-
-  if (file%nvar > 0) then
-     ! create temporal dimension
-     allocate(temp(file%nvar)); temp=file%var
-     ! deallocate the input data array
-     deallocate(file%var)
-     ! then reallocate
-     file%nvar=file%nvar+1
-     allocate(file%var(file%nvar))
-     ! restore the original data
-     file%var(1:file%nvar-1)=temp  
-     deallocate(temp)
-   else
-     ! first dimension in a file
-     file%nvar=1
-     allocate(file%var(file%nvar))
-   end if
-   file%var(file%nvar)%name=trim(name)
-   file%var(file%nvar)%longname=trim(longname)
-   file%var(file%nvar)%units=trim(units)
-   file%var(file%nvar)%ndim=1
-   file%var(file%nvar)%dims(1)=global_shape(1)
-   file%var(file%nvar)%pt1=>local_data
-end subroutine def_variable_1d
-
-
-subroutine def_variable_2d(file, name, global_shape, longname, units, local_data)
-  implicit none
-  type(nc_file),    intent(inout)        :: file
-  character(len=*), intent(in)           :: name
-  integer, intent(in)                    :: global_shape(2)
-  character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout) :: local_data(:,:)
-  integer                                :: c
-  type(nc_vars), allocatable, dimension(:) :: temp
-
-  if (file%nvar > 0) then
-     ! create temporal dimension
-     allocate(temp(file%nvar)); temp=file%var
-     ! deallocate the input data array
-     deallocate(file%var)
-     ! then reallocate
-     file%nvar=file%nvar+1
-     allocate(file%var(file%nvar))
-     ! restore the original data
-     file%var(1:file%nvar-1)=temp  
-     deallocate(temp)
-   else
-     ! first dimension in a file
-     file%nvar=1
-     allocate(file%var(file%nvar))
-   end if
-   file%var(file%nvar)%name=trim(name)
-   file%var(file%nvar)%longname=trim(longname)
-   file%var(file%nvar)%units=trim(units)
-   file%var(file%nvar)%ndim=2
-   file%var(file%nvar)%dims(1:2)=global_shape
-   file%var(file%nvar)%pt2=>local_data
-end subroutine def_variable_2d
 
 
 subroutine write_restart(file, istep, mesh)
