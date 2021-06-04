@@ -51,7 +51,7 @@ MODULE io_RESTART
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
-  PUBLIC :: restart, ocean_file, ice_file 
+  PUBLIC :: restart 
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
