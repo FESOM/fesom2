@@ -208,7 +208,7 @@ as=sin(theta_io)
 	row=elnodes(i)
         if(row>myDim_nod2D) cycle       !! PP if(part(row).ne.mype) cycle
 
-        DO q=SSH_stiff%rowptr_loc(row)+1, SSH_stiff%rowptr_loc(row+1)-1
+        DO q=SSH_stiff%rowptr_loc(row), SSH_stiff%rowptr_loc(row+1)-1
            n2=SSH_stiff%colind_loc(q)
            n_num(n2)=q
         END DO
@@ -347,9 +347,9 @@ if (lfirst) then
         ssh_stiff%colind-1, ice_stiff_values, 1, MPI_COMM_FESOM)
     lfirst=.false.
  end if
-
-    call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
-    call psolve(ident, rhs_v, ice_stiff_values, v_ice, 0)  ! values remain constant
+ 
+ call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
+ call psolve(ident, rhs_v, ice_stiff_values, v_ice, 0)  ! values remain constant
    
 end subroutine VPsolve 
 ! ============================================================================
@@ -359,6 +359,7 @@ use mod_mesh
 use i_PARAM
 use i_ARRAYS
 use ice_VP_interfaces, except_this_one => VPdynamics
+use g_comm_auto
 ! Driving routine of VP rheology
 IMPLICIT NONE
 integer        :: n, row, is, ie
@@ -383,6 +384,7 @@ REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice !!! just 
  END DO   
  call VPmatrix_rhs(mesh)
  call VPbc(mesh)
+ call exchange_nod(rhs_u,rhs_v)
  call VPsolve(mesh, 1)
 
  DO row=1,myDim_nod2D+eDim_nod2D     !! PP n=1,myDim_nod2D+eDim_nod2D       
@@ -395,6 +397,7 @@ REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice !!! just 
  DO n=1, ice_VP_iter   !(Picard iterations)
   call VPmatrix_rhs(mesh)
   call VPbc(mesh)
+  call exchange_nod(rhs_u,rhs_v)
   call VPsolve(mesh, 1)
  END DO  
  DO row=1,myDim_nod2D+eDim_nod2D     !! PP  n=1,myDim_nod2D+eDim_nod2D       
@@ -405,6 +408,7 @@ REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice !!! just 
  call VPmatrix_rhs(mesh)
  call VPbc(mesh)
  call VPsolve(mesh, 1)
+ call exchange_nod(rhs_u,rhs_v)
  call VPmake_implicit(mesh)
 
 
