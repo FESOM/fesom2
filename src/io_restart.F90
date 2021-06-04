@@ -424,10 +424,9 @@ subroutine write_restart(file, istep, mesh)
 end subroutine write_restart
 
 
-subroutine read_restart(file, mesh, arg)
+subroutine read_restart(file, mesh)
   implicit none
   type(nc_file),     intent(inout) :: file
-  integer, optional, intent(in)    :: arg
   real(kind=WP), allocatable       :: aux(:), laux(:)
   integer                          :: i, lev, size1, size2, shape
   integer                          :: rec2read, c
@@ -459,11 +458,7 @@ subroutine read_restart(file, mesh, arg)
         call par_ex
      end if 
      
-     if (.not. present(arg)) then
-        rec2read=file%rec_count
-     else
-        rec2read=arg
-     end if
+     rec2read=file%rec_count
      write(*,*) 'restart from record ', rec2read, ' of ', file%rec_count
 
      if (int(ctime)/=int(rtime)) then
