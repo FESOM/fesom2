@@ -407,8 +407,8 @@ REAL(kind=WP), ALLOCATABLE, DIMENSION(:), SAVE         :: rhs_diag_ice !!! just 
  END DO  
  call VPmatrix_rhs(mesh)
  call VPbc(mesh)
- call VPsolve(mesh, 1)
  call exchange_nod(rhs_u,rhs_v)
+ call VPsolve(mesh, 1)
  call VPmake_implicit(mesh)
 
 
