@@ -351,6 +351,14 @@ if (lfirst) then
  call psolve(ident, rhs_u, ice_stiff_values, u_ice, new_values)
  call psolve(ident, rhs_v, ice_stiff_values, v_ice, 0)  ! values remain constant
    
+! Sets boundary conditions to the solution - might leave parms as /= 0
+DO n=1,myDim_nod2D
+   if((a_ice(n)<0.01).or.(bc_index_nod2D(n)<0.5)) then    
+     u_ice(n)=0._8
+     v_ice(n)=0._8
+   end if   
+END DO
+
 end subroutine VPsolve 
 ! ============================================================================
 subroutine VPdynamics(mesh)
