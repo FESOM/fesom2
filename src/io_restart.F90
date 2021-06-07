@@ -32,10 +32,8 @@ MODULE io_RESTART
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, mesh)
   integer, intent(in)       :: year
-  integer                   :: ncid, j
-  integer                   :: varid
+  integer                   :: j
   character(500)            :: longname
-  character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
@@ -102,11 +100,6 @@ end subroutine ini_ocean_io
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ice_io(year, mesh)
   integer,      intent(in)  :: year
-  integer                   :: ncid, j
-  integer                   :: varid
-  character(500)            :: longname
-  character(500)            :: filename
-  character(500)            :: trname, units
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
   logical, save :: has_been_called = .false.
@@ -143,7 +136,6 @@ subroutine restart(istep, l_write, l_read, mesh)
   integer :: istep
   logical :: l_write, l_read
   logical :: is_restart
-  integer :: mpierr
   type(t_mesh), intent(in) , target :: mesh
 
   ctime=timeold+(dayold-1.)*86400
