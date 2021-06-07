@@ -196,12 +196,10 @@ subroutine restart(istep, l_write, l_read, mesh)
   end if
 
   if (l_read) then
-   call assoc_ids(ocean_file);          call was_error(ocean_file)
-   call read_restart(ocean_file, mesh); call was_error(ocean_file)
-   if (use_ice) then
-      call assoc_ids(ice_file);          call was_error(ice_file)
-      call read_restart(ice_file, mesh); call was_error(ice_file)
-   end if
+    call read_restart(oce_path, oce_files)
+    if (use_ice) then
+      call read_restart(ice_path, ice_files)
+    end if
   end if
 
   if (istep==0) return
@@ -396,105 +394,51 @@ subroutine write_restart(file, istep, mesh)
 end subroutine write_restart
 
 
-subroutine read_restart(file, mesh)
-  implicit none
-  type(nc_file),     intent(inout) :: file
-  real(kind=WP), allocatable       :: aux(:), laux(:)
-  integer                          :: i, lev, size1, size2, shape
-  integer                          :: rec2read, c
-  real(kind=WP)                    :: rtime !timestamp of the record
-  logical                          :: file_exist=.False.
-  type(t_mesh), intent(in)        , target :: mesh
+subroutine read_restart(path, filegroup)
+  character(len=*), intent(in) :: path
+  type(restart_file_group), intent(inout) :: filegroup
+  ! EO parameters
+  real(kind=WP) rtime
+  integer i
+  character(:), allocatable :: dirpath
 
-#include  "associate_mesh.h"
+  do i=1, filegroup%nfiles
+    if( filegroup%files(i)%is_iorank() ) then
+      dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
+      if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
+        call execute_command_line("mkdir -p "//dirpath)
+        filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+        write(*,*) 'reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+        call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        ! todo: print a reasonable error message if the file does not exist
+      end if
+    end if
 
-  ! laux=0.
-  ! Serial output implemented so far
-  c=1
-  if (mype==0) then
-     file_exist=.False.
-     inquire(file=file%filename,exist=file_exist) 
-     if (file_exist) then
-        write(*,*) '     reading restart file:  ', trim(file%filename)
-        file%error_status(c)=nf_open(file%filename, nf_nowrite, file%ncid);                           c=c+1
-        file%error_status(c)=nf_get_vara_int(file%ncid,    file%iter_varid, file%rec_count, 1, globalstep, 1); c=c+1
-        file%error_status(c)=nf_get_vara_double(file%ncid, file%time_varid, file%rec_count, 1, rtime, 1);      c=c+1
-     else
-        write(*,*)
-        print *, achar(27)//'[33m'
-        write(*,*) '____________________________________________________________________'
-        write(*,*) ' ERROR: could not find restart_file:',trim(file%filename),'!'    
-        write(*,*) '____________________________________________________________________'
-        print *, achar(27)//'[0m'
-        write(*,*)
-        call par_ex
-     end if 
-     
-     rec2read=file%rec_count
-     write(*,*) 'restart from record ', rec2read, ' of ', file%rec_count
+    call filegroup%files(i)%async_read_and_scatter_variables()
+  end do
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%join()
 
-     if (int(ctime)/=int(rtime)) then
+    if(filegroup%files(i)%is_iorank()) then
+      write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count()
+
+      ! read the last entry from the iter variable
+      call filegroup%files(i)%read_var1(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()], globalstep)
+
+      ! read the last entry from the time variable
+      call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()], rtime)
+      call filegroup%files(i)%close_file()
+
+      if (int(ctime)/=int(rtime)) then
         write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'
-        file%error_status(c)=-310; c=c+1
-     end if
-  end if
-
-  call was_error(file); c=1
- 
-  do i=1, file%nvar
-     shape=file%var(i)%ndim
-     if (mype==0) write(*,*) 'reading restart for ', trim(file%var(i)%name)
-!_______writing 2D fields________________________________________________
-     if (shape==1) then
-        size1=file%var(i)%dims(1)
-        if (mype==0) then
-           allocate(aux(size1))
-           file%error_status(c)=nf_get_vara_double(file%ncid, file%var(i)%code, (/1, file%rec_count/), (/size1, 1/), aux, 1); c=c+1
-!          write(*,*) 'min/max 2D =', minval(aux), maxval(aux)
-        end if
-        if (size1==nod2D)  call broadcast_nod (file%var(i)%pt1, aux)
-        if (size1==elem2D) call broadcast_elem(file%var(i)%pt1, aux)
-        if (mype==0) deallocate(aux)
-!_______writing 3D fields________________________________________________
-     elseif (shape==2) then
-        size1=file%var(i)%dims(1)
-        size2=file%var(i)%dims(2)
-        if (mype==0)       allocate(aux (size2))
-        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
-        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))        
-        do lev=1, size1
-           if (mype==0) then
-              file%error_status(c)=nf_get_vara_double(file%ncid, file%var(i)%code, (/lev, 1, file%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
-!             write(*,*) 'min/max 3D ', lev,'=', minval(aux), maxval(aux)
-           end if
-           file%var(i)%pt2(lev,:)=0.
-!          if (size1==nod2D  .or. size2==nod2D)  call broadcast_nod (file%var(i)%pt2(lev,:), aux)
-!          if (size1==elem2D .or. size2==elem2D) call broadcast_elem(file%var(i)%pt2(lev,:), aux)
-           if (size2==nod2D)  then
-              call broadcast_nod (laux, aux)
-              file%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
-           end if
-           if (size2==elem2D) then
-              call broadcast_elem(laux, aux)
-              file%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
-           end if
-        end do
-        deallocate(laux)
-        if (mype==0) deallocate(aux)
-     else
-        if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
-           call par_ex
-           stop
-     end if
-     call was_error(file); c=1
+        stop 1
+      end if
+    end if    
   end do
-
-  if (mype==0) file%error_status(1)=nf_close(file%ncid);
-  file%error_count=1
-  call was_error(file)
-end subroutine read_restart
+end subroutine
 
 
 subroutine assoc_ids(file)
