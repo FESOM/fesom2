@@ -13,7 +13,7 @@ MODULE io_RESTART
 #include "netcdf.inc"
 
 
-  integer,       save       :: globalstep=0
+  integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
   PRIVATE
@@ -31,8 +31,6 @@ MODULE io_RESTART
 ! ini_ocean_io initializes ocean_file datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ocean_io(year, mesh)
-  implicit none
-
   integer, intent(in)       :: year
   integer                   :: ncid, j
   integer                   :: varid
@@ -103,8 +101,6 @@ end subroutine ini_ocean_io
 ! ini_ice_io initializes ice_file datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
 subroutine ini_ice_io(year, mesh)
-  implicit none
-
   integer,      intent(in)  :: year
   integer                   :: ncid, j
   integer                   :: varid
@@ -140,7 +136,6 @@ end subroutine ini_ice_io
 !--------------------------------------------------------------------------------------------
 !
 subroutine restart(istep, l_write, l_read, mesh)
-  implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
   ! if l_read   is TRUE the restart file will be read
