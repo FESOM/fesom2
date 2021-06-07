@@ -230,11 +230,9 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   ! write restart
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(ocean_file);                  call was_error(ocean_file)  
-  call write_restart(ocean_file, istep, mesh); call was_error(ocean_file)
+  call write_restart(oce_path, oce_files, istep)
   if (use_ice) then
-     call assoc_ids(ice_file);                  call was_error(ice_file)  
-     call write_restart(ice_file, istep, mesh); call was_error(ice_file)
+    call write_restart(ice_path, ice_files, istep)
   end if
   
   ! actualize clock file to latest restart point
@@ -307,91 +305,46 @@ subroutine create_new_file(file)
 end subroutine create_new_file
 
 
-subroutine write_restart(file, istep, mesh)
-  implicit none
-  type(nc_file),  intent(inout) :: file
-  integer,  intent(in)          :: istep
-  type(t_mesh), intent(in)     , target :: mesh
-  real(kind=WP), allocatable    :: aux(:), laux(:)
-  integer                       :: i, lev, size1, size2, shape
-  integer                       :: c
-  real(kind=WP)                 :: t0, t1, t2, t3
+subroutine write_restart(path, filegroup, istep)
+  character(len=*), intent(in) :: path
+  type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: istep
+  ! EO parameters
+  integer cstep
+  integer i
+  character(:), allocatable :: dirpath
+  
+  cstep = globalstep+istep
+  
+  do i=1, filegroup%nfiles
+    if(filegroup%files(i)%is_iorank()) then
+      dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
+      if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
+        call execute_command_line("mkdir -p "//dirpath)
+        filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+        call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
+      else
+        call filegroup%files(i)%open_write_append(filegroup%files(i)%path)
+      end if
 
-#include  "associate_mesh.h"
+      write(*,*) 'writing restart record ', filegroup%files(i)%rec_count()+1, ' to ', filegroup%files(i)%path
+      ! todo: write iter to a separate (non-mesh-variable) file
+      call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()+1], [1], [cstep])
+      ! todo: write time via the fesom_file_type
+      call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()+1], [1], [ctime])
+    end if
 
-  ! Serial output implemented so far
-  if (mype==0) then
-     c=1
-     !file%rec_count=file%rec_count+1
-     write(*,*) 'writing restart record ', file%rec_count
-     file%error_status(c)=nf_open(file%filename, nf_write, file%ncid); c=c+1
-     file%error_status(c)=nf_put_vara_double(file%ncid, file%time_varid, file%rec_count, 1, ctime, 1); c=c+1
-     file%error_status(c)=nf_put_vara_int(file%ncid,    file%iter_varid, file%rec_count, 1, globalstep+istep, 1);   c=c+1
-  end if
-
-  call was_error(file); c=1
-
-  do i=1, file%nvar
-     shape=file%var(i)%ndim
-!_______writing 2D fields________________________________________________
-     if (shape==1) then
-        size1=file%var(i)%dims(1)
-        if (mype==0) allocate(aux(size1))
-        t0=MPI_Wtime()
-        if (size1==nod2D)  call gather_nod (file%var(i)%pt1, aux)
-        if (size1==elem2D) call gather_elem(file%var(i)%pt1, aux)
-        t1=MPI_Wtime()
-        if (mype==0) then
-           file%error_status(c)=nf_put_vara_double(file%ncid, file%var(i)%code, (/1, file%rec_count/), (/size1, 1/), aux, 1); c=c+1
-        end if
-        t2=MPI_Wtime()
-#ifdef DEBUG
-        ! Timeing information for collecting and writing restart file
-        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'gather_nod: ', t1-t0
-        if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size1, 'nf_put_var: ', t2-t1
-#endif
-        if (mype==0) deallocate(aux)
-!_______writing 3D fields________________________________________________
-     elseif (shape==2) then
-        size1=file%var(i)%dims(1)
-        size2=file%var(i)%dims(2)
-        if (mype==0)       allocate(aux (size2))
-        if (size2==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
-        if (size2==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
-        do lev=1, size1
-           laux=file%var(i)%pt2(lev,:)
-!          if (size1==nod2D  .or. size2==nod2D)  call gather_nod (file%var(i)%pt2(lev,:), aux)
-!          if (size1==elem2D .or. size2==elem2D) call gather_elem(file%var(i)%pt2(lev,:), aux)
-           t0=MPI_Wtime()
-           if (size1==nod2D  .or. size2==nod2D)  call gather_nod (laux, aux)
-           if (size1==elem2D .or. size2==elem2D) call gather_elem(laux, aux)
-           t1=MPI_Wtime()
-           if (mype==0) then
-              file%error_status(c)=nf_put_vara_double(file%ncid, file%var(i)%code, (/lev, 1, file%rec_count/), (/1, size2, 1/), aux, 1); c=c+1
-           end if
-           t2=MPI_Wtime()
-#ifdef DEBUG
-           ! Timeing information for collecting and writing output file
-           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'gather_nod: ', t1-t0
-           if (mype==0) write(*,*) 'nvar: ', i, 'size: ', size2, 'lev: ', lev, 'nf_put_var: ', t2-t1
-#endif
-        end do
-        deallocate(laux)
-        if (mype==0) deallocate(aux)
-     else
-        if (mype==0) write(*,*) 'not supported shape of array in restart file'
-           call par_ex
-           stop
-     end if
-     call was_error(file); c=1
+    call filegroup%files(i)%async_gather_and_write_variables()
   end do
-
-  if (mype==0) file%error_count=c-1
-  call was_error(file)
-  if (mype==0) file%error_status(1)=nf_close(file%ncid);
-  file%error_count=1
-  call was_error(file)
-end subroutine write_restart
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%join()
+    
+    if(filegroup%files(i)%is_iorank()) then
+      call filegroup%files(i)%close_file()
+    end if
+  end do
+end subroutine
 
 
 subroutine read_restart(path, filegroup)
