@@ -10,7 +10,6 @@ MODULE io_RESTART
   use g_cvmix_tke
   use g_cvmix_idemix
   implicit none
-#include "netcdf.inc"
 
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
