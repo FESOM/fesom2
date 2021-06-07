@@ -1245,11 +1245,11 @@ submodule (icedrv_main) icedrv_step
 
              select case (whichEVP)
                 case (0)
-                   !call EVPdynamics(mesh)
+                   call EVPdynamics(mesh)
                 case (1)
-                   !call EVPdynamics_m(mesh)
+                   call EVPdynamics_m(mesh)
                 case (2)
-                   !call EVPdynamics_a(mesh)
+                   call EVPdynamics_a(mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
                    call par_ex
@@ -1323,10 +1323,6 @@ submodule (icedrv_main) icedrv_step
 
           t4 = MPI_Wtime()
           time_therm = t4 - t1 - time_advec - time_evp
-
-          !time_advec = c0
-          !time_therm = c0
-          !time_evp   = c0
 
       end subroutine step_icepack
 
