@@ -524,6 +524,9 @@ DO row=1,myDim_nod2D
     
      rhs_u(row)=0._8
      rhs_v(row)=0._8
+     
+     u_ice(row)=0._8
+     v_ice(row)=0._8
    end if   
 END DO  
 
