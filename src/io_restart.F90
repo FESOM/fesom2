@@ -1,22 +1,15 @@
 MODULE io_RESTART
   use restart_file_group_module
-  use g_config
   use g_clock
-  use g_parsup
-  use g_comm_auto
-  use mod_mesh
   use o_arrays
   use i_arrays
   use g_cvmix_tke
-  use g_cvmix_idemix
   implicit none
-
+  public :: restart 
+  private
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
-
-  PRIVATE
-  PUBLIC :: restart 
   
   type(restart_file_group), save :: oce_files
   type(restart_file_group), save :: ice_files
