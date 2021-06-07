@@ -11,43 +11,8 @@ MODULE io_RESTART
   use g_cvmix_idemix
   implicit none
 #include "netcdf.inc"
-!
-!--------------------------------------------------------------------------------------------
-! 
-  type nc_dims
-    integer        :: size
-    character(100) :: name
-    integer        :: code
-  end type nc_dims
-!
-!--------------------------------------------------------------------------------------------
-!
-  type nc_vars
-    character(100) :: name
-    integer        :: code
-    character(500) :: longname
-    character(100) :: units
-    integer        :: ndim
-    integer        :: dims(2) !<=2; assume there are no variables with dimension more than 2xNLxT
-    real(kind=WP), pointer :: pt1(:), pt2(:,:)
-  end type nc_vars
-!
-!--------------------------------------------------------------------------------------------
-!
-  type nc_file
-    character(500)                                :: filename
-    type(nc_dims), allocatable, dimension(:) :: dim
-    type(nc_vars), allocatable, dimension(:) :: var
-    integer :: ndim=0, nvar=0
-    integer :: rec_dimid, time_varid, iter_varid
-    integer :: ncid
-    integer :: rec_count=0
-    integer :: error_status(250), error_count
-    logical :: is_in_use=.false.
-  end type nc_file
 
 
-  type(nc_file), save       :: ocean_file, ice_file
   integer,       save       :: globalstep=0
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
 
