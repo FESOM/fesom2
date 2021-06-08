@@ -181,8 +181,8 @@ subroutine restart(istep, l_write, l_read, mesh)
   
   ! actualize clock file to latest restart point
   if (mype==0) then
-		write(*,*) ' --> actualize clock file to latest restart point'
-		call clock_finish  
+    write(*,*) ' --> actualize clock file to latest restart point'
+    call clock_finish  
   end if
   
 end subroutine restart
