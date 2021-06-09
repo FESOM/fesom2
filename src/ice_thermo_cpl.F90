@@ -474,6 +474,11 @@ contains
   real(kind=WP)  zcprosn
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+    !---- freezing temperature of sea-water [K]
+  real(kind=WP)  :: TFrezs
+
+  !---- compute freezing temperature of sea-water from salinity
+  TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
 
   snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
   zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
