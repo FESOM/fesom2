@@ -5,7 +5,7 @@ MODULE io_RESTART
   use i_arrays
   use g_cvmix_tke
   implicit none
-  public :: restart 
+  public :: restart, finalize_restart
   private
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
@@ -200,14 +200,18 @@ subroutine write_restart(path, filegroup, istep)
   cstep = globalstep+istep
   
   do i=1, filegroup%nfiles
+    call filegroup%files(i)%join() ! join the previous write (if required)
+
     if(filegroup%files(i)%is_iorank()) then
+      if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file() ! close the file from previous write
+      
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
       else
-        call filegroup%files(i)%open_write_append(filegroup%files(i)%path)
+        call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
       end if
 
       write(*,*) 'writing restart record ', filegroup%files(i)%rec_count()+1, ' to ', filegroup%files(i)%path
@@ -220,13 +224,31 @@ subroutine write_restart(path, filegroup, istep)
     call filegroup%files(i)%async_gather_and_write_variables()
   end do
   
-  do i=1, filegroup%nfiles
-    call filegroup%files(i)%join()
-    
-    if(filegroup%files(i)%is_iorank()) then
-      call filegroup%files(i)%close_file()
+end subroutine
+
+
+! join remaining threads and close all open files
+subroutine finalize_restart()
+  integer i
+
+  ! join all previous writes
+  ! close all restart files
+
+  do i=1, oce_files%nfiles
+    call oce_files%files(i)%join()
+    if(oce_files%files(i)%is_iorank()) then
+      if(oce_files%files(i)%is_attached()) call oce_files%files(i)%close_file()
     end if
   end do
+
+  if(use_ice) then
+    do i=1, ice_files%nfiles
+      call ice_files%files(i)%join()
+      if(ice_files%files(i)%is_iorank()) then
+        if(ice_files%files(i)%is_attached()) call ice_files%files(i)%close_file()
+      end if
+    end do
+  end if
 end subroutine
 
 

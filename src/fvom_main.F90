@@ -239,6 +239,7 @@ type(t_mesh), target, save      :: mesh
     end do
     
     call finalize_output()
+    call finalize_restart()
     
     !___FINISH MODEL RUN________________________________________________________
 
