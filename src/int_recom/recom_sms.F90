@@ -1,262 +1,263 @@
-subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSW,sms,Temp,SinkVel,zF,PAR, mesh)
+subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR, mesh)
 
-  Use REcoM_declarations
-  use REcoM_LocVar
-  use REcoM_GloVar
-  use recom_config
-  use REcoM_ciso
-  use g_clock
-  use o_PARAM
-  use g_PARSUP
-  use g_rotate_grid
-  use g_config
-  use mod_MESH
-  use i_arrays
-  use o_param
-  use i_param
-  use o_arrays
-  use g_forcing_arrays
-  use g_comm_auto
-  use i_therm_param
-  use g_comm
-  use g_support
+    use REcoM_declarations
+    use REcoM_LocVar
+    use REcoM_GloVar
+    use recom_config
+    use REcoM_ciso
+    use g_clock
+    use o_PARAM
+    use g_PARSUP
+    use g_rotate_grid
+    use g_config
+    use mod_MESH
+    use i_arrays
+    use o_param
+    use i_param
+    use o_arrays
+    use g_forcing_arrays
+    use g_comm_auto
+    use i_therm_param
+    use g_comm
+    use g_support
 
-  Implicit none
-  type(t_mesh), intent(in) , target                       :: mesh
-  Integer, intent(in)                                     :: Nn                   !< Total number of nodes in the vertical
-  Real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: state                !< ChlA conc in phytoplankton [mg/m3]
-										  !! should be in instead of inout
+    implicit none
+    type(t_mesh), intent(in) , target                       :: mesh
+    integer, intent(in)                                     :: Nn                   !< Total number of nodes in the vertical
+    real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: state                !< ChlA conc in phytoplankton [mg/m3]
+									  	    !! should be in instead of inout
 
-  Real(kind=8),dimension(mesh%nl-1)                       :: thick                !< [m] Vertical distance between two nodes = Thickness 
-  Real(kind=8),dimension(mesh%nl-1)                       :: recipthick           !< [1/m] reciprocal of thick
-  Real(kind=8), intent(in)                                :: SurfSW               !< [W/m2] ShortWave radiation at surface
+    real(kind=8),dimension(mesh%nl-1)                       :: thick                !< [m] Vertical distance between two nodes = Thickness 
+    real(kind=8),dimension(mesh%nl-1)                       :: recipthick           !< [1/m] reciprocal of thick
+    real(kind=8), intent(in)                                :: SurfSR               !< [W/m2] ShortWave radiation at surface
 
-  Real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: sms                  !< Source-Minus-Sinks term
-  Real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Temp                 !< [degrees C] Ocean temperature
-  Real(kind=8),dimension(mesh%nl,3)        ,intent(in)    :: SinkVel
+    real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: sms                  !< Source-Minus-Sinks term
+    real(kind=8),dimension(mesh%nl-1)        ,intent(in)    :: Temp                 !< [degrees C] Ocean temperature
+    real(kind=8),dimension(mesh%nl,4)        ,intent(in)    :: SinkVel
 
-  Real(kind=8),dimension(mesh%nl),intent(in)              :: zF                   !< [m] Depth of fluxes
-  Real(kind=8),dimension(mesh%nl-1),intent(inout)         :: PAR
+    real(kind=8),dimension(mesh%nl),intent(in)              :: zF                   !< [m] Depth of fluxes
+    real(kind=8),dimension(mesh%nl-1),intent(inout)         :: PAR
 
-  Real(kind=8)                                            :: net                  
+    real(kind=8)                                            :: net                  
 
-  Real(kind=8)                                            :: dt_d                 !< Size of time steps [day]
-  Real(kind=8)                                            :: dt_b                 !< Size of time steps [day]
-  Real(kind=8),dimension(mesh%nl-1)                       :: Sink
-  Real(kind=8)                                            :: dt_sink              !< Size of local time step
-  Real(kind=8)                                            :: Fc                   !< Flux of labile C into sediment, used for denitrification calculation [umolC/cm2/s]
-  Real(kind=8)                                            :: recip_hetN_plus      !< MB's addition to heterotrophic respiration
-  Real(kind=8)                                            :: recip_res_het        !< [day] Reciprocal of respiration by heterotrophs and mortality (loss to detritus)
+    real(kind=8)                                            :: dt_d                 !< Size of time steps [day]
+    real(kind=8)                                            :: dt_b                 !< Size of time steps [day]
+    real(kind=8),dimension(mesh%nl-1)                       :: Sink
+    real(kind=8)                                            :: dt_sink              !< Size of local time step
+    real(kind=8)                                            :: Fc                   !< Flux of labile C into sediment, used for denitrification calculation [umolC/cm2/s]
+    real(kind=8)                                            :: recip_hetN_plus      !< MB's addition to heterotrophic respiration
+    real(kind=8)                                            :: recip_res_het        !< [day] Reciprocal of respiration by heterotrophs and mortality (loss to detritus)
 
-  Integer                                                 :: k,step,ii, idiags,n
-  Real(kind=8)                                            :: & 
-    DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
-    DIC,     & !< Dissolved Inorganic Carbon				[mmol/m3]
-    Alk,     & !< Total Alkalinity					[mmol/m3]
-    PhyN,    & !< Intracellular conc of Nitrogen in small phytoplankton	[mmol/m3]
-    PhyC,    & !< Intracellular conc of Carbon in small phytoplankton 	[mmol/m3]
-    PhyChl,  & !< Current intracellular ChlA conc. 			[mg/m3]
-    DetN,    & !< Conc of N in Detritus 				[mmol/m3]
-    DetC,    & !< Conc of C in Detritus					[mmol/m3]
-    HetN,    & !< Conc of N in heterotrophs				[mmol/m3]
-    HetC,    & !< Conc of C in heterotrophs				[mmol/m3]
-    DON,     & !< Dissolved organic N in the water			[mmol/m3]
-    EOC,     & !< Extracellular Organic C conc				[mmol/m3]
-    DiaN,    &
-    DiaC,    &
-    DiaChl,  &
-    DiaSi,   &
-    DetSi,   &
-    Si,      &
-    Fe,      &
-    PhyCalc, &
-    DetCalc, &
+    integer                                                 :: k,step,ii, idiags,n
+    real(kind=8)                                            :: & 
+        DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
+        DIC,     & !< Dissolved Inorganic Carbon				[mmol/m3]
+        Alk,     & !< Total Alkalinity					        [mmol/m3]
+        PhyN,    & !< Intracellular conc of Nitrogen in small phytoplankton	[mmol/m3]
+        PhyC,    & !< Intracellular conc of Carbon in small phytoplankton 	[mmol/m3]
+        PhyChl,  & !< Current intracellular ChlA conc. 			        [mg/m3]
+        DetN,    & !< Conc of N in Detritus 				        [mmol/m3]
+        DetC,    & !< Conc of C in Detritus					[mmol/m3]
+        HetN,    & !< Conc of N in heterotrophs				        [mmol/m3]
+        HetC,    & !< Conc of C in heterotrophs				        [mmol/m3]
+        DON,     & !< Dissolved organic N in the water			        [mmol/m3]
+        EOC,     & !< Extracellular Organic C conc				[mmol/m3]
+        DiaN,    &
+        DiaC,    &
+        DiaChl,  &
+        DiaSi,   &
+        DetSi,   &
+        Si,      &
+        Fe,      &
+        PhyCalc, &
+        DetCalc, &
 !    if (REcoM_Second_Zoo) then
-    Zoo2N,    &
-    Zoo2C,    &
-     DetZ2N,   &
-     DetZ2C,   &
-     DetZ2Si,  &
-     DetZ2Calc,&
-
+        Zoo2N,    &
+        Zoo2C,    &
+        DetZ2N,   &
+        DetZ2C,   &
+        DetZ2Si,  &
+        DetZ2Calc,&
 !    endif
-    FreeFe,  &
-    O2
-     ! mmol/m3
+        FreeFe,  &
+        O2
+     
 #include "../associate_mesh.h"
 
-  if (ciso) then
-    Cphot_z = zero                 ! initialize vertical profiles of
-    Cphot_dia_z = zero             ! daily-mean photosynthesis rates
-    if (.not. ciso_calcdiss) then  ! turn off isotopic fractionation
-        alpha_calc_13 = 1.   ! during calcification / dissolution
-        alpha_calc_14 = 1.
-        alpha_dcal_13 = 1.
-        alpha_dcal_14 = 1.
+    if (ciso) then
+        Cphot_z = zero                 ! initialize vertical profiles of
+        Cphot_dia_z = zero             ! daily-mean photosynthesis rates
+        if (.not. ciso_calcdiss) then  ! turn off isotopic fractionation
+            alpha_calc_13 = 1.d0   ! during calcification / dissolution
+            alpha_calc_14 = 1.d0
+            alpha_dcal_13 = 1.d0
+            alpha_dcal_14 = 1.d0
+        endif
     endif
-  endif
 
-  sms = zero
-  tiny_N   = tiny_chl/chl2N_max
-  tiny_N_d = tiny_chl/chl2N_max_d
-  tiny_C   = tiny_N  /NCmax    
-  tiny_C_d = tiny_N_d/NCmax_d
-  tiny_Si  = tiny_C_d/SiCmax
+    sms = zero ! double precision
 
-  recip_res_het = 1./res_het
+    tiny_N   = tiny_chl/chl2N_max      ! 0.00001/ 3.15d0   Chl2N_max [mg CHL/mmol N] Maximum CHL a : N ratio = 0.3 gCHL gN^-1
+    tiny_N_d = tiny_chl/chl2N_max_d    ! 0.00001/ 4.2d0
+    tiny_C   = tiny_N  /NCmax          ! NCmax   = 0.2d0   [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
+    tiny_C_d = tiny_N_d/NCmax_d        ! NCmax_d = 0.2d0 
+    tiny_Si  = tiny_C_d/SiCmax         ! SiCmax = 0.8d0
+
+    recip_res_het = 1.d0/res_het       ! res_het = 0.01d0  [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 
 !-------------------------------------------------------------------------------
 !> REcoM time steps [day]
 !-------------------------------------------------------------------------------
 
-  rTref =  real(one)/recom_Tref
+    rTref =  real(one)/recom_Tref
   
-  dt_d	=  dt/SecondsPerDay     !< Size of FESOM time step [day]
-  dt_b	=  dt_d/real(biostep)   !< Size of REcoM time step [day]
+    dt_d  =  dt/SecondsPerDay     !< Size of FESOM time step [day]
+    dt_b  =  dt_d/real(biostep)   !< Size of REcoM time step [day]
 
 !-------------------------------------------------------------------------------
 !Main time loop starts
-  do step  = one,biostep
+    do step  = one,biostep
 
-    kdzUpper	= 0.d0	        !< Upper light attenuation of top cell is set to zero
+        kdzUpper	= 0.d0	        !< Upper light attenuation of top cell is set to zero
 
-    if (any(abs(sms(:,:)) <= tiny)) sms(:,:) = zero
-
-!    do k  = one,Nn
-!      do ii = one,bgc_num
-!        if (abs(sms(k,ii)) .le. tiny) sms(k,ii) = zero
-!      end do
-!    end do 
+        if (any(abs(sms(:,:)) <= tiny)) sms(:,:) = zero      ! tiny = 2.23D-16
+!if (mype==0) write(*,*) sms(:,:)
 
 !-------------------------------------------------------------------------------
 ! Main vertical loop starts
-  do k = one,Nn
+        do k = one,Nn   ! nzmin, nzmax 
 !    do n=1, myDim_nod2D!+eDim_nod2D 
 !       Nn=nlevels_nod2D(n)-1  !nzmax
+!       nzmin = ulevels_nod2D(row)
+!       nzmax = nlevels_nod2D(row)
 !       do k=1, Nn
-
-    DIN    = max(tiny,state(k,idin)  	 	+ sms(k,idin  )) !< Avoids division by zero
-    DIC    = max(tiny,state(k,idic)   		+ sms(k,idic  )) !! and updates Conc between
-    ALK    = max(tiny,state(k,ialk)   		+ sms(k,ialk  )) !! local steps in REcoM when
-    PhyN   = max(tiny_N,state(k,iphyn)  	+ sms(k,iphyn )) !! biostep > 1
-    PhyC   = max(tiny_C,state(k,iphyc) 		+ sms(k,iphyc ))
-    PhyChl = max(tiny_chl,state(k,ipchl)  	+ sms(k,ipchl ))
-    DetN   = max(tiny,state(k,idetn)  		+ sms(k,idetn ))
-    DetC   = max(tiny,state(k,idetc)  		+ sms(k,idetc ))
-    HetN   = max(tiny,state(k,ihetn)  		+ sms(k,ihetn ))
-    HetC   = max(tiny,state(k,ihetc)  		+ sms(k,ihetc ))
-if (REcoM_Second_Zoo) then 
-    Zoo2N  = max(tiny,state(k,izoo2n)           + sms(k,izoo2n))
-    Zoo2C  = max(tiny,state(k,izoo2c)           + sms(k,izoo2c))
-    DetZ2N = max(tiny,state(k,idetz2n)  + sms(k,idetz2n ))
-    DetZ2C = max(tiny,state(k,idetz2c)  + sms(k,idetz2c ))
-    DetZ2Si = max(tiny,state(k,idetz2si)  + sms(k,idetz2si ))
-    DetZ2Calc = max(tiny,state(k,idetz2calc)  + sms(k,idetz2calc ))
-endif
-    DON    = max(tiny,state(k,idon)   		+ sms(k,idon  ))
-    EOC    = max(tiny,state(k,idoc)   		+ sms(k,idoc  ))
-    DiaN   = max(tiny_N,state(k,idian)  	+ sms(k,idian ))
-    DiaC   = max(tiny_C,state(k,idiac)  	+ sms(k,idiac ))
-    DiaChl = max(tiny_chl,state(k,idchl)  	+ sms(k,idchl ))
-    DiaSi  = max(tiny_si,state(k,idiasi) 	+ sms(k,idiasi))
-    DetSi  = max(tiny,state(k,idetsi) 		+ sms(k,idetsi))
-    Si     = max(tiny,state(k,isi)    		+ sms(k,isi   ))
-    Fe     = max(tiny,state(k,ife)    		+ sms(k,ife   ))
-    O2     = max(tiny,state(k,ioxy)             + sms(k,ioxy  ))
-    FreeFe = zero
+            DIN    = max(tiny,state(k,idin)  	 	+ sms(k,idin  )) !< Avoids division by zero
+            DIC    = max(tiny,state(k,idic)   		+ sms(k,idic  )) !! and updates Conc between
+            ALK    = max(tiny,state(k,ialk)   		+ sms(k,ialk  )) !! local steps in REcoM when
+            PhyN   = max(tiny_N,state(k,iphyn)  	+ sms(k,iphyn )) !! biostep > 1
+            PhyC   = max(tiny_C,state(k,iphyc) 		+ sms(k,iphyc ))
+            PhyChl = max(tiny_chl,state(k,ipchl)  	+ sms(k,ipchl ))
+            DetN   = max(tiny,state(k,idetn)  		+ sms(k,idetn ))
+            DetC   = max(tiny,state(k,idetc)  		+ sms(k,idetc ))
+            HetN   = max(tiny,state(k,ihetn)  		+ sms(k,ihetn ))
+            HetC   = max(tiny,state(k,ihetc)  		+ sms(k,ihetc ))
+            if (REcoM_Second_Zoo) then 
+                Zoo2N  = max(tiny,state(k,izoo2n)       + sms(k,izoo2n))
+                Zoo2C  = max(tiny,state(k,izoo2c)       + sms(k,izoo2c))
+                DetZ2N = max(tiny,state(k,idetz2n)      + sms(k,idetz2n))
+                DetZ2C = max(tiny,state(k,idetz2c)      + sms(k,idetz2c))
+                DetZ2Si = max(tiny,state(k,idetz2si)    + sms(k,idetz2si))
+                DetZ2Calc = max(tiny,state(k,idetz2calc)+ sms(k,idetz2calc))
+            endif
+            DON    = max(tiny,state(k,idon)   		+ sms(k,idon  ))
+            EOC    = max(tiny,state(k,idoc)   		+ sms(k,idoc  ))
+            DiaN   = max(tiny_N,state(k,idian)  	+ sms(k,idian ))
+            DiaC   = max(tiny_C,state(k,idiac)  	+ sms(k,idiac ))
+            DiaChl = max(tiny_chl,state(k,idchl)  	+ sms(k,idchl ))
+            DiaSi  = max(tiny_si,state(k,idiasi) 	+ sms(k,idiasi))
+            DetSi  = max(tiny,state(k,idetsi) 		+ sms(k,idetsi))
+            Si     = max(tiny,state(k,isi)    		+ sms(k,isi   ))
+            Fe     = max(tiny,state(k,ife)    		+ sms(k,ife   ))
+            O2     = max(tiny,state(k,ioxy)             + sms(k,ioxy  ))
+            FreeFe = zero
 !#ifdef REcoM_calcification		
-    PhyCalc= max(tiny,state(k,iphycal)		+ sms(k,iphycal))
-    DetCalc= max(tiny,state(k,idetcal)		+ sms(k,idetcal))
+            PhyCalc= max(tiny,state(k,iphycal)		+ sms(k,iphycal))
+            DetCalc= max(tiny,state(k,idetcal)		+ sms(k,idetcal))
 
-    calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth
-    calc_diss2     = calc_diss_rate2  ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth  seczoo
+            calc_diss      = calc_diss_rate * SinkVel(k,ivdet) /20.d0 ! Dissolution rate of CaCO3 scaled by the sinking velocity at the current depth 0.005714   !20.d0/3500.d0
+            calc_diss2     = calc_diss_rate2  ! Dissolution rate of CaCO3 for seczoo
 !#endif
 
-    quota          	=  PhyN / PhyC
-    recipquota     	=  real(one) / quota
-    Chl2C          	=  PhyChl  / PhyC
-    Chl2N          	=  PhyChl  / PhyN
-    CHL2C_plast    	=  Chl2C * (quota/(quota - NCmin))
+            quota          =  PhyN / PhyC ! include variability of the N: C ratio, cellular chemical composition 
+            recipquota     =  real(one) / quota
+            Chl2C          =  PhyChl  / PhyC ! Chl a:phytoplankton carbon ratio, cellular chemical composition [gCHL gC^-1]
+            Chl2N          =  PhyChl  / PhyN ! Chl a:phytoplankton nitrogen ratio, cellular chemical composition [gCHL gN^-1]
+            CHL2C_plast    =  Chl2C * (quota/(quota - NCmin))
     
-    quota_dia      	=  DiaN / DiaC
-    recipQuota_dia 	=  real(one)/quota_dia
-    Chl2C_dia      	=  DiaChl / DiaC
-    Chl2N_dia      	=  DiaChl / DiaN
-    CHL2C_plast_dia 	=  Chl2C_dia * (quota_dia/(quota_dia - NCmin_d))
-    qSiC           	=  DiaSi / DiaC
-    qSiN           	=  DiaSi / DiaN
+            quota_dia      	=  DiaN / DiaC
+            recipQuota_dia 	=  real(one)/quota_dia
+            Chl2C_dia      	=  DiaChl / DiaC
+            Chl2N_dia      	=  DiaChl / DiaN
+            CHL2C_plast_dia 	=  Chl2C_dia * (quota_dia/(quota_dia - NCmin_d))
+            qSiC           	=  DiaSi / DiaC
+            qSiN           	=  DiaSi / DiaN
 
+            recipQZoo      	=  HetC / HetN
+            recip_hetN_plus 	= 1. / (HetN + tiny_het) ! MB's addition for more stable zoo respiration
 
-    recipQZoo      	=  HetC / HetN
-    recip_hetN_plus 	= 1. / (hetN + tiny_het) ! MB's addition for more stable zoo respiration
-    if (REcoM_Second_Zoo) then  
-      recipQZoo2     =  Zoo2C / Zoo2N
-    endif
-    if (Grazing_detritus) then
-      recipDet = DetC / DetN
-      recipDet2 = DetZ2C / DetZ2N
-    end if
+            if (REcoM_Second_Zoo) then  
+                recipQZoo2     =  Zoo2C / Zoo2N
+            endif
+            if (Grazing_detritus) then
+                 recipDet  = DetC / DetN
+                 recipDet2 = DetZ2C / DetZ2N
+            end if
 
-
-    if (ciso) then
+            if (ciso) then
 !<       additional variables are declared in module REcoM_ciso
-        DIC_13     = max(tiny,state(k,idic_13)    + sms(k,idic_13  ))
-        DIC_14     = max(tiny,state(k,idic_14)    + sms(k,idic_14  ))
-        PhyC_13    = max(tiny_C,state(k,iphyc_13) + sms(k,iphyc_13 ))
-        PhyC_14    = max(tiny_C,state(k,iphyc_14) + sms(k,iphyc_14 ))
-        DetC_13    = max(tiny,state(k,idetc_13)   + sms(k,idetc_13 ))
-        DetC_14    = max(tiny,state(k,idetc_14)   + sms(k,idetc_14 ))
-        HetC_13    = max(tiny,state(k,ihetc_13)   + sms(k,ihetc_13 ))
-        HetC_14    = max(tiny,state(k,ihetc_14)   + sms(k,ihetc_14 ))
-        EOC_13     = max(tiny,state(k,idoc_13)    + sms(k,idoc_13  ))
-        EOC_14     = max(tiny,state(k,idoc_14)    + sms(k,idoc_14  ))
-        DiaC_13    = max(tiny_C,state(k,idiac_13) + sms(k,idiac_13 ))
-        DiaC_14    = max(tiny_C,state(k,idiac_14) + sms(k,idiac_14 ))
-        PhyCalc_13 = max(tiny,state(k,iphycal_13) + sms(k,iphycal_13))
-        PhyCalc_14 = max(tiny,state(k,iphycal_14) + sms(k,iphycal_14))
-        DetCalc_13 = max(tiny,state(k,idetcal_13) + sms(k,idetcal_13))
-        DetCalc_14 = max(tiny,state(k,idetcal_14) + sms(k,idetcal_14))
+                DIC_13     = max(tiny,state(k,idic_13)    + sms(k,idic_13  ))
+                DIC_14     = max(tiny,state(k,idic_14)    + sms(k,idic_14  ))
+                PhyC_13    = max(tiny_C,state(k,iphyc_13) + sms(k,iphyc_13 ))
+                PhyC_14    = max(tiny_C,state(k,iphyc_14) + sms(k,iphyc_14 ))
+                DetC_13    = max(tiny,state(k,idetc_13)   + sms(k,idetc_13 ))
+                DetC_14    = max(tiny,state(k,idetc_14)   + sms(k,idetc_14 ))
+                HetC_13    = max(tiny,state(k,ihetc_13)   + sms(k,ihetc_13 ))
+                HetC_14    = max(tiny,state(k,ihetc_14)   + sms(k,ihetc_14 ))
+                EOC_13     = max(tiny,state(k,idoc_13)    + sms(k,idoc_13  ))
+                EOC_14     = max(tiny,state(k,idoc_14)    + sms(k,idoc_14  ))
+                DiaC_13    = max(tiny_C,state(k,idiac_13) + sms(k,idiac_13 ))
+                DiaC_14    = max(tiny_C,state(k,idiac_14) + sms(k,idiac_14 ))
+                PhyCalc_13 = max(tiny,state(k,iphycal_13) + sms(k,iphycal_13))
+                PhyCalc_14 = max(tiny,state(k,iphycal_14) + sms(k,iphycal_14))
+                DetCalc_13 = max(tiny,state(k,idetcal_13) + sms(k,idetcal_13))
+                DetCalc_14 = max(tiny,state(k,idetcal_14) + sms(k,idetcal_14))
 
-        calc_diss_13   = alpha_dcal_13 * calc_diss
-        calc_diss_14   = alpha_dcal_14 * calc_diss
+                calc_diss_13   = alpha_dcal_13 * calc_diss
+                calc_diss_14   = alpha_dcal_14 * calc_diss
 
-        quota_13             = PhyN / PhyC_13
-        quota_14             = PhyN / PhyC_14
-        recipQuota_13        = real(one) / quota_13
-        recipQuota_14        = real(one) / quota_14
+                quota_13             = PhyN / PhyC_13
+                quota_14             = PhyN / PhyC_14
+                recipQuota_13        = real(one) / quota_13
+                recipQuota_14        = real(one) / quota_14
 
-        quota_dia_13         = DiaN / DiaC_13
-        quota_dia_14         = DiaN / DiaC_14
-        recipQuota_dia_13    = real(one) / quota_dia_13
-        recipQuota_dia_14    = real(one) / quota_dia_14
+                quota_dia_13         = DiaN / DiaC_13
+                quota_dia_14         = DiaN / DiaC_14
+                recipQuota_dia_13    = real(one) / quota_dia_13
+                recipQuota_dia_14    = real(one) / quota_dia_14
 
-        recipQZoo_13         = HetC_13 / HetN 
-        recipQZoo_14         = HetC_14 / HetN 
-    end if ! ciso
+                recipQZoo_13         = HetC_13 / HetN 
+                recipQZoo_14         = HetC_14 / HetN 
+            end if ! ciso
 
 !-------------------------------------------------------------------------------
 !> Temperature dependence of rates
 !------------------------------------------------------------------------------- 
 !< Schourup 2013 Eq. A54
 !< Temperature dependence of metabolic rate, fT, dimensionless
-!< rTloc: inverse of local temperature in [1/Kelvin]
-!< rTref=288.15 (15 degC): Reference temperature for Arrhenius function [1/Kelvin]
-!< See Figure A1 
-    rTloc          	= real(one)/(Temp(k) + C2K)
-    arrFunc        	= exp( -Ae * ( rTloc - rTref))
+!< Ae: Slope of the linear region of the Arrhenius plot
+!< rTloc: Inverse of local temperature in [1/Kelvin]
+!< rTref=288.15 (15 degC): Reference temperature for Arrhenius equation [1/Kelvin]
+!< See Figure A1
+!< Other functions can be used for temperature dependency (Eppley 1972; Li 1980; Ahlgren 1987)
+
+    rTloc   = real(one)/(Temp(k) + C2K)
+    arrFunc = exp(-Ae * ( rTloc - rTref))
+
     if (REcoM_Second_Zoo) then 
-      arrFuncZoo2   = exp(t1_zoo2/t2_zoo2 - t1_zoo2*rTloc)/(1 + exp(t3_zoo2/t4_zoo2 - t3_zoo2*rTloc))
+        arrFuncZoo2 = exp(t1_zoo2/t2_zoo2 - t1_zoo2*rTloc)/(1 + exp(t3_zoo2/t4_zoo2 - t3_zoo2*rTloc))
     endif
 
 !< Silicate temperature dependence
-    reminSiT 		= min(1.32e16 * exp(-11200.d0 * rTloc),reminSi) !! arrFunc control
+    reminSiT = min(1.32e16 * exp(-11200.d0 * rTloc),reminSi) !! arrFunc control, reminSi=0.02d0
 
 !-------------------------------------------------------------------------------
 !> Photosynthesis section, light parameters and rates
 !-------------------------------------------------------------------------------
 
 !_______________________________________________________________________
-!< Small phytoplankton 
+!< Small phytoplankton
+!< Schourup 2013 Appendix A6.2
+!< Intracellular regulation of C uptake
 !< qlimitFac, qlimitFacTmp: Factor that regulates photosynthesis
 !< NMinSlope: 50.d0
 !< NCmin: 0.04d0
@@ -266,10 +267,16 @@ endif
 !< if quota > ≈ 9 * NCmin qlimitFac=1
 !< P_cm: 3.0d0 [1/day], Rate of C-specific photosynthesis 
 
-    qlimitFac     	= recom_limiter(NMinSlope,NCmin,quota)
-    feLimitFac  	= Fe/(k_Fe + Fe)
-    qlimitFac   	= min(qlimitFac,feLimitFac)
-    pMax          	= P_cm * qlimitFac * arrFunc
+
+!< pMax = The carbon-specific, light-saturated rate of photosynthesis [day−1]
+!< Nutrient limited environment
+!< Small pyhtoplankton is limited by iron and nitrogen
+!< Diatoms are additionally limited by silicon
+
+    qlimitFac     	= recom_limiter(NMinSlope,NCmin,quota) ! Eqn A55
+    feLimitFac  	= Fe/(k_Fe + Fe) ! Use Michaelis–Menten kinetics
+    qlimitFac   	= min(qlimitFac,feLimitFac) ! Liebig law of the minimum
+    pMax          	= P_cm * qlimitFac * arrFunc ! Maximum value of C-specific rate of photosynthesis
     
 !_______________________________________________________________________
 !< Diatoms
@@ -282,33 +289,34 @@ endif
 
 !_______________________________________________________________________
 !< Light
-    if (k==1) then 
-      PARave = max(tiny,SurfSW)
-      PAR(k) = PARave
-      chl_upper = (PhyChl + DiaChl)
+! Exponential diminition of downward irradiance
+    if (k==1) then  ! ulevels_nod2D(n)==1
+        PARave = max(tiny,SurfSR)
+        PAR(k) = PARave
+        chl_upper = (PhyChl + DiaChl)
     else    
-      chl_lower = PhyChl + DiaChl
-      Chlave    = (chl_upper+chl_lower)*0.5
+        chl_lower = PhyChl + DiaChl
+        Chlave    = (chl_upper+chl_lower)*0.5d0
 
-      kappar          =  k_w + a_chl * (Chlave)
-      kappastar      =  kappar / cosAI(n)
-      kdzLower       =  kdzUpper + kappastar * thick(k)
-      Lowerlight     =  SurfSW * exp(-kdzLower)
-      Lowerlight         =  max(tiny,Lowerlight)
-      PARave         =  Lowerlight
-      PAR(k)         =  PARave
-      chl_upper      =  chl_lower
-      kdzUpper       =  kdzLower
+        kappar         =  k_w + a_chl * (Chlave)
+        kappastar      =  kappar / cosAI(n)
+        kdzLower       =  kdzUpper + kappastar * thick(k)
+        Lowerlight     =  SurfSR * exp(-kdzLower)
+        Lowerlight     =  max(tiny,Lowerlight)
+        PARave         =  Lowerlight
+        PAR(k)         =  PARave
+        chl_upper      =  chl_lower
+        kdzUpper       =  kdzLower
     end if
 
 !-------------------------------------------------------------------------------
 !< Small phytoplankton photosynthesis rate
     if ( pMax .lt. tiny .OR. PARave /= PARave                  &
          .OR. CHL2C /= CHL2C) then
-      Cphot       = zero
+        Cphot       = zero
     else
-      Cphot       = pMax*( real(one) &
-                   - exp(-alfa * Chl2C * PARave / pMax))
+        Cphot       = pMax*( real(one) &
+                     - exp(-alfa * Chl2C * PARave / pMax))
     end if
     if ( Cphot .lt. tiny) Cphot = zero
     
@@ -316,10 +324,10 @@ endif
 !< Diatom photosynthesis rate
     if ( pMax_dia .lt. tiny .OR. PARave /= PARave               &
          .OR. CHL2C_dia /= CHL2C_dia) then
-      Cphot_dia   = zero
+        Cphot_dia   = zero
     else
-      Cphot_dia   = pMax_dia * (real(one) &
-           	- exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
+        Cphot_dia   = pMax_dia * (real(one) &
+                     - exp(-alfa_d * Chl2C_dia * PARave / pMax_dia))
     end if
     if (Cphot_dia .lt. tiny) Cphot_dia = zero
 
@@ -343,53 +351,64 @@ endif
     if (use_photodamage) then
 !< Phyto Chla loss
 !< adding a minimum value for photodamage 
-       if (pMax .lt. tiny .OR. PARave /= PARave                 &
-            .OR. CHL2C_plast /= CHL2C_plast) then
-          KOchl = deg_Chl*0.1d0
-       else
-          KOchl = deg_Chl*(1-exp(-alfa * CHL2C_plast * PARave / pMax))
-          KOchl = max((deg_Chl*0.1d0), KOchl)
-       end if
+        if (pMax .lt. tiny .OR. PARave /= PARave                 &
+             .OR. CHL2C_plast /= CHL2C_plast) then
+            KOchl = deg_Chl*0.1d0
+        else
+            KOchl = deg_Chl*(1-exp(-alfa * CHL2C_plast * PARave / pMax))
+            KOchl = max((deg_Chl*0.1d0), KOchl)
+        end if
 
 !< Phyto Chla loss                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
-       if (pMax_dia .lt. tiny .OR. PARave /= PARave             &
-                .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
-          KOchl_dia = deg_Chl_d*0.1d0
-       else
-          KOchl_dia = deg_Chl_d * ( 1 -                         &
+        if (pMax_dia .lt. tiny .OR. PARave /= PARave             &
+            .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
+            KOchl_dia = deg_Chl_d*0.1d0
+        else
+            KOchl_dia = deg_Chl_d * ( 1 -                         &
                exp( -alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
-          KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
-       end if
+            KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
+        end if
 
-       if (KOchl /= KOchl) then
-          print*,' KOchl is ', KOchl
-          print*,' deg_Chl is ', deg_Chl
-          print*,' alfa is ', alfa
-          print*,' CHL2C is ', CHL2C_plast
-          print*,' PARave is ', PARave
-          print*,' pMax is ', pMax
-          stop
-       end if
-       if (KOchl_dia /= KOchl_dia) then
-          print*,' KOchl_dia is ', KOchl_dia
-          print*,' deg_Chl_d is ', deg_Chl_d
-          print*,' alfa_d is ', alfa_d
-          print*,' CHL2C_d is ', CHL2C_plast_dia
-          print*,' PARave is ', PARave
-          print*,' pMax_d is ', pMax_dia
-          stop
-       end if
+        if (KOchl /= KOchl) then
+            print*,' KOchl is ', KOchl
+            print*,' deg_Chl is ', deg_Chl
+            print*,' alfa is ', alfa
+            print*,' CHL2C is ', CHL2C_plast
+            print*,' PARave is ', PARave
+            print*,' pMax is ', pMax
+            stop
+        end if
+        if (KOchl_dia /= KOchl_dia) then
+            print*,' KOchl_dia is ', KOchl_dia
+            print*,' deg_Chl_d is ', deg_Chl_d
+            print*,' alfa_d is ', alfa_d
+            print*,' CHL2C_d is ', CHL2C_plast_dia
+            print*,' PARave is ', PARave
+            print*,' pMax_d is ', pMax_dia
+            stop
+        end if
 
     end if ! photodamage 
  
 !-------------------------------------------------------------------------------
 !> Assimilation section
 !-------------------------------------------------------------------------------
+!< Nitrogen and silicon part
 !< Compute assimilation from Geider et al 1998
+!< V_cm: Scaling factor for C-specific N uptake, dimensionless
+!< NCmax: Maximum cell quota of nitrogen (N:C) [mmol N/mmol C]
+!< NMaxSlope: Max slope for limiting function
+!< NCuptakeRatio: Maximum uptake ratio N:C [mmol N mmol C−1]
+!< SiCUptakeRatio: Maximum uptake ratio Si : C [mmol Si mmol C−1 ]
+!< The N:C ratio is taken into account, as a
+!! too high ratio indicates that the intracellular 
+!! concentration of energy rich carbon molecules becomes too low to 
+!! use energy on silicon uptake.
+
     V_cm           = V_cm_fact
     limitFacN      = recom_limiter(NMaxSlope,quota,NCmax)
     N_assim        = V_cm * pMax * NCuptakeRatio &                ! [mmol N / (mmol C * day)]
-                      * limitFacN * (DIN/(DIN + k_din))
+                      * limitFacN * (DIN/(DIN + k_din)) ! Michaelis–Menten kinetics
 
     V_cm           = V_cm_fact_d
     limitFacN_dia  = recom_limiter(NMaxSlope,quota_dia,NCmax_d)
@@ -402,54 +421,61 @@ endif
                       * limitFacSi * Si/(Si + k_si)
 
 !-------------------------------------------------------------------------------
-! Iron chemistry
+!< Iron chemistry
  
-    freeFe      = iron_chemistry(Fe,totalligand,ligandStabConst)
+    freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
 
 !-------------------------------------------------------------------------------
-! Chlorophyll synthesis
+!< Chlorophyll synthesis
+!< Coupled to N uptake
+!< Converted to chlorophyll units with a maximum Chl:N ratio, Chl2N_max
+!< Chl2N_max: Maximum Chl:N ratio for phytoplankton [mg Chl mmol N−1 ]
 
-    chlSynth       = zero
+    chlSynth = zero
     if (PARave .ge. tiny .AND. PARave .eq. PARave) then
-       chlSynth = N_assim * Chl2N_max                    &
-          * min( real(one),Cphot/(alfa*Chl2C*PARave))
+        chlSynth = N_assim * Chl2N_max                    &
+            * min( real(one),Cphot/(alfa * Chl2C * PARave))
     end if
-    ChlSynth_dia   = zero
+    ChlSynth_dia = zero
     if (PARave .ge. tiny .AND. PARave .eq. PARave) then
-       ChlSynth_dia = N_assim_dia                        &
-          * Chl2N_max_d * min(real(one),                 &
+        ChlSynth_dia = N_assim_dia                        &
+            * Chl2N_max_d * min(real(one),                 &
             Cphot_dia /(alfa_d * Chl2C_dia * PARave))
     end if
 !-------------------------------------------------------------------------------
-! Phytoplankton respiraion rate
+!< Phytoplankton respiraion rate
+!< res_phy: Maintenance respiration rate constant [day−1 ]
+!< biosynth: The cost of biosynthesis of N [mmol C mmol N−1 ]
     phyRespRate     = res_phy * limitFacN + biosynth * N_assim
     phyRespRate_dia = res_phy_d * limitFacN_dia +        &
-            biosynth * N_assim_dia + biosynthSi * Si_assim
+        biosynth * N_assim_dia + biosynthSi * Si_assim
+
     if (ciso) then
 !       we assume that
 !       phyRespRate_13,14     = phyRespRate
 !       phyRespRate_dia_13,14 = phyRespRate_dia
     end if
+
 !-------------------------------------------------------------------------------
 ! Zooplankton grazing on small phytoplankton and diatoms
 ! At the moment there is no preference for one or the other food. Change this!
 
     if (REcoM_Grazing_Variable_Preference) then
-       if (Grazing_detritus) then
-          if (Graz_pref_new) then
-             varpzPhy      = pzPhy * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-             varpzDia      = pzDia * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-             varpzDet      = pzDet * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-             varpzDetZ2    = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)   
-          else
-             DiaNsq        = DiaN * DiaN
-             varpzDia      = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
-             PhyNsq        = PhyN * PhyN
-             varpzPhy      = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
-             DetNsq        = DetN * DetN
-             varpzDet      = pzDet * DetNsq /(sDetNsq + DetNsq)
-             DetZ2Nsq      = DetZ2N * DetZ2N
-             varpzDetZ2    = pzDetZ2 * DetZ2Nsq /(sDetZ2Nsq + DetZ2Nsq)
+        if (Grazing_detritus) then
+            if (Graz_pref_new) then
+                varpzPhy      = pzPhy * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDia      = pzDia * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDet      = pzDet * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDetZ2    = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)   
+            else
+                DiaNsq        = DiaN * DiaN
+                varpzDia      = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
+                PhyNsq        = PhyN * PhyN
+                varpzPhy      = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
+                DetNsq        = DetN * DetN
+                varpzDet      = pzDet * DetNsq /(sDetNsq + DetNsq)
+                DetZ2Nsq      = DetZ2N * DetZ2N
+                varpzDetZ2    = pzDetZ2 * DetZ2Nsq /(sDetZ2Nsq + DetZ2Nsq)
           endif
           fDiaN        = varpzDia * DiaN
           fPhyN        = varpzPhy * PhyN
@@ -588,16 +614,18 @@ endif
 !-------------------------------------------------------------------------------
 ! Heterotrophic respiration is assumed to drive zooplankton back to Redfield C:N
 ! if their C:N becomes higher than Redfield
+! res_het: Timescale for zooplankton respiration [day−1 ]
+
     if (het_resp_noredfield) then
-       HetRespFlux    = res_het *  arrFunc * HetC
+        HetRespFlux    = res_het *  arrFunc * HetC ! tau * f_T [HetC]
     else
-       if (HetRespFlux_plus) then
-          HetRespFlux    = recip_res_het * arrFunc * (hetC    * recip_hetN_plus - redfield) * HetC
-       else
+        if (HetRespFlux_plus) then
+            HetRespFlux    = recip_res_het * arrFunc * (hetC    * recip_hetN_plus - redfield) * HetC
+        else
 ! default computation scheme 
-          HetRespFlux    = recip_res_het * arrFunc * (recipQZoo    - redfield) * HetC  
-       endif
-       HetRespFlux    = max(zero,HetRespFlux)
+            HetRespFlux    = recip_res_het * arrFunc * (recipQZoo    - redfield) * HetC  ! 1/tau * f_T * (q_zoo - q_standard)
+        endif
+        HetRespFlux    = max(zero,HetRespFlux)
     endif
 
 ! Next part changes results, but is needed: Otherwise heterotrophs take up 
@@ -607,8 +635,8 @@ endif
 
     if (ciso) then
 !MB    set HetRespFlux_plus = .true. !
-       HetRespFlux_13 = max(zero, recip_res_het * arrFunc * (hetC_13 * recip_hetN_plus - redfield) * HetC_13)
-       HetRespFlux_14 = max(zero, recip_res_het * arrFunc * (hetC_14 * recip_hetN_plus - redfield) * HetC_14)
+        HetRespFlux_13 = max(zero, recip_res_het * arrFunc * (hetC_13 * recip_hetN_plus - redfield) * HetC_13)
+        HetRespFlux_14 = max(zero, recip_res_het * arrFunc * (hetC_14 * recip_hetN_plus - redfield) * HetC_14)
     end if
 
 !-------------------------------------------------------------------------------

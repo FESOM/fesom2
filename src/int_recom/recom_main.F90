@@ -111,7 +111,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
         r_atm_14 = LocAtmCO2_14(1) / LocAtmCO2(1)
      end if
 
-     !!---- Shortvawe penetration
+     !!---- Shortwave penetration
      SW = parFrac * shortwave(n)
      SW = SW * (1.d0 - a_ice(n))
 

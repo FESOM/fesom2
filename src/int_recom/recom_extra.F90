@@ -27,7 +27,7 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick,mesh)
   real(kind=8),dimension(mesh%nl-1),intent(out)    :: thick          ! [m] Distance between two nodes = thickness
   real(kind=8),dimension(mesh%nl-1),intent(out)    :: recipthick     ! [1/m] reciprocal of thickness
 
-  real(kind=8),dimension(mesh%nl,3),intent(out)    :: wF             ! [m/day] Velocities of fluxes at the border of the control volumes
+  real(kind=8),dimension(mesh%nl,4),intent(out)    :: wF             ! [m/day] Velocities of fluxes at the border of the control volumes
   Integer                                          :: k, n           ! Index for depth      
 #include "../associate_mesh.h"
 ! ======================================================================================
@@ -48,6 +48,7 @@ subroutine Depth_calculations(n,Nn,wF,zF,thick,recipthick,mesh)
   wF(2:Nn,ivphy) = VPhy  
   wF(2:Nn,ivdia) = VDia
   wF(2:Nn,ivdet) = VDet
+  wF(2:Nn,ivdetsc) = VDet_zoo2
 
   wF(1,:)         = 0.d0
   wF(Nn+1,:)      = 0.d0

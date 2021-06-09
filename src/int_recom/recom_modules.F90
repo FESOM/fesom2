@@ -132,7 +132,7 @@ module recom_config
   Real(kind=8)                 :: k_Fe           = 0.04d0
   Real(kind=8)                 :: k_Fe_d         = 0.12d0
   Real(kind=8)                 :: k_si           = 4.d0
-  Real(kind=8)                 :: P_cm           = 3.0d0          ! [1/day]            Rate of C-specific photosynthesis 
+  Real(kind=8)                 :: P_cm           = 3.0d0          ! [1/day]   the rate of C-specific photosynthesis
   Real(kind=8)                 :: P_cm_d         = 3.5d0
   namelist /palimiter_function/ NMinSlope, SiMinSlope, NCmin, NCmin_d, SiCmin, k_Fe, k_Fe_d, k_si, P_cm, P_cm_d   
 !!------------------------------------------------------------------------------
@@ -142,8 +142,8 @@ module recom_config
   namelist /palight_calculations/ k_w, a_chl   
 !!------------------------------------------------------------------------------
 !! *** Photosynthesis ***
-  Real(kind=8)                 :: alfa           = 0.14d0		! [(mmol C*m2)/(mg Chl*W*day)] 
-  Real(kind=8)                 :: alfa_d         = 0.19d0       ! An initial slope of the P-I curve
+  Real(kind=8)                 :: alfa           = 0.14d0	  ! [(mmol C*m2)/(mg Chl*W*day)] 
+  Real(kind=8)                 :: alfa_d         = 0.19d0         ! An initial slope of the P-I curve
   Real(kind=8)                 :: parFrac        = 0.43d0
   namelist /paphotosynthesis/ alfa, alfa_d, parFrac   
 !!------------------------------------------------------------------------------
@@ -286,9 +286,9 @@ module recom_config
   namelist /pairon/ Fe2N, Fe2N_benthos, Fe2C, Fe2C_benthos, kScavFe, dust_sol
 !!------------------------------------------------------------------------------
 !! *** Calcification ***
-  Real(kind=8)                 :: calc_prod_ratio = 0.02
+  Real(kind=8)                 :: calc_prod_ratio = 0.02d0
   Real(kind=8)                 :: calc_diss_guts  = 0.0d0
-  Real(kind=8)                 :: calc_diss_rate  = 0.005714   !20.d0/3500.d0
+  Real(kind=8)                 :: calc_diss_rate  = 0.005714d0   !20.d0/3500.d0
   Real(kind=8)                 :: calc_diss_rate2 = 0.005714d0
   namelist /pacalc/ calc_prod_ratio, calc_diss_guts, calc_diss_rate, calc_diss_rate2
 !!------------------------------------------------------------------------------
