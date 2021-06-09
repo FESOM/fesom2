@@ -209,8 +209,8 @@ subroutine oce_fluxes(mesh)
     water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
 
     ! Evaporation
-    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
-    ice_sublimation(:) = 0.0_WP
+    evaporation(:) = -evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+    ice_sublimation(:) = - ice_sublimation * inv_rhowat
 
     call init_flux_atm_ocn()
 
@@ -228,6 +228,9 @@ subroutine oce_fluxes(mesh)
     
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
+#if defined (__icepack)
+    call exchange_nod(evaporation, ice_sublimation)
+#endif
 
     !___________________________________________________________________________
     ! on freshwater inflow/outflow or virtual salinity:
@@ -292,7 +295,7 @@ subroutine oce_fluxes(mesh)
     ! we conserve only the fluxes from the database plus evaporation.
     flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
             +prec_rain                       &
-            +prec_snow*(1.0_WP-a_ice_old)    &
+            +prec_snow*(1.0_WP-a_ice)    &
             +runoff    
             
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 

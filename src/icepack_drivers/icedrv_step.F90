@@ -972,9 +972,9 @@ submodule (icedrv_main) icedrv_step
           flwout_ocn = - emiss_wat * stefan_boltzmann * TsfK**4
 
           ! downward latent and sensible heat fluxes
-          fsens_ocn =  shcoef * delt
+          fsens_ocn =  shcoef * delt 
           flat_ocn  =  lhcoef * delq
-          evap_ocn  = -flat_ocn / Lvap
+          evap_ocn  = -flat_ocn / Lvap 
 
           ! Compute heat change due to exchange between ocean and atmosphere
 
