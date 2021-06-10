@@ -486,7 +486,7 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   f_v_ib_old, l_semiimplicit, semiimplicit_coeff, &
 		   AB_coeff, file_meltrates, rho_icb)
 
-  call prepare_icb2fesom(ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
+  call prepare_icb2fesom(mesh,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib)
   !new_u_ib = 2.0
   !new_v_ib = 0.0
 

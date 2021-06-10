@@ -40,9 +40,9 @@ use omp_lib
 IMPLICIT NONE
 
 ! kh 01.03.21
-integer :: n, n_ib, nsub, nsteps, offset, row, i
+integer :: n, n_ib, nsub, nsteps, offset, row, i, provided
 
-real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t1_icb, t1b_icb, t2_icb, t2b_icb, t3_icb, t4_icb
+real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc, t1_icb, t1b_icb, t2_icb, t2b_icb, t3_icb, t4_icb
 
 ! kh 09.02.21 
 real(kind=WP)     :: t1_1st_section, t2_1st_section, t1_2nd_section, t2_2nd_section
@@ -50,7 +50,7 @@ real(kind=WP)     :: t1_1st_section, t2_1st_section, t1_2nd_section, t2_2nd_sect
 ! kh 24.02.21
 real(kind=WP)     :: t1_par_sections, t2_par_sections
 
-real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_icb_calc, rtime_icb_write
+real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_icb_calc, rtime_icb_write, rtime_read_forcing
 
 ! kh 09.02.21
 real(kind=WP)     :: time_1st_section, time_2nd_section, rtime_1st_section, rtime_2nd_section
@@ -94,21 +94,11 @@ integer             :: fesom_thread_info
 
 logical             :: bIcbCalcCycleCompleted
 
-
-! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
-IMPLICIT NONE
-
-integer :: n, nsteps, offset, row, i, provided
-real(kind=WP)     :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t0_ice, t1_ice, t0_frc, t1_frc
-real(kind=WP)     :: rtime_fullice,    rtime_write_restart, rtime_write_means, rtime_compute_diag, rtime_read_forcing
-real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing 
-real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
-real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
-real(kind=real32) :: runtime_alltimesteps
-
 type(t_mesh),             target, save :: mesh
 
+! kh 26.03.21 get current values for ib_async_mode and thread_support_level_required
     call read_namelist_icebergs
+
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
     !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
@@ -135,7 +125,7 @@ type(t_mesh),             target, save :: mesh
     else
         call MPI_INIT(i)
     end if
-    call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
+    !call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
 
@@ -419,7 +409,7 @@ type(t_mesh),             target, save :: mesh
 ! kh 10.03.21 it is not the start of a real parallel section here, but the value of the timer is still of interest
             t1_par_sections = MPI_Wtime()
 
-            call compute_vel_nodes
+            call compute_vel_nodes(mesh)
 
 ! kh 08.03.21 t1 moved up to here to include the iceberg computation time (like in former FESOM2 paleodyn_icb versions)
            t1 = MPI_Wtime()
@@ -437,8 +427,8 @@ type(t_mesh),             target, save :: mesh
 ! kh 08.03.21 t1 moved up to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)
 !           t1 = MPI_Wtime()
             if(use_ice) then
-                call ocean2ice
-                call update_atm_forcing(n)
+                call ocean2ice(mesh)
+                call update_atm_forcing(n, mesh)
                 
                 if (ice_steps_since_upd>=ice_ave_steps-1) then
                     ice_update=.true.
@@ -448,10 +438,10 @@ type(t_mesh),             target, save :: mesh
                     ice_steps_since_upd=ice_steps_since_upd+1
                 endif
                 
-                if (ice_update) call ice_timestep(n)
+                if (ice_update) call ice_timestep(n, mesh)
                 
-                call oce_fluxes_mom ! momentum only
-                call oce_fluxes
+                call oce_fluxes_mom(mesh) ! momentum only
+                call oce_fluxes(mesh)
             end if  
 
             if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -460,7 +450,7 @@ type(t_mesh),             target, save :: mesh
 
 ! kh 08.03.21 add time for call icb2fesom to the end of t2_icb (i.e. time is calculated like in former FESOM2 paleodyn_icb  versions, also see above)
                 t1b_icb = MPI_Wtime()
-                call icb2fesom
+                call icb2fesom(mesh)
 !               write(*,*) '*** MASS BALANCE ***'
 !               write(*,*) '*** integrated BV: ',SUM(fwbv_flux_ib)*dt*steps_per_ib_step
 !               write(*,*) '*** integrated B: ',SUM(fwb_flux_ib)*dt*steps_per_ib_step
@@ -488,7 +478,7 @@ type(t_mesh),             target, save :: mesh
 !$omp parallel sections default (none) &
 !$omp&  shared(first_section_done, ib_async_1st_section_first, ib_async_2nd_section_first, mype_copy, limit_list_mype, &
 !$omp&  mype, &
-!$omp&  n, n_ib, nsteps, steps_per_ib_step, t1, t1_icb, t2_icb, use_ice, use_icebergs, ice_steps_since_upd, ice_ave_steps, ice_update, &
+!$omp&  n, n_ib, mesh, nsteps, steps_per_ib_step, t1, t1_icb, t2_icb, use_ice, use_icebergs, ice_steps_since_upd, ice_ave_steps, ice_update, &
 !$omp&  t1_1st_section, t1_2nd_section, t2_1st_section, t2_2nd_section, &
 !$omp&  time_1st_section, time_2nd_section, t1_par_sections, t2_par_sections, rtime_par_sections, &
 !$omp&  rtime_fullice, rtime_icb_calc, rtime_1st_section, rtime_2nd_section, rtime_compute_diag, rtime_write_means, rtime_write_restart, &
@@ -522,10 +512,10 @@ type(t_mesh),             target, save :: mesh
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
                     if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                         !$omp critical 
-                        call compute_vel_nodes
+                        call compute_vel_nodes(mesh)
                         !$omp end critical
                     else
-                        call compute_vel_nodes
+                        call compute_vel_nodes(mesh)
                     end if
 
                 !___model sea-ice step__________________________________________________
@@ -540,19 +530,19 @@ type(t_mesh),             target, save :: mesh
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
                     if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                         !$omp critical 
-                        call ocean2ice
+                        call ocean2ice(mesh)
                         !$omp end critical
                     else
-                        call ocean2ice
+                        call ocean2ice(mesh)
                     end if
 
-! kh 26.03.21 alternatively, a preprocessor definition could be used here
+! kh 26.03.21 alternatively, a preprocessor defi(mesh)nition could be used here
                     if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                         !$omp critical 
-                        call update_atm_forcing(n)
+                        call update_atm_forcing(n, mesh)
                         !$omp end critical
                     else
-                        call update_atm_forcing(n)
+                        call update_atm_forcing(n, mesh)
                     end if
 
                     if (ice_steps_since_upd>=ice_ave_steps-1) then
@@ -566,21 +556,21 @@ type(t_mesh),             target, save :: mesh
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
                     if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                         !$omp critical 
-                        if (ice_update) call ice_timestep(n)
+                        if (ice_update) call ice_timestep(n, mesh)
                         !$omp end critical
                     else
-                        if (ice_update) call ice_timestep(n)
+                        if (ice_update) call ice_timestep(n, mesh)
                     end if
                     
-                    call oce_fluxes_mom ! momentum only
+                    call oce_fluxes_mom(mesh) ! momentum only
 
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
                     if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                         !$omp critical 
-                        call oce_fluxes
+                        call oce_fluxes(mesh)
                         !$omp end critical
                     else
-                        call oce_fluxes
+                        call oce_fluxes(mesh)
                     end if
 
                 end if ! (use_ice)
@@ -593,13 +583,13 @@ type(t_mesh),             target, save :: mesh
 ! kh 26.03.21 alternatively, a preprocessor definition could be used here
                         if (thread_support_level_required == MPI_THREAD_SERIALIZED) then
                             !$omp critical 
-                            call loop_end_part (.false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
+                            call loop_end_part (mesh, .false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                                                 t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
                                                 rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
                                                 rtime_1st_section, rtime_2nd_section, rtime_par_sections)
                             !$omp end critical
                         else
-                            call loop_end_part (.false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
+                            call loop_end_part (mesh, .false., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                                                 t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
                                                 rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
                                                 rtime_1st_section, rtime_2nd_section, rtime_par_sections)
@@ -732,7 +722,7 @@ type(t_mesh),             target, save :: mesh
             if (use_icebergs) then
 !               t1_icb = MPI_Wtime()
 !               call iceberg_calculation(n)
-                call icb2fesom
+                call icb2fesom(mesh)
 !               write(*,*) '*** MASS BALANCE ***'
 !               write(*,*) '*** integrated BV: ',SUM(fwbv_flux_ib)*dt*steps_per_ib_step
 !               write(*,*) '*** integrated B: ',SUM(fwb_flux_ib)*dt*steps_per_ib_step
@@ -751,10 +741,12 @@ type(t_mesh),             target, save :: mesh
             write(*,*) 'ib_async_mode < 0 is not supported: ', ib_async_mode 
         end if ! (ib_async_mode == 0) then
 
-        call loop_end_part (.true., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
+        write(*,*) "*** LA DEBUG start loop_end_part ***"
+        call loop_end_part (mesh, .true., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                             t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
                             rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
                             rtime_1st_section, rtime_2nd_section, rtime_par_sections)
+        write(*,*) "*** LA DEBUG finish loop_end_part ***"
 
         n = n + 1
 
@@ -834,7 +826,7 @@ type(t_mesh),             target, save :: mesh
         call oce_timestep_ale(n, mesh)
         t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1, mesh)'//achar(27)//'[0m'
         call compute_diagnostics(1, mesh)
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
@@ -1048,7 +1040,7 @@ end subroutine loop_start_part
 
 
 ! kh 25.02.21 end part from main loop factored out for the async iceberg implementation
-subroutine loop_end_part (bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
+subroutine loop_end_part (mesh, bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                           t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
                           rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
                           rtime_1st_section, rtime_2nd_section, rtime_par_sections)
@@ -1058,6 +1050,9 @@ subroutine loop_end_part (bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, time_1s
     use io_MEANDATA     ! output(...)
     use diagnostics     ! compute_diagnostics(...)
     use g_config        ! use_icebergs
+    
+    use g_parsup
+    use MOD_MESH
 
     implicit none
     logical, intent(in)             :: bOuterLoopCall
@@ -1069,22 +1064,24 @@ subroutine loop_end_part (bOuterLoopCall, bIcbCalcCycleCompleted, n, t1, time_1s
     real(kind=WP), intent(inout)    :: rtime_1st_section, rtime_2nd_section, rtime_par_sections
 
     real(kind=WP)                   :: t2, t3, t4, t5, t6
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
     t2 = MPI_Wtime()
         
 !___model ocean step____________________________________________________
-    call oce_timestep_ale(n)
+    call oce_timestep_ale(n, mesh)
     t3 = MPI_Wtime()
-    call compute_diagnostics(1)
+    call compute_diagnostics(1, mesh)
     t4 = MPI_Wtime()
     !___prepare output______________________________________________________
-    call output (n)
+    call output (n, mesh)
     if (use_icebergs .and. bIcbCalcCycleCompleted) then
         call reset_ib_fluxes
     end if
 
     t5 = MPI_Wtime()
-    call restart(n, .false., .false.)
+    call restart(n, .false., .false., mesh)
     t6 = MPI_Wtime()
 
 ! kh 08.03.21 do it only once per iceberg step if ib_async_mode > 0 to include the iceberg calculation time (like in former FESOM2 paleodyn_icb versions)

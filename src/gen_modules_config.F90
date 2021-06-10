@@ -111,7 +111,7 @@ module g_config
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
 ! ib_async_mode == 2: OpenMP code active but computations still serialized via spinlock (for testing purposes)
-  integer                       :: ib_async_mode=1
+  integer                       :: ib_async_mode=0
   integer                       :: thread_support_level_required=2 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
 
   namelist /icebergs/ use_icebergs, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required

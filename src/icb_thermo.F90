@@ -513,101 +513,101 @@ end subroutine potit_ib
 !
 !-------------------------------------------------------------------------------------
 !
-subroutine potit(salz,pt,pres,rfpres,tin)
-  ! Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
-  ! (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
-  ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
-  ! eines Iterationsverfahrens aus.
-
-  integer iter
-  real salz,pt,pres,rfpres,tin
-  real epsi,tpmd,pt1,ptd,pttmpr
-
-  data tpmd / 0.001 /
-
-  epsi = 0.
-  do iter=1,100
-     tin  = pt+epsi
-     pt1  = pttmpr(salz,tin,pres,rfpres)
-     ptd  = pt1-pt
-     if(abs(ptd).lt.tpmd) return
-     epsi = epsi-ptd
-  enddo
-  write(6,*) ' WARNING!'
-  write(6,*) ' in-situ temperature calculation has not converged.'
-  stop
-  return
-end subroutine potit
+!subroutine potit(salz,pt,pres,rfpres,tin)
+!  ! Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
+!  ! (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
+!  ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
+!  ! eines Iterationsverfahrens aus.
+!
+!  integer iter
+!  real salz,pt,pres,rfpres,tin
+!  real epsi,tpmd,pt1,ptd,pttmpr
+!
+!  data tpmd / 0.001 /
+!
+!  epsi = 0.
+!  do iter=1,100
+!     tin  = pt+epsi
+!     pt1  = pttmpr(salz,tin,pres,rfpres)
+!     ptd  = pt1-pt
+!     if(abs(ptd).lt.tpmd) return
+!     epsi = epsi-ptd
+!  enddo
+!  write(6,*) ' WARNING!'
+!  write(6,*) ' in-situ temperature calculation has not converged.'
+!  stop
+!  return
+!end subroutine potit
 !
 !-------------------------------------------------------------------------------------
 !
-real function pttmpr(salz,temp,pres,rfpres)
-  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
-  ! (TEMP) und dem in-situ Druck/dbar (PRES) die potentielle Temperatur/
-  ! degC (PTTMPR) bezogen auf den Referenzdruck/dbar (RFPRES). Es wird
-  ! ein Runge-Kutta Verfahren vierter Ordnung verwendet.
-  ! Checkwert: PTTMPR = 36.89073 DegC
-  !       fuer SALZ   =    40.0 psu
-  !            TEMP   =    40.0 DegC
-  !            PRES   = 10000.000 dbar
-  !            RFPRES =     0.000 dbar
-
-  data ct2 ,ct3  /0.29289322 ,  1.707106781/
-  data cq2a,cq2b /0.58578644 ,  0.121320344/
-  data cq3a,cq3b /3.414213562, -4.121320344/
-
-  real salz,temp,pres,rfpres
-  real p,t,dp,dt,q,ct2,ct3,cq2a,cq2b,cq3a,cq3b
-  real adlprt
-
-  p  = pres
-  t  = temp
-  dp = rfpres-pres
-  dt = dp*adlprt(salz,t,p)
-  t  = t +0.5*dt
-  q = dt
-  p  = p +0.5*dp
-  dt = dp*adlprt(salz,t,p)
-  t  = t + ct2*(dt-q)
-  q  = cq2a*dt + cq2b*q
-  dt = dp*adlprt(salz,t,p)
-  t  = t + ct3*(dt-q)
-  q  = cq3a*dt + cq3b*q
-  p  = rfpres
-  dt = dp*adlprt(salz,t,p)
-
-  pttmpr = t + (dt-q-q)/6.0
-
-end function pttmpr
+!real function pttmpr(salz,temp,pres,rfpres)
+!  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
+!  ! (TEMP) und dem in-situ Druck/dbar (PRES) die potentielle Temperatur/
+!  ! degC (PTTMPR) bezogen auf den Referenzdruck/dbar (RFPRES). Es wird
+!  ! ein Runge-Kutta Verfahren vierter Ordnung verwendet.
+!  ! Checkwert: PTTMPR = 36.89073 DegC
+!  !       fuer SALZ   =    40.0 psu
+!  !            TEMP   =    40.0 DegC
+!  !            PRES   = 10000.000 dbar
+!  !            RFPRES =     0.000 dbar
+!
+!  data ct2 ,ct3  /0.29289322 ,  1.707106781/
+!  data cq2a,cq2b /0.58578644 ,  0.121320344/
+!  data cq3a,cq3b /3.414213562, -4.121320344/
+!
+!  real salz,temp,pres,rfpres
+!  real p,t,dp,dt,q,ct2,ct3,cq2a,cq2b,cq3a,cq3b
+!  real adlprt
+!
+!  p  = pres
+!  t  = temp
+!  dp = rfpres-pres
+!  dt = dp*adlprt(salz,t,p)
+!  t  = t +0.5*dt
+!  q = dt
+!  p  = p +0.5*dp
+!  dt = dp*adlprt(salz,t,p)
+!  t  = t + ct2*(dt-q)
+!  q  = cq2a*dt + cq2b*q
+!  dt = dp*adlprt(salz,t,p)
+!  t  = t + ct3*(dt-q)
+!  q  = cq3a*dt + cq3b*q
+!  p  = rfpres
+!  dt = dp*adlprt(salz,t,p)
+!
+!  pttmpr = t + (dt-q-q)/6.0
+!
+!end function pttmpr
 !
 !-------------------------------------------------------------------------------------
 !
-real function adlprt(salz,temp,pres)
-  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
-  ! (TEMP) und dem in-situ Druck/dbar (PRES) den adiabatischen Temperatur-
-  ! gradienten/(K Dbar^-1) ADLPRT.
-  ! Checkwert: ADLPRT =     3.255976E-4 K dbar^-1
-  !       fuer SALZ   =    40.0 psu
-  !            TEMP   =    40.0 DegC
-  !            PRES   = 10000.000 dbar
-
-  real salz,temp,pres
-  real s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds
-
-  data s0 /35.0/
-  data a0,a1,a2,a3 /3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10/
-  data b0,b1       /1.8932E-6, -4.2393E-8/
-  data c0,c1,c2,c3 /1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14/
-  data d0,d1       /-1.1351E-10, 2.7759E-12/
-  data e0,e1,e2    /-4.6206E-13,  1.8676E-14, -2.1687E-16/
-
-  ds = salz-s0
-  adlprt = ( ( (e2*temp + e1)*temp + e0 )*pres                     &
-       + ( (d1*temp + d0)*ds                                  &
-       + ( (c3*temp + c2)*temp + c1 )*temp + c0 ) )*pres   &
-       + (b1*temp + b0)*ds +  ( (a3*temp + a2)*temp + a1 )*temp + a0
-
-END function adlprt
+!real function adlprt(salz,temp,pres)
+!  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
+!  ! (TEMP) und dem in-situ Druck/dbar (PRES) den adiabatischen Temperatur-
+!  ! gradienten/(K Dbar^-1) ADLPRT.
+!  ! Checkwert: ADLPRT =     3.255976E-4 K dbar^-1
+!  !       fuer SALZ   =    40.0 psu
+!  !            TEMP   =    40.0 DegC
+!  !            PRES   = 10000.000 dbar
+!
+!  real salz,temp,pres
+!  real s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds
+!
+!  data s0 /35.0/
+!  data a0,a1,a2,a3 /3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10/
+!  data b0,b1       /1.8932E-6, -4.2393E-8/
+!  data c0,c1,c2,c3 /1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14/
+!  data d0,d1       /-1.1351E-10, 2.7759E-12/
+!  data e0,e1,e2    /-4.6206E-13,  1.8676E-14, -2.1687E-16/
+!
+!  ds = salz-s0
+!  adlprt = ( ( (e2*temp + e1)*temp + e0 )*pres                     &
+!       + ( (d1*temp + d0)*ds                                  &
+!       + ( (c3*temp + c2)*temp + c1 )*temp + c0 ) )*pres   &
+!       + (b1*temp + b0)*ds +  ( (a3*temp + a2)*temp + a1 )*temp + a0
+!
+!END function adlprt
 !
 !----------------------------------------------------------------------------------------
 !

@@ -80,7 +80,7 @@ subroutine forcing_array_setup(mesh)
 
   prec_rain=0.0_WP
   prec_snow=0.0_WP
-  allocate(u_wind(n2), v_wind(n2))
+  !allocate(u_wind(n2), v_wind(n2))
   u_wind=0.0_WP
   v_wind=0.0_WP
   allocate(Tair(n2), shum(n2))

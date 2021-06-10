@@ -19,7 +19,7 @@ subroutine reset_ib_fluxes()
 end subroutine
 
 
-subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
+subroutine prepare_icb2fesom(mesh, ib,i_have_element,localelement,depth_ib)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -28,13 +28,16 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
 ! kh 18.03.21 not really used here
 !   use o_arrays
 
-    !use o_mesh
+    use o_mesh
+    use MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
     use iceberg_params
 
     integer   			:: iceberg_node  
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
     if(i_have_element) then 
         iceberg_node=elem2D_nodes(1,localelement)
@@ -52,7 +55,7 @@ subroutine prepare_icb2fesom(ib,i_have_element,localelement,depth_ib)
 end subroutine prepare_icb2fesom
 
 
-subroutine icb2fesom
+subroutine icb2fesom(mesh)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -61,11 +64,14 @@ subroutine icb2fesom
 ! kh 18.03.21 specification of structure used
     use o_arrays, only: water_flux
 
-    !use o_mesh
+    use o_mesh
+    use MOD_MESH
     use g_config
     use g_parsup
     use i_arrays
     use iceberg_params
+type(t_mesh), intent(in) , target :: mesh
+#include "associate_mesh.h"
 
     do n=1, myDim_nod2d
         water_flux(n) = water_flux(n)-ibfwbv(n)-ibfwb(n)-ibfwl(n)-ibfwe(n)
