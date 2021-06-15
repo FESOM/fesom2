@@ -419,7 +419,9 @@ type(t_mesh),             target, save :: mesh
             if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
                 if (mype==0) write(*,*) '*** step n=',n
                 t1_icb = MPI_Wtime()
+                write(*,*) "LA DEBUG: start iceberg_calculation"
                 call iceberg_calculation(mesh,n)
+                write(*,*) "LA DEBUG: finish iceberg_calculation"
                 t2_icb = MPI_Wtime()
             end if
             !___model sea-ice step__________________________________________________
@@ -443,6 +445,11 @@ type(t_mesh),             target, save :: mesh
                 call oce_fluxes_mom(mesh) ! momentum only
                 call oce_fluxes(mesh)
             end if  
+                
+            !###################################
+            ! LA check wheather this needs to go inside omp
+            call before_oce_step(mesh)
+            !###################################
 
             if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
 !               t1_icb = MPI_Wtime()
@@ -574,6 +581,11 @@ type(t_mesh),             target, save :: mesh
                     end if
 
                 end if ! (use_ice)
+
+                !###################################
+                ! LA check wheather this needs to go inside omp
+                call before_oce_step(mesh)
+                !###################################
 
                 if (nsub < steps_per_ib_step) then
                     if (n == nsteps) then
@@ -741,12 +753,10 @@ type(t_mesh),             target, save :: mesh
             write(*,*) 'ib_async_mode < 0 is not supported: ', ib_async_mode 
         end if ! (ib_async_mode == 0) then
 
-        write(*,*) "*** LA DEBUG start loop_end_part ***"
         call loop_end_part (mesh, .true., bIcbCalcCycleCompleted, n, t1, time_1st_section, time_2nd_section, &
                             t1_icb, t2_icb, t1_par_sections, t2_par_sections, &
                             rtime_fullice, rtime_compute_diag, rtime_write_means, rtime_write_restart, rtime_icb_calc, & 
                             rtime_1st_section, rtime_2nd_section, rtime_par_sections)
-        write(*,*) "*** LA DEBUG finish loop_end_part ***"
 
         n = n + 1
 
@@ -772,76 +782,76 @@ type(t_mesh),             target, save :: mesh
        call foreph_ini(yearnew, month)
     end if
 
-    do n=1, nsteps        
-        if (use_global_tides) then
-           call foreph(mesh)
-        end if
-        mstep = n
-        if (mod(n,logfile_outfreq)==0 .and. mype==0) then
-            write(*,*) 'FESOM ======================================================='
-!             write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
-            write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
-            write(*,*)
-        end if
-#if defined (__oifs) || defined (__oasis)
-            seconds_til_now=INT(dt)*(n-1)
-#endif
-        call clock
-        
-        !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes(mesh)
-        
-        !___model sea-ice step__________________________________________________
-        t1 = MPI_Wtime()
-        if(use_ice) then
-            !___compute fluxes from ocean to ice________________________________
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(mesh)
-            
-            !___compute update of atmospheric forcing____________________________
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
-            t0_frc = MPI_Wtime()
-            call update_atm_forcing(n, mesh)
-            t1_frc = MPI_Wtime()            
-            !___compute ice step________________________________________________
-            if (ice_steps_since_upd>=ice_ave_steps-1) then
-                ice_update=.true.
-                ice_steps_since_upd = 0
-            else
-                ice_update=.false.
-                ice_steps_since_upd=ice_steps_since_upd+1
-            endif
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (ice_update) call ice_timestep(n, mesh)  
-            !___compute fluxes to the ocean: heat, freshwater, momentum_________
-            if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom(mesh) ! momentum only
-            call oce_fluxes(mesh)
-        end if
-        call before_oce_step(mesh) ! prepare the things if required
-        t2 = MPI_Wtime()
-        
-        !___model ocean step____________________________________________________
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
-        call oce_timestep_ale(n, mesh)
-        t3 = MPI_Wtime()
-        !___compute energy diagnostics..._______________________________________
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1, mesh)'//achar(27)//'[0m'
-        call compute_diagnostics(1, mesh)
-        t4 = MPI_Wtime()
-        !___prepare output______________________________________________________
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n, mesh)
-        t5 = MPI_Wtime()
-        call restart(n, .false., .false., mesh)
-        t6 = MPI_Wtime()
-        
-        rtime_fullice       = rtime_fullice       + t2 - t1
-        rtime_compute_diag  = rtime_compute_diag  + t4 - t3
-        rtime_write_means   = rtime_write_means   + t5 - t4   
-        rtime_write_restart = rtime_write_restart + t6 - t5
-        rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
-    end do
+    !do n=1, nsteps        
+    !    if (use_global_tides) then
+    !       call foreph(mesh)
+    !    end if
+    !    mstep = n
+    !    if (mod(n,logfile_outfreq)==0 .and. mype==0) then
+    !        write(*,*) 'FESOM ======================================================='
+!   !          write(*,*) 'FESOM step:',n,' day:', n*dt/24./3600.,
+    !        write(*,*) 'FESOM step:',n,' day:', daynew,' year:',yearnew 
+    !        write(*,*)
+    !    end if
+!#if !defined (__oifs) || defined (__oasis)
+    !        seconds_til_now=INT(dt)*(n-1)
+!#end!if
+    !    !call clock
+    !    
+    !    !___compute horizontal velocity on nodes (originaly on elements)________
+    !    !call compute_vel_nodes(mesh)
+    !    
+    !    !___model sea-ice step__________________________________________________
+    !    !t1 = MPI_Wtime()
+    !    !if(use_ice) then
+    !    !    !___compute fluxes from ocean to ice________________________________
+    !    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
+    !    !    !call ocean2ice(mesh)
+    !    !    
+    !    !    !___compute update of atmospheric forcing____________________________
+    !    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
+    !    !    !t0_frc = MPI_Wtime()
+    !    !    !call update_atm_forcing(n, mesh)
+    !    !    !t1_frc = MPI_Wtime()            
+    !    !    !___compute ice step________________________________________________
+    !    !    !if (ice_steps_since_upd>=ice_ave_steps-1) then
+    !    !    !    ice_update=.true.
+    !    !    !    ice_steps_since_upd = 0
+    !    !    !else
+    !    !    !    ice_update=.false.
+    !    !    !    ice_steps_since_upd=ice_steps_since_upd+1
+    !    !    !endif
+    !    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
+    !    !    !if (ice_update) call ice_timestep(n, mesh)  
+    !    !    !!___compute fluxes to the ocean: heat, freshwater, momentum_________
+    !    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
+    !    !    !call oce_fluxes_mom(mesh) ! momentum only
+    !    !    !call oce_fluxes(mesh)
+    !    !end if
+    !    !call before_oce_step(mesh) ! prepare the things if required
+    !    !t2 = MPI_Wtime()
+    !    
+    !    !!___model ocean step____________________________________________________
+    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+    !    !call oce_timestep_ale(n, mesh)
+    !    !t3 = MPI_Wtime()
+    !    !!___compute energy diagnostics..._______________________________________
+    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1, mesh)'//achar(27)//'[0m'
+    !    !call compute_diagnostics(1, mesh)
+    !    !t4 = MPI_Wtime()
+    !    !___prepare output______________________________________________________
+    !    !if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+    !    !call output (n, mesh)
+    !    !t5 = MPI_Wtime()
+    !    !call restart(n, .false., .false., mesh)
+    !    !t6 = MPI_Wtime()
+    !    !
+    !    !rtime_fullice       = rtime_fullice       + t2 - t1
+    !    !rtime_compute_diag  = rtime_compute_diag  + t4 - t3
+    !    !rtime_write_means   = rtime_write_means   + t5 - t4   
+    !    !rtime_write_restart = rtime_write_restart + t6 - t5
+    !    !rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
+    !end do
     
     call finalize_output()
     

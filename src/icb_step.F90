@@ -129,12 +129,20 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE"
+end if
+
  completed = .false.
  do while (.not. completed)
 !$omp critical
-  CALL MPI_TEST(req, completed, status, MPIERR_IB)
+CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
+
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_TEST"
+end if
 
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
@@ -143,12 +151,20 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
 !$omp end critical
 
- completed = .false.
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 2"
+end if
+
+completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
+
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_TEST 2"
+end if
 
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
 ! kh 25.03.21 orig
@@ -158,12 +174,20 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 3"
+end if
+
  completed = .false.
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
+
+if (mype==0) then
+    write(*,*) "LA DEBUG: finished MPI_TEST 3"
+end if
 
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
@@ -214,6 +238,9 @@ type(t_mesh), intent(in) , target :: mesh
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)	
+        if (mype==0) then
+            write(*,*) "LA DEBUG: finish iceberg_step2"
+        end if
         !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
         !end do
     end if
@@ -375,7 +402,7 @@ type(t_mesh), intent(in) , target :: mesh
   if(mype==0) write(*,*) 'Preparing local_idx_of array...'
   allocate(local_idx_of(elem2D))
   !creates mapping
-  call global2local(mesh, local_idx_of)
+  call global2local(mesh, local_idx_of, elem2D)
   firstcall=.false.
   if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
  end if 
@@ -499,9 +526,11 @@ if( local_idx_of(iceberg_elem) > 0 ) then
   !conci_ib = 0.3
 		   
   !=======================END OF DYNAMICS============================
-  
+ 
+  write(*,*) "LA DEBUG: call depth_bathy"
   call depth_bathy(mesh, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
+  write(*,*) "LA DEBUG: call FEM_3eval"
   call FEM_3eval(mesh, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
@@ -1148,13 +1177,17 @@ subroutine iceberg_restart
   if(mype==0) then
   write(*,*) 'no iceberg restart'
 
+  write(*,*) 'LA DEBUG: start init_buoy_output'
   if(.NOT.ascii_out) call init_buoy_output
+  write(*,*) 'LA DEBUG: finish init_buoy_output'
 
   end if
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
+  write(*,*) 'LA DEBUG: start init_icebergs'
   call init_icebergs ! all PEs read LON,LAT,LENGTH from files
+  write(*,*) 'LA DEBUG: finish init_icebergs'
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
  end if

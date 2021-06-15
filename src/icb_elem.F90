@@ -712,18 +712,18 @@ END SUBROUTINE stdbafu_2D
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine global2local(mesh, aux)
+subroutine global2local(mesh, aux, tmp)
  use g_parsup !for myDim_elem2D, myList_elem2D
  !use o_mesh
  USE MOD_MESH
  implicit none
  
- integer, dimension(:), allocatable, intent(out):: aux
+ integer, intent(in):: tmp
+ integer, dimension(tmp), intent(out):: aux
  integer:: n
 
 type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h", only: myDim_elem2D,myList_elem2D
- allocate(aux(elem2D))
+#include "associate_mesh.h", only: myDim_elem2D, myList_elem2D
 
  aux = 0
  do n = 1, myDim_elem2D
