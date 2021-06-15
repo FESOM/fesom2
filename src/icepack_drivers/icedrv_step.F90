@@ -989,7 +989,7 @@ submodule (icedrv_main) icedrv_step
              fsalt = fsalt / p001 / rhow        
           endif
 
-          fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          fresh_tot = fresh + frain + (-evap_ocn + fsnow)*(c1-aice)
 
       end subroutine ocn_mixed_layer_icepack
 
@@ -1202,7 +1202,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           call step_therm1     (dt) ! vertical thermodynamics
-          call step_therm2     (dt) ! ice thickness distribution thermo
+!!PS           call step_therm2     (dt) ! ice thickness distribution thermo
     
           !-----------------------------------------------------------------         
           ! clean up, update tendency diagnostics
@@ -1280,30 +1280,34 @@ submodule (icedrv_main) icedrv_step
              ! initialize tendencies needed by fesom
              !-----------------------------------------------------------------
 
-             dhi_r_dt(:) = vice(:)
-             dhs_r_dt(:) = vsno(:)
+!!PS              dhi_r_dt(:) = vice(:)
+!!PS              dhs_r_dt(:) = vsno(:)
+             dhi_r_dt(:) = 0.0
+             dhs_r_dt(:) = 0.0
 
-             !-----------------------------------------------------------------
-             ! ridging
-             !-----------------------------------------------------------------
-
-             call step_dyn_ridge (dt_dyn, ndtd)
-     
-             ! clean up, update tendency diagnostics
-             offset = c0
-             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-
-             !-----------------------------------------------------------------
-             ! tendencies needed by fesom
-             !-----------------------------------------------------------------
-
-             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
-             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
+!!PS              !-----------------------------------------------------------------
+!!PS              ! ridging
+!!PS              !-----------------------------------------------------------------
+!!PS 
+!!PS !!PS              call step_dyn_ridge (dt_dyn, ndtd)
+!!PS      
+!!PS              ! clean up, update tendency diagnostics
+!!PS              offset = c0
+!!PS              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
+!!PS 
+!!PS              !-----------------------------------------------------------------
+!!PS              ! tendencies needed by fesom
+!!PS              !-----------------------------------------------------------------
+!!PS 
+!!PS              dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+!!PS              dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
     
           enddo
-
-          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
-          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+!!PS 
+!!PS           dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+!!PS           dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+          dhi_dt(:) = 0.0
+          dhs_dt(:) = 0.0
     
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation
