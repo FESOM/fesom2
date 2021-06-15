@@ -206,14 +206,27 @@ subroutine oce_fluxes(mesh)
                            evap_out=ice_sublimation        )
 
     heat_flux(:)   = - net_heat_flux(:)
-    water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
+!     water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
+!     water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat)
+    water_flux(:)  = - (fresh_wa_flux(:) / 1000.0_WP) - runoff(:)
 
     ! Evaporation
-    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+!     evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+!     evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) / 1000.0_WP
+!     evaporation(:) = - evaporation(:) / 1000.0_WP
     ice_sublimation(:) = 0.0_WP
-
+    
+!     runoff  = 0.0_WP       
+    thdgr   = 0.0_WP
+    thdgrsn = 0.0_WP
+!     evaporation = 0.0_WP
+!     prec_rain = 0.0_WP
+!     prec_snow = 0.0_WP
     call init_flux_atm_ocn()
-
+!     rhoice = 917.0_WP
+!     rhosno = 330.0_WP
+    
 #else
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
@@ -290,9 +303,9 @@ subroutine oce_fluxes(mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
-    flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
-            +prec_rain                       &
-            +prec_snow*(1.0_WP-a_ice_old)    &
+    flux = evaporation-ice_sublimation   & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+            +prec_rain                   &
+            +prec_snow*(1.0_WP-a_ice)    &
             +runoff    
             
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
@@ -305,7 +318,10 @@ subroutine oce_fluxes(mesh)
     ! salinity flux
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
-        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
+!         flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
+
+        ! just as test for icepack use there rhoice and rhosno defintion 
+        flux = flux-thdgr*917.0_WP/1000.0_WP-thdgrsn*330.0_WP/1000.0_WP
     end if     
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
