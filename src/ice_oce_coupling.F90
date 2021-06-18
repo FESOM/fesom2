@@ -305,11 +305,14 @@ subroutine oce_fluxes(mesh)
         end if 
     end if 
             
-    call integrate_nod(flux, net, mesh)
+    ! call integrate_nod(flux, net, mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
-    water_flux=water_flux+net/ocean_area 
+
+    ! water_flux=water_flux+net/ocean_area 
+    call integrate_nod(water_flux, net, mesh)
+    water_flux=water_flux-net/ocean_area
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)

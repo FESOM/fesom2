@@ -86,7 +86,7 @@ subroutine thermodynamics(mesh)
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
-  real(kind=WP)  :: h0min = 0.50, h0max = 1.5
+  real(kind=WP)  :: h0min = 1.0, h0max = 1.5
   type(t_mesh), intent(in)   , target :: mesh  
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
@@ -138,9 +138,9 @@ subroutine thermodynamics(mesh)
      if (geolat.lt.0.) then
         h0min = 1.0
         h0max = 1.0
-     else
-        h0min = 0.3
-        h0max = 0.3
+!     else
+!        h0min = 0.3
+!        h0max = 0.3
      endif
 #endif /* (__oifs) */
 
@@ -488,7 +488,8 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(TFrezs,t)                       ! Not warmer than freezing please!
+! t=min(TFrezs,t)                       ! Not warmer than freezing please!
+  t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
