@@ -309,8 +309,14 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-    dsnow = A*min(Qatmice-Qicecon,0._WP)
-    dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    !---- new condition added - surface temperature must be
+    !----                       larger than zero to melt snow
+    where (ice_temp > -0.1_WP) 
+        dsnow = A*min(Qatmice-Qicecon,0._WP)
+        dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    elsewhere
+        dsnow = 0.0_WP
+    endwhere
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow
