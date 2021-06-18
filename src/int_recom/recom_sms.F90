@@ -457,81 +457,93 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     end if
 
 !-------------------------------------------------------------------------------
-! Zooplankton grazing on small phytoplankton and diatoms
-! At the moment there is no preference for one or the other food. Change this!
+!< Zooplankton grazing on small phytoplankton and diatoms
+!< At the moment there is no preference for one or the other food. Change this!
 
     if (REcoM_Grazing_Variable_Preference) then
         if (Grazing_detritus) then
             if (Graz_pref_new) then
-                varpzPhy      = pzPhy * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDia      = pzDia * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDet      = pzDet * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
-                varpzDetZ2    = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)   
-            else
-                DiaNsq        = DiaN * DiaN
-                varpzDia      = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
-                PhyNsq        = PhyN * PhyN
-                varpzPhy      = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
-                DetNsq        = DetN * DetN
-                varpzDet      = pzDet * DetNsq /(sDetNsq + DetNsq)
-                DetZ2Nsq      = DetZ2N * DetZ2N
-                varpzDetZ2    = pzDetZ2 * DetZ2Nsq /(sDetZ2Nsq + DetZ2Nsq)
-          endif
-          fDiaN        = varpzDia * DiaN
-          fPhyN        = varpzPhy * PhyN
-          fDetN        = varpzDet * DetN
-          fDetZ2N      = varpzDetZ2 * DetZ2N
-       else
 
-          if (Graz_pref_new) then
-             varpzPhy      = pzPhy * PhyN /(pzPhy*PhyN + pzDia*DiaN)
-             varpzDia      = pzDia * DiaN /(pzPhy*PhyN + pzDia*DiaN)
-          else
-             DiaNsq        = DiaN * DiaN
-             varpzDia      = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
-             PhyNsq        = PhyN * PhyN
-             varpzPhy      = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
-          end if
-          fDiaN         = varpzDia * DiaN
-          fPhyN         = varpzPhy * PhyN
-       end if
-     else
-       fDiaN         = pzDia * DiaN
-       fPhyN         = pzPhy * PhyN
-       if (Grazing_detritus) then
-          fDetN        = pzDet * DetN
-          fDetZ2N      = pzDetZ2 * DetZ2N
-       end if
+!< pzPhy: Maximum nanophytoplankton preference
+!< pzDia: Maximum diatom preference
+!< pzDet: Maximum small detritus prefence by first zooplankton
+!< pzDetZ2: Maximum large detritus preference by first zooplankton
+
+                varpzPhy    = pzPhy   * PhyN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDia    = pzDia   * DiaN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDet    = pzDet   * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+                varpzDetZ2  = pzDetZ2 * DetN /(pzPhy*PhyN + pzDia*DiaN + PzDet*DetN + pzDetZ2*DetZ2N)
+            else
+
+                DiaNsq      = DiaN * DiaN
+                varpzDia    = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
+                PhyNsq      = PhyN * PhyN
+                varpzPhy    = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
+                DetNsq      = DetN * DetN
+                varpzDet    = pzDet * DetNsq /(sDetNsq + DetNsq)
+                DetZ2Nsq    = DetZ2N * DetZ2N
+                varpzDetZ2  = pzDetZ2 * DetZ2Nsq /(sDetZ2Nsq + DetZ2Nsq)
+
+            endif
+
+            fDiaN    = varpzDia   * DiaN
+            fPhyN    = varpzPhy   * PhyN
+            fDetN    = varpzDet   * DetN
+            fDetZ2N  = varpzDetZ2 * DetZ2N
+
+        else
+
+            if (Graz_pref_new) then
+                varpzPhy      = pzPhy * PhyN /(pzPhy*PhyN + pzDia*DiaN)
+                varpzDia      = pzDia * DiaN /(pzPhy*PhyN + pzDia*DiaN)
+            else
+                DiaNsq        = DiaN  * DiaN
+                varpzDia      = pzDia * DiaNsq /(sDiaNsq + DiaNsq)
+                PhyNsq        = PhyN  * PhyN
+                varpzPhy      = pzPhy * PhyNsq /(sPhyNsq + PhyNsq)
+            end if
+
+            fDiaN         = varpzDia * DiaN
+            fPhyN         = varpzPhy * PhyN
+
+        end if
+    else
+        fDiaN         = pzDia * DiaN
+        fPhyN         = pzPhy * PhyN
+        if (Grazing_detritus) then
+            fDetN        = pzDet   * DetN
+            fDetZ2N      = pzDetZ2 * DetZ2N
+        end if
     end if
 
     if (Grazing_detritus) then
-       food            = fPhyN + fDiaN + fDetN + fDetZ2N
-       foodsq          = food * food
-       grazingFlux     = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
-       grazingFlux_phy = grazingFlux * fphyN / food
-       grazingFlux_Dia = grazingFlux * fDiaN / food
-       grazingFlux_Det = grazingFlux * fDetN / food
+       food              = fPhyN + fDiaN + fDetN + fDetZ2N
+       foodsq            = food * food
+       grazingFlux       = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
+       grazingFlux_phy   = grazingFlux * fphyN / food
+       grazingFlux_Dia   = grazingFlux * fDiaN / food
+       grazingFlux_Det   = grazingFlux * fDetN / food
        grazingFlux_DetZ2 = grazingFlux * fDetZ2N / food
     else
-       food            = PhyN + fDiaN
-       foodsq          = food * food
-       grazingFlux     = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
-       grazingFlux_phy = grazingFlux * phyN / food
-       grazingFlux_Dia = grazingFlux * fDiaN / food
+       food              = PhyN + fDiaN
+       foodsq            = food * food
+       grazingFlux       = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * arrFunc
+       grazingFlux_phy   = grazingFlux * phyN / food
+       grazingFlux_Dia   = grazingFlux * fDiaN / food
     endif
 
     if (REcoM_Second_Zoo) then
 !-------------------------------------------------------------------------------
-! Second Zooplankton grazing on small phytoplankton, diatoms and heterotrophs
-! At the moment there is no preference for one or the other food. Change this!
+!< Second Zooplankton grazing on small phytoplankton, diatoms and heterotrophs
+!< At the moment there is no preference for one or the other food. Change this!
         
     if (REcoM_Grazing_Variable_Preference) then
        if (Grazing_detritus) then
           if (Graz_pref_new) then
-             varpzDia2      = pzDia2 * DiaN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-             varpzPhy2      = pzPhy2 * PhyN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
-             varpzHet       = pzHet * HetN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)  
-             varpzDet2      = pzDet2 * DetN /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+             varpzDia2      = pzDia2   * DiaN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+             varpzPhy2      = pzPhy2   * PhyN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
+             varpzHet       = pzHet    * HetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)  
+             varpzDet2      = pzDet2   * DetN   /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
              varpzDetZ22    = pzDetZ22 * DetZ2N /(pzPhy2 * PhyN + PzDia2 * DiaN + pzHet * HetN + pzDet2 * DetN + pzDetZ22 * DetZ2N)
           else
              DiaNsq2        = DiaN * DiaN
@@ -714,16 +726,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     else
        calc_loss_gra = grazingFlux_phy           &
                        * recipQuota/(PhyC + tiny)    * PhyCalc
-    endif  
+    endif
+ 
+ 
     if (ciso) then
         calcification_13 = calc_prod_ratio * Cphot * PhyC_13 * alpha_calc_13
         calcification_14 = calc_prod_ratio * Cphot * PhyC_14 * alpha_calc_14
         calc_loss_agg_13 = aggregationRate * PhyCalc_13
         calc_loss_agg_14 = aggregationRate * PhyCalc_14
         calc_loss_gra_13 = grazingFlux_phy *              &
-          recipQuota_13/(PhyC_13 + tiny)   * PhyCalc_13
+            recipQuota_13/(PhyC_13 + tiny)   * PhyCalc_13
         calc_loss_gra_14 = grazingFlux_phy *              &
-          recipQuota_14/(PhyC_14 + tiny)   * PhyCalc_14
+            recipQuota_14/(PhyC_14 + tiny)   * PhyCalc_14
     end if
 
 !#endif
