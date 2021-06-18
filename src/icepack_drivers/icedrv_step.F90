@@ -1202,7 +1202,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           call step_therm1     (dt) ! vertical thermodynamics
-!!PS           call step_therm2     (dt) ! ice thickness distribution thermo
+          call step_therm2     (dt) ! ice thickness distribution thermo
     
           !-----------------------------------------------------------------         
           ! clean up, update tendency diagnostics
@@ -1304,10 +1304,10 @@ submodule (icedrv_main) icedrv_step
     
           enddo
 !!PS 
-!!PS           dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
-!!PS           dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
-          dhi_dt(:) = 0.0
-          dhs_dt(:) = 0.0
+          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+!!PS           dhi_dt(:) = 0.0
+!!PS           dhs_dt(:) = 0.0
     
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation

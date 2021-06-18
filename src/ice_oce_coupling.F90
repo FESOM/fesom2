@@ -218,8 +218,8 @@ subroutine oce_fluxes(mesh)
     ice_sublimation(:) = 0.0_WP
     
 !     runoff  = 0.0_WP       
-    thdgr   = 0.0_WP
-    thdgrsn = 0.0_WP
+!     thdgr   = 0.0_WP
+!     thdgrsn = 0.0_WP
 !     evaporation = 0.0_WP
 !     prec_rain = 0.0_WP
 !     prec_snow = 0.0_WP
