@@ -142,10 +142,6 @@ subroutine thermodynamics(mesh)
 !        h0min = 0.3
 !        h0max = 0.3
      endif
-#endif /* (__oifs) */
-
-     call ice_growth
-#if defined (__oifs)
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -160,7 +156,7 @@ subroutine thermodynamics(mesh)
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
 #endif
-
+     call ice_growth
 
      a_ice(inod)         = A
      m_ice(inod)         = h
@@ -184,9 +180,9 @@ contains
   !===================================================================
 
   subroutine ice_growth
-
+      
     implicit none
-
+ 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
     real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
 
@@ -309,8 +305,19 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
+#ifdef oifs
+    !---- new condition added - surface temperature must be
+    !----                       larger than -0.1ÂC to melt snow
+    if (t.gt.-0.1_WP) then
+        dsnow = A*min(Qatmice-Qicecon,0._WP)
+        dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    else
+        dsnow = 0.0_WP
+    endif
+#else
     dsnow = A*min(Qatmice-Qicecon,0._WP)
     dsnow = max(dsnow*rhoice/rhosno,-hsn)
+#endif
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow
