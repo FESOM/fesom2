@@ -30,7 +30,7 @@ subroutine thermodynamics(mesh)
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
-#ifdef oifs
+#if defined (__oifs)
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
        , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
 #else
@@ -42,7 +42,7 @@ subroutine thermodynamics(mesh)
   use g_config,         only: dt
 
   !---- variables from gen_modules_forcing.F90
-#ifdef oifs
+#if defined (__oifs)
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
        , enthalpyoffuse
@@ -86,7 +86,7 @@ subroutine thermodynamics(mesh)
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
-  real(kind=WP)  :: h0min = 1.0, h0max = 1.5
+  real(kind=WP)  :: h0min = 0.5, h0max = 1.5
   type(t_mesh), intent(in)   , target :: mesh  
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
@@ -134,14 +134,14 @@ subroutine thermodynamics(mesh)
 
 #if defined (__oifs)
      !---- different lead closing parameter for NH and SH
-     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-     if (geolat.lt.0.) then
-        h0min = 1.0
-        h0max = 1.0
+!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+!     if (geolat.lt.0.) then
+!        h0min = 1.0
+!        h0max = 1.0
 !     else
 !        h0min = 0.3
 !        h0max = 0.3
-     endif
+!     endif
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -305,10 +305,10 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-#ifdef oifs
+#if defined (__oifs)
     !---- new condition added - surface temperature must be
-    !----                       larger than -0.1ÂC to melt snow
-    if (t.gt.-0.1_WP) then
+    !----                       larger than 273K to melt snow
+    if (t.gt.273_WP) then
         dsnow = A*min(Qatmice-Qicecon,0._WP)
         dsnow = max(dsnow*rhoice/rhosno,-hsn)
     else

@@ -167,15 +167,15 @@ CASE ('m_ice     ')
     end if
 CASE ('thdgr     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'growth rate ice',                 'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('thdgrsn   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'growth rate ice',                 'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('flice     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D,  'flice',    'flice',                           'm/s',    flice(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D,  'flice',    'flooding growth rate ice',       'm/s',    flice(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('m_snow    ')
     if (use_ice) then
