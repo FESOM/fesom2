@@ -478,13 +478,25 @@ contains
   real(kind=WP)  zcpdt
   real(kind=WP)  zcpdte
   real(kind=WP)  zcprosn
-  !---- local parameters
-  real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+  !---- additional local variables
+  real(kind=WP)  dice  
+  real(kind=WP)  dsno
+  real(kind=WP)  asno
+  real(kind=WP), parameter :: ltk = 0.05_WP
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
 
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
+
+  if (hsn .ge. ltk) then
+     dsno = ltk
+     dice = 0.0_WP
+  else
+     dsno = max(hsno, 0.0_WP)
+     asno = ltk - hsno
+     dice = (rhosno*cpsno)/(rhoice*cpice)*asno
+  end if
 
   snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
   zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
@@ -492,7 +504,7 @@ contains
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  zcpdte=zcpdt+zcprosn*dsno             ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
 ! t=min(TFrezs,t)                       ! Not warmer than freezing please!
   t=min(273.15_WP,t)
