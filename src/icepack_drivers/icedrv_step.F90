@@ -1135,7 +1135,7 @@ submodule (icedrv_main) icedrv_step
     
           logical (kind=log_kind) :: &
              calc_Tsfc, skl_bgc, solve_zsal, z_tracers, tr_brine, &  ! from icepack
-             tr_fsd, wave_spec !!PS, update_ocn_f_out
+             tr_fsd, wave_spec
          
           real (kind=dbl_kind) :: &
              offset,              &   ! d(age)/dt time offset
@@ -1165,8 +1165,6 @@ submodule (icedrv_main) icedrv_step
           call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers)
           call icepack_query_parameters(solve_zsal_out=solve_zsal, calc_Tsfc_out=calc_Tsfc, &
                                         wave_spec_out=wave_spec)
-!!PS           call icepack_query_parameters(update_ocn_f_out=update_ocn_f)
-!!PS           write(*,*) " in subroutine step_icepack(...), update_ocn_f=",update_ocn_f_out
           
           call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_fsd_out=tr_fsd)
           call icepack_warnings_flush(ice_stderr)
