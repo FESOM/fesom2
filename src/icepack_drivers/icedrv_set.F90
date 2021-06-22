@@ -850,7 +850,7 @@
                fbot_xfer_type_in=fbot_xfer_type, &
                wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
                ksno_in=ksno, dragio_in=dragio, Cstar_in=C_star, &
-               Pstar_in=P_star, albocn_in=albocn)
+               Pstar_in=P_star, albocn_in=albocn, update_ocn_f_in=update_ocn_f)
           call icepack_init_tracer_sizes(ntrcr_in=ntrcr, &
                ncat_in=ncat, nilyr_in=nilyr, nslyr_in=nslyr, nblyr_in=nblyr, &
                nfsd_in=nfsd, n_aero_in=n_aero)
