@@ -29,7 +29,7 @@
                                          mpi_comm_fesom
           use i_param,             only: whichEVP
           use i_param,             only: cd_oce_ice, Pstar, c_pressure  
-          use i_therm_param,       only: albw
+          use i_therm_param,       only: albw, rhowat, rhoice, rhosno
 
           implicit none
 
@@ -153,7 +153,6 @@
           character (len=char_len) :: tfrz_option     
           logical (kind=log_kind)  :: oceanmixed_ice   
           character (len=char_len) :: wave_spec_type
-
 
           !-----------------------------------------------------------------
           ! Namelist definition
@@ -850,7 +849,8 @@
                fbot_xfer_type_in=fbot_xfer_type, &
                wave_spec_type_in=wave_spec_type, wave_spec_in=wave_spec, &
                ksno_in=ksno, dragio_in=dragio, Cstar_in=C_star, &
-               Pstar_in=P_star, albocn_in=albocn, update_ocn_f_in=update_ocn_f)
+               Pstar_in=P_star, albocn_in=albocn, update_ocn_f_in=update_ocn_f, &
+               rhoi_in=rhoice, rhos_in=rhosno, rhow_in=rhowat)
           call icepack_init_tracer_sizes(ntrcr_in=ntrcr, &
                ncat_in=ncat, nilyr_in=nilyr, nslyr_in=nslyr, nblyr_in=nblyr, &
                nfsd_in=nfsd, n_aero_in=n_aero)
