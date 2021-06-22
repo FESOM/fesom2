@@ -312,7 +312,7 @@ submodule (icedrv_main) icedrv_step
              ntrcr, nbtrcr
     
           logical (kind=log_kind) :: &
-             tr_fsd  ! floe size distribution tracers
+             tr_fsd, update_ocn_f_out  ! floe size distribution tracers
     
           character(len=*), parameter :: subname='(step_therm2)'
     
@@ -322,6 +322,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
+          call icepack_query_parameters(update_ocn_f_out=update_ocn_f) 
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
@@ -1134,7 +1135,7 @@ submodule (icedrv_main) icedrv_step
     
           logical (kind=log_kind) :: &
              calc_Tsfc, skl_bgc, solve_zsal, z_tracers, tr_brine, &  ! from icepack
-             tr_fsd, wave_spec
+             tr_fsd, wave_spec !!PS, update_ocn_f_out
          
           real (kind=dbl_kind) :: &
              offset,              &   ! d(age)/dt time offset
@@ -1164,6 +1165,9 @@ submodule (icedrv_main) icedrv_step
           call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers)
           call icepack_query_parameters(solve_zsal_out=solve_zsal, calc_Tsfc_out=calc_Tsfc, &
                                         wave_spec_out=wave_spec)
+!!PS           call icepack_query_parameters(update_ocn_f_out=update_ocn_f)
+!!PS           write(*,*) " in subroutine step_icepack(...), update_ocn_f=",update_ocn_f_out
+          
           call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_fsd_out=tr_fsd)
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
@@ -1245,11 +1249,11 @@ submodule (icedrv_main) icedrv_step
 
              select case (whichEVP)
                 case (0)
-                   !call EVPdynamics(mesh)
+                   call EVPdynamics(mesh)
                 case (1)
-                   !call EVPdynamics_m(mesh)
+                   call EVPdynamics_m(mesh)
                 case (2)
-                   !call EVPdynamics_a(mesh)
+                   call EVPdynamics_a(mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
                    call par_ex
@@ -1271,7 +1275,7 @@ submodule (icedrv_main) icedrv_step
 
              t2 = MPI_Wtime()
 
-             !call tracer_advection_icepack(mesh)
+             call tracer_advection_icepack(mesh)
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2
@@ -1280,30 +1284,29 @@ submodule (icedrv_main) icedrv_step
              ! initialize tendencies needed by fesom
              !-----------------------------------------------------------------
 
-!!PS              dhi_r_dt(:) = vice(:)
-!!PS              dhs_r_dt(:) = vsno(:)
-             dhi_r_dt(:) = 0.0
-             dhs_r_dt(:) = 0.0
+             dhi_r_dt(:) = vice(:)
+             dhs_r_dt(:) = vsno(:)
+!!PS              dhi_r_dt(:) = 0.0
+!!PS              dhs_r_dt(:) = 0.0
 
-!!PS              !-----------------------------------------------------------------
-!!PS              ! ridging
-!!PS              !-----------------------------------------------------------------
-!!PS 
-!!PS !!PS              call step_dyn_ridge (dt_dyn, ndtd)
-!!PS      
-!!PS              ! clean up, update tendency diagnostics
-!!PS              offset = c0
-!!PS              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-!!PS 
-!!PS              !-----------------------------------------------------------------
-!!PS              ! tendencies needed by fesom
-!!PS              !-----------------------------------------------------------------
-!!PS 
-!!PS              dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
-!!PS              dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
+             !-----------------------------------------------------------------
+             ! ridging
+             !-----------------------------------------------------------------
+
+             call step_dyn_ridge (dt_dyn, ndtd)
+     
+             ! clean up, update tendency diagnostics
+             offset = c0
+             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
+
+             !-----------------------------------------------------------------
+             ! tendencies needed by fesom
+             !-----------------------------------------------------------------
+
+             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
     
           enddo
-!!PS 
           dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
           dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
 !!PS           dhi_dt(:) = 0.0
