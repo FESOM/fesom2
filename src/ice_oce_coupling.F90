@@ -192,7 +192,6 @@ subroutine oce_fluxes(mesh)
     !     V    |
     !     
 #if defined (__icepack)
-
     call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
                            aice_out=a_ice,                 &
                            vice_out=m_ice,                 &
@@ -206,22 +205,23 @@ subroutine oce_fluxes(mesh)
                            evap_out=ice_sublimation        )
     
     ! Heat flux 
-    heat_flux(:)   = - net_heat_flux(:)
+    heat_flux       = - net_heat_flux
     
     ! Freshwater flux (convert units from icepack to fesom)
-    water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
+    water_flux      = - (fresh_wa_flux * inv_rhowat) - runoff(:)
 
     ! Evaporation (convert units from icepack to fesom)
-    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+    evaporation     = - evaporation * (1.0_WP - a_ice) * inv_rhowat
     
     ! Ice-Sublimation is not added to evap in icepack 
-    ice_sublimation(:) = 0.0_WP
+    ice_sublimation = 0.0_WP
     
     call init_flux_atm_ocn()
     
 #else
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
+    
 #endif 
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
    
@@ -295,11 +295,25 @@ subroutine oce_fluxes(mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
+    
+    ! Icepack adds rain, snow and evap is based on the newly formed ice 
+    ! concentration (a_ice). In our standard ice model rain, snow and evap is
+    ! added based on the ice concentration of the previous time step (a_ice_old)  
+    ! So for the proper balancing of snow the proper aice has to be choosen 
+#if defined (__icepack)    
     flux = evaporation-ice_sublimation   & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
             +prec_rain                   &
             +prec_snow*(1.0_WP-a_ice)    &
             +runoff    
-            
+        
+#else
+    flux = evaporation-ice_sublimation   & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+            +prec_rain                   &
+            +prec_snow*(1.0_WP-a_ice_old)&
+            +runoff  
+        
+#endif 
+
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
     ! growth rates of sea ice have to be taken into account to preserve the fresh water 
@@ -311,7 +325,6 @@ subroutine oce_fluxes(mesh)
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
         flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
-        
     end if     
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
