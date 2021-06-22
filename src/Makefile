@@ -20,7 +20,7 @@ CPP_SOL   = -DPARMS
 
 ###### Objects for Mesh Partitioning ################################################
 # modules
-MOD_INI =  fort_part.o  oce_modules.o  gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
+MOD_INI =  fort_part.o  oce_modules.o MOD_MESH.o gen_modules_config.o gen_modules_partitioning.o gen_modules_rotate_grid.o  
 
 OBJ_INI =  fvom_init.o \
            oce_local.o \
@@ -29,6 +29,8 @@ OBJ_INI =  fvom_init.o \
 # objects
 
 MODULES = oce_modules.o \
+          info_module.o \
+          command_line_options.o \
           MOD_MESH.o \
           ice_modules.o \
           gen_modules_config.o \
@@ -40,6 +42,10 @@ MODULES = oce_modules.o \
           gen_halo_exchange.o \
           gen_support.o \
           oce_ale_mixing_kpp.o \
+          oce_adv_tra_hor.o \
+          oce_adv_tra_ver.o \
+          oce_adv_tra_fct.o \
+          oce_adv_tra_driver.o \
           gen_modules_diag.o \
           psolve.o \
           oce_ale_mixing_pp.o \
@@ -58,12 +64,23 @@ MODULES = oce_modules.o \
           gen_modules_cvmix_tidal.o \
           cvmix_shear.o \
           gen_modules_cvmix_pp.o \
+          async_threads_module.o \
+          forcing_provider_netcdf_module.o \
+          forcing_lookahead_reader_module.o \
+          forcing_provider_async_module.o \
+          io_gather.o \
+          mpi_topology_module.o \
+          io_netcdf_workaround_module.o \
+          io_data_strategy.o \
+          fesom_version_info.o \
           io_meandata.o \
           io_restart.o \
           io_blowup.o \
           io_mesh_info.o \
           gen_ic3d.o \
-          gen_surface_forcing.o
+          gen_surface_forcing.o \
+          gen_modules_gpot.o \
+          toy_channel_soufflet.o 
 
 OBJECTS=  fvom_main.o 		\
           gen_comm.o 		\
@@ -75,11 +92,11 @@ OBJECTS=  fvom_main.o 		\
 	  oce_ale_pressure_bv.o \
 	  oce_fer_gm.o 		\
           oce_muscl_adv.o 	\
-          oce_ale_fct_3d_adv.o 	\
           oce_ice_init_state.o 	\
           oce_shortwave_pene.o 	\
           oce_ale.o 		\
           oce_ale_tracer.o 	\
+          cavity_param.o        \
           ice_EVP.o             \
           ice_maEVP.o 		\
           ice_setup_step.o 	\

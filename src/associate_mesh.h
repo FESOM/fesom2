@@ -3,6 +3,7 @@ integer         , pointer :: elem2D
 integer         , pointer :: edge2D   
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
+real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
@@ -22,7 +23,7 @@ real(kind=WP), dimension(:,:), pointer :: gradient_sca
 integer,       dimension(:)  , pointer :: bc_index_nod2D
 real(kind=WP), dimension(:)  , pointer :: zbar, Z, elem_depth
 integer,       dimension(:)  , pointer :: nlevels, nlevels_nod2D, nlevels_nod2D_min
-real(kind=WP), dimension(:,:), pointer :: area, area_inv
+real(kind=WP), dimension(:,:), pointer :: area, area_inv, areasvol, areasvol_inv
 real(kind=WP), dimension(:)  , pointer :: mesh_resolution
 real(kind=WP), dimension(:)  , pointer :: lump2d_north, lump2d_south
 type(sparse_matrix)          , pointer :: ssh_stiff
@@ -35,7 +36,8 @@ nod2D              => mesh%nod2D
 elem2D             => mesh%elem2D             
 edge2D             => mesh%edge2D             
 edge2D_in          => mesh%edge2D_in          
-ocean_area         => mesh%ocean_area         
+ocean_area         => mesh%ocean_area
+ocean_areawithcav  => mesh%ocean_areawithcav         
 nl                 => mesh%nl  
 
 !!$coord_nod2D        => mesh%coord_nod2D        
@@ -45,6 +47,7 @@ nl                 => mesh%nl
 !!$edge_tri           => mesh%edge_tri           
 !!$elem_edges         => mesh%elem_edges         
 !!$elem_area          => mesh%elem_area          
+!!$node_area          => mesh%node_area  
 !!$edge_dxdy          => mesh%edge_dxdy          
 !!$edge_cross_dxdy    => mesh%edge_cross_dxdy    
 !!$elem_cos           => mesh%elem_cos           
@@ -64,7 +67,8 @@ nl                 => mesh%nl
 !!$nlevels            => mesh%nlevels            
 !!$nlevels_nod2D      => mesh%nlevels_nod2D
 !!$nlevels_nod2D_min  => mesh%nlevels_nod2D_min
-!!$area               => mesh%area     
+!!$area               => mesh%area  
+!!$area2               => mesh%area2 
 !!$area_inv           => mesh%area_inv     
 !!$mesh_resolution    => mesh%mesh_resolution    
 !!$ssh_stiff          => mesh%ssh_stiff          
@@ -82,7 +86,7 @@ elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
 edges(1:2,1:myDim_edge2D+eDim_edge2D)                      => mesh%edges              
 edge_tri(1:2,1:myDim_edge2D+eDim_edge2D)                   => mesh%edge_tri           
 elem_edges(1:3,1:myDim_elem2D)                             => mesh%elem_edges         
-elem_area(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)         => mesh%elem_area          
+elem_area(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)         => mesh%elem_area 
 edge_dxdy(1:2,1:myDim_edge2D+eDim_edge2D)                  => mesh%edge_dxdy          
 edge_cross_dxdy(1:4,1:myDim_edge2D+eDim_edge2D)            => mesh%edge_cross_dxdy    
 elem_cos(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)          => mesh%elem_cos           
@@ -102,8 +106,10 @@ elem_depth         => mesh%elem_depth      ! never used, not even allocated
 nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels            
 nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
 nlevels_nod2D_min(1:myDim_nod2D+eDim_nod2D)                => mesh%nlevels_nod2D_min
-area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                   => mesh%area     
-area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%area_inv     
+area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                   => mesh%area   
+areasvol(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%areasvol
+area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%area_inv  
+areasvol_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)           => mesh%areasvol_inv
 mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution    
 ssh_stiff                                                  => mesh%ssh_stiff
 lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north

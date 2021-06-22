@@ -62,7 +62,11 @@ subroutine ini_ocean_io(year, mesh)
   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
         call oce_files%def_node_var('iwe', 'Internal Wave eneryy', 'm2/s2', tke(:,:), mesh)
   endif 
-
+  if (visc_option==8) then
+        call oce_files%def_elem_var('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh)
+        call oce_files%def_elem_var('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh)
+  endif
+  
   do j=1,num_tracers
      SELECT CASE (j) 
        CASE(1)

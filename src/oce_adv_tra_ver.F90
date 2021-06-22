@@ -146,19 +146,28 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         ! 1/dz(nz)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
         
+        !!PS a(nz)=0.0_WP
+        !!PS v_adv=zinv*areasvol(nz+1,n)/areasvol(nz,n)
+        !!PS b(nz)= hnode_new(nz,n)+W(nz, n)*zinv-min(0._WP, W(nz+1, n))*v_adv
+        !!PS c(nz)=-max(0._WP, W(nz+1, n))*v_adv
+        
         a(nz)=0.0_WP
-        v_adv=zinv*area(nz+1,n)/area(nz,n)
-        b(nz)= hnode_new(nz,n)+W(nz, n)*zinv-min(0._WP, W(nz+1, n))*v_adv
+        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        b(nz)= hnode_new(nz,n)+W(nz, n)*v_adv
+        
+        v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+        b(nz)= b(nz)-min(0._WP, W(nz+1, n))*v_adv
         c(nz)=-max(0._WP, W(nz+1, n))*v_adv
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
-            a(nz)=min(0._WP, W(nz, n))*zinv
-            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+            v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+            a(nz)=min(0._WP, W(nz, n))*v_adv
+            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
             
-            v_adv=zinv*area(nz+1,n)/area(nz,n)
+            v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv
             c(nz)=     -max(0._WP, W(nz+1, n))*v_adv
         end do ! --> do nz=2, nzmax-2
@@ -167,8 +176,12 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
         ! Regular part of coefficients: --> nl-1 layer
         nz=nzmax-1
         ! update from the vertical advection
-        a(nz)=                min(0._WP, W(nz, n))*zinv
-        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+        !!PS a(nz)=                min(0._WP, W(nz, n))*zinv
+        !!PS b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
+        !!PS c(nz)=0.0_WP
+        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        a(nz)=                min(0._WP, W(nz, n))*v_adv
+        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
         c(nz)=0.0_WP
         
         !_______________________________________________________________________
@@ -382,7 +395,6 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     ! --------------------------------------------------------------------------
     overshoot_counter=0
     counter          =0
-    flux             =0.0_WP
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are 
@@ -391,18 +403,16 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         nzmax=nlevels_nod2D(n)
         nzmin=ulevels_nod2D(n)
         
-        ! tracer at surface layer
-        tv(nzmin)=ttf(nzmin,n)
-        
-        ! tracer at surface+1 layer
-        !   tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
-        tv(nzmin+1)=0.5*(ttf(nzmin,n)+ttf(nzmin+1,n))
-        
-        ! tacer at bottom-1 layer
-        !tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0, W(nzmax-1,n)), 0._WP)
-        tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
-        
-        ! tracer at bottom layer
+        ! tracer at surface level
+        tv(nzmin)=ttf(nzmin,n)        
+        ! tracer at surface+1 level
+!       tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
+!       tv(3)=-ttf(2,n)*min(sign(1.0, W(3,n)), 0._WP)+ttf(3,n)*max(sign(1.0, W(3,n)), 0._WP)
+        tv(nzmin+1)=0.5*(ttf(nzmin,  n)+ttf(nzmin+1,n))
+        ! tacer at bottom-1 level
+        tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0_wp, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0_wp, W(nzmax-1,n)), 0._WP)
+!       tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        ! tracer at bottom level
         tv(nzmax)=ttf(nzmax-1,n)
         
         !_______________________________________________________________________
@@ -410,7 +420,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! see Colella and Woodward, JCP, 1984, 174-201 --> equation (1.9)
         ! loop over layers (segments)
         !!PS do nz=3, nzmax-3
-        do nz=nzmin+2, nzmax-2 
+        do nz=nzmin+1, nzmax-3
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
             ! equation (1.9)
@@ -420,10 +430,10 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
             ! for non-uniformity spaced vertical grids --> piecewise parabolic 
             ! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201 
             ! --> full equation (1.6), (1.7) and (1.8)
-            dzjm1    = hnode_new(nz-2,n)
-            dzj      = hnode_new(nz-1,n)
-            dzjp1    = hnode_new(nz,n)
-            dzjp2    = hnode_new(nz+1,n)
+            dzjm1    = hnode_new(nz-1,n)
+            dzj      = hnode_new(nz  ,n)
+            dzjp1    = hnode_new(nz+1,n)
+            dzjp2    = hnode_new(nz+2,n)
             ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
             
             !___________________________________________________________________

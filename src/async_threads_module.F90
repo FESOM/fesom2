@@ -57,9 +57,9 @@ contains
     
 #ifdef DISABLE_MULTITHREADING
     call this%disable_async()
-#endif    
-
+#else
     if(this%with_real_threads) call init_ccall(this%idx)
+#endif
   end subroutine
 
 
@@ -67,7 +67,9 @@ contains
     class(thread_type) this
     ! EO args
     if(this%with_real_threads) then
+#ifndef DISABLE_MULTITHREADING
       call begin_ccall(this%idx)
+#endif
     else
       call async_threads_execute_fcall(this%idx)
     end if
@@ -76,8 +78,10 @@ contains
 
   subroutine join(this)
     class(thread_type) this
-    ! EO args
+    ! EO args    
+#ifndef DISABLE_MULTITHREADING
     if(this%with_real_threads) call end_ccall(this%idx)
+#endif
   end subroutine
   
   

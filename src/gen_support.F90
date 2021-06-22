@@ -190,7 +190,7 @@ subroutine smooth_elem2D(arr, N, mesh)
 #include "associate_mesh.h"    
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
-        DO node=1, myDim_nod2D+eDim_nod2D
+        DO node=1, myDim_nod2D
             vol=0._WP
             work_array(node)=0._WP
             DO j=1, nod_in_elem2D_num(node)
@@ -201,7 +201,7 @@ subroutine smooth_elem2D(arr, N, mesh)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
-
+        call exchange_nod(work_array)
         DO elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
@@ -221,13 +221,14 @@ subroutine smooth_elem3D(arr, N, mesh)
     integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
     real(kind=WP)                                :: vol
 #include "associate_mesh.h"  
+
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     
     my_nl=ubound(arr,1)
     DO q=1, N !apply mass matrix N times to smooth the field
         DO nz=1, my_nl
             work_array = 0.0_WP
-            DO node=1, myDim_nod2D+eDim_nod2D
+            DO node=1, myDim_nod2D
                 vol=0._WP
                 if (nz > nlevels_nod2d(node)) CYCLE
                 if (nz < ulevels_nod2D(node)    ) CYCLE
@@ -242,7 +243,7 @@ subroutine smooth_elem3D(arr, N, mesh)
                 END DO
                 work_array(node)=work_array(node)/vol
             END DO
-            
+            call exchange_nod(work_array)
             DO elem=1, myDim_elem2D
                 if (nz>nlevels(elem)  ) CYCLE
                 if (nz<ulevels(elem)) CYCLE
@@ -253,6 +254,7 @@ subroutine smooth_elem3D(arr, N, mesh)
         call exchange_elem(arr)
     END DO
     deallocate(work_array)
+
 end subroutine smooth_elem3D
 !
 !--------------------------------------------------------------------------------------------
@@ -272,7 +274,8 @@ subroutine integrate_nod_2D(data, int2D, mesh)
 #include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
-     lval=lval+data(row)*area(1,row)
+     !!PS lval=lval+data(row)*area(1,row)
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
 
   int2D=0.0_WP
@@ -299,7 +302,7 @@ subroutine integrate_nod_3D(data, int3D, mesh)
   do row=1, myDim_nod2D
      !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-        lval=lval+data(k, row)*area(k,row)*hnode_new(k,row)
+        lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
   int3D=0.0_WP

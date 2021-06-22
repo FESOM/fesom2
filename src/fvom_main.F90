@@ -23,6 +23,7 @@ use io_mesh_info
 use diagnostics
 use mo_tidal
 use fesom_version_info_module
+use command_line_options_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -44,6 +45,14 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
+character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
+integer mpi_version_len
+
+
+  if(command_argument_count() > 0) then
+    call command_line_options%parse()
+    stop
+  end if
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -51,16 +60,18 @@ type(t_mesh),             target, save :: mesh
     call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
-    t1 = MPI_Wtime()
 
 #if defined (__oasis)
     call cpl_oasis3mct_init(MPI_COMM_FESOM)
 #endif
+    t1 = MPI_Wtime()
 
     call par_init 
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
+        call MPI_Get_library_version(mpi_version_txt, mpi_version_len, MPIERR)
+        print *,"MPI library version: "//trim(mpi_version_txt)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if

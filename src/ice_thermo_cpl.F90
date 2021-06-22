@@ -30,16 +30,26 @@ subroutine thermodynamics(mesh)
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
+#ifdef oifs
+  use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
+       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
+#else
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
        , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, S_oc_array, T_oc_array
+#endif
 
   !---- variables from gen_modules_config.F90
   use g_config,         only: dt
 
   !---- variables from gen_modules_forcing.F90
+#ifdef oifs
+  use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
+       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
+       , enthalpyoffuse
+#else
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice
-
+#endif
   !---- variables from gen_modules_rotate_grid.F90
   use g_rotate_grid,    only: r2g
 #endif
@@ -99,7 +109,11 @@ subroutine thermodynamics(mesh)
      h       = m_ice(inod)
      hsn     = m_snow(inod)
 
+#if defined (__oifs)
+     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+#else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+#endif
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)
@@ -118,17 +132,17 @@ subroutine thermodynamics(mesh)
         rsf     = 0._WP
      end if
 
-!#if defined (__oifs)
-!     !---- different lead closing parameter for NH and SH
-!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-!     if (geolat.lt.0.) then
-!        h0min = 0.75
-!        h0max = 1.0
-!     else
-!        h0min = 0.5
-!        h0max = 0.75
-!     endif
-!#endif /* (__oifs) */
+#if defined (__oifs)
+     !---- different lead closing parameter for NH and SH
+     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+     if (geolat.lt.0.) then
+        h0min = 1.0
+        h0max = 1.0
+     else
+        h0min = 0.3
+        h0max = 0.3
+     endif
+#endif /* (__oifs) */
 
      call ice_growth
 #if defined (__oifs)
@@ -140,7 +154,8 @@ subroutine thermodynamics(mesh)
         call ice_surftemp(max(h/(max(A,Aimin)),0.05),hsn/(max(A,Aimin)),a2ihf,t)
         ice_temp(inod) = t
      else
-        ice_temp(inod) = 275.15_WP
+        ! Freezing temp of saltwater in K
+        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
      call ice_albedo(h,hsn,t,alb)
      ice_alb(inod)       = alb
@@ -459,18 +474,21 @@ contains
   real(kind=WP)  zcprosn
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
-  real(kind=WP), parameter :: ctfreez = 271.38_WP                   ! ECHAM6's temperature at which sea starts freezing/melting
+  !---- freezing temperature of sea-water [K]
+  real(kind=WP)  :: TFrezs
 
+  !---- compute freezing temperature of sea-water from salinity
+  TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
 
-  snicecond = con/consn*rhowat/rhosno   ! equivalence fraction thickness of ice/snow
-  zsniced=h+snicecond*hsn     ! Ice + Snow-Ice-equivalent thickness [m]
-  zicefl=con*ctfreez/zsniced            ! Conductive heat flux through sea ice [W/m²]
+  snicecond = con/consn                 ! equivalence fraction thickness of ice/snow
+  zsniced=h+snicecond*hsn               ! Ice + Snow-Ice-equivalent thickness [m]
+  zicefl=con*TFrezs/zsniced             ! Conductive heat flux through sea ice [W/m²]
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
-  zcprosn=rhowat*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
+  zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(ctfreez,t)                      ! Not warmer than freezing please!
+  t=min(TFrezs,t)                       ! Not warmer than freezing please!
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
@@ -491,7 +509,7 @@ contains
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (h>0.0_WP) then
-     if (t<273.14_WP) then         ! freezing condition    
+     if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       

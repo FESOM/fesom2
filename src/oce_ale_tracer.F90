@@ -83,6 +83,16 @@ module bc_surface_interface
     end function
   end interface
 end module
+module diff_part_bh_interface
+  interface
+    subroutine diff_part_bh(ttf, mesh)
+      use MOD_MESH
+      use g_PARSUP
+      type(t_mesh) , intent(in),    target :: mesh
+      real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    end subroutine
+  end interface
+end module
 
 !
 !
@@ -137,8 +147,11 @@ subroutine solve_tracers_ale(mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        call relax_to_clim(tr_num, mesh)
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_temp(mesh)
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+            call relax_zonal_temp(mesh)
+        else
+            call relax_to_clim(tr_num, mesh)
+        end if 
         call exchange_nod(tr_arr(:,:,tr_num))
     end do
     
@@ -246,6 +259,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
     use diff_ver_part_expl_ale_interface
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
+    use diff_part_bh_interface
     implicit none
     
     integer, intent(in)      :: tr_num
@@ -304,6 +318,10 @@ subroutine diff_tracers_ale(tr_num, mesh)
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
+    !init_tracers will set it to zero for the next timestep
+    if (smooth_bh_tra) then
+       call diff_part_bh(tr_arr(:,:,tr_num), mesh) ! alpply biharmonic diffusion (implemented as filter)                                                
+    end if
 end subroutine diff_tracers_ale
 !
 !
@@ -364,9 +382,9 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
         !_______________________________________________________________________
         !!PS do nz=1,nl1-1
         do nz=ul1,nl1-1
-            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dt/area(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz) - vd_flux(nz+1))/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))*dt/areasvol(nz,n)
         end do
-        del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/area(nl1,n)
+        del_ttf(nl1,n) = del_ttf(nl1,n) + (vd_flux(nl1)/(zbar_3d_n(nl1,n)-zbar_3d_n(nl1+1,n)))*dt/areasvol(nl1,n)
         
     end do ! --> do n=1, myDim_nod2D
 end subroutine diff_ver_part_expl_ale
@@ -413,7 +431,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     ! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + RHS 
     ! -->   solve for dT_new
     !    
-    !    ----------- zbar_1, V_1 (Volume eq. to Area)
+    !    ----------- zbar_1, V_1 (Skalar Volume), A_1 (Area of edge),  no Cavity A1==V1, yes Cavity A1 !=V1
     ! Z_1 o T_1
     !    ----------- zbar_2, V_2
     ! Z_2 o T_2
@@ -422,8 +440,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     !    ----------- zbar_4
     !        :
     ! --> Difference Quotient at Volume _2:  ddTnew_2/dt + d/dz*K_33 d/dz*dTnew_2 = 0 --> homogene solution 
-    ! V2*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_3 ] + RHS
-    !    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*V_3/V_2 ] + RHS
+    ! V2*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3 ] + RHS
+    !    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2/V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3/V_2 ] + RHS
     !                                                  |                                 |
     !                                                  v                                 v
     !                                         diffusive flux towards             diffusive flux towards
@@ -432,11 +450,11 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     ! --> solve coefficents for homogene part   
     !    dTnew_2 *h^(n+0.5) = -dt * [ a*dTnew_1 + b*dTnew_2 + c*dTnew_3 ] 
     !
-    ! --> a = -dt*K_33/(Z_1-Z_2)
+    ! --> a = -dt*K_33/(Z_1-Z_2)*A_2/V_2
     ! 
-    ! --> c = -dt*K_33/(Z_2-Z_3)*V_3/V_2
+    ! --> c = -dt*K_33/(Z_2-Z_3)*A_3/V_2
     !
-    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2) + dt*K_33/(Z_2-Z_3)*V_3/V_2 ] = -(a+c) + h^(n+0.5)
+    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2)*A_2/V_2 + dt*K_33/(Z_2-Z_3)*A_3/V_2 ] = -(a+c) + h^(n+0.5)
     
     !___________________________________________________________________________
     ! loop over local nodes
@@ -490,15 +508,26 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
         a(nz)=0.0_WP
         !!PS c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
-        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
+        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
         b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
         
         ! update from the vertical advection --> comes from splitting of vert 
         ! velocity into explicite and implicite contribution
         if (do_wimpl) then
-            v_adv=zinv*area(nz+1,n)/area(nz,n)
-            b(nz)=b(nz)+Wvel_i(nz, n)*zinv-min(0._WP, Wvel_i(nz+1, n))*v_adv
-            c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+            !!PS v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
+            !!PS b(nz) =b(nz)+Wvel_i(nz, n)*zinv-min(0._WP, Wvel_i(nz+1, n))*v_adv
+            !!PS c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
+            
+            !___________________________________________________________________
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP
+            v_adv =zinv* ( area(nz  ,n)/areasvol(nz,n) )
+            b(nz) =b(nz)+Wvel_i(nz, n)*v_adv
+            
+            v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
+            b(nz) =b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
+            c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
         end if        
         ! backup zinv2 for next depth level
         zinv1=zinv2
@@ -517,9 +546,14 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
                  (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
             Ty =Ty *isredi
             Ty1=Ty1*isredi
+            
             ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
-            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv
-            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
+            !___________________________________________________________________
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP   
+            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) ) 
+            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
             ! backup zinv2 for next depth level
@@ -527,10 +561,15 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             
             ! update from the vertical advection
             if (do_wimpl) then
-                v_adv=zinv
+                !_______________________________________________________________
+                ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+                ! numerical reasons, to gurante that area/areasvol in case of no 
+                ! cavity is ==1.0_WP   
+                v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
-                v_adv=v_adv*area(nz+1,n)/area(nz,n)
+                !!PS v_adv=v_adv*areasvol(nz+1,n)/areasvol(nz,n)
+                v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
                 b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
                 c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
             end if
@@ -547,13 +586,22 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             (zbar_n(nz)-Z_n(nz)) *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
         Ty =Ty *isredi
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
-        a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv
+        
+        !___________________________________________________________________
+        ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+        ! numerical reasons, to gurante that area/areasvol in case of no 
+        ! cavity is ==1.0_WP
+        a(nz)=-(Kv(nz,n)+Ty)*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) )
         c(nz)=0.0_WP
         b(nz)=-a(nz)+hnode_new(nz,n)
         
         ! update from the vertical advection
         if (do_wimpl) then
-            v_adv=zinv
+            !___________________________________________________________________
+            ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
+            ! numerical reasons, to gurante that area/areasvol in case of no 
+            ! cavity is ==1.0_WP
+            v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
             a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv       
             b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
         end if
@@ -617,7 +665,7 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             !!PS do nz=1, nzmax-1
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
+                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/areasvol(nz,n))*zinv
             end do
         end if
         
@@ -719,15 +767,15 @@ subroutine diff_ver_part_redi_expl(mesh)
             Tx=0.0_WP
             Ty=0.0_WP
             do k=1, nod_in_elem2D_num(n)
-            elem=nod_in_elem2D(k,n)
-            !!PS if(nz.LE.(nlevels(elem)-1)) then
-            if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
-                Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
-                Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
-            endif
-        end do
-        tr_xynodes(1,nz,n)=tx/3.0_WP/area(nz,n)
-        tr_xynodes(2,nz,n)=ty/3.0_WP/area(nz,n)
+                elem=nod_in_elem2D(k,n)
+                !!PS if(nz.LE.(nlevels(elem)-1)) then
+                if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
+                    Tx=Tx+tr_xy(1,nz,elem)*elem_area(elem)
+                    Ty=Ty+tr_xy(2,nz,elem)*elem_area(elem)
+                endif
+            end do
+            tr_xynodes(1,nz,n)=tx/3.0_WP/areasvol(nz,n)
+            tr_xynodes(2,nz,n)=ty/3.0_WP/areasvol(nz,n)
         end do
     end do
     
@@ -756,13 +804,13 @@ subroutine diff_ver_part_redi_expl(mesh)
         !!PS do nz=2,nl1
         do nz=ul1+1,nl1
             vd_flux(nz)=(Z_n(nz-1)-zbar_n(nz))*(slope_tapered(1,nz-1,n)*tr_xynodes(1,nz-1,n)+slope_tapered(2,nz-1,n)*tr_xynodes(2,nz-1,n))*Ki(nz-1,n)
-                        vd_flux(nz)=vd_flux(nz)+&
-                          (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)     *tr_xynodes(2,nz,n))  *Ki(nz,n)
-                        vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
+            vd_flux(nz)=vd_flux(nz)+&
+                        (zbar_n(nz)-Z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
+            vd_flux(nz)=vd_flux(nz)/(Z_n(nz-1)-Z_n(nz))*area(nz,n)
         enddo
         !!PS do nz=1,nl1
         do nz=ul1,nl1
-            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/area(nz,n)
+            del_ttf(nz,n) = del_ttf(nz,n)+(vd_flux(nz) - vd_flux(nz+1))*dt/areasvol(nz,n)
         enddo
     end do
 end subroutine diff_ver_part_redi_expl!
@@ -908,11 +956,82 @@ subroutine diff_part_hor_redi(mesh)
         if (ul2>0) ul12=min(ul1,ul2)
         !!PS del_ttf(1:nl12,enodes(1))=del_ttf(1:nl12,enodes(1))+rhs1(1:nl12)*dt/area(1:nl12,enodes(1))
         !!PS del_ttf(1:nl12,enodes(2))=del_ttf(1:nl12,enodes(2))+rhs2(1:nl12)*dt/area(1:nl12,enodes(2))
-        del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/area(ul12:nl12,enodes(1))
-        del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/area(ul12:nl12,enodes(2))
+        del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(1))
+        del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(2))
         
     end do
 end subroutine diff_part_hor_redi
+!
+!
+!===============================================================================
+SUBROUTINE diff_part_bh(ttf, mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    use O_MESH
+    use o_param
+    use g_config
+    use g_comm_auto
+
+    IMPLICIT NONE
+    type(t_mesh),  intent(in),    target :: mesh
+    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)                        :: u1, v1, len, vi, tt, ww 
+    integer                              :: nz, ed, el(2), en(2), k, elem, nl1, ul1
+    real(kind=WP), allocatable           :: temporary_ttf(:,:)
+
+#include "associate_mesh.h"
+
+    ed=myDim_nod2D+eDim_nod2D
+    allocate(temporary_ttf(nl-1, ed))
+
+    temporary_ttf=0.0_8
+    DO ed=1, myDim_edge2D+eDim_edge2D
+       if (myList_edge2D(ed)>edge2D_in) cycle
+       el=edge_tri(:,ed)
+       en=edges(:,ed)
+       len=sqrt(sum(elem_area(el)))
+       ul1=minval(ulevels_nod2D_max(en))
+       nl1=maxval(nlevels_nod2D_min(en))-1
+       DO  nz=ul1,nl1
+           u1=UV(1, nz,el(1))-UV(1, nz,el(2))
+           v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+           vi=u1*u1+v1*v1
+           tt=ttf(nz,en(1))-ttf(nz,en(2))
+           vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+           !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
+           !vi=sqrt(10.*le)
+           tt=tt*vi
+           temporary_ttf(nz,en(1))=temporary_ttf(nz,en(1))-tt
+           temporary_ttf(nz,en(2))=temporary_ttf(nz,en(2))+tt
+       END DO 
+    END DO
+    call exchange_nod(temporary_ttf)
+    ! ===========
+    ! Second round: 
+    ! ===========
+    DO ed=1, myDim_edge2D+eDim_edge2D
+       if (myList_edge2D(ed)>edge2D_in) cycle
+          el=edge_tri(:,ed)
+          en=edges(:,ed)
+          len=sqrt(sum(elem_area(el)))
+          ul1=minval(ulevels_nod2D_max(en))
+          nl1=maxval(nlevels_nod2D_min(en))-1
+          DO  nz=ul1,nl1
+              u1=UV(1, nz,el(1))-UV(1, nz,el(2))
+              v1=UV(2, nz,el(1))-UV(2, nz,el(2))
+              vi=u1*u1+v1*v1
+              tt=temporary_ttf(nz,en(1))-temporary_ttf(nz,en(2))
+              vi=sqrt(max(gamma0, max(gamma1*sqrt(vi), gamma2*vi))*len)
+              !vi=sqrt(max(sqrt(u1*u1+v1*v1),0.04)*le)  ! 10m^2/s for 10 km (0.04 h/50)
+              !vi=sqrt(10.*le) 
+              tt=-tt*vi*dt
+              ttf(nz,en(1))=ttf(nz,en(1))-tt/area(nz,en(1))
+              ttf(nz,en(2))=ttf(nz,en(2))+tt/area(nz,en(2))
+          END DO 
+    END DO  
+    deallocate(temporary_ttf)
+end subroutine diff_part_bh
 !
 !
 !===============================================================================
@@ -927,9 +1046,9 @@ FUNCTION bc_surface(n, id, mesh)
   implicit none
   
   type(t_mesh), intent(in) , target :: mesh  
-  REAL(kind=WP)     :: bc_surface
-  integer           :: n, id
-  character(len=10) :: id_string
+  REAL(kind=WP)       :: bc_surface
+  integer, intent(in) :: n, id
+  character(len=10)   :: id_string
 
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....                            
   !  --> is_nonlinfs=0.0 for linfs
