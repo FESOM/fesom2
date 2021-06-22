@@ -291,7 +291,7 @@ subroutine oce_fluxes(mesh)
     ! salinity flux
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
-        flux = water_flux+thdgr*rhoice*inv_rhowat+thdgrsn*rhosno*inv_rhowat
+        flux = water_flux+thdgr*rhoice*inv_rhowat!+thdgrsn*rhosno*inv_rhowat
     end if     
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
