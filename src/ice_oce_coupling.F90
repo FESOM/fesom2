@@ -311,7 +311,9 @@ subroutine oce_fluxes(mesh)
 
     ! water_flux=water_flux+net/ocean_area 
     if (.not. use_virt_salt) then
-       call integrate_nod(flux, net, mesh)
+       ! lets just impose the total flux (water_flux) conservation here       
+       ! using just flux will not conserve due to cutoffs in the sea ice module
+       call integrate_nod(water_flux, net, mesh)
        water_flux=water_flux-net/ocean_area
     end if
     
