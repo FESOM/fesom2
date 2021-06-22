@@ -77,8 +77,8 @@
           vatm(:)   = v_wind(:)
           fsw(:)    = shortwave(:)
           flw(:)    = longwave(:)
-          frain(:)  = prec_rain(:) * 1000.0_dbl_kind
-          fsnow(:)  = prec_snow(:) * 1000.0_dbl_kind
+          frain(:)  = prec_rain(:) * rhowat
+          fsnow(:)  = prec_snow(:) * rhowat
 
           wind(:)   = sqrt(uatm(:)**2 + vatm(:)**2)
 

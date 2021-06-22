@@ -204,28 +204,20 @@ subroutine oce_fluxes(mesh)
                            dhi_dt_out=thdgr,               &
                            evap_ocn_out=evaporation,       &
                            evap_out=ice_sublimation        )
-
+    
+    ! Heat flux 
     heat_flux(:)   = - net_heat_flux(:)
-!     water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
-!     water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat)
-    water_flux(:)  = - (fresh_wa_flux(:) / 1000.0_WP) - runoff(:)
+    
+    ! Freshwater flux (convert units from icepack to fesom)
+    water_flux(:)  = - (fresh_wa_flux(:) * inv_rhowat) - runoff(:)
 
-    ! Evaporation
-!     evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
-!     evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
-    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) / 1000.0_WP
-!     evaporation(:) = - evaporation(:) / 1000.0_WP
+    ! Evaporation (convert units from icepack to fesom)
+    evaporation(:) = - evaporation(:) * (1.0_WP - a_ice(:)) * inv_rhowat
+    
+    ! Ice-Sublimation is not added to evap in icepack 
     ice_sublimation(:) = 0.0_WP
     
-!     runoff  = 0.0_WP       
-!     thdgr   = 0.0_WP
-!     thdgrsn = 0.0_WP
-!     evaporation = 0.0_WP
-!     prec_rain = 0.0_WP
-!     prec_snow = 0.0_WP
     call init_flux_atm_ocn()
-!     rhoice = 917.0_WP
-!     rhosno = 330.0_WP
     
 #else
     heat_flux   = -net_heat_flux 
@@ -318,10 +310,8 @@ subroutine oce_fluxes(mesh)
     ! salinity flux
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
-!         flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
-
-        ! just as test for icepack use there rhoice and rhosno defintion 
-        flux = flux-thdgr*917.0_WP/1000.0_WP-thdgrsn*330.0_WP/1000.0_WP
+        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
+        
     end if     
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
