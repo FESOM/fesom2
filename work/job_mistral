@@ -65,6 +65,7 @@ cp -n ../config/namelist.config  .
 cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
+cp -n ../config/namelist.icepack .
 
 date
 srun --mpi=pmi2 fesom.x > "fesom2.0.out"

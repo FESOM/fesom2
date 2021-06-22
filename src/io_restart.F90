@@ -10,7 +10,7 @@ MODULE io_RESTART
 
   integer,       save       :: globalstep=0 ! todo: remove this from module scope as it will mess things up if we use async read/write from the same process
   real(kind=WP)             :: ctime !current time in seconds from the beginning of the year
-  
+
   type(restart_file_group), save :: oce_files
   type(restart_file_group), save :: ice_files
   character(:), allocatable, save :: oce_path
@@ -30,7 +30,7 @@ subroutine ini_ocean_io(year, mesh)
   character(4)              :: cyear
   type(t_mesh), intent(in) , target :: mesh
   logical, save :: has_been_called = .false.
-  
+
   write(cyear,'(i4)') year
   oce_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.oce.restart.nc'
 
@@ -121,6 +121,12 @@ end subroutine ini_ice_io
 !--------------------------------------------------------------------------------------------
 !
 subroutine restart(istep, l_write, l_read, mesh)
+
+#if defined(__icepack)
+  icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
+#endif
+
+  implicit none
   ! this is the main restart subroutine
   ! if l_write  is TRUE writing restart file will be forced
   ! if l_read   is TRUE the restart file will be read
@@ -132,16 +138,16 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-    call ini_ocean_io(yearnew, mesh)
-    if (use_ice) call ini_ice_io  (yearnew, mesh)
+               call ini_ocean_io(yearnew, mesh)
+  if (use_ice) call ini_ice_io  (yearnew, mesh)
   else
-    call ini_ocean_io(yearold, mesh)
-    if (use_ice) call ini_ice_io  (yearold, mesh)
+               call ini_ocean_io(yearold, mesh)
+  if (use_ice) call ini_ice_io  (yearold, mesh)
   end if
 
   if (l_read) then
     call read_restart(oce_path, oce_files)
-    if (use_ice) then
+   if (use_ice) then
       call read_restart(ice_path, ice_files)
     end if
   end if
@@ -181,8 +187,8 @@ subroutine restart(istep, l_write, l_read, mesh)
   
   ! actualize clock file to latest restart point
   if (mype==0) then
-    write(*,*) ' --> actualize clock file to latest restart point'
-    call clock_finish  
+		write(*,*) ' --> actualize clock file to latest restart point'
+		call clock_finish  
   end if
   
 end subroutine restart
@@ -191,7 +197,7 @@ end subroutine restart
 subroutine write_restart(path, filegroup, istep)
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
-  integer, intent(in) :: istep
+  integer,  intent(in)          :: istep
   ! EO parameters
   integer cstep
   integer i
@@ -210,7 +216,7 @@ subroutine write_restart(path, filegroup, istep)
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
-      else
+     else
         call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
       end if
 
@@ -288,7 +294,7 @@ subroutine read_restart(path, filegroup)
       call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()], rtime)
       call filegroup%files(i)%close_file()
 
-      if (int(ctime)/=int(rtime)) then
+     if (int(ctime)/=int(rtime)) then
         write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'

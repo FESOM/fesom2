@@ -4,3 +4,6 @@
 *.x
 #*.out
 *~
+*.swp
+src/icepack_drivers/Icepack
+/work_*
