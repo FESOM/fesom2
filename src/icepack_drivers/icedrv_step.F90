@@ -389,7 +389,7 @@ submodule (icedrv_main) icedrv_step
 ! finalize thermo updates
 !
 
-      subroutine update_state (dt, daidt, dvidt, dagedt, offset)
+      subroutine update_state (dt, daidt, dvidt, dagedt, offset, comp_t)
 
           ! column package includes
           use icepack_intfc, only: icepack_aggregate
@@ -399,6 +399,9 @@ submodule (icedrv_main) icedrv_step
           real (kind=dbl_kind), intent(in) :: &
              dt    , & ! time step
              offset    ! d(age)/dt time offset = dt for thermo, 0 for dyn
+
+          logical (kind=log_kind), intent(in) :: &
+             comp_t    ! if .true. (as by default) compute tendencies
     
           real (kind=dbl_kind), dimension(:), intent(inout) :: &
              daidt, & ! change in ice area per time step
@@ -433,7 +436,7 @@ submodule (icedrv_main) icedrv_step
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
-    
+  
           do i = 1, nx
     
           !-----------------------------------------------------------------
@@ -455,17 +458,19 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
           ! Compute thermodynamic area and volume tendencies.
           !-----------------------------------------------------------------
-    
-             daidt(i) = (aice(i) - daidt(i)) / dt
-             dvidt(i) = (vice(i) - dvidt(i)) / dt
-             if (tr_iage) then
-                if (offset > c0) then                 ! thermo
-                   if (trcr(i,nt_iage) > c0) &
-                   dagedt(i) = (trcr(i,nt_iage) &
-                                    - dagedt(i) - offset) / dt
-                else                                  ! dynamics
-                   dagedt(i) = (trcr(i,nt_iage) &
-                                    - dagedt(i)) / dt
+
+             if (comp_t) then    
+                daidt(i) = (aice(i) - daidt(i)) / dt
+                dvidt(i) = (vice(i) - dvidt(i)) / dt
+                if (tr_iage) then
+                   if (offset > c0) then                 ! thermo
+                      if (trcr(i,nt_iage) > c0) &
+                      dagedt(i) = (trcr(i,nt_iage) &
+                                       - dagedt(i) - offset) / dt
+                   else                                  ! dynamics
+                      dagedt(i) = (trcr(i,nt_iage) &
+                                       - dagedt(i)) / dt
+                   endif
                 endif
              endif
     
@@ -1171,8 +1176,6 @@ submodule (icedrv_main) icedrv_step
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
-          ! TODO: Add appropriate timing
-
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
@@ -1184,7 +1187,9 @@ submodule (icedrv_main) icedrv_step
           ! do update_state(...) here so the aggregated variables are computed in 
           ! case there was a restart, because for the restart only the thickness
           ! class variables are stored not the aggregated one
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+          if (istep1 .eq. 1) then
+             call update_state (dt, daidtt, dvidtt, dagedtt, offset, comp_t=.false.)
+          end if
           dhi_t_dt(:) = vice(:)
           dhs_t_dt(:) = vsno(:)
             
@@ -1209,7 +1214,7 @@ submodule (icedrv_main) icedrv_step
           ! clean up, update tendency diagnostics
           !-----------------------------------------------------------------
           offset = dt
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset, comp_t=.true.)
             
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
@@ -1284,7 +1289,7 @@ submodule (icedrv_main) icedrv_step
              
              ! clean up, update tendency diagnostics
              offset = c0
-             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
+             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset, comp_t=.true.)
              
              !-----------------------------------------------------------------
              ! tendencies needed by fesom
@@ -1311,11 +1316,7 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------  
           t4 = MPI_Wtime()
           time_therm = t4 - t1 - time_advec - time_evp
-            
-          !time_advec = c0
-          !time_therm = c0
-          !time_evp   = c0
-        
+                    
       end subroutine step_icepack
 
 
