@@ -134,14 +134,14 @@ subroutine thermodynamics(mesh)
 
 #if defined (__oifs)
      !---- different lead closing parameter for NH and SH
-!     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-!     if (geolat.lt.0.) then
-!        h0min = 1.0
-!        h0max = 1.0
-!     else
-!        h0min = 0.3
-!        h0max = 0.3
-!     endif
+     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
+     if (geolat.lt.0.) then
+        h0min = 1.0
+        h0max = 1.0
+     else
+        h0min = 0.3
+        h0max = 0.3
+     endif
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -153,7 +153,7 @@ subroutine thermodynamics(mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
-     call ice_albedo(h,hsn,t,alb)
+     call ice_albedo(h,hsn,t,alb,geolat)
      ice_alb(inod)       = alb
 #endif
      call ice_growth
@@ -480,7 +480,7 @@ contains
   real(kind=WP)  zcpdte
   real(kind=WP)  zcprosn
   !---- local parameters
-  real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+  real(kind=WP), parameter :: dice  = 0.10_WP                       ! Thickness for top ice "layer"
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
 
@@ -499,23 +499,29 @@ contains
   t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(h,hsn,t,alb)
+ subroutine ice_albedo(h,hsn,t,alb,geolat)
   ! INPUT:
-  ! hsn - snow thickness, used for albedo parameterization [m]
-  ! t - temperature of snow/ice surface [C]
+  ! h      - ice thickness [m]
+  ! hsn    - snow thickness [m]
+  ! t      - temperature of snow/ice surface [C]
+  ! geolat - lattitude 
   ! 
   ! OUTPUT:
-  ! alb - snow albedo
+  ! alb    - selected broadband albedo
   use i_therm_param
   implicit none
 
-  real(kind=WP)  h
-  real(kind=WP)  hsn    
-  real(kind=WP)  t    
-  real(kind=WP)  alb
+  real(kind=WP) :: h
+  real(kind=WP) :: hsn    
+  real(kind=WP) :: t    
+  real(kind=WP) :: alb
+  real(kind=WP) :: geolat
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
+  if (geolat.gt.0.) then !SH does not have melt ponds
+      albsnm = albsnm+0.1_WP
+  endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.0_WP) then !   snow cover present  
