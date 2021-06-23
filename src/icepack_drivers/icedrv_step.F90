@@ -1176,56 +1176,52 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
-
           call fesom_to_icepack(mesh)
-
+            
           !-----------------------------------------------------------------
           ! initialize tendencies needed by fesom
           !-----------------------------------------------------------------
-
+          ! do update_state(...) here so the aggregated variables are computed in 
+          ! case there was a restart, because for the restart only the thickness
+          ! class variables are stored not the aggregated one
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
           dhi_t_dt(:) = vice(:)
           dhs_t_dt(:) = vsno(:)
-
+            
           !-----------------------------------------------------------------
           ! initialize diagnostics
           !-----------------------------------------------------------------
-    
           call init_history_therm
           call init_history_bgc
-    
+            
           !-----------------------------------------------------------------
           ! Scale radiation fields
           !-----------------------------------------------------------------
-    
           if (calc_Tsfc) call prep_radiation ()
-    
+            
           !-----------------------------------------------------------------
           ! thermodynamics and biogeochemistry
           !-----------------------------------------------------------------
-    
           call step_therm1     (dt) ! vertical thermodynamics
           call step_therm2     (dt) ! ice thickness distribution thermo
-    
+            
           !-----------------------------------------------------------------         
           ! clean up, update tendency diagnostics
           !-----------------------------------------------------------------
-
           offset = dt
           call update_state (dt, daidtt, dvidtt, dagedtt, offset)
-
+            
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
-
           dhi_t_dt(:) = ( vice(:) - dhi_t_dt(:) ) / dt
           dhs_t_dt(:) = ( vsno(:) - dhs_t_dt(:) ) / dt
-    
+            
           !-----------------------------------------------------------------
           ! dynamics, transport, ridging
           !-----------------------------------------------------------------
-    
           call init_history_dyn
-    
+            
           ! Compute sea-ice internal stress (immediately before EVP)
           do i = 1, nx
               call icepack_ice_strength(ncat,                     &
@@ -1236,15 +1232,14 @@ submodule (icedrv_main) icedrv_step
           ! wave fracture of the floe size distribution
           ! note this is called outside of the dynamics subcycling loop
           if (tr_fsd .and. wave_spec) call step_dyn_wave(dt)
-    
+            
           do k = 1, ndtd
-    
+                
              !-----------------------------------------------------------------
              ! EVP 
              !-----------------------------------------------------------------
-
              t2 = MPI_Wtime()
-
+                
              select case (whichEVP)
                 case (0)
                    call EVPdynamics(mesh)
@@ -1257,82 +1252,70 @@ submodule (icedrv_main) icedrv_step
                    call par_ex
                    stop
              end select
-
+                
              t3 = MPI_Wtime()
              time_evp = t3 - t2
-
+                
              !-----------------------------------------------------------------
              ! update ice velocities
              !-----------------------------------------------------------------
-
              call fesom_to_icepack(mesh)
-
+             
              !-----------------------------------------------------------------
              ! advect tracers
              !-----------------------------------------------------------------
-
              t2 = MPI_Wtime()
-
+             
              call tracer_advection_icepack(mesh)
-
+             
              t3 = MPI_Wtime()
              time_advec = t3 - t2
-
+                
              !-----------------------------------------------------------------
              ! initialize tendencies needed by fesom
              !-----------------------------------------------------------------
-
              dhi_r_dt(:) = vice(:)
              dhs_r_dt(:) = vsno(:)
-!!PS              dhi_r_dt(:) = 0.0
-!!PS              dhs_r_dt(:) = 0.0
-
+             
              !-----------------------------------------------------------------
              ! ridging
              !-----------------------------------------------------------------
-
              call step_dyn_ridge (dt_dyn, ndtd)
-     
+             
              ! clean up, update tendency diagnostics
              offset = c0
              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-
+             
              !-----------------------------------------------------------------
              ! tendencies needed by fesom
              !-----------------------------------------------------------------
-
              dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
              dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
-    
+            
           enddo
           dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
           dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
-!!PS           dhi_dt(:) = 0.0
-!!PS           dhs_dt(:) = 0.0
-    
+            
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation
           !-----------------------------------------------------------------
-    
           call step_radiation (dt)
-    
+            
           !-----------------------------------------------------------------
           ! get ready for coupling and the next time step
           !-----------------------------------------------------------------
-    
           call coupling_prep (dt)
-
+            
           !-----------------------------------------------------------------
           ! icepack timing
           !-----------------------------------------------------------------  
-
           t4 = MPI_Wtime()
           time_therm = t4 - t1 - time_advec - time_evp
-
+            
           !time_advec = c0
           !time_therm = c0
           !time_evp   = c0
-
+        
       end subroutine step_icepack
 
 
