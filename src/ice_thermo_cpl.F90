@@ -474,7 +474,7 @@ contains
   real(kind=WP)  zcprosn
   !---- local parameters
   real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
-  !---- freezing temperature of sea-water [K]
+    !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
 
   !---- compute freezing temperature of sea-water from salinity
@@ -488,7 +488,7 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(TFrezs,t)                       ! Not warmer than freezing please!
+  t=min(273.15_WP,t)                       ! Not warmer than freezing please!
  end subroutine ice_surftemp
 
  subroutine ice_albedo(h,hsn,t,alb)
