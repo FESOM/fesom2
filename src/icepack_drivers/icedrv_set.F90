@@ -615,6 +615,9 @@
                 write(nu_diag,1000) ' ahmax                     = ', ahmax
              endif    
 
+             write(nu_diag,1000) ' rhos                      = ', rhosno
+             write(nu_diag,1000) ' rhoi                      = ', rhoice
+             write(nu_diag,1000) ' rhow                      = ', rhowat
              write(nu_diag,1000) ' rfracmin                  = ', rfracmin
              write(nu_diag,1000) ' rfracmax                  = ', rfracmax
 
