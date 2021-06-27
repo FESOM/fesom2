@@ -214,6 +214,9 @@ subroutine update_atm_forcing(istep, mesh)
 	     shortwave(:)         =  exchange(:)		  ! heat_swr
 	     tmp_shortwave(:)     =  exchange(:) 		  ! to reset for flux 
 	     							  ! correction
+             !where ((geo_coord_nod2D(2, :)< 65) .and. (geo_coord_nod2D(2, :)> 55)) !only one band in SO
+             !    shortwave = shortwave*0.9_WP
+             !end where
 	     end if
 	     mask=1.-a_ice
 	     shortwave(:)   =  tmp_shortwave(:)
