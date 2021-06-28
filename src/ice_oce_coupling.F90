@@ -309,10 +309,10 @@ subroutine oce_fluxes(mesh)
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
     if (use_cavity) then
-        if (.not. use_virt_salt) then
+        if (.not. use_virt_salt) then !zstar, zlevel
             ! only for full-free surface approach otherwise total ocean volume will drift
             where (ulevels_nod2d > 1) flux = -water_flux
-        else
+        else ! linfs 
             where (ulevels_nod2d > 1) flux =  0.0_WP
         end if 
     end if 
