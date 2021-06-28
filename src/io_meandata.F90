@@ -103,7 +103,7 @@ subroutine ini_mean_io(mesh)
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
-  integer,dimension(12)     :: sel_forcvar=0
+  integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -167,11 +167,15 @@ CASE ('m_ice     ')
     end if
 CASE ('thdgr     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'growth rate ice',                 'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('thdgrsn   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'growth rate ice',                 'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('flice     ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D,  'flice',    'flooding growth rate ice',       'm/s',    flice(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('m_snow    ')
     if (use_ice) then
@@ -262,8 +266,8 @@ CASE ('ty_sur    ')
 CASE ('curl_surf ')
     if (lcurt_stress_surf) then
     call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-    end if
     
+    end if
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation 2D  
 CASE ('fer_C     ')
@@ -510,9 +514,10 @@ END DO
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
         if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
         if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'cd','wind drag coef. '             , '', cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4,  mesh)
     end if
     
     
@@ -611,6 +616,9 @@ subroutine create_new_file(entry, mesh)
   
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
+  !if (entry%ndim==2) then
+  !   call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
+  !end if
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
