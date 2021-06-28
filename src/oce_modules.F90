@@ -98,7 +98,7 @@ END TYPE tracer_source3d_type
 
 integer	                       :: num_tracers=2
 !!!wiso-code!!! add water isotope parameters
-real, dimension(3)             :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/) 
+real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/) 
 integer                        :: num_wiso_tracers = 3      ! number of wiso tracers
 !!!wiso-code!!!
 

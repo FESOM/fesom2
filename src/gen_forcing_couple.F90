@@ -120,23 +120,23 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = ice_alb(:)                                ! ice albedo
 !!!wiso-code!!!
             elseif (i.eq.6) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1.)*1000. ! delta 18O of surface water
+                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
               end where
              end if
 
             elseif (i.eq.7) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1.)*1000. ! delta D of surface water
+                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
               end where
              end if
 
             elseif (i.eq.8) then
-            exchange(:) = 0.0                          ! delta H216O of surface water is set to zero permill
+            exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
 !!!wiso-code!!!
 
             else	    
@@ -154,42 +154,42 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = m_snow(:)                                 ! snow thickness
 !!!wiso-code!!!
             elseif (i.eq.5) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1.)*1000. ! delta 18O of surface water
+                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
               end where
              end if
 
             elseif (i.eq.6) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1.)*1000. ! delta D of surface water
+                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
               end where
              end if
 
             elseif (i.eq.7) then
-            exchange(:) = 0.0                          ! delta H216O of surface water is set to zero permill
+            exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
 
             elseif (i.eq.8) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1.)*1000. ! delta 18O of sea ice
+                exchange(:) = (tr_arr_ice(:, 1)/tr_arr_ice(:, 3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of sea ice
               end where
              end if
 
             elseif (i.eq.9) then
-             exchange(:) = 0.0
+             exchange(:) = 0.0_WP
              if (lwiso) then
               where (tr_arr_ice(:, 3) > zwisomin)
-                exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1.)*1000. ! delta 18O of sea ice
+                exchange(:) = (tr_arr_ice(:, 2)/tr_arr_ice(:, 3)/wiso_smow(2) - 1._WP)*1000._WP ! delta 18O of sea ice
               end where
              end if
 
             elseif (i.eq.10) then
-            exchange(:) = 0.0                          ! delta H216O of sea ice is set to zero permill
+            exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
 !!!wiso-code!!!
 
             else	    
