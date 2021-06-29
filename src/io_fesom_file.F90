@@ -162,7 +162,6 @@ contains
   
   
   subroutine read_and_scatter_variables(this)
-    use g_PARSUP
     use io_scatter_module
     class(fesom_file_type), target :: this
     ! EO parameters
@@ -181,7 +180,7 @@ contains
       is_2d = (nlvl == 1)
       allocate(laux( size(var%external_local_data_ptr,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
-      if(mype == this%iorank) then
+      if(this%is_iorank()) then
         ! todo: choose how many levels we read at once
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
       else
@@ -189,7 +188,7 @@ contains
       end if
 
       do lvl=1, nlvl
-        if(mype == this%iorank) then
+        if(this%is_iorank()) then
           if(is_2d) then
             call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
           else
@@ -199,9 +198,9 @@ contains
         end if
 
         if(var%is_elem_based) then
-          call scatter_elem2D(var%global_level_data, laux, this%iorank, MPI_comm_fesom)
+          call scatter_elem2D(var%global_level_data, laux, this%iorank, this%comm)
         else
-          call scatter_nod2D(var%global_level_data, laux, this%iorank, MPI_comm_fesom)
+          call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm)
         end if
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
        var%external_local_data_ptr(lvl,:) = laux ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
@@ -212,7 +211,6 @@ contains
 
 
   subroutine gather_and_write_variables(this)
-    use g_PARSUP
     use io_gather_module
     class(fesom_file_type), target :: this
     ! EO parameters
@@ -221,7 +219,7 @@ contains
     real(kind=8), allocatable :: laux(:)
     type(var_info), pointer :: var
 
-    if(mype == this%iorank) this%rec_cnt = this%rec_count()+1
+    if(this%is_iorank()) this%rec_cnt = this%rec_count()+1
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
@@ -230,7 +228,7 @@ contains
       is_2d = (nlvl == 1)
       allocate(laux( size(var%local_data_copy,dim=2) )) ! i.e. myDim_elem2D+eDim_elem2D or myDim_nod2D+eDim_nod2D
 
-      if(mype == this%iorank) then
+      if(this%is_iorank()) then
         ! todo: choose how many levels we write at once
         if(.not. allocated(var%global_level_data)) allocate(var%global_level_data( var%global_level_data_size ))
       else
@@ -242,12 +240,12 @@ contains
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 
         if(var%is_elem_based) then
-          call gather_elem2D(laux, var%global_level_data, this%iorank, 42, MPI_comm_fesom)
+          call gather_elem2D(laux, var%global_level_data, this%iorank, 42, this%comm)
         else
-          call gather_nod2D (laux, var%global_level_data, this%iorank, 42, MPI_comm_fesom)
+          call gather_nod2D (laux, var%global_level_data, this%iorank, 42, this%comm)
         end if
 
-        if(mype == this%iorank) then
+        if(this%is_iorank()) then
           if(is_2d) then
             call this%write_var(var%var_index, [1,this%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
           else
@@ -259,7 +257,7 @@ contains
       deallocate(laux)
     end do
     
-    if(mype == this%iorank) call this%flush_file() ! flush the file to disk after each write
+    if(this%is_iorank()) call this%flush_file() ! flush the file to disk after each write
   end subroutine
 
 
