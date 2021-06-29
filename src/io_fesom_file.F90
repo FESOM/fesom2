@@ -36,7 +36,6 @@ module io_fesom_file_module
     logical :: thread_running = .false.
     integer :: comm
     logical gather_and_write
-    integer :: mype_workaround
   contains
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: close_file ! inherited procedures we overwrite
@@ -158,9 +157,7 @@ contains
     ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
-    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()
-    
-    this%mype_workaround = mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()    
   end subroutine
   
   
@@ -314,7 +311,6 @@ contains
     type(fesom_file_type), pointer :: f
 
     f => all_fesom_files(fesom_file_index)%ptr
-    mype = f%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
     if(f%gather_and_write) then
       call f%gather_and_write_variables()
