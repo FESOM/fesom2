@@ -71,7 +71,6 @@ contains
 
   ! return the number of timesteps of the file if a file is attached or return the default value of -1
   function rec_count(this) result(x)
-    use g_PARSUP
     class(fesom_file_type), intent(inout) :: this
     integer x
     ! EO parameters
@@ -88,7 +87,6 @@ contains
 
 
   function time_varindex(this) result(x)
-    use g_PARSUP
     class(fesom_file_type), intent(in) :: this
     integer x
     x = this%time_varidx
@@ -96,7 +94,6 @@ contains
 
 
   function time_dimindex(this) result(x)
-    use g_PARSUP
     class(fesom_file_type), intent(in) :: this
     integer x
     x = this%time_dimidx
@@ -303,7 +300,6 @@ contains
 
 
   subroutine async_worker(fesom_file_index)
-    use g_PARSUP
     integer, intent(in) :: fesom_file_index
     ! EO parameters
     type(fesom_file_type), pointer :: f
@@ -323,7 +319,6 @@ contains
   ! we have to assign the corresponding dimindx somewhere else, which would be error prone
   subroutine specify_node_var_2d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
@@ -341,7 +336,6 @@ contains
 
   subroutine specify_node_var_3d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
@@ -358,7 +352,6 @@ contains
 
   subroutine specify_elem_var_2d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
@@ -376,7 +369,6 @@ contains
 
   subroutine specify_elem_var_3d(this, name, longname, units, local_data)
     use, intrinsic :: ISO_C_BINDING
-    use g_PARSUP
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
