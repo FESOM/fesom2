@@ -272,7 +272,7 @@ subroutine update_atm_forcing(istep, mesh)
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
             press_air(i)= 0.0_WP 
-!             runoff(i)   = 0.0_WP
+            runoff(i)   = 0.0_WP
         end if 
     end do
   endif 
