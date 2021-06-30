@@ -56,12 +56,12 @@ subroutine write_step_info(istep,outfreq, mesh)
 		loc       =0.
 		!_______________________________________________________________________
 		do n=1, myDim_nod2D
-            if (ulevels_nod2D(n)>1) cycle
-			loc_eta   = loc_eta   + area(ulevels_nod2D(n), n)*eta_n(n)
-			loc_hbar  = loc_hbar  + area(ulevels_nod2D(n), n)*hbar(n)
-			loc_deta  = loc_deta  + area(ulevels_nod2D(n), n)*d_eta(n)
-			loc_dhbar = loc_dhbar + area(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
-			loc_wflux = loc_wflux + area(ulevels_nod2D(n), n)*water_flux(n)
+!!PS             if (ulevels_nod2D(n)>1) cycle
+			loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
+			loc_hbar  = loc_hbar  + areasvol(ulevels_nod2D(n), n)*hbar(n)
+			loc_deta  = loc_deta  + areasvol(ulevels_nod2D(n), n)*d_eta(n)
+			loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
+			loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
 !!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
 !!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
 !!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
@@ -76,18 +76,18 @@ subroutine write_step_info(istep,outfreq, mesh)
 !!PS 		call MPI_AllREDUCE(loc_hflux, int_hflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_temp , int_temp , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 !!PS 		call MPI_AllREDUCE(loc_salt , int_salt , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-
-		int_eta  = int_eta  /ocean_area
-		int_hbar = int_hbar /ocean_area
-		int_deta = int_deta /ocean_area
-		int_dhbar= int_dhbar/ocean_area
-		int_wflux= int_wflux/ocean_area
+! 
+!!PS  		int_eta  = int_eta  /ocean_area
+!!PS  		int_hbar = int_hbar /ocean_area
+!!PS  		int_deta = int_deta /ocean_area
+!!PS  		int_dhbar= int_dhbar/ocean_area
+!!PS  		int_wflux= int_wflux/ocean_area
 		
-!!PS 		int_eta  = int_eta  /ocean_areawithcav
-!!PS 		int_hbar = int_hbar /ocean_areawithcav
-!!PS 		int_deta = int_deta /ocean_areawithcav
-!!PS 		int_dhbar= int_dhbar/ocean_areawithcav
-!!PS 		int_wflux= int_wflux/ocean_areawithcav
+ 		int_eta  = int_eta  /ocean_areawithcav
+ 		int_hbar = int_hbar /ocean_areawithcav
+ 		int_deta = int_deta /ocean_areawithcav
+ 		int_dhbar= int_dhbar/ocean_areawithcav
+ 		int_wflux= int_wflux/ocean_areawithcav
 		
 !!PS 		int_hflux= int_hflux/ocean_area
 !!PS 		int_temp = int_temp /ocean_area
