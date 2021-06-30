@@ -316,14 +316,24 @@ subroutine oce_fluxes(mesh)
             where (ulevels_nod2d > 1) flux =  0.0_WP
         end if 
     end if 
-            
+    
+    ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, mesh)
+    
+    !___________________________________________________________________________
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
     ! if use_cavity=.false. --> ocean_area == ocean_areawithcav
     !! water_flux=water_flux+net/ocean_area
-    water_flux=water_flux+net/ocean_areawithcav
+    if (use_cavity) then
+        ! due to rigid lid approximation under the cavity we to not add freshwater
+        ! under the cavity for the freshwater balancing we do this only for the open
+        ! ocean
+        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+    else
+        water_flux=water_flux+net/ocean_area
+    end if 
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)
