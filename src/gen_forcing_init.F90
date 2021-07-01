@@ -47,9 +47,10 @@ subroutine forcing_array_setup(mesh)
 #include "associate_mesh.h"
   n2=myDim_nod2D+eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
-  allocate(shortwave(n2), longwave(n2))
+  allocate(shortwave(n2), longwave(n2), o_shortwave(n2))
   shortwave=0.0_WP
   longwave=0.0_WP
+  o_shortwave=0.0_WP
   allocate(prec_rain(n2), prec_snow(n2))
   prec_rain=0.0_WP
   prec_snow=0.0_WP

@@ -24,7 +24,7 @@ module cpl_driver
 
 #if defined (__oifs)
   integer, parameter         :: nsend = 5
-  integer, parameter         :: nrecv = 13
+  integer, parameter         :: nrecv = 20
 #else
   integer, parameter         :: nsend = 4
   integer, parameter         :: nrecv = 12
@@ -411,6 +411,14 @@ contains
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
     cpl_recv(13) = 'enth_oce'
+    cpl_recv(14) = 'O_2m_temperature'
+    cpl_recv(15) = 'O_2m_humidity'
+    cpl_recv(16) = 'O_10m_u_wind'
+    cpl_recv(17) = 'O_10m_v_wind'
+    cpl_recv(18) = 'O_surf_srad_down'
+    cpl_recv(19) = 'O_surf_trad_down'
+    cpl_recv(20) = 'O_surf_pressure'
+
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'

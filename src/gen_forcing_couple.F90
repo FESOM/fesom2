@@ -211,13 +211,13 @@ subroutine update_atm_forcing(istep, mesh)
 	     call force_flux_consv(ice_heat_flux, mask, i, 2,action, mesh) ! Southern Hemisphere	     
          elseif (i.eq.11) then
              if (action) then
-	     shortwave(:)         =  exchange(:)		  ! heat_swr
+	     o_shortwave(:)       =  exchange(:)		  ! heat_swr
 	     tmp_shortwave(:)     =  exchange(:) 		  ! to reset for flux 
 	     							  ! correction
 	     end if
 	     mask=1.-a_ice
-	     shortwave(:)   =  tmp_shortwave(:)
-	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
+	     o_shortwave(:)   =  tmp_shortwave(:)
+	     call force_flux_consv(o_shortwave, mask, i, 0,action, mesh)
          elseif (i.eq.12) then
              if (action) then
 	     runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
@@ -230,6 +230,35 @@ subroutine update_atm_forcing(istep, mesh)
 	     enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
     	     mask=1.
 	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
+             end if
+         ! Icepack couplinng
+         elseif (i.eq.14) then
+             if (action) then
+             Tair(:) = exchange(:) - 273.15_WP  ! 2m temperature
+             end if
+         elseif (i.eq.15) then
+             if (action) then
+             shum(:) = exchange(:)              ! 2m relative humidity
+             end if
+         elseif (i.eq.16) then
+             if (action) then
+             u_wind(:) = exchange(:)            ! 10m wind - u component
+             end if
+         elseif (i.eq.17) then
+             if (action) then
+             v_wind(:) = exchange(:)            ! 10m wind - v component
+             end if
+         elseif (i.eq.18) then
+             if (action) then
+             shortwave(:) = exchange(:)         ! net downward shortwave radiation
+             end if
+         elseif (i.eq.19) then
+             if (action) then
+             longwave(:) = exchange(:)          ! net downward thermal radiation
+             end if
+         elseif (i.eq.20) then
+             if (action) then
+             press_air(:) = exchange(:)         ! near surface pressure
              end if
 	 end if  
 #endif	  

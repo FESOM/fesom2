@@ -35,6 +35,9 @@ subroutine cal_shortwave_rad(mesh)
      !__________________________________________________________________________
      ! shortwave rad.
      swsurf=(1.0_WP-albw)*shortwave(n2)
+#if defined (__oasis)
+     swsurf=o_shortwave(n2)
+#endif
      ! the visible part (300nm-750nm)
      swsurf=swsurf*0.54_WP
      ! subtract visible sw rad. from heat_flux, which is '+' for upward
