@@ -149,8 +149,12 @@
              dvirdgdt(:), & ! rate of ice volume ridged (m/s)
              closing(:),  & ! rate of closing due to divergence/shear (1/s)
              opening(:),  & ! rate of opening due to divergence/shear (1/s)   
-             dhi_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
-             dhs_dt(:),   & ! snow volume tendency due to thermodynamics (m/s) 
+             dhi_dt(:),   & ! ice volume tendency (m/s)
+             dhs_dt(:),   & ! snow volume tendency (m/s) 
+             dhi_t_dt(:),   & ! ice volume tendency due to thermodynamics (m/s)
+             dhs_t_dt(:),   & ! snow volume tendency due to thermodynamics (m/s)
+             dhi_r_dt(:),   & ! ice volume tendency due to ridging (m/s)
+             dhs_r_dt(:),   & ! snow volume tendency due to ridging (m/s)
              ! ridging diagnostics in categories
              dardg1ndt(:,:), & ! rate of area loss by ridging ice (1/s)
              dardg2ndt(:,:), & ! rate of area gain by new ridges (1/s)
@@ -808,7 +812,8 @@
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
-                                          fsalt_out,     evap_ocn_out      )
+                                          fsalt_out,     evap_ocn_out,     &
+                                          evap_out                         )
                   use mod_mesh
                   implicit none        
                   integer (kind=int_kind), intent(in) :: &
@@ -824,7 +829,8 @@
                      fsalt_out,     &
                      dhs_dt_out,    &
                      dhi_dt_out,    &
-                     evap_ocn_out
+                     evap_ocn_out,  &
+                     evap_out
               end subroutine icepack_to_fesom
 
               ! Copy variables from icepack to fesom (single node or element)
