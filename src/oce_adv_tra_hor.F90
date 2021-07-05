@@ -87,7 +87,7 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
 #endif
             !$acc
             do n=1, myDim_nod2D
-                do nz=1,nzmax
+                do nz=1,nzmax-1
                     flux(nz,n)=0.0_WP
                 end do
             end do
@@ -99,7 +99,7 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
 #endif
         !$acc
         do n=1, myDim_nod2D
-            do nz=1,nzmax
+            do nz=1,nzmax-1
                 flux(nz,n)=0.0_WP
             end do
         end do
@@ -285,7 +285,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
         if (init_zero)then
             !$acc parallel loop collapse(2) present(flux)
             do n=1, myDim_nod2D
-                do nz=1,nzmax
+                do nz=1,nzmax-1
                     flux(nz,n)=0.0_WP
                 end do
             end do
@@ -293,7 +293,7 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     else
         !$acc parallel loop collapse(2) present(flux)
         do n=1, myDim_nod2D
-            do nz=1,nzmax
+            do nz=1,nzmax-1
                 flux(nz,n)=0.0_WP
             end do
         end do
@@ -591,7 +591,7 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
         if (init_zero)then
             !$acc parallel loop collapse(2) present(flux)
             do n=1, myDim_nod2D
-                do nz=1,nzmax
+                do nz=1,nzmax-1
                     flux(nz,n)=0.0_WP
                 end do
             end do
@@ -599,7 +599,7 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
     else
         !$acc parallel loop collapse(2) present(flux)
         do n=1, myDim_nod2D
-            do nz=1,nzmax
+            do nz=1,nzmax-1
                 flux(nz,n)=0.0_WP
             end do
         end do

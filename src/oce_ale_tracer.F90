@@ -243,7 +243,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     !$acc parallel loop collapse(2) present(del_ttf_advhoriz,del_ttf_advvert)
     do n=1,myDim_nod2D+eDim_nod2D
-        do nz=1,nl
+        do nz=1,nl-1
             del_ttf_advhoriz(nz,n) = 0.0_WP
             del_ttf_advvert(nz,n)  = 0.0_WP
         end do
@@ -255,7 +255,7 @@ subroutine adv_tracers_ale(tr_num, mesh)
     ! and vertical advection
     !$acc parallel loop collapse(2) present(del_ttf,del_ttf_advhoriz,del_ttf_advvert)
     do n=1,myDim_nod2D+eDim_nod2D
-        do nz=1,nl
+        do nz=1,nl-1
             del_ttf(nz,n)=del_ttf_advhoriz(nz,n) + del_ttf_advvert(nz,n)
         end do
     end do
@@ -524,8 +524,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             tp(nz) = 0.0_WP
             cp(nz) = 0.0_WP    
             zbar_n(nz) = 0.0_WP
+        end do
+        do nz=1, nzmaxmax-1
             Z_n(nz) = 0.0_WP
-            end do
+        end do
         
         ! max. number of levels at node n
         nzmax=nlevels_nod2D(n)

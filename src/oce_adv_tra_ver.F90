@@ -533,7 +533,7 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         !!PS do nz=3, nzmax-3
         !$acc loop vector&
         !$acc& private(dzjm1,dzj,dzjp1,dzjp2,deltaj,deltajp1)
-        do nz=nzmin+2, nzmax-2 
+        do nz=nzmin+2, nzmax-3 
             !___________________________________________________________________
             ! for uniform spaced vertical grids --> piecewise parabolic method (ppm)
             ! equation (1.9)
