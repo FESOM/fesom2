@@ -468,6 +468,14 @@ subroutine oce_fluxes(mesh)
       endif
    end do
 
+   do n=1, myDim_nod2D+eDim_nod2D
+      if (tr_arr_ice(n,3) .lt. zwisomin) then           ! if H216O tracer becomes too small or even negative. 
+         tr_arr_ice(n,1) = zwisomin*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! change H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)= 
+         tr_arr_ice(n,2) = zwisomin*tr_arr_ice(n,2)/tr_arr_ice(n,3)     ! change HDO16 based on the original ratio between HDO16 and H2O16 (i.e. the delta values are not changed)= 
+         tr_arr_ice(n,3) = zwisomin     ! change H216O to zwisomin (i.e. the delta values are not changed)
+      endif
+   end do
+
    end if  ! lwiso end
    
 !---wiso-code-end
