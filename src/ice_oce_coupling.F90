@@ -343,11 +343,11 @@ subroutine oce_fluxes(mesh)
         end if 
     end if 
             
-    call integrate_nod(flux, net, mesh)
+    call integrate_nod(water_flux, net, mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
-    water_flux=water_flux+net/ocean_area 
+    water_flux=water_flux-net/ocean_area 
     
 !---wiso-code
 
@@ -454,9 +454,17 @@ subroutine oce_fluxes(mesh)
 
    ! limit absolute sea ice isotope tracer concentration, but keep the delta values 
    ! (concentration is not completely balanced and may grow steadily in regions with permanent sea ice)
+  ! do n=1, myDim_nod2D+eDim_nod2D
+  !    if (tr_arr_ice(n,3) > 2000._WP) then           ! if H216O tracer reaches (arbitrary) limit of 2000.,
+  !       tr_arr_ice(n,:) = tr_arr_ice(n,:)/2._WP     ! reduce all tracer concentrations to their half (i.e. the delta values are not changed)
+  !    endif
+  ! end do
+
    do n=1, myDim_nod2D+eDim_nod2D
-      if (tr_arr_ice(n,3) > 2000._WP) then           ! if H216O tracer reaches (arbitrary) limit of 2000.,
-         tr_arr_ice(n,:) = tr_arr_ice(n,:)/2._WP     ! reduce all tracer concentrations to their half (i.e. the delta values are not changed)
+      if (tr_arr_ice(n,3) > 1500._WP) then           ! if H216O tracer reaches (arbitrary) limit of 1500.,
+         tr_arr_ice(n,1) = 1500._WP*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! reduce H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)= 
+         tr_arr_ice(n,2) = 1500._WP*tr_arr_ice(n,2)/tr_arr_ice(n,3)     ! reduce HDO16 based on the original ratio between HDO16 and H2O16 (i.e. the delta values are not changed)= 
+         tr_arr_ice(n,3) = 1500._WP     ! reduce H216O to 1500 (i.e. the delta values are not changed)
       endif
    end do
 
