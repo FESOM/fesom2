@@ -58,10 +58,10 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: prec_rain, prec_snow
   real(kind=WP), allocatable, dimension(:)         :: runoff, evaporation, ice_sublimation
   real(kind=WP), allocatable, dimension(:)         :: cloudiness, press_air
-  !wiso-code!!!
+  !---wiso-code
   real(kind=WP), allocatable, dimension(:)         :: www1,www2,www3,iii1,iii2,iii3
   real(kind=WP), allocatable, dimension(:)         :: tmp_iii1,tmp_iii2,tmp_iii3
-  !wiso-code!!!
+  !---wiso-code-end
 
 #if defined (__oasis)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac

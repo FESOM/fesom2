@@ -483,7 +483,7 @@ CONTAINS
       DO n=1, n_ic3d
       filename=trim(ClimateDataPath)//trim(filelist(n))
       varname =trim(varlist(n))
-      DO current_tracer=1, num_tracers
+      DO current_tracer=1, num_tracers+num_wiso_tracers
          if (tracer_ID(current_tracer)==idlist(n)) then
             ! read initial conditions for current tracer
             call nc_ic3d_ini(mesh)
@@ -492,7 +492,7 @@ CONTAINS
             call nc_end ! deallocate arrqays associated with netcdf file
             call extrap_nod(tr_arr(:,:,current_tracer), mesh)
             exit
-         elseif (current_tracer==num_tracers) then
+         elseif (current_tracer==num_tracers+num_wiso_tracers) then
             if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
             if (mype==0) write(*,*) "check your namelists!"
             call par_ex

@@ -97,10 +97,11 @@ TYPE tracer_source3d_type
 END TYPE tracer_source3d_type
 
 integer	                       :: num_tracers=2
-!!!wiso-code!!! add water isotope parameters
-real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/) 
-integer                        :: num_wiso_tracers = 3      ! number of wiso tracers
-!!!wiso-code!!!
+!---wiso-code
+! add water isotope parameters
+integer                        :: num_wiso_tracers = 0                                ! number of water isotope tracers
+real(kind=WP), dimension(3)    :: wiso_smow = (/2005.2e-6_WP, 155.76e-6_WP, 1.0_WP/)  ! water isotope SMOW values
+!---wiso-code-end
 
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
@@ -240,14 +241,14 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
-real(kind=WP), allocatable         :: tr_arr_ice(:,:) !!!wiso-code!!! add ice tracers
+real(kind=WP), allocatable         :: tr_arr_ice(:,:) !---wiso-code: add sea ice isotope tracers
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
-real(kind=WP), allocatable    :: wiso_flux_oce(:,:) !!!wiso-code!!! add isotope fluxes over open water
-real(kind=WP), allocatable    :: wiso_flux_ice(:,:) !!!wiso-code!!! add isotope fluxes over sea ice
+real(kind=WP), allocatable    :: wiso_flux_oce(:,:)   !---wiso-code: add isotope fluxes over open water
+real(kind=WP), allocatable    :: wiso_flux_ice(:,:)   !---wiso-code: add isotope fluxes over sea ice
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)

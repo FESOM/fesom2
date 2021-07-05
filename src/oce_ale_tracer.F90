@@ -101,7 +101,7 @@ end module
 subroutine solve_tracers_ale(mesh)
     use g_config
     use g_parsup
-    use o_PARAM, only: num_tracers, SPP, Fer_GM
+    use o_PARAM, only: num_tracers, num_wiso_tracers, SPP, Fer_GM
     use o_arrays
     use mod_mesh
     use g_comm_auto
@@ -131,7 +131,7 @@ subroutine solve_tracers_ale(mesh)
     end if
     !___________________________________________________________________________
     ! loop over all tracers 
-    do tr_num=1,num_tracers
+    do tr_num=1,num_tracers+num_wiso_tracers
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part 
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -1025,14 +1025,14 @@ FUNCTION bc_surface(n, id, mesh)
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
-!!!wiso-code!!!
+!---wiso-code
     CASE (101) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)
     CASE (102)  ! apply boundary conditions to tracer ID=102 (HDO)
         bc_surface = dt*wiso_flux_oce(n,2)
     CASE (103)  ! apply boundary conditions to tracer ID=103 (H216O)
         bc_surface = dt*wiso_flux_oce(n,3)
-!!!wiso-code-end!!!
+!---wiso-code-end
     CASE (301)
         bc_surface=0.0_WP
     CASE (302)

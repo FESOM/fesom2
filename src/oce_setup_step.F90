@@ -190,9 +190,9 @@ use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
-!!!wiso-code!!!
+!---wiso-code
 integer     :: nt
-!!!wiso-code!!!
+!---wiso-code-end
 
 type(t_mesh), intent(in) , target :: mesh
 
@@ -232,8 +232,12 @@ allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
 ! ================
 allocate(T_rhs(nl-1, node_size))
 allocate(S_rhs(nl-1, node_size))
-allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
-allocate(tr_arr_ice(node_size,num_wiso_tracers)) !!!wiso-code!!! add ice tracers
+allocate(tr_arr(nl-1,node_size,num_tracers+num_wiso_tracers),tr_arr_old(nl-1,node_size,num_tracers+num_wiso_tracers))
+!---wiso-code
+if (lwiso) then
+  allocate(tr_arr_ice(node_size,num_wiso_tracers))  ! add sea ice tracers
+end if
+!---wiso-code-end
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
@@ -258,12 +262,14 @@ allocate(heat_flux(node_size), Tsurf(node_size))
 allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
-!!!wiso-code!!! allocate isotope fluxes
-allocate(wiso_flux_oce(node_size,num_wiso_tracers))
-allocate(wiso_flux_ice(node_size,num_wiso_tracers))
-!!!wiso-code!!!
 allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
+!---wiso-code
+if (lwiso) then
+  allocate(wiso_flux_oce(node_size,num_wiso_tracers))
+  allocate(wiso_flux_ice(node_size,num_wiso_tracers))
+end if
+!---wiso-code-end
 ! =================
 ! Arrays used to organize surface forcing
 ! =================
@@ -288,7 +294,7 @@ allocate(Av(nl,elem_size), Kv(nl,node_size))
 Av=0.0_WP
 Kv=0.0_WP
 if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-   allocate(Kv_double(nl,node_size,num_tracers))
+   allocate(Kv_double(nl,node_size,num_tracers+num_wiso_tracers))
    Kv_double=0.0_WP
    !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
 end if
@@ -398,11 +404,13 @@ end if
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 
-!!!wiso-code!!!
+!---wiso-code
     ! initialize atmospheric fluxes over open ocean and sea ice
-    wiso_flux_oce=0.0_WP
-    wiso_flux_ice=0.0_WP
-!!!wiso-code!!!
+    if (lwiso) then
+      wiso_flux_oce=0.0_WP
+      wiso_flux_ice=0.0_WP
+    end if
+!---wiso-code-end
 
     Ssurf=0.0_WP
     
@@ -413,14 +421,16 @@ end if
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP
     
-!!!wiso-code!!!
+!---wiso-code
     ! initialize sea ice isotopes with 0. permill
     ! absolute tracer values are increased by factor 1000. for numerical reasons
     ! (see also routine oce_fluxes in ice_oce_coupling.F90)
-    do nt = 1, num_wiso_tracers
-       tr_arr_ice(:,nt)=wiso_smow(nt) * 1000.0_WP
-    end do
-!!!wiso-code!!!
+    if (lwiso) then
+      do nt = 1, num_wiso_tracers
+         tr_arr_ice(:,nt)=wiso_smow(nt) * 1000.0_WP
+      end do
+    end if
+!---wiso-code-end
 
     bvfreq=0.0_WP
     mixlay_dep=0.0_WP
@@ -486,7 +496,10 @@ USE g_ic3d
 #include "associate_mesh.h"
 
   if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
-  if (mype==0) write(*,*) 'tracer IDs are: ', tracer_ID(1:num_tracers)
+  IF (lwiso) THEN
+    if (mype==0) write(*,*) num_wiso_tracers, ' water isotope tracers will be used in FESOM'
+  END IF 
+  if (mype==0) write(*,*) 'tracer IDs are: ', tracer_ID(1:num_tracers+num_wiso_tracers)
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -517,32 +530,33 @@ USE g_ic3d
   allocate(ptracers_restore(ptracers_restore_total))
   
   rcounter3=0         ! counter for tracers with 3D source
-  DO i=3, num_tracers
+  DO i=3, num_tracers+num_wiso_tracers
      id=tracer_ID(i)
      SELECT CASE (id)
-  !wiso-code for tracers 101, 102, 103
-       CASE (101)       ! initialize tracer ID=101 h2o18 ysun
+  !---wiso-code
+  ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
+       CASE (101)       ! initialize tracer ID=101 H218O
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             write (*,*) tr_arr(1,1,i)
          end if
-       CASE (102)       ! initialize tracer ID=102 hDo16 ysun
+       CASE (102)       ! initialize tracer ID=102 HD16O
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             write (*,*) tr_arr(1,1,i)
          end if
-       CASE (103)       ! initialize tracer ID=103 h2o16 ysun
+       CASE (103)       ! initialize tracer ID=103 H216O
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             write (*,*) tr_arr(1,1,i)
          end if
-  !wiso-code for tracers 101, 102, 103
+  !---wiso-code-end
 
        CASE (301) !Fram Strait 3d restored passive tracer
          tr_arr(:,:,i)=0.0_WP

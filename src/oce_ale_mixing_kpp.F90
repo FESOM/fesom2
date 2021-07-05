@@ -256,7 +256,7 @@ contains
      real(kind=WP)              :: rho_surf, rho_insitu
      real(KIND=WP), dimension(mesh%nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
      real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, num_tracers+num_wiso_tracers), intent(inout) :: diffK !for T and S
 
 #include "associate_mesh.h"
 

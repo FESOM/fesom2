@@ -158,9 +158,9 @@ subroutine oce_fluxes(mesh)
   use g_PARSUP
   use g_support
   use i_therm_param
-!!!wiso-code
+  !---wiso-code
   use o_PARAM, only: num_wiso_tracers
-!!!wiso-code
+  !---wiso-code-end
   
 #if defined (__icepack)
   use icedrv_main,   only: icepack_to_fesom,    &
@@ -173,7 +173,7 @@ subroutine oce_fluxes(mesh)
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
 
-  !!!wiso-code
+  !---wiso-code
   integer                    :: nt
   real(kind=WP), dimension(3) :: zfrac_freezing
   real(kind=WP)              :: zwisomin
@@ -181,26 +181,28 @@ subroutine oce_fluxes(mesh)
   real(kind=WP), allocatable :: wiso_prec_o16(:)
   real(kind=WP), allocatable :: wiso_rain(:,:), wiso_snow(:,:), wiso_melt(:,:)
   real(kind=WP), allocatable :: wiso_delta_rain(:,:),wiso_delta_snow(:,:),wiso_delta_ocean(:,:),wiso_delta_seaice(:,:)
-  !!!wiso-code
+  !---wiso-code-end
 
 #include  "associate_mesh.h"
     
     allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP
 
-  !!!wiso-code
-  allocate(snmelt(myDim_nod2D+eDim_nod2D))
-  allocate(icemelt(myDim_nod2D+eDim_nod2D))
-  allocate(wiso_prec_o16(myDim_nod2D+eDim_nod2D))
-  allocate(wiso_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_melt(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_delta_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_delta_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_delta_ocean(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  allocate(wiso_delta_seaice(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
-  zwisomin= 1.e-6_WP
-  !!!wiso-code
+  !---wiso-code
+  if (lwiso) then
+    allocate(snmelt(myDim_nod2D+eDim_nod2D))
+    allocate(icemelt(myDim_nod2D+eDim_nod2D))
+    allocate(wiso_prec_o16(myDim_nod2D+eDim_nod2D))
+    allocate(wiso_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_melt(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_delta_rain(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_delta_snow(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_delta_ocean(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    allocate(wiso_delta_seaice(myDim_nod2D+eDim_nod2D,num_wiso_tracers))
+    zwisomin= 1.e-6_WP
+  end if
+  !---wiso-code-end
 
     
     ! ==================
@@ -308,13 +310,15 @@ subroutine oce_fluxes(mesh)
             +prec_snow*(1.0_WP-a_ice_old)    &
             +runoff    
     
-!!!wiso-code  
-    ! calculate snow melt (> 0.) and sea ice melt/growth (melt: > 0.; growth < 0.) as fraction of freshwater flux into the ocean
-    snmelt = 0._WP
-    icemelt = 0._WP
-    where (abs(flux) > zwisomin) snmelt = -(thdgrsn*rhosno*inv_rhowat)/abs(flux)
-    where (abs(flux) > zwisomin) icemelt = -(thdgr*rhoice*inv_rhowat)/abs(flux)
-!!!wiso-code
+!---wiso-code
+    if (lwiso) then
+      ! calculate snow melt (> 0.) and sea ice melt/growth (melt: > 0.; growth < 0.) as fraction of freshwater flux into the ocean
+      snmelt = 0._WP
+      icemelt = 0._WP
+      where (abs(flux) > zwisomin) snmelt = -(thdgrsn*rhosno*inv_rhowat)/abs(flux)
+      where (abs(flux) > zwisomin) icemelt = -(thdgr*rhoice*inv_rhowat)/abs(flux)
+    end if
+!---wiso-code-end
             
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
@@ -345,8 +349,10 @@ subroutine oce_fluxes(mesh)
     ! have there original sign
     water_flux=water_flux+net/ocean_area 
     
-!!!wiso-code
+!---wiso-code
 
+    if (lwiso) then
+    
     ! *** Important ***: The following wiso tracer order is assumed: nt=1: H218O, nt=2: HDO, nt=3: H216O
     
 
@@ -396,7 +402,7 @@ subroutine oce_fluxes(mesh)
       do nt=1,2
         ! calculate delta of open water (top ocean level)
         wiso_delta_ocean(n,nt)=wiso_smow(nt)
-        if (tr_arr(1,n,3+2).gt.zwisomin) wiso_delta_ocean(n,nt) = tr_arr(1,n,nt+2)/tr_arr(1,n,3+2)
+        if (tr_arr(1,n,num_tracers+3).gt.zwisomin) wiso_delta_ocean(n,nt) = tr_arr(1,n,num_tracers+nt)/tr_arr(1,n,num_tracers+3)
         !calculate delta of sea ice
         wiso_delta_seaice(n,nt)=wiso_smow(nt)
         if (tr_arr_ice(n,3).gt.zwisomin) wiso_delta_seaice(n,nt) = tr_arr_ice(n,nt)/tr_arr_ice(n,3)
@@ -454,7 +460,9 @@ subroutine oce_fluxes(mesh)
       endif
    end do
 
-  !!!wiso-code
+   end if  ! lwiso end
+   
+!---wiso-code-end
 
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)

@@ -68,9 +68,9 @@ subroutine update_atm_forcing(istep, mesh)
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2
-!!!wiso-code!!!
+  !---wiso-code
   real(kind=WP)            :: zwisomin
-!!!wiso-code!!!
+  !---wiso-code-end
 #ifdef __oasis
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
@@ -89,9 +89,9 @@ subroutine update_atm_forcing(istep, mesh)
   !character(500)                        :: file
 #include "associate_mesh.h"
   t1=MPI_Wtime()
-!!!wiso-code!!!!
+  !---wiso-code
   zwisomin= 1.e-6_WP
-!!!wiso-code!!!!
+  !---wiso-code-end
   
 #ifdef __oasis
      if (firstcall) then
@@ -118,27 +118,6 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = ice_temp(:)                               ! ice surface temperature
             elseif (i.eq.5) then
             exchange(:) = ice_alb(:)                                ! ice albedo
-!!!wiso-code!!!
-            elseif (i.eq.6) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
-              end where
-             end if
-
-            elseif (i.eq.7) then
-             exchange(:) = 0.0_WP
-             if (lwiso) then
-              where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
-              end where
-             end if
-
-            elseif (i.eq.8) then
-            exchange(:) = 0.0_WP                          ! delta H216O of surface water is set to zero permill
-!!!wiso-code!!!
-
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
@@ -152,20 +131,20 @@ subroutine update_atm_forcing(istep, mesh)
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
             elseif (i.eq.4) then
             exchange(:) = m_snow(:)                                 ! snow thickness
-!!!wiso-code!!!
+!---wiso-code
             elseif (i.eq.5) then
              exchange(:) = 0.0_WP
              if (lwiso) then
-              where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 3)/tr_arr(1, :, 5)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
+              where (tr_arr(1, :, num_tracers+3) > zwisomin)
+                exchange(:) = (tr_arr(1, :, num_tracers+1)/tr_arr(1, :, num_tracers+3)/wiso_smow(1) - 1._WP)*1000._WP ! delta 18O of surface water
               end where
              end if
 
             elseif (i.eq.6) then
              exchange(:) = 0.0_WP
              if (lwiso) then
-              where (tr_arr(1, :, 5) > zwisomin)
-                exchange(:) = (tr_arr(1, :, 4)/tr_arr(1, :, 5)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
+              where (tr_arr(1, :, num_tracers+3) > zwisomin)
+                exchange(:) = (tr_arr(1, :, num_tracers+2)/tr_arr(1, :, num_tracers+3)/wiso_smow(2) - 1._WP)*1000._WP ! delta D of surface water
               end where
              end if
 
@@ -190,8 +169,7 @@ subroutine update_atm_forcing(istep, mesh)
 
             elseif (i.eq.10) then
             exchange(:) = 0.0_WP                          ! delta H216O of sea ice is set to zero permill
-!!!wiso-code!!!
-
+!---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
@@ -299,73 +277,9 @@ subroutine update_atm_forcing(istep, mesh)
     	     mask=1.
 	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
              end if
-        !!!wiso-code!!!
-         elseif (i.eq.15) then
-             if (action) then
-             ! tot_prec_o18 over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www1(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www1, mask, i, 0,action,mesh)
-             end if
-         elseif (i.eq.16) then
-             if (action) then
-             ! tot_prec_hdo over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www2(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www2, mask, i, 0,action,mesh)
-             end if
-         elseif (i.eq.14) then
-             if (action) then
-             ! tot_prec_o16 over water: this variable includes (i) rain open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
-             www3(:)         =  exchange(:)
-             end if
-             mask=1.
-             if (lwiso) then
-             call force_flux_consv(www3, mask, i, 0,action,mesh)
-             end if
-         elseif (i.eq.18) then
-             if (action) then
-             ! snowfall_o18 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii1(:)         =  exchange(:)
-             tmp_iii1(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii1(:)         =  tmp_iii1(:)
-             if (lwiso) then
-                 call force_flux_consv(iii1,mask,i,1,action, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii1,mask,i,2,action, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.19) then
-             if (action) then
-             ! snowfall_hdo over seaice: this variable includes snow and sublimation over sea ice areas
-             iii2(:)         =  exchange(:)
-             tmp_iii2(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii2(:)         =  tmp_iii2(:)
-             if (lwiso) then
-                 call force_flux_consv(iii2,mask,i,1,action, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii2,mask,i,2,action, mesh) ! Southern Hemisphere
-             end if
-         elseif (i.eq.17) then
-             if (action) then
-             ! snowfall_o16 over seaice: this variable includes snow and sublimation over sea ice areas
-             iii3(:)         =  exchange(:)
-             tmp_iii3(:)     =  exchange(:)                   ! to reset for flux correction
-             end if
-             mask=a_ice
-             iii3(:)         =  tmp_iii3(:)
-             if (lwiso) then
-                 call force_flux_consv(iii3,mask,i,1,action, mesh) ! Northern hemisphere
-                 call force_flux_consv(iii3,mask,i,2,action, mesh) ! Southern Hemisphere
-             end if
 	 end if  
+!---wiso-code
 #else
-        !!!wiso-code!!!
          elseif (i.eq.14) then
              if (action) then
              ! tot_prec_o18 over water: this variable includes (i) rain over open water and sea ice, (ii) snow and evap over open water,  (iii) river runoff
@@ -429,9 +343,8 @@ subroutine update_atm_forcing(istep, mesh)
                  call force_flux_consv(iii3,mask,i,1,action, mesh) ! Northern hemisphere
                  call force_flux_consv(iii3,mask,i,2,action, mesh) ! Southern Hemisphere
              end if
-        !!!wiso-code!!!
-
 	 end if  
+!---wiso-code-end
 #endif	  
 #ifdef VERBOSE
 	  if (mype==0) then
@@ -661,8 +574,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, mesh)
 #endif
   
   !last flux			   
-  !if (n==nrecv .AND. mype==0) write(*,*) 'Fluxes have been modified.'  
-  if (n==nrecv-6 .AND. mype==0) write(*,*) 'Fluxes have been modified.' !!!wiso-code 
+  if (n==nrecv .AND. mype==0) write(*,*) 'Fluxes have been modified.'  
 END SUBROUTINE force_flux_consv
 
 !
