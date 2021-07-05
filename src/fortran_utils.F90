@@ -5,25 +5,37 @@ module fortran_utils
 contains
 
 
-  function positiveint_to_txt(val) result(txt)
+  function int_to_txt(val) result(txt)
     integer, intent(in) :: val
-    character(int(log10(real(val)))+1) :: txt ! does not work for val=0
+    character(:), allocatable :: txt
     ! EO parameters
+    integer val_width
+
+    if(val == 0) then
+      val_width = 1
+    else
+      val_width = int(log10(real(val)))+1 ! does not work for val=0
+    end if
+    allocate(character(val_width) :: txt)
     write(txt,'(i0)') val
   end function
 
 
-  function positiveint_to_txt_pad(val, width) result(txt) ! for val=0 width must be > 0
+  function int_to_txt_pad(val, width) result(txt)
     integer, intent(in) :: val, width
     character(:), allocatable :: txt
     ! EO parameters
     integer w, val_width
     character(:), allocatable :: widthtxt
-
-    val_width = int(log10(real(val)))+1
+    
+    if(val == 0) then
+      val_width = 1
+    else
+      val_width = int(log10(real(val)))+1 ! does not work for val=0
+    end if
     w = width
     if(w < val_width) w = val_width
-    widthtxt = positiveint_to_txt(w)
+    widthtxt = int_to_txt(w)
     allocate(character(w) :: txt)
     write(txt,'(i0.'//widthtxt//')') val
   end function
