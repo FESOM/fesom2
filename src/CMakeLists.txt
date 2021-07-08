@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.4)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
+#add_compile_options(-DTRANSPOSE_RESTART)
 
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 

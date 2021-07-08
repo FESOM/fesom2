@@ -87,6 +87,12 @@ contains
 #else
       print '(g0)', 'VERBOSE is OFF'
 #endif  
+#ifdef TRANSPOSE_RESTART
+      print '(g0)', 'TRANSPOSE_RESTART is ON'
+#else
+      print '(g0)', 'TRANSPOSE_RESTART is OFF'
+#endif  
+#endif  
   end subroutine
 
 end module

@@ -190,7 +190,11 @@ contains
             call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
           else
             ! z,nod,time
-            call this%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data)
+#ifndef TRANSPOSE_RESTART
+            call this%read_var(var%var_index, [lvl,1,last_rec_idx], [1,size(var%global_level_data),1], var%global_level_data) ! untransposed
+#else
+            call this%read_var(var%var_index, [1,lvl,last_rec_idx], [size(var%global_level_data),1,1], var%global_level_data)
+#endif
           end if
         end if
 
@@ -247,7 +251,11 @@ contains
             call this%write_var(var%var_index, [1,this%rec_cnt], [size(var%global_level_data),1], var%global_level_data)
           else
             ! z,nod,time
-            call this%write_var(var%var_index, [lvl,1,this%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data)
+#ifndef TRANSPOSE_RESTART
+           call this%write_var(var%var_index, [lvl,1,this%rec_cnt], [1,size(var%global_level_data),1], var%global_level_data) ! untransposed
+#else
+           call this%write_var(var%var_index, [1,lvl,this%rec_cnt], [size(var%global_level_data),1,1], var%global_level_data)
+#endif
           end if
         end if
       end do
@@ -346,7 +354,11 @@ contains
     level_diminfo = obtain_diminfo(this, m_nod2d)    
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
 
-    call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
+#ifndef TRANSPOSE_RESTART
+   call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units) ! untransposed
+#else
+     call specify_variable(this, name, [level_diminfo%idx, depth_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .false., longname, units)
+#endif
   end subroutine
 
 
@@ -379,7 +391,11 @@ contains
     level_diminfo = obtain_diminfo(this, m_elem2d)
     depth_diminfo = obtain_diminfo(this, size(local_data, dim=1))
     
-    call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .true., longname, units)
+#ifndef TRANSPOSE_RESTART
+   call specify_variable(this, name, [depth_diminfo%idx, level_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .true., longname, units) ! untransposed
+#else
+   call specify_variable(this, name, [level_diminfo%idx, depth_diminfo%idx, this%time_dimidx], level_diminfo%len, local_data, .true., longname, units)
+#endif
   end subroutine
   
   
