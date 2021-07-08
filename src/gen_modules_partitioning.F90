@@ -14,6 +14,40 @@ save
  integer                                :: MPI_COMM_FESOM
  integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
+
+!NR Here is a first step towards communication optimized for multicore compute nodes. 
+!NR The basic idea is that MPI inside a compute node or GPU (physically shared memory) 
+!NR is faster than MPI between nodes (internode) by an order of magnitude.
+!NR We will sort the neighbouring PEs: the PEs on remote nodes come first,
+!NR than the ones located on the same compute nodes. 
+!NR For the halo exchange, the remote irecv, isend can be called first.   
+!NR This will help all critical halo exchanges, e.g. for the ice model.
+
+  type comm_halo
+     integer                                       :: comm   ! MPI communicator
+     integer                                       :: mype   ! rank within comm
+     integer                                       :: npes   ! number of PEs inside communicator
+     integer                                       :: color  ! ID of group of PEs I belong to in this comm
+                                                             ! "color" follows the convention of MPI_COMM_SPLIT
+     integer                                       :: rPEnum ! the number of PE I receive info from            
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: rPE    ! their list                       
+     integer, allocatable                          :: r_type_2D_i(:)  ! MPI datatype for 2D halos                        
+     integer, allocatable                          :: r_type_2D(:,:)  ! MPI datatype for 2D halos 
+     integer, allocatable                          :: r_type_3D(:,:,:)  ! MPI datatype for 3D halos
+     integer                                       :: sPEnum ! send part                                                                       
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sPE    
+     integer, allocatable                          :: s_type_2D_i(:) 
+     integer, allocatable                          :: s_type_2D(:,:) 
+     integer, allocatable                          :: s_type_3D(:,:,:) 
+     integer, dimension(:), allocatable            :: req    ! request for MPI_Wait     
+     integer                                       :: nreq   ! number of requests for MPI_Wait  
+                                                             ! (to combine halo exchange of several fields)    
+  end type comm_halo
+
+!NR And the old com_struct. It is augmented by the new option of split communicators.
+!NR They may be ignored, and for a start, we will only use them where there should be the
+!NR largest benefit (e.g. ice step)
+
   type com_struct
      integer                                       :: rPEnum ! the number of PE I receive info from 
      integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: rPE    ! their list
@@ -26,13 +60,21 @@ save
      integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
      integer                                       :: nreq   ! number of requests for MPI_Wait
                                                              ! (to combine halo exchange of several fields)
+     character(len=11)                             :: id     ! 'nod2D', 'elem2D', 'elem2D_full'
+     integer                                       :: shm_color ! same number for all PEs on the same compute node,
+                                                                ! distinct for PEs on distinct compute nodes
+     type(comm_halo)                               :: shm    ! halo exchange with pe on the same compute node
+     type(comm_halo)                               :: rem    ! halo exchange with pe over network
   end type com_struct
 
-  type(com_struct)   :: com_nod2D
+
+  type(com_struct)         :: com_nod2D
 !!$  type(com_struct)   :: com_edge2D
   type(com_struct), target :: com_elem2D
   type(com_struct), target :: com_elem2D_full
  
+ 
+
   ! MPI Datatypes for interface exchange
 
   ! Edge fields (2D)
@@ -486,8 +528,117 @@ subroutine set_par_support(mesh)
 
    call init_gatherLists
    if(mype==0) write(*,*) 'Communication arrays are set' 
+
+   call init_shared_mem
+
 end subroutine set_par_support
 
+!===================================================================
+
+subroutine init_shared_mem
+
+!NR The new communicator combines all PEs within one compute node
+!NR Carefull when running FESOM on CPUs and GPUs - take care where to call the comm_split! 
+!NR Consider to set up two shared mem communicators, one for the CPU nodes, one for the GPUs.
+
+  integer :: shm_comm, shm_mype, shm_npes, shm_color
+
+  if (npes==1) return
+
+  call MPI_Comm_split_type(MPI_COMM_FESOM, MPI_COMM_TYPE_SHARED,mype,MPI_INFO_NULL, shm_comm, MPIerr)
+
+  call MPI_Comm_rank(shm_comm,shm_mype, MPIerr)
+  call MPI_Comm_size(shm_comm,shm_npes)
+
+
+!NR As the unique id of all PEs grouped into one communicator (a compute node), 
+!NR we take the global rank mype (in MPI_COMM_FESOM) 
+!NR of the pe with local shm_mype=0 
+
+  if (shm_mype==0) shm_color = mype
+  call MPI_Bcast(shm_color, 1, MPI_INTEGER, 0, shm_comm, MPIerr)
+  
+
+!NR First application of this knowledge: sort the rPE, sPE for the halo exchanges
+!NR of nodes
+  call init_shm_halo_exchange(com_nod2D)
+  
+
+contains
+  subroutine init_shm_halo_exchange(com)
+    type(com_struct), intent(inout)  :: com
+
+    integer, dimension(MAX_NEIGHBOR_PARTITIONS) :: r_color(:), s_color(:)
+    integer          :: n, nreq, n_rem, n_shm
+
+!NR determine "color" of neighbouring PEs (same color = same compute node)
+    nreq = 0
+    DO n=1, com%rPEnum
+       nreq = nreq + 1
+       call MPI_IRECV(r_color(n), 1, MPI_INTEGER, com%rPE(n), &
+            com%rPE(n), MPI_COMM_FESOM, com%req(nreq), MPIerr)
+       nreq = nreq + 1
+       call MPI_ISEND(shm_color,  1, MPI_INTEGER, com%rPE(n), &
+            mype+npes, MPI_COMM_FESOM, com%req(nreq), MPIerr) 
+    END DO
+    DO n=1,com%sPEnum
+       nreq = nreq + 1
+       call MPI_IRECV(s_color(n), 1, MPI_INTEGER, com%sPE(n), &
+            com%sPE(n)+npes, MPI_COMM_FESOM, com%req(nreq), MPIerr)
+       nreq = nreq + 1
+       call MPI_ISEND(shm_color,  1, MPI_INTEGER, com%sPE(n), &
+            mype, MPI_COMM_FESOM, com%req(nreq), MPIerr)
+    END DO
+
+    call MPI_Waitall(nreq, com%req, MPI_STATUSES_IGNORE, MPIerr)
+
+!NR initialize the new components
+    com%shm_color = shm_color
+
+    com%shm%sPEnum = count(s_color(1:com%sPEnum)==shm_color)
+    com%rem%sPEnum = com%sPEnum - com%shm%sPEnum
+    allocate(com%shm%sPE(     com%shm%sPEnum))
+    allocate(com%rem%sPE(     com%rem%sPEnum))
+    allocate(com%shm%s_type_i(com%shm%sPEnum))
+    allocate(com%rem%s_type_i(com%rem%sPEnum))
+                                                                                                                 
+    com%shm%rPEnum = count(r_color(1:com%rPEnum)==shm_color)
+    com%rem%rPEnum = com%rPEnum- com%shm%rPEnum
+    allocate(com%shm%rPE(     com%shm%rPEnum))
+    allocate(com%rem%rPE(     com%rem%rPEnum))
+    allocate(com%shm%r_type_i(com%shm%rPEnum))
+    allocate(com%rem%r_type_i(com%rem%rPEnum))
+
+    if (trim(adjustl(com%id)) == 'nod2D') then
+       allocate(com%shm%s_type_2D(com%shm%sPEnum,1))
+       allocate(com%rem%s_type_2D(com%rem%sPEnum,1))
+       allocate(com%shm%s_type_3D(com%shm%sPEnum,nl-1:nl,3))
+       allocate(com%rem%s_type_3D(com%rem%sPEnum,nl-1:nl,3))
+
+    elseif (trim(adjustl(com%id)) == 'elem2D' .or. trim(adjustl(com%id)) == 'elem2D_full' ) then
+       allocate(com%shm%s_type_2D(com%shm%sPEnum,4))
+       allocate(com%rem%s_type_2D(com%rem%sPEnum,4))
+       allocate(com%shm%s_type_3D(com%shm%sPEnum,nl-1:nl,4))
+       allocate(com%rem%s_type_3D(com%rem%sPEnum,nl-1:nl,4))
+    end if
+
+    n_rem = 0
+    n_shm = 0
+    do n=1, com%rPEnum
+       if (r_color(n) == shm_color) then
+          n_shm = n_shm+1
+          com%shm%rPE(n_shm) = com%rPE(n)
+          
+          if (trim(adjustl(com%id)) == 'nod2D') then
+             com%shm%
+
+          endif
+
+       end if
+    end do
+
+  end subroutine init_shm_halo_exchange
+end subroutine init_shared_mem
 
 !===================================================================
 subroutine init_gatherLists
