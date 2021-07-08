@@ -342,6 +342,9 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     real(kind=WP)            :: zinv1,Ty
 
 #include "associate_mesh.h"
+
+    Ty = 0.0_WP
+    
     !___________________________________________________________________________    
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
