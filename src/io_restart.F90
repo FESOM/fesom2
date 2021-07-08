@@ -289,7 +289,7 @@ subroutine read_restart(path, filegroup)
     call filegroup%files(i)%join()
 
     if(filegroup%files(i)%is_iorank()) then
-      write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count()
+      write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
 
       ! read the last entry from the iter variable
       call filegroup%files(i)%read_var1(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()], globalstep)
