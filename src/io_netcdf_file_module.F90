@@ -151,8 +151,10 @@ contains
     ! EO parameters
     include "netcdf.inc"
     type(var_type), allocatable :: tmparr(:)
-    type(att_type_wrapper) empty_atts(0)
+    type(att_type_wrapper), allocatable :: empty_atts(:)
     
+    allocate(empty_atts(0)) ! if we use a fixed size array with size 0 there is a segfault at runtime when compiled with cray ftn
+
     ! assume the vars array is allocated
     allocate( tmparr(size(this%vars)+1) )
     tmparr(1:size(this%vars)) = this%vars
