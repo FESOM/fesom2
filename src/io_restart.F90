@@ -276,16 +276,22 @@ subroutine read_restart(path, filegroup)
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
-        write(*,*) 'reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#ifndef DISABLE_PARALLEL_RESTART_READ
+        write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#else
+        write(*,*) 'reading restart SEQIENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#endif
         call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
       end if
     end if
 
     call filegroup%files(i)%async_read_and_scatter_variables()
+#ifndef DISABLE_PARALLEL_RESTART_READ
   end do
   
   do i=1, filegroup%nfiles
+#endif
     call filegroup%files(i)%join()
 
     if(filegroup%files(i)%is_iorank()) then

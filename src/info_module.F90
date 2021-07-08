@@ -92,6 +92,10 @@ contains
 #else
       print '(g0)', 'TRANSPOSE_RESTART is OFF'
 #endif  
+#ifdef DISABLE_PARALLEL_RESTART_READ
+      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is ON'
+#else
+      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
 #endif  
   end subroutine
 

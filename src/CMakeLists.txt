@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.4)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 
 project(fesom C Fortran)
+if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
+#add_compile_options(-craympich-mt) # alternative cray-mpich library
+   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # work around issue on aleph
+endif()
 #add_compile_options(-DTRANSPOSE_RESTART)
 
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
