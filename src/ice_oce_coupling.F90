@@ -196,6 +196,10 @@ subroutine oce_fluxes(mesh)
                            aice_out=a_ice,                 &
                            vice_out=m_ice,                 &
                            vsno_out=m_snow,                &
+#if defined (__oifs)
+                           Tsfc_out=ice_temp,              &       
+                           albd_out=ice_alb,               &
+#endif /* (__oifs) */
                            fhocn_tot_out=net_heat_flux,    &
                            fresh_tot_out=fresh_wa_flux,    &
                            fsalt_out=real_salt_flux,       &

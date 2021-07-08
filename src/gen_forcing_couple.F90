@@ -76,6 +76,8 @@ subroutine update_atm_forcing(istep, mesh)
   logical                                          :: action
   logical                                          :: do_rotate_oce_wind=.false.
   logical                                          :: do_rotate_ice_wind=.false.
+  logical                                          :: do_rotate_u_wind=.false.
+  logical                                          :: do_rotate_v_wind=.false.
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
 #endif
@@ -160,13 +162,13 @@ subroutine update_atm_forcing(istep, mesh)
 	     do_rotate_ice_wind=.true.	     
          elseif (i.eq.5) then
              if (action) then 
-	        prec_rain(:)    =  exchange(:)	                  ! tot_prec
+	        prec_rain(:)    =  max(0.0_WP,exchange(:))	  ! tot_prec
 		mask=1.
 		call force_flux_consv(prec_rain, mask, i, 0,action, mesh)
 	     end if
          elseif (i.eq.6) then 
 	     if (action) then
-	        prec_snow(:)    =  exchange(:)                    ! snowfall
+	        prec_snow(:)    =  max(0.0_WP,exchange(:))        ! snowfall
 		mask=1.
 		call force_flux_consv(prec_snow, mask,i,1,action, mesh) ! Northern hemisphere
 		call force_flux_consv(prec_snow, mask,i,2,action, mesh) ! Southern Hemisphere
@@ -234,31 +236,33 @@ subroutine update_atm_forcing(istep, mesh)
          ! Icepack couplinng
          elseif (i.eq.14) then
              if (action) then
-             Tair(:) = exchange(:) - 273.15_WP  ! 2m temperature
+             Tair(:) = exchange(:) - 273.15_WP       ! 2m temperature
              end if
          elseif (i.eq.15) then
              if (action) then
-             shum(:) = exchange(:)              ! 2m relative humidity
+             shum(:) = max(0.0_WP,exchange(:))       ! 2m relative humidity
              end if
          elseif (i.eq.16) then
              if (action) then
-             u_wind(:) = exchange(:)            ! 10m wind - u component
+             u_wind(:) = exchange(:)                 ! 10m wind - u component
+             do_rotate_u_wind=.true.
              end if
          elseif (i.eq.17) then
              if (action) then
-             v_wind(:) = exchange(:)            ! 10m wind - v component
+             v_wind(:) = exchange(:)                 ! 10m wind - v component
+             do_rotate_v_wind=.true.
              end if
          elseif (i.eq.18) then
              if (action) then
-             shortwave(:) = exchange(:)         ! net downward shortwave radiation
+             shortwave(:) = max(0.0_WP,exchange(:))  ! net downward shortwave radiation
              end if
          elseif (i.eq.19) then
              if (action) then
-             longwave(:) = exchange(:)          ! net downward thermal radiation
+             longwave(:) = max(0.0_WP,exchange(:))   ! net downward thermal radiation
              end if
          elseif (i.eq.20) then
              if (action) then
-             press_air(:) = exchange(:)         ! near surface pressure
+             press_air(:) = exchange(:)              ! near surface pressure
              end if
 	 end if  
 #endif	  
@@ -277,6 +281,17 @@ subroutine update_atm_forcing(istep, mesh)
 	 do_rotate_oce_wind=.false.
          do_rotate_ice_wind=.false.
       end if
+
+#if defined (__oifs)
+      if ((do_rotate_u_wind .AND. do_rotate_v_wind) .AND. rotated_grid) then
+         do n=1, myDim_nod2D+eDim_nod2D
+	    call vector_g2r(u_wind(n), v_wind(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+	 end do
+	 do_rotate_u_wind=.false.
+         do_rotate_v_wind=.false.
+      end if
+#endif
+
 #else
   call sbc_do(mesh)
   u_wind    = atmdata(i_xwind,:)

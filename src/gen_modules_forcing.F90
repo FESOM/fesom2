@@ -30,8 +30,13 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   logical                       :: AOMIP_drag_coeff=.false.
   logical                       :: ncar_bulk_formulae=.false.
   real(kind=WP)                 :: ncar_bulk_z_wind=10.0_WP
+#if defined (__oifs)
+  real(kind=WP)                 :: ncar_bulk_z_tair=2.0_WP
+  real(kind=WP)                 :: ncar_bulk_z_shum=2.0_WP
+#else
   real(kind=WP)                 :: ncar_bulk_z_tair=10.0_WP
   real(kind=WP)                 :: ncar_bulk_z_shum=10.0_WP
+#endif
 
   namelist /forcing_bulk/ AOMIP_drag_coeff, ncar_bulk_formulae, ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
 

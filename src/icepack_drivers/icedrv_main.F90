@@ -809,6 +809,7 @@
               module subroutine icepack_to_fesom(                          &
                                           nx_in,                           &
                                           aice_out,  vice_out,  vsno_out,  &
+                                          Tsfc_out,  albd_out,             &     
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
@@ -822,6 +823,8 @@
                      aice_out, &
                      vice_out, &
                      vsno_out, &
+                     Tsfc_out, &
+                     albd_out, &
                      fhocn_tot_out, &
                      fresh_tot_out, &
                      strocnxT_out,  &

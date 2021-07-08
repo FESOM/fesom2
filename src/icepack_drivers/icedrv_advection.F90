@@ -1123,7 +1123,7 @@ submodule (icedrv_main) icedrv_advection
            do n = 1, ncat
               do i = 1, nx
                  if (trcrn(i,nt_Tsfc,n) > Tf(i) .or. trcrn(i,nt_Tsfc,n)< Tmin) then
-                     trcrn(i,nt_Tsfc,n) = min(Tf(i), (T_air(i) + 273.15_dbl_kind))
+                     trcrn(i,nt_Tsfc,n) = min(Tf(i), (T_air(i) - 273.15_dbl_kind))
                  endif
               enddo
            enddo

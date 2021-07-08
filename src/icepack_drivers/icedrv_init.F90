@@ -916,6 +916,10 @@
           use icepack_intfc, only: icepack_init_fsd
           use icepack_intfc, only: icepack_init_fsd_bounds
           use icepack_intfc, only: icepack_warnings_flush
+          use i_arrays,      only: a_ice, m_ice, m_snow
+#if defined (__oifs)
+          use i_arrays,      only: ice_temp, ice_alb
+#endif /* (__oifs) */
           use mod_mesh
     
           implicit none
@@ -988,9 +992,15 @@
           call init_shortwave    ! initialize radiative transfer using current swdn
           call init_flux_atm_ocn    ! initialize atmosphere, ocean fluxes
 
-      if (mype==0) write(*,*) maxval(aicen), minval(aicen)
-      if (mype==0) write(*,*) maxval(vicen), minval(vicen)
-      if (mype==0) write(*,*) maxval(trcrn(:,2:5,:)), minval(trcrn(:,2:5,:))
+          ! Send initialized and aggregated icepack variables to fesom variables
+          call icepack_to_fesom (nx_in=nx,             &
+#if defined (__oifs)
+                                 Tsfc_out=ice_temp,    &
+                                 albd_out=ice_alb,     &
+#endif /* (__oifs) */
+                                 aice_out=a_ice,       &
+                                 vice_out=m_ice,       &
+                                 vsno_out=m_snow)                
 
       end subroutine init_icepack
 

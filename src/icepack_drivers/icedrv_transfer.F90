@@ -175,11 +175,14 @@
 
       module subroutine icepack_to_fesom( nx_in,                           &
                                           aice_out,  vice_out,  vsno_out,  &
+                                          Tsfc_out,  albd_out,             &
                                           fhocn_tot_out, fresh_tot_out,    &
                                           strocnxT_out,  strocnyT_out,     &
                                           dhs_dt_out,    dhi_dt_out,       &
                                           fsalt_out,     evap_ocn_out,     &
                                           evap_out                         )
+
+          use icepack_intfc,    only: icepack_query_tracer_indices
 
           implicit none
 
@@ -190,6 +193,8 @@
              aice_out, &  
              vice_out, &
              vsno_out, &
+             Tsfc_out, &
+             albd_out, &
              fhocn_tot_out, &
              fresh_tot_out, &
              strocnxT_out,  &
@@ -200,12 +205,29 @@
              evap_ocn_out,  &
              evap_out
 
+          ! Local variables
+
+          integer (kind=int_kind) :: &
+             nt_Tsfc
+
           character(len=*),parameter :: subname='(icepack_to_fesom)'   
 
+          real (kind=dbl_kind), parameter :: &
+             frcvdr = 0.28_dbl_kind,    & ! frac of incoming sw in vis direct band
+             frcvdf = 0.24_dbl_kind,    & ! frac of incoming sw in vis diffuse band
+             frcidr = 0.31_dbl_kind,    & ! frac of incoming sw in near IR direct band
+             frcidf = 0.17_dbl_kind       ! frac of incoming sw in near IR diffuse band
+
+          call icepack_query_tracer_indices( nt_Tsfc_out=nt_Tsfc )
 
           if (present(aice_out)              ) aice_out         = aice
           if (present(vice_out)              ) vice_out         = vice
           if (present(vsno_out)              ) vsno_out         = vsno
+          if (present(Tsfc_out)              ) Tsfc_out         = min(273.15_dbl_kind, trcr(:,nt_Tsfc) + 273.15_dbl_kind)
+          if (present(albd_out)              ) albd_out         = min( alvdr * frcvdr + &
+                                                                       alvdf * frcvdf + &
+                                                                       alidr * frcidr + &
+                                                                       alidf * frcidf, 0.85_dbl_kind)  
           if (present(fresh_tot_out)         ) fresh_tot_out    = fresh_tot
           if (present(fhocn_tot_out)         ) fhocn_tot_out    = fhocn_tot
           if (present(strocnxT_out)          ) strocnxT_out     = strocnxT
