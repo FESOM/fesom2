@@ -120,6 +120,7 @@ subroutine compute_vel_rhs_vinv(mesh) !vector invariant
     real(kind=WP)     :: density0_inv = 1./density_0
 
 #include "associate_mesh.h"
+    w = 0.0_WP
 
     uvert=0.0_WP 
 
