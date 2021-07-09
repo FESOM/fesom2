@@ -6,6 +6,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # work around issue on aleph
 endif()
 #add_compile_options(-DTRANSPOSE_RESTART)
+#add_compile_options(-DTRANSPOSE_OUTPUT)
 
 option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 

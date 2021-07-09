@@ -97,6 +97,11 @@ contains
 #else
       print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
 #endif  
+#ifdef TRANSPOSE_OUTPUT
+      print '(g0)', 'TRANSPOSE_OUTPUT is ON'
+#else
+      print '(g0)', 'TRANSPOSE_OUTPUT is OFF'
+#endif  
   end subroutine
 
 end module
