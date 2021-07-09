@@ -128,12 +128,6 @@ integer mpi_version_len
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-    ! The interface to the restart module is made via call restart !
-    ! The inputs are: istep, l_write, l_create
-    ! if istep is not zero it will be decided whether restart shall be written
-    ! if l_write  is TRUE the restart will be forced
-    ! if l_read the restart will be read
-    ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
     call restart(0, .false., r_restart, mesh) ! istep, l_write, l_read
     if (mype==0) t7=MPI_Wtime()
     
