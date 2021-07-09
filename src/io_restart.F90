@@ -138,6 +138,7 @@ subroutine restart(istep, l_read, mesh)
   logical :: l_read
   logical :: is_restart
   type(t_mesh), intent(in) , target :: mesh
+  logical dumpfiles_exist
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
@@ -149,6 +150,11 @@ subroutine restart(istep, l_read, mesh)
   end if
 
   if (l_read) then
+    ! determine if we can load raw restart dump files
+    if(mype == 0) then
+      inquire(file=trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info", exist=dumpfiles_exist)
+    end if
+    call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, MPIerr)
     call read_restart(oce_path, oce_files)
    if (use_ice) then
       call read_restart(ice_path, ice_files)
