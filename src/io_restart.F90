@@ -159,24 +159,7 @@ subroutine restart(istep, l_write, l_read, mesh)
   if (istep==0) return
 
   !check whether restart will be written
-  is_restart=.false.
-
-  if (restart_length_unit.eq.'y') then
-     call annual_event(is_restart)
-  else if (restart_length_unit.eq.'m') then 
-     call monthly_event(is_restart) 
-  else if (restart_length_unit.eq.'d') then
-     call daily_event(is_restart, restart_length)
-  else if (restart_length_unit.eq.'h') then
-     call hourly_event(is_restart, restart_length)
-  else if (restart_length_unit.eq.'s') then
-     call step_event(is_restart, istep, restart_length)
-  else
-     write(*,*) 'You did not specify a supported outputflag.'
-     write(*,*) 'The program will stop to give you opportunity to do it.'
-     call par_ex(1)
-     stop
-  endif
+  is_restart = is_due(restart_length_unit, restart_length, istep)
 
   if (l_write) is_restart=.true.  
 
@@ -313,5 +296,32 @@ subroutine read_restart(path, filegroup)
     end if    
   end do
 end subroutine
+
+
+  function is_due(unit, frequency, istep) result(d)
+    character(len=*), intent(in) :: unit
+    integer, intent(in) :: frequency
+    integer, intent(in) :: istep
+    logical d
+    ! EO parameters
+    d = .false.
+    
+    if(unit.eq.'y') then
+      call annual_event(d)
+    else if(unit.eq.'m') then 
+      call monthly_event(d) 
+    else if(unit.eq.'d') then
+      call daily_event(d, frequency)
+    else if(unit.eq.'h') then
+      call hourly_event(d, frequency)
+    else if(unit.eq.'s') then
+      call step_event(d, istep, frequency)
+    else
+      write(*,*) 'You did not specify a supported outputflag.'
+      write(*,*) 'The program will stop to give you opportunity to do it.'
+      stop 1
+    stop
+    end if
+  end function
 
 end module
