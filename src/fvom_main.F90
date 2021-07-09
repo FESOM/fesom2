@@ -128,7 +128,7 @@ integer mpi_version_len
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-    call restart(0, .false., r_restart, mesh) ! istep, l_write, l_read
+    call restart(0, r_restart, mesh)
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
@@ -251,7 +251,7 @@ integer mpi_version_len
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, mesh)
         t5 = MPI_Wtime()
-        call restart(n, .false., .false., mesh)
+        call restart(n, .false., mesh)
         t6 = MPI_Wtime()
         
         rtime_fullice       = rtime_fullice       + t2 - t1

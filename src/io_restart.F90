@@ -124,7 +124,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read, mesh)
+subroutine restart(istep, l_read, mesh)
 
 #if defined(__icepack)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
@@ -132,11 +132,10 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   implicit none
   ! this is the main restart subroutine
-  ! if l_write  is TRUE writing restart file will be forced
   ! if l_read   is TRUE the restart file will be read
 
   integer :: istep
-  logical :: l_write, l_read
+  logical :: l_read
   logical :: is_restart
   type(t_mesh), intent(in) , target :: mesh
 
@@ -160,8 +159,6 @@ subroutine restart(istep, l_write, l_read, mesh)
 
   !check whether restart will be written
   is_restart = is_due(restart_length_unit, restart_length, istep)
-
-  if (l_write) is_restart=.true.  
 
   if (.not. is_restart) return
 
