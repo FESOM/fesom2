@@ -565,7 +565,7 @@ end if
  ! Communication information
  ! every proc reads its file
  ! ==============================
- com_nod2D%id = 'nod2D'
+
  file_name=trim(dist_mesh_dir)//'com_info'//trim(mype_string)//'.out'  
  fileID=103+mype !skip unit range 100--102  
  open(fileID, file=file_name)
@@ -595,7 +595,6 @@ end if
  ALLOCATE(com_nod2D%slist(n))
  read(fileID,*) com_nod2D%slist
 	 
- com_elem2D%id = 'elem2D'
  read(fileID,*) com_elem2D%rPEnum
  if (com_elem2D%rPEnum > MAX_NEIGHBOR_PARTITIONS) then
     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
@@ -621,7 +620,6 @@ end if
  ALLOCATE(com_elem2D%slist(n))
  read(fileID,*) com_elem2D%slist
 	 
- com_elem2D_full%id = 'elem2D_full'
  read(fileID,*) com_elem2D_full%rPEnum
  if (com_elem2D_full%rPEnum > MAX_NEIGHBOR_PARTITIONS) then
     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
