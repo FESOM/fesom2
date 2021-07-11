@@ -191,40 +191,54 @@ IMPLICIT NONE
  real(real64), intent(inout)  :: nod1_array2D(:)
  real(real64), intent(inout)  :: nod2_array2D(:)
 
- integer  :: n, sn, rn
+ integer  :: n, sn, rn, nreq
 
  if (npes > 1) then
 
-  sn=com_nod2D%sPEnum
-  rn=com_nod2D%rPEnum
-
-     ! Check MPI point-to-point communication for consistency
-#ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_nod2D, s_mpitype_nod2D,           &
-          com_nod2D%rPE, com_nod2D%sPE)
-#endif
-
-  DO n=1,rn         
-     call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr) 
- 
-     call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-               com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n),   MPIerr) 
-  END DO  
-  DO n=1, sn
-     call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
-
-     call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n),   MPIerr)
+    nreq = 0
+!NR First, initiate the inter-node communication (higher latency, lower bandwidth)
+  DO n=1, com_nod2D%rem%rPEnum
+     nreq = nreq+1
+     call MPI_IRECV(nod1_array2D, 1, com_nod2D%rem%r_type_2D(n), com_nod2D%rem%rPE(n), &
+               com_nod2D%rem%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
+     nreq = nreq+1
+     call MPI_IRECV(nod2_array2D, 1, com_nod2D%rem%r_type_2D(n), com_nod2D%rem%rPE(n), &
+               com_nod2D%rem%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
+  END DO
+  DO n=1, com_nod2D%rem%sPEnum
+     nreq = nreq+1
+     call MPI_ISEND(nod1_array2D, 1, com_nod2D%rem%s_type_2D(n), com_nod2D%rem%sPE(n), &
+                    mype,      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
+     nreq = nreq+1
+     call MPI_ISEND(nod2_array2D, 1, com_nod2D%rem%s_type_2D(n), com_nod2D%rem%sPE(n), &
+                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
   END DO
 
-   com_nod2D%nreq = 2*(rn+sn)
+!NR And now the inter-node communication, usually more performant by an order of magnitude
+  DO n=1, com_nod2D%shm%rPEnum
+     nreq = nreq+1
+     call MPI_IRECV(nod1_array2D, 1, com_nod2D%shm%r_type_2D(n), com_nod2D%shm%rPE(n), &
+               com_nod2D%shm%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
+     nreq = nreq+1
+     call MPI_IRECV(nod2_array2D, 1, com_nod2D%shm%r_type_2D(n), com_nod2D%shm%rPE(n), &
+               com_nod2D%shm%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
+  END DO
+  DO n=1, com_nod2D%shm%sPEnum
+     nreq = nreq+1
+     call MPI_ISEND(nod1_array2D, 1, com_nod2D%shm%s_type_2D(n), com_nod2D%shm%sPE(n), &
+                    mype,      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
+     nreq = nreq+1
+     call MPI_ISEND(nod2_array2D, 1, com_nod2D%shm%s_type_2D(n), com_nod2D%shm%sPE(n), &
+                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
+  END DO
+
+  com_nod2D%nreq = nreq
 
 end if
  
 END SUBROUTINE exchange_nod2D_2fields_begin
 
+! ========================================================================
 !===============================================
 subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D)
 
