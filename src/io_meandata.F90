@@ -99,6 +99,7 @@ subroutine ini_mean_io(mesh)
   use g_PARSUP
   use diagnostics
   use i_PARAM, only: whichEVP
+  use g_config, only : dt, lwiso   ! add lwiso switch
   implicit none
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
