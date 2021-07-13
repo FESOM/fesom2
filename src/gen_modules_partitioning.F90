@@ -15,35 +15,6 @@ save
  integer, parameter   :: MAX_LAENDERECK=16
  integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
-!NR Here is a first step towards communication optimized for multicore compute nodes. 
-!NR The basic idea is that MPI inside a compute node or GPU (physically shared memory) 
-!NR is faster than MPI between nodes (internode) by an order of magnitude.
-!NR We will sort the neighbouring PEs: the PEs on remote nodes come first,
-!NR than the ones located on the same compute nodes. 
-!NR For the halo exchange, the remote irecv, isend can be called first.   
-!NR This will help all critical halo exchanges, e.g. for the ice model.
-
-  type comm_halo
-     integer                              :: comm   ! MPI communicator
-     integer                              :: mype   ! rank within comm
-     integer                              :: npes   ! number of PEs inside communicator
-     integer                              :: color  ! ID of group of PEs I belong to in this comm
-                                                    ! "color" follows the convention of MPI_COMM_SPLIT
-     integer                              :: rPEnum ! the number of PE I receive info from            
-     integer                              :: rPE(MAX_NEIGHBOR_PARTITIONS)    ! their list
-     integer, allocatable                 :: r_type_2D(:)    ! MPI datatype for 2D halos
-     integer, allocatable                 :: r_type_2D_nval(:,:) !          for 2D halos, multiple values per node 
-     integer, allocatable                 :: r_type_3D(:,:,:)  ! MPI datatype for 3D halos
-     integer                              :: sPEnum ! send part  
-     integer                              :: sPE(MAX_NEIGHBOR_PARTITIONS)
-     integer, allocatable                 :: s_type_2D(:) 
-     integer, allocatable                 :: s_type_2D_nval(:,:) 
-     integer, allocatable                 :: s_type_3D(:,:,:) 
-     integer, dimension(:), allocatable   :: req    ! request for MPI_Wait     
-     integer                              :: nreq   ! number of requests for MPI_Wait  
-                                                             ! (to combine halo exchange of several fields)    
-  end type comm_halo
-
 !NR And the old com_struct. It is augmented by the new option of split communicators.
 !NR They may be ignored, and for a start, we will only use them where there should be the
 !NR largest benefit (e.g. ice step)
@@ -60,11 +31,7 @@ save
      integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
      integer                                       :: nreq   ! number of requests for MPI_Wait
                                                              ! (to combine halo exchange of several fields)
-     character(len=11)                             :: id     ! 'nod2D', 'elem2D', 'elem2D_full'
-     integer                                       :: shm_color ! same number for all PEs on the same compute node,
-                                                                ! distinct for PEs on distinct compute nodes
-     type(comm_halo)                               :: shm    ! halo exchange with pe on the same compute node
-     type(comm_halo)                               :: rem    ! halo exchange with pe over network
+     integer                                       :: comm_graph
   end type com_struct
 
 
@@ -223,10 +190,6 @@ subroutine set_par_support(mesh)
 
    if (npes > 1) then
 
-!NR Helpful to streamline some tasks:
-      com_nod2D%id       = 'nod2D'
-      com_elem2D%id      = 'elem2D'
-      com_elem2D_full%id = 'elem2D_full'
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
@@ -533,189 +496,22 @@ subroutine set_par_support(mesh)
    call init_gatherLists
    if(mype==0) write(*,*) 'Communication arrays are set' 
 
-   call init_shared_mem(mesh)
+   call init_graph_comm(com_nod2D)
 
 end subroutine set_par_support
 
 !===================================================================
 
-subroutine init_shared_mem(mesh)
+subroutine init_graph_comm(com)
 
-  use mod_mesh
-!NR The new communicator combines all PEs within one compute node
-!NR Carefull when running FESOM on CPUs and GPUs - take care where to call the comm_split! 
-!NR Consider to set up two shared mem communicators, one for the CPU nodes, one for the GPUs.
+  type(com_struct), intent(inout) :: com
 
-  type(t_mesh), intent(in) :: mesh
+  call MPI_Dist_graph_create_adjacent(MPI_COMM_FESOM, &
+       com%rPEnum, com%rPE, MPI_UNWEIGHTED, &
+       com%sPEnum, com%sPE, MPI_UNWEIGHTED, MPI_INFO_NULL, .false., com%comm_graph, MPIerr)
 
-  integer :: shm_comm, shm_mype, shm_npes, shm_color
-  integer :: nreq, n, n_rem, n_shm, nl
+end subroutine init_graph_comm
 
-
-  if (npes==1) return
-
-  call MPI_Comm_split_type(MPI_COMM_FESOM, MPI_COMM_TYPE_SHARED,mype,MPI_INFO_NULL, shm_comm, MPIerr)
-
-  call MPI_Comm_rank(shm_comm, shm_mype, MPIerr)
-  call MPI_Comm_size(shm_comm, shm_npes, MPIerr)
-
-
-!NR As the unique id of all PEs grouped into one communicator (a compute node), 
-!NR we take the global rank mype (in MPI_COMM_FESOM) 
-!NR of the pe with local shm_mype=0 
-
-  if (shm_mype==0) shm_color = mype
-  call MPI_Bcast(shm_color, 1, MPI_INTEGER, 0, shm_comm, MPIerr)
-  
-
-!NR First application of this knowledge: sort the rPE, sPE for the halo exchanges
-!NR of nodes
-  call init_shm_halo_exchange(com_nod2D)
-  
-
-contains
-  subroutine init_shm_halo_exchange(com)
-    type(com_struct), intent(inout)  :: com
-
-    integer, dimension(MAX_NEIGHBOR_PARTITIONS) :: r_color, s_color
-    integer          :: n, nreq, n_rem, n_shm
-
-!NR determine "color" of neighbouring PEs (same color = same compute node)
-    nreq = 0
-    DO n=1, com%rPEnum
-       nreq = nreq + 1
-       call MPI_IRECV(r_color(n), 1, MPI_INTEGER, com%rPE(n), &
-            com%rPE(n), MPI_COMM_FESOM, com%req(nreq), MPIerr)
-       nreq = nreq + 1
-       call MPI_ISEND(shm_color,  1, MPI_INTEGER, com%rPE(n), &
-            mype+npes, MPI_COMM_FESOM, com%req(nreq), MPIerr) 
-    END DO
-    DO n=1,com%sPEnum
-       nreq = nreq + 1
-       call MPI_IRECV(s_color(n), 1, MPI_INTEGER, com%sPE(n), &
-            com%sPE(n)+npes, MPI_COMM_FESOM, com%req(nreq), MPIerr)
-       nreq = nreq + 1
-       call MPI_ISEND(shm_color,  1, MPI_INTEGER, com%sPE(n), &
-            mype, MPI_COMM_FESOM, com%req(nreq), MPIerr)
-    END DO
-
-    call MPI_Waitall(nreq, com%req, MPI_STATUSES_IGNORE, MPIerr)
-
-!NR initialize the new components
-    com%shm%color = shm_color
-    com%shm%comm  = shm_comm
-
-    com%rem%color = 0
-    com%rem%comm  = MPI_COMM_FESOM
-    nl = mesh%nl
-
-    com%shm%sPEnum = count(s_color(1:com%sPEnum)==shm_color)
-    com%rem%sPEnum = com%sPEnum - com%shm%sPEnum
-                                                                                                                 
-    com%shm%rPEnum = count(r_color(1:com%rPEnum)==shm_color)
-    com%rem%rPEnum = com%rPEnum- com%shm%rPEnum
-
-    if (trim(adjustl(com%id)) == 'nod2D') then
-       allocate(com%shm%s_type_2D(com%shm%sPEnum))
-       allocate(com%rem%s_type_2D(com%rem%sPEnum))
-       allocate(com%shm%s_type_3D(com%shm%sPEnum,nl-1:nl,3))
-       allocate(com%rem%s_type_3D(com%rem%sPEnum,nl-1:nl,3))
-
-       allocate(com%shm%r_type_2D(com%shm%rPEnum))
-       allocate(com%rem%r_type_2D(com%rem%rPEnum))
-       allocate(com%shm%r_type_3D(com%shm%rPEnum,nl-1:nl,3))
-       allocate(com%rem%r_type_3D(com%rem%rPEnum,nl-1:nl,3))
-
-    elseif (trim(adjustl(com%id)) == 'elem2D' .or. trim(adjustl(com%id)) == 'elem2D_full' ) then
-       allocate(com%shm%s_type_2D_nval(com%shm%sPEnum,4))
-       allocate(com%rem%s_type_2D_nval(com%rem%sPEnum,4))
-       allocate(com%shm%s_type_3D(     com%shm%sPEnum,nl-1:nl,4))
-       allocate(com%rem%s_type_3D(     com%rem%sPEnum,nl-1:nl,4))
-
-       allocate(com%shm%r_type_2D_nval(com%shm%rPEnum,4))
-       allocate(com%rem%r_type_2D_nval(com%rem%rPEnum,4))
-       allocate(com%shm%r_type_3D(     com%shm%rPEnum,nl-1:nl,4))
-       allocate(com%rem%r_type_3D(     com%rem%rPEnum,nl-1:nl,4))
-    end if
-
-    ! Receive buffers, seperate for intra (shm) and inter (rem) node communication 
-
-    n_rem = 0
-    n_shm = 0
-    do n=1, com%rPEnum
-       if (r_color(n) == shm_color) then
-          n_shm = n_shm+1
-          com%shm%rPE(n_shm) = com%rPE(n)   ! We still work with the global communicator
-                                            ! and global PE numbering! Change this to local 
-                                            ! numbering within shm_comm for further optimization. 
-
-          if (trim(adjustl(com%id)) == 'nod2D') then 
-             com%shm%r_type_2D(  n_shm)     = r_mpitype_nod2D(  n)
-             com%shm%r_type_3D(  n_shm,:,:) = r_mpitype_nod3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D') then
-             com%shm%r_type_2D_nval(n_shm,:)   = r_mpitype_elem2D(  n, :)
-             com%shm%r_type_3D(     n_shm,:,:) = r_mpitype_elem3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D_full') then
-             com%shm%r_type_2D_nval(n_shm,:)   = r_mpitype_elem2D_full(  n, :)
-             com%shm%r_type_3D(     n_shm,:,:) = r_mpitype_elem3D_full(  n,:,:)
-          endif
-       else
-          n_rem = n_rem+1
-          com%rem%rPE(n_rem) = com%rPE(n)
-
-          if (trim(adjustl(com%id)) == 'nod2D') then
-             com%rem%r_type_2D(  n_rem)     = r_mpitype_nod2D(  n)
-             com%rem%r_type_3D(  n_rem,:,:) = r_mpitype_nod3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D') then
-             com%rem%r_type_2D_nval(n_rem,:)   = r_mpitype_elem2D(  n, :)
-             com%rem%r_type_3D(     n_rem,:,:) = r_mpitype_elem3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D_full') then
-             com%rem%r_type_2D_nval(n_rem,:)   = r_mpitype_elem2D_full(  n, :)
-             com%rem%r_type_3D(     n_rem,:,:) = r_mpitype_elem3D_full(  n,:,:)
-          endif
-       end if
-       
-    end do
-
-    ! Send buffers, seperate for intra (shm) and inter (rem) node communication 
-
-    n_rem = 0
-    n_shm = 0
-    do n=1, com%sPEnum
-       if (s_color(n) == shm_color) then
-          n_shm = n_shm+1
-          com%shm%sPE(n_shm) = com%sPE(n)
-
-          if (trim(adjustl(com%id)) == 'nod2D') then 
-             com%shm%s_type_2D(  n_shm)     = s_mpitype_nod2D(  n)
-             com%shm%s_type_3D(  n_shm,:,:) = s_mpitype_nod3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D') then
-             com%shm%s_type_2D_nval(n_shm,:)   = s_mpitype_elem2D(  n, :)
-             com%shm%s_type_3D(     n_shm,:,:) = s_mpitype_elem3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D_full') then
-             com%shm%s_type_2D_nval(n_shm,:)   = s_mpitype_elem2D_full(  n, :)
-             com%shm%s_type_3D(     n_shm,:,:) = s_mpitype_elem3D_full(  n,:,:)
-          endif
-       else
-          n_rem = n_rem+1
-          com%rem%sPE(n_rem) = com%sPE(n)
-
-          if (trim(adjustl(com%id)) == 'nod2D') then
-             com%rem%s_type_2D(  n_rem)     = s_mpitype_nod2D(  n)
-             com%rem%s_type_3D(  n_rem,:,:) = s_mpitype_nod3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D') then
-             com%rem%s_type_2D_nval(n_rem,:)   = s_mpitype_elem2D(  n, :)
-             com%rem%s_type_3D(     n_rem,:,:) = s_mpitype_elem3D(  n,:,:)
-          elseif (trim(adjustl(com%id)) == 'elem2D_full') then
-             com%rem%s_type_2D_nval(n_rem,:)   = s_mpitype_elem2D_full(  n, :)
-             com%rem%s_type_3D(     n_rem,:,:) = s_mpitype_elem3D_full(  n,:,:)
-          endif
-       end if
-       
-    end do
-
-  end subroutine init_shm_halo_exchange
-end subroutine init_shared_mem
 
 !===================================================================
 subroutine init_gatherLists

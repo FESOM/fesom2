@@ -179,66 +179,62 @@ IMPLICIT NONE
  end if
  
 END SUBROUTINE exchange_nod2D_2fields
-
 ! ========================================================================
+
 subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)
 USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
+! General version of the communication routine for 2D nodal fields 
 
-! General version of the communication routine for 2D nodal fields
- 
  real(real64), intent(inout)  :: nod1_array2D(:)
  real(real64), intent(inout)  :: nod2_array2D(:)
 
- integer  :: n, sn, rn, nreq
+ integer  :: n, sn, rn
+ integer  :: scount(com_nod2D%sPEnum)
+ integer  :: sdispl(com_nod2D%sPEnum)
+ integer  :: rcount(com_nod2D%rPEnum)
 
- if (npes > 1) then
+ real(real64) :: sendbuf1(com_nod2D%sptr(com_nod2D%sPEnum+1)-1)
+ real(real64) :: sendbuf2(com_nod2D%sptr(com_nod2D%sPEnum+1)-1)
 
-    nreq = 0
-!NR First, initiate the inter-node communication (higher latency, lower bandwidth)
-  DO n=1, com_nod2D%rem%rPEnum
-     nreq = nreq+1
-     call MPI_IRECV(nod1_array2D, 1, com_nod2D%rem%r_type_2D(n), com_nod2D%rem%rPE(n), &
-               com_nod2D%rem%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
-     nreq = nreq+1
-     call MPI_IRECV(nod2_array2D, 1, com_nod2D%rem%r_type_2D(n), com_nod2D%rem%rPE(n), &
-               com_nod2D%rem%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
-  END DO
-  DO n=1, com_nod2D%rem%sPEnum
-     nreq = nreq+1
-     call MPI_ISEND(nod1_array2D, 1, com_nod2D%rem%s_type_2D(n), com_nod2D%rem%sPE(n), &
-                    mype,      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
-     nreq = nreq+1
-     call MPI_ISEND(nod2_array2D, 1, com_nod2D%rem%s_type_2D(n), com_nod2D%rem%sPE(n), &
-                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
-  END DO
+ !NR Optimized version with topology-aware communicator com_nod2D%comm_graph
+ !NR This routine is the first to be rewritten, as it is the major one in the ice model.
+                                   
+ if (npes > 1) then                
+                                   
+    sn = com_nod2D%sPEnum          
+    rn = com_nod2D%rPEnum          
+                                   
+    !NR We have to use a send buffer with contiguous vectors for each part of the halo.
+    !NR The alterative alltoallw does not work with the scattered values of the send halo,
+    !NR overlapping for all neighbors to send to, and sometimes with a value to be send to
+    !NR two or more neighbors.
+    !NR The receiving part is already contiguous by construction (which, so far, we never
+    !NR employed) 
+    sendbuf1(:) = nod1_array2D(com_nod2D%slist(:)) 
+                                   
+    scount(1:sn) = com_nod2D%sptr(2:sn+1) - com_nod2D%sptr(1:sn)               
+    sdispl       = com_nod2D%sptr(1:sn)-1                                      
+                                   
+    rcount(1:rn) = com_nod2D%rptr(2:rn+1) - com_nod2D%rptr(1:rn)               
+                                   
+    call MPI_Ineighbor_alltoallv(sendbuf1,                  scount, sdispl,         MPI_DOUBLE_PRECISION, & 
+                                 nod1_array2D(myDim_nod2D), rcount, com_nod2D%rptr, MPI_DOUBLE_PRECISION,&                  
+                                 com_nod2D%comm_graph, com_nod2D%req(1), MPIerr)                               
 
-!NR And now the inter-node communication, usually more performant by an order of magnitude
-  DO n=1, com_nod2D%shm%rPEnum
-     nreq = nreq+1
-     call MPI_IRECV(nod1_array2D, 1, com_nod2D%shm%r_type_2D(n), com_nod2D%shm%rPE(n), &
-               com_nod2D%shm%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
-     nreq = nreq+1
-     call MPI_IRECV(nod2_array2D, 1, com_nod2D%shm%r_type_2D(n), com_nod2D%shm%rPE(n), &
-               com_nod2D%shm%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr) 
-  END DO
-  DO n=1, com_nod2D%shm%sPEnum
-     nreq = nreq+1
-     call MPI_ISEND(nod1_array2D, 1, com_nod2D%shm%s_type_2D(n), com_nod2D%shm%sPE(n), &
-                    mype,      MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
-     nreq = nreq+1
-     call MPI_ISEND(nod2_array2D, 1, com_nod2D%shm%s_type_2D(n), com_nod2D%shm%sPE(n), &
-                    mype+npes, MPI_COMM_FESOM, com_nod2D%req(nreq), MPIerr)
-  END DO
-
-  com_nod2D%nreq = nreq
-
-end if
- 
+    sendbuf2(:) = nod2_array2D(com_nod2D%slist(:)) 
+    call MPI_Ineighbor_alltoallv(sendbuf2,                  scount, sdispl,         MPI_DOUBLE_PRECISION, &    
+                                 nod2_array2D(myDim_nod2D), rcount, com_nod2D%rptr, MPI_DOUBLE_PRECISION,&   
+                                 com_nod2D%comm_graph, com_nod2D%req(2), MPIerr)                              
+                                   
+    com_nod2D%nreq = 2             
+                                   
+ end if                            
+                                   
 END SUBROUTINE exchange_nod2D_2fields_begin
 
-! ========================================================================
+
 !===============================================
 subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D)
 
