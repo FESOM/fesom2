@@ -17,6 +17,7 @@ MODULE io_RESTART
   character(:), allocatable, save :: ice_path
 
   character(:), allocatable, save :: raw_restart_dirpath
+  character(:), allocatable, save :: raw_restart_infopath
 
 
   contains
@@ -149,6 +150,7 @@ subroutine restart(istep, l_read, mesh)
   if(.not. initialized) then
     initialized = .true.
     raw_restart_dirpath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)
+    raw_restart_infopath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(mype == 0) then
         print *,"creating raw restart directory: "//raw_restart_dirpath
@@ -171,7 +173,7 @@ subroutine restart(istep, l_read, mesh)
   if (l_read) then
     ! determine if we can load raw restart dump files
     if(mype == 0) then
-      inquire(file=trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info", exist=dumpfiles_exist)
+      inquire(file=raw_restart_infopath, exist=dumpfiles_exist)
     end if
     call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, MPIerr)
     call read_restart(oce_path, oce_files)
