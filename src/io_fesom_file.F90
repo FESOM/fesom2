@@ -39,6 +39,7 @@ module io_fesom_file_module
     logical gather_and_write
   contains
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
     generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_3d
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
@@ -264,6 +265,22 @@ contains
     end do
     
     if(this%is_iorank()) call this%flush_file() ! flush the file to disk after each write
+  end subroutine
+
+
+  subroutine write_variables_raw(this, outdir)
+    class(fesom_file_type), target :: this
+    character(len=*) outdir
+    ! EO parameters
+    integer i, fileunit
+    type(var_info), pointer :: var
+    
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
+      open(newunit = fileunit, file = outdir//'/'//var%varname//'_'//mpirank_to_txt()//'.dump', form = 'unformatted')
+      write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
+      close(fileunit)
+    end do
   end subroutine
 
 
