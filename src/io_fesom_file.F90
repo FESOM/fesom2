@@ -284,6 +284,7 @@ contains
         close(fileunit)
       else
         print *,"can not open ",outdir//'/'//var%varname//'_'//mpirank_to_txt()//'.dump'
+        stop 1
       end if
     end do
   end subroutine
