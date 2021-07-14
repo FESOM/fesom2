@@ -16,6 +16,8 @@ MODULE io_RESTART
   character(:), allocatable, save :: oce_path
   character(:), allocatable, save :: ice_path
 
+  character(:), allocatable, save :: raw_restart_dirpath
+
 
   contains
 !
@@ -130,6 +132,7 @@ subroutine restart(istep, l_read, mesh)
   icepack restart not merged here ! produce a compiler error if USE_ICEPACK=ON; todo: merge icepack restart from 68d8b8b
 #endif
 
+  use fortran_utils
   implicit none
   ! this is the main restart subroutine
   ! if l_read   is TRUE the restart file will be read
@@ -139,6 +142,22 @@ subroutine restart(istep, l_read, mesh)
   logical :: is_restart
   type(t_mesh), intent(in) , target :: mesh
   logical dumpfiles_exist
+  logical, save :: initialized = .false.
+  integer cstat, estat
+  character(500) cmsg ! there seems to be no documentation about the max size of this text
+  
+  if(.not. initialized) then
+    initialized = .true.
+    raw_restart_dirpath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)
+    if(raw_restart_length_unit /= "off") then
+      if(mype == 0) then
+        print *,"creating raw restart directory: "//raw_restart_dirpath
+        call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
+        if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
+      end if
+      call MPI_Barrier(MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+    end if
+  end if
 
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
