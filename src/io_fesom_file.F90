@@ -473,6 +473,15 @@ contains
   end subroutine  
 
 
+  function mpirank_to_txt() result(txt)
+    use g_PARSUP
+    use fortran_utils
+    character(:), allocatable :: txt
+    ! EO parameters
+    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
+  end function
+
+
   subroutine assert(val, line)
     logical, intent(in) :: val
     integer, intent(in) :: line
