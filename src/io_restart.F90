@@ -18,6 +18,8 @@ MODULE io_RESTART
 
   character(:), allocatable, save :: raw_restart_dirpath
   character(:), allocatable, save :: raw_restart_infopath
+  
+  integer, parameter :: RAW_RESTART_METADATA_RANK = 0
 
 
   contains
@@ -152,7 +154,7 @@ subroutine restart(istep, l_read, mesh)
     raw_restart_dirpath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)
     raw_restart_infopath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info"
     if(raw_restart_length_unit /= "off") then
-      if(mype == 0) then
+      if(mype == RAW_RESTART_METADATA_RANK) then
         print *,"creating raw restart directory: "//raw_restart_dirpath
         call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
         if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
@@ -172,10 +174,10 @@ subroutine restart(istep, l_read, mesh)
 
   if (l_read) then
     ! determine if we can load raw restart dump files
-    if(mype == 0) then
+    if(mype == RAW_RESTART_METADATA_RANK) then
       inquire(file=raw_restart_infopath, exist=dumpfiles_exist)
     end if
-    call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, 0, MPI_COMM_FESOM, MPIerr)
+    call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
     call read_restart(oce_path, oce_files)
    if (use_ice) then
       call read_restart(ice_path, ice_files)
@@ -256,7 +258,7 @@ subroutine write_raw_restart(filegroup, istep)
     call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
   end do
   
-  if(mype == 0) then
+  if(mype == RAW_RESTART_METADATA_RANK) then
     ! store metadata about the raw restart
     cstep = globalstep+istep
     open(newunit = fileunit, file = raw_restart_infopath)
