@@ -269,6 +269,43 @@ subroutine write_raw_restart(filegroup, istep)
 end subroutine
 
 
+subroutine read_raw_restart(filegroup)
+  type(restart_file_group), intent(inout) :: filegroup
+  ! EO parameters
+  integer i
+  integer rstep
+  real(kind=WP) rtime
+  integer fileunit
+  integer status
+
+  if(mype == RAW_RESTART_METADATA_RANK) then
+    ! store metadata about the raw restart
+    open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
+    if(status == 0) then
+      read(fileunit,*) rstep
+      read(fileunit,*) rtime
+      close(fileunit)
+    else
+      print *,"can not open ",raw_restart_infopath
+      stop 1
+    end if
+    
+    ! compare the restart time with our actual time
+    if(int(ctime) /= int(rtime)) then
+      print *, "raw restart time ",rtime,"does not match current clock time",ctime
+      stop 1
+    end if
+    globalstep = rstep
+  end if
+  ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
+  call MPI_Bcast(globalstep, 1, MPI_INT, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%read_variables_raw(raw_restart_dirpath)
+  end do  
+end subroutine
+
+
 ! join remaining threads and close all open files
 subroutine finalize_restart()
   integer i
@@ -295,12 +332,14 @@ end subroutine
 
 
 subroutine read_restart(path, filegroup)
+  use g_PARSUP
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   ! EO parameters
   real(kind=WP) rtime
   integer i
   character(:), allocatable :: dirpath
+  integer mpistatus(MPI_STATUS_SIZE)
 
   do i=1, filegroup%nfiles
     if( filegroup%files(i)%is_iorank() ) then
@@ -342,8 +381,19 @@ subroutine read_restart(path, filegroup)
         write(*,*) 'the model will stop!'
         stop 1
       end if
-    end if    
+    end if
   end do
+  
+  ! sync globalstep with the process responsible for raw restart metadata
+  if(filegroup%nfiles >= 1) then
+    ! use the first restart I/O process to send the globalstep
+    if( filegroup%files(1)%is_iorank() ) then
+      call MPI_Send(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, 42, MPI_COMM_FESOM, MPIerr)
+    end if
+    if(mype == RAW_RESTART_METADATA_RANK) then
+      call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, MPI_COMM_FESOM, mpistatus, MPIerr)
+    end if
+  end if
 end subroutine
 
 
