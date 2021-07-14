@@ -35,8 +35,10 @@ module g_config
   integer                :: logfile_outfreq=1      ! logfile info. outp. freq., # steps
   integer                :: restart_length=1
   character              :: restart_length_unit='m'
+  integer                :: raw_restart_length=1
+  character              :: raw_restart_length_unit='m'
   
-  namelist /restart_log/   restart_length, restart_length_unit, logfile_outfreq
+  namelist /restart_log/   restart_length, restart_length_unit, raw_restart_length, raw_restart_length_unit, logfile_outfreq
 
   !_____________________________________________________________________________
   ! *** ale_def ***
