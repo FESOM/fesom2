@@ -244,6 +244,29 @@ subroutine write_restart(path, filegroup, istep)
 end subroutine
 
 
+subroutine write_raw_restart(filegroup, istep)
+  type(restart_file_group), intent(inout) :: filegroup
+  integer,  intent(in):: istep
+  ! EO parameters
+  integer i
+  integer cstep
+  integer fileunit
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
+  end do
+  
+  if(mype == 0) then
+    ! store metadata about the raw restart
+    cstep = globalstep+istep
+    open(newunit = fileunit, file = raw_restart_infopath)
+    write(fileunit, '(g0)') cstep
+    write(fileunit, '(g0)') ctime
+    close(fileunit)
+  end if
+end subroutine
+
+
 ! join remaining threads and close all open files
 subroutine finalize_restart()
   integer i
