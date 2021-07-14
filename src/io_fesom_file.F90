@@ -14,6 +14,7 @@ module io_fesom_file_module
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
+    character(:), allocatable :: varname ! todo: maybe use a getter in netcdf_file_type to get the name
   end type
   
   
@@ -459,6 +460,7 @@ contains
     this%var_infos(this%nvar_infos)%external_local_data_ptr => local_data
     this%var_infos(this%nvar_infos)%global_level_data_size = global_level_data_size
     this%var_infos(this%nvar_infos)%is_elem_based = is_elem_based
+    this%var_infos(this%nvar_infos)%varname = name
   end subroutine
   
   
