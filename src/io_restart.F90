@@ -223,6 +223,8 @@ subroutine write_restart(path, filegroup, istep)
   integer cstep
   integer i
   character(:), allocatable :: dirpath
+  character(:), allocatable :: filepath
+  logical file_exists
   
   cstep = globalstep+istep
   
@@ -231,11 +233,17 @@ subroutine write_restart(path, filegroup, istep)
 
     if(filegroup%files(i)%is_iorank()) then
       if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file() ! close the file from previous write
-      
+            
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
-      if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
+      filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
+      if(filegroup%files(i)%path == "") then
+        ! the path to an existing restart file is not set in read_restart if we had a restart from a raw restart
+        inquire(file=filepath, exist=file_exists)
+        if(file_exists) filegroup%files(i)%path = filepath
+      end if
+      if(filegroup%files(i)%path .ne. filepath) then
         call execute_command_line("mkdir -p "//dirpath)
-        filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+        filegroup%files(i)%path = filepath
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
      else
         call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
