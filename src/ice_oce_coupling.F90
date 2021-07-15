@@ -452,14 +452,6 @@ subroutine oce_fluxes(mesh)
        tr_arr_ice(n,:) = tr_arr_ice(n,:) + dt*wiso_flux_ice(n,:)
     end do
 
-   ! limit absolute sea ice isotope tracer concentration, but keep the delta values 
-   ! (concentration is not completely balanced and may grow steadily in regions with permanent sea ice)
-  ! do n=1, myDim_nod2D+eDim_nod2D
-  !    if (tr_arr_ice(n,3) > 2000._WP) then           ! if H216O tracer reaches (arbitrary) limit of 2000.,
-  !       tr_arr_ice(n,:) = tr_arr_ice(n,:)/2._WP     ! reduce all tracer concentrations to their half (i.e. the delta values are not changed)
-  !    endif
-  ! end do
-
    do n=1, myDim_nod2D+eDim_nod2D
       if (tr_arr_ice(n,3) .gt. 1500._WP) then           ! if H216O tracer reaches (arbitrary) limit of 1500.,
          tr_arr_ice(n,1) = 1500._WP*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! reduce H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)= 
