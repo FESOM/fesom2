@@ -151,8 +151,8 @@ subroutine restart(istep, l_read, mesh)
   
   if(.not. initialized) then
     initialized = .true.
-    raw_restart_dirpath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)
-    raw_restart_infopath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info"
+    raw_restart_dirpath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(npes)
+    raw_restart_infopath = trim(ResultPath)//"/fesom_raw_restart/np"//int_to_txt(npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(mype == RAW_RESTART_METADATA_RANK) then
         ! inquire does not work for directories, the directory might already exist
