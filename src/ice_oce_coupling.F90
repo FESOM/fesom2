@@ -461,7 +461,7 @@ subroutine oce_fluxes(mesh)
   ! end do
 
    do n=1, myDim_nod2D+eDim_nod2D
-      if (tr_arr_ice(n,3) > 1500._WP) then           ! if H216O tracer reaches (arbitrary) limit of 1500.,
+      if (tr_arr_ice(n,3) .gt. 1500._WP) then           ! if H216O tracer reaches (arbitrary) limit of 1500.,
          tr_arr_ice(n,1) = 1500._WP*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! reduce H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)= 
          tr_arr_ice(n,2) = 1500._WP*tr_arr_ice(n,2)/tr_arr_ice(n,3)     ! reduce HDO16 based on the original ratio between HDO16 and H2O16 (i.e. the delta values are not changed)= 
          tr_arr_ice(n,3) = 1500._WP     ! reduce H216O to 1500 (i.e. the delta values are not changed)
@@ -469,10 +469,10 @@ subroutine oce_fluxes(mesh)
    end do
 
    do n=1, myDim_nod2D+eDim_nod2D
-      if (tr_arr_ice(n,3) .lt. zwisomin) then           ! if H216O tracer becomes too small or even negative. 
-         tr_arr_ice(n,1) = zwisomin*tr_arr_ice(n,1)/tr_arr_ice(n,3)     ! change H2O18 based on the original ratio between H2O18 and H2O16 (i.e. the delta values are not changed)= 
-         tr_arr_ice(n,2) = zwisomin*tr_arr_ice(n,2)/tr_arr_ice(n,3)     ! change HDO16 based on the original ratio between HDO16 and H2O16 (i.e. the delta values are not changed)= 
-         tr_arr_ice(n,3) = zwisomin     ! change H216O to zwisomin (i.e. the delta values are not changed)
+      if (tr_arr_ice(n,3) .le. zwisomin) then           ! if H216O tracer becomes too small or even negative. 
+         tr_arr_ice(n,1) = zwisomin*wiso_smow(1)        ! set delta H2O18 to SMOW value 
+         tr_arr_ice(n,2) = zwisomin*wiso_smow(2)        ! set delta HDO16 to SMOW value
+         tr_arr_ice(n,3) = zwisomin                     ! set H216O to zwisomin
       endif
    end do
 
