@@ -178,9 +178,17 @@ subroutine restart(istep, l_read, mesh)
       inquire(file=raw_restart_infopath, exist=dumpfiles_exist)
     end if
     call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
-    call read_restart(oce_path, oce_files)
-   if (use_ice) then
-      call read_restart(ice_path, ice_files)
+    if(dumpfiles_exist) then
+      call read_raw_restart(oce_files)
+      if(use_ice) call read_raw_restart(ice_files)
+    else
+      call read_restart(oce_path, oce_files)
+      if (use_ice) call read_restart(ice_path, ice_files)
+      ! immediately create a raw restart
+      if(raw_restart_length_unit /= "off") then
+        call write_raw_restart(oce_files, istep)
+        if(use_ice) call write_raw_restart(ice_files, istep)
+      end if
     end if
   end if
 
