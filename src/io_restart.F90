@@ -195,7 +195,7 @@ subroutine restart(istep, l_read, mesh)
   if (istep==0) return
 
   !check whether restart will be written
-  is_portable_restart_write = is_due(restart_length_unit, restart_length, istep)
+  is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep)
 
   if (.not. is_portable_restart_write) return
 
@@ -433,6 +433,8 @@ end subroutine
       call hourly_event(d, frequency)
     else if(unit.eq.'s') then
       call step_event(d, istep, frequency)
+    else if(unit.eq.'off') then
+      d = .false.
     else
       write(*,*) 'You did not specify a supported outputflag.'
       write(*,*) 'The program will stop to give you opportunity to do it.'
