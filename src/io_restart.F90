@@ -314,7 +314,7 @@ subroutine read_raw_restart(filegroup)
     globalstep = rstep
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
-  call MPI_Bcast(globalstep, 1, MPI_INT, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+  call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%read_variables_raw(raw_restart_dirpath)
