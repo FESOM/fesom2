@@ -155,7 +155,7 @@ subroutine restart(istep, l_read, mesh)
     raw_restart_infopath = trim(ResultPath)//"/raw_restart/np"//int_to_txt(npes)//".info"
     if(raw_restart_length_unit /= "off") then
       if(mype == RAW_RESTART_METADATA_RANK) then
-        print *,"creating raw restart directory: "//raw_restart_dirpath
+        ! inquire does not work for directories, the directory might already exist
         call execute_command_line("mkdir -p "//raw_restart_dirpath, exitstat=estat, cmdstat=cstat, cmdmsg=cmsg) ! sometimes does not work on aleph
         if(cstat /= 0) print *,"creating raw restart directory ERROR ", trim(cmsg)
       end if
