@@ -142,7 +142,7 @@ subroutine restart(istep, l_read, mesh)
 
   integer :: istep
   logical :: l_read
-  logical :: is_restart
+  logical :: is_portable_restart_write
   type(t_mesh), intent(in) , target :: mesh
   logical dumpfiles_exist
   logical, save :: initialized = .false.
@@ -195,9 +195,9 @@ subroutine restart(istep, l_read, mesh)
   if (istep==0) return
 
   !check whether restart will be written
-  is_restart = is_due(restart_length_unit, restart_length, istep)
+  is_portable_restart_write = is_due(restart_length_unit, restart_length, istep)
 
-  if (.not. is_restart) return
+  if (.not. is_portable_restart_write) return
 
   ! write restart
   if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
