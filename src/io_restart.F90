@@ -275,6 +275,7 @@ subroutine write_raw_restart(filegroup, istep)
   end do
   
   if(mype == RAW_RESTART_METADATA_RANK) then
+    print *,"writing raw restart to "//raw_restart_dirpath
     ! store metadata about the raw restart
     cstep = globalstep+istep
     open(newunit = fileunit, file = raw_restart_infopath)
@@ -312,6 +313,7 @@ subroutine read_raw_restart(filegroup)
       stop 1
     end if
     globalstep = rstep
+    print *,"reading raw restart from "//raw_restart_dirpath
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
