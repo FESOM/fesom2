@@ -142,7 +142,7 @@ subroutine restart(istep, l_read, mesh)
 
   integer :: istep
   logical :: l_read
-  logical :: is_portable_restart_write
+  logical :: is_portable_restart_write, is_raw_restart_write
   type(t_mesh), intent(in) , target :: mesh
   logical dumpfiles_exist
   logical, save :: initialized = .false.
@@ -196,20 +196,30 @@ subroutine restart(istep, l_read, mesh)
 
   !check whether restart will be written
   is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep)
-
-  if (.not. is_portable_restart_write) return
-
-  ! write restart
-  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call write_restart(oce_path, oce_files, istep)
-  if (use_ice) then
-    call write_restart(ice_path, ice_files, istep)
+  if(is_portable_restart_write .and. (raw_restart_length_unit /= "off")) then
+    is_raw_restart_write = .true. ! always write a raw restart together with the portable restart (unless raw restarts are off)
+  else
+    is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep)
   end if
-  
+
+  if(is_portable_restart_write) then
+    ! write restart
+    if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
+    call write_restart(oce_path, oce_files, istep)
+    if(use_ice) call write_restart(ice_path, ice_files, istep)
+  end if
+
+  if(is_raw_restart_write) then
+    call write_raw_restart(oce_files, istep)
+    if(use_ice) call write_raw_restart(ice_files, istep)
+  end if
+
   ! actualize clock file to latest restart point
   if (mype==0) then
-		write(*,*) ' --> actualize clock file to latest restart point'
-		call clock_finish  
+    if(is_portable_restart_write .or. is_raw_restart_write) then
+		  write(*,*) ' --> actualize clock file to latest restart point'
+		  call clock_finish
+		end if
   end if
   
 end subroutine restart
