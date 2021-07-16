@@ -291,6 +291,7 @@ subroutine write_raw_restart(filegroup, istep)
     open(newunit = fileunit, file = raw_restart_infopath)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
+    write(fileunit, '(2(g0))') "! year: ",yearnew
     close(fileunit)
   end if
 end subroutine
