@@ -23,6 +23,7 @@ use io_mesh_info
 use diagnostics
 use mo_tidal
 use fesom_version_info_module
+use command_line_options_module
 
 ! Define icepack module
 #if defined (__icepack)
@@ -44,6 +45,14 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 type(t_mesh),             target, save :: mesh
+character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
+integer mpi_version_len
+
+
+  if(command_argument_count() > 0) then
+    call command_line_options%parse()
+    stop
+  end if
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -61,6 +70,8 @@ type(t_mesh),             target, save :: mesh
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
+        call MPI_Get_library_version(mpi_version_txt, mpi_version_len, MPIERR)
+        print *,"MPI library version: "//trim(mpi_version_txt)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
@@ -117,13 +128,7 @@ type(t_mesh),             target, save :: mesh
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-    ! The interface to the restart module is made via call restart !
-    ! The inputs are: istep, l_write, l_create
-    ! if istep is not zero it will be decided whether restart shall be written
-    ! if l_write  is TRUE the restart will be forced
-    ! if l_read the restart will be read
-    ! as an example, for reading restart one does: call restart(0, .false., .false., .true.)
-    call restart(0, .false., r_restart, mesh) ! istep, l_write, l_read
+    call restart(0, r_restart, mesh)
     if (mype==0) t7=MPI_Wtime()
     
     ! store grid information into netcdf file
@@ -246,7 +251,7 @@ type(t_mesh),             target, save :: mesh
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, mesh)
         t5 = MPI_Wtime()
-        call restart(n, .false., .false., mesh)
+        call restart(n, .false., mesh)
         t6 = MPI_Wtime()
         
         rtime_fullice       = rtime_fullice       + t2 - t1
@@ -257,6 +262,7 @@ type(t_mesh),             target, save :: mesh
     end do
     
     call finalize_output()
+    call finalize_restart()
     
     !___FINISH MODEL RUN________________________________________________________
 
