@@ -19,7 +19,7 @@ contains
     integer :: tag = 0
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
     integer status(MPI_STATUS_SIZE)
-    integer :: n, sender_rank
+    integer :: remote_rank
     integer, allocatable :: remote_list_nod2d(:)
     real(real64), allocatable :: sendbuf(:)
     integer node_size
@@ -28,20 +28,21 @@ contains
 
     if(mype == root_rank) then
       arr2D_local = arr2D_global(mylist_nod2d)
-      do  n = 1, npes-1
+      do remote_rank = 0, npes-1
+        if(remote_rank == root_rank) cycle
+        
         ! receive remote partition 2D size
-        call mpi_recv(node_size, 1, mpi_integer, MPI_ANY_SOURCE, tag+0, comm, status, mpierr)
-        sender_rank = status(mpi_source)
+        call mpi_recv(node_size, 1, mpi_integer, remote_rank, tag+0, comm, status, mpierr)
 
         ! receive remote mylist_nod2d
         allocate(remote_list_nod2d(node_size))
-        call mpi_recv(remote_list_nod2d(1), node_size, mpi_integer, sender_rank, tag+1, comm, status, mpierr)
+        call mpi_recv(remote_list_nod2d(1), node_size, mpi_integer, remote_rank, tag+1, comm, status, mpierr)
 
         allocate(sendbuf(node_size))
         sendbuf = arr2D_global(remote_list_nod2d)
         deallocate(remote_list_nod2d)
 
-        call mpi_send(sendbuf(1), node_size, mpi_precision, sender_rank, tag+2, comm, mpierr)
+        call mpi_send(sendbuf(1), node_size, mpi_precision, remote_rank, tag+2, comm, mpierr)
         deallocate(sendbuf)
       end do
     
@@ -50,7 +51,7 @@ contains
       call mpi_send(node_size, 1, mpi_integer, root_rank, tag+0, comm, mpierr)
       call mpi_send(mylist_nod2d(1), node_size, mpi_integer, root_rank, tag+1, comm, mpierr)
       
-      call mpi_recv(arr2D_local(1), node_size, mpi_precision, root_rank, tag+2, comm, status, mpierr)
+      call mpi_recv(arr2D_local(1), node_size, mpi_precision, root_rank, tag+2, comm, status, mpierr) ! aleph blocks here
     end if
 
     ! without a barrier, we get wrong results in arr2D_local
@@ -72,7 +73,7 @@ contains
     integer :: tag = 0
     integer :: mpi_precision = MPI_DOUBLE_PRECISION
     integer status(MPI_STATUS_SIZE)
-    integer :: n, sender_rank
+    integer :: remote_rank
     integer, allocatable :: remote_list_elem2d(:)
     real(real64), allocatable :: sendbuf(:)
     integer elem_size
@@ -82,20 +83,21 @@ contains
 
     if(mype == root_rank) then
       arr2D_local = arr2D_global(myList_elem2D(1:elem_size))
-      do  n = 1, npes-1
+      do remote_rank = 0, npes-1
+        if(remote_rank == root_rank) cycle
+
         ! receive remote partition 2D size
-        call mpi_recv(elem_size, 1, mpi_integer, MPI_ANY_SOURCE, tag+0, comm, status, mpierr)
-        sender_rank = status(mpi_source)
+        call mpi_recv(elem_size, 1, mpi_integer, remote_rank, tag+0, comm, status, mpierr)
 
         ! receive remote mylist_elem2d
         allocate(remote_list_elem2d(elem_size))
-        call mpi_recv(remote_list_elem2d(1), elem_size, mpi_integer, sender_rank, tag+1, comm, status, mpierr)
+        call mpi_recv(remote_list_elem2d(1), elem_size, mpi_integer, remote_rank, tag+1, comm, status, mpierr)
 
         allocate(sendbuf(elem_size))
         sendbuf = arr2D_global(remote_list_elem2d)
         deallocate(remote_list_elem2d)
 
-        call mpi_send(sendbuf(1), elem_size, mpi_precision, sender_rank, tag+2, comm, mpierr)
+        call mpi_send(sendbuf(1), elem_size, mpi_precision, remote_rank, tag+2, comm, mpierr)
         deallocate(sendbuf)
       end do
     
