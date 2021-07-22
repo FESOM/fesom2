@@ -88,7 +88,8 @@ module g_config
   !_____________________________________________________________________________
   ! *** fleap_year ***
   logical                       :: include_fleapyear=.false.
-  namelist /calendar/ include_fleapyear
+  logical                       :: use_flpyrcheck   =.true.
+  namelist /calendar/ include_fleapyear, use_flpyrcheck
   
   !_____________________________________________________________________________
   ! *** machine ***
