@@ -149,6 +149,7 @@ subroutine thermodynamics(mesh)
            snow=prec_rain(i)
         endif
         evap_in=evaporation(i) !evap_in: positive up
+!!PS         evap_in=0.0_WP
      else
         rain = prec_rain(i)
         snow = prec_snow(i)
@@ -195,7 +196,7 @@ subroutine thermodynamics(mesh)
      net_heat_flux(i) = ehf     !positive down
      evaporation(i)   = evap    !negative up
      ice_sublimation(i)= subli 
-
+     
      thdgr(i)         = ithdgr
      thdgrsn(i)       = ithdgrsn
      flice(i)         = iflice
@@ -206,6 +207,13 @@ subroutine thermodynamics(mesh)
      ! real salt flux due to salinity that is contained in the sea ice 4-5 psu
      real_salt_flux(i)= rsf !PS
 
+     ! if snow file is not given snow computed from prec_rain --> but prec_snow 
+     ! array needs to be filled --> so that the freshwater balancing adds up
+     if (.not. l_snow) then
+        prec_rain(i)     = rain
+        prec_snow(i)     = snow
+     end if 
+     
   end do
      deallocate(ustar_aux)
 end subroutine thermodynamics
