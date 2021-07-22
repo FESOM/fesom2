@@ -126,15 +126,15 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
-        if (arr(nz,n)/=arr(nz,n)) then
-            write(*,*) ' --> found NaN in smoothing'
-            write(*,*) ' mype = ', mype
-            write(*,*) ' n    = ', n
-            write(*,*) ' nz,uln,nln      = ', nz,uln,nln
-            write(*,*) ' arr(nz,n)       = ', arr(nz,n)
-            write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
-            write(*,*) ' vol(nz,n)       = ', vol(nz,n)
-        endif 
+!!PS         if (arr(nz,n)/=arr(nz,n)) then
+!!PS             write(*,*) ' --> found NaN in smoothing'
+!!PS             write(*,*) ' mype = ', mype
+!!PS             write(*,*) ' n    = ', n
+!!PS             write(*,*) ' nz,uln,nln      = ', nz,uln,nln
+!!PS             write(*,*) ' arr(nz,n)       = ', arr(nz,n)
+!!PS             write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
+!!PS             write(*,*) ' vol(nz,n)       = ', vol(nz,n)
+!!PS         endif 
      END DO
   end DO
   
