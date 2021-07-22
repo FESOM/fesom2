@@ -25,22 +25,22 @@ landice_end_mon=10
 /
 
 &nam_sbc
-   nm_xwind_file = '/work/ollie/clidyn/forcing/NCEP2/uwnd.10m.gauss.'        ! name of file with winds, if nm_sbc=2
-   nm_ywind_file = '/work/ollie/clidyn/forcing/NCEP2/vwnd.10m.gauss.'        ! name of file with winds, if nm_sbc=2
-   nm_humi_file  = '/work/ollie/clidyn/forcing/NCEP2/shum.2m.gauss.'         ! name of file with 2m specific humidity
-   nm_qsr_file   = '/work/ollie/clidyn/forcing/NCEP2/dswrf.sfc.gauss.'       ! name of file with solar heat
-   nm_qlw_file   = '/work/ollie/clidyn/forcing/NCEP2/dlwrf.sfc.gauss.'       ! name of file with Long wave
-   nm_tair_file  = '/work/ollie/clidyn/forcing/NCEP2/air.2m.gauss.'         ! name of file with 2m air temperature
-   nm_prec_file  = '/work/ollie/clidyn/forcing/NCEP2/prate.sfc.gauss.'       ! name of file with rain fall
-   nm_snow_file  = ''              				             ! name of file with snow fall
-   nm_mslp_file  = ''                                                        ! air_pressure_at_sea_level
+   nm_xwind_file = '/work/ollie/clidyn/forcing/NCEP2/uwnd.10m.gauss.'   ! name of file with winds, if nm_sbc=2
+   nm_ywind_file = '/work/ollie/clidyn/forcing/NCEP2/vwnd.10m.gauss.'   ! name of file with winds, if nm_sbc=2
+   nm_humi_file  = '/work/ollie/clidyn/forcing/NCEP2/shum.2m.gauss.'    ! name of file with 2m specific humidity
+   nm_qsr_file   = '/work/ollie/clidyn/forcing/NCEP2/dswrf.sfc.gauss.'  ! name of file with solar heat
+   nm_qlw_file   = '/work/ollie/clidyn/forcing/NCEP2/dlwrf.sfc.gauss.'  ! name of file with Long wave
+   nm_tair_file  = '/work/ollie/clidyn/forcing/NCEP2/air.2m.gauss.'     ! name of file with 2m air temperature
+   nm_prec_file  = '/work/ollie/clidyn/forcing/NCEP2/prate.sfc.gauss.'  ! name of file with rain fall
+   nm_snow_file  = ''                                                   ! name of file with snow fall
+   nm_mslp_file  = ''                                                   ! air_pressure_at_sea_level
    nm_xwind_var  = 'uwnd'   	! name of variable in file with wind
    nm_ywind_var  = 'vwnd'   	! name of variable in file with wind
    nm_humi_var   = 'shum'   	! name of variable in file with humidity
    nm_qsr_var    = 'dswrf'  	! name of variable in file with solar heat
    nm_qlw_var    = 'dlwrf'  	! name of variable in file with Long wave
    nm_tair_var   = 'air'    	! name of variable in file with 2m air temperature
-   nm_prec_var   = 'prate'    	! name of variable in file with total precipitation
+   nm_prec_var   = 'prate'  	! name of variable in file with total precipitation
    nm_snow_var   = ''       	! name of variable in file with total precipitation
    nm_mslp_var   = ''       	! name of variable in file with air_pressure_at_sea_level
    nm_nc_iyear   = 1800
