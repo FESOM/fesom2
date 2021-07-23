@@ -955,10 +955,10 @@ subroutine find_levels_cavity(mesh)
     ! outer iteration loop    
     count_iter2 = 0
     exit_flag2  = 0
-    elemfixlvl  = .False.
+    elemfixlvl  = .false.
     do while((exit_flag2==0) .and. (count_iter2<max_iter2))
         count_iter2   = count_iter2+1
-        elemreducelvl = .False.
+        elemreducelvl = .false.
         !_______________________________________________________________________
         ! Loop oper cavity occupying levels
         do nz=1,cavity_maxlev
@@ -1011,10 +1011,9 @@ subroutine find_levels_cavity(mesh)
                             ! except when this levels would remain less than 3 valid 
                             ! bottom levels --> in case make the levels of all sorounding
                             ! triangles shallower
-                            if ( (nlevels(elem)-(nz+1))>=3           .and. &
-                                 (elemreducelvl(elem) .eqv. .False.) .and. &
-                                 (elemfixlvl(   elem) .eqv. .False.)       &
-                                ) then 
+                            if ( (nlevels(elem)-(nz+1))>=3 .and.  &
+                                  elemreducelvl(elem) .eqv. .false. .and. &
+                                  elemfixlvl(elem) .eqv. .false.) then 
                                 ulevels(elem)=nz+1
                             else    
                                 ! --> can not increase depth anymore to eleminate isolated 
@@ -1024,7 +1023,7 @@ subroutine find_levels_cavity(mesh)
                                 !     to nz
                                 idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
                                 ulevels(elems(idx)) = nz-1
-                                elemreducelvl(elems(idx)) = .True.
+                                elemreducelvl(elems(idx)) = .true.
                             end if    
                             
                             !force recheck for all current ocean cells
@@ -1135,7 +1134,7 @@ subroutine find_levels_cavity(mesh)
                         elem=nod_in_elem2D(j,node)
                         if (ulevels(elem)>nz) then
                             ulevels(elem) = nz
-                            elemfixlvl(elem) = .True.
+                            elemfixlvl(elem) = .true.
                         end if     
                     end do
                 end if

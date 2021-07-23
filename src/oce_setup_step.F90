@@ -187,6 +187,10 @@ use g_forcing_arrays
 use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
 use diagnostics,     only: ldiag_dMOC, ldiag_DVD
+#if defined(__recom)
+use REcoM_GloVar
+use recom_config
+#endif
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
@@ -231,9 +235,15 @@ allocate(S_rhs(nl-1, node_size))
 allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
+allocate(dtr_bf(nl-1,node_size)) !jh
+allocate(vert_sink(nl-1,node_size)) ! OG
+
 del_ttf          = 0.0_WP
 del_ttf_advhoriz = 0.0_WP
 del_ttf_advvert  = 0.0_WP
+dtr_bf           = 0.0_WP ! jh
+vert_sink        = 0.0_WP ! OG
+
 !!PS allocate(del_ttf_diff(nl-1,node_size))
 if (ldiag_DVD) then
     allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
@@ -262,7 +272,18 @@ allocate(real_salt_flux(node_size)) !PS
 ! =================
 allocate(Tsurf_t(node_size,2), Ssurf_t(node_size,2))
 allocate(tau_x_t(node_size,2), tau_y_t(node_size,2))  
-
+! ================
+! RECOM forcing arrays
+! ================
+#if defined(__recom)
+  if(use_REcoM) then
+    if (restore_alkalinity) then
+      allocate(Alk_surf(node_size))
+      allocate(relax_alk(node_size))
+      allocate(virtual_alk(node_size))
+    endif
+  end if
+#endif
 ! =================
 ! All auxiliary arrays
 ! =================
@@ -420,7 +441,18 @@ end if
     Ssurf_t=0.0_WP
     tau_x_t=0.0_WP
     tau_y_t=0.0_WP
-    
+! ================
+! RECOM forcing arrays
+! ================
+#if defined(__recom)
+  if(use_REcoM) then
+    if (restore_alkalinity) then
+      Alk_surf=0.0_WP
+      relax_alk=0.0_WP
+      virtual_alk=0.0_WP
+    endif
+  end if
+#endif        
     ! init field for pressure force 
     allocate(density_ref(nl-1,node_size))
     density_ref = density_0
@@ -457,6 +489,11 @@ USE o_ARRAYS
 USE g_PARSUP
 USE g_config
 USE g_ic3d
+#if defined(__recom)
+USE recom_config
+USE REcoM_GloVar
+use REcoM_ciso
+#endif
   !
   ! reads the initial state or the restart file for the ocean
   !
@@ -473,8 +510,44 @@ USE g_ic3d
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
-  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
+#if defined(__recom)
+  if(use_REcoM) then
+    if (mype==0) write(*,*)      
+    if (mype==0) print *, achar(27)//'[36m'//'     --> RECOM ON'//achar(27)//'[0m'
+    if (ciso) then
+      if (mype==0) print *, achar(27)//'[36m'//'     --> CISO ON'//achar(27)//'[0m'
+    else
+      if (mype==0) print *, achar(27)//'[36m'//'     --> CISO OFF'//achar(27)//'[0m'
+    endif
+    if (mype==0) then
+      write(*,*) '____________________________________________________________'
+      write(*,*) ' --> Check namelist.oce for the number of tracers'
+      write(*,*)      
+    endif
+
+    if(DIC_PI) then 
+      filelist(5)='GLODAPv2.2016b.PI_TCO2_fesom2_fix_z_Fillvalue.nc'
+      varlist(5)='PI_TCO2'
+      if (mype==0) then
+        write(*,*) '____________________________________________________________'
+        write(*,*) ' --> Reading REcoM2 preindustrial DIC for restart'
+        write(*,*)
+      end if
+    end if
+
+    if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
+    if(mype==0) write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
+    if(mype==0) write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
+    if(mype==0) write(*,*) 'read DIC         climatology from:', trim(filelist(5))
+    if(mype==0) write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
+    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+#else
+  if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(1))
+  if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(2))
+#endif
+
   call do_ic3d(mesh)
   
   Tclim=tr_arr(:,:,1)
@@ -482,6 +555,15 @@ USE g_ic3d
   Tsurf=tr_arr(1,:,1)
   Ssurf=tr_arr(1,:,2)
   relax2clim=0.0_WP
+
+#if defined(__recom)
+    if (restore_alkalinity) then
+      if (mype==0)  print *, achar(27)//'[46;1m'//'--> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+      Alk_surf=tr_arr(1,:,5)
+      if(mype==0) write(*,*),'Alkalinity restoring = true. Field read in.'
+    endif
+  end if
+#endif
 
   ! count the passive tracers which require 3D source (ptracers_restore_total)
   ptracers_restore_total=0
@@ -502,12 +584,93 @@ USE g_ic3d
   rcounter3=0         ! counter for tracers with 3D source
   DO i=3, num_tracers
      id=tracer_ID(i)
+     if (any(id == idlist)) cycle ! OG recom tracers id's start from 1001
      SELECT CASE (id)
+! Read recom variables (hardcoded IDs) OG
+       CASE (1004:1017)
+         tr_arr(:,:,i)=0.0_WP
+        if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1020:1021)
+         tr_arr(:,:,i)=0.0_WP
+        if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+   CASE (1023:1028)
+         tr_arr(:,:,i)=0.0_WP
+        if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+!MB preliminary extension for carbon isotopes which should be refactored in later versions
+       CASE (1033:1034)       ! initialize tracer ID=33-34 = DIC_13|14
+         tr_arr(:,:,25:26)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1093:1094)       ! initialize tracer ID=93:94 = phyC_13|14
+         tr_arr(:,:,27:28)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1123:1124)       ! initialize tracer ID=123:124 = detC_13|14
+         tr_arr(:,:,29:30)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1143:1144)       ! initialize tracer ID=143:144 = hetC_13|14
+         tr_arr(:,:,31:32)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1163:1164)       ! initialize tracer ID=163:164 = DOC_13|14
+         tr_arr(:,:,33:34)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1183:1184)       ! initialize tracer ID=183:184 = diaC_13|14
+         tr_arr(:,:,35:36)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1223:1224)       ! initialize tracer ID=223:224 = phyCalc_13|14
+         tr_arr(:,:,37:38)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+       CASE (1233:1234)       ! initialize tracer ID=233:234 = detCalc_13|14
+         tr_arr(:,:,39:40)=0.0_WP
+         if (mype==0) then
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
+            write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+         end if
+
        CASE (101)       ! initialize tracer ID=101
          tr_arr(:,:,i)=0.0_WP
          if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (301) !Fram Strait 3d restored passive tracer
@@ -533,8 +696,8 @@ USE g_ic3d
          end do
          tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
          if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
 
@@ -561,8 +724,8 @@ USE g_ic3d
          end do
          tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
          if (mype==0) then
-            write (i_string,  "(I3)") i
-            write (id_string, "(I3)") id
+            write (i_string,  "(I4)") i
+            write (id_string, "(I4)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        

@@ -2555,10 +2555,10 @@ subroutine oce_timestep_ale(n, mesh)
 
     t0=MPI_Wtime()
     
-!     water_flux = 0.0_WP
-!     heat_flux  = 0.0_WP
-!     stress_surf= 0.0_WP
-!     stress_node_surf= 0.0_WP
+!!PS     water_flux = 0.0_WP
+!!PS     heat_flux  = 0.0_WP
+!!PS     stress_surf= 0.0_WP
+!!PS     stress_node_surf= 0.0_WP
     
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths

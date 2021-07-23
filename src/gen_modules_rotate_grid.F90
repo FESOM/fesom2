@@ -1,12 +1,9 @@
 ! Routines needed to support displaced poles: 
 ! The new pole position is set with 
-! alphaEuler, betaEuler and gammaEuler. The default values 
+! alphaEuler, betaEuler and gammaEuler. The degfault values 
 ! alphaEuler=50.   [degree] Euler angles, convention:
 ! betaEuler=15.	   [degree] first around z, then around new x,
 ! gammaEuler=-90.  [degree] then around new z.
-!
-! A helpful animation may be found online here:
-! https://en.wikipedia.org/wiki/Euler_angles
 !
 ! The first two define the new pole position 
 ! as phi_p=alphaEuler-90, theta_p=90-betaEuler.

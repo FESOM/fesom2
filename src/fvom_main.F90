@@ -23,7 +23,7 @@ use io_mesh_info
 use diagnostics
 use mo_tidal
 use fesom_version_info_module
-use command_line_options_module
+
 
 ! Define icepack module
 #if defined (__icepack)
@@ -32,6 +32,14 @@ use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 
 #if defined (__oasis)
 use cpl_driver
+#endif
+
+#if defined(__recom)
+  use REcoM_GloVar
+  use recom_config
+  use recom_diag
+! for diagnosing si mass balance:
+  use g_support                                                                                               
 #endif
 
 IMPLICIT NONE
@@ -43,16 +51,16 @@ real(kind=real32) :: rtime_setup_mesh, rtime_setup_ocean, rtime_setup_forcing
 real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
+#if defined(__recom)
+real(kind=WP),  save,  target                 :: intDSi
+real(kind=WP),  save,  target                 :: intDiaSi
+real(kind=WP),  save,  target                 :: intDetSi
+real(kind=WP),  save,  target                 :: intDetz2Si
+real(kind=WP),  save,  target                 :: intBenSi
+real(kind=WP),  save,  target                 :: sumSi1, sumSi2
+#endif
 
 type(t_mesh),             target, save :: mesh
-character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
-integer mpi_version_len
-
-
-  if(command_argument_count() > 0) then
-    call command_line_options%parse()
-    stop
-  end if
 
 #ifndef __oifs
     !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -70,8 +78,6 @@ integer mpi_version_len
     if(mype==0) then
         write(*,*)
         print *,"FESOM2 git SHA: "//fesom_git_sha()
-        call MPI_Get_library_version(mpi_version_txt, mpi_version_len, MPIERR)
-        print *,"MPI library version: "//trim(mpi_version_txt)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
     end if
@@ -99,6 +105,10 @@ integer mpi_version_len
        write(*,*) 'FESOM ocean_setup... complete'
        t3=MPI_Wtime()
     endif
+#if defined (__recom)
+       call recom_init(mesh)
+       if (mype==0) write(*,*) 'RECOM recom_init... complete'
+#endif    
     call forcing_setup(mesh)
     if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
@@ -107,6 +117,10 @@ integer mpi_version_len
         ice_update=.true.
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
     endif
+#if defined(__recom)
+        call compute_recom_diagnostics(0, mesh) ! allocate arrays for recom diagnostic
+#endif
+
     if (mype==0) t5=MPI_Wtime()
     call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
@@ -243,6 +257,76 @@ integer mpi_version_len
             call oce_fluxes(mesh)
         end if
         call before_oce_step(mesh) ! prepare the things if required
+#if defined (__recom)
+
+
+
+
+        if (use_REcoM) then
+if (0) then
+        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetz2si+2), intDetz2Si, mesh)
+        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        if (mype==0) print *, 'intDSi: ', intDSi
+        if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        if (mype==0) print *, 'intDetSi: ', intDetSi
+        if (mype==0) print *, 'intDetz2Si: ', intDetz2Si
+        if (mype==0) print *, 'intBenSi: ', intBenSi
+
+        sumSi1 = intDSi + intDiaSi + intDetSi + intDetz2Si + intBenSi
+        if (mype==0) print *, 'sumSi1, before recom call: ', sumSi1
+endif
+           call recom(mesh)
+if (0) then
+        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetz2si+2), intDetz2Si, mesh)
+        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        if (mype==0) print *, 'intDSi: ', intDSi
+        if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        if (mype==0) print *, 'intDetSi: ', intDetSi
+        if (mype==0) print *, 'intDetz2Si: ', intDetz2Si
+        if (mype==0) print *, 'intBenSi: ', intBenSi
+
+        sumSi2 = intDSi + intDiaSi + intDetSi + intDetz2Si + intBenSi
+
+        if (mype==0) print *, 'sumSi2, after recom call: ', sumSi2
+        if (mype==0) print *, ' '
+        if (mype==0) print *, ' '
+        if (mype==0) print *, 'sumSi2 - sumSi1', sumSi2 -  sumSi1
+        if (mype==0) print *, ' '
+        if (mype==0) print *, ' '
+        if (mype==0) print *, 'relative (sumSi2 - sumSi1)/sumSi1', (sumSi2 -  sumSi1)/sumSi1
+
+       ! for silicate mass balance:
+!        if (mype==0) print *, '2) si tracer global integral in fvom_main before oce_timestep_ale:'
+!        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+!        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+!        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+!        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        !if (mype==0) print *, 'intDSi: ', intDSi
+        !if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        !if (mype==0) print *, 'intDetSi: ', intDetSi
+        !if (mype==0) print *, 'intBenSi: ', intBenSi
+!        sumSi1 = intDSi + intDiaSi + intDetSi + intBenSi
+!        if (mype==0 .and. (sumSi1-sumSi8)<0) print *, 'sumSi8, sumSi1, fvom before oce_step: ', sumSi8, sumSi1
+!        if (mype==0) print *, 'sumSi1: ', sumSi1
+!        if (mype==0) print *, ''
+!        if (mype==0) print *, ''
+
+
+end if 
+
+!call par_ex
+!stop
+           if (mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call RECOM         '//achar(27)//'[0m'
+           call compute_recom_diagnostics(1, mesh)
+        end if
+#endif
+
         t2 = MPI_Wtime()
         
         !___model ocean step____________________________________________________

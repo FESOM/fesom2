@@ -231,8 +231,8 @@ subroutine update_atm_forcing(istep, mesh)
     	     mask=1.
 	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
              end if
-#endif	 
-     end if
+	 end if  
+#endif	  
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)

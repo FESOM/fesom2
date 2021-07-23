@@ -19,7 +19,14 @@ subroutine read_namelist
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock, only: timenew, daynew, yearnew
-  use g_ic3d 
+  use g_ic3d
+#ifdef __recom                   
+  use recom_config
+  use recom_diag, only: ldiag_carbon, ldiag_silicate, recom_diag_freq, &
+                        recom_diag_freq_unit, recom_logfile_outfreq, precom_diag_list
+  use REcoM_ciso
+#endif 
+ 
   implicit none
 
   character(len=MAX_PATH)   :: nmlfile
@@ -79,6 +86,41 @@ subroutine read_namelist
   open (20,file=nmlfile)
   read (20,NML=diag_list)
   close (20)
+
+#ifdef __recom              
+  nmlfile ='namelist.recom' ! name of recom namelist file
+  open (20,file=nmlfile)
+  read (20,NML=precom_diag_list)
+  read (20,NML=pavariables)
+  read (20,NML=pasinking)
+  read (20,NML=painitialization_N)
+  read (20,NML=paArrhenius)
+  read (20,NML=palimiter_function)
+  read (20,NML=palight_calculations)
+  read (20,NML=paphotosynthesis)
+  read (20,NML=paassimilation)
+  read (20,NML=pairon_chem)
+  read (20,NML=pazooplankton)
+  read (20,NML=pasecondzooplankton)
+  read (20,NML=pagrazingdetritus)
+  read (20,NML=paaggregation)
+  read (20,NML=padin_rho_N)
+  read (20,NML=padic_rho_C1)
+  read (20,NML=paphytoplankton_N)
+  read (20,NML=paphytoplankton_C)
+  read (20,NML=paphytoplankton_ChlA)
+  read (20,NML=padetritus_N)
+  read (20,NML=padetritus_C)
+  read (20,NML=paheterotrophs)
+  read (20,NML=paseczooloss)
+  read (20,NML=pairon)
+  read (20,NML=pacalc)
+  read (20,NML=pabenthos_decay_rate)
+  read (20,NML=paco2_flux_param)
+  read (20,NML=paalkalinity_restoring)
+  read (20,NML=paciso)
+  close (20)
+#endif
 
   if(mype==0) write(*,*) 'Namelist files are read in'
   

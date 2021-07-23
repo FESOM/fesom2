@@ -458,12 +458,11 @@ end subroutine dist_on_earth
 ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
 ! eines Iterationsverfahrens aus.
 subroutine potit(salz,pt,pres,rfpres,tin)
-  use o_PARAM , only: WP
     integer iter
-    real(kind=WP) :: salz,pt,pres,rfpres,tin
-    real(kind=WP) :: epsi, pt1,ptd,pttmpr
+    real salz,pt,pres,rfpres,tin
+    real epsi,tpmd,pt1,ptd,pttmpr
 
-     real(kind=WP), parameter :: tpmd=0.001_WP
+    data tpmd / 0.001 /
 
     epsi = 0.
     do iter=1,100
@@ -490,19 +489,15 @@ end subroutine potit
 !            TEMP   =    40.0 DegC
 !            PRES   = 10000.000 dbar
 !            RFPRES =     0.000 dbar
-real(kind=WP) function pttmpr(salz,temp,pres,rfpres)
-  use o_PARAM , only: WP
+real function pttmpr(salz,temp,pres,rfpres)
+  
+    data ct2 ,ct3  /0.29289322 ,  1.707106781/
+    data cq2a,cq2b /0.58578644 ,  0.121320344/
+    data cq3a,cq3b /3.414213562, -4.121320344/
 
-    real(kind=WP) :: salz,temp,pres,rfpres
-    real(kind=WP) :: p,t,dp,dt,q
-    real(kind=WP) :: adlprt
-    real(kind=WP), parameter :: ct2  =  0.29289322_WP
-    real(kind=WP), parameter :: ct3  =  1.707106781_WP
-    real(kind=WP), parameter :: cq2a =  0.58578644_WP
-    real(kind=WP), parameter :: cq2b =  0.121320344_WP
-    real(kind=WP), parameter :: cq3a =  3.414213562_WP
-    real(kind=WP), parameter :: cq3b = -4.121320344_WP    
-    
+    real salz,temp,pres,rfpres
+    real p,t,dp,dt,q,ct2,ct3,cq2a,cq2b,cq3a,cq3b
+    real adlprt
 
     p  = pres
     t  = temp
@@ -533,26 +528,17 @@ end function pttmpr
 !       fuer SALZ   =    40.0 psu
 !            TEMP   =    40.0 DegC
 !            PRES   = 10000.000 dbar
-real(kind=WP) function adlprt(salz,temp,pres)
+real function adlprt(salz,temp,pres)
   
-  use o_PARAM , only: WP
-  real(kind=WP) :: salz,temp,pres, ds
-  real(kind=WP), parameter :: s0 = 35.0
-  real(kind=WP), parameter :: a0 =  3.5803E-5
-  real(kind=WP), parameter :: a1 =  8.5258E-6
-  real(kind=WP), parameter :: a2 = -6.8360E-8
-  real(kind=WP), parameter :: a3 =  6.6228E-10
-  real(kind=WP), parameter :: b0 =  1.8932E-6
-  real(kind=WP), parameter :: b1 = -4.2393E-8
-  real(kind=WP), parameter :: c0 =  1.8741E-8
-  real(kind=WP), parameter :: c1 = -6.7795E-10
-  real(kind=WP), parameter :: c2 =  8.7330E-12
-  real(kind=WP), parameter :: c3 = -5.4481E-14
-  real(kind=WP), parameter :: d0 = -1.1351E-10
-  real(kind=WP), parameter :: d1 =  2.7759E-12
-  real(kind=WP), parameter :: e0 = -4.6206E-13
-  real(kind=WP), parameter :: e1 =  1.8676E-14
-  real(kind=WP), parameter :: e2 = -2.1687E-16
+  real salz,temp,pres
+  real s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds
+
+  data s0 /35.0/
+  data a0,a1,a2,a3 /3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10/
+  data b0,b1       /1.8932E-6, -4.2393E-8/
+  data c0,c1,c2,c3 /1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14/
+  data d0,d1       /-1.1351E-10, 2.7759E-12/
+  data e0,e1,e2    /-4.6206E-13,  1.8676E-14, -2.1687E-16/
 
   ds = salz-s0
   adlprt = ( ( (e2*temp + e1)*temp + e0 )*pres                     &
