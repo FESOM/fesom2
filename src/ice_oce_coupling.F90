@@ -320,6 +320,7 @@ subroutine oce_fluxes(mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
+
     ! water_flux=water_flux+net/ocean_area 
     if (.not. use_virt_salt) then
        ! lets just impose the total flux (water_flux) conservation here       
