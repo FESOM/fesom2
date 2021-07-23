@@ -311,7 +311,7 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
             ! the surface template for the scaling 
             !!PS do nz=2, nzmax
             do nz=nzmin+1, nzmax
-                fer_k(nz,n)=fer_k(1,n)*zscaling(nz)
+                fer_k(nz,n)=fer_k(nzmin,n)*zscaling(nz)
             end do 
             ! after vertical Ferreira scaling is done also scale surface template
             !!PS fer_k(1,n)=fer_k(1,n)*zscaling(1)

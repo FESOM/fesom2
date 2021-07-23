@@ -66,7 +66,6 @@ use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
 	 ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
      
      msum=sum(m_ice(elnodes))*val3
@@ -162,7 +161,6 @@ subroutine ssh2rhs(mesh)
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(elem) > 1) cycle
         
         !_______________________________________________________________________
@@ -189,7 +187,6 @@ subroutine ssh2rhs(mesh)
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(elem) > 1) cycle
         
         vol=elem_area(elem)
@@ -239,7 +236,6 @@ subroutine stress2rhs_m(mesh)
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
 
      if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
@@ -355,7 +351,6 @@ subroutine EVPdynamics_m(mesh)
         
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1) cycle
         
         !_______________________________________________________________________
@@ -384,7 +379,6 @@ subroutine EVPdynamics_m(mesh)
         elnodes=elem2D_nodes(:,el)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1)  cycle
         
         vol=elem_area(el)
@@ -431,7 +425,6 @@ subroutine EVPdynamics_m(mesh)
      
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(el) > 1) cycle
      
      msum=sum(m_ice(elnodes))*val3
@@ -468,7 +461,7 @@ subroutine EVPdynamics_m(mesh)
    do el=1,myDim_elem2D
      !__________________________________________________________________________
      if (ulevels(el)>1) cycle
-     
+
      !__________________________________________________________________________
      if(ice_el(el)) then
      
@@ -538,7 +531,7 @@ subroutine EVPdynamics_m(mesh)
                 (sigma12(el)*dx(3)+sigma22(el)*dy(3) - sigma11(el)*meancos)               ! metrics                                              
         end if
      end if
-  end do
+  end do ! --> do el=1,myDim_elem2D
   
   do i=1, myDim_nod2d 
      !__________________________________________________________________________
@@ -568,20 +561,44 @@ subroutine EVPdynamics_m(mesh)
         u_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsu +rdt*coriolis_node(i)*rhsv)
         v_ice_aux(i) = det*((1.0_WP+beta_evp+drag)*rhsv -rdt*coriolis_node(i)*rhsu)
         end if
-     end do
+     end do ! --> do i=1, myDim_nod2d 
 
-     call exchange_nod_begin(u_ice_aux, v_ice_aux)
+    !___________________________________________________________________________ 
+    ! apply sea ice velocity boundary condition 
+    do ed=1,myDim_edge2D
+        !_______________________________________________________________________
+        ! apply coastal sea ice velocity boundary conditions
+        if(myList_edge2D(ed) > edge2D_in) then
+            u_ice_aux(edges(:,ed))=0.0_WP
+            v_ice_aux(edges(:,ed))=0.0_WP
+        end if
+        
+        !_______________________________________________________________________
+        ! apply sea ice velocity boundary conditions at cavity-ocean edge
+        if (use_cavity) then 
+            if ( (ulevels(edge_tri(1,ed))>1) .or. &
+                 ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then 
+                u_ice_aux(edges(1:2,ed))=0.0_WP
+                v_ice_aux(edges(1:2,ed))=0.0_WP
+            end if 
+        end if 
+    end do ! --> do ed=1,myDim_edge2D
+    
+    !___________________________________________________________________________
+    call exchange_nod_begin(u_ice_aux, v_ice_aux)
 
-     do row=1, myDim_nod2d 
+    do row=1, myDim_nod2d 
         u_rhs_ice(row)=0.0_WP
         v_rhs_ice(row)=0.0_WP
-     end do
+    end do
 
-     call exchange_nod_end
-  end do
+    call exchange_nod_end
+    
+  end do ! --> do shortstep=1, steps
 
   u_ice=u_ice_aux
   v_ice=v_ice_aux
+  
 end subroutine EVPdynamics_m
 !
 !
@@ -624,7 +641,6 @@ subroutine find_alpha_field_a(mesh)
      elnodes=elem2D_nodes(:,elem)
      !_______________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
         
      msum=sum(m_ice(elnodes))*val3
@@ -700,7 +716,6 @@ subroutine stress_tensor_a(mesh)
    do elem=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element has any cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
      if (ulevels(elem) > 1) cycle
      
      !__________________________________________________________________________
@@ -782,6 +797,7 @@ use i_param
 use o_PARAM
 use i_therm_param
 use g_parsup
+use g_config, only: use_cavity
 use g_comm_auto
 use ice_maEVP_interfaces
 
@@ -830,7 +846,7 @@ use ice_maEVP_interfaces
          rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
 
          rhsu=beta_evp_array(i)*u_ice_aux(i)+rhsu
-	 rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
+         rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
          !solve (Coriolis and water stress are treated implicitly)
          fc=rdt*coriolis_node(i)
          det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
@@ -838,6 +854,28 @@ use ice_maEVP_interfaces
          u_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
          v_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
      end do
+     
+    !___________________________________________________________________________ 
+    ! apply sea ice velocity boundary condition 
+    do ed=1,myDim_edge2D
+        !_______________________________________________________________________
+        ! apply coastal sea ice velocity boundary conditions
+        if(myList_edge2D(ed) > edge2D_in) then
+            u_ice_aux(edges(:,ed))=0.0_WP
+            v_ice_aux(edges(:,ed))=0.0_WP
+        end if
+        
+        !_______________________________________________________________________
+        ! apply sea ice velocity boundary conditions at cavity-ocean edge
+        if (use_cavity) then 
+            if ( (ulevels(edge_tri(1,ed))>1) .or. &
+                 ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then 
+                u_ice_aux(edges(1:2,ed))=0.0_WP
+                v_ice_aux(edges(1:2,ed))=0.0_WP
+            end if 
+        end if 
+    end do ! --> do ed=1,myDim_edge2D
+    
      call exchange_nod(u_ice_aux, v_ice_aux)
   end do
      
@@ -870,6 +908,10 @@ type(t_mesh), intent(in)              , target :: mesh
 #include "associate_mesh.h"
 
     DO n=1, myDim_nod2D
+       !_______________________________________________________________________
+       ! if element has any cavity node skip it 
+       if (ulevels_nod2d(n)>1) cycle
+       
        ! ==============
        ! FESOM1.4 and stand-alone FESIM
        ! beta_evp_array(n) =  maxval(alpha_evp_array(nod_in_elem2D(n)%addresses(1:nod_in_elem2D(n)%nmb)))

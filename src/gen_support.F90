@@ -274,7 +274,8 @@ subroutine integrate_nod_2D(data, int2D, mesh)
 #include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
-     lval=lval+data(row)*area(1,row)
+     !!PS lval=lval+data(row)*area(1,row)
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
 
   int2D=0.0_WP
@@ -301,7 +302,7 @@ subroutine integrate_nod_3D(data, int3D, mesh)
   do row=1, myDim_nod2D
      !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-        lval=lval+data(k, row)*area(k,row)*hnode_new(k,row)
+        lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
   int3D=0.0_WP

@@ -452,7 +452,8 @@ subroutine integrate_tke( &
     dzw                                                             !
    
   ! IDEMIX variables, if run coupled iw_diss is added as forcing to TKE
-  real(cvmix_r8), dimension(max_nlev), intent(in), optional  :: &
+!!PS   real(cvmix_r8), dimension(max_nlev), intent(in), optional  :: &
+  real(cvmix_r8), dimension(nlev+1), intent(in), optional  :: &
     E_iw                                                         ,& !  
     alpha_c                                                      ,& !
     iw_diss                                                         !

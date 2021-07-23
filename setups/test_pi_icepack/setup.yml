@@ -27,8 +27,20 @@ namelist.oce:
 
 namelist.ice:
     ice_dyn:
-        whichEVP: 1
+        whichEVP: 0
         evp_rheol_steps: 120
+
+namelist.icepack:
+    nml_list_icepack:
+        io_list_icepack:
+            "aicen     ":
+                freq: 1
+                unit: d
+                prec: 8
+            "vicen     ":
+                freq: 1
+                unit: d
+                prec: 8
 
 namelist.io:
     diag_list:
@@ -61,13 +73,13 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.26911274194532003
-    salt: 23.9440531023692
-    temp: 1.7017743034836539
-    sst: 8.532529081624512
-    u: -0.0014065854610620704
-    v: 0.00014195144238082126
-
+    a_ice: 0.3059942958760058
+    salt: 23.866224273520945
+    temp: 1.7172059436119271
+    sst: 8.725966058658427
+    u: -0.0014448488412238854
+    v: 0.00018596541127645607
+    aicen: 0.061198859175201174
  
 
 

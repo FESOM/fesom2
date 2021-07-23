@@ -67,11 +67,11 @@ implicit none
   call my_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid)
 
   !Define the dimensions
-  call my_def_dim(ncid, 'nod_n',   nod2D,  nod_n_id)
+  call my_def_dim(ncid, 'nod2',    nod2D,  nod_n_id)
   call my_def_dim(ncid, 'edg_n',   edge2d, edge_n_id)
-  call my_def_dim(ncid, 'elem_n',  elem2d, elem_n_id)
-  call my_def_dim(ncid, 'nl',      nl,     nl_id)
-  call my_def_dim(ncid, 'nl1',     nl-1,   nl1_id)
+  call my_def_dim(ncid, 'elem',    elem2d, elem_n_id)
+  call my_def_dim(ncid, 'nz',      nl,     nl_id)
+  call my_def_dim(ncid, 'nz1',     nl-1,   nl1_id)
   call my_def_dim(ncid, 'n2',      2,      id_2)
   call my_def_dim(ncid, 'n3',      3,      id_3)
   call my_def_dim(ncid, 'n4',      4,      id_4)
@@ -79,8 +79,8 @@ implicit none
 
   !Define the variables
   ! 1D
-  call my_def_var(ncid, 'zbar',              NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels'                       )
-  call my_def_var(ncid, 'Z',                 NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers'                       )
+  call my_def_var(ncid, 'nz',                NF_DOUBLE, 1, (/nl_id /),    zbar_id,              'depth of levels'                       )
+  call my_def_var(ncid, 'nz1',               NF_DOUBLE, 1, (/nl1_id/),    z_id,                 'depth of layers'                       )
   call my_def_var(ncid, 'elem_area',         NF_DOUBLE, 1, (/elem_n_id/), elem_area_id,         'element areas'                         )
   call my_def_var(ncid, 'nlevels_nod2D',     NF_INT,    1, (/nod_n_id/),  nlevels_nod2D_id,     'number of levels below nodes'          )
   call my_def_var(ncid, 'nlevels',           NF_INT,    1, (/elem_n_id/), nlevels_id,           'number of levels below elements'       )
@@ -90,15 +90,15 @@ implicit none
   call my_def_var(ncid, 'zbar_e_bottom',     NF_DOUBLE, 1, (/elem_n_id/), zbar_e_bot_id,        'element bottom depth')
   call my_def_var(ncid, 'zbar_n_bottom',     NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_bot_id,        'nodal bottom depth')
   ! 2D
-  call my_def_var(ncid, 'nod_area',        NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
-  call my_def_var(ncid, 'elem',            NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
-  call my_def_var(ncid, 'nodes',           NF_DOUBLE, 2, (/nod_n_id,  id_2/), nod_id,             'nodal geo. coordinates'      )
-  call my_def_var(ncid, 'nod_in_elem2D',   NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node')
-  call my_def_var(ncid, 'edges',           NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges'                       )
-  call my_def_var(ncid, 'edge_tri',        NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles'              )
-  call my_def_var(ncid, 'edge_cross_dxdy', NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess'       )
-  call my_def_var(ncid, 'gradient_sca_x',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element')
-  call my_def_var(ncid, 'gradient_sca_y',  NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element')
+  call my_def_var(ncid, 'nod_area',          NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
+  call my_def_var(ncid, 'elements',          NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
+  call my_def_var(ncid, 'nodes',             NF_DOUBLE, 2, (/nod_n_id,  id_2/), nod_id,             'nodal geo. coordinates'      )
+  call my_def_var(ncid, 'nod_in_elem2D',     NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node')
+  call my_def_var(ncid, 'edges',             NF_INT,    2, (/edge_n_id, id_2/), edges_id,           'edges'                       )
+  call my_def_var(ncid, 'edge_tri',          NF_INT,    2, (/edge_n_id, id_2/), edge_tri_id,        'edge triangles'              )
+  call my_def_var(ncid, 'edge_cross_dxdy',   NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess'       )
+  call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_x_id,  'x component of a gradient at nodes of an element')
+  call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/id_3, elem_n_id/), gradient_sca_y_id,  'y component of a gradient at nodes of an element')
   call my_nf_enddef(ncid)
 
   ! vercical levels/layers
@@ -155,7 +155,7 @@ implicit none
   DO i=1, N_max
      lbuffer=0
         do k=1, myDim_nod2D
-           if ((nod_in_elem2D(i, k) > 0) .and. (N_max<=nod_in_elem2D_num(k))) then
+           if ((nod_in_elem2D_num(k)>=i)) then
               lbuffer(k)=myList_elem2D(nod_in_elem2D(i, k))
            end if
         end do
@@ -232,7 +232,7 @@ implicit none
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer)
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer)
+     call my_put_vara(ncid, gradient_sca_x_id, (/4-i, 1/), (/1, elem2D/), rbuffer) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -240,7 +240,7 @@ implicit none
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer)
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer)
+     call my_put_vara(ncid, gradient_sca_y_id, (/4-i, 1/), (/1, elem2D/), rbuffer) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
   

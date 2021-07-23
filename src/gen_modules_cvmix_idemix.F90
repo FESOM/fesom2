@@ -272,7 +272,7 @@ module g_cvmix_idemix
         implicit none
         type(t_mesh), intent(in), target :: mesh
         integer       :: node, elem, edge, node_size
-        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12
+        integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln 
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
@@ -286,20 +286,21 @@ module g_cvmix_idemix
         node_size = myDim_nod2D
         do node = 1,node_size
             nln = nlevels_nod2D(node)-1
+            uln = ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
-            bvfreq2        = 0.0_WP
-            bvfreq2(2:nln) = bvfreq(2:nln,node)
+            bvfreq2          = 0.0_WP
+            bvfreq2(uln:nln) = bvfreq(uln:nln,node)
             
             !___________________________________________________________________
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
-            dz_trr         = 0.0_WP
-            dz_trr(2:nln)  = abs(Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node))
-            dz_trr(1)      = hnode(1,node)/2.0_WP
-            dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
+            dz_trr           = 0.0_WP
+            dz_trr(uln+1:nln)= abs(Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node))
+            dz_trr(uln)      = hnode(uln,node)/2.0_WP
+            dz_trr(nln+1)    = hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
             ! main call to calculate idemix
@@ -307,41 +308,42 @@ module g_cvmix_idemix
             
             call cvmix_coeffs_idemix(&
                 ! parameter
-                dzw             = hnode(:,node),                &
-                dzt             = dz_trr(:),                    &
-                nlev            = nln,                          &
-                max_nlev        = nl-1,                         &  
-                dtime           = dt,                           &
-                coriolis        = coriolis_node(node),          &
+                dzw             = hnode(uln:nln,node),                &
+                dzt             = dz_trr(uln:nln+1),                  &
+!                 nlev            = nln,                                &
+                nlev            = nln-uln+1,                          &
+                max_nlev        = nl-1,                               &  
+                dtime           = dt,                                 &
+                coriolis        = coriolis_node(node),                &
                 ! essentials 
-                iwe_new         = iwe(:,node),                  & ! out
-                iwe_old         = iwe_old(:),                   & ! in
-                forc_iw_surface = forc_iw_surface_2D(node),     & ! in
-                forc_iw_bottom  = forc_iw_bottom_2D(node),      & ! in
+                iwe_new         = iwe(uln:nln+1,node),                & ! out
+                iwe_old         = iwe_old(uln:nln+1),                 & ! in
+                forc_iw_surface = forc_iw_surface_2D(node),           & ! in
+                forc_iw_bottom  = forc_iw_bottom_2D(node),            & ! in
                 ! FIXME: nils: better output IDEMIX Ri directly
-                alpha_c         = iwe_alpha_c(:,node),          & ! out (for Ri IMIX)
+                alpha_c         = iwe_alpha_c(uln:nln+1,node),        & ! out (for Ri IMIX)
                 ! only for Osborn shortcut 
                 ! FIXME: nils: put this to cvmix_tke
-                KappaM_out      = iwe_Av(:,node),               & ! out
-                KappaH_out      = iwe_Kv(:,node),               & ! out
-                Nsqr            = bvfreq2(:),                   & ! in
+                KappaM_out      = iwe_Av(  uln:nln+1,node),           & ! out
+                KappaH_out      = iwe_Kv(  uln:nln+1,node),           & ! out
+                Nsqr            = bvfreq2( uln:nln+1),                & ! in
                 ! diagnostics
-                iwe_Ttot        = iwe_Ttot(:,node),             &
-                iwe_Tdif        = iwe_Tdif(:,node),             &
-                iwe_Thdi        = iwe_Thdi(:,node),             &
-                iwe_Tdis        = iwe_Tdis(:,node),             &
-                iwe_Tsur        = iwe_Tsur(:,node),             &
-                iwe_Tbot        = iwe_Tbot(:,node),             &
-                c0              = iwe_c0(:,node),               &
-                v0              = iwe_v0(:,node),               &
+                iwe_Ttot        = iwe_Ttot(uln:nln+1,node),           &
+                iwe_Tdif        = iwe_Tdif(uln:nln+1,node),           &
+                iwe_Thdi        = iwe_Thdi(uln:nln+1,node),           &
+                iwe_Tdis        = iwe_Tdis(uln:nln+1,node),           &
+                iwe_Tsur        = iwe_Tsur(uln:nln+1,node),           &
+                iwe_Tbot        = iwe_Tbot(uln:nln+1,node),           &
+                c0              = iwe_c0(  uln:nln+1,node),           &
+                v0              = iwe_v0(  uln:nln+1,node),           &
                 ! debugging
-                debug           = debug,                        &
+                debug           = debug,                              &
                 !i = i,                                        &
                 !j = j,                                        &
                 !tstep_count = tstep_count,                    &
-                cvmix_int_1     = cvmix_dummy_1(:,node),        &
-                cvmix_int_2     = cvmix_dummy_2(:,node),        &
-                cvmix_int_3     = cvmix_dummy_3(:,node)         &
+                cvmix_int_1     = cvmix_dummy_1(uln:nln+1,node),      &
+                cvmix_int_2     = cvmix_dummy_2(uln:nln+1,node),      &
+                cvmix_int_3     = cvmix_dummy_3(uln:nln+1,node)       &
                 )
             
         end do !-->do node = 1,node_size
@@ -389,23 +391,24 @@ module g_cvmix_idemix
                 
                 ! number of above bottom levels at node
                 nln = nlevels_nod2D(node)-1
+                uln = ulevels_nod2D(node)
                 
                 ! thickness of mid-level to mid-level interface at node
-                dz_trr         = 0.0_WP
-                dz_trr(2:nln)  = Z_3d_n(1:nln-1,node)-Z_3d_n(2:nln,node)
-                dz_trr(1)      = hnode(1,node)/2.0_WP
-                dz_trr(nln+1)  = hnode(nln,node)/2.0_WP
+                dz_trr             = 0.0_WP
+                dz_trr(uln+1:nln)  = Z_3d_n(uln:nln-1,node)-Z_3d_n(uln+1:nln,node)
+                dz_trr(uln)        = hnode(uln,node)/2.0_WP
+                dz_trr(nln+1)      = hnode(nln,node)/2.0_WP
                 
                 ! surface cell 
-                vol_wcelli(1,node) = 1/(area(1,node)*dz_trr(1))
-                aux = sqrt(cflfac*(area(1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
-                iwe_v0(1,node) = min(iwe_v0(1,node),aux)
+                vol_wcelli(uln,node) = 1/(areasvol(uln,node)*dz_trr(uln))
+                aux = sqrt(cflfac*(area(uln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
+                iwe_v0(uln,node) = min(iwe_v0(uln,node),aux)
                 
                 ! bulk cells
                 !!PS do nz=2,nln
-                do nz=ulevels_nod2D(node)+1,nln
+                do nz=uln+1,nln
                     ! inverse volumne 
-                    vol_wcelli(nz,node) = 1/(area(nz-1,node)*dz_trr(nz))
+                    vol_wcelli(nz,node) = 1/(areasvol(nz-1,node)*dz_trr(nz))
                     
                     ! restrict iwe_v0
                     aux = sqrt(cflfac*(area(nz-1,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
@@ -415,7 +418,7 @@ module g_cvmix_idemix
                 end do 
                 
                 ! bottom cell 
-                vol_wcelli(nln+1,node) = 1/(area(nln,node)*dz_trr(nln+1))
+                vol_wcelli(nln+1,node) = 1/(areasvol(nln,node)*dz_trr(nln+1))
                 aux = sqrt(cflfac*(area(nln,node)/pi*4.0_WP)/(idemix_tau_h*dt/idemix_n_hor_iwe_prop_iter))
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
@@ -457,7 +460,7 @@ module g_cvmix_idemix
                 
                 ! thickness of mid-level to mid-level interface of element el(1)
                 dz_trr         = 0.0_WP
-                dz_trr(1)      = helem(1,el(1))/2.0_WP
+                dz_trr(nu1)    = helem(nu1,el(1))/2.0_WP
                 !!PS do nz=2,nl1-1
                 do nz=nu1+1,nl1-1
                     dz_trr(nz) = helem(nz-1,el(1))/2.0_WP + helem(nz,el(1))/2.0_WP
@@ -478,7 +481,7 @@ module g_cvmix_idemix
                     
                     ! thickness of mid-level to mid-level interface of element el(2)
                     dz_trr2         = 0.0_WP
-                    dz_trr2(1)      = helem(1,el(2))/2.0_WP
+                    dz_trr2(nu2)    = helem(nu2,el(2))/2.0_WP
                     !!PS do nz=2,nl2-1
                     do nz=nu2+1,nl2-1
                         dz_trr2(nz) = helem(nz-1,el(2))/2.0_WP + helem(nz,el(2))/2.0_WP

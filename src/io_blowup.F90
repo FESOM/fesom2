@@ -152,11 +152,9 @@ MODULE io_BLOWUP
 !!PS 		call def_variable(bid, 'u_ice_old'	, (/nod2D/)			, 'zonal velocity',    'm/s', u_ice_old);
 !!PS  		call def_variable(bid, 'v_ice_old'	, (/nod2D/)			, 'meridional velocity', 'm', v_ice_old);
  		call def_variable(bid, 'heat_flux'	, (/nod2D/)			, 'heat flux ',     '?', heat_flux); !PS
-!!PS  		call def_variable(bid, 'heat_flux_old', (/nod2D/)		, 'heat flux old',    '?', heat_flux_old); !PS
 		call def_variable(bid, 'water_flux'	, (/nod2D/)			, 'water flux ',    '?', water_flux); !PS
 		call def_variable(bid, 'tx_sur'	    , (/elem2d/)		, 'tx_sur',         '?', stress_surf(1, :)); !PS
 		call def_variable(bid, 'ty_sur'	    , (/elem2d/)		, 'ty_sur',         '?', stress_surf(2, :)); !PS
-!!PS 		call def_variable(bid, 'water_flux_old', (/nod2D/)		, 'water flux old',    '?', water_flux_old); !PS
 		
 !!PS 		call def_variable(bid, 'fer_k'			, (/nl, nod2D/)		, 'GM diffusivity', '', fer_K);
 		
