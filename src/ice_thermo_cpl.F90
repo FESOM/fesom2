@@ -519,23 +519,26 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.gt.0.) then !SH does not have melt ponds
-      albsnm = 0.72_WP
-  else
-      albsnm = 0.6_WP
-  endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
-        if (hsn.gt.0.0_WP) then !   snow cover present  
+        if (hsn.gt.0.0_WP) then    ! snow cover present  
            alb=albsn            
-        else                    !   no snow cover       
+        else                       ! no snow cover       
            alb=albi             
         endif
-     else                               ! melting condition     
-        if (hsn.gt.0.0_WP) then !   snow cover present  
-           alb=albsnm           
-        else                    !   no snow cover       
-           alb=albim            
+     else                          ! melting condition     
+        if (hsn.gt.0.0_WP) then    ! snow cover present  
+           if (geolat.gt.0.) then  ! SH does not have melt ponds
+              alb = albsnm
+      else                         ! NH does have melt ponds
+              alb = albsnm-0.12_WP
+           endif
+        else                       ! no snow cover       
+           if (geolat.gt.0.) then  ! SH does not have melt ponds
+              alb = albim
+      else                         ! NH does have melt ponds
+              alb = albim-0.12_WP
+           endif
         endif
      endif
    else

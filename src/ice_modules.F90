@@ -140,15 +140,16 @@ REAL(kind=WP)    :: Armin=0.01        ! Minimum ice concentration !!
 REAL(kind=WP)    :: emiss_ice=0.97        ! Emissivity of Snow/Ice, 
 REAL(kind=WP)    :: emiss_wat=0.97        ! Emissivity of open water
 
-REAL(kind=WP)    :: albsn=   0.81     ! Albedo: frozen snow
-REAL(kind=WP)    :: albsnm=  0.77     !         melting snow
-REAL(kind=WP)    :: albi=    0.70     !         frozen ice
-REAL(kind=WP)    :: albim=   0.68     !         melting ice
-REAL(kind=WP)    :: albw=    0.066    !         open water, LY2004
+REAL(kind=WP)    :: albsn=     0.81     ! Albedo: frozen snow
+REAL(kind=WP)    :: albsnm=    0.77     !         melting snow
+REAL(kind=WP)    :: albsnm_sh= 0.77     !         melting snow southern hemisphere
+REAL(kind=WP)    :: albsnm_nh= 0.67     !         melting snow northern hemisphere (lowered to account for melt ponds)
+REAL(kind=WP)    :: albi=      0.70     !         frozen ice
+REAL(kind=WP)    :: albim=     0.68     !         melting ice
+REAL(kind=WP)    :: albw=      0.066    !         open water, LY2004
 
   NAMELIST /ice_therm/ Sice, h0, emiss_ice, &
-  emiss_wat, albsn, albsnm, albi, albim, albw, con, consn
-
+  emiss_wat, albsn, albsnm, albsnm_sh, albsnm_nh, albi, albim, albw, con, consn
 end module i_therm_param
 
 
