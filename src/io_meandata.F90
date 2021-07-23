@@ -517,7 +517,9 @@ END DO
         call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+#if defined (__oasis)
         call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4,  mesh)
+#endif
     end if
     
     
