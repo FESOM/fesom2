@@ -312,7 +312,7 @@ submodule (icedrv_main) icedrv_step
              ntrcr, nbtrcr
     
           logical (kind=log_kind) :: &
-             tr_fsd  ! floe size distribution tracers
+             tr_fsd, update_ocn_f_out  ! floe size distribution tracers
     
           character(len=*), parameter :: subname='(step_therm2)'
     
@@ -322,6 +322,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
+          call icepack_query_parameters(update_ocn_f_out=update_ocn_f) 
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
@@ -388,7 +389,7 @@ submodule (icedrv_main) icedrv_step
 ! finalize thermo updates
 !
 
-      subroutine update_state (dt, daidt, dvidt, dagedt, offset)
+      subroutine update_state (dt, daidt, dvidt, dagedt, offset, comp_t)
 
           ! column package includes
           use icepack_intfc, only: icepack_aggregate
@@ -398,6 +399,9 @@ submodule (icedrv_main) icedrv_step
           real (kind=dbl_kind), intent(in) :: &
              dt    , & ! time step
              offset    ! d(age)/dt time offset = dt for thermo, 0 for dyn
+
+          logical (kind=log_kind), intent(in) :: &
+             comp_t    ! if .true. (as by default) compute tendencies
     
           real (kind=dbl_kind), dimension(:), intent(inout) :: &
              daidt, & ! change in ice area per time step
@@ -432,7 +436,7 @@ submodule (icedrv_main) icedrv_step
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
-    
+  
           do i = 1, nx
     
           !-----------------------------------------------------------------
@@ -454,17 +458,19 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
           ! Compute thermodynamic area and volume tendencies.
           !-----------------------------------------------------------------
-    
-             daidt(i) = (aice(i) - daidt(i)) / dt
-             dvidt(i) = (vice(i) - dvidt(i)) / dt
-             if (tr_iage) then
-                if (offset > c0) then                 ! thermo
-                   if (trcr(i,nt_iage) > c0) &
-                   dagedt(i) = (trcr(i,nt_iage) &
-                                    - dagedt(i) - offset) / dt
-                else                                  ! dynamics
-                   dagedt(i) = (trcr(i,nt_iage) &
-                                    - dagedt(i)) / dt
+
+             if (comp_t) then    
+                daidt(i) = (aice(i) - daidt(i)) / dt
+                dvidt(i) = (vice(i) - dvidt(i)) / dt
+                if (tr_iage) then
+                   if (offset > c0) then                 ! thermo
+                      if (trcr(i,nt_iage) > c0) &
+                      dagedt(i) = (trcr(i,nt_iage) &
+                                       - dagedt(i) - offset) / dt
+                   else                                  ! dynamics
+                      dagedt(i) = (trcr(i,nt_iage) &
+                                       - dagedt(i)) / dt
+                   endif
                 endif
              endif
     
@@ -922,8 +928,7 @@ submodule (icedrv_main) icedrv_step
              sst       , & ! sea surface temperature (C)
              sss       , & ! sea surface salinity
              frain     , & ! rainfall rate (kg/m^2/s)
-             fsnow     , & ! snowfall rate (kg/m^2/s)
-             fsalt         ! salt flux from ice to the ocean (kg/m^2/s) 
+             fsnow         ! snowfall rate (kg/m^2/s)
 
           real (kind=dbl_kind), intent(inout) :: &
              flwout_ocn, & ! outgoing longwave radiation (W/m^2)
@@ -934,7 +939,8 @@ submodule (icedrv_main) icedrv_step
              fresh     , & ! fresh water flux to ocean (kg/m^2/s)
              frzmlt    , & ! freezing/melting potential (W/m^2)
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
-             fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
+             fresh_tot , & ! fresh total water flux to ocean (kg/m^2/s)
+             fsalt         ! salt flux from ice to the ocean (kg/m^2/s) 
              
 
           real (kind=dbl_kind), parameter :: &
@@ -948,14 +954,15 @@ submodule (icedrv_main) icedrv_step
              Lvap,     & 
              lfs_corr, &  ! fresh water correction for linear free surface      
              stefan_boltzmann, &
-             ice_ref_salinity
+             ice_ref_salinity, &
+             rhow
 
           character(len=*),parameter :: subname='(icepack_ocn_mixed_layer)'
 
           call icepack_query_parameters( Tffresh_out=Tffresh, Lfresh_out=Lfresh, &
                                          stefan_boltzmann_out=stefan_boltzmann,  &
                                          ice_ref_salinity_out=ice_ref_salinity,  &
-                                         Lvap_out=Lvap                           )
+                                         Lvap_out=Lvap, rhow_out=rhow            )
 
           ! shortwave radiative flux ! Visible is absorbed by clorophil
           ! afterwards
@@ -984,9 +991,11 @@ submodule (icedrv_main) icedrv_step
           if (use_virt_salt) then
              lfs_corr = fsalt/ice_ref_salinity/p001
              fresh = fresh - lfs_corr * ice_ref_salinity / sss
+          else
+             fsalt = fsalt / p001 / rhow        
           endif
 
-          fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          fresh_tot = fresh + frain + (-evap_ocn + fsnow)*(c1-aice)
 
       end subroutine ocn_mixed_layer_icepack
 
@@ -1161,64 +1170,63 @@ submodule (icedrv_main) icedrv_step
           call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers)
           call icepack_query_parameters(solve_zsal_out=solve_zsal, calc_Tsfc_out=calc_Tsfc, &
                                         wave_spec_out=wave_spec)
+          
           call icepack_query_tracer_flags(tr_brine_out=tr_brine, tr_fsd_out=tr_fsd)
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
     
-          ! TODO: Add appropriate timing
-
           !-----------------------------------------------------------------
           ! copy variables from fesom2 (also ice velocities)
           !-----------------------------------------------------------------
-
           call fesom_to_icepack(mesh)
-
+            
           !-----------------------------------------------------------------
-          ! tendencies needed by fesom
+          ! initialize tendencies needed by fesom
           !-----------------------------------------------------------------
-
-          dhi_dt(:) = vice(:)
-          dhs_dt(:) = vsno(:)
-
+          ! do update_state(...) here so the aggregated variables are computed in 
+          ! case there was a restart, because for the restart only the thickness
+          ! class variables are stored not the aggregated one
+          if (istep1 .eq. 1) then
+             call update_state (dt, daidtt, dvidtt, dagedtt, offset, comp_t=.false.)
+          end if
+          dhi_t_dt(:) = vice(:)
+          dhs_t_dt(:) = vsno(:)
+            
           !-----------------------------------------------------------------
           ! initialize diagnostics
           !-----------------------------------------------------------------
-    
           call init_history_therm
           call init_history_bgc
-    
+            
           !-----------------------------------------------------------------
           ! Scale radiation fields
           !-----------------------------------------------------------------
-    
           if (calc_Tsfc) call prep_radiation ()
-    
+            
           !-----------------------------------------------------------------
           ! thermodynamics and biogeochemistry
           !-----------------------------------------------------------------
-    
           call step_therm1     (dt) ! vertical thermodynamics
           call step_therm2     (dt) ! ice thickness distribution thermo
-    
+            
+          !-----------------------------------------------------------------         
+          ! clean up, update tendency diagnostics
+          !-----------------------------------------------------------------
+          offset = dt
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset, comp_t=.true.)
+            
           !-----------------------------------------------------------------
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
-
-          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
-         
-          ! clean up, update tendency diagnostics
-    
-          offset = dt
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
-    
+          dhi_t_dt(:) = ( vice(:) - dhi_t_dt(:) ) / dt
+          dhs_t_dt(:) = ( vsno(:) - dhs_t_dt(:) ) / dt
+            
           !-----------------------------------------------------------------
           ! dynamics, transport, ridging
           !-----------------------------------------------------------------
-    
           call init_history_dyn
-    
+            
           ! Compute sea-ice internal stress (immediately before EVP)
           do i = 1, nx
               call icepack_ice_strength(ncat,                     &
@@ -1229,15 +1237,14 @@ submodule (icedrv_main) icedrv_step
           ! wave fracture of the floe size distribution
           ! note this is called outside of the dynamics subcycling loop
           if (tr_fsd .and. wave_spec) call step_dyn_wave(dt)
-    
+            
           do k = 1, ndtd
-    
+                
              !-----------------------------------------------------------------
              ! EVP 
              !-----------------------------------------------------------------
-
              t2 = MPI_Wtime()
-
+                
              select case (whichEVP)
                 case (0)
                    call EVPdynamics(mesh)
@@ -1250,62 +1257,66 @@ submodule (icedrv_main) icedrv_step
                    call par_ex
                    stop
              end select
-
+                
              t3 = MPI_Wtime()
              time_evp = t3 - t2
-
+                
              !-----------------------------------------------------------------
              ! update ice velocities
              !-----------------------------------------------------------------
-
              call fesom_to_icepack(mesh)
-
+             
              !-----------------------------------------------------------------
              ! advect tracers
              !-----------------------------------------------------------------
-
              t2 = MPI_Wtime()
-
+             
              call tracer_advection_icepack(mesh)
-
+             
              t3 = MPI_Wtime()
              time_advec = t3 - t2
-
+                
+             !-----------------------------------------------------------------
+             ! initialize tendencies needed by fesom
+             !-----------------------------------------------------------------
+             dhi_r_dt(:) = vice(:)
+             dhs_r_dt(:) = vsno(:)
+             
              !-----------------------------------------------------------------
              ! ridging
              !-----------------------------------------------------------------
-
              call step_dyn_ridge (dt_dyn, ndtd)
-     
+             
              ! clean up, update tendency diagnostics
              offset = c0
-             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-    
+             call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset, comp_t=.true.)
+             
+             !-----------------------------------------------------------------
+             ! tendencies needed by fesom
+             !-----------------------------------------------------------------
+             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
+            
           enddo
-    
+          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+            
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation
           !-----------------------------------------------------------------
-    
           call step_radiation (dt)
-    
+            
           !-----------------------------------------------------------------
           ! get ready for coupling and the next time step
           !-----------------------------------------------------------------
-    
           call coupling_prep (dt)
-
+            
           !-----------------------------------------------------------------
           ! icepack timing
           !-----------------------------------------------------------------  
-
           t4 = MPI_Wtime()
           time_therm = t4 - t1 - time_advec - time_evp
-
-          !time_advec = c0
-          !time_therm = c0
-          !time_evp   = c0
-
+                    
       end subroutine step_icepack
 
 
