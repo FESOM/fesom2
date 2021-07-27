@@ -319,7 +319,7 @@ subroutine read_raw_restart(filegroup)
   integer status
 
   if(mype == RAW_RESTART_METADATA_RANK) then
-    ! store metadata about the raw restart
+    ! read metadata info for the raw restart
     open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
     if(status == 0) then
       read(fileunit,*) rstep
