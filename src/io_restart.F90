@@ -186,8 +186,7 @@ subroutine restart(istep, l_read, mesh)
       if (use_ice) call read_restart(ice_path, ice_files)
       ! immediately create a raw restart
       if(raw_restart_length_unit /= "off") then
-        call write_raw_restart(oce_files, istep)
-        if(use_ice) call write_raw_restart(ice_files, istep)
+        call write_all_raw_restarts(istep)
       end if
     end if
   end if
@@ -210,8 +209,7 @@ subroutine restart(istep, l_read, mesh)
   end if
 
   if(is_raw_restart_write) then
-    call write_raw_restart(oce_files, istep)
-    if(use_ice) call write_raw_restart(ice_files, istep)
+    call write_all_raw_restarts(istep)
   end if
 
   ! actualize clock file to latest restart point
@@ -269,6 +267,15 @@ subroutine write_restart(path, filegroup, istep)
     call filegroup%files(i)%async_gather_and_write_variables()
   end do
   
+end subroutine
+
+
+subroutine write_all_raw_restarts(istep)
+  integer,  intent(in):: istep
+  ! EO parameters
+
+  call write_raw_restart(oce_files, istep)
+  if(use_ice) call write_raw_restart(ice_files, istep)
 end subroutine
 
 
