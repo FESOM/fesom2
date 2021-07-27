@@ -179,8 +179,7 @@ subroutine restart(istep, l_read, mesh)
     end if
     call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
     if(dumpfiles_exist) then
-      call read_raw_restart(oce_files)
-      if(use_ice) call read_raw_restart(ice_files)
+      call read_all_raw_restarts()
     else
       call read_restart(oce_path, oce_files)
       if (use_ice) call read_restart(ice_path, ice_files)
@@ -301,6 +300,12 @@ subroutine write_raw_restart(filegroup, istep)
     write(fileunit, '(2(g0))') "! year: ",yearnew
     close(fileunit)
   end if
+end subroutine
+
+
+subroutine read_all_raw_restarts()
+  call read_raw_restart(oce_files)
+  if(use_ice) call read_raw_restart(ice_files)
 end subroutine
 
 
