@@ -275,8 +275,8 @@ subroutine write_all_raw_restarts(istep)
   integer cstep
   integer fileunit
 
-  call write_raw_restart(oce_files)
-  if(use_ice) call write_raw_restart(ice_files)
+  call write_raw_restart_group(oce_files)
+  if(use_ice) call write_raw_restart_group(ice_files)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     print *,"writing raw restart to "//raw_restart_dirpath
@@ -291,7 +291,7 @@ subroutine write_all_raw_restarts(istep)
 end subroutine
 
 
-subroutine write_raw_restart(filegroup)
+subroutine write_raw_restart_group(filegroup)
   type(restart_file_group), intent(inout) :: filegroup
   ! EO parameters
   integer i
@@ -331,12 +331,12 @@ subroutine read_all_raw_restarts()
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
 
-  call read_raw_restart(oce_files)
-  if(use_ice) call read_raw_restart(ice_files)
+  call read_raw_restart_group(oce_files)
+  if(use_ice) call read_raw_restart_group(ice_files)
 end subroutine
 
 
-subroutine read_raw_restart(filegroup)
+subroutine read_raw_restart_group(filegroup)
   type(restart_file_group), intent(inout) :: filegroup
   ! EO parameters
   integer i
