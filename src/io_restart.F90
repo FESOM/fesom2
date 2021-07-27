@@ -334,18 +334,26 @@ subroutine read_all_raw_restarts()
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
 
-  call read_raw_restart_group(oce_files)
-  if(use_ice) call read_raw_restart_group(ice_files)
+  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  if(status == 0) then
+    call read_raw_restart_group(oce_files, fileunit)
+    if(use_ice) call read_raw_restart_group(ice_files, fileunit)
+    close(fileunit)
+  else
+    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump'
+    stop 1
+  end if
 end subroutine
 
 
-subroutine read_raw_restart_group(filegroup)
+subroutine read_raw_restart_group(filegroup, fileunit)
   type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: fileunit
   ! EO parameters
   integer i
   
   do i=1, filegroup%nfiles
-    call filegroup%files(i)%read_variables_raw(raw_restart_dirpath)
+    call filegroup%files(i)%read_variables_raw(fileunit)
   end do  
 end subroutine
 

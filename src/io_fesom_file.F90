@@ -268,24 +268,17 @@ contains
   end subroutine
 
 
-  subroutine read_variables_raw(this, outdir)
+  subroutine read_variables_raw(this, fileunit)
     class(fesom_file_type), target :: this
-    character(len=*), intent(in) :: outdir
+    integer, intent(in) :: fileunit
     ! EO parameters
-    integer i, fileunit
+    integer i
     type(var_info), pointer :: var
     integer status
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-      open(newunit = fileunit, status = 'old', iostat = status, file = outdir//'/'//var%varname//'_'//mpirank_to_txt()//'.dump', form = 'unformatted')
-      if(status == 0) then
-        read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-        close(fileunit)
-      else
-        print *,"can not open ",outdir//'/'//var%varname//'_'//mpirank_to_txt()//'.dump'
-        stop 1
-      end if
+      read(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
     end do
   end subroutine
 
@@ -510,15 +503,6 @@ contains
     this%rec_cnt = -1 ! reset state (should probably be done in all the open_ procedures, not here)
     call this%netcdf_file_type%close_file()
   end subroutine  
-
-
-  function mpirank_to_txt() result(txt)
-    use g_PARSUP
-    use fortran_utils
-    character(:), allocatable :: txt
-    ! EO parameters
-    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
-  end function
 
 
   subroutine assert(val, line)
