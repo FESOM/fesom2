@@ -288,6 +288,8 @@ subroutine write_all_raw_restarts(istep)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
     write(fileunit, '(2(g0))') "! year: ",yearnew
+    write(fileunit, '(g0)') "! oce"
+    if(use_ice) write(fileunit, '(g0)') "! ice"
     close(fileunit)
   end if
 end subroutine
