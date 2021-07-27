@@ -275,8 +275,10 @@ subroutine write_all_raw_restarts(istep)
   integer cstep
   integer fileunit
 
-  call write_raw_restart_group(oce_files)
-  if(use_ice) call write_raw_restart_group(ice_files)
+  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  call write_raw_restart_group(oce_files, fileunit)
+  if(use_ice) call write_raw_restart_group(ice_files, fileunit)
+  close(fileunit)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     print *,"writing raw restart to "//raw_restart_dirpath
@@ -291,13 +293,14 @@ subroutine write_all_raw_restarts(istep)
 end subroutine
 
 
-subroutine write_raw_restart_group(filegroup)
+subroutine write_raw_restart_group(filegroup, fileunit)
   type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: fileunit
   ! EO parameters
   integer i
   
   do i=1, filegroup%nfiles
-    call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
+    call filegroup%files(i)%write_variables_raw(fileunit)
   end do
 end subroutine
 
@@ -464,6 +467,15 @@ end subroutine
       stop 1
     stop
     end if
+  end function
+
+
+  function mpirank_to_txt() result(txt)
+    use g_PARSUP
+    use fortran_utils
+    character(:), allocatable :: txt
+    ! EO parameters
+    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
   end function
 
 end module

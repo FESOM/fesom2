@@ -290,18 +290,16 @@ contains
   end subroutine
 
 
-  subroutine write_variables_raw(this, outdir)
+  subroutine write_variables_raw(this, fileunit)
     class(fesom_file_type), target :: this
-    character(len=*) outdir
+    integer, intent(in) :: fileunit
     ! EO parameters
-    integer i, fileunit
+    integer i
     type(var_info), pointer :: var
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
-      open(newunit = fileunit, file = outdir//'/'//var%varname//'_'//mpirank_to_txt()//'.dump', form = 'unformatted')
       write(fileunit) var%external_local_data_ptr ! directly use external_local_data_ptr, use the local_data_copy only when called asynchronously
-      close(fileunit)
     end do
   end subroutine
 
