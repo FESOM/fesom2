@@ -272,24 +272,12 @@ end subroutine
 subroutine write_all_raw_restarts(istep)
   integer,  intent(in):: istep
   ! EO parameters
-
-  call write_raw_restart(oce_files, istep)
-  if(use_ice) call write_raw_restart(ice_files, istep)
-end subroutine
-
-
-subroutine write_raw_restart(filegroup, istep)
-  type(restart_file_group), intent(inout) :: filegroup
-  integer,  intent(in):: istep
-  ! EO parameters
-  integer i
   integer cstep
   integer fileunit
-  
-  do i=1, filegroup%nfiles
-    call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
-  end do
-  
+
+  call write_raw_restart(oce_files)
+  if(use_ice) call write_raw_restart(ice_files)
+
   if(mype == RAW_RESTART_METADATA_RANK) then
     print *,"writing raw restart to "//raw_restart_dirpath
     ! store metadata about the raw restart
@@ -303,16 +291,18 @@ subroutine write_raw_restart(filegroup, istep)
 end subroutine
 
 
-subroutine read_all_raw_restarts()
-  call read_raw_restart(oce_files)
-  if(use_ice) call read_raw_restart(ice_files)
-end subroutine
-
-
-subroutine read_raw_restart(filegroup)
+subroutine write_raw_restart(filegroup)
   type(restart_file_group), intent(inout) :: filegroup
   ! EO parameters
   integer i
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
+  end do
+end subroutine
+
+
+subroutine read_all_raw_restarts()
   integer rstep
   real(kind=WP) rtime
   integer fileunit
@@ -340,6 +330,16 @@ subroutine read_raw_restart(filegroup)
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+
+  call read_raw_restart(oce_files)
+  if(use_ice) call read_raw_restart(ice_files)
+end subroutine
+
+
+subroutine read_raw_restart(filegroup)
+  type(restart_file_group), intent(inout) :: filegroup
+  ! EO parameters
+  integer i
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%read_variables_raw(raw_restart_dirpath)
