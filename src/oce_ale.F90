@@ -2719,20 +2719,27 @@ subroutine oce_timestep_ale(n, mesh)
     call compute_hbar_ale(mesh)
     
     !___________________________________________________________________________
-    ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
-    ! equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
-    ! ...if we do it here we don't need to write hbar_old into a restart file...
+    ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
+    !   equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
+    !   ...if we do it here we don't need to write hbar_old into a restart file...
+    ! - where(ulevels_nod2D==1) is used here because of the rigid lid 
+    !   approximation under the cavity 
+    ! - at points in the cavity the time derivative term in ssh matrix will be 
+    !   omitted; and (14) will not be applied at cavity points. Additionally,
+    !   since there is no real elevation, but only surface pressure, there is 
+    !   no layer motion under the cavity. In this case the ice sheet acts as a 
+    !   rigid lid.
     where(ulevels_nod2D==1) eta_n=alpha*hbar+(1.0_WP-alpha)*hbar_old
-
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
     t5=MPI_Wtime() 
     
+    !___________________________________________________________________________
+    ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
     end if
     
-    !___________________________________________________________________________
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
     if (Fer_GM) then
