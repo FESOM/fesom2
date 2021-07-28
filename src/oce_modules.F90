@@ -146,6 +146,10 @@ real(kind=WP)                 :: density_ref_T     = 2.0_WP
 real(kind=WP)                 :: density_ref_S     = 34.0_WP
 
 !_______________________________________________________________________________
+! use k-profile nonlocal fluxes
+logical                       :: use_kpp_nonlclflx = .false.
+
+!_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
 real(kind=WP)    :: salinity_min=5.0              !minimal salinity 
@@ -182,7 +186,8 @@ character(20)                  :: which_pgf='shchepetkin'
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl, &
-            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra
+            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, &
+            use_kpp_nonlclflx
             
 END MODULE o_PARAM  
 !==========================================================
@@ -228,11 +233,12 @@ real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
+real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
 real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
-real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
+real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable         :: del_ttf(:,:)
@@ -240,7 +246,6 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:)
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
-real(kind=WP), allocatable    :: water_flux_old(:), Ssurf_old(:) !PS
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
@@ -273,6 +278,7 @@ real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
 real(kind=WP), allocatable,dimension(:,:,:) :: slope_tapered
 real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
+real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
@@ -326,7 +332,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
-!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n !, dum_3d_e
 !!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
 
 !_______________________________________________________________________________

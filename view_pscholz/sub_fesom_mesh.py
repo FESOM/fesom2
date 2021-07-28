@@ -130,7 +130,8 @@ class fesom_mesh:
         
         #_______________________________________________________________________
         # remove+augment periodic boundary
-        self.fesom_remove_pbnd()
+        if (inputarray['mesh_remove_cyc' ] == True):
+            self.fesom_remove_pbnd()
         
         # calculate fesom land mask interactivly
         #self.fesom_calc_landmask()
@@ -285,9 +286,9 @@ class fesom_mesh:
         
         #_______________________________________________________________________
         # make inverse of rotation matrix
-        if (str_mode == 'r2g') or (str_mode == 'focus'):
-            from numpy.linalg import inv
-            rotate_matrix=inv(rotate_matrix);
+#         if (str_mode == 'r2g') or (str_mode == 'focus'):
+#             from numpy.linalg import inv
+#             rotate_matrix=inv(rotate_matrix);
             
         #____3D_________________________________________________________________
         # calculate Cartesian coordinates
@@ -303,9 +304,14 @@ class fesom_mesh:
         
         #_______________________________________________________________________
         # rotate to geographical cartesian coordinates:
-        xg=rotate_matrix[0,0]*xr + rotate_matrix[0,1]*yr + rotate_matrix[0,2]*zr;
-        yg=rotate_matrix[1,0]*xr + rotate_matrix[1,1]*yr + rotate_matrix[1,2]*zr;
-        zg=rotate_matrix[2,0]*xr + rotate_matrix[2,1]*yr + rotate_matrix[2,2]*zr;
+        if (str_mode == 'r2g') or (str_mode == 'focus'):
+            xg=rotate_matrix[0,0]*xr + rotate_matrix[1,0]*yr + rotate_matrix[2,0]*zr;
+            yg=rotate_matrix[0,1]*xr + rotate_matrix[1,1]*yr + rotate_matrix[2,1]*zr;
+            zg=rotate_matrix[0,2]*xr + rotate_matrix[1,2]*yr + rotate_matrix[2,2]*zr;               
+        else:            
+            xg=rotate_matrix[0,0]*xr + rotate_matrix[0,1]*yr + rotate_matrix[0,2]*zr;
+            yg=rotate_matrix[1,0]*xr + rotate_matrix[1,1]*yr + rotate_matrix[1,2]*zr;
+            zg=rotate_matrix[2,0]*xr + rotate_matrix[2,1]*yr + rotate_matrix[2,2]*zr;
         
         ##______________________________________________________________________
         #self.nodes_2d_yg = np.degrees(np.arcsin(zg));

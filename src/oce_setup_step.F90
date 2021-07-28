@@ -247,6 +247,7 @@ allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
 allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+allocate(stress_node_surf(2,node_size))
 allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
 allocate(relax2clim(node_size)) 
 allocate(heat_flux(node_size), Tsurf(node_size))
@@ -254,8 +255,7 @@ allocate(water_flux(node_size), Ssurf(node_size))
 allocate(relax_salt(node_size))
 allocate(virtual_salt(node_size))
 
-allocate(heat_flux_old(node_size),  Tsurf_old(node_size)) !PS
-allocate(water_flux_old(node_size), Ssurf_old(node_size)) !PS
+allocate(heat_flux_in(node_size))
 allocate(real_salt_flux(node_size)) !PS
 ! =================
 ! Arrays used to organize surface forcing
@@ -345,8 +345,10 @@ sigma_xy=0.0_WP
 
 ! alpha and beta in the EoS
 allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
-sw_beta=0.0_WP
-sw_alpha=0.0_WP
+allocate(dens_flux(node_size))
+sw_beta  =0.0_WP
+sw_alpha =0.0_WP
+dens_flux=0.0_WP
 
 if (Fer_GM) then
    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
@@ -383,9 +385,8 @@ end if
 !
     T_rhs=0.0_WP
     heat_flux=0.0_WP
+    heat_flux_in=0.0_WP
     Tsurf=0.0_WP
-    heat_flux_old=0.0_WP !PS
-    Tsurf_old=0.0_WP !PS
 
     S_rhs=0.0_WP
     water_flux=0.0_WP
@@ -393,12 +394,13 @@ end if
     virtual_salt=0.0_WP
 
     Ssurf=0.0_WP
-    water_flux_old=0.0_WP !PS
-    Ssurf_old=0.0_WP !PS
     
     real_salt_flux=0.0_WP
-    stress_atmoce_x=0.
-    stress_atmoce_y=0.
+    
+    stress_surf      =0.0_WP
+    stress_node_surf =0.0_WP
+    stress_atmoce_x  =0.0_WP
+    stress_atmoce_y  =0.0_WP
     
     tr_arr=0.0_WP
     tr_arr_old=0.0_WP

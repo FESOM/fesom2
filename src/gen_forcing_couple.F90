@@ -141,98 +141,100 @@ subroutine update_atm_forcing(istep, mesh)
          call cpl_oasis3mct_recv (i,exchange,action)
 	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
-	 if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action)
-         if (i.eq.1) then
-     	     if (.not. action) cycle
-             stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
-	     do_rotate_oce_wind=.true.
-         elseif (i.eq.2) then
-     	     if (.not. action) cycle
-             stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
-	     do_rotate_oce_wind=.true.
-         elseif (i.eq.3) then
-     	     if (.not. action) cycle	
-             stress_atmice_x(:) =  exchange(:)                    ! taux_ice
-	     do_rotate_ice_wind=.true.
-         elseif (i.eq.4) then
-     	     if (.not. action) cycle	
-             stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
-	     do_rotate_ice_wind=.true.	     
-         elseif (i.eq.5) then
-             if (action) then 
-	        prec_rain(:)    =  exchange(:)	                  ! tot_prec
-		mask=1.
-		call force_flux_consv(prec_rain, mask, i, 0,action, mesh)
-	     end if
-         elseif (i.eq.6) then 
-	     if (action) then
-	        prec_snow(:)    =  exchange(:)                    ! snowfall
-		mask=1.
-		call force_flux_consv(prec_snow, mask,i,1,action, mesh) ! Northern hemisphere
-		call force_flux_consv(prec_snow, mask,i,2,action, mesh) ! Southern Hemisphere
-             end if
+    if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action)
+        if (i.eq.1) then
+            if (.not. action) cycle
+            stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
+            do_rotate_oce_wind=.true.
+        elseif (i.eq.2) then
+            if (.not. action) cycle
+            stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
+            do_rotate_oce_wind=.true.
+        elseif (i.eq.3) then
+            if (.not. action) cycle	
+            stress_atmice_x(:) =  exchange(:)                    ! taux_ice
+            do_rotate_ice_wind=.true.
+        elseif (i.eq.4) then
+            if (.not. action) cycle	
+            stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
+            do_rotate_ice_wind=.true.	     
+        elseif (i.eq.5) then
+            if (action) then 
+                prec_rain(:)    =  exchange(:)	                  ! tot_prec
+                mask=1.
+                call force_flux_consv(prec_rain, mask, i, 0,action, mesh)
+            end if
+        elseif (i.eq.6) then 
+            if (action) then
+                prec_snow(:)    =  exchange(:)                    ! snowfall
+                mask=1.
+                call force_flux_consv(prec_snow, mask,i,1,action, mesh) ! Northern hemisphere
+                call force_flux_consv(prec_snow, mask,i,2,action, mesh) ! Southern Hemisphere
+            end if
          elseif (i.eq.7) then
-             if (action) then
-	     evap_no_ifrac(:)     =  exchange(:)        	  ! tot_evap
-	     tmp_evap_no_ifrac(:) =  exchange(:) 		  ! to reset for flux 
-	     							  ! correction
-	     end if
- 	     mask=1.-a_ice
-	     evap_no_ifrac(:)     =  tmp_evap_no_ifrac(:)
-	     call force_flux_consv(evap_no_ifrac,mask,i,0,action, mesh)
-         elseif (i.eq.8) then
-             if (action) then
-	     sublimation(:)       =  exchange(:)        	  ! tot_subl
-	     tmp_sublimation(:)   =  exchange(:) 		  ! to reset for flux 
-	     							  ! correction
-	     end if
-	     mask=a_ice 
-             sublimation(:)       =  tmp_sublimation(:)
-	     call force_flux_consv(sublimation,mask,i,1,action, mesh) ! Northern hemisphere
-	     call force_flux_consv(sublimation,mask,i,2,action, mesh) ! Southern Hemisphere
-         elseif (i.eq.9) then
-             if (action) then
-	     oce_heat_flux(:)     =  exchange(:)        	  ! heat_oce
-	     tmp_oce_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
-	     							  ! correction
-	     end if
-	     mask=1.-a_ice
-	     oce_heat_flux(:)     =  tmp_oce_heat_flux(:)
-	     call force_flux_consv(oce_heat_flux, mask, i, 0,action, mesh)
-         elseif (i.eq.10) then
-             if (action) then
-	     ice_heat_flux(:)     =  exchange(:)        	  ! heat_ice
-	     tmp_ice_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
-	     							  ! correction
-	     end if
-	     mask=a_ice
-	     ice_heat_flux(:)     =  tmp_ice_heat_flux(:)
-	     call force_flux_consv(ice_heat_flux, mask, i, 1,action, mesh) ! Northern hemisphere
-	     call force_flux_consv(ice_heat_flux, mask, i, 2,action, mesh) ! Southern Hemisphere	     
-         elseif (i.eq.11) then
-             if (action) then
-	     shortwave(:)         =  exchange(:)		  ! heat_swr
-	     tmp_shortwave(:)     =  exchange(:) 		  ! to reset for flux 
-	     							  ! correction
-	     end if
-	     mask=1.-a_ice
-	     shortwave(:)   =  tmp_shortwave(:)
-	     call force_flux_consv(shortwave, mask, i, 0,action, mesh)
-         elseif (i.eq.12) then
-             if (action) then
-	     runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
-    	     mask=1.
-	     call force_flux_consv(runoff, mask, i, 0,action, mesh)
-             end if
+            if (action) then
+                evap_no_ifrac(:)     =  exchange(:)        	  ! tot_evap
+                tmp_evap_no_ifrac(:) =  exchange(:) 		  ! to reset for flux 
+                                                              ! correction
+            end if
+            mask=1.-a_ice
+            evap_no_ifrac(:)     =  tmp_evap_no_ifrac(:)
+            call force_flux_consv(evap_no_ifrac,mask,i,0,action, mesh)
+        elseif (i.eq.8) then
+            if (action) then
+                sublimation(:)       =  exchange(:)        	  ! tot_subl
+                tmp_sublimation(:)   =  exchange(:) 		  ! to reset for flux 
+                                                              ! correction
+            end if
+            mask=a_ice 
+            sublimation(:)       =  tmp_sublimation(:)
+            call force_flux_consv(sublimation,mask,i,1,action, mesh) ! Northern hemisphere
+            call force_flux_consv(sublimation,mask,i,2,action, mesh) ! Southern Hemisphere
+        elseif (i.eq.9) then
+            if (action) then
+                oce_heat_flux(:)     =  exchange(:)        	  ! heat_oce
+                tmp_oce_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
+                                                              ! correction
+            end if
+            mask=1.-a_ice
+            oce_heat_flux(:)     =  tmp_oce_heat_flux(:)
+            call force_flux_consv(oce_heat_flux, mask, i, 0,action, mesh)
+        elseif (i.eq.10) then
+            if (action) then
+                ice_heat_flux(:)     =  exchange(:)        	  ! heat_ice
+                tmp_ice_heat_flux(:) =  exchange(:) 		  ! to reset for flux 
+                                                              ! correction
+            end if
+            mask=a_ice
+            ice_heat_flux(:)     =  tmp_ice_heat_flux(:)
+            call force_flux_consv(ice_heat_flux, mask, i, 1,action, mesh) ! Northern hemisphere
+            call force_flux_consv(ice_heat_flux, mask, i, 2,action, mesh) ! Southern Hemisphere	     
+        elseif (i.eq.11) then
+            if (action) then
+                shortwave(:)         =  exchange(:)		        ! heat_swr
+                tmp_shortwave(:)     =  exchange(:) 		    ! to reset for flux 
+                                                                ! correction
+            end if
+            mask=1.-a_ice
+            shortwave(:)   =  tmp_shortwave(:)
+            call force_flux_consv(shortwave, mask, i, 0,action, mesh)
+        elseif (i.eq.12) then
+            if (action) then
+                runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
+                mask=1.
+                call force_flux_consv(runoff, mask, i, 0,action, mesh)
+            end if
 #if defined (__oifs)
+
          elseif (i.eq.13) then
              if (action) then
-	     enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
-    	     mask=1.
-	     call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
+	              enthalpyoffuse(:)            =  exchange(:)        ! enthalpy of fusion via solid water discharge from glaciers
+    	          mask=1.
+	              call force_flux_consv(enthalpyoffuse, mask, i, 0,action, mesh)
              end if
-	 end if  
-#endif	  
+#endif	 
+         end if
+
 #ifdef VERBOSE
 	  if (mype==0) then
 		write(*,*) 'FESOM RECV: flux ', i, ', max val: ', maxval(exchange)
@@ -240,14 +242,14 @@ subroutine update_atm_forcing(istep, mesh)
 #endif
       end do
 
-      if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
-         do n=1, myDim_nod2D+eDim_nod2D
-	    call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
-	    call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
-	 end do
-	 do_rotate_oce_wind=.false.
-         do_rotate_ice_wind=.false.
-      end if
+    if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
+        do n=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+            call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+        end do
+        do_rotate_oce_wind=.false.
+        do_rotate_ice_wind=.false.
+    end if
 #else
   call sbc_do(mesh)
   u_wind    = atmdata(i_xwind,:)
@@ -264,14 +266,15 @@ subroutine update_atm_forcing(istep, mesh)
   if (use_cavity) then 
     do i=1,myDim_nod2d+eDim_nod2d
         if (ulevels_nod2d(i)>1) then
-            u_wind(i)=0.0_WP
-            v_wind(i)=0.0_WP
-            shum(i)=0.0_WP
-            longwave(i)=0.0_WP
-            Tair(i)=0.0_WP
-            prec_rain(i)=0.0_WP
-            prec_snow(i)=0.0_WP
-            press_air(i)=0.0_WP            
+            u_wind(i)   = 0.0_WP
+            v_wind(i)   = 0.0_WP
+            shum(i)     = 0.0_WP
+            longwave(i) = 0.0_WP
+            Tair(i)     = 0.0_WP
+            prec_rain(i)= 0.0_WP
+            prec_snow(i)= 0.0_WP
+            press_air(i)= 0.0_WP 
+            runoff(i)   = 0.0_WP
         end if 
     end do
   endif 

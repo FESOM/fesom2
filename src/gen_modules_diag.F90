@@ -18,7 +18,7 @@ module diagnostics
   public :: ldiag_solver, lcurt_stress_surf, ldiag_energy, ldiag_dMOC, ldiag_DVD, ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, wrhof, rhof, &
             u_x_u, u_x_v, v_x_v, v_x_w, u_x_w, dudx, dudy, dvdx, dvdy, dudz, dvdz, utau_surf, utau_bott, av_dudz_sq, av_dudz, av_dvdz, stress_bott, u_surf, v_surf, u_bott, v_bott, &
-            std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux, &
+            std_dens_min, std_dens_max, std_dens_N, std_dens, std_dens_UVDZ, std_dens_DIV, std_dens_Z, std_dens_dVdT, std_dens_flux, dens_flux_e, &
             compute_diag_dvd_2ndmoment_klingbeil_etal_2014, compute_diag_dvd_2ndmoment_burchard_etal_2008, compute_diag_dvd
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -50,7 +50,7 @@ module diagnostics
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
   real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_Z(:,:)
-  real(kind=WP),  save, allocatable, target      :: dens_flux(:)
+  real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
 
   logical                                       :: ldiag_solver     =.false.
   logical                                       :: lcurt_stress_surf=.false.
@@ -134,7 +134,8 @@ subroutine diag_curl_stress_surf(mode, mesh)
      end if
   END DO
   DO n=1, myDim_nod2D+eDim_nod2D
-     curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
+     !!PS curl_stress_surf(n)=curl_stress_surf(n)/area(1,n)
+     curl_stress_surf(n)=curl_stress_surf(n)/areasvol(ulevels_nod2D(n),n)
   END DO
 end subroutine diag_curl_stress_surf
 ! ==============================================================
@@ -209,7 +210,7 @@ subroutine diag_curl_vel3(mode, mesh)
     DO n=1, myDim_nod2D
         !!PS DO nz=1, nlevels_nod2D(n)-1
         DO nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
-            curl_vel3(nz,n)=curl_vel3(nz,n)/area(nz,n)
+            curl_vel3(nz,n)=curl_vel3(nz,n)/areasvol(nz,n)
         END DO
     END DO
 end subroutine diag_curl_vel3
@@ -408,7 +409,7 @@ subroutine diag_densMOC(mode, mesh)
      allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
      allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
      allocate(std_dens_Z   (  std_dens_N, myDim_elem2D))
-     allocate(dens_flux(elem2D))
+     allocate(dens_flux_e(elem2D))
      allocate(aux  (nl-1))
      allocate(dens (nl))
      allocate(el_depth(nl))
@@ -438,7 +439,7 @@ subroutine diag_densMOC(mode, mesh)
   std_dens_UVDZ=0.
   std_dens_w   =0.! temporat thing for wiighting (ageraging) mean fields within a bin
   std_dens_flux=0.
-  dens_flux    =0.
+  dens_flux_e    =0.
   std_dens_VOL2=0.
   std_dens_DIV =0.
   std_dens_Z   =0.
@@ -450,11 +451,11 @@ subroutine diag_densMOC(mode, mesh)
      
      ! density flux on elements (although not related to binning it might be usefull for diagnostic and to verify the consistency)
      do jj=1,3
-        dens_flux(elem)= dens_flux(elem) + (sw_alpha(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * heat_flux(elnodes(jj))  / vcpw + &
-                                            sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt(elnodes(jj)) + water_flux(elnodes(jj)) * & 
+       dens_flux_e(elem)=dens_flux_e(elem) + (sw_alpha(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * heat_flux_in(elnodes(jj))  / vcpw + &
+                                            sw_beta(ulevels_nod2D(elnodes(jj)),elnodes(jj)) * (relax_salt  (elnodes(jj)) + water_flux(elnodes(jj)) * & 
                                             tr_arr(ulevels_nod2D(elnodes(jj)),elnodes(jj),2)))
      end do 
-     dens_flux(elem) = dens_flux(elem)/3.0_WP
+     dens_flux_e(elem) =dens_flux_e(elem)/3.0_WP
      ! density_dmoc is the sigma_2 density given at nodes. it is computed in oce_ale_pressure_bv
      do nz=nzmin, nzmax-1
         aux(nz)=sum(density_dmoc(nz, elnodes))/3.-1000.
@@ -473,8 +474,8 @@ subroutine diag_densMOC(mode, mesh)
 
      ! heat, freshwater and restoring at density classes
      is=minloc(abs(std_dens-dens(1)),1)
-     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux (elnodes   ))/3./vcpw
-     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt(elnodes   ))/3.
+     std_dens_flux(1, is,elem)=std_dens_flux(1, is,elem)+elem_area(elem)*sum(sw_alpha(1,elnodes) * heat_flux_in(elnodes   ))/3./vcpw
+     std_dens_flux(2, is,elem)=std_dens_flux(2, is,elem)+elem_area(elem)*sum(sw_beta (1,elnodes) * relax_salt  (elnodes   ))/3.
      
      dd = 0.0_WP
      do jj=1,3
