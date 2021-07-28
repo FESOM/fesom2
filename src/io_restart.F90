@@ -243,21 +243,25 @@ subroutine write_restart(path, filegroup, istep)
             
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
-      if(filegroup%files(i)%path == "") then
+      if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
         ! the path to an existing restart file is not set in read_restart if we had a restart from a raw restart
+        ! OR we might have skipped the file when reading restarts and it does not exist at all
         inquire(file=filepath, exist=file_exists)
-        if(file_exists) filegroup%files(i)%path = filepath
+        if(file_exists) then
+          filegroup%files(i)%path = filepath
+        else if(.not. filegroup%files(i)%must_exist_on_read) then
+          filegroup%files(i)%path = ""
+        end if
       end if
       if(filegroup%files(i)%path .ne. filepath) then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = filepath
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
-     else
+      else
         call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
       end if
 
       write(*,*) 'writing restart record ', filegroup%files(i)%rec_count()+1, ' to ', filegroup%files(i)%path
-      ! todo: write iter to a separate (non-mesh-variable) file
       call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()+1], [1], [cstep])
       ! todo: write time via the fesom_file_type
       call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()+1], [1], [ctime])
