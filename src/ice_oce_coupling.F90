@@ -12,6 +12,11 @@ subroutine oce_fluxes_mom(mesh)
     use i_PARAM
     USE g_CONFIG
     use g_comm_auto
+
+#if defined (__icepack)
+    use icedrv_main,   only: icepack_to_fesom
+#endif
+
     implicit none
     
     integer                  :: n, elem, elnodes(3),n1
@@ -24,6 +29,12 @@ subroutine oce_fluxes_mom(mesh)
     ! momentum flux:
     ! ==================
     !___________________________________________________________________________
+
+#if defined (__icepack)
+     call icepack_to_fesom(nx_in=(myDim_nod2D+eDim_nod2D), &
+                           aice_out=a_ice)
+#endif
+
     do n=1,myDim_nod2D+eDim_nod2D   
         !_______________________________________________________________________
         ! if cavity node skip it 
@@ -38,6 +49,10 @@ subroutine oce_fluxes_mom(mesh)
             stress_iceoce_x(n)=0.0_WP
             stress_iceoce_y(n)=0.0_WP
         end if
+        
+        ! total surface stress (iceoce+atmoce) on nodes 
+        stress_node_surf(1,n) = stress_iceoce_x(n)*a_ice(n) + stress_atmoce_x(n)*(1.0_WP-a_ice(n))
+        stress_node_surf(2,n) = stress_iceoce_y(n)*a_ice(n) + stress_atmoce_y(n)*(1.0_WP-a_ice(n))
     end do
     
     !___________________________________________________________________________
@@ -52,6 +67,8 @@ subroutine oce_fluxes_mom(mesh)
                                 stress_atmoce_x(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
         stress_surf(2,elem)=sum(stress_iceoce_y(elnodes)*a_ice(elnodes) + &
                                 stress_atmoce_y(elnodes)*(1.0_WP-a_ice(elnodes)))/3.0_WP
+        !!PS stress_surf(1,elem)=sum(stress_node_surf(1,elnodes))/3.0_WP
+        !!PS stress_surf(2,elem)=sum(stress_node_surf(2,elnodes))/3.0_WP
     END DO
     
     !___________________________________________________________________________
@@ -136,23 +153,29 @@ end subroutine ocean2ice
 !
 !_______________________________________________________________________________
 subroutine oce_fluxes(mesh)
-    use MOD_MESH
-    use g_CONFIG
-    use o_ARRAYS
-    use i_ARRAYS
-    use g_comm_auto
-    use g_forcing_param, only: use_virt_salt
-    use g_forcing_arrays
-    use g_PARSUP
-    use g_support
-    use i_therm_param
-    
-    implicit none
-    type(t_mesh), intent(in)   , target :: mesh
-    integer                    :: n, elem, elnodes(3),n1
-    real(kind=WP)              :: rsss, net
-    real(kind=WP), allocatable :: flux(:)
-    
+
+  use MOD_MESH
+  USE g_CONFIG
+  use o_ARRAYS
+  use i_ARRAYS
+  use g_comm_auto
+  use g_forcing_param, only: use_virt_salt
+  use g_forcing_arrays
+  use g_PARSUP
+  use g_support
+  use i_therm_param
+
+#if defined (__icepack)
+  use icedrv_main,   only: icepack_to_fesom,    &
+                           init_flux_atm_ocn
+#endif
+
+  implicit none
+  type(t_mesh), intent(in)   , target :: mesh
+  integer                    :: n, elem, elnodes(3),n1
+  real(kind=WP)              :: rsss, net
+  real(kind=WP), allocatable :: flux(:)
+
 #include  "associate_mesh.h"
     
     allocate(flux(myDim_nod2D+eDim_nod2D))
@@ -160,10 +183,7 @@ subroutine oce_fluxes(mesh)
     
     ! ==================
     ! heat and freshwater
-    ! ==================
-    heat_flux_old  = heat_flux !PS
-    water_flux_old = water_flux !PS
-    
+    ! ==================   
     !___________________________________________________________________________
     ! from here on: 
     !    (-)  (+)
@@ -171,11 +191,39 @@ subroutine oce_fluxes(mesh)
     ! ~~~~|~~~~|~~~~
     !     V    |
     !     
+#if defined (__icepack)
+
+    call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                           aice_out=a_ice,                 &
+                           vice_out=m_ice,                 &
+                           vsno_out=m_snow,                &
+                           fhocn_tot_out=net_heat_flux,    &
+                           fresh_tot_out=fresh_wa_flux,    &
+                           fsalt_out=real_salt_flux,       &
+                           dhi_dt_out=thdgrsn,             &
+                           dhs_dt_out=thdgr,               &
+                           evap_ocn_out=evaporation        )
+
+    heat_flux(:)   = - net_heat_flux(:)
+    water_flux(:)  = - (fresh_wa_flux(:)/1000.0_WP) - runoff(:)
+
+    ! Evaporation
+    evaporation(:) = - evaporation(:) / 1000.0_WP
+    ice_sublimation(:) = 0.0_WP
+
+    call init_flux_atm_ocn()
+
+#else
     heat_flux   = -net_heat_flux 
     water_flux  = -fresh_wa_flux
-    
+#endif 
+    heat_flux_in=heat_flux ! sw_pene will change the heat_flux
+   
     if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
+    
+!!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
+!!PS     where(ulevels_nod2D>1) water_flux=0.0_WP
     
     !___________________________________________________________________________
     call exchange_nod(heat_flux, water_flux) 
@@ -211,7 +259,12 @@ subroutine oce_fluxes(mesh)
         end if    
         virtual_salt=virtual_salt-net/ocean_area
     end if
-    
+
+    where (ulevels_nod2d == 1)
+          dens_flux=sw_alpha(1,:) * heat_flux_in / vcpw + sw_beta(1, :) * (relax_salt + water_flux * tr_arr(1,:,2))
+    elsewhere
+          dens_flux=0.0_WP
+    end where
     !___________________________________________________________________________
     ! balance SSS restoring to climatology
     if (use_cavity) then 
@@ -268,7 +321,9 @@ subroutine oce_fluxes(mesh)
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
-    water_flux=water_flux+net/ocean_area 
+    ! if use_cavity=.false. --> ocean_area == ocean_areawithcav
+    !! water_flux=water_flux+net/ocean_area
+    water_flux=water_flux+net/ocean_areawithcav
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)

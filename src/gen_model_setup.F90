@@ -22,7 +22,7 @@ subroutine read_namelist
   use g_ic3d 
   implicit none
 
-  character(len=100)   :: nmlfile
+  character(len=MAX_PATH)   :: nmlfile
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file

@@ -92,7 +92,7 @@ class clim_data(object):
                 depth3d = np.zeros(valueS.shape)
                 for di in range(0,self.depth.size):
                     depth3d[di,:,:] = self.depth[di]
-                self.value = sw.ptmp(valueS, valueT, depth3d)
+                self.value = sw.ptmp(valueS, valueT, np.abs(depth3d))
                 
             elif var=='salt':
                 self.value = valueS

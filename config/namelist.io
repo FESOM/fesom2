@@ -13,11 +13,11 @@ ldiag_forc       =.false.
 io_listsize=100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 /
 
-# for sea ice related variables use_ice should be true, otherewise there will be no output
-# for 'curl_surf' to work lcurt_stress_surf must be .true. otherwise no output
-# for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
-# 'otracers' - all other tracers if applicable
-# for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
+! for sea ice related variables use_ice should be true, otherewise there will be no output
+! for 'curl_surf' to work lcurt_stress_surf must be .true. otherwise no output
+! for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
+! 'otracers' - all other tracers if applicable
+! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
@@ -32,7 +32,7 @@ io_list =  'sst       ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
            'temp      ',1, 'y', 4,
-           'salt      ',1, 'y', 4,
+           'salt      ',1, 'y', 8,
            'N2        ',1, 'y', 4,
            'Kv        ',1, 'y', 4,
            'u         ',1, 'y', 4,

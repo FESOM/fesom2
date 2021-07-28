@@ -30,6 +30,11 @@ use mod_mesh
 use i_arrays
 use g_parsup
 USE g_CONFIG
+
+#if defined (__icepack)
+use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+
 implicit none
 
 real(kind=WP), intent(in) :: ice_strength(mydim_elem2D)
@@ -53,7 +58,6 @@ type(t_mesh), intent(in), target  :: mesh
   do el=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element contains cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
      if (ulevels(el) > 1) cycle
      
      ! ===== Check if there is ice on elem
@@ -117,8 +121,15 @@ type(t_mesh), intent(in), target  :: mesh
         sigma12(el) = det2*(sigma12(el)+dte*r3)
         sigma11(el) = 0.5_WP*(si1+si2)
         sigma22(el) = 0.5_WP*(si1-si2)
+
+#if defined (__icepack)
+        rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
+        rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
+#endif
+
      endif
   end do
+
 end subroutine stress_tensor
 !===================================================================
 subroutine stress_tensor_no1(ice_strength, mesh)
@@ -154,7 +165,6 @@ type(t_mesh), intent(in)              , target :: mesh
   do el=1,myDim_elem2D
      !__________________________________________________________________________
      ! if element contains cavity node skip it 
-     !!PS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
      if (ulevels(el) > 1) cycle
       ! ===== Check if there is ice on elem
 
@@ -191,7 +201,10 @@ type(t_mesh), intent(in)              , target :: mesh
       
       ! ===== if delta is too small or zero, viscosity will too large (unlimited)
       ! (limit delta_inv)
-        delta_inv = 1.0_WP/max(delta,delta_min) 
+        delta_inv = 1.0_WP/max(delta,delta_min)
+        
+!!PS         delta_inv = delta/(delta+delta_min)
+        
         zeta = ice_strength(el)*delta_inv			     
       ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta 
       ! is too large in some regions and CFL criterion is violated.
@@ -206,7 +219,7 @@ type(t_mesh), intent(in)              , target :: mesh
       !end if 
       
         zeta = zeta*Tevp_inv
-      				     
+        
         r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*Tevp_inv
         r2  = zeta*(eps11(el)-eps22(el))*vale
         r3  = zeta*eps12(el)*vale
@@ -235,6 +248,7 @@ USE i_PARAM
 USE i_therm_param
 USE i_arrays
 USE g_PARSUP
+use g_config, only: use_cavity
 
 
 IMPLICIT NONE
@@ -254,7 +268,13 @@ type(t_mesh), intent(in)              , target :: mesh
  DO  ed=1,myDim_edge2D
     ednodes=edges(:,ed) 
     el=edge_tri(:,ed)
-    if(myList_edge2D(ed)>edge2D_in) cycle     
+    if(myList_edge2D(ed)>edge2D_in) cycle    
+
+    ! stress boundary condition at ocean cavity boundary edge ==0
+    if (use_cavity) then 
+        if ( (ulevels(el(1))>1) .or.  ( el(2)>0 .and. ulevels(el(2))>1) ) cycle
+    end if 
+    
     ! elements on both sides
     uc = - sigma12(el(1))*edge_cross_dxdy(1,ed) + sigma11(el(1))*edge_cross_dxdy(2,ed) &
          + sigma12(el(2))*edge_cross_dxdy(3,ed) - sigma11(el(2))*edge_cross_dxdy(4,ed)
@@ -333,7 +353,6 @@ do el=1,myDim_elem2D
 !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE 
    !____________________________________________________________________________
    ! if element contains cavity node skip it 
-   !!OS if ( any(ulevels_nod2d(elem2D_nodes(:,el)) > 1) ) cycle
    if (ulevels(el) > 1) cycle
    
    !____________________________________________________________________________
@@ -389,6 +408,11 @@ USE g_CONFIG
 USE g_comm_auto
 use ice_EVP_interfaces
 
+#if defined (__icepack)
+  use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+  use icedrv_main,   only: icepack_to_fesom   
+#endif
+
 IMPLICIT NONE
 integer                   :: steps, shortstep
 real(kind=WP)             :: rdt, asum, msum, r_a, r_b
@@ -412,6 +436,19 @@ REAL(kind=WP) :: mass, uc, vc,  deltaX1, deltaX2, deltaY1, deltaY2
 type(t_mesh), intent(in)  , target :: mesh
 
 #include "associate_mesh.h"
+
+! If Icepack is used, always update the tracers
+
+#if defined (__icepack)
+  a_ice_old(:)  = a_ice(:)
+  m_ice_old(:)  = a_ice(:)
+  m_snow_old(:) = m_snow(:)
+
+  call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+                         aice_out=a_ice,                 &
+                         vice_out=m_ice,                 &
+                         vsno_out=m_snow)
+#endif
 
 rdt=ice_dt/(1.0*evp_rheol_steps)
 ax=cos(theta_io)
@@ -458,7 +495,6 @@ if ( .not. trim(which_ALE)=='linfs') then
 		elnodes = elem2D_nodes(:,el)
 		!_______________________________________________________________________
 		! if element has any cavity node skip it 
-		!!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
 		if (ulevels(el) > 1) cycle
 		
 		!_______________________________________________________________________
@@ -475,7 +511,11 @@ if ( .not. trim(which_ALE)=='linfs') then
 			
 			!___________________________________________________________________
 			! Hunke and Dukowicz c*h*p*
-			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#if defined (__icepack)
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#else
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#endif
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
 			!___________________________________________________________________
@@ -508,7 +548,6 @@ else
         elnodes = elem2D_nodes(:,el)
         !_______________________________________________________________________
         ! if element has any cavity node skip it 
-        !!PS if ( any(ulevels_nod2d(elnodes)>1) ) cycle
         if (ulevels(el) > 1) cycle
         
         !_______________________________________________________________________
@@ -522,7 +561,11 @@ else
 			asum = sum(a_ice(elnodes))/3.0_WP
 			
 			! ===== Hunke and Dukowicz c*h*p*
-			ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#if defined (__icepack)
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#else
+                        ice_strength(el) = pstar*msum*exp(-c_pressure*(1.0_WP-asum))
+#endif
 			ice_strength(el) = 0.5_WP*ice_strength(el)
 			
 			! use rhs_m and rhs_a for storing the contribution from elevation:
@@ -547,8 +590,14 @@ do n=1,myDim_nod2D
 
 !==============================================================
 ! And the ice stepping starts
+
+#if defined (__icepack)
+   rdg_conv_elem(:)  = 0.0_WP
+   rdg_shear_elem(:) = 0.0_WP
+#endif
+
 do shortstep=1, evp_rheol_steps 
- 
+
    call stress_tensor(ice_strength, mesh)
    call stress2rhs(inv_areamass,ice_strength, mesh) 
  
@@ -557,7 +606,7 @@ do shortstep=1, evp_rheol_steps
    do n=1,myDim_nod2D 
    
       !_________________________________________________________________________
-      ! if cavity ndoe skip it 
+      ! if cavity node skip it 
       if ( ulevels_nod2d(n)>1 ) cycle
       
       !_________________________________________________________________________
@@ -587,14 +636,32 @@ do shortstep=1, evp_rheol_steps
       end if
 
    end do
-   DO  ed=1,myDim_edge2D
-   ! boundary conditions
-      if(myList_edge2D(ed) > edge2D_in) then
-         U_ice(edges(1:2,ed))=0.0_WP
-         V_ice(edges(1:2,ed))=0.0_WP
-      endif
-   end do
- 
-   call exchange_nod(U_ice,V_ice)
+   
+    !___________________________________________________________________________
+    ! apply sea ice velocity boundary condition 
+    DO  ed=1,myDim_edge2D
+        !_______________________________________________________________________
+        ! apply coastal sea ice velocity boundary conditions
+        if(myList_edge2D(ed) > edge2D_in) then
+            U_ice(edges(1:2,ed))=0.0_WP
+            V_ice(edges(1:2,ed))=0.0_WP
+        endif
+        
+        !_______________________________________________________________________
+        ! apply sea ice velocity boundary conditions at cavity-ocean edge
+        if (use_cavity) then 
+            if ( (ulevels(edge_tri(1,ed))>1) .or. &
+                 ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then 
+                U_ice(edges(1:2,ed))=0.0_WP
+                V_ice(edges(1:2,ed))=0.0_WP
+            end if 
+        end if 
+      
+    end do
+    
+    !___________________________________________________________________________
+    call exchange_nod(U_ice,V_ice)
 END DO
+
+
 end subroutine EVPdynamics

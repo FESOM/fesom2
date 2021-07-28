@@ -1,7 +1,8 @@
 ! Ice namelist
 &ice_dyn
-whichEVP=1             ! 0=standart; 1=mEVP; 2=aEVP
+whichEVP=0             ! 0=standart; 1=mEVP; 2=aEVP
 Pstar=30000.0          ! [N/m^2]
+ellipse=2.0
 c_pressure=20.0        ! ice concentration parameter used in ice strength computation
 delta_min=1.0e-11      ! [s^(-1)]
 evp_rheol_steps=120    ! number of EVP subcycles

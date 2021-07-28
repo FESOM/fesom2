@@ -220,7 +220,7 @@ module g_cvmix_kpp
     ! routine from cvmix library
     subroutine init_cvmix_kpp(mesh)
         implicit none
-        character(len=100) :: nmlfile
+        character(len=MAX_PATH) :: nmlfile
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
         type(t_mesh), intent(in) , target :: mesh

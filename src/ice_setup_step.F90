@@ -143,12 +143,13 @@ e_size=myDim_elem2D+eDim_elem2D
   allocate(oce_heat_flux(n_size), ice_heat_flux(n_size))
   allocate(tmp_oce_heat_flux(n_size), tmp_ice_heat_flux(n_size))
 #if defined (__oifs)
-  allocate(ice_alb(n_size), ice_temp(n_size))
+  allocate(ice_alb(n_size), ice_temp(n_size), enthalpyoffuse(n_size))
   allocate(rhs_tempdiv(n_size), rhs_temp(n_size))
   ice_alb=0.6_WP
   ice_temp=265.15_WP
   rhs_tempdiv=0._WP
   rhs_temp=0._WP
+  enthalpyoffuse=0._WP
 #endif /* (__oifs) */
   oce_heat_flux=0._WP
   ice_heat_flux=0._WP
@@ -158,20 +159,35 @@ e_size=myDim_elem2D+eDim_elem2D
 end subroutine ice_array_setup
 !
 !
+!
 !_______________________________________________________________________________
 ! Sea ice model step
 subroutine ice_timestep(step, mesh)
-    use i_arrays
-    use o_param
-    use g_parsup
-    use g_CONFIG
-    use i_PARAM, only: whichEVP
-    use mod_mesh
-    implicit none 
-    type(t_mesh), intent(in)   , target :: mesh
-    integer                    :: step,i
-    REAL(kind=WP)              :: t0,t1, t2, t3
-    t0=MPI_Wtime()
+use i_arrays
+use o_param
+use g_parsup
+use g_CONFIG
+use i_PARAM, only: whichEVP
+use mod_mesh
+
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack 
+#endif
+
+implicit none 
+type(t_mesh), intent(in)   , target :: mesh
+integer                    :: step,i
+REAL(kind=WP)              :: t0,t1, t2, t3
+
+#if defined (__icepack)
+real(kind=WP)              :: time_evp, time_advec, time_therm
+#endif
+
+t0=MPI_Wtime()
+
+#if defined (__icepack)
+    call step_icepack(mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts    
+#else     
     
     !___________________________________________________________________________
     ! ===== Dynamics
@@ -216,7 +232,7 @@ subroutine ice_timestep(step, mesh)
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-    call cut_off
+    call cut_off(mesh)
     
     if (use_cavity) call cavity_ice_clean_ma(mesh)
     t2=MPI_Wtime()
@@ -225,20 +241,41 @@ subroutine ice_timestep(step, mesh)
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
     call thermodynamics(mesh)
+#endif /* (__icepack) */
+
+
+    do i=1,myDim_nod2D+eDim_nod2D
+        if ( ( U_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) .or. (V_ice(i)/=0.0_WP .and. mesh%ulevels_nod2d(i)>1) ) then
+            write(*,*) " --> found cavity velocity /= 0.0_WP , ", mype
+            write(*,*) " ulevels_nod2d(n) = ", mesh%ulevels_nod2d(i)
+            write(*,*) " U_ice(n) = ", U_ice(i)
+            write(*,*) " V_ice(n) = ", V_ice(i)
+            write(*,*)
+        end if 
+    end do
+
+
+
+
     t3=MPI_Wtime()
-    
-    !___________________________________________________________________________
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
     if(mod(step,logfile_outfreq)==0 .and. mype==0) then 
-            write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
-            write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
-            write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
-            write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
-            write(*,*) '   _______________________________'
-            write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
-            write(*,*)
-    endif
+		write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
+#if defined (__icepack)
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
+                write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
+                write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
+#else
+		write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
+		write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
+		write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+#endif /* (__icepack) */
+		write(*,*) '   _______________________________'
+		write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
+		write(*,*)
+     endif
+
 end subroutine ice_timestep
 !
 !
@@ -255,7 +292,7 @@ subroutine ice_initial_state(mesh)
     !
     type(t_mesh), intent(in)           , target :: mesh
     integer                            :: i
-    character*100                      :: filename
+    character(MAX_PATH)                      :: filename
     real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
 #include  "associate_mesh.h"
@@ -270,7 +307,11 @@ subroutine ice_initial_state(mesh)
     do i=1,myDim_nod2D+eDim_nod2D    
     
         !_______________________________________________________________________
-        if (ulevels_nod2d(i)>1) cycle ! --> if cavity, no sea ice, no initial state
+        if (ulevels_nod2d(i)>1) then
+            !!PS m_ice(i)  = 1.0e15_WP
+            !!PS m_snow(i) = 0.1e15_WP
+            cycle ! --> if cavity, no sea ice, no initial state
+        endif    
         
         !_______________________________________________________________________
         if (tr_arr(1,i,1)< 0.0_WP) then
