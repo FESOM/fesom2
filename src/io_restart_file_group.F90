@@ -10,6 +10,7 @@ module restart_file_group_module
     integer iter_varindex
     character(:), allocatable :: varname
     character(:), allocatable :: path
+    logical must_exist_on_read
   end type
 
 
@@ -36,7 +37,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     ! EO parameters
 
-    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
@@ -50,7 +51,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     ! EO parameters
 
-    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
     call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
   end subroutine
 
@@ -64,7 +65,7 @@ contains
     type(t_mesh), intent(in) :: mesh
     ! EO parameters
 
-    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
@@ -78,14 +79,15 @@ contains
     type(t_mesh), intent(in) :: mesh
     ! EO parameters
 
-    call add_file(this, name, mesh%nod2d, mesh%elem2d, mesh%nl)
+    call add_file(this, name, .true., mesh%nod2d, mesh%elem2d, mesh%nl)
     call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
 
-  subroutine add_file(g, name, mesh_nod2d, mesh_elem2d, mesh_nl)
+  subroutine add_file(g, name, must_exist_on_read, mesh_nod2d, mesh_elem2d, mesh_nl)
     class(restart_file_group), target, intent(inout) :: g
     character(len=*), intent(in) :: name
+    logical must_exist_on_read
     integer mesh_nod2d, mesh_elem2d, mesh_nl
     ! EO parameters
     type(restart_file_type), pointer :: f
@@ -96,6 +98,7 @@ contains
     
     f%path = ""
     f%varname = name
+    f%must_exist_on_read = must_exist_on_read
     call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl)
     ! this is specific for a restart file
     f%iter_varindex = f%add_var_int('iter', [f%time_dimindex()])    
