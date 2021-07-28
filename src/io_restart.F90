@@ -394,29 +394,61 @@ subroutine read_restart(path, filegroup)
   integer i
   character(:), allocatable :: dirpath
   integer mpistatus(MPI_STATUS_SIZE)
-
+  logical file_exists
+  logical, allocatable :: skip_file(:)
+  integer current_iorank_snd, current_iorank_rcv
+  
+  allocate(skip_file(filegroup%nfiles))
+  skip_file = .false.
+  current_iorank_snd = 0
+  current_iorank_rcv = 0
+  
   do i=1, filegroup%nfiles
     if( filegroup%files(i)%is_iorank() ) then
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+        ! determine if the file should be skipped
+        if(.not. filegroup%files(i)%must_exist_on_read) then
+          current_iorank_snd = mype
+          inquire(file=filegroup%files(i)%path, exist=file_exists)
+          if(.not. file_exists) skip_file(i) = .true.
+        end if
+
+        if(.not. skip_file(i)) then
 #ifndef DISABLE_PARALLEL_RESTART_READ
-        write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+          write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #else
-        write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+          write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #endif
-        call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        else
+#ifndef DISABLE_PARALLEL_RESTART_READ
+          write(*,*) 'skipping reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#else
+          write(*,*) 'skipping reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#endif
+        end if
+        
+        if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
-      end if
+      end if      
     end if
 
-    call filegroup%files(i)%async_read_and_scatter_variables()
+    ! iorank already knows if we skip the file, tell the others
+    if(.not. filegroup%files(i)%must_exist_on_read) then
+      call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+      call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, MPI_COMM_FESOM, MPIerr)
+    end if      
+
+    if(.not. skip_file(i)) call filegroup%files(i)%async_read_and_scatter_variables()
 #ifndef DISABLE_PARALLEL_RESTART_READ
   end do
   
   do i=1, filegroup%nfiles
 #endif
+    if(skip_file(i)) cycle
     call filegroup%files(i)%join()
 
     if(filegroup%files(i)%is_iorank()) then
