@@ -23,6 +23,11 @@ module restart_file_group_module
     generic, public :: def_elem_var => def_elem_var_2d, def_elem_var_3d
     procedure, private :: def_node_var_2d, def_node_var_3d
     procedure, private :: def_elem_var_2d, def_elem_var_3d
+    ! def_*_optional procedures create a restart variable which does not have to exist when reading the restart file
+    generic, public :: def_node_var_optional => def_node_var_2d_optional, def_node_var_3d_optional
+    generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
+    procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional
+    procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
   end type
   
 contains
@@ -102,6 +107,62 @@ contains
     call f%fesom_file_type%init(mesh_nod2d, mesh_elem2d, mesh_nl)
     ! this is specific for a restart file
     f%iter_varindex = f%add_var_int('iter', [f%time_dimindex()])    
+  end subroutine
+
+
+  subroutine def_node_var_2d_optional(this, name, longname, units, local_data, mesh)
+    use mod_mesh
+    class(restart_file_group), target, intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_node_var_3d_optional(this, name, longname, units, local_data, mesh)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_node_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_elem_var_2d_optional(this, name, longname, units, local_data, mesh)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
+  end subroutine
+
+
+  subroutine def_elem_var_3d_optional(this, name, longname, units, local_data, mesh)
+    use mod_mesh
+    class(restart_file_group), intent(inout) :: this
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: units, longname
+    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    type(t_mesh), intent(in) :: mesh
+    ! EO parameters
+
+    call add_file(this, name, .false., mesh%nod2d, mesh%elem2d, mesh%nl)
+    call this%files(this%nfiles)%specify_elem_var(name, longname, units, local_data)
   end subroutine
 
 
