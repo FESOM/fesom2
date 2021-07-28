@@ -329,9 +329,9 @@ subroutine oce_fluxes(mesh)
         ! due to rigid lid approximation under the cavity we to not add freshwater
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
-        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+        where (ulevels_nod2d == 1) water_flux=water_flux-net/ocean_area
     else
-        water_flux=water_flux+net/ocean_area
+        water_flux=water_flux-net/ocean_area
     end if 
     
     !___________________________________________________________________________
