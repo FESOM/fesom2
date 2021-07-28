@@ -404,7 +404,7 @@ subroutine read_restart(path, filegroup)
 #ifndef DISABLE_PARALLEL_RESTART_READ
         write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #else
-        write(*,*) 'reading restart SEQIENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+        write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #endif
         call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
