@@ -289,10 +289,10 @@ subroutine oce_fluxes(mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
-    !flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
-    !        +prec_rain                       &
-    !        +prec_snow*(1.0_WP-a_ice_old)    &
-    !        +runoff                
+    flux = evaporation-ice_sublimation       & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+            +prec_rain                       &
+            +prec_snow*(1.0_WP-a_ice_old)    &
+            +runoff                
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
     ! growth rates of sea ice have to be taken into account to preserve the fresh water 
@@ -303,7 +303,7 @@ subroutine oce_fluxes(mesh)
     ! salinity flux
     !!PS   if ( .not. use_floatice .and. .not. use_virt_salt) then
     if (.not. use_virt_salt) then
-        flux = water_flux+thdgr*rhoice*inv_rhowat+thdgrsn*rhosno*inv_rhowat
+        flux = flux-thdgr*rhoice*inv_rhowat-thdgrsn*rhosno*inv_rhowat
     end if     
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
@@ -329,9 +329,9 @@ subroutine oce_fluxes(mesh)
         ! due to rigid lid approximation under the cavity we to not add freshwater
         ! under the cavity for the freshwater balancing we do this only for the open
         ! ocean
-        where (ulevels_nod2d == 1) water_flux=water_flux-net/ocean_area
+        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
     else
-        water_flux=water_flux-net/ocean_area
+        water_flux=water_flux+net/ocean_area
     end if 
     
     !___________________________________________________________________________
