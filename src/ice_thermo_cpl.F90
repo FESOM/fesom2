@@ -515,26 +515,27 @@ contains
   real(kind=WP) :: t    
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
+  real(kind=WP) :: melt_pool_alb_reduction
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
   if (geolat.gt.0.) then !SH does not have melt ponds
-      albsnm = 0.79_WP
+      melt_pool_alb_reduction = 0.0_WP
   else
-      albsnm = 0.7_WP
+      melt_pool_alb_reduction = 0.12_WP
   endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
-        if (hsn.gt.0.0_WP) then !   snow cover present  
+        if (hsn.gt.0.001_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       
            alb=albi             
         endif
      else                               ! melting condition     
-        if (hsn.gt.0.0_WP) then !   snow cover present  
-           alb=albsnm           
+        if (hsn.gt.0.001_WP) then !   snow cover present  
+           alb=albsnm-melt_pool_alb_reduction           
         else                    !   no snow cover       
-           alb=albim            
+           alb=albim-melt_pool_alb_reduction
         endif
      endif
    else
