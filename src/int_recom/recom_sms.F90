@@ -1951,8 +1951,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp,SinkVel,zF,PAR,
     end if
   end if ! ciso
 
-end if
-
 !-------------------------------------------------------------------------------
 ! Benthic layer: Detritus and phytoplankton sink into the benthic layer and are 
 ! lost from the water column
