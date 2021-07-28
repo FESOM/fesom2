@@ -430,7 +430,7 @@ subroutine read_restart(path, filegroup)
       call filegroup%files(i)%close_file()
 
      if (int(ctime)/=int(rtime)) then
-        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
+        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'
         stop 1
