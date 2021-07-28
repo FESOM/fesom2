@@ -30,7 +30,7 @@ subroutine thermodynamics(mesh)
   !---- variables from ice_modules.F90
   use i_dyn_parms,      only: Cd_oce_ice
   use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
-#ifdef oifs
+#if defined (__oifs)
   use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
        , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
 #else
@@ -42,7 +42,7 @@ subroutine thermodynamics(mesh)
   use g_config,         only: dt
 
   !---- variables from gen_modules_forcing.F90
-#ifdef oifs
+#if defined (__oifs)
   use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
        , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
        , enthalpyoffuse
@@ -86,7 +86,7 @@ subroutine thermodynamics(mesh)
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
-  real(kind=WP)  :: h0min = 0.50, h0max = 1.5
+  real(kind=WP)  :: h0min = 0.5, h0max = 1.5
   type(t_mesh), intent(in)   , target :: mesh  
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
@@ -142,10 +142,6 @@ subroutine thermodynamics(mesh)
         h0min = 0.3
         h0max = 0.3
      endif
-#endif /* (__oifs) */
-
-     call ice_growth
-#if defined (__oifs)
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!
@@ -157,10 +153,10 @@ subroutine thermodynamics(mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP
      endif
-     call ice_albedo(h,hsn,t,alb)
+     call ice_albedo(h,hsn,t,alb,geolat)
      ice_alb(inod)       = alb
 #endif
-
+     call ice_growth
 
      a_ice(inod)         = A
      m_ice(inod)         = h
@@ -184,9 +180,9 @@ contains
   !===================================================================
 
   subroutine ice_growth
-
+      
     implicit none
-
+ 
     !---- thermodynamic production rates (pos.: growth; neg.: melting)
     real(kind=WP)  :: dsnow, dslat, dhice, dhiow, dcice, dciow
 
@@ -309,8 +305,19 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
+#if defined (__oifs)
+    !---- new condition added - surface temperature must be
+    !----                       larger than 273K to melt snow
+    if (t.gt.273_WP) then
+        dsnow = A*min(Qatmice-Qicecon,0._WP)
+        dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    else
+        dsnow = 0.0_WP
+    endif
+#else
     dsnow = A*min(Qatmice-Qicecon,0._WP)
     dsnow = max(dsnow*rhoice/rhosno,-hsn)
+#endif
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow
@@ -473,7 +480,7 @@ contains
   real(kind=WP)  zcpdte
   real(kind=WP)  zcprosn
   !---- local parameters
-  real(kind=WP), parameter :: dice  = 0.05_WP                       ! ECHAM6's thickness for top ice "layer"
+  real(kind=WP), parameter :: dice  = 0.10_WP                       ! Thickness for top ice "layer"
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
 
@@ -488,38 +495,47 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
-  t=min(TFrezs,t)                       ! Not warmer than freezing please!
+  t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(h,hsn,t,alb)
+ subroutine ice_albedo(h,hsn,t,alb,geolat)
   ! INPUT:
-  ! hsn - snow thickness, used for albedo parameterization [m]
-  ! t - temperature of snow/ice surface [C]
+  ! h      - ice thickness [m]
+  ! hsn    - snow thickness [m]
+  ! t      - temperature of snow/ice surface [C]
+  ! geolat - lattitude 
   ! 
   ! OUTPUT:
-  ! alb - snow albedo
+  ! alb    - selected broadband albedo
   use i_therm_param
   implicit none
 
-  real(kind=WP)  h
-  real(kind=WP)  hsn    
-  real(kind=WP)  t    
-  real(kind=WP)  alb
+  real(kind=WP) :: h
+  real(kind=WP) :: hsn    
+  real(kind=WP) :: t    
+  real(kind=WP) :: alb
+  real(kind=WP) :: geolat
+  real(kind=WP) :: melt_pool_alb_reduction
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
+  if (geolat.gt.0.) then !SH does not have melt ponds
+      melt_pool_alb_reduction = 0.0_WP
+  else
+      melt_pool_alb_reduction = 0.12_WP
+  endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
-        if (hsn.gt.0.0_WP) then !   snow cover present  
+        if (hsn.gt.0.001_WP) then !   snow cover present  
            alb=albsn            
         else                    !   no snow cover       
            alb=albi             
         endif
      else                               ! melting condition     
-        if (hsn.gt.0.0_WP) then !   snow cover present  
-           alb=albsnm           
+        if (hsn.gt.0.001_WP) then !   snow cover present  
+           alb=albsnm-melt_pool_alb_reduction           
         else                    !   no snow cover       
-           alb=albim            
+           alb=albim-melt_pool_alb_reduction
         endif
      endif
    else

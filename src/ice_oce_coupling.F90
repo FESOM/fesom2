@@ -289,11 +289,10 @@ subroutine oce_fluxes(mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
-    flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+    flux = evaporation-ice_sublimation       & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
             +prec_rain                       &
             +prec_snow*(1.0_WP-a_ice_old)    &
-            +runoff    
-            
+            +runoff                
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
     ! growth rates of sea ice have to be taken into account to preserve the fresh water 
