@@ -121,8 +121,8 @@ subroutine ini_ice_io(year, mesh)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', u_ice, mesh)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   v_ice, mesh)
 #if defined (__oifs)
-  call ice_files%def_node_var('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
-  call ice_files%def_node_var('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
+  call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
+  call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
@@ -179,15 +179,13 @@ subroutine restart(istep, l_read, mesh)
     end if
     call MPI_Bcast(dumpfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
     if(dumpfiles_exist) then
-      call read_raw_restart(oce_files)
-      if(use_ice) call read_raw_restart(ice_files)
+      call read_all_raw_restarts()
     else
       call read_restart(oce_path, oce_files)
       if (use_ice) call read_restart(ice_path, ice_files)
       ! immediately create a raw restart
       if(raw_restart_length_unit /= "off") then
-        call write_raw_restart(oce_files, istep)
-        if(use_ice) call write_raw_restart(ice_files, istep)
+        call write_all_raw_restarts(istep)
       end if
     end if
   end if
@@ -210,8 +208,7 @@ subroutine restart(istep, l_read, mesh)
   end if
 
   if(is_raw_restart_write) then
-    call write_raw_restart(oce_files, istep)
-    if(use_ice) call write_raw_restart(ice_files, istep)
+    call write_all_raw_restarts(istep)
   end if
 
   ! actualize clock file to latest restart point
@@ -246,21 +243,25 @@ subroutine write_restart(path, filegroup, istep)
             
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
-      if(filegroup%files(i)%path == "") then
+      if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
         ! the path to an existing restart file is not set in read_restart if we had a restart from a raw restart
+        ! OR we might have skipped the file when reading restarts and it does not exist at all
         inquire(file=filepath, exist=file_exists)
-        if(file_exists) filegroup%files(i)%path = filepath
+        if(file_exists) then
+          filegroup%files(i)%path = filepath
+        else if(.not. filegroup%files(i)%must_exist_on_read) then
+          filegroup%files(i)%path = ""
+        end if
       end if
       if(filegroup%files(i)%path .ne. filepath) then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = filepath
         call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
-     else
+      else
         call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
       end if
 
       write(*,*) 'writing restart record ', filegroup%files(i)%rec_count()+1, ' to ', filegroup%files(i)%path
-      ! todo: write iter to a separate (non-mesh-variable) file
       call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()+1], [1], [cstep])
       ! todo: write time via the fesom_file_type
       call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()+1], [1], [ctime])
@@ -272,18 +273,17 @@ subroutine write_restart(path, filegroup, istep)
 end subroutine
 
 
-subroutine write_raw_restart(filegroup, istep)
-  type(restart_file_group), intent(inout) :: filegroup
+subroutine write_all_raw_restarts(istep)
   integer,  intent(in):: istep
   ! EO parameters
-  integer i
   integer cstep
   integer fileunit
-  
-  do i=1, filegroup%nfiles
-    call filegroup%files(i)%write_variables_raw(raw_restart_dirpath)
-  end do
-  
+
+  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  call write_raw_restart_group(oce_files, fileunit)
+  if(use_ice) call write_raw_restart_group(ice_files, fileunit)
+  close(fileunit)
+
   if(mype == RAW_RESTART_METADATA_RANK) then
     print *,"writing raw restart to "//raw_restart_dirpath
     ! store metadata about the raw restart
@@ -292,22 +292,33 @@ subroutine write_raw_restart(filegroup, istep)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
     write(fileunit, '(2(g0))') "! year: ",yearnew
+    write(fileunit, '(g0)') "! oce"
+    if(use_ice) write(fileunit, '(g0)') "! ice"
     close(fileunit)
   end if
 end subroutine
 
 
-subroutine read_raw_restart(filegroup)
+subroutine write_raw_restart_group(filegroup, fileunit)
   type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: fileunit
   ! EO parameters
   integer i
+  
+  do i=1, filegroup%nfiles
+    call filegroup%files(i)%write_variables_raw(fileunit)
+  end do
+end subroutine
+
+
+subroutine read_all_raw_restarts()
   integer rstep
   real(kind=WP) rtime
   integer fileunit
   integer status
 
   if(mype == RAW_RESTART_METADATA_RANK) then
-    ! store metadata about the raw restart
+    ! read metadata info for the raw restart
     open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
     if(status == 0) then
       read(fileunit,*) rstep
@@ -328,9 +339,27 @@ subroutine read_raw_restart(filegroup)
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, MPI_COMM_FESOM, MPIerr)
+
+  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump', form = 'unformatted')
+  if(status == 0) then
+    call read_raw_restart_group(oce_files, fileunit)
+    if(use_ice) call read_raw_restart_group(ice_files, fileunit)
+    close(fileunit)
+  else
+    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt()//'.dump'
+    stop 1
+  end if
+end subroutine
+
+
+subroutine read_raw_restart_group(filegroup, fileunit)
+  type(restart_file_group), intent(inout) :: filegroup
+  integer, intent(in) :: fileunit
+  ! EO parameters
+  integer i
   
   do i=1, filegroup%nfiles
-    call filegroup%files(i)%read_variables_raw(raw_restart_dirpath)
+    call filegroup%files(i)%read_variables_raw(fileunit)
   end do  
 end subroutine
 
@@ -369,29 +398,62 @@ subroutine read_restart(path, filegroup)
   integer i
   character(:), allocatable :: dirpath
   integer mpistatus(MPI_STATUS_SIZE)
-
+  logical file_exists
+  logical, allocatable :: skip_file(:)
+  integer current_iorank_snd, current_iorank_rcv
+  integer max_globalstep
+  
+  allocate(skip_file(filegroup%nfiles))
+  skip_file = .false.
+  
   do i=1, filegroup%nfiles
+    current_iorank_snd = 0
+    current_iorank_rcv = 0
     if( filegroup%files(i)%is_iorank() ) then
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
         call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+        ! determine if the file should be skipped
+        if(.not. filegroup%files(i)%must_exist_on_read) then
+          current_iorank_snd = mype
+          inquire(file=filegroup%files(i)%path, exist=file_exists)
+          if(.not. file_exists) skip_file(i) = .true.
+        end if
+
+        if(.not. skip_file(i)) then
 #ifndef DISABLE_PARALLEL_RESTART_READ
-        write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+          write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #else
-        write(*,*) 'reading restart SEQIENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+          write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
 #endif
-        call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        else
+#ifndef DISABLE_PARALLEL_RESTART_READ
+          write(*,*) 'skipping reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#else
+          write(*,*) 'skipping reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
+#endif
+        end if
+        
+        if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
-      end if
+      end if      
     end if
 
-    call filegroup%files(i)%async_read_and_scatter_variables()
+    ! iorank already knows if we skip the file, tell the others
+    if(.not. filegroup%files(i)%must_exist_on_read) then
+      call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+      call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, MPI_COMM_FESOM, MPIerr)
+    end if      
+
+    if(.not. skip_file(i)) call filegroup%files(i)%async_read_and_scatter_variables()
 #ifndef DISABLE_PARALLEL_RESTART_READ
   end do
   
   do i=1, filegroup%nfiles
 #endif
+    if(skip_file(i)) cycle
     call filegroup%files(i)%join()
 
     if(filegroup%files(i)%is_iorank()) then
@@ -405,14 +467,20 @@ subroutine read_restart(path, filegroup)
       call filegroup%files(i)%close_file()
 
      if (int(ctime)/=int(rtime)) then
-        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match'
+        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'
         stop 1
       end if
     end if
   end do
-  
+
+  ! sync globalstep with processes which may have skipped a restart upon reading and thus need to know the globalstep when writing their restart 
+  if( any(skip_file .eqv. .true.) ) then
+    call MPI_Allreduce(globalstep, max_globalstep, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    globalstep = max_globalstep
+  end if
+
   ! sync globalstep with the process responsible for raw restart metadata
   if(filegroup%nfiles >= 1) then
     ! use the first restart I/O process to send the globalstep
@@ -452,6 +520,15 @@ end subroutine
       stop 1
     stop
     end if
+  end function
+
+
+  function mpirank_to_txt() result(txt)
+    use g_PARSUP
+    use fortran_utils
+    character(:), allocatable :: txt
+    ! EO parameters
+    txt = int_to_txt_pad(mype,int(log10(real(npes)))+1) ! pad to the width of the number of processes
   end function
 
 end module
