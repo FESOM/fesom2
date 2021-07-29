@@ -401,6 +401,7 @@ subroutine read_restart(path, filegroup)
   logical file_exists
   logical, allocatable :: skip_file(:)
   integer current_iorank_snd, current_iorank_rcv
+  integer max_globalstep
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
@@ -473,7 +474,13 @@ subroutine read_restart(path, filegroup)
       end if
     end if
   end do
-  
+
+  ! sync globalstep with processes which may have skipped a restart upon reading and thus need to know the globalstep when writing their restart 
+  if( any(skip_file .eqv. .true.) ) then
+    call MPI_Allreduce(globalstep, max_globalstep, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    globalstep = max_globalstep
+  end if
+
   ! sync globalstep with the process responsible for raw restart metadata
   if(filegroup%nfiles >= 1) then
     ! use the first restart I/O process to send the globalstep
