@@ -404,10 +404,10 @@ subroutine read_restart(path, filegroup)
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
-  current_iorank_snd = 0
-  current_iorank_rcv = 0
   
   do i=1, filegroup%nfiles
+    current_iorank_snd = 0
+    current_iorank_rcv = 0
     if( filegroup%files(i)%is_iorank() ) then
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
