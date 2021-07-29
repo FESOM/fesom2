@@ -121,8 +121,8 @@ subroutine ini_ice_io(year, mesh)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', u_ice, mesh)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   v_ice, mesh)
 #if defined (__oifs)
-  call ice_files%def_node_var('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
-  call ice_files%def_node_var('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
+  call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',                 '-',   ice_alb, mesh)
+  call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice_temp, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
