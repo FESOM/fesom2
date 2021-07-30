@@ -412,7 +412,6 @@ subroutine read_restart(path, filegroup)
     if( filegroup%files(i)%is_iorank() ) then
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
-        call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
 
         ! determine if the file should be skipped
