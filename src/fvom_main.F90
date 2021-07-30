@@ -26,6 +26,7 @@ use fesom_version_info_module
 !---wiso-code
 use g_ic3d
 !---wiso-code-end
+use g_picocpl
 
 ! Define icepack module
 #if defined (__icepack)
@@ -132,6 +133,7 @@ type(t_mesh),             target, save :: mesh
     call init_icepack(mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
+    call init_picocpl(mesh)
     
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
@@ -204,7 +206,7 @@ type(t_mesh),             target, save :: mesh
        call foreph_ini(yearnew, month)
     end if
 
-    do n=1, nsteps        
+    do n=1, nsteps
         if (use_global_tides) then
            call foreph(mesh)
         end if
@@ -273,6 +275,7 @@ type(t_mesh),             target, save :: mesh
         rtime_write_means   = rtime_write_means   + t5 - t4   
         rtime_write_restart = rtime_write_restart + t6 - t5
         rtime_read_forcing  = rtime_read_forcing  + t1_frc - t0_frc
+        call fesom2pico(mesh)
     end do
     
     call finalize_output()
