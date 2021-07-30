@@ -12,7 +12,7 @@ set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
-set(RECOM_COUPLED ON CACHE BOOL "compile fesom coupled to RECOM")
+set(RECOM_COUPLED OFF CACHE BOOL "compile fesom coupled to RECOM")
 #set(VERBOSE OFF CACHE BOOL "toggle debug output")
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
