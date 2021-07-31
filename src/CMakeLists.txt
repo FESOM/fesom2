@@ -7,14 +7,12 @@ option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
-if(${RECOM_COUPLED})
-		file(GLOB sources_Fortran ${src_home}/*.F90 
-                                          ${src_home}/int_recom/*.F90 
-                                          ${src_home}/int_recom/recom/*.F90)
-elseif(${USE_ICEPACK})
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/icepack_drivers/*.F90
-                             ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
+if(${USE_ICEPACK})
+   file(GLOB sources_Fortran 
+        ${src_home}/*.F90
+        ${src_home}/icepack_drivers/*.F90
+        ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90
+   )
 else()
    file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
@@ -65,6 +63,8 @@ if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 if(${RECOM_COUPLED})
+   # check for RECOM and retun RECOM_LIB_DIR else exit the build
+   include(${CMAKE_CURRENT_LIST_DIR}/../cmake/find_recom.cmake)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2)
 endif()
 if(${CISO_COUPLED})
@@ -91,10 +91,18 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
+
+if(${RECOM_COUPLED})
+    # INCLUDE and LINK settings for RECOM
+    target_include_directories(${PROJECT_NAME} PRIVATE ${RECOM_LIB_DIR})
+    target_link_libraries(${PROJECT_NAME} ${RECOM_LIB_DIR}/librecom.a)
+endif()
+
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_C ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} async_threads_cpp)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
+
 
 set(FESOM_INSTALL_FILEPATH "${CMAKE_CURRENT_LIST_DIR}/../bin/fesom.x" CACHE FILEPATH "file path where the FESOM binary should be put")
 get_filename_component(FESOM_INSTALL_PATH ${FESOM_INSTALL_FILEPATH} DIRECTORY)
