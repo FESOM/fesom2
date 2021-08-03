@@ -7,15 +7,30 @@ option(DISABLE_MULTITHREADING "disable asynchronous operations" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# ===
+# add source files
+# ===
+# default FESOM codes
+file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# ICEPACK sources
 if(${USE_ICEPACK})
    file(GLOB sources_Fortran 
         ${src_home}/*.F90
         ${src_home}/icepack_drivers/*.F90
         ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90
    )
-else()
-   file(GLOB sources_Fortran ${src_home}/*.F90)
 endif()
+
+# RECOM sources
+if(${USE_RECOM})
+    file(GLOB sources_Fortran 
+        ${src_home}/*.F90
+        ${src_home}/recom_drivers/*.F90
+    )
+endif()
+
 #list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_partition_init.F90)
 file(GLOB sources_C ${src_home}/*.c)
 

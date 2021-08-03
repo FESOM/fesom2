@@ -6,6 +6,7 @@ module diff_part_hor_redi_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_muscle_ale_interface
   interface
     subroutine adv_tracers_muscle_ale(ttfAB, num_ord, do_Xmoment, mesh)
@@ -18,6 +19,7 @@ module adv_tracers_muscle_ale_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_vert_ppm_ale_interface
   interface
     subroutine adv_tracers_vert_ppm_ale(ttf, do_Xmoment, mesh)
@@ -29,6 +31,7 @@ module adv_tracers_vert_ppm_ale_interface
     end subroutine
   end interface
 end module
+
 module adv_tracers_ale_interface
   interface
     subroutine adv_tracers_ale(tr_num, mesh)
@@ -38,6 +41,7 @@ module adv_tracers_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_expl_ale_interface
   interface
     subroutine diff_ver_part_expl_ale(tr_num, mesh)
@@ -47,6 +51,7 @@ module diff_ver_part_expl_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_redi_expl_interface
   interface
     subroutine diff_ver_part_redi_expl(mesh)
@@ -55,6 +60,7 @@ module diff_ver_part_redi_expl_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_part_impl_ale_interface
   interface
     subroutine diff_ver_part_impl_ale(tr_num, mesh)
@@ -64,6 +70,7 @@ module diff_ver_part_impl_ale_interface
     end subroutine
   end interface
 end module
+
 module diff_tracers_ale_interface
   interface
     subroutine diff_tracers_ale(tr_num, mesh)
@@ -73,6 +80,7 @@ module diff_tracers_ale_interface
     end subroutine
   end interface
 end module
+
 module bc_surface_interface
   interface
     function bc_surface(n, id, mesh)
@@ -83,6 +91,7 @@ module bc_surface_interface
     end function
   end interface
 end module
+
 module diff_part_bh_interface
   interface
     subroutine diff_part_bh(ttf, mesh)
@@ -93,6 +102,7 @@ module diff_part_bh_interface
     end subroutine
   end interface
 end module
+
 module diff_ver_recom_expl_interface
   interface
     subroutine diff_ver_recom_expl(tr_num, mesh)
@@ -103,6 +113,7 @@ module diff_ver_recom_expl_interface
     end subroutine
   end interface
 end module
+
 module ver_sinking_recom_benthos_interface
   interface
     subroutine ver_sinking_recom_benthos(tr_num, mesh)
@@ -129,8 +140,10 @@ subroutine solve_tracers_ale(mesh)
     use Toy_Channel_Soufflet
     use adv_tracers_ale_interface
     use diff_tracers_ale_interface
+#if defined(__recom)
     use REcom_config, only: ciso     ! to calculation radioactive decay of 14C
     use REcoM_ciso, only: lambda_14  ! decay constant of 14C
+#endif
     
     implicit none
     type(t_mesh), intent(in) , target :: mesh
@@ -407,7 +420,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
 
 !       call ver_sinking_recom_benthos(tr_num, mesh)   
 
-#endif
+#endif     /* __recom  */
     
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov etal "FESOM2 from finite elements
@@ -864,330 +877,290 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
 end subroutine diff_ver_part_impl_ale
 
 
-
-
-
-
-
-
-
-
-
-
-!
-!
-!===============================================================================
-subroutine ver_sinking_recom_benthos(tr_num,mesh)
-    use o_ARRAYS
-    use g_PARSUP
-    use MOD_MESH
-    USE o_param
-    use g_config
-    use g_comm_auto
-    USE O_MESH
-    use g_forcing_arrays
-use ver_sinking_recom_benthos_interface
 #if defined(__recom)
-    USE REcoM_GloVar
-    use recom_config !, recom_debug
-#endif
-    IMPLICIT NONE
-    type(t_mesh), intent(in) , target  :: mesh
-    integer                   :: elem,k, tr_num
-    integer                   :: n2,nl1,nl2,nz,n,id,ul1
-    real(kind=WP)             :: bottom_flux(myDim_nod2D)
-    real(kind=WP)             :: Vben(mesh%nl)
-    integer                   :: nlevels_nod2D_minimum
-    real(kind=WP)             :: ver_flux(mesh%nl,myDim_nod2D+eDim_nod2D)
-!   real(kind=WP)             :: Vbenthic_det,Vbenthic_phy,Vbenthic_dia
-!    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-#include "associate_mesh.h"
+    !
+    !
+    !===============================================================================
+    subroutine ver_sinking_recom_benthos(tr_num,mesh)
+        use o_ARRAYS
+        use g_PARSUP
+        use MOD_MESH
+        USE o_param
+        use g_config
+        use g_comm_auto
+        USE O_MESH
+        use g_forcing_arrays
+    use ver_sinking_recom_benthos_interface
+    ! deniz: commented out and added conditional compilation on top of the subroutine
+    !#if defined(__recom)
+        USE REcoM_GloVar
+        use recom_config, only : allow_var_sinking, GlowFluxPhy, GlowFluxDet, GlowFluxDia     !, recom_debug
+    !#endif
+        IMPLICIT NONE
+        type(t_mesh), intent(in) , target  :: mesh
+        integer                   :: elem,k, tr_num
+        integer                   :: n2,nl1,nl2,nz,n,id,ul1
+        real(kind=WP)             :: bottom_flux(myDim_nod2D)
+        real(kind=WP)             :: Vben(mesh%nl)
+        integer                   :: nlevels_nod2D_minimum
+        real(kind=WP)             :: ver_flux(mesh%nl,myDim_nod2D+eDim_nod2D)
+    !   real(kind=WP)             :: Vbenthic_det,Vbenthic_phy,Vbenthic_dia
+    !    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    #include "associate_mesh.h"
 
-   do n=1, myDim_nod2D
-        nl1=nlevels_nod2D(n)-1
-        ul1=ulevels_nod2D(n)
+       do n=1, myDim_nod2D
+            nl1=nlevels_nod2D(n)-1
+            ul1=ulevels_nod2D(n)
 
-        ver_flux=0._WP
-        bottom_flux=0._WP
-!tr_arr(:,:,tr_num)
-        if (tracer_id(tr_num)==1007 .or. &  !idetn
-            tracer_id(tr_num)==1008 .or. &  !idetc
-            tracer_id(tr_num)==1017 .or. &  !idetsi
-            tracer_id(tr_num)==1021 ) then  !idetcal
-	    if (allow_var_sinking) then
-            	Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
-            else
-            	Vben = VDet
-            endif
-!        if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
+            ver_flux=0._WP
+            bottom_flux=0._WP
+    !tr_arr(:,:,tr_num)
+            if (tracer_id(tr_num)==1007 .or. &  !idetn
+                tracer_id(tr_num)==1008 .or. &  !idetc
+                tracer_id(tr_num)==1017 .or. &  !idetsi
+                tracer_id(tr_num)==1021 ) then  !idetcal
+                if (allow_var_sinking) then
+                    Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDet
+                else
+                    Vben = VDet
+                endif
+    !        if (mype==0) then
+    !             write(*,*) '____________________________________________________________'
+    !             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
+    !         endif
 
-        elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
-               tracer_id(tr_num)==1005 .or. &  !iphyc
-               tracer_id(tr_num)==1020 .or. &  !iphycal
-               tracer_id(tr_num)==1006 ) then  !ipchl
+            elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
+                   tracer_id(tr_num)==1005 .or. &  !iphyc
+                   tracer_id(tr_num)==1020 .or. &  !iphycal
+                   tracer_id(tr_num)==1006 ) then  !ipchl
 
-	       if (allow_var_sinking) then
+                if (allow_var_sinking) then
                    Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VPhy
-               else
-            	   Vben = VPhy
-               endif
+                else
+                    Vben = VPhy
+            endif
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
-        elseif(tracer_id(tr_num)==1013 .or. &  !idian
-               tracer_id(tr_num)==1014 .or. &  !idiac
-               tracer_id(tr_num)==1016 .or. &  !idiasi
-               tracer_id(tr_num)==1015 ) then  !idchl
+    !         if (mype==0) then
+    !             write(*,*) '____________________________________________________________'
+    !             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
+    !         endif
+            elseif(tracer_id(tr_num)==1013 .or. &  !idian
+                   tracer_id(tr_num)==1014 .or. &  !idiac
+                   tracer_id(tr_num)==1016 .or. &  !idiasi
+                   tracer_id(tr_num)==1015 ) then  !idchl
 
-	       if (allow_var_sinking) then
-            	   Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
-               else
-            	   Vben = VDia
-               endif
+                if (allow_var_sinking) then
+                    Vben = Vdet_a * abs(zbar_3d_n(:,n)) + VDia
+                else
+                    Vben = VDia
+                endif
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
+    !         if (mype==0) then
+    !             write(*,*) '____________________________________________________________'
+    !             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
+    !         endif
 
-!   if (REcoM_Second_Zoo) then ! No variable sinking
-        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+    !   if (REcoM_Second_Zoo) then ! No variable sinking
+            elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
                tracer_id(tr_num)==1026 .or. &  !idetz2c
                tracer_id(tr_num)==1027 .or. &  !idetz2si
                tracer_id(tr_num)==1028 ) then  !idetz2calc
 
                Vben = VDet_zoo2
 
-        else
-        endif
+            else
+                ! deniz: this is not required
+            endif
 
-        Vben=Vben/SecondsPerDay ! convert [m/d] --> [m/s]
+            Vben=Vben/SecondsPerDay ! convert [m/d] --> [m/s]
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
+    !         if (mype==0) then
+    !             write(*,*) '____________________________________________________________'
+    !             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
+    !         endif
 
-        k=nod_in_elem2D_num(n)
-        ! Screening minimum depth in neigbouring nodes around node n
-        nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
+            k=nod_in_elem2D_num(n)
+            ! Screening minimum depth in neigbouring nodes around node n
+            nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
 
-        !_______________________________________________________________________
-        ! Bottom flux
-        do nz=nlevels_nod2D_minimum, nl1
-           ver_flux(nz,n)=(area(nz,n)-area(nz+1,n)) * Vben(nz) * tr_arr(nz,n,tr_num) ![m2 * m/s * mmol/m3]
+            !_______________________________________________________________________
+            ! Bottom flux
+            do nz=nlevels_nod2D_minimum, nl1
+               ver_flux(nz,n)=(area(nz,n)-area(nz+1,n)) * Vben(nz) * tr_arr(nz,n,tr_num) ![m2 * m/s * mmol/m3]
+            end do
+            nz=nl1
+            ver_flux(nz+1,n)= area(nz+1,n) * Vben(nz) * tr_arr(nz,n,tr_num)
+            
+            bottom_flux(n)=sum(ver_flux(ul1:nl1+1,n)/areasvol(nz,n)) ![mmol/m2/s]
+
+    !         if (mype==0) then
+    !             write(*,*) '____________________________________________________________'
+    !             write(*,*) ' --> bottom_flux,  = ', bottom_flux(n)
+    !         endif        
+
+            if (tracer_id(tr_num)==1004) GlowFluxPhy(n,1)= bottom_flux(n) !iphyn
+            if (tracer_id(tr_num)==1005) GlowFluxPhy(n,2)= bottom_flux(n) !iphyc
+            if (tracer_id(tr_num)==1020) GlowFluxPhy(n,3)= bottom_flux(n) !iphycal
+            if (tracer_id(tr_num)==1006) GlowFluxPhy(n,4)= bottom_flux(n) !ipchl
+
+            if (tracer_id(tr_num)==1007) GlowFluxDet(n,1)= bottom_flux(n) !idetn
+            if (tracer_id(tr_num)==1008) GlowFluxDet(n,2)= bottom_flux(n) !idetc
+            if (tracer_id(tr_num)==1017) GlowFluxDet(n,3)= bottom_flux(n) !idetsi
+            if (tracer_id(tr_num)==1021) GlowFluxPhy(n,4)= bottom_flux(n) !idetcal
+
+            if (tracer_id(tr_num)==1013) GlowFluxDia(n,1)= bottom_flux(n) !idian
+            if (tracer_id(tr_num)==1014) GlowFluxDia(n,2)= bottom_flux(n) !idiac
+            if (tracer_id(tr_num)==1015) GlowFluxDia(n,4)= bottom_flux(n) !idchl
+            if (tracer_id(tr_num)==1016) GlowFluxDia(n,3)= bottom_flux(n) !idiasi
+
+    !   if (REcoM_Second_Zoo) then
+            if (tracer_id(tr_num)==1025) GlowFluxDet(n,5)= bottom_flux(n) !idetz2n
+            if (tracer_id(tr_num)==1026) GlowFluxDet(n,6)= bottom_flux(n) !idetz2c
+            if (tracer_id(tr_num)==1027) GlowFluxDet(n,7)= bottom_flux(n) !idetz2si
+            if (tracer_id(tr_num)==1028) GlowFluxDet(n,8)= bottom_flux(n) !idetz2calc
+    ! endif
         end do
-        nz=nl1
-        ver_flux(nz+1,n)= area(nz+1,n) * Vben(nz) * tr_arr(nz,n,tr_num)
-        
-        bottom_flux(n)=sum(ver_flux(ul1:nl1+1,n)/areasvol(nz,n)) ![mmol/m2/s]
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> bottom_flux,  = ', bottom_flux(n)
-!         endif        
-
-         if (tracer_id(tr_num)==1004) GlowFluxPhy(n,1)= bottom_flux(n) !iphyn
-         if (tracer_id(tr_num)==1005) GlowFluxPhy(n,2)= bottom_flux(n) !iphyc
-         if (tracer_id(tr_num)==1020) GlowFluxPhy(n,3)= bottom_flux(n) !iphycal
-         if (tracer_id(tr_num)==1006) GlowFluxPhy(n,4)= bottom_flux(n) !ipchl
-
-         if (tracer_id(tr_num)==1007) GlowFluxDet(n,1)= bottom_flux(n) !idetn
-         if (tracer_id(tr_num)==1008) GlowFluxDet(n,2)= bottom_flux(n) !idetc
-         if (tracer_id(tr_num)==1017) GlowFluxDet(n,3)= bottom_flux(n) !idetsi
-         if (tracer_id(tr_num)==1021) GlowFluxPhy(n,4)= bottom_flux(n) !idetcal
-
-         if (tracer_id(tr_num)==1013) GlowFluxDia(n,1)= bottom_flux(n) !idian
-         if (tracer_id(tr_num)==1014) GlowFluxDia(n,2)= bottom_flux(n) !idiac
-         if (tracer_id(tr_num)==1015) GlowFluxDia(n,4)= bottom_flux(n) !idchl
-         if (tracer_id(tr_num)==1016) GlowFluxDia(n,3)= bottom_flux(n) !idiasi
+    !GlodecayBenthos(n,3)
+    end subroutine ver_sinking_recom_benthos
+#endif   /* __recom  */
 
 
 
-
-!   if (REcoM_Second_Zoo) then
-         if (tracer_id(tr_num)==1025) GlowFluxDet(n,5)= bottom_flux(n) !idetz2n
-         if (tracer_id(tr_num)==1026) GlowFluxDet(n,6)= bottom_flux(n) !idetz2c
-         if (tracer_id(tr_num)==1027) GlowFluxDet(n,7)= bottom_flux(n) !idetz2si
-         if (tracer_id(tr_num)==1028) GlowFluxDet(n,8)= bottom_flux(n) !idetz2calc
-! endif
-    end do
-
-!GlodecayBenthos(n,3)
-end subroutine ver_sinking_recom_benthos
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-!
-!
-!===============================================================================
-subroutine diff_ver_recom_expl(tr_num,mesh)
-    use o_ARRAYS
-    use g_PARSUP
-    use MOD_MESH
-    USE o_param
-    use g_config
-    use g_comm_auto
-    USE O_MESH
-    use g_forcing_arrays
-use diff_ver_recom_expl_interface
 #if defined(__recom)
-    USE REcoM_GloVar
-    use recom_config !, recom_debug
-#endif
-    IMPLICIT NONE
-    type(t_mesh), intent(in) , target :: mesh
-    integer                  :: elem,k,tr_num
-    integer                  :: n2,nl1,nl2,nz,n,id,ul1
-    real(kind=WP)            :: vd_flux(mesh%nl)
-    integer                  :: nlevels_nod2D_minimum
-    real(kind=WP)            :: bottom_flux(myDim_nod2D+eDim_nod2D)
+    !
+    !
+    !===============================================================================
+    subroutine diff_ver_recom_expl(tr_num,mesh)
+        use o_ARRAYS
+        use g_PARSUP
+        use MOD_MESH
+        USE o_param
+        use g_config
+        use g_comm_auto
+        USE O_MESH
+        use g_forcing_arrays
+    use diff_ver_recom_expl_interface
+    ! deniz: commented out this one moved it to top
+    !#if defined(__recom)
+        USE REcoM_GloVar
+        use recom_config, only: GlodecayBenthos, GlowFluxPhy, GlowFluxDet, GlowFluxDia  !, recom_debug
+    !#endif
+        IMPLICIT NONE
+        type(t_mesh), intent(in) , target :: mesh
+        integer                  :: elem,k,tr_num
+        integer                  :: n2,nl1,nl2,nz,n,id,ul1
+        real(kind=WP)            :: vd_flux(mesh%nl)
+        integer                  :: nlevels_nod2D_minimum
+        real(kind=WP)            :: bottom_flux(myDim_nod2D+eDim_nod2D)
 
-#include "associate_mesh.h"
+    #include "associate_mesh.h"
 
-bottom_flux = 0._WP
-id = tracer_id(tr_num)
-!if (mype==0) write (*,*) "id= ", id
+    bottom_flux = 0._WP
+    id = tracer_id(tr_num)
+    !if (mype==0) write (*,*) "id= ", id
 
-  SELECT CASE (id)
-    CASE (1001)
-      bottom_flux = GlodecayBenthos(:,1) ! DIN
-    CASE (1002)
-      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(n,4) ! DIC and calcification
-    CASE (1003)
-      bottom_flux = GlodecayBenthos(:,4) * 2.0_WP ! Alk
+        SELECT CASE (id)
+            CASE (1001)
+                bottom_flux = GlodecayBenthos(:,1) ! DIN
+            CASE (1002)
+                bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(n,4) ! DIC and calcification
+            CASE (1003)
+                bottom_flux = GlodecayBenthos(:,4) * 2.0_WP ! Alk
+            CASE (1004)
+                bottom_flux = -GlowFluxPhy(:,1) ! iphyn
+            CASE (1005)
+                bottom_flux = -GlowFluxPhy(:,2) ! iphyc
+            CASE (1006)
+                bottom_flux = -GlowFluxPhy(:,4) ! ipchl
+            CASE (1007)
+                bottom_flux = -GlowFluxDet(:,1) ! idetn
+            CASE (1008)
+                bottom_flux = -GlowFluxDet(:,2) ! idetc
+            CASE (1013)
+                bottom_flux = -GlowFluxDia(:,1) ! idian
+            CASE (1014)
+                bottom_flux = -GlowFluxDia(:,2) ! idiac
+            CASE (1015)
+                bottom_flux = -GlowFluxDia(:,4) ! idchl
+            CASE (1016)
+                bottom_flux = -GlowFluxDia(:,3) ! idiasi
+            CASE (1017)
+                bottom_flux = -GlowFluxDet(:,3) ! idetsi
+            CASE (1018)
+                bottom_flux = GlodecayBenthos(:,3) ! Si
+            CASE (1019)
+                if(use_Fe2N) then 
+                    bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos
+                else
+                    bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
+                end if
+            CASE (1020)
+                bottom_flux = -GlowFluxPhy(:,3) ! iphycal
+            CASE (1021)
+                bottom_flux = -GlowFluxDet(:,4) ! idetcal
+            CASE (1022)
+                bottom_flux = -GlodecayBenthos(:,2) * redO2C ! Oxy
 
-    CASE (1004)
-      bottom_flux = -GlowFluxPhy(:,1) ! iphyn
-    CASE (1005)
-      bottom_flux = -GlowFluxPhy(:,2) ! iphyc
-    CASE (1006)
-      bottom_flux = -GlowFluxPhy(:,4) ! ipchl
-    CASE (1007)
-      bottom_flux = -GlowFluxDet(:,1) ! idetn
-    CASE (1008)
-      bottom_flux = -GlowFluxDet(:,2) ! idetc
-    CASE (1013)
-      bottom_flux = -GlowFluxDia(:,1) ! idian
-    CASE (1014)
-      bottom_flux = -GlowFluxDia(:,2) ! idiac
-    CASE (1015)
-      bottom_flux = -GlowFluxDia(:,4) ! idchl
-    CASE (1016)
-      bottom_flux = -GlowFluxDia(:,3) ! idiasi
-    CASE (1017)
-      bottom_flux = -GlowFluxDet(:,3) ! idetsi
+            CASE (1025)
+                bottom_flux = -GlowFluxDet(:,5) ! Oxy
+            CASE (1026)
+                bottom_flux = -GlowFluxDet(:,6) ! Oxy
+            CASE (1027)
+                bottom_flux = -GlowFluxDet(:,7) ! Oxy
+            CASE (1028)
+                bottom_flux = -GlowFluxDet(:,8) ! Oxy
 
+            CASE (1033)
+                if (ciso) then
+                bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) ! DIC_13 and Calc: DIC_13
+                end if
+            CASE (1034)
+                if (ciso) then
+                bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) ! DIC_14 and Calc: DIC_14
+                end if
+            CASE DEFAULT
+                if (mype==0) then
+                    if (mype==0) write(*,*) 'check specified in boundary conditions'
+                    if (mype==0) write(*,*) 'the model will stop!'
+                end if
+                call par_ex
+                stop
+        END SELECT
+     
+        do n=1, myDim_nod2D
+            nl1=nlevels_nod2D(n)-1
+            ul1=ulevels_nod2D(n)
 
-    CASE (1018)
-      bottom_flux = GlodecayBenthos(:,3) ! Si
-    CASE (1019)
-      if(use_Fe2N) then 
-        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos
-      else
-        bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
-      end if
+            vd_flux=0._WP
 
+            k=nod_in_elem2D_num(n)
+            ! Screening minimum depth in neigbouring nodes around node n
+            nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
 
-    CASE (1020)
-      bottom_flux = -GlowFluxPhy(:,3) ! iphycal
-    CASE (1021)
-      bottom_flux = -GlowFluxDet(:,4) ! idetcal
+            !_______________________________________________________________________
+            ! Bottom flux
+            do nz=nlevels_nod2D_minimum, nl1
+    !            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* GlodecayBenthos(n,3)
+                vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)            
+            end do
 
+            nz=nl1
+    !        vd_flux(nz+1)= (area(nz+1,n))* GlodecayBenthos(n,3)       
+            vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)
 
-    CASE (1022)
-      bottom_flux = -GlodecayBenthos(:,2) * redO2C ! Oxy
-
-
-    CASE (1025)
-      bottom_flux = -GlowFluxDet(:,5) ! Oxy
-    CASE (1026)
-      bottom_flux = -GlowFluxDet(:,6) ! Oxy
-    CASE (1027)
-      bottom_flux = -GlowFluxDet(:,7) ! Oxy
-    CASE (1028)
-      bottom_flux = -GlowFluxDet(:,8) ! Oxy
-
-
-
-
-
-
-
-
-
-
-
-
-    CASE (1033)
-      if (ciso) then
-        bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,7) ! DIC_13 and Calc: DIC_13
-      end if
-    CASE (1034)
-      if (ciso) then
-        bottom_flux = GlodecayBenthos(:,6) + GlodecayBenthos(:,8) ! DIC_14 and Calc: DIC_14
-      end if
-    CASE DEFAULT
-      if (mype==0) then
-         if (mype==0) write(*,*) 'check specified in boundary conditions'
-         if (mype==0) write(*,*) 'the model will stop!'
-      end if
-      call par_ex
-      stop
-  END SELECT
- 
-
-
-   do n=1, myDim_nod2D
-
-        nl1=nlevels_nod2D(n)-1
-        ul1=ulevels_nod2D(n)
-
-        vd_flux=0._WP
-
-        k=nod_in_elem2D_num(n)
-        ! Screening minimum depth in neigbouring nodes around node n
-        nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
-
-        !_______________________________________________________________________
-        ! Bottom flux
-        do nz=nlevels_nod2D_minimum, nl1
-!            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* GlodecayBenthos(n,3)
-            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)            
+            !_______________________________________________________________________
+            ! writing flux into rhs
+            do nz=ul1,nl1
+                ! flux contribute only the cell through its bottom !!!
+                dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+            end do
         end do
+    end subroutine diff_ver_recom_expl
 
-        nz=nl1
-!        vd_flux(nz+1)= (area(nz+1,n))* GlodecayBenthos(n,3)       
-        vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)
+#endif   /*  __recom  */
 
-        !_______________________________________________________________________
-        ! writing flux into rhs
-        do nz=ul1,nl1
-            ! flux contribute only the cell through its bottom !!!
-            dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
-        end do
-    end do
-end subroutine diff_ver_recom_expl
+
 !
 !
 !===============================================================================
@@ -1490,10 +1463,10 @@ FUNCTION bc_surface(n, id, mesh)
   USE g_PARSUP, only: mype, par_ex
   USE g_config
 #if defined(__recom)
-USE REcoM_GloVar
-use recom_config, only: ciso, recom_debug
-use REcoM_declarations
-use REcoM_ciso
+  use REcoM_GloVar
+  use recom_config, only: ciso, recom_debug
+  use REcoM_declarations
+  use REcoM_ciso
 #endif
 
   implicit none
@@ -1586,7 +1559,7 @@ use REcoM_ciso
     CASE (1102:1299)
         bc_surface=0.0_WP  ! added by MB for ciso
 !ciso adapted by MB
-#endif 
+#endif    /*  __recom   */
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
     CASE (301)
