@@ -120,7 +120,7 @@ subroutine read_namelist
   read (20,NML=paalkalinity_restoring)
   read (20,NML=paciso)
   close (20)
-#endif
+#endif  /*  __recom  */
 
   if(mype==0) write(*,*) 'Namelist files are read in'
   

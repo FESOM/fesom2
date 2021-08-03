@@ -200,6 +200,7 @@ subroutine ini_ice_io(year, mesh)
 #endif /* (__oifs) */
 
 end subroutine ini_ice_io
+
 #if defined(__recom)
 !
 !--------------------------------------------------------------------------------------------
@@ -242,7 +243,8 @@ subroutine ini_bio_io(year, mesh)
     call def_variable(bid, 'BenCalc_14',    (/nod2D/), 'Benthos Calcite-14',  'mmol/m3',   Benthos(:,8)); 
   end if
 end subroutine ini_bio_io
-#endif
+
+#endif  /*  __recom  */
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -266,27 +268,32 @@ subroutine restart(istep, l_write, l_read, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                call ini_ocean_io(yearnew, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+      if (use_ice) call ini_ice_io  (yearnew, mesh)
+
 #if defined(__recom)
-  if (use_REcoM) then
-               call ini_bio_io  (yearnew, mesh)
-  end if 
+      if (use_REcoM) then
+          call ini_bio_io(yearnew, mesh)
+      end if 
 #endif
+
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearnew, mesh)
+      if (use_ice) call init_restart_icepack(yearnew, mesh)
 #endif
-  else
-               call ini_ocean_io(yearold, mesh)
-  if (use_ice) call ini_ice_io  (yearold, mesh)
+
+      else
+          call ini_ocean_io(yearold, mesh)
+      if (use_ice) call ini_ice_io  (yearold, mesh)
+
 #if defined(__recom)
-  if (REcoM_restart) then
-               call ini_bio_io(yearold, mesh)
-  end if 
+      if (REcoM_restart) then
+          call ini_bio_io(yearold, mesh)
+      end if 
 #endif
+
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearold, mesh)
+      if (use_ice) call init_restart_icepack(yearold, mesh)
 #endif
-  end if
+  end if  ! l_read
 
   if (l_read) then
    call assoc_ids(oid);          call was_error(oid)
@@ -299,15 +306,17 @@ subroutine restart(istep, l_write, l_read, mesh)
       call read_restart(ip_id, mesh); call was_error(ip_id)
 #endif
     end if
+
 #if defined(__recom)
-!RECOM restart
-!read here
-if(mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart 
-   if (REcoM_restart) then
-      call assoc_ids(bid);          call was_error(bid)
-      call read_restart(bid, mesh); call was_error(bid)
-   end if 
+    !RECOM restart
+    !read here
+    if(mype==0)  write(*,*) 'REcoM_restart= ',REcoM_restart 
+    if (REcoM_restart) then
+        call assoc_ids(bid);          call was_error(bid)
+        call read_restart(bid, mesh); call was_error(bid)
+    end if 
 #endif
+
   end if
 
   if (istep==0) return
