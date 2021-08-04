@@ -292,8 +292,8 @@ subroutine write_all_raw_restarts(istep)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
     write(fileunit, '(2(g0))') "! year: ",yearnew
-    write(fileunit, '(g0)') "! oce"
-    if(use_ice) write(fileunit, '(g0)') "! ice"
+    write(fileunit, '(3(g0))') "! oce: ", oce_files%nfiles, " variables"
+    if(use_ice) write(fileunit, '(3(g0))') "! ice: ", ice_files%nfiles, " variables"
     close(fileunit)
   end if
 end subroutine
@@ -412,7 +412,6 @@ subroutine read_restart(path, filegroup)
     if( filegroup%files(i)%is_iorank() ) then
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
-        call execute_command_line("mkdir -p "//dirpath)
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
 
         ! determine if the file should be skipped
@@ -484,10 +483,9 @@ subroutine read_restart(path, filegroup)
   ! sync globalstep with the process responsible for raw restart metadata
   if(filegroup%nfiles >= 1) then
     ! use the first restart I/O process to send the globalstep
-    if( filegroup%files(1)%is_iorank() ) then
+    if( filegroup%files(1)%is_iorank() .and. (mype .ne. RAW_RESTART_METADATA_RANK)) then
       call MPI_Send(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, 42, MPI_COMM_FESOM, MPIerr)
-    end if
-    if(mype == RAW_RESTART_METADATA_RANK) then
+    else if((mype == RAW_RESTART_METADATA_RANK) .and. (.not. filegroup%files(1)%is_iorank())) then
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, MPI_COMM_FESOM, mpistatus, MPIerr)
     end if
   end if
