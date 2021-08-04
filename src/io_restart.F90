@@ -483,10 +483,9 @@ subroutine read_restart(path, filegroup)
   ! sync globalstep with the process responsible for raw restart metadata
   if(filegroup%nfiles >= 1) then
     ! use the first restart I/O process to send the globalstep
-    if( filegroup%files(1)%is_iorank() ) then
+    if( filegroup%files(1)%is_iorank() .and. (mype .ne. RAW_RESTART_METADATA_RANK)) then
       call MPI_Send(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, 42, MPI_COMM_FESOM, MPIerr)
-    end if
-    if(mype == RAW_RESTART_METADATA_RANK) then
+    else if((mype == RAW_RESTART_METADATA_RANK) .and. (.not. filegroup%files(1)%is_iorank())) then
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, MPI_COMM_FESOM, mpistatus, MPIerr)
     end if
   end if
