@@ -136,7 +136,8 @@ save
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
- reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
+ reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (bc_index_nod2d(elem2D_nodes(:,elem))==1) )
  end function reject_elem
  
  ! gives number of "coastal" nodes in cavity setup, i.e. number of nodes that are
@@ -150,7 +151,8 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
- coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
+! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
+ coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (bc_index_nod2d(elem2D_nodes(:,elem))==1) )
  end function coastal_nodes
 #endif
 end module iceberg_params

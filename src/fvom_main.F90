@@ -123,9 +123,13 @@ type(t_mesh),             target, save :: mesh
             stop
         end if
     else
-        call MPI_INIT(i)
+
+! kh 05.08.21 iceberg version
+!       call MPI_INIT(i)
+
+! kh 05.08.21 wiso version
+        call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
     end if
-    !call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
 
@@ -419,9 +423,9 @@ type(t_mesh),             target, save :: mesh
             if (use_icebergs .and. mod(n - 1, steps_per_ib_step)==0) then
                 if (mype==0) write(*,*) '*** step n=',n
                 t1_icb = MPI_Wtime()
-                write(*,*) "LA DEBUG: start iceberg_calculation"
+                !write(*,*) "LA DEBUG: start iceberg_calculation"
                 call iceberg_calculation(mesh,n)
-                write(*,*) "LA DEBUG: finish iceberg_calculation"
+                !write(*,*) "LA DEBUG: finish iceberg_calculation"
                 t2_icb = MPI_Wtime()
             end if
             !___model sea-ice step__________________________________________________

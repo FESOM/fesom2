@@ -129,9 +129,9 @@ type(t_mesh), intent(in) , target :: mesh
  call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE"
+!end if
 
  completed = .false.
  do while (.not. completed)
@@ -140,9 +140,9 @@ CALL MPI_TEST(req, completed, status, MPIERR_IB)
 !$omp end critical
  end do
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_TEST"
+!end if
 
 ! kh 25.03.21 orig
 ! call MPI_AllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, &
@@ -151,9 +151,9 @@ end if
  call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)  
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 2"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 2"
+!end if
 
 completed = .false.
  do while (.not. completed)
@@ -162,9 +162,9 @@ completed = .false.
 !$omp end critical
  end do
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST 2"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_TEST 2"
+!end if
 
  !ALLREDUCE: vl_block, containing the volume losses (IBs may switch PE during the output interval)
 ! kh 25.03.21 orig
@@ -174,9 +174,9 @@ end if
  call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM_IB, req, MPIERR_IB)
 !$omp end critical
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 3"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_IAllREDUCE 3"
+!end if
 
  completed = .false.
  do while (.not. completed)
@@ -185,9 +185,9 @@ end if
 !$omp end critical
  end do
 
-if (mype==0) then
-    write(*,*) "LA DEBUG: finished MPI_TEST 3"
-end if
+!if (mype==0) then
+!    write(*,*) "LA DEBUG: finished MPI_TEST 3"
+!end if
 
 ! call MPI_Barrier(MPI_COMM_WORLD,MPIerr)
 ! arr_block_red = 0.0
@@ -238,9 +238,6 @@ end if
                             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib), lastsubstep,&
                             f_u_ib_old(ib), f_v_ib_old(ib), l_semiimplicit,   &
                             semiimplicit_coeff, AB_coeff, istep)	
-        if (mype==0) then
-            write(*,*) "LA DEBUG: finish iceberg_step2"
-        end if
         !call MPI_Barrier(MPI_COMM_WORLD, MPIERR) !necessary?
         !end do
     end if
@@ -400,15 +397,18 @@ type(t_mesh), intent(in) , target :: mesh
  
  if (firstcall) then
   if(mype==0) write(*,*) 'Preparing local_idx_of array...'
+  !write(*,*) 'Preparing local_idx_of array...'
   allocate(local_idx_of(elem2D))
+  !write(*,*) 'LA DEBUG: finished allocate(local_idx_of)'
   !creates mapping
   call global2local(mesh, local_idx_of, elem2D)
   firstcall=.false.
   if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
+  !write(*,*) 'Preparing local_idx_of done.' 
  end if 
  
  if (find_iceberg_elem) then
- lon_rad = lon_deg*rad
+  lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
   !write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
@@ -441,8 +441,8 @@ type(t_mesh), intent(in) , target :: mesh
   end if
   
   if(i_have_element) then 
-   !write(*,*) 'IB ',ib,' in element ',iceberg_elem
-   !write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
+   write(*,*) 'IB ',ib,' in element ',iceberg_elem
+   write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
    !do i=1,3
    ! iceberg_node=elem2D_nodes(i,local_idx_of(iceberg_elem))
    ! write(*,*) 'node ', i, 's coords lon:', coord_nod2d(1,iceberg_node)/rad,' lat: ', coord_nod2d(2,iceberg_node)/rad
@@ -463,8 +463,19 @@ type(t_mesh), intent(in) , target :: mesh
 ! f_u_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*u_ib
 ! f_v_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*v_ib
 
-  f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
-  f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+! kh 06.08.21 observed via -check bounds: forrtl: severe (408): fort: (3): Subscript #1 of the array CORIOLIS has value 0 which is less than the lower bound of 1
+  if(local_idx_of(iceberg_elem) > 0) then
+    if(local_idx_of(iceberg_elem) <= myDim_elem2D ) then
+
+      f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
+      f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+      
+    else
+      write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
+    endif
+  else
+    write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
+  endif
  end if
  
  file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
@@ -527,10 +538,8 @@ if( local_idx_of(iceberg_elem) > 0 ) then
 		   
   !=======================END OF DYNAMICS============================
  
-  write(*,*) "LA DEBUG: call depth_bathy"
   call depth_bathy(mesh, Zdepth3, local_idx_of(iceberg_elem))
   !interpolate depth to location of iceberg (2 times because FEM_3eval expects a 2 component vector...)
-  write(*,*) "LA DEBUG: call FEM_3eval"
   call FEM_3eval(mesh, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
@@ -1177,17 +1186,13 @@ subroutine iceberg_restart
   if(mype==0) then
   write(*,*) 'no iceberg restart'
 
-  write(*,*) 'LA DEBUG: start init_buoy_output'
   if(.NOT.ascii_out) call init_buoy_output
-  write(*,*) 'LA DEBUG: finish init_buoy_output'
 
   end if
 
   !call init_buoys ! all PEs read LON,LAT from files  
   !write(*,*) 'initialized positions from file'
-  write(*,*) 'LA DEBUG: start init_icebergs'
   call init_icebergs ! all PEs read LON,LAT,LENGTH from files
-  write(*,*) 'LA DEBUG: finish init_icebergs'
   !write(*,*) 'initialized positions and length/width from file'
   !write(*,*) '*************************************************************'
  end if
