@@ -3,7 +3,9 @@ integer         , pointer :: elem2D
 integer         , pointer :: edge2D
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
+real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
+
 real(kind=WP), dimension(:,:), pointer, contiguous :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer, contiguous :: elem2D_nodes
 integer, dimension(:,:)      , pointer, contiguous :: edges
@@ -22,7 +24,7 @@ real(kind=WP), dimension(:,:), pointer, contiguous :: gradient_sca
 integer,       dimension(:)  , pointer, contiguous :: bc_index_nod2D
 real(kind=WP), dimension(:)  , pointer, contiguous :: zbar, Z, elem_depth
 integer,       dimension(:)  , pointer, contiguous :: nlevels, nlevels_nod2D, nlevels_nod2D_min
-real(kind=WP), dimension(:,:), pointer, contiguous :: area, area_inv
+real(kind=WP), dimension(:,:), pointer, contiguous :: area, area_inv, areasvol, areasvol_inv
 real(kind=WP), dimension(:)  , pointer, contiguous :: mesh_resolution
 real(kind=WP), dimension(:)  , pointer, contiguous :: lump2d_north, lump2d_south
 type(sparse_matrix)          , pointer             :: ssh_stiff
@@ -105,6 +107,8 @@ nlevels_nod2D           => mesh%nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)
 nlevels_nod2D_min       => mesh%nlevels_nod2D_min(1:myDim_nod2D+eDim_nod2D)
 area 		        => mesh%area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)
 area_inv                => mesh%area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)
+areasvol                => mesh%areasvol(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)
+areasvol_inv            => mesh%areasvol_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)
 mesh_resolution         => mesh%mesh_resolution(1:myDim_nod2d+eDim_nod2D)
 ssh_stiff               => mesh%ssh_stiff
 lump2d_north            => mesh%lump2d_north(1:myDim_nod2d)
@@ -145,7 +149,9 @@ nlevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%nlevels
 nlevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%nlevels_nod2D
 nlevels_nod2D_min(1:myDim_nod2D+eDim_nod2D)                => mesh%nlevels_nod2D_min
 area(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)                   => mesh%area
+areasvol(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%areasvol
 area_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)               => mesh%area_inv
+areasvol_inv(1:mesh%nl,1:myDim_nod2d+eDim_nod2D)           => mesh%areasvol_inv
 mesh_resolution(1:myDim_nod2d+eDim_nod2D)                  => mesh%mesh_resolution
 ssh_stiff                                                  => mesh%ssh_stiff
 lump2d_north(1:myDim_nod2d)                                => mesh%lump2d_north

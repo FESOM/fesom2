@@ -126,15 +126,15 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
      nln = min(nlev,nlevels_nod2d(n))
      DO nz=uln,nln
         arr(nz, n) = work_array(nz, n) *vol(nz,n) 
-        if (arr(nz,n)/=arr(nz,n)) then
-            write(*,*) ' --> found NaN in smoothing'
-            write(*,*) ' mype = ', mype
-            write(*,*) ' n    = ', n
-            write(*,*) ' nz,uln,nln      = ', nz,uln,nln
-            write(*,*) ' arr(nz,n)       = ', arr(nz,n)
-            write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
-            write(*,*) ' vol(nz,n)       = ', vol(nz,n)
-        endif 
+!!PS         if (arr(nz,n)/=arr(nz,n)) then
+!!PS             write(*,*) ' --> found NaN in smoothing'
+!!PS             write(*,*) ' mype = ', mype
+!!PS             write(*,*) ' n    = ', n
+!!PS             write(*,*) ' nz,uln,nln      = ', nz,uln,nln
+!!PS             write(*,*) ' arr(nz,n)       = ', arr(nz,n)
+!!PS             write(*,*) ' work_array(nz,n)= ', work_array(nz,n)
+!!PS             write(*,*) ' vol(nz,n)       = ', vol(nz,n)
+!!PS         endif 
      END DO
   end DO
   
@@ -274,7 +274,8 @@ subroutine integrate_nod_2D(data, int2D, mesh)
 #include "associate_mesh.h"
   lval=0.0_WP
   do row=1, myDim_nod2D
-     lval=lval+data(row)*area(1,row)
+     !!PS lval=lval+data(row)*area(1,row)
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
 
   int2D=0.0_WP
@@ -301,7 +302,7 @@ subroutine integrate_nod_3D(data, int3D, mesh)
   do row=1, myDim_nod2D
      !!PS do k=1, nlevels_nod2D(row)-1
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-        lval=lval+data(k, row)*area(k,row)*hnode_new(k,row)
+        lval=lval+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
   end do
   int3D=0.0_WP

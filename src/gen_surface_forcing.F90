@@ -354,7 +354,7 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
       
       ! digg for calendar attribute in time axis variable
-      if (mype==0) then
+      if (mype==0 .and. use_flpyrcheck) then
          iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
          iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
          aux_calendar = aux_calendar(1:aux_len)
@@ -676,7 +676,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then
             write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
@@ -685,7 +685,7 @@ CONTAINS
          delta_t = 1.0_wp
          if (mype==0) then 
             write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
-            write(*,*) file_name
+            write(*,*) trim(file_name)
             write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if

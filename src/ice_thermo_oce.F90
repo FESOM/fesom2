@@ -1,41 +1,63 @@
 !===================================================================
-subroutine cut_off()
-use o_param
-use i_arrays
-implicit none
+subroutine cut_off(mesh)
+    use o_param
+    use i_arrays
+    use MOD_MESH
+    use g_config, only: use_cavity
+    use g_parsup
+    implicit none
+    type(t_mesh), intent(in)           , target :: mesh
 
-where(a_ice>1.0_WP)
- a_ice=1.0_WP
-end where
+#include  "associate_mesh.h"
 
-where(a_ice<0.1e-8_WP)
- a_ice=0.0_WP
+    !___________________________________________________________________________
+    ! lower cutoff: a_ice
+    where(a_ice>1.0_WP)  a_ice=1.0_WP
+
+    ! upper cutoff: a_ice
+    where(a_ice<0.1e-8_WP)
+        a_ice=0.0_WP
 #if defined (__oifs)
- m_ice=0.0_WP
- m_snow=0.0_WP
- ice_temp=273.15_WP
+        m_ice=0.0_WP
+        m_snow=0.0_WP
+        ice_temp=273.15_WP
 #endif /* (__oifs) */
-end where
+    end where
 
-where(m_ice<0.1e-8_WP)
- m_ice=0.0_WP 
+    !___________________________________________________________________________
+    ! lower cutoff: m_ice
+    where(m_ice<0.1e-8_WP)
+        m_ice=0.0_WP 
 #if defined (__oifs)
- m_snow=0.0_WP
- a_ice=0.0_WP
- ice_temp=273.15_WP
+        m_snow=0.0_WP
+        a_ice=0.0_WP
+        ice_temp=273.15_WP
 #endif /* (__oifs) */
-end where
+    end where
+    
 
+!!PS     if (use_cavity) then
+!!PS         ! upper cutoff SH: m_ice
+!!PS         where(m_ice>5.0_WP  .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)<0.0_WP) m_ice=5.0_WP 
+!!PS         
+!!PS         ! upper cutoff NH: m_ice
+!!PS         where(m_ice>10.0_WP .and. ulevels_nod2d==1 .and. geo_coord_nod2D(2,:)>0.0_WP) m_ice=10.0_WP 
+!!PS         
+!!PS         ! upper cutoff: m_snow
+!!PS         where(m_snow>2.5_WP .and. ulevels_nod2d==1) m_snow=2.5_WP 
+!!PS         
+!!PS         !___________________________________________________________________________
+!!PS         ! lower cutoff: m_snow
+!!PS         !!PS where(m_snow<0.1e-8_WP) m_snow=0.0_WP
+!!PS     end if 
+    
+    !___________________________________________________________________________
 #if defined (__oifs)
-where(ice_temp>273.15_WP)
- ice_temp=273.15_WP
-end where
+    where(ice_temp>273.15_WP) ice_temp=273.15_WP
 #endif /* (__oifs) */
 
 #if defined (__oifs)
-where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP)
- ice_temp=271.35_WP
-end where
+    where(ice_temp < 173.15_WP .and. a_ice >= 0.1e-8_WP) ice_temp=271.35_WP
 #endif /* (__oifs) */
 
 end subroutine cut_off
@@ -127,6 +149,7 @@ subroutine thermodynamics(mesh)
            snow=prec_rain(i)
         endif
         evap_in=evaporation(i) !evap_in: positive up
+!!PS         evap_in=0.0_WP
      else
         rain = prec_rain(i)
         snow = prec_snow(i)
@@ -173,7 +196,7 @@ subroutine thermodynamics(mesh)
      net_heat_flux(i) = ehf     !positive down
      evaporation(i)   = evap    !negative up
      ice_sublimation(i)= subli 
-
+     
      thdgr(i)         = ithdgr
      thdgrsn(i)       = ithdgrsn
      flice(i)         = iflice
@@ -184,6 +207,13 @@ subroutine thermodynamics(mesh)
      ! real salt flux due to salinity that is contained in the sea ice 4-5 psu
      real_salt_flux(i)= rsf !PS
 
+     ! if snow file is not given snow computed from prec_rain --> but prec_snow 
+     ! array needs to be filled --> so that the freshwater balancing adds up
+     if (.not. l_snow) then
+        prec_rain(i)     = rain
+        prec_snow(i)     = snow
+     end if 
+     
   end do
      deallocate(ustar_aux)
 end subroutine thermodynamics

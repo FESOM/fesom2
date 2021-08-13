@@ -71,13 +71,7 @@ save
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
-  logical :: elem_full_flag
-!$OMP threadprivate(com_nod2D,com_elem2D,com_elem2D_full)
-!$OMP threadprivate(mype)
-!$OMP threadprivate(myDim_nod2D, eDim_nod2D, myList_nod2D)
-!$OMP threadprivate(myDim_elem2D, eDim_elem2D, eXDim_elem2D, myList_elem2D)
-!$OMP threadprivate(myDim_edge2D, eDim_edge2D, myList_edge2D)
-
+  logical :: elem_full_flag  
 
 contains
 subroutine par_init    ! initializes MPI

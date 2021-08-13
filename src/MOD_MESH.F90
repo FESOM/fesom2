@@ -18,7 +18,7 @@ END TYPE SPARSE_MATRIX
 
 TYPE T_MESH
 integer                                     :: nod2D           ! the number of 2D nodes
-real(kind=WP)                               :: ocean_area
+real(kind=WP)                               :: ocean_area, ocean_areawithcav
 real(kind=WP), allocatable, dimension(:,:)  :: coord_nod2D, geo_coord_nod2D
 integer                                     :: edge2D       ! the number of 2D edges
 integer                                     :: edge2D_in    ! the number of internal 2D edges
@@ -63,7 +63,7 @@ integer,       allocatable, dimension(:)    :: nlevels, nlevels_nod2D, nlevels_n
 !
 !
 !___horizontal mesh info________________________________________________________
-real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv
+real(kind=WP), allocatable, dimension(:,:)  :: area, area_inv, areasvol, areasvol_inv
 real(kind=WP), allocatable, dimension(:)    :: mesh_resolution
 
 !

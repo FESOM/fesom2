@@ -135,11 +135,20 @@ logical                       :: use_windmix   = .false.
 real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
+! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
+logical                       :: smooth_bh_tra = .false.
+real(kind=WP)                 :: gamma0_tra    = 0.0005
+real(kind=WP)                 :: gamma1_tra    = 0.0125
+real(kind=WP)                 :: gamma2_tra    = 0.
 !_______________________________________________________________________________
 ! use non-constant reference density if .false. density_ref=density_0
 logical                       :: use_density_ref   = .false.
 real(kind=WP)                 :: density_ref_T     = 2.0_WP
 real(kind=WP)                 :: density_ref_S     = 34.0_WP
+
+!_______________________________________________________________________________
+! use k-profile nonlocal fluxes
+logical                       :: use_kpp_nonlclflx = .false.
 
 !_______________________________________________________________________________
 ! *** active tracer cutoff
@@ -177,7 +186,9 @@ character(20)                  :: which_pgf='shchepetkin'
             tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
-            use_windmix, windmix_kv, windmix_nl
+            use_windmix, windmix_kv, windmix_nl, &
+            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, &
+            use_kpp_nonlclflx
             
 END MODULE o_PARAM  
 !==========================================================
@@ -223,12 +234,13 @@ real(kind=WP), allocatable         :: eta_n(:), d_eta(:)
 real(kind=WP), allocatable         :: ssh_rhs(:), hpressure(:,:)
 real(kind=WP), allocatable         :: CFL_z(:,:)
 real(kind=WP), allocatable         :: stress_surf(:,:)
+real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: T_rhs(:,:) 
-real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
+real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
 !$acc declare create(heat_flux)
-real(kind=WP), allocatable         :: heat_flux_old(:), Tsurf_old(:)  !PS
+real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: S_rhs(:,:)
 real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable         :: del_ttf(:,:)
@@ -239,7 +251,6 @@ real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 !$acc declare create(virtual_salt)
 !$acc declare create(relax_salt)
-real(kind=WP), allocatable    :: water_flux_old(:), Ssurf_old(:) !PS
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
 real(kind=WP), allocatable    :: Visc(:,:)
 real(kind=WP), allocatable    :: Tsurf_t(:,:), Ssurf_t(:,:)
@@ -272,6 +283,7 @@ real(kind=WP), allocatable,dimension(:,:,:) :: neutral_slope
 real(kind=WP), allocatable,dimension(:,:,:) :: slope_tapered
 real(kind=WP), allocatable,dimension(:,:,:) :: sigma_xy
 real(kind=WP), allocatable,dimension(:,:)   :: sw_beta, sw_alpha
+real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !real(kind=WP), allocatable,dimension(:,:,:) :: tsh, tsv, tsh_nodes
 !real(kind=WP), allocatable,dimension(:,:)   :: hd_flux,vd_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
@@ -327,7 +339,7 @@ real(kind=WP), allocatable,dimension(:,:)   :: pgf_x, pgf_y
 
 !_______________________________________________________________________________
 !!PS ! dummy arrays
-!!PS real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n, dum_3d_e
+real(kind=WP), allocatable,dimension(:,:)   :: dum_3d_n !, dum_3d_e
 !!PS real(kind=WP), allocatable,dimension(:)     :: dum_2d_n, dum_2d_e
 
 !_______________________________________________________________________________

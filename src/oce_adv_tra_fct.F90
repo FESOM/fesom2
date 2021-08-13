@@ -404,9 +404,9 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
         !$acc loop vector&
         !$acc& private(flux)
         do nz=nu1,nl1-1
-            flux=fct_plus(nz,n)*dt/area(nz,n)+flux_eps
+            flux=fct_plus(nz,n)*dt/areasvol(nz,n)+flux_eps
             fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
-            flux=fct_minus(nz,n)*dt/area(nz,n)-flux_eps
+            flux=fct_minus(nz,n)*dt/areasvol(nz,n)-flux_eps
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
     end do

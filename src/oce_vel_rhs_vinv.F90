@@ -92,7 +92,7 @@ subroutine relative_vorticity(mesh)
         nl1 = nlevels_nod2D(n)
         !!PS DO nz=1,nlevels_nod2D(n)-1
         DO nz=ul1,nl1-1
-            vorticity(nz,n)=vorticity(nz,n)/area(nz,n)
+            vorticity(nz,n)=vorticity(nz,n)/areasvol(nz,n)
         END DO
     END DO      
     
@@ -120,6 +120,7 @@ subroutine compute_vel_rhs_vinv(mesh) !vector invariant
     real(kind=WP)     :: density0_inv = 1./density_0
 
 #include "associate_mesh.h"
+    w = 0.0_WP
 
     uvert=0.0_WP 
 
@@ -151,7 +152,7 @@ subroutine compute_vel_rhs_vinv(mesh) !vector invariant
         !!PS DO nz=1, nlevels_nod2D(n)-1
         DO nz=nzmin, nzmax-1
         !DO nz=1, nl-1
-            KE_node(nz,n)=KE_node(nz,n)/(6._WP*area(nz,n))  !NR divide by 6 here
+            KE_node(nz,n)=KE_node(nz,n)/(6._WP*areasvol(nz,n))  !NR divide by 6 here
         END DO
     END DO   
 

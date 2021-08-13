@@ -103,7 +103,7 @@ subroutine ini_mean_io(mesh)
   integer                   :: i, j
   integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
   integer                   :: iost
-  integer,dimension(12)     :: sel_forcvar=0
+  integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
   type(t_mesh), intent(in) , target :: mesh
@@ -147,6 +147,11 @@ CASE ('ssh       ')
 CASE ('vve_5     ')
     call def_stream(nod2D, myDim_nod2D, 'vve_5',    'vertical velocity at 5th level', 'm/s',    Wvel(5,:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 
+CASE ('ssh_rhs       ')
+    call def_stream(nod2D, myDim_nod2D, 'ssh_rhs',      'ssh rhs',          '?',      ssh_rhs,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('ssh_rhs_old   ')
+    call def_stream(nod2D, myDim_nod2D, 'ssh_rhs_old',      'ssh rhs',          '?',      ssh_rhs_old,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+
 !___________________________________________________________________________________________________________________________________
 ! output sea ice
 CASE ('uice      ')
@@ -167,11 +172,15 @@ CASE ('m_ice     ')
     end if
 CASE ('thdgr     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'growth rate ice',                 'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('thdgrsn   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'growth rate ice',                 'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('flice     ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D,  'flice',    'flooding growth rate ice',       'm/s',    flice(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
 CASE ('m_snow    ')
     if (use_ice) then
@@ -188,7 +197,7 @@ CASE ('MLD2      ')
 !___________________________________________________________________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
-    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('fw        ')
     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('atmice_x  ')
@@ -207,6 +216,8 @@ CASE ('alpha     ')
     call def_stream(nod2D, myDim_nod2D, 'alpha',    'thermal expansion',               'none',   sw_alpha(1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('beta      ')
     call def_stream(nod2D, myDim_nod2D, 'beta',     'saline contraction',              'none',   sw_beta (1,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+CASE ('dens_flux ')
+    call def_stream(nod2D, myDim_nod2D , 'dflux',   'density flux',               'kg/(m3*s)',   dens_flux(:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('runoff    ')
     sel_forcvar(10)= 1
     call def_stream(nod2D, myDim_nod2D, 'runoff',   'river runoff',                    'none',   runoff(:),                 io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -263,7 +274,6 @@ CASE ('curl_surf ')
     if (lcurt_stress_surf) then
     call def_stream(nod2D, myDim_nod2D,    'curl_surf', 'vorticity of the surface stress','none',   curl_stress_surf(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-
 !___________________________________________________________________________________________________________________________________
 ! output Ferrari/GM parameterisation 2D
 CASE ('fer_C     ')
@@ -351,15 +361,14 @@ CASE ('dMOC      ')
     if (ldiag_dMOC) then
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'U_rho_x_DZ',     'fluxes for density MOC', 'fluxes', std_dens_UVDZ(1,:,:),   1, 'y', i_real4, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'V_rho_x_DZ',     'fluxes for density MOC', 'fluxes', std_dens_UVDZ(2,:,:),   1, 'y', i_real4, mesh)
-       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'RHO_Z',          'drho/dz',                'kg/m4' , std_dens_RHOZ(:,:),     1, 'y', i_real4, mesh)
-       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_heat_flux',  'drho/dz',                'kg*m/s' ,std_dens_flux(1,:,:),   1, 'y', i_real4, mesh)
-       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_rest_flux',  'drho/dz',                'kg*m/s' ,std_dens_flux(2,:,:),   1, 'y', i_real4, mesh)
-       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_frwt_flux',  'drho/dz',                'kg*m/s' ,std_dens_flux(3,:,:),   1, 'y', i_real4, mesh)
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_heat_flux',  'HF bouyancy flux      ', 'kg*m/s' ,std_dens_flux(1,:,:),   1, 'y', i_real4, mesh)
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_rest_flux',  'RESTOR. bouyancy flux ', 'kg*m/s' ,std_dens_flux(2,:,:),   1, 'y', i_real4, mesh)
+       call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_frwt_flux',  'FW bouyancy flux      ', 'kg*m/s' ,std_dens_flux(3,:,:),   1, 'y', i_real4, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_dVdT',  'dV/dT',                  'm3/s'   ,std_dens_dVdT(:,:),     1, 'y', i_real4, mesh)
        call def_stream((/std_dens_N, nod2D /),  (/std_dens_N,  myDim_nod2D/), 'std_dens_DIV',   'm3/s',                   'm3/s'   ,std_dens_DIV(:,:),      1, 'y', i_real4, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_Z',     'm',                      'm'      ,std_dens_Z(:,:),        1, 'y', i_real4, mesh)
        call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      1, 'y', i_real4, mesh)
-       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux',   'density'               , 'm',      dens_flux(:),           1, 'y', i_real4, mesh)
+       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm',      dens_flux_e(:),         1, 'y', i_real4, mesh)
     end if
 !___________________________________________________________________________________________________________________________________
 CASE ('pgf_x     ')
@@ -513,9 +522,12 @@ END DO
         if (sel_forcvar(10)==0) call def_stream(nod2D , myDim_nod2D , 'runoff', 'river runoff'                   , 'none' , runoff(:)        , 1, 'm', i_real4, mesh)
         if (sel_forcvar(11)==0) call def_stream(elem2D, myDim_elem2D, 'tx_sur', 'zonal wind str. to ocean'       , 'm/s^2', stress_surf(1, :), 1, 'm', i_real4, mesh)
         if (sel_forcvar(12)==0) call def_stream(elem2D, myDim_elem2D, 'ty_sur', 'meridional wind str. to ocean'  , 'm/s^2', stress_surf(2, :), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'cd','wind drag coef. '             , '', cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ch','transfer coeff. sensible heat', '', ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
-        call def_stream(nod2D , myDim_nod2D , 'ce','transfer coeff. evaporation ' , '', ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+        call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), 1, 'm', i_real4, mesh)
+#if defined (__oasis)
+        call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:),   1, 'm',  i_real4,  mesh)
+#endif
     end if
 
 
@@ -614,6 +626,10 @@ subroutine create_new_file(entry, mesh)
 
   call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
                                     (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
+!CHUNKING stuff (netcdf libraries not always compited with it)
+!if (entry%ndim==2) then
+!     call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
+!  end if
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'description', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'long_name', len_trim(entry%description), entry%description), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%varID, 'units',       len_trim(entry%units),       entry%units), __LINE__)
@@ -949,10 +965,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
      write(*,*) 'adding I/O stream 3D for ', trim(name)
   end if
 
-  ! add this instance to io_stream array
-  io_NSTREAMS = io_NSTREAMS +1
-  call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
-  entry=>io_stream(io_NSTREAMS)
+  call associate_new_stream(name, entry)
 
   ! 3d specific
   entry%ptr3 => data                      !2D! entry%ptr3(1:1,1:size(data)) => data
@@ -1015,11 +1028,8 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
      write(*,*) 'adding I/O stream 2D for ', trim(name)
   end if
 
-  ! add this instance to io_stream array
-  io_NSTREAMS = io_NSTREAMS +1
-  call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
-  entry=>io_stream(io_NSTREAMS)
-
+  call associate_new_stream(name, entry)
+  
   ! 2d specific
   entry%ptr3(1:1,1:size(data)) => data
 
@@ -1040,6 +1050,30 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   ! non dimension specific
   call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
 end subroutine
+
+
+  subroutine associate_new_stream(name, entry)
+    type(Meandata), pointer :: entry
+    character(len=*), intent(in) :: name
+    integer i
+
+    entry => null()
+    
+    ! check if we already have this variable
+    do i=1, io_NSTREAMS
+      if(trim(io_stream(i)%name) .eq. name) then
+          print *,"variable '"//name//"' already exists, &
+              check if you define it multiple times, for example in namelist.io, &
+              namelist.icepack, io_meandata.F90 or other place that add I/O stream."
+          call assert(.false., __LINE__) 
+      end if
+    end do
+        
+    ! add this instance to io_stream array
+    io_NSTREAMS = io_NSTREAMS +1
+    call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
+    entry=>io_stream(io_NSTREAMS)
+  end subroutine
 
 
   subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, mesh)
