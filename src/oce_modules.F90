@@ -16,7 +16,6 @@ real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
 real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
-!$acc declare create(vcpw)
 real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
 real(kind=WP), parameter      :: small=1.0e-8 !small value
 integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
