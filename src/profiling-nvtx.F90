@@ -4,8 +4,10 @@ module profiling_nvtx
 use iso_c_binding
 implicit none
 
+#ifdef WITH_NVTX
 integer,private :: col(7) = [ Z'0000ff00', Z'000000ff', Z'00ffff00', Z'00ff00ff', Z'0000ffff', Z'00ff0000', Z'00ffffff']
 character(len=256),private :: tempName
+#endif
 
 type, bind(C):: nvtxEventAttributes
   integer(C_INT16_T):: version=1
