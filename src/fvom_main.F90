@@ -123,9 +123,13 @@ type(t_mesh),             target, save :: mesh
             stop
         end if
     else
-        call MPI_INIT(i)
+
+! kh 05.08.21 iceberg version
+!       call MPI_INIT(i)
+
+! kh 05.08.21 wiso version
+        call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
     end if
-    !call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, provided, i)
 #endif
     
 

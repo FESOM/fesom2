@@ -136,6 +136,7 @@ save
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
+! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  reject_elem = all( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
  end function reject_elem
  
@@ -150,6 +151,7 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_mesh), intent(in) , target :: mesh
 #include "associate_mesh.h"
 
+! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  coastal_nodes = count( (cavity_flag_nod2d(elem2D_nodes(:,elem))==1) .OR. (index_nod2d(elem2D_nodes(:,elem))==1) )
  end function coastal_nodes
 #endif

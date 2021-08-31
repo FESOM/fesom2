@@ -408,7 +408,7 @@ type(t_mesh), intent(in) , target :: mesh
  end if 
  
  if (find_iceberg_elem) then
- lon_rad = lon_deg*rad
+  lon_rad = lon_deg*rad
   lat_rad = lat_deg*rad
   !write(*,*) 'IB ',ib,' not rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
   call g2r(lon_rad, lat_rad, lon_rad, lat_rad)
@@ -463,8 +463,19 @@ type(t_mesh), intent(in) , target :: mesh
 ! f_u_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*u_ib
 ! f_v_ib_old = coriolis_ib(local_idx_of(iceberg_elem))*v_ib
 
-  f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
-  f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+! kh 06.08.21 observed via -check bounds: forrtl: severe (408): fort: (3): Subscript #1 of the array CORIOLIS has value 0 which is less than the lower bound of 1
+  if(local_idx_of(iceberg_elem) > 0) then
+    if(local_idx_of(iceberg_elem) <= myDim_elem2D ) then
+
+      f_u_ib_old = coriolis(local_idx_of(iceberg_elem))*u_ib
+      f_v_ib_old = coriolis(local_idx_of(iceberg_elem))*v_ib
+      
+    else
+      write(*,*) 'Error local_idx_of(iceberg_elem) > myDim_elem2D, istep, local_idx_of(iceberg_elem), myDim_elem2D', istep, local_idx_of(iceberg_elem), myDim_elem2D
+    endif
+  else
+    write(*,*) 'Error local_idx_of(iceberg_elem) <= 0, istep, local_idx_of(iceberg_elem)', istep, local_idx_of(iceberg_elem)
+  endif
  end if
  
  file_track='/work/ollie/lackerma/iceberg/iceberg_ICBref_'
