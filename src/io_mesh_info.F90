@@ -4,6 +4,7 @@ use MOD_MESH
 use g_config
 use g_comm_auto
 use o_ARRAYS
+use o_PARAM
 
 implicit none
 #include "netcdf.inc"
@@ -50,6 +51,7 @@ implicit none
   integer                    :: zbar_e_bot_id,zbar_n_bot_id
   integer                    :: elem_id
   integer                    :: nod_id
+  integer                    :: lon_id, lat_id
   character(100)             :: longname
   character(2000)            :: filename
   real(kind=WP), allocatable :: rbuffer(:), lrbuffer(:)
@@ -88,7 +90,10 @@ implicit none
   call my_def_var(ncid, 'nod_part',          NF_INT,    1, (/nod_n_id/),  nod_part_id,          'nodal partitioning at the cold start'  )
   call my_def_var(ncid, 'elem_part',         NF_INT,    1, (/elem_n_id/), elem_part_id,         'element partitioning at the cold start')
   call my_def_var(ncid, 'zbar_e_bottom',     NF_DOUBLE, 1, (/elem_n_id/), zbar_e_bot_id,        'element bottom depth')
-  call my_def_var(ncid, 'zbar_n_bottom',     NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_bot_id,        'nodal bottom depth')
+  call my_def_var(ncid, 'zbar_n_bottom',     NF_DOUBLE, 1, (/nod_n_id/),  zbar_n_bot_id,        'nodal bottom depth')
+  call my_def_var(ncid, 'lon',               NF_DOUBLE, 1, (/nod_n_id/),  lon_id,               'longitude')
+  call my_def_var(ncid, 'lat',               NF_DOUBLE, 1, (/nod_n_id/),  lat_id,               'latitude')
+
   ! 2D
   call my_def_var(ncid, 'nod_area',          NF_DOUBLE, 2, (/nod_n_id, nl_id/), nod_area_id,        'nodal areas'                 )
   call my_def_var(ncid, 'elements',          NF_INT,    2, (/elem_n_id, id_3/), elem_id,            'elements'                    )
@@ -185,7 +190,13 @@ implicit none
   allocate(rbuffer(nod2D))
   do i=1, 2
      call gather_nod(geo_coord_nod2D(i, 1:myDim_nod2D), rbuffer)
+     rbuffer = rbuffer/rad
      call my_put_vara(ncid, nod_id, (/1, i/), (/nod2D, 1/), rbuffer)
+     if (i == 1) then
+        call my_put_vara(ncid, lon_id, 1, nod2D, rbuffer)
+     else
+        call my_put_vara(ncid, lat_id, 1, nod2D, rbuffer)
+     endif
   end do
   deallocate(rbuffer)
 

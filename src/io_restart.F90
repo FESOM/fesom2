@@ -29,6 +29,7 @@ MODULE io_RESTART
     integer        :: ndim
     integer        :: dims(2) !<=2; assume there are no variables with dimension more than 2xNLxT
     real(kind=WP), pointer :: pt1(:), pt2(:,:)
+    logical        :: is_in_restart !if the variable is in the restart file
   end type nc_vars
 !
 !--------------------------------------------------------------------------------------------
@@ -560,9 +561,9 @@ subroutine read_restart(id, mesh, arg)
   integer, optional, intent(in)    :: arg
   real(kind=WP), allocatable       :: aux(:), laux(:)
   integer                          :: i, lev, size1, size2, size_gen, size_lev, shape
-  integer                          :: rec2read, c, order
+  integer                          :: rec2read, c, order, ierror
   real(kind=WP)                    :: rtime !timestamp of the record
-  logical                          :: file_exist=.False.
+  logical                          :: file_exist=.False., var_exist
   type(t_mesh), intent(in)        , target :: mesh
 
 #include  "associate_mesh.h"
@@ -605,10 +606,17 @@ subroutine read_restart(id, mesh, arg)
   end if
 
   call was_error(id); c=1
- 
+
   do i=1, id%nvar
      shape=id%var(i)%ndim
-     if (mype==0) write(*,*) 'reading restart for ', trim(id%var(i)%name)
+     var_exist=id%var(i)%is_in_restart
+     call MPI_BCast(var_exist, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+     if (var_exist) then
+        if (mype==0) write(*,*) 'reading restart for ', trim(id%var(i)%name)
+     else
+        if (mype==0) write(*,*) '...skip reading for ', trim(id%var(i)%name)
+        cycle
+     end if
 !_______writing 2D fields________________________________________________
      if (shape==1) then
         size1=id%var(i)%dims(1)
@@ -681,7 +689,7 @@ subroutine assoc_ids(id)
 
   type(nc_file),  intent(inout) :: id
   character(500)                :: longname
-  integer                       :: c, j, k
+  integer                       :: c, j, k, status
   real(kind=WP)                 :: rtime !timestamp of the record
   ! Serial output implemented so far
   if (mype/=0) return
@@ -730,7 +738,11 @@ subroutine assoc_ids(id)
   id%rec_count=max(id%rec_count, 1)
 !___Associate physical variables____________________________________________
   do j=1, id%nvar
-     id%error_status(c) = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
+     status = nf_inq_varid(id%ncid, id%var(j)%name, id%var(j)%code); c=c+1
+     id%var(j)%is_in_restart=(status .eq. nf_noerr) !does the requested variable exist in the file
+     if (.not. id%var(j)%is_in_restart) then        !if not give the error message
+         write(*,*) 'WARNING: entry ', trim(id%var(j)%name), ' does not exist in the restart file!'
+     end if
   end do
   id%error_status(c)=nf_close(id%ncid); c=c+1
   id%error_count=c-1

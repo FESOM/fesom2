@@ -354,7 +354,7 @@ CONTAINS
       call check_nferr(iost,flf%file_name)
       
       ! digg for calendar attribute in time axis variable
-      if (mype==0) then
+      if (mype==0 .and. use_flpyrcheck) then
          iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
          iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
          aux_calendar = aux_calendar(1:aux_len)

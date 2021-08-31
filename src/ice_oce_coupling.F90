@@ -289,11 +289,10 @@ subroutine oce_fluxes(mesh)
     ! enforce the total freshwater/salt flux be zero
     ! 1. water flux ! if (.not. use_virt_salt) can be used!
     ! we conserve only the fluxes from the database plus evaporation.
-    flux = evaporation-ice_sublimation     & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
+    flux = evaporation-ice_sublimation       & ! the ice2atmos subplimation does not contribute to the freshwater flux into the ocean
             +prec_rain                       &
             +prec_snow*(1.0_WP-a_ice_old)    &
-            +runoff    
-            
+            +runoff                
     ! --> In case of zlevel and zstar and levitating sea ice, sea ice is just sitting 
     ! on top of the ocean without displacement of water, there the thermodynamic 
     ! growth rates of sea ice have to be taken into account to preserve the fresh water 
@@ -309,21 +308,31 @@ subroutine oce_fluxes(mesh)
     
     ! Also balance freshwater flux that come from ocean-cavity boundary
     if (use_cavity) then
-        if (.not. use_virt_salt) then
+        if (.not. use_virt_salt) then !zstar, zlevel
             ! only for full-free surface approach otherwise total ocean volume will drift
             where (ulevels_nod2d > 1) flux = -water_flux
-        else
+        else ! linfs 
             where (ulevels_nod2d > 1) flux =  0.0_WP
         end if 
     end if 
-            
+    
+    ! compute total global net freshwater flux into the ocean 
     call integrate_nod(flux, net, mesh)
+    
+    !___________________________________________________________________________
     ! here the + sign must be used because we switched up the sign of the 
     ! water_flux with water_flux = -fresh_wa_flux, but evap, prec_... and runoff still
     ! have there original sign
     ! if use_cavity=.false. --> ocean_area == ocean_areawithcav
     !! water_flux=water_flux+net/ocean_area
-    water_flux=water_flux+net/ocean_areawithcav
+    if (use_cavity) then
+        ! due to rigid lid approximation under the cavity we to not add freshwater
+        ! under the cavity for the freshwater balancing we do this only for the open
+        ! ocean
+        where (ulevels_nod2d == 1) water_flux=water_flux+net/ocean_area
+    else
+        water_flux=water_flux+net/ocean_area
+    end if 
     
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)

@@ -342,6 +342,9 @@ subroutine diff_ver_part_expl_ale(tr_num, mesh)
     real(kind=WP)            :: zinv1,Ty
 
 #include "associate_mesh.h"
+
+    Ty = 0.0_WP
+    
     !___________________________________________________________________________    
     do n=1, myDim_nod2D
         nl1=nlevels_nod2D(n)-1
@@ -400,7 +403,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     use g_PARSUP
     use g_CONFIG
     use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_    
+    use o_mixing_KPP_mod !for ghats _GO_   
+    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     use bc_surface_interface
         
     implicit none
@@ -425,36 +429,80 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     Ty1   =0.0_WP
     
     ! solve equation diffusion equation implicite part: 
-    ! --> h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
-    ! -->   dTnew = T^(n+0.5)-Tstar
-    ! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + K_33*dt*d/dz*Tstar 
-    ! -->   h^(n+0.5)* (dTnew) = dt*(K_33*d/dz*dTnew) + RHS 
-    ! -->   solve for dT_new
-    !    
-    !    ----------- zbar_1, V_1 (Skalar Volume), A_1 (Area of edge),  no Cavity A1==V1, yes Cavity A1 !=V1
-    ! Z_1 o T_1
-    !    ----------- zbar_2, V_2
-    ! Z_2 o T_2
-    !    ----------- zbar_3, V_3
-    ! Z_3 o T_3
-    !    ----------- zbar_4
-    !        :
-    ! --> Difference Quotient at Volume _2:  ddTnew_2/dt + d/dz*K_33 d/dz*dTnew_2 = 0 --> homogene solution 
-    ! V2*dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3 ] + RHS
-    !    dTnew_2 *h^(n+0.5) = -dt * [ (dTnew_1-dTnew_2)/(Z_1-Z_2)*A_2/V_2 + (dTnew_2-dTnew_3)/(Z_2-Z_3)*A_3/V_2 ] + RHS
-    !                                                  |                                 |
-    !                                                  v                                 v
-    !                                         diffusive flux towards             diffusive flux towards
-    !                                         T_2 trough boundary V2             T_2 trough boundary V3 
-    !    
-    ! --> solve coefficents for homogene part   
-    !    dTnew_2 *h^(n+0.5) = -dt * [ a*dTnew_1 + b*dTnew_2 + c*dTnew_3 ] 
+    ! -->   h^(n+0.5)* (T^(n+0.5)-Tstar) = dt*( K_33*d/dz*(T^(n+0.5)-Tstar) + K_33*d/dz*Tstar )
+    ! -->   Tnew = T^(n+0.5)-Tstar
+    ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + K_33*dt*d/dz*Tstar 
+    ! -->   h^(n+0.5)* (Tnew) = dt*(K_33*d/dz*Tnew) + RHS        
+    ! -->   solve for T_new                                      
+    ! -->   V_1 (Skalar Volume), A_1 (Area of edge),              .                 
+    !       no Cavity A1==V1, yes Cavity A1 !=V1                 /I\ nvec_up (+1)
+    !                                                             I
+    !    ----------- zbar_1, A_1                             *----I----*
+    ! Z_1 o T_1, V1                                          |\   I  ./|
+    !    ----------- zbar_2, A_2                             | \   ./  |   Gaus Theorem:
+    ! Z_2 o T_2, V2                                          |  \ /    |    --> Flux form
+    !    ----------- zbar_3, A_3                             |   |     |    --> normal vec outwards facing
+    ! Z_3 o T_3, V3                                          *---|-----*
+    !    ----------- zbar_4                                   \  | I ./
+    !        :                                                 \ | I/ 
+    !                                                           \|/I   
+    !                                                            * I
+    !                                                             \I/
+    !                                                              *  nvec_dwn (-1)
+    ! --> 1st. solve homogenouse part:
+    ! f(Tnew) = h^(n+0.5)* (Tnew) - dt*(K_33*dTnew/dz) = 0
     !
-    ! --> a = -dt*K_33/(Z_1-Z_2)*A_2/V_2
+    ! --> 2nd. Difference Quotient at Tnew_i in flux form (Gaus Theorem, dont forget normal vectors!!!):  
+    ! V_i*Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i * nvec_up 
+    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1 * nvec_dwn ]
+    !     Tnew_i *h_i = -dt * [ K_33 * (Tnew_i-1 - Tnew_i)/(Z_i-1 - Z_i) * A_i  /V_i * nvec_up 
+    !                          +K_33 * (Tnew_i - Tnew_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * nvec_dwn ]
+    !
+    ! --> 3rd. solve for coefficents a, b, c:
+    ! f(Tnew) = [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] 
+    !
+    !     df(Tnew)/dTnew_i-1 = a = -dt*K_33/(Z_i-1 - Z_i) * A_i/V_i * (nvec_up =1)
     ! 
-    ! --> c = -dt*K_33/(Z_2-Z_3)*A_3/V_2
+    !     df(Tnew)/dTnew_i+1 = c =  dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
+    !                            = -dt * K_33 * 1/(Z_i - Z_i+1) * A_i+1/V_i
     !
-    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_1-Z_2)*A_2/V_2 + dt*K_33/(Z_2-Z_3)*A_3/V_2 ] = -(a+c) + h^(n+0.5)
+    !     df(Tnew)/dTnew_i   = b = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=+1)
+    !                                  - dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
+    !                            = h_i + dt*K_33/(Z_i-1 - Z_i) * A_i/V_i
+    !                                  + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i
+    !                            = h_i -(a+c)
+    !
+    ! --> 4th. solve inhomogenous part:
+    ! [ a*dTnew_i-1 + b*dTnew_i + c*dTnew_i+1 ] = RHS/V_i
+    !
+    ! RHS     = K_33*dt*d/dz*Tstar
+    !
+    ! --> write as Difference Quotient in flux form
+    ! RHS/V_i =  K_33 * dt * (Tstar_i-1 - Tstar_i)/(Z_i-1 - Z_i) * A_i/V_i   * (nvec_up=1)
+    !          + K_33 * dt * (Tstar_i - Tstar_i+1)/(Z_i - Z_i+1) * A_i+1/V_i * (nvec_dwn=-1)
+    !
+    !         =  K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i-1
+    !          - K_33*dt/(Z_i-1 - Z_i) * A_i/V_i   * Tstar_i
+    !          - K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i
+    !          + K_33*dt/(Z_i - Z_i+1) * A_i+1/V_i * Tstar_i+1
+    !         
+    !         = -a*Tstar_i-1 + (a+c)*Tstar_i - c * Tstar_i+1
+    !                            |-> b = h_i - (a+c), a+c = h_i-b
+    !
+    !         = -a*Tstar_i-1 - (b-h_i)*Tstar_i - c * Tstar_i+1
+    !
+    ! --> 5th. solve for Tnew_i --> forward sweep algorithm --> see lower
+    !  | b_1 c_1 ...            |   |dTnew_1|
+    !  | a_2 b_2 c_2 ...        |   |dTnew_2|
+    !  |     a_3 b_3 c_3 ...    | * |dTnew_3| = RHS/V_i
+    !  |         a_4 b_4 c_4 ...|   |dTnew_4| 
+    !  |              :         |   |   :   |   
+    !
+    ! --> a = -dt*K_33 / (Z_i-1 - Z_i) * A_i/V_i
+    ! 
+    ! --> c = -dt*K_33 / (Z_i - Z_i+1) * A_i+1/V_i
+    !
+    ! --> b = h^(n+0.5) -[ dt*K_33/(Z_i-1 - Z_i)*A_i/V_i + dt*K_33/(Z_i - Z_i+1) * A_i+1/V_i ] = -(a+c) + h^(n+0.5)
     
     !___________________________________________________________________________
     ! loop over local nodes
@@ -480,20 +528,16 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
         zbar_n=0.0_WP
         Z_n=0.0_WP
-!         zbar_n(nzmax)=zbar(nzmax)
         zbar_n(nzmax)=zbar_n_bot(n)
         Z_n(nzmax-1)=zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
-        !!PS do nz=nzmax-1,2,-1
         do nz=nzmax-1,nzmin+1,-1
             zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
             Z_n(nz-1)  = zbar_n(nz) + hnode_new(nz-1,n)/2.0_WP
         end do
-        !!PS zbar_n(1) = zbar_n(2) + hnode_new(1,n)
         zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer 
-        !!PS nz=1
         nz=nzmin
         
         ! 1/dz(nz)
@@ -507,25 +551,22 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
         a(nz)=0.0_WP
-        !!PS c(nz)=-(Kv(2,n)+Ty1)*zinv2*zinv*area(nz+1,n)/area(nz,n)
-        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
+        !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * (area(nz+1,n)/areasvol(nz,n))
+        c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n) 
         b(nz)=-c(nz)+hnode_new(nz,n)      ! ale
         
         ! update from the vertical advection --> comes from splitting of vert 
         ! velocity into explicite and implicite contribution
         if (do_wimpl) then
-            !!PS v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
-            !!PS b(nz) =b(nz)+Wvel_i(nz, n)*zinv-min(0._WP, Wvel_i(nz+1, n))*v_adv
-            !!PS c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
-            
             !___________________________________________________________________
             ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
             ! numerical reasons, to gurante that area/areasvol in case of no 
             ! cavity is ==1.0_WP
-            v_adv =zinv* ( area(nz  ,n)/areasvol(nz,n) )
+            v_adv =zinv * ( area(nz  ,n)/areasvol(nz,n) )
             b(nz) =b(nz)+Wvel_i(nz, n)*v_adv
             
-            v_adv =zinv*area(nz+1,n)/areasvol(nz,n)
+            !!PS v_adv =zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            v_adv =zinv * area(nz+1,n)/areasvol(nz,n)
             b(nz) =b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
             c(nz) =c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
         end if        
@@ -534,7 +575,6 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> 2nd...nl-2 layer
-        !!PS do nz=2, nzmax-2
         do nz=nzmin+1, nzmax-2
         
             ! 1/dz(nz)
@@ -552,8 +592,9 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
             ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
             ! numerical reasons, to gurante that area/areasvol in case of no 
             ! cavity is ==1.0_WP   
-            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv* ( area(nz  ,n)/areasvol(nz,n) ) 
-            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv*area(nz+1,n)/areasvol(nz,n)
+            a(nz)=-(Kv(nz,n)  +Ty )*zinv1*zinv * ( area(nz  ,n)/areasvol(nz,n) ) 
+            !!PS c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * ( area(nz+1,n)/areasvol(nz,n) )
+            c(nz)=-(Kv(nz+1,n)+Ty1)*zinv2*zinv * area(nz+1,n)/areasvol(nz,n)
             b(nz)=-a(nz)-c(nz)+hnode_new(nz,n)
             
             ! backup zinv2 for next depth level
@@ -565,15 +606,16 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
                 ! use brackets when computing ( area(nz  ,n)/areasvol(nz,n) ) for 
                 ! numerical reasons, to gurante that area/areasvol in case of no 
                 ! cavity is ==1.0_WP   
-                v_adv=zinv* ( area(nz  ,n)/areasvol(nz,n) )
+                v_adv=zinv * ( area(nz  ,n)/areasvol(nz,n) )
                 a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
                 b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
                 !!PS v_adv=v_adv*areasvol(nz+1,n)/areasvol(nz,n)
-                v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+                !!PS v_adv=zinv * ( area(nz+1,n)/areasvol(nz,n) )
+                v_adv=zinv * area(nz+1,n)/areasvol(nz,n) 
                 b(nz)=b(nz)-min(0._WP, Wvel_i(nz+1, n))*v_adv
                 c(nz)=c(nz)-max(0._WP, Wvel_i(nz+1, n))*v_adv
             end if
-        end do ! --> do nz=2, nzmax-2
+        end do ! --> do nz=nzmin+1, nzmax-2
         
         !_______________________________________________________________________
         ! Regular part of coefficients: --> nl-1 layer
@@ -582,8 +624,8 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
         
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty= (Z_n(nz-1)-zbar_n(nz))   *zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n) + &
-            (zbar_n(nz)-Z_n(nz)) *zinv1 *slope_tapered(3,nz,n)**2  *Ki(nz,n)
+        Ty= (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
+            (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
         Ty =Ty *isredi
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
         
@@ -616,56 +658,135 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !
         ! -+--> tr(1) =(a(1)+c(1))*tr_arr(1,n,tr_num)-c(1)*tr_arr(2,n,tr_num)
         !  |--> a(1)=0
-        !!PS nz=1
         nz=nzmin
         dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
         !tr(nz)=c(nz)*(tr_arr(nz,n,tr_num) - tr_arr(nz+1,n,tr_num))
         
-        
-        ! *******************************************************************
-        ! nonlocal transport to the rhs (only T and S currently) _GO_
-        ! *******************************************************************
-        ! rsss will be used later to compute:
-        ! 1. the virtual salinity flux 
-        ! 2. the contribution from the nonlocal term in KPP for salinity
-        if (tr_num==2) then 
-            rsss=ref_sss
-                if (ref_sss_local) rsss=tr_arr(1,n,2)
-        end if
-        
-        !!PS do nz=2,nzmax-2
         do nz=nzmin+1,nzmax-2
             dz=hnode_new(nz,n)
-            tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)-c(nz)*tr_arr(nz+1,n,tr_num)
-            !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num) &
-            !       -c(nz)*tr_arr(nz+1,n,tr_num) &
-            !       +(a(nz)+c(nz))*tr_arr(nz,n,tr_num)
+            tr(nz)= -a(nz)     * tr_arr(nz-1,n,tr_num) &
+                    -(b(nz)-dz)* tr_arr(nz,n,tr_num) &
+                    -c(nz)     * tr_arr(nz+1,n,tr_num)
+            !tr(nz)=-a(nz)        * tr_arr(nz-1,n,tr_num) &
+            !       +(a(nz)+c(nz))* tr_arr(nz,n,tr_num)   &
+            !       -c(nz)        * tr_arr(nz+1,n,tr_num)
             
-            ! *******************************************************************
-            ! nonlocal transport to the rhs (only T and S currently) _GO_
-            ! *******************************************************************
-!leads to non conservation in 8th digit. needs to be checked!
-!            if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-!                if (tr_num==1) then ! T
-!                    tr(nz)=tr(nz)+(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*heat_flux(n)/vcpw
-!                elseif (tr_num==2) then ! S
-!                    tr(nz)=tr(nz)-(MIN(ghats(nz,n)*Kv(nz,n), 1.0_WP)-MIN(ghats(nz+1,n)*Kv(nz+1,n), 1.0_WP)*area(nz+1,n)/area(nz,n))*rsss*water_flux(n)
-!                end if
-!            end if 
         end do
+        
         nz=nzmax-1
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)-(b(nz)-dz)*tr_arr(nz,n,tr_num)
         !tr(nz)=-a(nz)*tr_arr(nz-1,n,tr_num)+a(nz)*tr_arr(nz,n,tr_num)
         
         !_______________________________________________________________________
+        ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
+        ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains 
+        ! at this point the mixing enhancments from momix, instable
+        ! mixing or windmixing which are to much for nonlocal 
+        ! transports and lead to instability of the model
+        if (use_kpp_nonlclflx) then
+            if (tr_num==2) then 
+                rsss=ref_sss
+                if (ref_sss_local) rsss=tr_arr(1,n,2)
+            end if
+            
+            !___________________________________________________________________
+            ! use fesom1.4 KPP
+            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+                if     (tr_num==1) then ! temperature
+                    ! --> no fluxes to the top out of the surface, no fluxes 
+                    !     downwards out of the bottom
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               +(-MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               +( MIN(ghats(nz  ,n)*blmc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                                
+                elseif (tr_num==2) then ! salinity
+                    ! --> no fluxes to the top out of the surface, no fluxes 
+                    !     downwards out of the bottom
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               -(-MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    !___bulk____________________________________________________            
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(ghats(nz+1,n)*blmc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                end if 
+            !___________________________________________________________________
+            ! use cvmix KPP
+            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+                if     (tr_num==1) then ! temperature
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               +(-MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    !___bulk____________________________________________________
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(kpp_nonlcltranspT(nz+1,n)*kpp_oblmixc(nz+1,n,2), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               +( MIN(kpp_nonlcltranspT(nz  ,n)*kpp_oblmixc(nz  ,n,2), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * heat_flux(n) / vcpw * dt
+                                
+                elseif (tr_num==2) then ! salinity
+                    !___surface_________________________________________________
+                    nz = nzmin
+                    tr(nz)=tr(nz) &
+                               -(-MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    !___bulk____________________________________________________            
+                    do nz=nzmin+1, nzmax-2
+                        tr(nz)=tr(nz) &
+                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                 -MIN(kpp_nonlcltranspS(nz+1,n)*kpp_oblmixc(nz+1,n,3), 1.0_WP)*(area(nz+1,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                    end do
+                    !___bottom__________________________________________________
+                    nz = nzmax-1
+                    tr(nz)=tr(nz) &
+                               -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
+                                ) * rsss * water_flux(n) * dt
+                end if
+            end if
+        end if ! --> if (use_kpp_nonlclflx) then
+        
+        !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tr_num==1) then
-            !!PS do nz=1, nzmax-1
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/areasvol(nz,n))*zinv
+                !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
+                tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv
             end do
         end if
         
@@ -681,7 +802,6 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+) 
         !                            
-        !!PS tr(1)= tr(1)+bc_surface(n, tracer_id(tr_num))        
         tr(nzmin)= tr(nzmin)+bc_surface(n, tracer_id(tr_num),mesh) 
         
         !_______________________________________________________________________
@@ -705,13 +825,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !      --> dTnew_i = rhs'_i-c'_i*dTnew_i+1 ; i = n-1,n-2,...,1
         !
         ! initialize c-prime and s,t-prime
-        !!PS cp(1) = c(1)/b(1)
-        !!PS tp(1) = tr(1)/b(1)
         cp(nzmin) = c(nzmin)/b(nzmin)
         tp(nzmin) = tr(nzmin)/b(nzmin)
         
         ! solve for vectors c-prime and t, s-prime
-        !!PS do nz = 2,nzmax-1
         do nz = nzmin+1,nzmax-1
             m = b(nz)-cp(nz-1)*a(nz)
             cp(nz) = c(nz)/m
@@ -722,7 +839,6 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         tr(nzmax-1) = tp(nzmax-1)
         
         ! solve for x from the vectors c-prime and d-prime
-        !!PS do nz = nzmax-2, 1, -1
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
@@ -730,12 +846,10 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
-        !!PS do nz=1,nzmax-1
         do nz=nzmin,nzmax-1
             ! tr_arr - before ... T*
             tr_arr(nz,n,tr_num)=tr_arr(nz,n,tr_num)+tr(nz)
             ! tr_arr - after ... T^(n+0.5) = dTnew + T* = T^(n+0.5) - T* + T* 
-            
         end do
         
     end do ! --> do n=1,myDim_nod2D   
