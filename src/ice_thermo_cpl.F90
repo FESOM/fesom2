@@ -520,12 +520,12 @@ contains
 
   ! set albedo
   ! ice and snow, freezing and melting conditions are distinguished
-  if (geolat.gt.0.) then !SH does not have melt ponds
+  if (geolat.lt.0.) then !SH does not have melt ponds
       melt_pool_alb_reduction = 0.0_WP
       nh_winter_reduction = 0.0_WP
   else
       melt_pool_alb_reduction = 0.20_WP
-      nh_winter_reduction = 0.1_WP
+      nh_winter_reduction = 0.06_WP
   endif
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
