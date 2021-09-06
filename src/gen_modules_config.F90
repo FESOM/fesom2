@@ -82,8 +82,12 @@ module g_config
                                             ! geographical coordinates
   integer                :: thers_zbar_lev=5     ! minimum number of levels to be                                            
   character(len=5)       :: which_depth_n2e='mean'                                           
-  namelist /geometry/  cartesian, fplane, &
-       cyclic_length, rotated_grid, alphaEuler, betaEuler, gammaEuler, force_rotation, which_depth_n2e
+  logical                :: use_depthonelem =.false.
+  logical                :: use_cavityonelem=.false.
+  namelist /geometry/   cartesian, fplane, &
+                        cyclic_length, rotated_grid, force_rotation, &
+                        alphaEuler, betaEuler, gammaEuler, &
+                        which_depth_n2e, use_depthonelem, use_cavityonelem
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
