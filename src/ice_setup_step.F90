@@ -1,3 +1,33 @@
+module ice_array_setup_interface
+  interface
+    subroutine ice_array_setup(mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in),    target              :: mesh
+    end subroutine
+  end interface
+end module
+
+module ice_initial_state_interface
+  interface
+    subroutine ice_initial_state(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in), target    :: mesh
+      type(t_tracer), intent(in), target    :: tracers(:)
+    end subroutine
+  end interface
+end module
+module ice_setup_interface
+  interface
+    subroutine ice_setup(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in), target    :: mesh
+      type(t_tracer), intent(in), target    :: tracers(:)
+    end subroutine
+  end interface
+end module
 !
 !_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
