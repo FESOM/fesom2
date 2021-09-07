@@ -142,14 +142,13 @@ subroutine solve_tracers_ale(tracers, mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+        if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers(tr_num), mesh)
         else
             call relax_to_clim(tracers(tr_num), mesh)
         end if 
         call exchange_nod(tracers(tr_num)%values(:,:))
     end do
-
     !___________________________________________________________________________
     do tr_num=1, ptracers_restore_total
         tracers(ptracers_restore(tr_num)%locid)%values(:,ptracers_restore(tr_num)%ind2)=1.0_WP    
@@ -290,13 +289,13 @@ subroutine diff_tracers_ale(tracer, mesh)
         !tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                        del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
+
     !___________________________________________________________________________
     if (i_vert_diff) then
         ! do vertical diffusion: implicite 
         call diff_ver_part_impl_ale(tracer, mesh)
         
     end if
-    
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
     !init_tracers will set it to zero for the next timestep

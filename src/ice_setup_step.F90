@@ -316,7 +316,6 @@ subroutine ice_initial_state(tracers, mesh)
     real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
 #include  "associate_mesh.h"
-    write(*,*) tracers(1)%ID, tracers(2)%ID
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP
