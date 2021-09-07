@@ -4,6 +4,7 @@ MODULE io_RESTART
   use g_parsup
   use g_comm_auto
   use mod_mesh
+  use mod_tracer
   use o_arrays
   use i_arrays
   use g_cvmix_tke
@@ -77,7 +78,7 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year, mesh)
+subroutine ini_ocean_io(year, tracers, mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -87,8 +88,8 @@ subroutine ini_ocean_io(year, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh), intent(in) , target :: mesh
-
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
 #include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
@@ -146,9 +147,9 @@ subroutine ini_ocean_io(year, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
+     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%values(:,:));
      longname=trim(longname)//', Adams–Bashforth'
-     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%valuesAB(:,:));
   end do
   call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
   call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
@@ -197,7 +198,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read, mesh)
+subroutine restart(istep, l_write, l_read, tracers, mesh)
 
 #if defined(__icepack)
   use icedrv_main,   only: init_restart_icepack
@@ -212,17 +213,17 @@ subroutine restart(istep, l_write, l_read, mesh)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
-  type(t_mesh), intent(in) , target :: mesh
-
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, mesh)
+               call ini_ocean_io(yearnew, tracers, mesh)
   if (use_ice) call ini_ice_io  (yearnew, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearnew, mesh)
 #endif
   else
-               call ini_ocean_io(yearold, mesh)
+               call ini_ocean_io(yearold, tracers, mesh)
   if (use_ice) call ini_ice_io  (yearold, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearold, mesh)
@@ -388,7 +389,7 @@ subroutine def_variable_1d(id, name, dims, longname, units, data)
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(1)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout)        :: data(:)
+  real(kind=WP),target,     intent(in)   :: data(:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 
@@ -424,7 +425,7 @@ subroutine def_variable_2d(id, name, dims, longname, units, data)
   character(len=*), intent(in)           :: name
   integer, intent(in)                    :: dims(2)
   character(len=*), intent(in), optional :: units, longname
-  real(kind=WP),target,     intent(inout) :: data(:,:)
+  real(kind=WP),target,     intent(in)   :: data(:,:)
   integer                                :: c
   type(nc_vars), allocatable, dimension(:) :: temp
 

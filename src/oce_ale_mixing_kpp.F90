@@ -8,6 +8,7 @@ MODULE o_mixing_KPP_mod
   !---------------------------------------------------------------  
   USE o_PARAM
   USE MOD_MESH
+  USE MOD_TRACER
   USE o_ARRAYS
   USE g_PARSUP
   USE g_config
@@ -237,7 +238,7 @@ contains
   !  diffK = diffusion coefficient (m^2/s) 
   !
   !---------------------------------------------------------------  
-  subroutine oce_mixing_KPP(viscAE, diffK, mesh)
+  subroutine oce_mixing_KPP(viscAE, diffK, tracers, mesh)
 
      IMPLICIT NONE
 
@@ -245,7 +246,8 @@ contains
 !     Define allocatble arrays under oce_modules.F90
 !     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
-     type(t_mesh), intent(in)   , target :: mesh
+     type(t_mesh),   intent(in), target :: mesh
+     type(t_tracer), intent(in), target :: tracers(:)
      integer                    :: node, kn, elem, elnodes(3)
      integer                    :: nz, ns, j, q, lay, lay_mi, nzmin, nzmax
      real(KIND=WP)              :: smftu, smftv, aux, vol
@@ -289,14 +291,7 @@ contains
      dVsq (nzmin,node) = 0.0_WP  
      dbsfc(nzmin,node) = 0.0_WP 
 
-! Surface temperature and salinity
-     !!PS tsurf = tr_arr(1,node,1)   
-     !!PS ssurf = tr_arr(1,node,2)
-!!PS      tsurf = tr_arr(nzmin,node,1)   
-!!PS      ssurf = tr_arr(nzmin,node,2)
 ! Surface velocity
-     !!PS usurf = Unode(1,1,node)   
-     !!PS vsurf = Unode(2,1,node)
      usurf = Unode(1,nzmin,node)   
      vsurf = Unode(2,nzmin,node)
 
@@ -327,10 +322,6 @@ contains
 !       Reason: oce_timestep(n) is called after subroutine oce_mixing_(K)PP 
 !       where compute_sigma_xy -> sw_alpha_beta is called (Fer_GM should be set to true)
 !      *******************************************************************
-!  IF ( .not. Fer_GM ) THEN
-!     CALL sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2))
-!  ENDIF
-!      *******************************************************************
 !       friction velocity, turbulent sfc buoyancy forcing
 !       ustar = sqrt( sqrt( stress_atmoce_x^2 + stress_atmoce_y^2 ) / rho ) (m/s)
 !       bo =  -g * ( Talpha*heat_flux/vcpw + Sbeta * salinity*water_flux ) (m^2/s^3)
@@ -342,10 +333,8 @@ contains
 !!PS      ustar(node) = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
      
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
-     !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-     !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
      Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (nzmin,node) * water_flux(node) * tr_arr(nzmin,node,2)) 
+                      + sw_beta (nzmin,node) * water_flux(node) * tracers(2)%values(nzmin,node)) 
   END DO
       
 ! compute interior mixing coefficients everywhere, due to constant 
@@ -354,7 +343,7 @@ contains
     CALL ri_iwmix(viscA, diffK, mesh)
 ! add double diffusion
     IF (double_diffusion) then
-       CALL ddmix(diffK, mesh)
+       CALL ddmix(diffK, tracers, mesh)
     END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
@@ -854,10 +843,11 @@ contains
   !
   ! output: update diffu
   !
-  subroutine ddmix(diffK, mesh)
+  subroutine ddmix(diffK, tracers, mesh)
 
      IMPLICIT NONE
-     type(t_mesh), intent(in)       , target :: mesh
+     type(t_mesh),   intent(in), target :: mesh
+     type(t_tracer), intent(in), target :: tracers(:)
      real(KIND=WP), parameter       :: Rrho0               = 1.9_WP          ! limit for double diffusive density ratio
      real(KIND=WP), parameter       :: dsfmax              = 1.e-4_WP        ! (m^2/s) max diffusivity in case of salt fingering
      real(KIND=WP), parameter       :: viscosity_molecular = 1.5e-6_WP       ! (m^2/s)
@@ -877,8 +867,8 @@ contains
         DO nz=nzmin+1,nzmax-1
 
        ! alphaDT and betaDS @Z 
-           alphaDT = sw_alpha(nz-1,node) * tr_arr(nz-1,node,1)
-           betaDS  = sw_beta (nz-1,node) * tr_arr(nz-1,node,2)
+           alphaDT = sw_alpha(nz-1,node) * tracers(1)%values(nz-1,node)
+           betaDS  = sw_beta (nz-1,node) * tracers(2)%values(nz-1,node)
 
            IF (alphaDT > betaDS .and. betaDS > 0.0_WP) THEN
 

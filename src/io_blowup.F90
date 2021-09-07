@@ -4,6 +4,7 @@ MODULE io_BLOWUP
 	use g_parsup
 	use g_comm_auto
         USE MOD_MESH
+        USE MOD_TRACER        
 	use o_arrays
 	use i_arrays
 	implicit none
@@ -62,10 +63,11 @@ MODULE io_BLOWUP
 	!_______________________________________________________________________________
 	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year, mesh)
+	subroutine ini_blowup_io(year, tracers, mesh)
 		implicit none
-                type(t_mesh), intent(in) , target :: mesh
 		integer, intent(in)       :: year
+                type(t_tracer), intent(in), target :: tracers(:)
+                type(t_mesh),   intent(in), target :: mesh
 		integer                   :: ncid, j
 		integer                   :: varid
 		character(500)            :: longname
@@ -130,9 +132,9 @@ MODULE io_BLOWUP
 				write(longname,'(A15,i1)') 'passive tracer ', j
 				units='none'
 			END SELECT
-			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tr_arr(:,:,j));
+			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%values(:,:));
 !!PS 			longname=trim(longname)//', Adams–Bashforth'
-!!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tr_arr_old(:,:,j));
+!!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%valuesAB(:,:)(:,:));
 		end do
 		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel);
 		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_e);
@@ -166,13 +168,14 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine blowup(istep, mesh)
+	subroutine blowup(istep, tracers, mesh)
 		implicit none
-                type(t_mesh), intent(in) , target :: mesh		
+                type(t_mesh),   intent(in), target :: mesh		
+                type(t_tracer), intent(in), target :: tracers(:)
 		integer                   :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew, mesh)
+		call ini_blowup_io(yearnew, tracers, mesh)
 		if(mype==0) write(*,*)'Do output (netCDF, blowup) ...'
 		if(mype==0) write(*,*)' --> call assoc_ids(bid)'
 		call assoc_ids(bid) ; call was_error(bid)  
@@ -276,7 +279,7 @@ MODULE io_BLOWUP
 		character(len=*), intent(in)           :: name
 		integer, intent(in)                    :: dims(1)
 		character(len=*), intent(in), optional :: units, longname
-		real(kind=WP),target,     intent(inout)        :: data(:)
+		real(kind=WP),target,     intent(in)   :: data(:)
 		integer                                :: c
 		type(nc_vars), allocatable, dimension(:) :: temp
 		
@@ -312,7 +315,7 @@ MODULE io_BLOWUP
 		character(len=*), intent(in)           :: name
 		integer, intent(in)                    :: dims(2)
 		character(len=*), intent(in), optional :: units, longname
-		real(kind=WP),target,     intent(inout) :: data(:,:)
+		real(kind=WP),target,     intent(in)   :: data(:,:)
 		integer                                :: c
 		type(nc_vars), allocatable, dimension(:) :: temp
 		
@@ -349,7 +352,7 @@ MODULE io_BLOWUP
 		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
-        type(t_mesh), intent(in)     , target :: mesh
+                type(t_mesh), intent(in), target :: mesh
 
 #include  "associate_mesh.h"
 

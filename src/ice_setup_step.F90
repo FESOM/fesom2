@@ -1,31 +1,19 @@
-module ice_setup_step_interfaces
-  interface
-    subroutine ice_array_setup(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
-    end subroutine
-
-    subroutine ice_initial_state(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
-    end subroutine
-  end interface
-end module
-
-!
 !
 !_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
-subroutine ice_setup(mesh)
+subroutine ice_setup(tracers, mesh)
     use o_param
     use g_parsup
     use i_param
     use i_arrays
     use g_CONFIG
     use mod_mesh
-    use ice_setup_step_interfaces
+    use mod_tracer
+    use ice_array_setup_interface
+    use ice_initial_state_interface
     implicit none 
-    type(t_mesh), intent(in)           , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
     
     ! ================ DO not change
     ice_dt=real(ice_ave_steps,WP)*dt
@@ -41,7 +29,7 @@ subroutine ice_setup(mesh)
     ! Initialization routine, user input is required 
     ! ================
     !call ice_init_fields_test
-    call ice_initial_state(mesh)   ! Use it unless running test example
+    call ice_initial_state(tracers, mesh)   ! Use it unless running test example
     if(mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 !
@@ -281,22 +269,24 @@ end subroutine ice_timestep
 !
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
-subroutine ice_initial_state(mesh)
+subroutine ice_initial_state(tracers, mesh)
     use i_ARRAYs
     use MOD_MESH
+    use MOD_TRACER
     use o_PARAM   
     use o_arrays        
     use g_parsup 
     use g_CONFIG
     implicit none
     !
-    type(t_mesh), intent(in)           , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
     integer                            :: i
     character(MAX_PATH)                      :: filename
     real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
 
 #include  "associate_mesh.h"
-
+    write(*,*) tracers(1)%ID, tracers(2)%ID
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP
@@ -314,7 +304,7 @@ subroutine ice_initial_state(mesh)
         endif    
         
         !_______________________________________________________________________
-        if (tr_arr(1,i,1)< 0.0_WP) then
+        if (tracers(1)%values(1,i)< 0.0_WP) then
             if (geo_coord_nod2D(2,i)>0._WP) then
                 m_ice(i) = 1.0_WP
                 m_snow(i)= 0.1_WP 

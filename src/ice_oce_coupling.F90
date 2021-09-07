@@ -1,3 +1,25 @@
+module ocean2ice_interface
+  interface
+    subroutine ocean2ice(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_tracer), intent(inout), target :: tracers(:)
+    end subroutine
+  end interface
+end module
+
+module oce_fluxes_interface
+  interface
+    subroutine oce_fluxes(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_tracer), intent(inout), target :: tracers(:)
+    end subroutine
+  end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
@@ -78,7 +100,7 @@ end subroutine oce_fluxes_mom
 !
 !
 !_______________________________________________________________________________
-subroutine ocean2ice(mesh)
+subroutine ocean2ice(tracers, mesh)
   
     ! transmits the relevant fields from the ocean to the ice model
 
@@ -86,31 +108,35 @@ subroutine ocean2ice(mesh)
     use o_ARRAYS
     use i_ARRAYS
     use MOD_MESH
+    use MOD_TRACER
     use g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     implicit none
 
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
     integer :: n, elem, k
     real(kind=WP) :: uw, vw, vol
-
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include  "associate_mesh.h"
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
 
     ! the arrays in the ice model are renamed
         
     if (ice_update) then
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 
-            T_oc_array(n) = tr_arr(1,n,1)
-            S_oc_array(n) = tr_arr(1,n,2)
+            T_oc_array(n) = temp(1,n)
+            S_oc_array(n) = salt(1,n)
             elevation(n)  = hbar(n)
         end do
     else
         do n=1, myDim_nod2d+eDim_nod2d
             if (ulevels_nod2D(n)>1) cycle 
-            T_oc_array(n) = (T_oc_array(n)*real(ice_steps_since_upd,WP)+tr_arr(1,n,1))/real(ice_steps_since_upd+1,WP)
-            S_oc_array(n) = (S_oc_array(n)*real(ice_steps_since_upd,WP)+tr_arr(1,n,2))/real(ice_steps_since_upd+1,WP)
+            T_oc_array(n) = (T_oc_array(n)*real(ice_steps_since_upd,WP)+temp(1,n))/real(ice_steps_since_upd+1,WP)
+            S_oc_array(n) = (S_oc_array(n)*real(ice_steps_since_upd,WP)+salt(1,n))/real(ice_steps_since_upd+1,WP)
             elevation(n)  = (elevation(n) *real(ice_steps_since_upd,WP)+      hbar(n))/real(ice_steps_since_upd+1,WP)
         !NR !PS      elevation(n)=(elevation(n)*real(ice_steps_since_upd)+eta_n(n))/real(ice_steps_since_upd+1,WP)
         !NR     elevation(n)=(elevation(n)*real(ice_steps_since_upd)+hbar(n))/real(ice_steps_since_upd+1,WP) !PS
@@ -152,9 +178,10 @@ end subroutine ocean2ice
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes(mesh)
+subroutine oce_fluxes(tracers, mesh)
 
   use MOD_MESH
+  use MOD_TRACER
   USE g_CONFIG
   use o_ARRAYS
   use i_ARRAYS
@@ -169,14 +196,17 @@ subroutine oce_fluxes(mesh)
   use icedrv_main,   only: icepack_to_fesom,    &
                            init_flux_atm_ocn
 #endif
-
+  use cavity_heat_water_fluxes_3eq_interface
   implicit none
-  type(t_mesh), intent(in)   , target :: mesh
+  type(t_mesh),   intent(in),     target :: mesh
+  type(t_tracer), intent(in),     target :: tracers(:)
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
-
+  real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include  "associate_mesh.h"
+  temp=>tracers(1)%values(:,:)
+  salt=>tracers(2)%values(:,:)
     
     allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP
@@ -218,8 +248,7 @@ subroutine oce_fluxes(mesh)
     water_flux  = -fresh_wa_flux
 #endif 
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
-   
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(mesh)
+    if (use_cavity) call cavity_heat_water_fluxes_3eq(tracers, mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
 !!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
@@ -245,8 +274,8 @@ subroutine oce_fluxes(mesh)
     if (use_virt_salt) then ! will remain zero otherwise
         rsss=ref_sss
         do n=1, myDim_nod2D+eDim_nod2D
-            !!PS if (ref_sss_local) rsss = tr_arr(1,n,2)
-            if (ref_sss_local) rsss = tr_arr(ulevels_nod2d(n),n,2)
+            !!PS if (ref_sss_local) rsss = salt(1,n)
+            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
             virtual_salt(n)=rsss*water_flux(n) 
         end do
         
@@ -261,7 +290,7 @@ subroutine oce_fluxes(mesh)
     end if
 
     where (ulevels_nod2d == 1)
-          dens_flux=sw_alpha(1,:) * heat_flux_in / vcpw + sw_beta(1, :) * (relax_salt + water_flux * tr_arr(1,:,2))
+          dens_flux=sw_alpha(1,:) * heat_flux_in / vcpw + sw_beta(1, :) * (relax_salt + water_flux * salt(1,:))
     elsewhere
           dens_flux=0.0_WP
     end where
@@ -271,13 +300,13 @@ subroutine oce_fluxes(mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             relax_salt(n) = 0.0_WP
             if (ulevels_nod2d(n)>1) cycle
-            !!PS relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(1,n,2))
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(ulevels_nod2d(n),n,2))
+            !!PS relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(1,n))
+            relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
         end do
     else
         do n=1, myDim_nod2D+eDim_nod2D
-            !!PS relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(1,n,2))
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-tr_arr(ulevels_nod2d(n),n,2))
+            !!PS relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(1,n))
+            relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
         end do
     end if 
     

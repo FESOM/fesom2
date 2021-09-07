@@ -91,7 +91,9 @@ module io_MEANDATA
   end subroutine
 
 
-subroutine ini_mean_io(mesh)
+subroutine ini_mean_io(tracers, mesh)
+  use MOD_MESH
+  use MOD_TRACER
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -106,7 +108,8 @@ subroutine ini_mean_io(mesh)
   integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
 
@@ -139,9 +142,9 @@ DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('sst       ')
-    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C',      tr_arr(1,1:myDim_nod2D,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C',      tracers(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('sss       ')
-    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu',    tr_arr(1,1:myDim_nod2D,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu',    tracers(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      eta_n,                     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('vve_5     ')
@@ -286,13 +289,13 @@ CASE ('fer_C     ')
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tr_arr(:,:,1),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('salt      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tr_arr(:,:,2),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 CASE ('otracers  ')
     do j=3, num_tracers
     write (id_string, "(I3.3)") tracer_id(j)
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tr_arr(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'pasive tracer ID='//id_string, 'n/a', tracers(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end do
 CASE ('slope_x   ')
     call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_x',   'neutral slope X',    'none', slope_tapered(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
@@ -795,9 +798,10 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine output(istep, mesh)
+subroutine output(istep, tracers, mesh)
   use g_clock
   use mod_mesh
+  use mod_tracer
   use g_PARSUP
   use io_gather_module
 #if defined (__icepack)
@@ -811,13 +815,14 @@ subroutine output(istep, mesh)
   integer       :: n, k
   logical       :: do_output
   type(Meandata), pointer :: entry
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
   character(:), allocatable :: filepath
   real(real64)                  :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-     call ini_mean_io(mesh)
+     call ini_mean_io(tracers, mesh)
      call init_io_gather()
 #if defined (__icepack)
      call init_io_icepack(mesh)
@@ -941,7 +946,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   implicit none
   integer,               intent(in)    :: glsize(2), lcsize(2)
   character(len=*),      intent(in)    :: name, description, units
-  real(kind=WP), target, intent(inout) :: data(:,:)
+  real(kind=WP), target, intent(in)    :: data(:,:)
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy
@@ -1006,7 +1011,7 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
-  real(kind=WP), target, intent(inout) :: data(:)
+  real(kind=WP), target, intent(in)    :: data(:)
   integer,               intent(in)    :: freq
   character,             intent(in)    :: freq_unit
   integer,               intent(in)    :: accuracy

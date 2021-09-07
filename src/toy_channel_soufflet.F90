@@ -1,5 +1,6 @@
 MODULE Toy_Channel_Soufflet
   use mod_mesh
+  use mod_tracer
   USE o_ARRAYS
   USE o_PARAM
   USE g_PARSUP
@@ -46,7 +47,7 @@ subroutine relax_zonal_vel(mesh)
   implicit none
   integer        :: elem,  nz, nn, nn1
   real(kind=WP)  :: a, yy, uzon 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
 #include  "associate_mesh.h"
 
   DO elem=1, myDim_elem2D
@@ -75,11 +76,13 @@ subroutine relax_zonal_vel(mesh)
    
 end subroutine relax_zonal_vel
 !==========================================================================
-subroutine relax_zonal_temp(mesh)
+subroutine relax_zonal_temp(tracer, mesh)
   implicit none
   integer                           :: n, nz, nn, nn1
   real(kind=WP)                     :: yy, a, Tzon
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_tracer), intent(inout), target :: tracer
+
 #include  "associate_mesh.h"
 
   do n=1, myDim_nod2D+eDim_nod2D
@@ -97,7 +100,7 @@ subroutine relax_zonal_temp(mesh)
     end if
     do nz=1, nlevels_nod2D(n)-1
        Tzon=(1.0-a)*ztem(nz,nn)+a*ztem(nz,nn1)
-       tr_arr(nz,n,1)=  tr_arr(nz,n,1)+dt*tau_inv*(Tclim(nz,n)-Tzon)
+       tracer%values(nz,n)=  tracer%values(nz,n)+dt*tau_inv*(Tclim(nz,n)-Tzon)
     end do
   end do
 end subroutine relax_zonal_temp
@@ -107,7 +110,8 @@ subroutine compute_zonal_mean_ini(mesh)
   real(kind=8)                      :: ymean, Ly
   integer                           :: elem, nz, m, elnodes(3)
   real(kind=8), allocatable         :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+
 #include  "associate_mesh.h"
 
 Ly=ysize/r_earth       ! The meridional lenght in radians
@@ -157,11 +161,13 @@ ztem=0.0
  ! no division by 0 is occurring 
 end subroutine compute_zonal_mean_ini
 !==========================================================================
-subroutine compute_zonal_mean(mesh)
+subroutine compute_zonal_mean(tracers, mesh)
   implicit none 
   integer       :: elem, nz, m, elnodes(3)
   real(kind=8), allocatable  :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
+
 #include  "associate_mesh.h"
 
 
@@ -170,7 +176,7 @@ subroutine compute_zonal_mean(mesh)
  DO elem=1,myDim_elem2D
     if(elem2D_nodes(1,elem)>myDim_nod2D) cycle
     Do nz=1,nlevels(elem)-1
-    ztem(nz,bpos(elem))=ztem(nz,bpos(elem))+sum(tr_arr(nz,elem2D_nodes(:,elem),1))/3.0_8
+    ztem(nz,bpos(elem))=ztem(nz,bpos(elem))+sum(tracers(1)%values(nz,elem2D_nodes(:,elem)))/3.0_8
     zvel(nz,bpos(elem))=zvel(nz,bpos(elem))+UV(1,nz,elem)
     END DO
  END DO
@@ -217,10 +223,12 @@ subroutine compute_zonal_mean(mesh)
 
 end subroutine compute_zonal_mean
 ! ====================================================================================
-subroutine initial_state_soufflet(mesh)
+subroutine initial_state_soufflet(tracers, mesh)
  ! Profiles Soufflet 2016 (OM)
   implicit none
-  type(t_mesh), intent(in) , target  :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_tracer), intent(inout), target :: tracers(:)
+
   integer                            :: n, nz, elnodes(3)
   real(kind=8)                       :: dst, yn, Fy, Lx
 ! real(kind=8)                       :: Ljet,rhomax,Sb, drho_No, drho_So
@@ -231,10 +239,10 @@ subroutine initial_state_soufflet(mesh)
   dy=ysize/nybins/r_earth
 
   ! Default values
-  stress_surf   = 0.0_WP
-  heat_flux     = 0.0_WP
-  tr_arr(:,:,2) = 35.0_WP
-  Ssurf         = tr_arr(1,:,2)
+  stress_surf       = 0.0_WP
+  heat_flux         = 0.0_WP
+  tracers(2)%values = 35.0_WP
+  Ssurf         = tracers(2)%values(1,:)
   water_flux    = 0.0_WP
   relax2clim    = 0.0_WP
 
@@ -279,21 +287,21 @@ do n=1, myDim_nod2D+eDim_nod2D
         end if
      end if
      do nz=1, nlevels_nod2D(n)-1
-        tr_arr(nz, n,1)=rho_So(nz)+(rho_No(nz)-rho_So(nz))*(1.0-Fy)
+        tracers(1)%values(nz,n)=rho_So(nz)+(rho_No(nz)-rho_So(nz))*(1.0-Fy)
      end do
   end do
  
   ! ========
   ! Make consistent
   ! ========
-  Tsurf=tr_arr(1,:,1)
-  Tclim=tr_arr(:,:,1)
+  Tsurf=tracers(1)%values(1,:)
+  Tclim=tracers(1)%values(:,:)
   ! ========
   ! add small perturbation:
   do n=1, myDim_nod2D+eDim_nod2D
      dst=(coord_nod2D(2, n)-lat0)*r_earth
      do nz=1, nlevels_nod2D(n)-1
-        tr_arr(nz,n,1)=tr_arr(nz,n,1)-0.1*sin(2*pi*dst/ysize)*exp(2*Z(nz)/zsize) &
+        tracers(1)%values(nz,n)=tracers(1)%values(nz,n)-0.1*sin(2*pi*dst/ysize)*exp(2*Z(nz)/zsize) &
 	       *(sin(8*pi*coord_nod2D(1,n)*r_earth/xsize)+ &
 	       0.5*sin(3*pi*coord_nod2D(1,n)*r_earth/xsize))
      end do
@@ -301,7 +309,7 @@ do n=1, myDim_nod2D+eDim_nod2D
   ! =======
   ! Compute geostrophically balanced flow
   ! =======
-  write(*,*) mype, 'T', maxval(tr_arr(:,:,1)), minval(tr_arr(:,:,1))
+  write(*,*) mype, 'T', maxval(tracers(1)%values), minval(tracers(1)%values)
   ! Redefine Coriolis (to agree with the Soufflet paper) 
   DO n=1,myDim_elem2D
   elnodes=elem2D_nodes(:,n)
@@ -327,18 +335,7 @@ do n=1, myDim_nod2D+eDim_nod2D
   call exchange_elem(UV)
   
   allocate(Uclim(nl-1,myDim_elem2D+eDim_elem2D))
-  Uclim=UV(1,:,:)
-  
-!!PS  tr_arr(:,:,1) = 16.0_WP
-!!PS  tr_arr(:,:,2) = 35.0_WP
-!!PS  Ssurf         = tr_arr(1,:,2)
-!!PS  Tsurf         = tr_arr(1,:,1)
-!!PS  Tclim         = tr_arr(:,:,1)
-  
-!!PS  UV            = 0.0_WP
-!!PS  UV(1,:,:)     = 0.01_WP
-!!PS  Uclim         = UV(1,:,:)
-  
+  Uclim=UV(1,:,:)    
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================

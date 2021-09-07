@@ -1,3 +1,13 @@
+module cavity_heat_water_fluxes_3eq_interface
+  interface
+    subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in), target :: mesh
+      type(t_tracer), intent(in), target :: tracers(:)
+    end subroutine
+  end interface
+end module
 !
 !
 !_______________________________________________________________________________
@@ -12,7 +22,7 @@ subroutine compute_nrst_pnt2cavline(mesh)
     use g_PARSUP
     implicit none
 
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_mesh),   intent(inout) , target :: mesh
     integer                                             :: node, kk, elnodes(3), gnode, aux_idx
     integer,       allocatable, dimension(:)            :: cavl_idx, lcl_cavl_idx
     real(kind=WP), allocatable, dimension(:)            :: cavl_lon, cavl_lat, cavl_dep,lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep
@@ -120,16 +130,18 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(mesh)
+subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
     use MOD_MESH
+    use MOD_TRACER
     use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n, Unode, density_m_rho0,density_ref
+    use o_ARRAYS, only: heat_flux, water_flux, Z_3d_n, Unode, density_m_rho0,density_ref
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     use g_PARSUP
     implicit none
     
     !___________________________________________________________________________
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_mesh),   intent(inout),  target :: mesh
+    type(t_tracer), intent(in),     target :: tracers(:)
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
@@ -177,8 +189,8 @@ subroutine cavity_heat_water_fluxes_3eq(mesh)
         if(nzmin==1) cycle ! if no cavity skip that node
         
         !_______________________________________________________________________
-        temp = tr_arr(nzmin, node,1)
-        sal  = tr_arr(nzmin, node,2)
+        temp = tracers(1)%values(nzmin,node)
+        sal  = tracers(2)%values(nzmin,node)
         zice = Z_3d_n(nzmin, node)  !(<0)
         
         !_______________________________________________________________________
@@ -305,15 +317,17 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Compute the heat and freshwater fluxes under ice cavity using simple 2equ.
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
-subroutine cavity_heat_water_fluxes_2eq(mesh)
+subroutine cavity_heat_water_fluxes_2eq(tracers, mesh)
     use MOD_MESH
+    use MOD_TRACER
     use o_PARAM , only: WP
-    use o_ARRAYS, only: heat_flux, water_flux, tr_arr, Z_3d_n
+    use o_ARRAYS, only: heat_flux, water_flux, Z_3d_n
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     use g_PARSUP
     implicit none
 
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_mesh),   intent(inout) , target :: mesh
+    type(t_tracer), intent(in),     target :: tracers(:)
     integer        :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
@@ -336,8 +350,8 @@ subroutine cavity_heat_water_fluxes_2eq(mesh)
     do node=1,myDim_nod2D      
         nzmin = ulevels_nod2D(node)
         if(nzmin==1) cycle
-        t_i  = tr_arr(nzmin,node,1)
-        s_i  = tr_arr(nzmin,node,2)
+        t_i  = tracers(1)%values(nzmin,node)
+        s_i  = tracers(2)%values(nzmin,node)
         t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(Z_3d_n(nzmin,node))
         
         heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)

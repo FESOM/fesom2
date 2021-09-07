@@ -13,6 +13,7 @@ MODULE g_ic3d
    !!
    USE o_ARRAYS
    USE MOD_MESH
+   USE MOD_TRACER
    USE o_PARAM
    USE g_PARSUP
    USE g_comm_auto
@@ -296,7 +297,7 @@ CONTAINS
       end if   
    END SUBROUTINE nc_ic3d_ini
 
-   SUBROUTINE getcoeffld(mesh)
+   SUBROUTINE getcoeffld(tracers, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!              
@@ -323,13 +324,14 @@ CONTAINS
       integer              :: elnodes(3)
       integer              :: ierror              ! return error code
 
-      type(t_mesh), intent(in), target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_tracer), intent(inout), target :: tracers(:)
 #include "associate_mesh.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP
       data1d=0.0_WP
-      tr_arr(:,:,current_tracer)=dummy
+      tracers(current_tracer)%values(:,:)=dummy
       !open NETCDF file on 0 core     
       if (mype==0) then
          iost = nf_open(filename,NF_NOWRITE,ncid)
@@ -360,7 +362,6 @@ CONTAINS
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename)
       call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
       do ii = 1, myDim_nod2d
@@ -370,8 +371,6 @@ CONTAINS
          j = bilin_indx_j(ii)
          ip1 = i + 1   
          jp1 = j + 1
-!!PS          x  = geo_coord_nod2D(1,ii)/rad
-!!PS          y  = geo_coord_nod2D(2,ii)/rad
          !______________________________________________________________________
          ! its a cavity node use extrapolation points of closest cavity line point
          ! exchange the coordinates of the cavity node with the coordinates of the 
@@ -426,11 +425,11 @@ CONTAINS
                             cf_a  = (d2 - d1)/ delta_d
                             ! value of interpolated OB data on Z from model
                             cf_b  = d1 - cf_a * nc_depth(d_indx)
-                            !!PS tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
-                            tr_arr(k,ii,current_tracer) = -cf_a * aux_z + cf_b
+                            !!PS tracers(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tracers(current_tracer)%values(k,ii) = -cf_a * aux_z + cf_b
                         end if
                     elseif (d_indx==0) then
-                        tr_arr(k,ii,current_tracer)=data1d(1)
+                        tracers(current_tracer)%values(k,ii)=data1d(1)
                     end if
                 enddo
             !___________________________________________________________________
@@ -450,10 +449,10 @@ CONTAINS
                             cf_a  = (d2 - d1)/ delta_d
                             ! value of interpolated OB data on Z from model
                             cf_b  = d1 - cf_a * nc_depth(d_indx)
-                            tr_arr(k,ii,current_tracer) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tracers(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
                         end if
                     elseif (d_indx==0) then
-                        tr_arr(k,ii,current_tracer)=data1d(1)
+                        tracers(current_tracer)%values(k,ii)=data1d(1)
                     end if
                 enddo
             end if ! --> if (use_cavity) then
@@ -466,16 +465,19 @@ CONTAINS
       DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
    
-   SUBROUTINE do_ic3d(mesh)
+   SUBROUTINE do_ic3d(tracers, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE do_ic3d ***
       !!              
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
+      USE insitu2pot_interface
       IMPLICIT NONE
       integer                       :: n, i
-      type(t_mesh), intent(in)     , target :: mesh
       real(kind=WP)                 :: locTmax, locTmin, locSmax, locSmin, glo
+    
+      type(t_mesh),   intent(in), target    :: mesh
+      type(t_tracer), intent(inout), target :: tracers(:)
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
@@ -488,9 +490,9 @@ CONTAINS
             ! read initial conditions for current tracer
             call nc_ic3d_ini(mesh)
             ! get first coeficients for time inerpolation on model grid for all datas
-            call getcoeffld(mesh)
+            call getcoeffld(tracers, mesh)
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tr_arr(:,:,current_tracer), mesh)
+            call extrap_nod(tracers(current_tracer)%values(:,:), mesh)
             exit
          elseif (current_tracer==num_tracers) then
             if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
@@ -502,42 +504,35 @@ CONTAINS
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
-      !_________________________________________________________________________
-      ! set remaining dummy values from bottom topography to 0.0_WP
-      where (tr_arr > 0.9_WP*dummy)
-            tr_arr=0.0_WP
-      end where
-      
+      do current_tracer=1, num_tracers
+         !_________________________________________________________________________
+         ! set remaining dummy values from bottom topography to 0.0_WP
+         where (tracers(current_tracer)%values > 0.9_WP*dummy)
+               tracers(current_tracer)%values=0.0_WP
+         end where
+
+         !_________________________________________________________________________
+         ! eliminate values within cavity that result from the extrapolation of 
+         ! initialisation
+         do n=1,myDim_nod2d + eDim_nod2D
+            ! ensure cavity is zero
+            if (use_cavity) tracers(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
+            ! ensure bottom is zero
+            tracers(current_tracer)%values(mesh%nlevels_nod2D(n):mesh%nl-1,n)=0.0_WP
+         end do
+      end do
       !_________________________________________________________________________
       ! convert temperature from Kelvin --> °C
-      where (tr_arr(:,:,1) > 100._WP)
-         tr_arr(:,:,1)=tr_arr(:,:,1)-273.15_WP
+      where (tracers(1)%values(:,:) > 100._WP)
+             tracers(1)%values(:,:) = tracers(1)%values(:,:)-273.15_WP
       end where
-      
-      !_________________________________________________________________________
-      ! eliminate values within cavity that result from the extrapolation of 
-      ! initialisation
-      do n=1,myDim_nod2d + eDim_nod2D
-            ! ensure cavity is zero
-            if (use_cavity) tr_arr(1:mesh%ulevels_nod2D(n)-1,n,:)=0.0_WP
-            ! ensure bottom is zero
-            tr_arr(mesh%nlevels_nod2D(n):mesh%nl-1,n,:)=0.0_WP            
-      end do 
       
       !_________________________________________________________________________
       if (t_insitu) then
          if (mype==0) write(*,*) "converting insitu temperature to potential..."
-         call insitu2pot(mesh)
+         call insitu2pot(tracers, mesh)
       end if
-      if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"
-      
-      !_________________________________________________________________________
-      ! Homogenous temp salt initialisation --> for testing and debuging
-!!PS       do n=1,myDim_nod2d + eDim_nod2D
-!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1) = 16.0
-!!PS             tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2) = 35.0
-!!PS       end do 
-        
+      if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
       !_________________________________________________________________________
       ! check initial fields
       locTmax = -6666
@@ -545,31 +540,10 @@ CONTAINS
       locSmax = locTmax
       locSmin = locTmin
       do n=1,myDim_nod2d
-!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)>0.99_WP*dummy)) then
-!!PS             write(*,*) '____________________________________________________________'
-!!PS             write(*,*) ' --> check init fields SALT >0.99_WP*dummy'
-!!PS             write(*,*) 'mype =',mype
-!!PS             write(*,*) 'n    =',n
-!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
-!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
-!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
-!!PS             write(*,*) 'tr_arr(unl:lnl,n,2) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)
-!!PS             write(*,*) 'tr_arr(  1:lnl,n,2) =',tr_arr(1:mesh%nlevels_nod2D(n)-1,n,2)
-!!PS         end if 
-!!PS         if (any( tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)>0.99_WP*dummy)) then
-!!PS             write(*,*) '____________________________________________________________'
-!!PS             write(*,*) ' --> check init fields TEMP >0.99_WP*dummy'
-!!PS             write(*,*) 'mype =',mype
-!!PS             write(*,*) 'n    =',n
-!!PS             write(*,*) 'lon,lat               =',mesh%geo_coord_nod2D(:,n)/rad
-!!PS             write(*,*) 'mesh%ulevels_nod2D(n) =',mesh%ulevels_nod2D(n)
-!!PS             write(*,*) 'mesh%nlevels_nod2D(n) =',mesh%nlevels_nod2D(n)
-!!PS             write(*,*) 'tr_arr(:,n,1) =',tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)
-!!PS         end if 
-        locTmax = max(locTmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
-        locTmin = min(locTmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,1)) )
-        locSmax = max(locSmax,maxval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
-        locSmin = min(locSmin,minval(tr_arr(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n,2)) )
+        locTmax = max(locTmax,maxval(tracers(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locTmin = min(locTmin,minval(tracers(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locSmax = max(locSmax,maxval(tracers(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locSmin = min(locSmin,minval(tracers(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
@@ -578,8 +552,7 @@ CONTAINS
       call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo
-      
+      if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
   
    END SUBROUTINE do_ic3d
    

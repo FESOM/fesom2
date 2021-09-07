@@ -57,6 +57,17 @@ module oce_ale_interfaces
   end interface
 end module
 
+module oce_timestep_ale_interface
+  interface
+    subroutine oce_timestep_ale(n, tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      integer,        intent(in)                         :: n
+      type(t_tracer), intent(inout), target, allocatable :: tracers(:)
+      type(t_mesh),   intent(in),    target              :: mesh
+    end subroutine
+  end interface
+end module
 ! CONTENT:
 ! ------------
 !    subroutine ale_init
@@ -2528,9 +2539,10 @@ end subroutine impl_vert_visc_ale
 !
 !
 !===============================================================================
-subroutine oce_timestep_ale(n, mesh)
+subroutine oce_timestep_ale(n, tracers, mesh)
     use g_config
     use MOD_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -2545,12 +2557,17 @@ subroutine oce_timestep_ale(n, mesh)
     use g_cvmix_tidal
     use Toy_Channel_Soufflet
     use oce_ale_interfaces
-    
+    use pressure_bv_interface
+    use pressure_force_4_linfs_interface
+    use pressure_force_4_zxxxx_interface
+    use solve_tracers_ale_interface
+    use write_step_info_interface
+    use check_blowup_interface
     IMPLICIT NONE
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: n, node
-    type(t_mesh), intent(in) , target :: mesh
-
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_tracer), intent(inout), target :: tracers(:)
 #include "associate_mesh.h"
 
     t0=MPI_Wtime()
@@ -2563,24 +2580,23 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
-    call pressure_bv(mesh)            !!!!! HeRE change is made. It is linear EoS now.
+    call pressure_bv(tracers, mesh)            !!!!! HeRE change is made. It is linear EoS now.
     
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_force_4_...'//achar(27)//'[0m'
     if (trim(which_ale)=='linfs') then
-        call pressure_force_4_linfs(mesh)
+        call pressure_force_4_linfs(tracers, mesh)
     else  
-        call pressure_force_4_zxxxx(mesh)
+        call pressure_force_4_zxxxx(tracers, mesh)
     end if
-        
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
-    call sw_alpha_beta(tr_arr(:,:,1),tr_arr(:,:,2), mesh)
+    call sw_alpha_beta(tracers(1)%values, tracers(2)%values, mesh)
     
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
-    call compute_sigma_xy(tr_arr(:,:,1),tr_arr(:,:,2), mesh)
+    call compute_sigma_xy(tracers(1)%values,tracers(2)%values, mesh)
     
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
@@ -2588,7 +2604,6 @@ subroutine oce_timestep_ale(n, mesh)
     
     !___________________________________________________________________________
     call status_check
-    
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
     ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<
@@ -2616,7 +2631,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
-        call oce_mixing_KPP(Av, Kv_double, mesh)
+        call oce_mixing_KPP(Av, Kv_double, tracers, mesh)
         Kv=Kv_double(:,:,1)
         call mo_convect(mesh)
         
@@ -2630,7 +2645,7 @@ subroutine oce_timestep_ale(n, mesh)
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
-        call calc_cvmix_kpp(mesh)
+        call calc_cvmix_kpp(tracers, mesh)
         call mo_convect(mesh)
         
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
@@ -2651,7 +2666,7 @@ subroutine oce_timestep_ale(n, mesh)
         call mo_convect(mesh)
         
     end if     
-
+    
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
     ! in a numerical model of the ocean general circulation", ocean modelling to 
@@ -2733,7 +2748,6 @@ subroutine oce_timestep_ale(n, mesh)
     ! --> eta_(n)
     ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
     t5=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
@@ -2747,8 +2761,7 @@ subroutine oce_timestep_ale(n, mesh)
         call fer_solve_Gamma(mesh)
         call fer_gamma2vel(mesh)
     end if
-    t6=MPI_Wtime() 
-    
+    t6=MPI_Wtime()    
     !___________________________________________________________________________
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
@@ -2759,7 +2772,7 @@ subroutine oce_timestep_ale(n, mesh)
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(mesh)
+    call solve_tracers_ale(tracers, mesh)
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________
@@ -2767,14 +2780,13 @@ subroutine oce_timestep_ale(n, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(mesh)
     t9=MPI_Wtime() 
-    
     !___________________________________________________________________________
     ! write out global fields for debugging
-    call write_step_info(n,logfile_outfreq, mesh)
+    call write_step_info(n,logfile_outfreq, tracers, mesh)
     
     ! check model for blowup --> ! write_step_info and check_blowup require 
     ! togeather around 2.5% of model runtime
-    call check_blowup(n, mesh)
+    call check_blowup(n, tracers, mesh)
     t10=MPI_Wtime()
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
@@ -2805,5 +2817,4 @@ subroutine oce_timestep_ale(n, mesh)
         write(*,*)
         write(*,*)
     end if
-
 end subroutine oce_timestep_ale

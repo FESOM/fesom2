@@ -1,24 +1,50 @@
-module array_setup_interface
-  interface
-    subroutine array_setup(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
-    end subroutine
-  end interface
-end module
 module oce_initial_state_interface
   interface
-    subroutine oce_initial_state(mesh)
+    subroutine oce_initial_state(tracers, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_tracer
+      type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_tracer), intent(inout), target :: tracers(:)
     end subroutine
   end interface
 end module
+module tracer_init_interface
+  interface
+    subroutine tracer_init(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in),    target              :: mesh
+      type(t_tracer), intent(inout), target, allocatable :: tracers(:)
+    end subroutine
+  end interface
+end module
+module ocean_setup_interface
+  interface
+    subroutine ocean_setup(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in),    target              :: mesh
+      type(t_tracer), intent(inout), target, allocatable :: tracers(:)
+    end subroutine
+  end interface
+end module
+module before_oce_step_interface
+  interface
+    subroutine before_oce_step(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_mesh),   intent(in),    target              :: mesh
+      type(t_tracer), intent(inout), target, allocatable :: tracers(:)
+    end subroutine
+  end interface
+end module
+
 !
 !
 !_______________________________________________________________________________
-subroutine ocean_setup(mesh)
+subroutine ocean_setup(tracers, mesh)
 USE MOD_MESH
+USE MOD_TRACER
 USE o_PARAM
 USE g_PARSUP
 USE o_ARRAYS
@@ -30,11 +56,12 @@ use g_cvmix_pp
 use g_cvmix_kpp
 use g_cvmix_tidal
 use Toy_Channel_Soufflet
-use array_setup_interface
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
-type(t_mesh), intent(inout) , target :: mesh
+type(t_mesh),   intent(inout), target :: mesh
+type(t_tracer), intent(inout), target :: tracers(:)
+integer                               :: n
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
     ! salinity flux need to be used
@@ -49,8 +76,7 @@ type(t_mesh), intent(inout) , target :: mesh
         use_virt_salt=.true.
         is_nonlinfs = 0.0_WP
     end if
-    call array_setup(mesh)
-    
+   
     !___________________________________________________________________________
     ! initialize arrays for ALE
     if (mype==0) then
@@ -144,16 +170,20 @@ type(t_mesh), intent(inout) , target :: mesh
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
            if (mod(mstep, soufflet_forc_update)==0) then
-              call initial_state_soufflet(mesh)
+              call initial_state_soufflet(tracers, mesh)
               call compute_zonal_mean_ini(mesh)  
-              call compute_zonal_mean(mesh)
+              call compute_zonal_mean(tracers, mesh)
            end if
        END SELECT
     else
-       call oce_initial_state(mesh)   ! Use it if not running tests
+       call oce_initial_state(tracers, mesh)   ! Use it if not running tests
     end if
 
-    if (.not.r_restart) tr_arr_old=tr_arr
+    if (.not.r_restart) then
+       do n=1, num_tracers
+          tracers(n)%valuesAB=tracers(n)%values
+       end do
+    end if
     
     !___________________________________________________________________________
     ! first time fill up array for hnode & helem
@@ -173,10 +203,46 @@ type(t_mesh), intent(inout) , target :: mesh
         write(*,*) '******************************************************************************'
     end if
 end subroutine ocean_setup
+!_______________________________________________________________________________
+SUBROUTINE tracer_init(tracers, mesh)
+USE MOD_MESH
+USE MOD_TRACER
+USE g_PARSUP
+IMPLICIT NONE
+integer     :: elem_size, node_size
+integer     :: n
+type(t_mesh),   intent(in) ,    target              :: mesh
+type(t_tracer), intent(inout) , target, allocatable :: tracers(:)
+#include "associate_mesh.h"
+
+elem_size=myDim_elem2D+eDim_elem2D
+node_size=myDim_nod2D+eDim_nod2D
+
+! ================
+! Temperature (index=1), Salinity (index=2), etc.
+! ================
+allocate(tracers(num_tracers))
+do n=1, num_tracers
+   allocate(tracers(n)%values  (nl-1,node_size))
+   allocate(tracers(n)%valuesAB(nl-1,node_size))
+   tracers(n)%tra_adv_hor   = TRIM(tra_adv_hor)
+   tracers(n)%tra_adv_ver   = TRIM(tra_adv_ver)
+   tracers(n)%tra_adv_lim   = TRIM(tra_adv_lim)
+   tracers(n)%tra_adv_ph    = tra_adv_ph
+   tracers(n)%tra_adv_pv    = tra_adv_pv
+   tracers(n)%smooth_bh_tra = smooth_bh_tra
+   tracers(n)%gamma0_tra    = gamma0_tra
+   tracers(n)%gamma1_tra    = gamma1_tra
+   tracers(n)%gamma2_tra    = gamma2_tra
+   tracers(n)%values        = 0.
+   tracers(n)%valuesAB      = 0.
+   tracers(n)%ID            = n
+end do
+END SUBROUTINE tracer_init
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE array_setup(mesh)
+SUBROUTINE arrays_init(mesh)
 USE MOD_MESH
 USE o_ARRAYS
 USE o_PARAM
@@ -190,8 +256,7 @@ use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
 integer     :: elem_size, node_size
 integer     :: n
-type(t_mesh), intent(in) , target :: mesh
-
+type(t_mesh),   intent(in) ,    target              :: mesh
 #include "associate_mesh.h"
 
 
@@ -223,12 +288,7 @@ if (use_ice .and. use_momix) mixlength=0.
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
 allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
-! ================
-! Temperature and salinity
-! ================
-allocate(T_rhs(nl-1, node_size))
-allocate(S_rhs(nl-1, node_size))
-allocate(tr_arr(nl-1,node_size,num_tracers),tr_arr_old(nl-1,node_size,num_tracers))
+
 allocate(del_ttf(nl-1,node_size))
 allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
 del_ttf          = 0.0_WP
@@ -383,12 +443,10 @@ end if
     CFL_z   =0.0_WP
     hpressure=0.0_WP
 !
-    T_rhs=0.0_WP
     heat_flux=0.0_WP
     heat_flux_in=0.0_WP
     Tsurf=0.0_WP
 
-    S_rhs=0.0_WP
     water_flux=0.0_WP
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
@@ -402,9 +460,6 @@ end if
     stress_atmoce_x  =0.0_WP
     stress_atmoce_y  =0.0_WP
     
-    tr_arr=0.0_WP
-    tr_arr_old=0.0_WP
-
     bvfreq=0.0_WP
     mixlay_dep=0.0_WP
     bv_ref=0.0_WP
@@ -445,14 +500,15 @@ end if
 !!PS     dum_3d_n = 0.0_WP
 !!PS     dum_2d_e = 0.0_WP
 !!PS     dum_3d_e = 0.0_WP
-END SUBROUTINE array_setup
+END SUBROUTINE arrays_init
 !
 !
 !_______________________________________________________________________________
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
 ! ID = 0 and 1 are reserved for temperature and salinity
-SUBROUTINE oce_initial_state(mesh)
+SUBROUTINE oce_initial_state(tracers, mesh)
 USE MOD_MESH
+USE MOD_TRACER
 USE o_ARRAYS
 USE g_PARSUP
 USE g_config
@@ -463,7 +519,8 @@ USE g_ic3d
   implicit none
   integer                  :: i, k, counter, rcounter3, id
   character(len=10)        :: i_string, id_string
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in) ,   target :: mesh
+  type(t_tracer), intent(inout), target :: tracers(:)
   real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
 
 #include "associate_mesh.h"
@@ -475,12 +532,12 @@ USE g_ic3d
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
   if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
   if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
-  call do_ic3d(mesh)
+  call do_ic3d(tracers, mesh)
   
-  Tclim=tr_arr(:,:,1)
-  Sclim=tr_arr(:,:,2)
-  Tsurf=tr_arr(1,:,1)
-  Ssurf=tr_arr(1,:,2)
+  Tclim=tracers(1)%values
+  Sclim=tracers(2)%values
+  Tsurf=Tclim(1,:)
+  Ssurf=Sclim(1,:)
   relax2clim=0.0_WP
 
   ! count the passive tracers which require 3D source (ptracers_restore_total)
@@ -504,14 +561,14 @@ USE g_ic3d
      id=tracer_ID(i)
      SELECT CASE (id)
        CASE (101)       ! initialize tracer ID=101
-         tr_arr(:,:,i)=0.0_WP
+         tracers(i)%values(:,:)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
          end if
        CASE (301) !Fram Strait 3d restored passive tracer
-         tr_arr(:,:,i)=0.0_WP
+         tracers(i)%values(:,:)=0.0_WP
          rcounter3    =rcounter3+1
          counter=0
          do k=1, myDim_nod2D+eDim_nod2D
@@ -531,7 +588,7 @@ USE g_ic3d
                ptracers_restore(rcounter3)%ind2(counter)=k
             end if
          end do
-         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
+         tracers(i)%values(:,ptracers_restore(rcounter3)%ind2)=1.
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
@@ -539,7 +596,7 @@ USE g_ic3d
          end if
 
        CASE (302) !Bering Strait 3d restored passive tracer
-         tr_arr(:,:,i)=0.
+         tracers(i)%values(:,:)=0.0_WP
          rcounter3    =rcounter3+1
          counter=0
          do k=1, myDim_nod2D+eDim_nod2D
@@ -559,7 +616,7 @@ USE g_ic3d
                ptracers_restore(rcounter3)%ind2(counter)=k
             end if
          end do
-         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
+         tracers(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
@@ -567,7 +624,7 @@ USE g_ic3d
          end if
        
       CASE (303) !BSO 3d restored passive tracer
-         tr_arr(:,:,i)=0.
+         tracers(i)%values(:,:)=0.0_WP
          rcounter3    =rcounter3+1
          counter=0
          do k=1, myDim_nod2D+eDim_nod2D
@@ -587,7 +644,7 @@ USE g_ic3d
                ptracers_restore(rcounter3)%ind2(counter)=k
             end if
          end do
-         tr_arr(:,ptracers_restore(rcounter3)%ind2,i)=1.
+         tracers(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
          if (mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
@@ -609,8 +666,9 @@ end subroutine oce_initial_state
 !
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
-SUBROUTINE before_oce_step(mesh)
+SUBROUTINE before_oce_step(tracers, mesh)
     USE MOD_MESH
+    USE MOD_TRACER
     USE o_ARRAYS
     USE g_PARSUP
     USE g_config
@@ -618,7 +676,8 @@ SUBROUTINE before_oce_step(mesh)
     implicit none
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),  intent(in),    target              :: mesh
+    type(t_tracer), intent(inout), target, allocatable :: tracers(:)
 
 #include "associate_mesh.h"
 
@@ -626,7 +685,7 @@ SUBROUTINE before_oce_step(mesh)
         SELECT CASE (TRIM(which_toy))
             CASE ("soufflet") !forcing update for soufflet testcase
             if (mod(mstep, soufflet_forc_update)==0) then
-                call compute_zonal_mean(mesh)
+                call compute_zonal_mean(tracers, mesh)
             end if
         END SELECT
     end if

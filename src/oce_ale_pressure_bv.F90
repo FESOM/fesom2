@@ -30,9 +30,11 @@ module pressure_force_4_linfs_fullcell_interface
 end module
 module pressure_force_4_linfs_nemo_interface
   interface
-    subroutine pressure_force_4_linfs_nemo(mesh)
+    subroutine pressure_force_4_linfs_nemo(tracers, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_tracer
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
 end module
@@ -46,9 +48,11 @@ module pressure_force_4_linfs_shchepetkin_interface
 end module
 module pressure_force_4_linfs_easypgf_interface
   interface
-    subroutine pressure_force_4_linfs_easypgf(mesh)
+    subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_tracer
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
 end module
@@ -78,9 +82,11 @@ module pressure_force_4_zxxxx_shchepetkin_interface
 end module
 module pressure_force_4_zxxxx_easypgf_interface
   interface
-    subroutine pressure_force_4_zxxxx_easypgf(mesh)
+    subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_tracer
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
 end module
@@ -100,16 +106,57 @@ module init_ref_density_interface
     end subroutine
   end interface
 end module
+module insitu2pot_interface
+  interface
+    subroutine insitu2pot(tracers, mesh)
+    use mod_mesh
+    use mod_tracer
+    type(t_mesh),   intent(in),     target  :: mesh
+    type(t_tracer), intent(inout),  target  :: tracers(:)
+    end subroutine
+  end interface
+end module
+module pressure_bv_interface
+  interface
+    subroutine pressure_bv(tracers, mesh)
+    use mod_mesh
+    use mod_tracer
+    type(t_mesh),   intent(in),  target  :: mesh
+    type(t_tracer), intent(in),  target  :: tracers(:)
+    end subroutine
+  end interface
+end module
+module pressure_force_4_linfs_interface
+  interface
+    subroutine pressure_force_4_linfs(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
+    end subroutine
+  end interface
+end module
+module pressure_force_4_zxxxx_interface
+  interface
+    subroutine pressure_force_4_zxxxx(tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
+    end subroutine
+  end interface
+end module
 !
 !
 !===============================================================================
-subroutine pressure_bv(mesh)
+subroutine pressure_bv(tracers, mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency 
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
     use g_config
     USE o_PARAM
     USE MOD_MESH
+    USE MOD_TRACER
     USE o_ARRAYS
     USE g_PARSUP
     use i_arrays
@@ -118,14 +165,19 @@ subroutine pressure_bv(mesh)
     use densityJM_components_interface
     use density_linear_interface
     IMPLICIT NONE
-    type(t_mesh), intent(in) , target :: mesh    
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_tracer), intent(inout), target :: tracers(:)
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                  :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
     real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
     real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     logical                  :: flag1, flag2, mixing_kpp
+
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
@@ -138,7 +190,7 @@ subroutine pressure_bv(mesh)
         nzmax = nlevels_nod2D(node)
         !!PS do nz=1,nlevels_nod2d(node)-1
         do nz=nzmin,nzmax-1
-            a=min(a,tr_arr(nz,node,2))
+            a=min(a,salt(nz,node))
         enddo
     enddo
     
@@ -151,7 +203,7 @@ subroutine pressure_bv(mesh)
             nzmax = nlevels_nod2D(node)
             !!PS do nz=1, nlevels_nod2d(node)-1
             do nz=nzmin, nzmax-1
-                if (tr_arr(nz, node, 2) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+                if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
     endif
@@ -175,8 +227,8 @@ subroutine pressure_bv(mesh)
         !_______________________________________________________________________
         ! apply equation of state
         do nz=nzmin, nzmax-1
-            t=tr_arr(nz, node,1)
-            s=tr_arr(nz, node,2)
+            t=temp(nz, node)
+            s=salt(nz, node)
             select case(state_equation)
                 case(0)
                     call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
@@ -238,8 +290,8 @@ subroutine pressure_bv(mesh)
         ! like at the cavity-ocean interface --> compute water mass density that
         ! is replaced by the cavity
         if (nzmin>1) then 
-            t=tr_arr(nzmin, node,1)
-            s=tr_arr(nzmin, node,2)
+            t=temp(nzmin, node)
+            s=salt(nzmin, node)
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
@@ -368,10 +420,11 @@ end subroutine pressure_bv
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
-subroutine pressure_force_4_linfs(mesh)
+subroutine pressure_force_4_linfs(tracers, mesh)
     use g_config
     use g_PARSUP
     use mod_mesh
+    use mod_tracer
     use pressure_force_4_linfs_fullcell_interface
     use pressure_force_4_linfs_nemo_interface
     use pressure_force_4_linfs_shchepetkin_interface
@@ -379,7 +432,11 @@ subroutine pressure_force_4_linfs(mesh)
     use pressure_force_4_linfs_cavity_interface
     use pressure_force_4_linfs_easypgf_interface
     implicit none
-    type(t_mesh), intent(in) , target :: mesh    
+    type(t_mesh),   intent(in),     target  :: mesh
+    type(t_tracer), intent(in),     target  :: tracers(:)
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
@@ -391,7 +448,7 @@ subroutine pressure_force_4_linfs(mesh)
         elseif (trim(which_pgf)=='shchepetkin') then    
             call pressure_force_4_linfs_shchepetkin(mesh)
         elseif (trim(which_pgf)=='easypgf') then
-            call pressure_force_4_linfs_easypgf(mesh)    
+            call pressure_force_4_linfs_easypgf(tracers, mesh)    
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -406,13 +463,13 @@ subroutine pressure_force_4_linfs(mesh)
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
         if     (trim(which_pgf)=='nemo') then
-            call pressure_force_4_linfs_nemo(mesh)
+            call pressure_force_4_linfs_nemo(tracers, mesh)
         elseif (trim(which_pgf)=='shchepetkin') then
             call pressure_force_4_linfs_shchepetkin(mesh)
         elseif (trim(which_pgf)=='cubicspline') then
             call pressure_force_4_linfs_cubicspline(mesh)
         elseif (trim(which_pgf)=='easypgf') then
-            call pressure_force_4_linfs_easypgf(mesh)    
+            call pressure_force_4_linfs_easypgf(tracers, mesh)    
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -476,9 +533,10 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
-subroutine pressure_force_4_linfs_nemo(mesh)
+subroutine pressure_force_4_linfs_nemo(tracers, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -492,8 +550,12 @@ subroutine pressure_force_4_linfs_nemo(mesh)
     real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -589,10 +651,10 @@ subroutine pressure_force_4_linfs_nemo(mesh)
             !! state ...
             !else
                 ! ... interpolate temperature and saltinity ...
-                dval          = tr_arr(nlc,  elnodes(ni),1) - tr_arr(nlc-1,elnodes(ni),1)
-                interp_n_temp = tr_arr(nlc-1,elnodes(ni),1) + (dval/dZn*dZn_i)
-                dval          = tr_arr(nlc  ,elnodes(ni),2) - tr_arr(nlc-1,elnodes(ni),2)
-                interp_n_salt = tr_arr(nlc-1,elnodes(ni),2) + (dval/dZn*dZn_i)
+                dval          = temp(nlc,  elnodes(ni)) - temp(nlc-1,elnodes(ni))
+                interp_n_temp = temp(nlc-1,elnodes(ni)) + (dval/dZn*dZn_i)
+                dval          = salt(nlc  ,elnodes(ni)) - salt(nlc-1,elnodes(ni))
+                interp_n_salt = salt(nlc-1,elnodes(ni)) + (dval/dZn*dZn_i)
                 
                 ! calculate density at element mid-depth bottom depth via 
                 ! equation of state from linear interpolated temperature and 
@@ -895,9 +957,10 @@ end subroutine pressure_force_4_linfs_shchepetkin
 !===============================================================================
 ! Calculate pressure gradient force (PGF) 
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_easypgf(mesh)
+subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -914,8 +977,13 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
     real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
+    real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
+
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1014,13 +1082,13 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
                     dx21(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz+1,elnodes(ni))
                     dx20(ni)   = Z_3d_n(nlz+2,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
                     
-                    t0(ni)     = tr_arr(nlz  ,elnodes(ni),1)
-                    dt10(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
-                    dt21(ni)   = tr_arr(nlz+2,elnodes(ni),1)-tr_arr(nlz+1,elnodes(ni),1)
+                    t0(ni)     = temp(nlz  ,elnodes(ni))
+                    dt10(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
+                    dt21(ni)   = temp(nlz+2,elnodes(ni))-temp(nlz+1,elnodes(ni))
                     
-                    s0(ni)     = tr_arr(nlz  ,elnodes(ni),2)
-                    ds10(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
-                    ds21(ni)   = tr_arr(nlz+2,elnodes(ni),2)-tr_arr(nlz+1,elnodes(ni),2)
+                    s0(ni)     = salt(nlz  ,elnodes(ni))
+                    ds10(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
+                    ds21(ni)   = salt(nlz+2,elnodes(ni))-salt(nlz+1,elnodes(ni))
                     !___________________________________________________________________
                     ! interpoalte vertice temp and salinity to elemental level Z_n
                     temp_at_Zn(ni) = t0(ni) &
@@ -1053,13 +1121,13 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
                     dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
                     dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
                     
-                    t0(ni)     = tr_arr(nlz-1,elnodes(ni),1)
-                    dt10(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
-                    dt21(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
+                    t0(ni)     = temp(nlz-1,elnodes(ni))
+                    dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
+                    dt21(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
                     
-                    s0(ni)     = tr_arr(nlz-1,elnodes(ni),2)
-                    ds10(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
-                    ds21(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
+                    s0(ni)     = salt(nlz-1,elnodes(ni))
+                    ds10(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                    ds21(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
                     !___________________________________________________________________               
                     ! interpoalte vertice temp and salinity to elemental level Z_n
                     temp_at_Zn(ni) = t0(ni) &
@@ -1156,14 +1224,14 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
                 dx21(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
                 dx20(ni)   = Z_3d_n(nlz  ,elnodes(ni))-Z_3d_n(nlz-2,elnodes(ni))
                 
-                t0(ni)     = tr_arr(nlz-2,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz-1,elnodes(ni),1)-tr_arr(nlz-2,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
+                t0(ni)     = temp(nlz-2,elnodes(ni))
+                dt10(ni)   = temp(nlz-1,elnodes(ni))-temp(nlz-2,elnodes(ni))
+                dt21(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz-2,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz-1,elnodes(ni),2)-tr_arr(nlz-2,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
-                !___________________________________________________________________
+                s0(ni)     = salt(nlz-2,elnodes(ni))
+                ds10(ni)   = salt(nlz-1,elnodes(ni))-salt(nlz-2,elnodes(ni))
+                ds21(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                !_________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
                                 + dt10(ni)/dx10(ni)*(Z_n(nlz)-Z_3d_n(nlz-2,elnodes(ni))) & 
@@ -1195,13 +1263,13 @@ subroutine pressure_force_4_linfs_easypgf(mesh)
                 dx21(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz  ,elnodes(ni))
                 dx20(ni)   = Z_3d_n(nlz+1,elnodes(ni))-Z_3d_n(nlz-1,elnodes(ni))
                 
-                t0(ni)     = tr_arr(nlz-1,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
+                t0(ni)     = temp(nlz-1,elnodes(ni))
+                dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
+                dt21(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz-1,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
+                s0(ni)     = salt(nlz-1,elnodes(ni))
+                ds10(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                ds21(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
                 !___________________________________________________________________               
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
@@ -1658,22 +1726,25 @@ end subroutine pressure_force_4_linfs_cavity
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
-subroutine pressure_force_4_zxxxx(mesh)
+subroutine pressure_force_4_zxxxx(tracers, mesh)
     use g_PARSUP
     use g_config
     use mod_mesh
+    use mod_tracer
     use pressure_force_4_zxxxx_shchepetkin_interface
     use pressure_force_4_zxxxx_cubicspline_interface
     use pressure_force_4_zxxxx_easypgf_interface
     implicit none
-    type(t_mesh), intent(in) , target :: mesh    
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
+
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
         call pressure_force_4_zxxxx_shchepetkin(mesh)
     elseif (trim(which_pgf)=='cubicspline') then
         call pressure_force_4_zxxxx_cubicspline(mesh)
     elseif (trim(which_pgf)=='easypgf'    ) then
-        call pressure_force_4_zxxxx_easypgf(mesh)    
+        call pressure_force_4_zxxxx_easypgf(tracers, mesh)    
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -2113,9 +2184,10 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_zxxxx_easypgf(mesh)
+subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use g_PARSUP
     use g_config
@@ -2132,8 +2204,12 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
     real(kind=WP)       :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
     real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
+    type(t_tracer), intent(in), target :: tracers(:)
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
+    temp=>tracers(1)%values(:,:)
+    salt=>tracers(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -2221,13 +2297,13 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
                 !!PS df10(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 !!PS df21(ni)   = density_m_rho0(nlz+2,elnodes(ni))-density_m_rho0(nlz+1,elnodes(ni))
                 
-                t0(ni)     = tr_arr(nlz  ,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz+2,elnodes(ni),1)-tr_arr(nlz+1,elnodes(ni),1)
+                t0(ni)     = temp(nlz  ,elnodes(ni))
+                dt10(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
+                dt21(ni)   = temp(nlz+2,elnodes(ni))-temp(nlz+1,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz  ,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz+2,elnodes(ni),2)-tr_arr(nlz+1,elnodes(ni),2)
+                s0(ni)     = salt(nlz  ,elnodes(ni))
+                ds10(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
+                ds21(ni)   = salt(nlz+2,elnodes(ni))-salt(nlz+1,elnodes(ni))
                 !___________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
@@ -2270,13 +2346,13 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
                 !!PS df10(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 !!PS df21(ni)   = density_m_rho0(nlz+1,elnodes(ni))-density_m_rho0(nlz  ,elnodes(ni))
                 
-                t0(ni)     = tr_arr(nlz-1,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
+                t0(ni)     = temp(nlz-1,elnodes(ni))
+                dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
+                dt21(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz-1,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
+                s0(ni)     = salt(nlz-1,elnodes(ni))
+                ds10(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                ds21(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
                 !___________________________________________________________________               
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
@@ -2348,13 +2424,13 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
             !!PS df10   = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
             !!PS df21   = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
             
-            t0     = tr_arr(nlz-1,elnodes,1)
-            dt10   = tr_arr(nlz  ,elnodes,1)-tr_arr(nlz-1,elnodes,1)
-            dt21   = tr_arr(nlz+1,elnodes,1)-tr_arr(nlz  ,elnodes,1)
+            t0     = temp(nlz-1,elnodes)
+            dt10   = temp(nlz  ,elnodes)-temp(nlz-1,elnodes)
+            dt21   = temp(nlz+1,elnodes)-temp(nlz  ,elnodes)
             
-            s0     = tr_arr(nlz-1,elnodes,2)
-            ds10   = tr_arr(nlz  ,elnodes,2)-tr_arr(nlz-1,elnodes,2)
-            ds21   = tr_arr(nlz+1,elnodes,2)-tr_arr(nlz  ,elnodes,2)
+            s0     = salt(nlz-1,elnodes)
+            ds10   = salt(nlz  ,elnodes)-salt(nlz-1,elnodes)
+            ds21   = salt(nlz+1,elnodes)-salt(nlz  ,elnodes)
             !___________________________________________________________________               
             ! interpoalte vertice temp and salinity to elemental level Z_n
             temp_at_Zn = t0 &
@@ -2435,13 +2511,13 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
                 !!PS df10(ni)   = density_m_rho0(nlz-1,elnodes(ni))-density_m_rho0(nlz-2,elnodes(ni))
                 !!PS df21(ni)   = density_m_rho0(nlz  ,elnodes(ni))-density_m_rho0(nlz-1,elnodes(ni))
                 
-                t0(ni)     = tr_arr(nlz-2,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz-1,elnodes(ni),1)-tr_arr(nlz-2,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
+                t0(ni)     = temp(nlz-2,elnodes(ni))
+                dt10(ni)   = temp(nlz-1,elnodes(ni))-temp(nlz-2,elnodes(ni))
+                dt21(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz-2,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz-1,elnodes(ni),2)-tr_arr(nlz-2,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
+                s0(ni)     = salt(nlz-2,elnodes(ni))
+                ds10(ni)   = salt(nlz-1,elnodes(ni))-salt(nlz-2,elnodes(ni))
+                ds21(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
                 !___________________________________________________________________
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
@@ -2484,13 +2560,13 @@ subroutine pressure_force_4_zxxxx_easypgf(mesh)
                 !!PS df10   = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
                 !!PS df21   = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
             
-                t0(ni)     = tr_arr(nlz-1,elnodes(ni),1)
-                dt10(ni)   = tr_arr(nlz  ,elnodes(ni),1)-tr_arr(nlz-1,elnodes(ni),1)
-                dt21(ni)   = tr_arr(nlz+1,elnodes(ni),1)-tr_arr(nlz  ,elnodes(ni),1)
+                t0(ni)     = temp(nlz-1,elnodes(ni))
+                dt10(ni)   = temp(nlz  ,elnodes(ni))-temp(nlz-1,elnodes(ni))
+                dt21(ni)   = temp(nlz+1,elnodes(ni))-temp(nlz  ,elnodes(ni))
                 
-                s0(ni)     = tr_arr(nlz-1,elnodes(ni),2)
-                ds10(ni)   = tr_arr(nlz  ,elnodes(ni),2)-tr_arr(nlz-1,elnodes(ni),2)
-                ds21(ni)   = tr_arr(nlz+1,elnodes(ni),2)-tr_arr(nlz  ,elnodes(ni),2)
+                s0(ni)     = salt(nlz-1,elnodes(ni))
+                ds10(ni)   = salt(nlz  ,elnodes(ni))-salt(nlz-1,elnodes(ni))
+                ds21(ni)   = salt(nlz+1,elnodes(ni))-salt(nlz  ,elnodes(ni))
                 !___________________________________________________________________               
                 ! interpoalte vertice temp and salinity to elemental level Z_n
                 temp_at_Zn(ni) = t0(ni) &
@@ -2949,9 +3025,10 @@ end subroutine compute_neutral_slope
 !
 !===============================================================================
 !converts insitu temperature to a potential one
-!               tr_arr(:,:,1) will be modified!
-subroutine insitu2pot(mesh)
+!               tracers(1)%values will be modified!
+subroutine insitu2pot(tracers, mesh)
   use mod_mesh
+  use mod_tracer
   use o_param
   use o_arrays
   use g_config
@@ -2960,10 +3037,13 @@ subroutine insitu2pot(mesh)
   real(kind=WP), external     :: ptheta
   real(kind=WP)               :: pp, pr, tt, ss
   integer                     :: n, nz, nzmin,nzmax
-  type(t_mesh), intent(in) , target :: mesh
-
+  type(t_mesh),   intent(in),     target  :: mesh
+  type(t_tracer), intent(inout),  target  :: tracers(:)
+  real(kind=WP),  dimension(:,:), pointer :: temp, salt
+  
 #include  "associate_mesh.h"
- 
+  temp=>tracers(1)%values(:,:)
+  salt=>tracers(2)%values(:,:)
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
   do n=1,myDim_nod2d+eDim_nod2D
@@ -2971,8 +3051,8 @@ subroutine insitu2pot(mesh)
      nzmax = nlevels_nod2D(n)
      !!PS do nz=1, nlevels_nod2D(n)-1
      do nz=nzmin, nzmax-1    
-        tt=tr_arr(nz,n,1)
-        ss=tr_arr(nz,n,2)
+        tt=temp(nz,n)
+        ss=salt(nz,n)
         
         !!PS ___________________________________________________________________
         !!PS using here Z_3d_n at the beginning makes the model very instable after 
@@ -2981,7 +3061,7 @@ subroutine insitu2pot(mesh)
         !!PS anyway do a spinup and it its only used at initialisation time
         !!PS pp=abs(Z_3d_n(nz,n))
         pp=abs(Z(nz))
-        tr_arr(nz,n,1)=ptheta(ss, tt, pp, pr)
+        temp(nz,n)=ptheta(ss, tt, pp, pr)
      end do
   end do
 end subroutine insitu2pot

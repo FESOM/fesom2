@@ -95,8 +95,7 @@ TYPE tracer_source3d_type
     integer                             :: ID
     integer, allocatable, dimension(:)  :: ind2
 END TYPE tracer_source3d_type
-
-integer	                       :: num_tracers=2
+integer                        :: num_tracers=2
 integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
                                                                                  ! 0=temp, 1=salt etc.
 type(tracer_source3d_type), &
@@ -236,11 +235,8 @@ real(kind=WP), allocatable         :: stress_surf(:,:)
 real(kind=WP), allocatable         :: stress_node_surf(:,:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
-real(kind=WP), allocatable         :: T_rhs(:,:) 
 real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
-real(kind=WP), allocatable         :: S_rhs(:,:)
-real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
@@ -256,8 +252,6 @@ real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:)
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:)
 real(kind=WP), allocatable    :: ssh_gp(:)
-! Passive and age tracers
-real(kind=WP), allocatable    :: tracer(:,:,:), tracer_rhs(:,:,:)   
 !Tracer gradients&RHS      
 real(kind=WP), allocatable :: ttrhs(:,:)
 real(kind=WP), allocatable :: tr_xy(:,:,:)

@@ -23,6 +23,7 @@ module g_cvmix_kpp
     use g_config
     use o_param           
     use mod_mesh
+    use mod_tracer
     use g_parsup
     use o_arrays
     use g_comm_auto 
@@ -341,8 +342,9 @@ module g_cvmix_kpp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp(mesh)
-        type(t_mesh), intent(in)  , target :: mesh
+    subroutine calc_cvmix_kpp(tracers, mesh)
+        type(t_mesh),   intent(in), target :: mesh
+        type(t_tracer), intent(in), target :: tracers(:)
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -352,7 +354,10 @@ module g_cvmix_kpp
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
+        real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
+        temp=>tracers(1)%values(:,:)
+        salt=>tracers(2)%values(:,:)
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP
@@ -404,9 +409,9 @@ module g_cvmix_kpp
                     ! buoyancy difference with respect to the surface --> computed in
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
-                    !!PS call densityJM_components(tr_arr(1,node,1), tr_arr(1,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nun,node,1), tr_arr(nun,node,2), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -441,8 +446,8 @@ module g_cvmix_kpp
                     do nztmp = nun, nzsfc
                         delh     = min( max(0.0_WP,sldepth-htot), hnode(nztmp,node) )
                         htot     = htot+delh
-                        sfc_temp = sfc_temp + tr_arr(nztmp,node,1)*delh
-                        sfc_salt = sfc_salt + tr_arr(nztmp,node,2)*delh
+                        sfc_temp = sfc_temp + temp(nztmp,node)*delh
+                        sfc_salt = sfc_salt + salt(nztmp,node)*delh
                         sfc_u    = sfc_u    + Unode(1,nztmp,node) *delh
                         sfc_v    = sfc_v    + Unode(2,nztmp,node) *delh
                     end do
@@ -464,7 +469,7 @@ module g_cvmix_kpp
                     !     depth level as the deep point --> than calculate bouyancy 
                     !     difference
                     call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(tr_arr(nz,node,1), tr_arr(nz,node,2), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -491,10 +496,10 @@ module g_cvmix_kpp
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call surface buyflux[0m'
             !!PS kpp_sbuoyflx(node) = -g * &
             !!PS                         (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-            !!PS                          sw_beta( 1,node)*water_flux(node)*tr_arr(1,node,2))
+            !!PS                          sw_beta( 1,node)*water_flux(node)*salt(1,node,2))
             kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(nun,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-                                     sw_beta( nun,node)*water_flux(node)*tr_arr(nun,node,2))
+                                     sw_beta( nun,node)*water_flux(node)*salt(nun,node))
             
             
             ! calculate friction velocity (ustar) at surface (m/s)

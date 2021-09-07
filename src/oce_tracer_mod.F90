@@ -1,6 +1,7 @@
 !============================================================================================
 MODULE o_tracers
 USE MOD_MESH
+USE MOD_TRACER
 IMPLICIT NONE
 
 interface
@@ -29,7 +30,6 @@ SUBROUTINE tracer_gradient_elements(ttf, mesh)
     integer                  :: elem,  elnodes(3)
     integer                  :: n, nz, nzmin, nzmax
 
-
 #include  "associate_mesh.h"
 
     DO elem=1, myDim_elem2D
@@ -46,29 +46,29 @@ END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE init_tracers_AB(tr_num, mesh)
+SUBROUTINE init_tracers_AB(tracer, mesh)
     use g_config, only: flag_debug
     use g_parsup
     use o_arrays
     use g_comm_auto
     use mod_mesh
-
+    use mod_tracer
     IMPLICIT NONE
     integer                    :: tr_num,n,nz 
-    type(t_mesh), intent(in)   , target :: mesh
-
+    type(t_mesh),   intent(in)   , target :: mesh
+    type(t_tracer), intent(inout), target :: tracer
     !filling work arrays
     del_ttf=0.0_WP
 
     !AB interpolation
-    tr_arr_old(:,:,tr_num)=-(0.5_WP+epsilon)*tr_arr_old(:,:,tr_num)+(1.5_WP+epsilon)*tr_arr(:,:,tr_num)
+    tracer%valuesAB(:,:)=-(0.5_WP+epsilon)*tracer%valuesAB(:,:)+(1.5_WP+epsilon)*tracer%values(:,:)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tr_arr_old(:,:,tr_num), mesh)
+    call tracer_gradient_elements(tracer%valuesAB, mesh)
     call exchange_elem_begin(tr_xy)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-    call tracer_gradient_z(tr_arr(:,:,tr_num), mesh)
+    call tracer_gradient_z(tracer%values, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
     call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
 
@@ -77,43 +77,44 @@ SUBROUTINE init_tracers_AB(tr_num, mesh)
     call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tr_arr(:,:,tr_num), mesh) !redefine tr_arr to the current timestep
+    call tracer_gradient_elements(tracer%values, mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy)
 
 END SUBROUTINE init_tracers_AB
 !
 !
 !========================================================================================
-SUBROUTINE relax_to_clim(tr_num, mesh)
-
+SUBROUTINE relax_to_clim(tracer, mesh)
     use g_config,only: dt
     USE g_PARSUP
     use o_arrays
     IMPLICIT NONE
 
-    type(t_mesh), intent(in) , target :: mesh
-    integer                  :: tr_num,n,nz, nzmin, nzmax
+    type(t_mesh),   intent(in),    target  :: mesh
+    type(t_tracer), intent(inout), target  :: tracer
+    integer                                :: n,nz, nzmin, nzmax
+    
+    real(kind=WP), dimension(:,:), pointer :: trarr
 
 #include  "associate_mesh.h"
+    trarr=>tracer%values(:,:)
 
-    if ((clim_relax>1.0e-8_WP).and.(tr_num==1)) then
+    if ((clim_relax>1.0e-8_WP).and.(tracer%ID==1)) then
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)    
             !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
             !!PS         relax2clim(n)*dt*(Tclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
-            tr_arr(nzmin:nzmax-1,n,tr_num)=tr_arr(nzmin:nzmax-1,n,tr_num)+&
-                    relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-tr_arr(nzmin:nzmax-1,n,tr_num))
+            trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
+                    relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
     END if
-    if ((clim_relax>1.0e-8_WP).and.(tr_num==2)) then
+    if ((clim_relax>1.0e-8_WP).and.(tracer%ID==2)) then
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)  
-            !!PS tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)=tr_arr(1:nlevels_nod2D(n)-1,n,tr_num)+&
-            !!PS         relax2clim(n)*dt*(Sclim(1:nlevels_nod2D(n)-1,n)-tr_arr(1:nlevels_nod2D(n)-1,n,tr_num))
-            tr_arr(nzmin:nzmax-1,n,tr_num)=tr_arr(nzmin:nzmax-1,n,tr_num)+&
-                    relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-tr_arr(nzmin:nzmax-1,n,tr_num))
+            trarr(nzmin:nzmax-1,n)=trarr(nzmin:nzmax-1,n)+&
+                    relax2clim(n)*dt*(Sclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
     END IF 
 END SUBROUTINE relax_to_clim

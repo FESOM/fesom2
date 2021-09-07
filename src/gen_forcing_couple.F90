@@ -37,11 +37,23 @@ module integrate_2D_interface
   end interface
 end module
 
+module update_atm_forcing_interface
+  interface
+    subroutine update_atm_forcing(istep, tracers, mesh)
+      use mod_mesh
+      use mod_tracer
+      integer,        intent(in)         :: istep
+      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_mesh),   intent(in), target :: mesh
+    end subroutine
+  end interface
+end module
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-subroutine update_atm_forcing(istep, mesh)
+subroutine update_atm_forcing(istep, tracers, mesh)
   use o_PARAM
   use mod_MESH
+  use MOD_TRACER
   use o_arrays
   use i_arrays
   use i_param
@@ -63,7 +75,8 @@ subroutine update_atm_forcing(istep, mesh)
   use force_flux_consv_interface
 
   implicit none
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_tracer), intent(in), target :: tracers(:)
   integer		   :: i, istep,itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
@@ -101,7 +114,7 @@ subroutine update_atm_forcing(istep, mesh)
 #if defined (__oifs) 
             ! AWI-CM3 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tr_arr(1, n, 1)+tmelt	                    ! sea surface temperature [K]
+            exchange(n)=tracers(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
             end do
             elseif (i.eq.2) then
             exchange(:) = a_ice(:)                                  ! ice concentation [%]
@@ -116,7 +129,7 @@ subroutine update_atm_forcing(istep, mesh)
 #else
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
-            exchange(n)=tr_arr(1, n, 1)                             ! sea surface temperature [°C]
+            exchange(n)=tracers(1)%values(1, n)                     ! sea surface temperature [°C]
             end do
             elseif (i.eq.2) then
             exchange(:) = m_ice(:)                                  ! ice thickness [m]
