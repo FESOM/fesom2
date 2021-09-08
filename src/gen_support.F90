@@ -260,7 +260,6 @@ end subroutine smooth_elem3D
 !--------------------------------------------------------------------------------------------
 !
 subroutine integrate_nod_2D(data, int2D, mesh)
-  use o_MESH
   use g_PARSUP
   use g_comm_auto
 

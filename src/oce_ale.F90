@@ -566,7 +566,6 @@ subroutine init_thickness_ale(mesh)
     use g_config,only: dt, which_ale
     use o_PARAM
     use MOD_MESH
-    use O_MESH
     use g_PARSUP
     use o_ARRAYS
     implicit none
@@ -811,7 +810,6 @@ end subroutine init_thickness_ale
 subroutine update_thickness_ale(mesh)
     use o_PARAM
     use MOD_MESH
-    use O_MESH
     use g_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
@@ -1393,7 +1391,7 @@ subroutine update_stiff_mat_ale(mesh)
     use g_config,only: dt
     use o_PARAM
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use g_PARSUP
     use o_ARRAYS
     !
@@ -1713,7 +1711,6 @@ end subroutine compute_hbar_ale
 subroutine vert_vel_ale(mesh)
     use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
     use MOD_MESH
-    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP

@@ -421,5 +421,4 @@ if (mype==0) status = nf_close(ncid)
 call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 if (status .ne. nf_noerr) call handle_err(status)
 end subroutine my_close
-
 end module io_mesh_info

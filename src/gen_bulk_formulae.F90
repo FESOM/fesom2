@@ -325,7 +325,6 @@ subroutine cal_wind_drag_coeff
   ! Reviewed by ??
   !--------------------------------------------------
   
-  use o_mesh
   use i_arrays
   use g_forcing_arrays
   use g_parsup

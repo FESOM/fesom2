@@ -14,7 +14,6 @@ program MAIN
 
   use o_PARAM
   use MOD_MESH
-  use o_MESH
   use g_PARSUP
   use g_CONFIG
   use g_rotate_grid
@@ -314,7 +313,6 @@ END SUBROUTINE  test_tri_ini
 !> Finds edges. Creates 3 files: edgenum.out, edges.out, edge_tri.out
 SUBROUTINE find_edges_ini(mesh)
 USE MOD_MESH
-USE o_MESH
 USE o_PARAM
 USE g_PARSUP
 USE g_CONFIG
@@ -357,7 +355,6 @@ DO n=1,elem2D
     DO q=1,q1
        ne_num(elnodes(q))=ne_num(elnodes(q))+1
        if (ne_num(elnodes(q)) > MAX_ADJACENT ) then
-          print *,'Parameter in o_MESH from ocean_modules.F90, too small.'
           print *,'Recompile with larger value for MAX_ADJACENT.'
           stop
        else
@@ -1386,7 +1383,6 @@ subroutine stiff_mat_ini(mesh)
               num_ne(nod(j)) = num_ne(nod(j)) + 1
 
               if (max(num_ne(nod(i)), num_ne(nod(j))) > MAX_ADJACENT ) then
-                 print *,'Parameter in o_MESH from ocean_modules.F90, too small.'
                  print *,'Recompile with larger value for MAX_ADJACENT.'
                  stop
               else

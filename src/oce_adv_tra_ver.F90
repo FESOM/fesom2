@@ -82,7 +82,6 @@ end module
 !===============================================================================
 subroutine adv_tra_vert_impl(ttf, w, mesh)
     use MOD_MESH
-    use O_MESH
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS

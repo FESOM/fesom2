@@ -26,7 +26,7 @@ end module
 !	adv_tracer_muscl
 subroutine muscl_adv_init(mesh)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -123,7 +123,7 @@ end SUBROUTINE muscl_adv_init
 !_______________________________________________________________________________
 SUBROUTINE find_up_downwind_triangles(mesh)
 USE MOD_MESH
-USE O_MESH
+USE MOD_TRACER
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -283,11 +283,10 @@ end SUBROUTINE find_up_downwind_triangles
 !
 !_______________________________________________________________________________
 SUBROUTINE fill_up_dn_grad(mesh)
-
 ! ttx, tty  elemental gradient of tracer 
 USE o_PARAM
 USE MOD_MESH
-USE O_MESH
+USE MOD_TRACER
 USE o_ARRAYS
 USE g_PARSUP
 IMPLICIT NONE

@@ -190,33 +190,6 @@ character(20)                  :: which_pgf='shchepetkin'
             
 END MODULE o_PARAM  
 !==========================================================
-
-!==========================================================
-MODULE o_MESH
-USE o_PARAM
-USE, intrinsic :: ISO_FORTRAN_ENV
-! All variables used to keep the mesh structure +
-! auxiliary variables involved in implementation 
-! of open boundaries and advection schemes
-!
-! The fct part
-real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
-real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
-real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
-
-real(kind=WP),allocatable,dimension(:,:)      :: fct_ttf_max,fct_ttf_min
-real(kind=WP),allocatable,dimension(:,:)      :: fct_plus,fct_minus
-! Quadratic reconstruction part
-integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
-real(kind=WP),allocatable,dimension(:,:,:)    :: quad_int_mat, quad_int_coef
-integer,allocatable,dimension(:,:)            :: nn_pos
-! MUSCL type reconstruction
-integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
-real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
-end module o_MESH
-!==========================================================
-
-!==========================================================
 MODULE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
@@ -237,9 +210,6 @@ REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_x(:)
 REAL(kind=WP), ALLOCATABLE         :: stress_atmoce_y(:)
 real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:) 
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
-real(kind=WP), allocatable         :: del_ttf(:,:)
-real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
-
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)
@@ -339,10 +309,5 @@ real(kind=WP),         allocatable    :: fer_UV(:,:,:), fer_wvel(:,:)
 real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
-
-!_______________________________________________________________________________
-! in case ldiag_DVD=.true. --> calculate discrete variance decay (DVD)
-real(kind=WP), allocatable    :: tr_dvd_horiz(:,:,:),tr_dvd_vert(:,:,:)
-
 END MODULE o_ARRAYS
 !==========================================================

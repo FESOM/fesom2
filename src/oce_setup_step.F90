@@ -207,6 +207,7 @@ end subroutine ocean_setup
 SUBROUTINE tracer_init(tracers, mesh)
 USE MOD_MESH
 USE MOD_TRACER
+USE DIAGNOSTICS, only: ldiag_DVD
 USE g_PARSUP
 IMPLICIT NONE
 integer     :: elem_size, node_size
@@ -238,6 +239,18 @@ do n=1, num_tracers
    tracers(n)%valuesAB      = 0.
    tracers(n)%ID            = n
 end do
+
+allocate(del_ttf(nl-1,node_size))
+allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
+del_ttf          = 0.0_WP
+del_ttf_advhoriz = 0.0_WP
+del_ttf_advvert  = 0.0_WP
+
+if (ldiag_DVD) then
+    allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
+    tr_dvd_horiz = 0.0_WP
+    tr_dvd_vert  = 0.0_WP
+end if 
 END SUBROUTINE tracer_init
 !
 !
@@ -288,19 +301,6 @@ if (use_ice .and. use_momix) mixlength=0.
 allocate(Wvel(nl, node_size), hpressure(nl,node_size))
 allocate(Wvel_e(nl, node_size), Wvel_i(nl, node_size))
 allocate(CFL_z(nl, node_size)) ! vertical CFL criteria
-
-allocate(del_ttf(nl-1,node_size))
-allocate(del_ttf_advhoriz(nl-1,node_size),del_ttf_advvert(nl-1,node_size))
-del_ttf          = 0.0_WP
-del_ttf_advhoriz = 0.0_WP
-del_ttf_advvert  = 0.0_WP
-!!PS allocate(del_ttf_diff(nl-1,node_size))
-if (ldiag_DVD) then
-    allocate(tr_dvd_horiz(nl-1,node_size,2),tr_dvd_vert(nl-1,node_size,2))
-    tr_dvd_horiz = 0.0_WP
-    tr_dvd_vert  = 0.0_WP
-end if 
-
 allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
 ! ================
 ! Ocean forcing arrays

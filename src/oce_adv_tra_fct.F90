@@ -24,7 +24,7 @@ end module
 !===============================================================================
 subroutine oce_adv_tra_fct_init(mesh)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -63,7 +63,7 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     ! HO ==High-order (3rd/4th order gradient reconstruction method)
     ! Adds limited fluxes to the LO solution   
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP

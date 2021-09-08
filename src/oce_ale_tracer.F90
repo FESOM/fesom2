@@ -840,6 +840,7 @@ subroutine diff_ver_part_redi_expl(mesh)
     use o_ARRAYS
     use g_PARSUP
     use MOD_MESH
+    use MOD_TRACER
     USE o_param
     use g_config
     use g_comm_auto
@@ -914,6 +915,7 @@ subroutine diff_part_hor_redi(mesh)
     use o_ARRAYS
     use g_PARSUP
     use MOD_MESH
+    use MOD_TRACER
     use o_param
     use g_config
     IMPLICIT NONE
@@ -1061,7 +1063,6 @@ SUBROUTINE diff_part_bh(ttf, mesh)
     use o_ARRAYS
     use g_PARSUP
     use MOD_MESH
-    use O_MESH
     use o_param
     use g_config
     use g_comm_auto

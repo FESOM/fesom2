@@ -733,7 +733,6 @@ end subroutine visc_filt_bilapl
 ! Quadratic in velocity term can be introduced if needed.
 SUBROUTINE visc_filt_bidiff(mesh)
     USE MOD_MESH
-    USE o_MESH
     USE o_ARRAYS
     USE o_PARAM
     USE g_PARSUP

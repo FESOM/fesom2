@@ -56,7 +56,6 @@ end module
 !===============================================================================
 subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
     use MOD_MESH
-    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -214,7 +213,7 @@ end subroutine adv_tra_hor_upw1
 !===============================================================================
 subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -484,7 +483,7 @@ end subroutine adv_tra_hor_muscl
 !===============================================================================
 subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP

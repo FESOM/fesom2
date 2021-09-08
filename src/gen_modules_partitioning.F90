@@ -486,7 +486,6 @@ end subroutine set_par_support
 !===================================================================
 subroutine init_gatherLists
 
-  use o_MESH
   implicit none
   
   integer :: n2D, e2D, sum_loc_elem2D

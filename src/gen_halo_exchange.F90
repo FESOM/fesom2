@@ -71,7 +71,6 @@ END SUBROUTINE exchange_nod2D_i
 !=============================================================================
 
 subroutine exchange_nod2D_i_begin(nod_array2D)
-  USE o_MESH
   USE g_PARSUP
   IMPLICIT NONE
 
@@ -127,7 +126,6 @@ END SUBROUTINE exchange_nod2D
 
 ! ========================================================================
 subroutine exchange_nod2D_begin(nod_array2D)
-  USE o_MESH
   USE g_PARSUP
   IMPLICIT NONE
 
@@ -182,7 +180,6 @@ END SUBROUTINE exchange_nod2D_2fields
 
 ! ========================================================================
 subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -246,7 +243,6 @@ END SUBROUTINE exchange_nod2D_3fields
 
 ! ========================================================================
 subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -315,7 +311,6 @@ END SUBROUTINE exchange_nod3D
 
 ! ========================================================================
 subroutine exchange_nod3D_begin(nod_array3D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -381,7 +376,6 @@ END SUBROUTINE exchange_nod3D_2fields
 
 ! ========================================================================
 subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -444,7 +438,6 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
 END SUBROUTINE exchange_nod3D_2fields_begin
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -460,7 +453,6 @@ END SUBROUTINE exchange_nod3D_n
 !=================================================
 
 subroutine exchange_nod3D_n_begin(nod_array3D)
-USE o_MESH
 USE g_PARSUP
 IMPLICIT NONE
 
@@ -548,7 +540,6 @@ END SUBROUTINE exchange_elem_end
 !nr  Not used, no MPI datatype built (yet)
 !
 !!$subroutine exchange_edge3D(edge_array3D)
-!!$  use o_MESH
 !!$  use g_PARSUP 
 !!$  implicit none
 !!$  
@@ -618,7 +609,6 @@ END SUBROUTINE exchange_elem_end
 !==========================================================================
 
 !!$subroutine exchange_edge2D(edge_array2D)
-!!$  use o_MESH
 !!$  use g_PARSUP 
 !!$  implicit none
 !!$
@@ -660,7 +650,6 @@ IMPLICIT NONE
 END SUBROUTINE exchange_elem3D
 !===========================================
 subroutine exchange_elem3D_begin(elem_array3D)
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -787,7 +776,6 @@ END SUBROUTINE exchange_elem3D_begin
 
 !=============================================================================
 subroutine exchange_elem3D_n(elem_array3D)
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -803,7 +791,6 @@ IMPLICIT NONE
 END SUBROUTINE exchange_elem3D_n
 !=============================================================================
 subroutine exchange_elem3D_n_begin(elem_array3D)
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -888,7 +875,6 @@ endif
 END SUBROUTINE exchange_elem3D_n_begin
 !========================================================================
 subroutine exchange_elem2D(elem_array2D)
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -905,7 +891,6 @@ IMPLICIT NONE
 END SUBROUTINE exchange_elem2D
 !========================================================================
 subroutine exchange_elem2D_begin(elem_array2D)
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -972,7 +957,6 @@ END SUBROUTINE exchange_elem2D_begin
 ! ========================================================================
 subroutine exchange_elem2D_i(elem_array2D)
 !Exchange with ALL(!) the neighbours
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -989,7 +973,6 @@ END SUBROUTINE exchange_elem2D_i
 !=============================================================================
 subroutine exchange_elem2D_i_begin(elem_array2D)
 !Exchange with ALL(!) the neighbours
-USE o_MESH
 USE g_PARSUP 
 IMPLICIT NONE
 
@@ -1037,7 +1020,6 @@ END SUBROUTINE exchange_elem2D_i_begin
 subroutine broadcast_nod3D(arr3D, arr3Dglobal)
 ! Distribute the nodal information available on 0 PE to other PEs
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1102,7 +1084,6 @@ end subroutine broadcast_nod3D
 subroutine broadcast_nod2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
-USE o_MESH
 IMPLICIT NONE
 
 real(real64) ::  arr2D(:)
@@ -1151,7 +1132,6 @@ end subroutine broadcast_nod2D
 subroutine broadcast_elem3D(arr3D, arr3Dglobal)
 ! Distribute the elemental information available on 0 PE to other PEs
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1217,7 +1197,6 @@ end subroutine broadcast_elem3D
 subroutine broadcast_elem2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
-USE o_MESH
 IMPLICIT NONE
 
 integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
@@ -1272,7 +1251,6 @@ subroutine gather_nod3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -1335,7 +1313,6 @@ subroutine gather_real4_nod3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -1397,7 +1374,6 @@ subroutine gather_int2_nod3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1455,7 +1431,6 @@ subroutine gather_nod2D(arr2D, arr2D_global)
 ! Make nodal information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1510,7 +1485,6 @@ subroutine gather_real4_nod2D(arr2D, arr2D_global)
 ! Make nodal information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1566,7 +1540,6 @@ subroutine gather_int2_nod2D(arr2D, arr2D_global)
 ! Make nodal information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1624,7 +1597,6 @@ subroutine gather_elem3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -1692,7 +1664,6 @@ subroutine gather_real4_elem3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -1761,7 +1732,6 @@ subroutine gather_int2_elem3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -1827,7 +1797,6 @@ subroutine gather_elem2D(arr2D, arr2D_global)
 ! Make element information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1887,7 +1856,6 @@ subroutine gather_real4_elem2D(arr2D, arr2D_global)
 ! Make element information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -1947,7 +1915,6 @@ subroutine gather_int2_elem2D(arr2D, arr2D_global)
 ! Make element information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -2010,7 +1977,6 @@ subroutine gather_real8to4_nod3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -2075,7 +2041,6 @@ subroutine gather_real8to4_nod2D(arr2D, arr2D_global)
 ! Make nodal information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -2133,7 +2098,6 @@ subroutine gather_real8to4_elem3D(arr3D, arr3D_global)
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 
 use g_PARSUP
-USE o_MESH
 
 
 IMPLICIT NONE
@@ -2195,7 +2159,6 @@ subroutine gather_real8to4_elem2D(arr2D, arr2D_global)
 ! Make element information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -2253,7 +2216,6 @@ end subroutine gather_real8to4_elem2D
 subroutine gather_elem2D_i(arr2D, arr2D_global)
 ! Make element information available to master PE 
   use g_PARSUP
-  use o_MESH
   IMPLICIT NONE
 
   integer                       :: n
@@ -2290,7 +2252,6 @@ subroutine gather_nod2D_i(arr2D, arr2D_global)
 ! Make nodal information available to master PE 
 
 use g_PARSUP
-USE o_MESH
 
 IMPLICIT NONE
 
@@ -2343,7 +2304,6 @@ end subroutine gather_nod2D_i
 subroutine gather_edg2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
-USE o_MESH
 IMPLICIT NONE
 
 real(real64) ::  arr2D(:)
@@ -2384,7 +2344,6 @@ end subroutine gather_edg2D
 subroutine gather_edg2D_i(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
 use g_PARSUP
-USE o_MESH
 IMPLICIT NONE
 
 integer  ::  arr2D(:)

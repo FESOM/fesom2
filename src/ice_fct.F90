@@ -181,10 +181,9 @@ subroutine ice_solve_low_order(mesh)
     ! We add diffusive contribution to the rhs. The diffusion operator
     ! is implemented as the difference between the consistent and lumped mass
     ! matrices acting on the field from the previous time step. The consistent 
-    ! mass matrix on the lhs is replaced with the lumped one.   
-    
+    ! mass matrix on the lhs is replaced with the lumped one.       
     use MOD_MESH
-    use o_MESH
+    use MOD_TRACER
     use i_ARRAYS
     use i_PARAM
     use g_PARSUP
@@ -237,9 +236,8 @@ end subroutine ice_solve_low_order
 !
 !_______________________________________________________________________________
 subroutine ice_solve_high_order(mesh)
-
   use MOD_MESH
-  use O_MESH
+  use MOD_TRACER
   use i_ARRAYS
   use g_PARSUP
   use o_PARAM
@@ -326,9 +324,8 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     ! Int. J. Numer. Meth. Fluids, 7 (1987), 1093--1109) as described by Kuzmin and
     ! Turek. (kuzmin@math.uni-dortmund.de) 
     !
-
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use i_arrays
     use i_param
     use o_PARAM
@@ -634,7 +631,7 @@ end subroutine ice_fem_fct
 SUBROUTINE ice_mass_matrix_fill(mesh)
 ! Used in ice_fct inherited from FESOM
   use MOD_MESH
-  use O_MESH
+  use MOD_TRACER
   use i_PARAM
   use i_ARRAYS
   use g_PARSUP
@@ -803,7 +800,7 @@ end subroutine ice_TG_rhs_div
 !_______________________________________________________________________________
 subroutine ice_update_for_div(mesh)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use i_Arrays
     use i_PARAM
     use g_PARSUP

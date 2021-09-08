@@ -40,7 +40,7 @@ end module
 !===============================================================================
 subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
     use MOD_MESH
-    use O_MESH
+    use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
@@ -200,7 +200,6 @@ end subroutine do_oce_adv_tra
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dttf_h, dttf_v, flux_h, flux_v, mesh, use_lo, ttf, lo)
     use MOD_MESH
-    use O_MESH
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
