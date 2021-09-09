@@ -8,13 +8,12 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
+    subroutine adv_tra_hor_upw1(ttf, vel, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh), intent(in) , target :: mesh
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-      integer,       intent(in)         :: do_Xmoment
       real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
@@ -25,11 +24,10 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_hor_muscl(ttf, vel, mesh, num_ord, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh    
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -38,11 +36,10 @@ module oce_adv_tra_hor_interfaces
     end subroutine
 ! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
 ! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_hor_mfct(ttf, vel, mesh, num_ord, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh    
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -54,7 +51,7 @@ end module
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
+subroutine adv_tra_hor_upw1(ttf, vel, mesh, flux, init_zero)
     use MOD_MESH
     use o_ARRAYS
     use o_PARAM
@@ -63,7 +60,6 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
     use g_comm_auto
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
@@ -140,8 +136,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
            !____________________________________________________________________
            ! 1st. low order upwind solution
            flux(nz, edge)=-0.5_WP*(                                                     &
-                         (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
-                         (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux))  &
+                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                         ttf(nz, enodes(2))*(vflux-abs(vflux))  &
                          )-flux(nz, edge)
         end do
         
@@ -158,8 +154,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
                 !___________________________________________________________
                 ! 1st. low order upwind solution
                 flux(nz, edge)=-0.5_WP*(                                           &
-                            (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
-                            (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux)))-flux(nz, edge)
+                            ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                            ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
             end do
         end if     
         
@@ -176,8 +172,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
                   +(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
                   
             flux(nz, edge)=-0.5_WP*(                                                     &
-                         (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
-                         (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux)))-flux(nz, edge)
+                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                         ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
         
         !_______________________________________________________________________
@@ -189,8 +185,8 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
            !____________________________________________________________________
            ! 1st. low order upwind solution
            flux(nz, edge)=-0.5_WP*(                                                     &
-                         (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
-                         (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux))  &
+                         ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                         ttf(nz, enodes(2))*(vflux-abs(vflux))  &
                          )-flux(nz, edge)
         end do
         
@@ -203,15 +199,15 @@ subroutine adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, flux, init_zero)
                 !_______________________________________________________________
                 ! 1st. low order upwind solution
                 flux(nz, edge)=-0.5_WP*(                                           &
-                             (ttf(nz, enodes(1))**do_Xmoment)*(vflux+abs(vflux))+ &
-                             (ttf(nz, enodes(2))**do_Xmoment)*(vflux-abs(vflux)))-flux(nz, edge)
+                             ttf(nz, enodes(1))*(vflux+abs(vflux))+ &
+                             ttf(nz, enodes(2))*(vflux-abs(vflux)))-flux(nz, edge)
         end do
     end do
 end subroutine adv_tra_hor_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_hor_muscl(ttf, vel, mesh, num_ord, flux, init_zero)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -221,7 +217,6 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
     use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh    
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -310,8 +305,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) 
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -337,8 +332,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
                 !_______________________________________________________________
                 ! volume flux across the segments
                 vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-                cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-                flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+                cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+                flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
             end do
         end if 
         
@@ -425,8 +420,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
                         
             !___________________________________________________________________
             ! (1-num_ord) is done with 3rd order upwind
-            cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -449,8 +444,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) 
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -473,15 +468,15 @@ subroutine adv_tra_hor_muscl(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zer
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
 end subroutine adv_tra_hor_muscl
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_hor_mfct(ttf, vel, mesh, num_ord, flux, init_zero)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -491,7 +486,6 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
     use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh    
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
@@ -576,8 +570,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) 
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -599,8 +593,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
             !___________________________________________________________________
             ! volume flux across the segments
             vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-            cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
             end do
         end if
         
@@ -683,8 +677,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
                         
             !___________________________________________________________________
             ! (1-num_ord) is done with 3rd order upwind
-            cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+            cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+            flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -704,8 +698,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(-VEL(2,nz,el(1))*deltaX1 + VEL(1,nz,el(1))*deltaY1)*helem(nz,el(1)) 
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
         
         !_______________________________________________________________________
@@ -725,8 +719,8 @@ subroutine adv_tra_hor_mfct(ttf, vel, do_Xmoment, mesh, num_ord, flux, init_zero
            !____________________________________________________________________
            ! volume flux across the segments
            vflux=(VEL(2,nz,el(2))*deltaX2 - VEL(1,nz,el(2))*deltaY2)*helem(nz,el(2))
-           cHO=(vflux+abs(vflux))*(Tmean1**do_Xmoment) + (vflux-abs(vflux))*(Tmean2**do_Xmoment)
-           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*( 0.5_WP*(Tmean1+Tmean2))**do_Xmoment-flux(nz,edge)
+           cHO=(vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
+           flux(nz,edge)=-0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2)-flux(nz,edge)
         end do
     end do
 end subroutine adv_tra_hor_mfct

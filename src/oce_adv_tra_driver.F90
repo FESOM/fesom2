@@ -1,6 +1,6 @@
 module oce_adv_tra_driver_interfaces
   interface
-   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
+   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv, mesh)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -8,7 +8,6 @@ module oce_adv_tra_driver_interfaces
       real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)         :: ttf   (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -38,7 +37,7 @@ end module
 !
 !
 !===============================================================================
-subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v, opth, optv, mesh)
+subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv, mesh)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -56,7 +55,6 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: ttf  (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -80,7 +78,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         ! compute the low order upwind horizontal flux
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
-        call adv_tra_hor_upw1(ttf, vel, do_Xmoment, mesh, adv_flux_hor, init_zero=.true.)
+        call adv_tra_hor_upw1(ttf, vel, mesh, adv_flux_hor, init_zero=.true.)
         
         ! update the LO solution for horizontal contribution
         fct_LO=0.0_WP
@@ -109,7 +107,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
         
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
-        call adv_tra_ver_upw1(ttf, we, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+        call adv_tra_ver_upw1(ttf, we, mesh, adv_flux_ver, init_zero=.true.)
         
         ! update the LO solution for vertical contribution
         do n=1, myDim_nod2D
@@ -128,7 +126,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
             ! zero the input/output flux before computation
             ! --> compute here low order part of vertical anti diffusive fluxes, 
             !     has to be done on the full vertical velocity w
-            call adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, adv_flux_ver, init_zero=.true.)
+            call adv_tra_ver_upw1(ttf, w, mesh, adv_flux_ver, init_zero=.true.)
         end if
         
         call exchange_nod(fct_LO)
@@ -142,11 +140,11 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     SELECT CASE(trim(tra_adv_hor))
         CASE('MUSCL')
             ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
-            call adv_tra_hor_muscl(ttfAB, uv,   do_Xmoment, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
+            call adv_tra_hor_muscl(ttfAB, uv, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
         CASE('MFCT')
-             call adv_tra_hor_mfct(ttfAB, uv,   do_Xmoment, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
+             call adv_tra_hor_mfct(ttfAB, uv, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
         CASE('UPW1')
-             call adv_tra_hor_upw1(ttfAB, uv,   do_Xmoment, mesh,        adv_flux_hor, init_zero=do_zero_flux)
+             call adv_tra_hor_upw1(ttfAB, uv, mesh,        adv_flux_hor, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
@@ -163,13 +161,13 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, do_Xmoment, dttf_h, dttf_v
     SELECT CASE(trim(tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
-            call adv_tra_ver_qr4c (ttfAB, pwvel,   do_Xmoment, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_qr4c (ttfAB, pwvel, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
         CASE('CDIFF')
-            call adv_tra_ver_cdiff(ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_cdiff(ttfAB, pwvel, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_vert_ppm (ttfAB, pwvel, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('UPW1')
-        call adv_tra_ver_upw1 (ttfAB, pwvel,   do_Xmoment, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+        call adv_tra_ver_upw1 (ttfAB, pwvel,     mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
             call par_ex(1)

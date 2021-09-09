@@ -15,11 +15,10 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
+    subroutine adv_tra_ver_upw1(ttf, w, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
-      integer,       intent(in)  :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)  :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)  :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout) :: flux(mesh%nl,  myDim_nod2D)
@@ -31,11 +30,10 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_ver_qr4c(ttf, w, mesh, num_ord, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -48,12 +46,11 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
+   subroutine adv_tra_vert_ppm(ttf, w, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
       integer                           :: n, nz, nl1
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP)                     :: tvert(mesh%nl), tv
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -65,12 +62,11 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
+    subroutine adv_tra_ver_cdiff(ttf, w, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
       integer                           :: n, nz, nl1
-      integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
       real(kind=WP)                     :: tvert(mesh%nl), tv
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -227,7 +223,7 @@ end subroutine adv_tra_vert_impl
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
+subroutine adv_tra_ver_upw1(ttf, w, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -236,7 +232,6 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use g_forcing_arrays
     implicit none
     type(t_mesh),  intent(in), target :: mesh
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP)                     :: tvert(mesh%nl)
     integer                           :: n, nz, nzmax, nzmin
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -274,15 +269,15 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
        ! vert. flux at remaining levels    
        do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
-                      (ttf(nz  ,n)**do_Xmoment)*(W(nz,n)+abs(W(nz,n)))+ &
-                      (ttf(nz-1,n)**do_Xmoment)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
+                      ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
+                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
        end do
     end do
 end subroutine adv_tra_ver_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_ver_qr4c(ttf, w, mesh, num_ord, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -291,7 +286,6 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     use g_forcing_arrays
     implicit none
     type(t_mesh),  intent(in), target :: mesh
-    integer,       intent(in)    :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)    :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
     real(kind=WP), intent(in)    :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)    :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -348,16 +342,16 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
                     
             Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
             Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
-            Tmean =(W(nz,n)+abs(W(nz,n)))*(Tmean1**do_Xmoment)+(W(nz,n)-abs(W(nz,n)))*(Tmean2**do_Xmoment)
+            Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
     !         flux(nz,n)=-0.5_WP*(num_ord*(Tmean1+Tmean2)*W(nz,n)+(1.0_WP-num_ord)*Tmean)*area(nz,n)-flux(nz,n)
-            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*((0.5_WP*(Tmean1+Tmean2))**do_Xmoment)*W(nz,n))*area(nz,n)-flux(nz,n)
+            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
        end do
     end do
 end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
+subroutine adv_tra_vert_ppm(ttf, w, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -366,7 +360,6 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use g_forcing_arrays
     implicit none
     type(t_mesh),  intent(in) , target :: mesh
-    integer,       intent(in)          :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)          :: ttf (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)       :: flux(mesh%nl,   myDim_nod2D)
@@ -514,21 +507,21 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
             if (W(nz,n)>0._WP) then
                 x=min(W(nz,n)*dt/dzj, 1._WP)
                 tvert(nz  )=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))
-                tvert(nz  )=( tvert(nz)**do_Xmoment ) ! compute 2nd moment for DVD
+                tvert(nz  )=tvert(nz) ! compute 2nd moment for DVD
                 tvert(nz  )=tvert(nz)*area(nz,n)*W(nz,n)
             end if
             
             if (W(nz+1,n)<0._WP) then
                 x=min(-W(nz+1,n)*dt/dzj, 1._WP)
                 tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))
-                tvert(nz+1)=( tvert(nz+1)**do_Xmoment ) ! compute 2nd moment for DVD
+                tvert(nz+1)=tvert(nz+1) ! compute 2nd moment for DVD
                 tvert(nz+1)=tvert(nz+1)*area(nz+1,n)*W(nz+1,n)
             end if
         end do
         
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -( tv(nzmin)**do_Xmoment )*W(nzmin,n)*area(nzmin,n)
+        tvert(nzmin)= -tv(nzmin)*W(nzmin,n)*area(nzmin,n)
         ! Zero bottom flux
         tvert(nzmax)=0.0_WP        
         flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
@@ -538,7 +531,7 @@ end subroutine adv_tra_vert_ppm
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
+subroutine adv_tra_ver_cdiff(ttf, w, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -547,7 +540,6 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     use g_forcing_arrays
     implicit none
     type(t_mesh),  intent(in), target :: mesh
-    integer,       intent(in)         :: do_Xmoment !--> = [1,2] compute 1st & 2nd moment of tracer transport
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  myDim_nod2D)
@@ -569,7 +561,7 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
         
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -W(nzmin,n)*(ttf(nzmin,n)**do_Xmoment)*area(nzmin,n)
+        tvert(nzmin)= -W(nzmin,n)*ttf(nzmin,n)*area(nzmin,n)
         
         !_______________________________________________________________________
         ! Zero bottom flux
@@ -579,7 +571,6 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
         ! Other levels
         do nz=nzmin+1, nzmax
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
-            tv=tv**do_Xmoment
             tvert(nz)= -tv*W(nz,n)*area(nz,n)
         end do
         
