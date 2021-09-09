@@ -142,7 +142,8 @@ subroutine solve_tracers_ale(tracers, mesh)
         
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
-        if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+!       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
+        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers(tr_num), mesh)
         else
             call relax_to_clim(tracers(tr_num), mesh)
@@ -263,7 +264,7 @@ subroutine diff_tracers_ale(tracer, mesh)
     call diff_part_hor_redi(mesh) ! seems to be ~9% faster than diff_part_hor
     !___________________________________________________________________________
     ! do vertical diffusion: explicite 
-    if (.not. i_vert_diff) call diff_ver_part_expl_ale(tracer, mesh)
+    if (.not. tracer%i_vert_diff) call diff_ver_part_expl_ale(tracer, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(mesh)
@@ -291,7 +292,7 @@ subroutine diff_tracers_ale(tracer, mesh)
     end do
 
     !___________________________________________________________________________
-    if (i_vert_diff) then
+    if (tracer%i_vert_diff) then
         ! do vertical diffusion: implicite 
         call diff_ver_part_impl_ale(tracer, mesh)
         
@@ -299,7 +300,7 @@ subroutine diff_tracers_ale(tracer, mesh)
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers will set it to zero for the next timestep
     !init_tracers will set it to zero for the next timestep
-    if (smooth_bh_tra) then
+    if (tracer%smooth_bh_tra) then
        call diff_part_bh(tracer, mesh) ! alpply biharmonic diffusion (implemented as filter)                                                
     end if
 end subroutine diff_tracers_ale

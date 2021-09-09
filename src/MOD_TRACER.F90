@@ -6,7 +6,7 @@ IMPLICIT NONE
 SAVE
 
 TYPE T_TRACER
-real(kind=WP), allocatable, dimension(:,:)  :: values, valuesAB !instant values & Adams-Bashfort interpolation
+real(kind=WP), allocatable, dimension(:,:)  :: values, valuesAB  ! instant values & Adams-Bashfort interpolation
 logical                                     :: smooth_bh_tra=.false.
 real(kind=WP)                               :: gamma0_tra, gamma1_tra, gamma2_tra
 logical                                     :: i_vert_diff =.false.
