@@ -1,18 +1,17 @@
 module oce_adv_tra_driver_interfaces
   interface
-   subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv, mesh)
+   subroutine do_oce_adv_tra(vel, w, wi, we, dttf_h, dttf_v, tracer, mesh)
+      use MOD_TRACER
       use MOD_MESH
       use g_PARSUP
-      type(t_mesh),  intent(in), target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_tracer), intent(inout), target :: tracer
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
       real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: ttf   (mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: ttfAB (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: opth, optv
     end subroutine
   end interface
 end module
@@ -37,7 +36,7 @@ end module
 !
 !
 !===============================================================================
-subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv, mesh)
+subroutine do_oce_adv_tra(vel, w, wi, we, dttf_h, dttf_v, tracer, mesh)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -50,17 +49,16 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
     implicit none
-    type(t_mesh),  intent(in), target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_tracer), intent(inout), target :: tracer
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
     real(kind=WP), intent(in), target :: W(mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in), target :: WI(mesh%nl,   myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in), target :: WE(mesh%nl,   myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: ttf  (mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: ttfAB(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: opth, optv
     real(kind=WP), pointer, dimension (:,:) :: pwvel
+    real(kind=WP), pointer, dimension (:,:) :: ttf, ttfAB
  
     integer       :: el(2), enodes(2), nz, n, e
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2, tr_num
@@ -68,13 +66,19 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
     real(kind=WP) :: qc, qu, qd
     real(kind=WP) :: tvert(mesh%nl), tvert_e(mesh%nl), a, b, c, d, da, db, dg, vflux, Tupw1
     real(kind=WP) :: Tmean, Tmean1, Tmean2, num_ord
+    real(kind=WP) :: opth, optv
     logical       :: do_zero_flux
 
 #include "associate_mesh.h"
+
+    ttf   => tracer%values
+    ttfAB => tracer%valuesAB
+    opth  =  tracer%tra_adv_ph
+    optv  =  tracer%tra_adv_pv
     !___________________________________________________________________________
     ! compute FCT horzontal and vertical low order solution as well as lw order 
     ! part of antidiffusive flux
-    if (trim(tra_adv_lim)=='FCT') then 
+    if (trim(tracer%tra_adv_lim)=='FCT') then 
         ! compute the low order upwind horizontal flux
         ! init_zero=.true.  : zero the horizontal flux before computation
         ! init_zero=.false. : input flux will be substracted
@@ -133,11 +137,11 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
     end if
 
     do_zero_flux=.true.
-    if (trim(tra_adv_lim)=='FCT') do_zero_flux=.false.
+    if (trim(tracer%tra_adv_lim)=='FCT') do_zero_flux=.false.
    
     !___________________________________________________________________________
     ! do horizontal tracer advection, in case of FCT high order solution 
-    SELECT CASE(trim(tra_adv_hor))
+    SELECT CASE(trim(tracer%tra_adv_hor))
         CASE('MUSCL')
             ! compute the untidiffusive horizontal flux (init_zero=.false.: input is the LO horizontal flux computed above)
             call adv_tra_hor_muscl(ttfAB, uv, mesh, opth,  adv_flux_hor, init_zero=do_zero_flux)
@@ -150,7 +154,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
             call par_ex(1)
     END SELECT
    
-    if (trim(tra_adv_lim)=='FCT') then
+    if (trim(tracer%tra_adv_lim)=='FCT') then
        pwvel=>w
     else
        pwvel=>we
@@ -158,7 +162,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
  
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution 
-    SELECT CASE(trim(tra_adv_ver))
+    SELECT CASE(trim(tracer%tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
             call adv_tra_ver_qr4c (ttfAB, pwvel, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
@@ -184,7 +188,7 @@ subroutine do_oce_adv_tra(ttf, ttfAB, vel, w, wi, we, dttf_h, dttf_v, opth, optv
 !   write(*,*) '2:', minval(adv_flux_hor), maxval(adv_flux_hor), sum(adv_flux_hor)
 !   write(*,*) '3:', minval(adv_flux_ver), maxval(adv_flux_ver), sum(adv_flux_ver)
 !end if
-    if (trim(tra_adv_lim)=='FCT') then
+    if (trim(tracer%tra_adv_lim)=='FCT') then
 !if (mype==0) write(*,*) 'before:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
        call oce_tra_adv_fct(dttf_h, dttf_v, ttf, fct_LO, adv_flux_hor, adv_flux_ver, mesh)
 !if (mype==0) write(*,*) 'after:', sum(abs(adv_flux_ver)), sum(abs(adv_flux_hor))
