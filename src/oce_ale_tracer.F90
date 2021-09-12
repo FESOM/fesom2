@@ -144,7 +144,7 @@ subroutine solve_tracers_ale(tracers, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
 !       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
         if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
-            call relax_zonal_temp(tracers(tr_num), mesh)
+            call relax_zonal_temp(tracers(1), mesh)
         else
             call relax_to_clim(tracers(tr_num), mesh)
         end if 
