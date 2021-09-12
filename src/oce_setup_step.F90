@@ -237,6 +237,7 @@ do n=1, num_tracers
    tracers(n)%gamma2_tra    = gamma2_tra
    tracers(n)%values        = 0.
    tracers(n)%valuesAB      = 0.
+   tracers(n)%i_vert_diff   = i_vert_diff
    tracers(n)%ID            = n
 end do
 
