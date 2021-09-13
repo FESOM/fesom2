@@ -135,7 +135,7 @@ integer mpi_version_len
     if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
     call set_icepack
     call alloc_icepack
-    call init_icepack(mesh)
+    call init_icepack(tracers(1), mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
     

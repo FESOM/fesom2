@@ -100,7 +100,7 @@ submodule (icedrv_main) icedrv_advection
     module subroutine init_advection_icepack(mesh)
     
         use o_param
-        use o_mesh
+        use mod_tracer
         use g_parsup
         use mod_mesh
     
@@ -139,7 +139,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine fill_mass_matrix_icepack(mesh)
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use i_param
         use g_parsup
       
@@ -215,7 +215,7 @@ submodule (icedrv_main) icedrv_advection
         ! mass matrix on the lhs is replaced with the lumped one.
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use i_param
         use g_parsup
   
@@ -253,7 +253,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine solve_high_order_icepack(mesh, trc)
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use i_param
         use g_parsup
    
@@ -309,7 +309,7 @@ submodule (icedrv_main) icedrv_advection
         ! Turek. (kuzmin@math.uni-dortmund.de)
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use o_param
         use i_param
         use g_parsup
@@ -460,7 +460,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine tg_rhs_div_icepack(mesh, trc)
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use o_param
         use i_param
         use g_parsup
@@ -529,7 +529,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine update_for_div_icepack(mesh, trc)
     
         use mod_mesh
-        use o_mesh
+        use mod_tracer
         use o_param
         use i_param
         use g_parsup
