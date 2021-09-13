@@ -15,6 +15,15 @@ real(kind=WP)                               :: tra_adv_ph  = 1.  ! a parameter t
 real(kind=WP)                               :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
 integer                                     :: ID
 END TYPE T_TRACER
+integer                                     :: num_tracers=2
+
+! general options for all tracers (can be moved to T_TRACER is needed)
+! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
+logical                       :: smooth_bh_tra = .false.
+real(kind=WP)                 :: gamma0_tra    = 0.0005
+real(kind=WP)                 :: gamma1_tra    = 0.0125
+real(kind=WP)                 :: gamma2_tra    = 0.
+logical                       :: i_vert_diff   = .true.
 
 !auxuary arrays to work with tracers:
 real(kind=WP), allocatable         :: del_ttf(:,:)
@@ -34,6 +43,17 @@ integer,allocatable,dimension(:)              :: nn_num, nboundary_lay
 integer,allocatable,dimension(:,:)            :: nn_pos
 integer,allocatable,dimension(:,:)            :: edge_up_dn_tri
 real(kind=WP),allocatable,dimension(:,:,:)    :: edge_up_dn_grad
+
+! auxury type for reading namelist.tra
+type nml_tracer_list_type
+        INTEGER                 :: ID         =-1
+        CHARACTER(len=4)        :: adv_hor    ='NONE'
+        CHARACTER(len=4)        :: adv_ver    ='NONE'
+        CHARACTER(len=4)        :: adv_lim    ='NONE'
+        REAL(kind=WP)           :: adv_ph     =1.
+        REAL(kind=WP)           :: adv_pv     =1.
+end type
+
 end module MOD_TRACER
 !==========================================================
 

@@ -209,12 +209,49 @@ USE MOD_MESH
 USE MOD_TRACER
 USE DIAGNOSTICS, only: ldiag_DVD
 USE g_PARSUP
+USE g_ic3d
 IMPLICIT NONE
-integer     :: elem_size, node_size
-integer     :: n
-type(t_mesh),   intent(in) ,    target              :: mesh
-type(t_tracer), intent(inout) , target, allocatable :: tracers(:)
+integer        :: elem_size, node_size
+integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
+integer        :: iost
+integer        :: n
+
+type(t_mesh),   intent(in) ,   target               :: mesh
+type(t_tracer), intent(inout), target, allocatable  :: tracers(:)
+type(nml_tracer_list_type),    target, allocatable  :: nml_tracer_list(:)
+
+namelist /tracer_listsize/ num_tracers
+namelist /tracer_list    / nml_tracer_list
+namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
+
 #include "associate_mesh.h"
+
+! OPEN and read namelist for I/O
+open( unit=nm_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
+if (iost == 0) then
+   if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
+else
+   if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
+   call par_ex
+   stop
+end if
+
+READ(nm_unit,  nml=tracer_listsize, iostat=iost)
+allocate(nml_tracer_list(num_tracers))
+READ(nm_unit,  nml=tracer_list,     iostat=iost)
+read (nm_unit, nml=tracer_init3d,   iostat=iost)
+READ(nm_unit,  nml=tracer_general,  iostat=iost)
+close(nm_unit)
+
+do n=1, num_tracers
+   if (nml_tracer_list(n)%id==-1) then
+      if (mype==0) write(*,*) 'number of tracers will be changed from ', num_tracers, ' to ', n-1, '!'
+      num_tracers=n-1
+      EXIT
+   end if
+end do
+
+if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
 elem_size=myDim_elem2D+eDim_elem2D
 node_size=myDim_nod2D+eDim_nod2D
@@ -226,18 +263,19 @@ allocate(tracers(num_tracers))
 do n=1, num_tracers
    allocate(tracers(n)%values  (nl-1,node_size))
    allocate(tracers(n)%valuesAB(nl-1,node_size))
-   tracers(n)%tra_adv_hor   = TRIM(tra_adv_hor)
-   tracers(n)%tra_adv_ver   = TRIM(tra_adv_ver)
-   tracers(n)%tra_adv_lim   = TRIM(tra_adv_lim)
-   tracers(n)%tra_adv_ph    = tra_adv_ph
-   tracers(n)%tra_adv_pv    = tra_adv_pv
+   tracers(n)%ID            = nml_tracer_list(n)%id
+   tracers(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
+   tracers(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
+   tracers(n)%tra_adv_lim   = TRIM(nml_tracer_list(n)%adv_lim)
+   tracers(n)%tra_adv_ph    = nml_tracer_list(n)%adv_ph
+   tracers(n)%tra_adv_pv    = nml_tracer_list(n)%adv_pv
    tracers(n)%smooth_bh_tra = smooth_bh_tra
    tracers(n)%gamma0_tra    = gamma0_tra
    tracers(n)%gamma1_tra    = gamma1_tra
    tracers(n)%gamma2_tra    = gamma2_tra
    tracers(n)%values        = 0.
    tracers(n)%valuesAB      = 0.
-   tracers(n)%ID            = n
+   tracers(n)%i_vert_diff   = i_vert_diff
 end do
 
 allocate(del_ttf(nl-1,node_size))
@@ -257,6 +295,7 @@ END SUBROUTINE tracer_init
 !_______________________________________________________________________________
 SUBROUTINE arrays_init(mesh)
 USE MOD_MESH
+USE MOD_TRACER, only : num_tracers
 USE o_ARRAYS
 USE o_PARAM
 USE g_PARSUP
@@ -526,7 +565,7 @@ USE g_ic3d
 #include "associate_mesh.h"
 
   if (mype==0) write(*,*) num_tracers, ' tracers will be used in FESOM'
-  if (mype==0) write(*,*) 'tracer IDs are: ', tracer_ID(1:num_tracers)
+  if (mype==0) write(*,*) 'tracer IDs are: ', tracers(1:num_tracers)%ID
   !
   ! read ocean state
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -543,7 +582,7 @@ USE g_ic3d
   ! count the passive tracers which require 3D source (ptracers_restore_total)
   ptracers_restore_total=0
   DO i=3, num_tracers
-     id=tracer_ID(i)
+     id=tracers(i)%ID
      SELECT CASE (id)
      CASE (301)
           ptracers_restore_total=ptracers_restore_total+1
@@ -558,7 +597,7 @@ USE g_ic3d
   
   rcounter3=0         ! counter for tracers with 3D source
   DO i=3, num_tracers
-     id=tracer_ID(i)
+     id=tracers(i)%ID
      SELECT CASE (id)
        CASE (101)       ! initialize tracer ID=101
          tracers(i)%values(:,:)=0.0_WP
@@ -676,7 +715,7 @@ SUBROUTINE before_oce_step(tracers, mesh)
     implicit none
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh),  intent(in),    target              :: mesh
+    type(t_mesh),  intent(in),     target              :: mesh
     type(t_tracer), intent(inout), target, allocatable :: tracers(:)
 
 #include "associate_mesh.h"

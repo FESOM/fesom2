@@ -150,7 +150,7 @@ subroutine do_oce_adv_tra(vel, w, wi, we, dttf_h, dttf_v, tracer, mesh)
         CASE('UPW1')
              call adv_tra_hor_upw1(ttfAB, uv, mesh,        adv_flux_hor, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
-            if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tra_adv_hor), '! Check your namelists!'
+            if (mype==0) write(*,*) 'Unknown horizontal advection type ',  trim(tracer%tra_adv_hor), '! Check your namelists!'
             call par_ex(1)
     END SELECT
    
@@ -173,7 +173,7 @@ subroutine do_oce_adv_tra(vel, w, wi, we, dttf_h, dttf_v, tracer, mesh)
         CASE('UPW1')
         call adv_tra_ver_upw1 (ttfAB, pwvel,     mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
-            if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tra_adv_ver), '! Check your namelists!'
+            if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracer%tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
         ! --> be aware the vertical implicite part in case without FCT is done in 
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, mesh)

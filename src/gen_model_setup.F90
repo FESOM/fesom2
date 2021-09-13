@@ -56,8 +56,10 @@ subroutine read_namelist
   nmlfile ='namelist.oce'    ! name of ocean namelist file
   open (20,file=nmlfile)
   read (20,NML=oce_dyn)
-  read (20,NML=oce_tra)
-  read (20,NML=oce_init3d)
+  close (20)
+
+  nmlfile ='namelist.tra'    ! name of ocean namelist file
+  read (20,NML=tracer_phys)
   close (20)
 
   nmlfile ='namelist.forcing'    ! name of forcing namelist file

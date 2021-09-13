@@ -96,7 +96,7 @@ end module
 subroutine solve_tracers_ale(tracers, mesh)
     use g_config
     use g_parsup
-    use o_PARAM, only: num_tracers, SPP, Fer_GM
+    use o_PARAM, only: SPP, Fer_GM
     use o_arrays
     use mod_mesh
     use mod_tracer
@@ -144,7 +144,7 @@ subroutine solve_tracers_ale(tracers, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
 !       if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
         if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
-            call relax_zonal_temp(tracers(tr_num), mesh)
+            call relax_zonal_temp(tracers(1), mesh)
         else
             call relax_to_clim(tracers(tr_num), mesh)
         end if 
@@ -334,11 +334,11 @@ subroutine diff_ver_part_expl_ale(tracer, mesh)
         ul1=ulevels_nod2D(n)
         
         vd_flux=0._WP
-        if (tr_num==1) then
+        if (tracer%ID==1) then
             flux  = -heat_flux(n)/vcpw
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
-        elseif (tr_num==2) then
+        elseif (tracer%ID==2) then
             flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
         else
             flux  = 0._WP
@@ -409,7 +409,7 @@ subroutine diff_ver_part_impl_ale(tracer, mesh)
 #include "associate_mesh.h"
     trarr=>tracer%values(:,:)
     !___________________________________________________________________________
-    if ((trim(tra_adv_lim)=='FCT') .OR. (.not. w_split)) do_wimpl=.false.
+    if ((trim(tracer%tra_adv_lim)=='FCT') .OR. (.not. w_split)) do_wimpl=.false.
     
     if (Redi) isredi=1._WP
     dt_inv=1.0_WP/dt

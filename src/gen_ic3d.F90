@@ -25,7 +25,7 @@ MODULE g_ic3d
    include 'netcdf.inc'
 
    public  do_ic3d, &                                       ! read and apply 3D initial conditions
-           n_ic3d, idlist, filelist, varlist, oce_init3d, & ! to be read from the namelist
+           n_ic3d, idlist, filelist, varlist, tracer_init3d, & ! to be read from the namelist
            t_insitu
    private
 
@@ -40,7 +40,7 @@ MODULE g_ic3d
    character(MAX_PATH), save, dimension(ic_max) :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / oce_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
+   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
 
    character(MAX_PATH), save                    :: filename
    character(50),  save                         :: varname
@@ -232,8 +232,7 @@ CONTAINS
       warn = 0
 
       if (mype==0) then
-         write(*,*) 'reading input tracer file for tracer ID= ', tracer_ID(current_tracer)
-         write(*,*) 'input file: ', trim(filename)
+         write(*,*) 'reading ',     trim(filename)
          write(*,*) 'variable  : ', trim(varname)
       end if
       
@@ -486,7 +485,7 @@ CONTAINS
       filename=trim(ClimateDataPath)//trim(filelist(n))
       varname =trim(varlist(n))
       DO current_tracer=1, num_tracers
-         if (tracer_ID(current_tracer)==idlist(n)) then
+         if (tracers(current_tracer)%ID==idlist(n)) then
             ! read initial conditions for current tracer
             call nc_ic3d_ini(mesh)
             ! get first coeficients for time inerpolation on model grid for all datas

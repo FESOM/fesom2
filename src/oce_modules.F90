@@ -81,10 +81,7 @@ real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
                                                  ! elevation and divergence
 real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset 
 ! Tracers
-logical                       :: i_vert_diff= .true.
 logical                       :: i_vert_visc= .true.
-character(20)                 :: tra_adv_ver, tra_adv_hor, tra_adv_lim
-real(kind=WP)                 :: tra_adv_ph, tra_adv_pv
 logical                       :: w_split  =.false.
 real(kind=WP)                 :: w_max_cfl=1.e-5_WP
 
@@ -95,9 +92,7 @@ TYPE tracer_source3d_type
     integer                             :: ID
     integer, allocatable, dimension(:)  :: ind2
 END TYPE tracer_source3d_type
-integer                        :: num_tracers=2
-integer, dimension(100)        :: tracer_ID  = RESHAPE((/0, 1/), (/100/), (/0/)) ! ID for each tracer for treating the initialization and surface boundary condition
-                                                                                 ! 0=temp, 1=salt etc.
+
 type(tracer_source3d_type), &
     allocatable, dimension(:)  :: ptracers_restore
 integer                        :: ptracers_restore_total=0
@@ -133,11 +128,6 @@ logical                       :: use_windmix   = .false.
 real(kind=WP)                 :: windmix_kv    = 1.e-3
 integer                       :: windmix_nl    = 2
 
-! bharmonic diffusion for tracers. We recommend to use this option in very high resolution runs (Redi is generally off there).
-logical                       :: smooth_bh_tra = .false.
-real(kind=WP)                 :: gamma0_tra    = 0.0005
-real(kind=WP)                 :: gamma1_tra    = 0.0125
-real(kind=WP)                 :: gamma2_tra    = 0.
 !_______________________________________________________________________________
 ! use non-constant reference density if .false. density_ref=density_0
 logical                       :: use_density_ref   = .false.
@@ -179,13 +169,11 @@ character(20)                  :: which_pgf='shchepetkin'
                     K_back, c_back, uke_scaling, uke_scaling_factor, smooth_back, smooth_dis, &
                     smooth_back_tend, rosb_dis
 
- NAMELIST /oce_tra/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
-            balance_salt_water, clim_relax, ref_sss_local, ref_sss, i_vert_diff, tra_adv_ver, tra_adv_hor, &
-            tra_adv_lim, tra_adv_ph, tra_adv_pv, num_tracers, tracer_ID, &
+ NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
+            balance_salt_water, clim_relax, ref_sss_local, ref_sss, &
             use_momix, momix_lat, momix_kv, &
             use_instabmix, instabmix_kv, &
             use_windmix, windmix_kv, windmix_nl, &
-            smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, &
             use_kpp_nonlclflx
             
 END MODULE o_PARAM  
