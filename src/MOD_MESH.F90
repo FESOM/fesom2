@@ -9,7 +9,7 @@ integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
 TYPE SPARSE_MATRIX 
      integer :: nza
      integer :: dim
-     real(kind=WP), allocatable,    dimension(:) :: values
+     real(kind=WP),  allocatable,   dimension(:) :: values
      integer(int32), allocatable,   dimension(:) :: colind
      integer(int32), allocatable,   dimension(:) :: rowptr
      integer(int32), allocatable,   dimension(:) :: colind_loc
