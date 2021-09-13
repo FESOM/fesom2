@@ -323,19 +323,19 @@ interface
    subroutine elem_center(elem, x, y, mesh)
      USE MOD_MESH
      USE g_CONFIG
-     integer, intent(in)        :: elem
-     real(kind=WP), intent(out) :: x, y
-     type(t_mesh), intent(in), target   :: mesh
+     integer, intent(in)                 :: elem
+     real(kind=WP), intent(out)          :: x, y
+     type(t_mesh),  intent(in), target   :: mesh
    end subroutine elem_center
 end interface
 
-integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:)
+integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:), nn_num(:), nn_pos(:,:)
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
 integer                               :: elnodes(4), ed(2), flag, eledges(4)
 integer                               :: temp(100), node 
 real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh), intent(inout), target   :: mesh
 #include "associate_mesh_ini.h"
 ! ====================
 ! (a) find edges. To make the procedure fast 
