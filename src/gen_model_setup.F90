@@ -59,6 +59,7 @@ subroutine read_namelist
   close (20)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
+  open (20,file=nmlfile)
   read (20,NML=tracer_phys)
   close (20)
 
