@@ -1,6 +1,8 @@
 !==========================================================
 MODULE MOD_MESH
 USE O_PARAM
+USE MOD_WRITE_BINARY_ARRAYYS
+USE MOD_READ_BINARY_ARRAYYS
 USE,     intrinsic    :: ISO_FORTRAN_ENV
 IMPLICIT NONE
 SAVE
@@ -91,8 +93,163 @@ real(kind=WP), allocatable, dimension(:)    :: lump2d_south, lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south, ind_north    
 !#endif  
 
-  character(:), allocatable :: representative_checksum
+character(:), allocatable :: representative_checksum
+
+contains
+   procedure write_t_mesh
+  procedure read_t_mesh
+  generic :: write(unformatted) => write_t_mesh
+  generic :: read(unformatted)  => read_t_mesh
 END TYPE T_MESH
+
+contains
+
+! Unformatted writing for t_mesh
+subroutine write_t_mesh(mesh, unit, iostat, iomsg)
+    class(t_mesh), intent(in)         :: mesh
+    integer,      intent(in)          :: unit
+    integer,      intent(out)         :: iostat
+    character(*), intent(inout)       :: iomsg
+    integer                           :: i, j, k
+    integer                           :: s1, s2, s3
+    ! write records (giving sizes for the allocation for arrays)
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%nod2D
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%ocean_area
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%ocean_areawithcav
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%edge2D
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%edge2D_in
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%elem2D
+    call write_bin_array(mesh%elem2D_nodes, unit, iostat, iomsg)
+    call write_bin_array(mesh%edges,        unit, iostat, iomsg)
+    call write_bin_array(mesh%edge_tri,     unit, iostat, iomsg)
+    call write_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
+    call write_bin_array(mesh%elem_area,    unit, iostat, iomsg)
+    call write_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
+
+    call write_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
+    call write_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
+    call write_bin_array(mesh%metric_factor,       unit, iostat, iomsg)
+    call write_bin_array(mesh%elem_neighbors,      unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_elem2D,       unit, iostat, iomsg)
+    call write_bin_array(mesh%x_corners,           unit, iostat, iomsg)
+    call write_bin_array(mesh%y_corners,           unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call write_bin_array(mesh%depth,               unit, iostat, iomsg)
+    call write_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
+    call write_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)
+    call write_bin_array(mesh%bc_index_nod2D,      unit, iostat, iomsg)
+
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%nl
+
+    call write_bin_array(mesh%zbar,              unit, iostat, iomsg)
+    call write_bin_array(mesh%Z,                 unit, iostat, iomsg)
+    call write_bin_array(mesh%elem_depth,        unit, iostat, iomsg)
+    call write_bin_array(mesh%ulevels,           unit, iostat, iomsg)
+    call write_bin_array(mesh%ulevels_nod2D,     unit, iostat, iomsg)
+    call write_bin_array(mesh%ulevels_nod2D_max, unit, iostat, iomsg)
+    call write_bin_array(mesh%nlevels,           unit, iostat, iomsg)
+    call write_bin_array(mesh%nlevels_nod2D,     unit, iostat, iomsg)
+    call write_bin_array(mesh%nlevels_nod2D_min, unit, iostat, iomsg)
+    call write_bin_array(mesh%area,              unit, iostat, iomsg)
+    call write_bin_array(mesh%area_inv,          unit, iostat, iomsg)
+    call write_bin_array(mesh%areasvol,          unit, iostat, iomsg)
+    call write_bin_array(mesh%areasvol_inv,      unit, iostat, iomsg)
+    call write_bin_array(mesh%mesh_resolution,   unit, iostat, iomsg)
+
+    call write_bin_array(mesh%cavity_flag_n,     unit, iostat, iomsg)
+    call write_bin_array(mesh%cavity_flag_e,     unit, iostat, iomsg)
+    call write_bin_array(mesh%cavity_depth,      unit, iostat, iomsg)
+    call write_bin_array(mesh%cavity_nrst_cavlpnt_xyz,   unit, iostat, iomsg)
+
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%dim
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%nza
+ 
+    call write_bin_array(mesh%ssh_stiff%rowptr,     unit, iostat, iomsg)
+    call write_bin_array(mesh%ssh_stiff%colind,     unit, iostat, iomsg)
+    call write_bin_array(mesh%ssh_stiff%values,     unit, iostat, iomsg)
+    call write_bin_array(mesh%ssh_stiff%colind_loc, unit, iostat, iomsg)
+    call write_bin_array(mesh%ssh_stiff%rowptr_loc, unit, iostat, iomsg)
+
+    call write_bin_array(mesh%lump2d_south,            unit, iostat, iomsg)
+    call write_bin_array(mesh%lump2d_north,            unit, iostat, iomsg)
+    call write_bin_array(mesh%ind_south,               unit, iostat, iomsg)
+    call write_bin_array(mesh%ind_north,               unit, iostat, iomsg)
+!   call write_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
+end subroutine write_t_mesh
+
+! Unformatted reading for t_mesh
+subroutine read_t_mesh(mesh, unit, iostat, iomsg)
+    class(t_mesh), intent(inout)       :: mesh
+    integer,       intent(in)          :: unit
+    integer,       intent(out)         :: iostat
+    character(*),  intent(inout)       :: iomsg
+    integer                            :: i, j, k
+    integer                            :: s1, s2, s3
+    ! write records (giving sizes for the allocation for arrays)
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%nod2D
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%ocean_area
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%ocean_areawithcav
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%edge2D
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%edge2D_in
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%elem2D
+
+    call read_bin_array(mesh%elem2D_nodes, unit, iostat, iomsg)
+    call read_bin_array(mesh%edges,        unit, iostat, iomsg)
+    call read_bin_array(mesh%edge_tri,     unit, iostat, iomsg)
+    call read_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
+    call read_bin_array(mesh%elem_area,    unit, iostat, iomsg)
+    call read_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
+
+    call read_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
+    call read_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
+    call read_bin_array(mesh%metric_factor,       unit, iostat, iomsg)
+    call read_bin_array(mesh%elem_neighbors,      unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_elem2D,       unit, iostat, iomsg)
+    call read_bin_array(mesh%x_corners,           unit, iostat, iomsg)
+    call read_bin_array(mesh%y_corners,           unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call read_bin_array(mesh%depth,               unit, iostat, iomsg)
+    call read_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
+    call read_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)
+    call read_bin_array(mesh%bc_index_nod2D,      unit, iostat, iomsg)
+
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%nl
+
+    call read_bin_array(mesh%zbar,              unit, iostat, iomsg)
+    call read_bin_array(mesh%Z,                 unit, iostat, iomsg)
+    call read_bin_array(mesh%elem_depth,        unit, iostat, iomsg)
+    call read_bin_array(mesh%ulevels,           unit, iostat, iomsg)
+    call read_bin_array(mesh%ulevels_nod2D,     unit, iostat, iomsg)
+    call read_bin_array(mesh%ulevels_nod2D_max, unit, iostat, iomsg)
+    call read_bin_array(mesh%nlevels,           unit, iostat, iomsg)
+    call read_bin_array(mesh%nlevels_nod2D,     unit, iostat, iomsg)
+    call read_bin_array(mesh%nlevels_nod2D_min, unit, iostat, iomsg)
+    call read_bin_array(mesh%area,              unit, iostat, iomsg)
+    call read_bin_array(mesh%area_inv,          unit, iostat, iomsg)
+    call read_bin_array(mesh%areasvol,          unit, iostat, iomsg)
+    call read_bin_array(mesh%areasvol_inv,      unit, iostat, iomsg)
+    call read_bin_array(mesh%mesh_resolution,   unit, iostat, iomsg)
+
+    call read_bin_array(mesh%cavity_flag_n,     unit, iostat, iomsg)
+    call read_bin_array(mesh%cavity_flag_e,     unit, iostat, iomsg)
+    call read_bin_array(mesh%cavity_depth,      unit, iostat, iomsg)
+    call read_bin_array(mesh%cavity_nrst_cavlpnt_xyz,   unit, iostat, iomsg)
+
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%dim
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%ssh_stiff%nza
+
+    call read_bin_array(mesh%ssh_stiff%rowptr,     unit, iostat, iomsg)
+    call read_bin_array(mesh%ssh_stiff%colind,     unit, iostat, iomsg)
+    call read_bin_array(mesh%ssh_stiff%values,     unit, iostat, iomsg)
+    call read_bin_array(mesh%ssh_stiff%colind_loc, unit, iostat, iomsg)
+    call read_bin_array(mesh%ssh_stiff%rowptr_loc, unit, iostat, iomsg)
+
+    call read_bin_array(mesh%lump2d_south,            unit, iostat, iomsg)
+    call read_bin_array(mesh%lump2d_north,            unit, iostat, iomsg)
+    call read_bin_array(mesh%ind_south,               unit, iostat, iomsg)
+    call read_bin_array(mesh%ind_north,               unit, iostat, iomsg)
+!   call read_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
+end subroutine read_t_mesh
 end module MOD_MESH
 !==========================================================
 
