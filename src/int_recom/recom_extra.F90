@@ -567,7 +567,7 @@ subroutine Erosion_input(mesh)
 !           write(*,*) mype, 'ErosionTSI2D', maxval(ErosionTSI2D(:)), minval(ErosionTSI2D(:))        
         end if
      end if
-
+  else
      is_erosioninput = 0.0d0
 
      ErosionTOC2D = 0.0d0
