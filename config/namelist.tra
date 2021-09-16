@@ -3,11 +3,10 @@ num_tracers=100 !number of tracers to allocate. shallbe large or equal to the nu
 /
 
 &tracer_list
-! ID | tra_adv_hor | tra_adv_ver | tra_adv_lim | tra_adv_ph | tra_adv_pv
 nml_tracer_list =  
-1  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., !ID=1=Temperature
-2  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., !ID=2=Salinity
-!101, 'UPW1',       'UPW1',       'NON ',        0.,          0. !ID=X=Whatever
+1  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+2  , 'MFCT',       'QR4C',       'FCT ',        1.,          1., 
+!101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
 /
 
 &tracer_init3d                            ! initial conditions for tracers
