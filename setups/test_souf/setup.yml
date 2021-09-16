@@ -42,11 +42,14 @@ namelist.oce:
         Fer_GM: False
         Redi: False
         mix_scheme: "PP"
-    oce_tra:
+        
+namelist.tra:
+    tracer_phys:
         use_momix: False
         K_hor: 10
         surf_relax_S: 0.0
         balance_salt_water: False
+
 
 namelist.ice:
     ice_dyn:
