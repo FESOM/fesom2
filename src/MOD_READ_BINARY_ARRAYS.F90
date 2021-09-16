@@ -2,7 +2,7 @@
 !
 !------------------------------------------------------------------------------------------
 ! useful interface (read_bin_array) for reading arbitary binary arrays into an opened file
-MODULE MOD_READ_BINARY_ARRAYYS
+MODULE MOD_READ_BINARY_ARRAYS
 use o_PARAM
 private
 public :: read_bin_array
@@ -100,6 +100,6 @@ subroutine read3d_int(arr, unit, iostat, iomsg)
     allocate(arr(s1,s2,s3))
     read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1, 1:s2, 1:s3)
 end subroutine read3d_int
-end module MOD_READ_BINARY_ARRAYYS
+end module MOD_READ_BINARY_ARRAYS
 !==========================================================
 
