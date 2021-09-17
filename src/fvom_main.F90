@@ -187,26 +187,26 @@ integer mpi_version_len
     endif
 
 
-    write (dump_filename, "(A7,I7.7)") "t_mesh.", mype
-    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
-    write (mype+300) mesh
-    close (mype+300)
+!    write (dump_filename, "(A7,I7.7)") "t_mesh.", mype
+!    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
+!    write (mype+300) mesh
+!    close (mype+300)
 
-    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
-    read  (mype+300) mesh_copy
-    close (mype+300)
+!    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
+!    read  (mype+300) mesh_copy
+!    close (mype+300)
          
-    write (dump_filename, "(A9,I7.7)") "t_tracer.", mype
-    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
-    write (mype+300) tracers
-    close (mype+300)
+!    write (dump_filename, "(A9,I7.7)") "t_tracer.", mype
+!    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
+!    write (mype+300) tracers
+!    close (mype+300)
 
-    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
-    read  (mype+300) tracers_copy
-    close (mype+300)
+!    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
+!    read  (mype+300) tracers_copy
+!    close (mype+300)
 
-call par_ex
-stop
+!call par_ex
+!stop
 !         
 !    if (mype==10) write(,) mesh1%ssh_stiff%values-mesh%ssh_stiff%value
 
