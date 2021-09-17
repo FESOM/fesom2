@@ -33,7 +33,7 @@ module pressure_force_4_linfs_nemo_interface
     subroutine pressure_force_4_linfs_nemo(tracers, mesh)
       use mod_mesh
       use mod_tracer
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -51,7 +51,7 @@ module pressure_force_4_linfs_easypgf_interface
     subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
       use mod_mesh
       use mod_tracer
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -85,7 +85,7 @@ module pressure_force_4_zxxxx_easypgf_interface
     subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
       use mod_mesh
       use mod_tracer
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -112,7 +112,7 @@ module insitu2pot_interface
     use mod_mesh
     use mod_tracer
     type(t_mesh),   intent(in),     target  :: mesh
-    type(t_tracer), intent(inout),  target  :: tracers(:)
+    type(t_tracer), intent(inout),  target  :: tracers
     end subroutine
   end interface
 end module
@@ -122,7 +122,7 @@ module pressure_bv_interface
     use mod_mesh
     use mod_tracer
     type(t_mesh),   intent(in),  target  :: mesh
-    type(t_tracer), intent(in),  target  :: tracers(:)
+    type(t_tracer), intent(in),  target  :: tracers
     end subroutine
   end interface
 end module
@@ -131,7 +131,7 @@ module pressure_force_4_linfs_interface
     subroutine pressure_force_4_linfs(tracers, mesh)
       use mod_mesh
       use mod_tracer
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -141,7 +141,7 @@ module pressure_force_4_zxxxx_interface
     subroutine pressure_force_4_zxxxx(tracers, mesh)
       use mod_mesh
       use mod_tracer
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -166,7 +166,7 @@ subroutine pressure_bv(tracers, mesh)
     use density_linear_interface
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
-    type(t_tracer), intent(inout), target :: tracers(:)
+    type(t_tracer), intent(inout), target :: tracers
     real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
     integer                  :: node, nz, nl1, nzmax, nzmin
     real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
@@ -176,8 +176,8 @@ subroutine pressure_bv(tracers, mesh)
 
     real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
     mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)  ! NR Evaluate string comparison outside the loop. It is expensive.
@@ -433,10 +433,10 @@ subroutine pressure_force_4_linfs(tracers, mesh)
     use pressure_force_4_linfs_easypgf_interface
     implicit none
     type(t_mesh),   intent(in),     target  :: mesh
-    type(t_tracer), intent(in),     target  :: tracers(:)
+    type(t_tracer), intent(in),     target  :: tracers
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
@@ -551,11 +551,11 @@ subroutine pressure_force_4_linfs_nemo(tracers, mesh)
                            dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
     real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -978,11 +978,11 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
     real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
 
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -1736,7 +1736,7 @@ subroutine pressure_force_4_zxxxx(tracers, mesh)
     use pressure_force_4_zxxxx_easypgf_interface
     implicit none
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
 
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
@@ -2205,11 +2205,11 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
     real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
     real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -3025,7 +3025,7 @@ end subroutine compute_neutral_slope
 !
 !===============================================================================
 !converts insitu temperature to a potential one
-!               tracers(1)%values will be modified!
+!               tracers%data(1)%values will be modified!
 subroutine insitu2pot(tracers, mesh)
   use mod_mesh
   use mod_tracer
@@ -3038,12 +3038,12 @@ subroutine insitu2pot(tracers, mesh)
   real(kind=WP)               :: pp, pr, tt, ss
   integer                     :: n, nz, nzmin,nzmax
   type(t_mesh),   intent(in),     target  :: mesh
-  type(t_tracer), intent(inout),  target  :: tracers(:)
+  type(t_tracer), intent(inout),  target  :: tracers
   real(kind=WP),  dimension(:,:), pointer :: temp, salt
   
 #include  "associate_mesh.h"
-  temp=>tracers(1)%values(:,:)
-  salt=>tracers(2)%values(:,:)
+  temp=>tracers%data(1)%values(:,:)
+  salt=>tracers%data(2)%values(:,:)
   ! Convert in situ temperature into potential temperature
   pr=0.0_WP
   do n=1,myDim_nod2d+eDim_nod2D

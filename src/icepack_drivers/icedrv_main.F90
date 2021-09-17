@@ -792,8 +792,8 @@
                   use mod_mesh
                   use mod_tracer
                   implicit none
-                  type(t_mesh),   intent(in), target :: mesh
-                  type(t_tracer), intent(in), target :: tracer
+                  type(t_mesh),        intent(in), target :: mesh
+                  type(t_tracer_data), intent(in), target :: tracer
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack

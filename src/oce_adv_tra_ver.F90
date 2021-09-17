@@ -2,7 +2,7 @@ module oce_adv_tra_ver_interfaces
   interface
 ! implicit 1st order upwind vertical advection with to solve for fct_LO
 ! updates the input tracer ttf
-    subroutine adv_tra_vert_impl(ttf, w, mesh)
+    subroutine adv_tra_vert_impl(w, ttf, mesh)
       use mod_mesh
       use g_PARSUP
       type(t_mesh),  intent(in), target  :: mesh
@@ -15,7 +15,7 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_upw1(ttf, w, mesh, flux, init_zero)
+    subroutine adv_tra_ver_upw1(w, ttf, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -30,7 +30,7 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_qr4c(ttf, w, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_ver_qr4c(w, ttf, mesh, num_ord, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -46,7 +46,7 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(ttf, w, mesh, flux, init_zero)
+   subroutine adv_tra_vert_ppm(w, ttf, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -62,7 +62,7 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_ver_cdiff(ttf, w, mesh, flux, init_zero)
+    subroutine adv_tra_ver_cdiff(w, ttf, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
@@ -76,7 +76,7 @@ module oce_adv_tra_ver_interfaces
   end interface
 end module
 !===============================================================================
-subroutine adv_tra_vert_impl(ttf, w, mesh)
+subroutine adv_tra_vert_impl(w, ttf, mesh)
     use MOD_MESH
     use o_PARAM
     use o_ARRAYS
@@ -223,7 +223,7 @@ end subroutine adv_tra_vert_impl
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_upw1(ttf, w, mesh, flux, init_zero)
+subroutine adv_tra_ver_upw1(w, ttf, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -277,7 +277,7 @@ end subroutine adv_tra_ver_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_qr4c(ttf, w, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_ver_qr4c(w, ttf, mesh, num_ord, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -351,7 +351,7 @@ end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(ttf, w, mesh, flux, init_zero)
+subroutine adv_tra_vert_ppm(w, ttf, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS
@@ -531,7 +531,7 @@ end subroutine adv_tra_vert_ppm
 !
 !
 !===============================================================================
-subroutine adv_tra_ver_cdiff(ttf, w, mesh, flux, init_zero)
+subroutine adv_tra_ver_cdiff(w, ttf, mesh, flux, init_zero)
     use g_config
     use MOD_MESH
     use o_ARRAYS

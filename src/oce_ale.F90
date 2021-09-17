@@ -63,7 +63,7 @@ module oce_timestep_ale_interface
       use mod_mesh
       use mod_tracer
       integer,        intent(in)                         :: n
-      type(t_tracer), intent(inout), target, allocatable :: tracers(:)
+      type(t_tracer), intent(inout), target              :: tracers
       type(t_mesh),   intent(in),    target              :: mesh
     end subroutine
   end interface
@@ -2564,7 +2564,7 @@ subroutine oce_timestep_ale(n, tracers, mesh)
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: n, node
     type(t_mesh),   intent(in),    target :: mesh
-    type(t_tracer), intent(inout), target :: tracers(:)
+    type(t_tracer), intent(inout), target :: tracers
 #include "associate_mesh.h"
 
     t0=MPI_Wtime()
@@ -2590,10 +2590,10 @@ subroutine oce_timestep_ale(n, tracers, mesh)
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
-    call sw_alpha_beta(tracers(1)%values, tracers(2)%values, mesh)
+    call sw_alpha_beta(tracers%data(1)%values, tracers%data(2)%values, mesh)
     
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
-    call compute_sigma_xy(tracers(1)%values,tracers(2)%values, mesh)
+    call compute_sigma_xy(tracers%data(1)%values,tracers%data(2)%values, mesh)
     
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?

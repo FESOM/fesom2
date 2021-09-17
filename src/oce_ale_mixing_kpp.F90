@@ -247,7 +247,7 @@ contains
 !     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
      type(t_mesh),   intent(in), target :: mesh
-     type(t_tracer), intent(in), target :: tracers(:)
+     type(t_tracer), intent(in), target :: tracers
      integer                    :: node, kn, elem, elnodes(3)
      integer                    :: nz, ns, j, q, lay, lay_mi, nzmin, nzmax
      real(KIND=WP)              :: smftu, smftv, aux, vol
@@ -260,7 +260,7 @@ contains
      real(kind=WP)              :: rho_surf, rho_insitu
      real(KIND=WP), dimension(mesh%nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
      real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
 
 #include "associate_mesh.h"
 
@@ -334,13 +334,13 @@ contains
      
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
      Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (nzmin,node) * water_flux(node) * tracers(2)%values(nzmin,node)) 
+                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
   END DO
       
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
-    CALL ri_iwmix(viscA, diffK, mesh)
+    CALL ri_iwmix(viscA, diffK, tracers, mesh)
 ! add double diffusion
     IF (double_diffusion) then
        CALL ddmix(diffK, tracers, mesh)
@@ -718,9 +718,10 @@ contains
   !    visc = viscosity coefficient (m**2/s)       
   !    diff = diffusion coefficient (m**2/s)     
   !
-  subroutine ri_iwmix(viscA, diffK, mesh)
+  subroutine ri_iwmix(viscA, diffK, tracers, mesh)
      IMPLICIT NONE
-     type(t_mesh), intent(in)    , target :: mesh
+     type(t_mesh),   intent(in), target :: mesh
+     type(t_tracer), intent(in), target :: tracers
      integer                     :: node, nz, mr, nzmin, nzmax
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
@@ -728,7 +729,7 @@ contains
      real(KIND=WP)               :: dz_inv, shear, aux, dep, lat, Kv0_b
 
      real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D             ), intent(inout) :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D ,num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D ,tracers%num_tracers), intent(inout) :: diffK !for T and S
 
 ! Put them under the namelist.oce
      logical                     :: smooth_richardson_number = .false.
@@ -847,7 +848,7 @@ contains
 
      IMPLICIT NONE
      type(t_mesh),   intent(in), target :: mesh
-     type(t_tracer), intent(in), target :: tracers(:)
+     type(t_tracer), intent(in), target :: tracers
      real(KIND=WP), parameter       :: Rrho0               = 1.9_WP          ! limit for double diffusive density ratio
      real(KIND=WP), parameter       :: dsfmax              = 1.e-4_WP        ! (m^2/s) max diffusivity in case of salt fingering
      real(KIND=WP), parameter       :: viscosity_molecular = 1.5e-6_WP       ! (m^2/s)
@@ -867,8 +868,8 @@ contains
         DO nz=nzmin+1,nzmax-1
 
        ! alphaDT and betaDS @Z 
-           alphaDT = sw_alpha(nz-1,node) * tracers(1)%values(nz-1,node)
-           betaDS  = sw_beta (nz-1,node) * tracers(2)%values(nz-1,node)
+           alphaDT = sw_alpha(nz-1,node) * tracers%data(1)%values(nz-1,node)
+           betaDS  = sw_beta (nz-1,node) * tracers%data(2)%values(nz-1,node)
 
            IF (alphaDT > betaDS .and. betaDS > 0.0_WP) THEN
 

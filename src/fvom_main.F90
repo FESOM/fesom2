@@ -52,8 +52,14 @@ real(kind=real32) :: rtime_setup_ice,  rtime_setup_other, rtime_setup_restart
 real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
+
 type(t_mesh),                target, save :: mesh
-type(t_tracer), allocatable, target, save :: tracers(:)
+type(t_tracer),              target, save :: tracers
+
+
+character(LEN=256)               :: dump_filename
+type(t_mesh),       target, save :: mesh_copy
+type(t_tracer),     target, save :: tracers_copy
 
 character(LEN=MPI_MAX_LIBRARY_VERSION_STRING) :: mpi_version_txt
 integer mpi_version_len
@@ -105,15 +111,16 @@ integer mpi_version_len
     call check_mesh_consistency(mesh)
     if (mype==0) t2=MPI_Wtime()
 
-    call tracer_init(tracers, mesh) ! allocate array of ocean tracers (derived type "t_tracer")
-    call arrays_init(mesh)          ! allocate other arrays (to be refactured same as tracers in the future)
-    call ocean_setup(tracers, mesh) ! 
+    call tracer_init(tracers, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
+    call arrays_init(tracers%num_tracers, mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
+    call ocean_setup(tracers, mesh)
 
     if (mype==0) then
        write(*,*) 'FESOM ocean_setup... complete'
        t3=MPI_Wtime()
     endif
     call forcing_setup(mesh)
+
     if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
         call ice_setup(tracers, mesh)
@@ -135,10 +142,9 @@ integer mpi_version_len
     if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
     call set_icepack
     call alloc_icepack
-    call init_icepack(tracers(1), mesh)
+    call init_icepack(tracers%data(1), mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
-    
     call clock_newyear                        ! check if it is a new year
     if (mype==0) t6=MPI_Wtime()
     !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
@@ -150,7 +156,6 @@ integer mpi_version_len
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, mesh)
     call restart(0, .false., r_restart, tracers, mesh) ! istep, l_write, l_read
     if (mype==0) t7=MPI_Wtime()
-    
     ! store grid information into netcdf file
     if (.not. r_restart) call write_mesh_info(mesh)
 
@@ -159,7 +164,6 @@ integer mpi_version_len
     if (r_restart) then
         call restart_thickness_ale(mesh)
     end if
-
     if (mype==0) then
        t8=MPI_Wtime()
     
@@ -181,6 +185,30 @@ integer mpi_version_len
        write(*,*) ' > runtime setup other   ',rtime_setup_other 
         write(*,*) '============================================' 
     endif
+
+
+    write (dump_filename, "(A7,I7.7)") "t_mesh.", mype
+    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
+    write (mype+300) mesh
+    close (mype+300)
+
+    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
+    read  (mype+300) mesh_copy
+    close (mype+300)
+         
+    write (dump_filename, "(A9,I7.7)") "t_tracer.", mype
+    open  (mype+300, file=trim(dump_filename), status='replace', form="unformatted")
+    write (mype+300) tracers
+    close (mype+300)
+
+    open  (mype+300, file=trim(dump_filename), status='old', form="unformatted")
+    read  (mype+300) tracers_copy
+    close (mype+300)
+
+call par_ex
+stop
+!         
+!    if (mype==10) write(,) mesh1%ssh_stiff%values-mesh%ssh_stiff%value
 
     !=====================
     ! Time stepping

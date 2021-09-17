@@ -46,7 +46,7 @@ END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE init_tracers_AB(tracer, mesh)
+SUBROUTINE init_tracers_AB(tr_num, tracers, mesh)
     use g_config, only: flag_debug
     use g_parsup
     use o_arrays
@@ -54,52 +54,53 @@ SUBROUTINE init_tracers_AB(tracer, mesh)
     use mod_mesh
     use mod_tracer
     IMPLICIT NONE
-    integer                    :: tr_num,n,nz 
+    integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in)   , target :: mesh
-    type(t_tracer), intent(inout), target :: tracer
+    type(t_tracer), intent(inout), target :: tracers
+    integer                               :: n,nz 
     !filling work arrays
-    del_ttf=0.0_WP
+    tracers%work%del_ttf=0.0_WP
 
     !AB interpolation
-    tracer%valuesAB(:,:)=-(0.5_WP+epsilon)*tracer%valuesAB(:,:)+(1.5_WP+epsilon)*tracer%values(:,:)
+    tracers%data(tr_num)%valuesAB(:,:)=-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesAB(:,:)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:,:)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracer%valuesAB, mesh)
+    call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, mesh)
     call exchange_elem_begin(tr_xy)
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-    call tracer_gradient_z(tracer%values, mesh)    !WHY NOT AB HERE? DSIDOREN!
+    call tracer_gradient_z(tracers%data(tr_num)%values, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end()      ! tr_xy used in fill_up_dn_grad
     call exchange_nod_begin(tr_z) ! not used in fill_up_dn_grad 
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call fill_up_dn_grad'//achar(27)//'[0m'
-    call fill_up_dn_grad(mesh)
+    call fill_up_dn_grad(tracers%work, mesh)
     call exchange_nod_end()       ! tr_z halos should have arrived by now.
 
     if (flag_debug .and. mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracer%values, mesh) !redefine tr_arr to the current timestep
+    call tracer_gradient_elements(tracers%data(tr_num)%values, mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy)
 
 END SUBROUTINE init_tracers_AB
 !
 !
 !========================================================================================
-SUBROUTINE relax_to_clim(tracer, mesh)
+SUBROUTINE relax_to_clim(tr_num, tracers, mesh)
     use g_config,only: dt
     USE g_PARSUP
     use o_arrays
     IMPLICIT NONE
 
+    integer,        intent(in)             :: tr_num
     type(t_mesh),   intent(in),    target  :: mesh
-    type(t_tracer), intent(inout), target  :: tracer
-    integer                                :: n,nz, nzmin, nzmax
-    
+    type(t_tracer), intent(inout), target  :: tracers
+    integer                                :: n,nz, nzmin, nzmax    
     real(kind=WP), dimension(:,:), pointer :: trarr
 
 #include  "associate_mesh.h"
-    trarr=>tracer%values(:,:)
+    trarr=>tracers%data(tr_num)%values(:,:)
 
-    if ((clim_relax>1.0e-8_WP).and.(tracer%ID==1)) then
+    if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==1)) then
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)    
@@ -109,7 +110,7 @@ SUBROUTINE relax_to_clim(tracer, mesh)
                     relax2clim(n)*dt*(Tclim(nzmin:nzmax-1,n)-trarr(nzmin:nzmax-1,n))
         END DO
     END if
-    if ((clim_relax>1.0e-8_WP).and.(tracer%ID==2)) then
+    if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==2)) then
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
             nzmax = nlevels_nod2D(n)  

@@ -1,8 +1,8 @@
 !==========================================================
 MODULE MOD_MESH
 USE O_PARAM
-USE MOD_WRITE_BINARY_ARRAYYS
-USE MOD_READ_BINARY_ARRAYYS
+USE MOD_WRITE_BINARY_ARRAYS
+USE MOD_READ_BINARY_ARRAYS
 USE,     intrinsic    :: ISO_FORTRAN_ENV
 IMPLICIT NONE
 SAVE
@@ -91,7 +91,11 @@ type(sparse_matrix)                         :: ssh_stiff
 !#if defined (__oasis)
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south, lump2d_north  
 integer,       allocatable, dimension(:)    :: ind_south, ind_north    
-!#endif  
+!#endif
+
+integer                                       :: nn_size
+integer, allocatable, dimension(:)            :: nn_num
+integer, allocatable, dimension(:,:)          :: nn_pos
 
 character(:), allocatable :: representative_checksum
 
@@ -174,6 +178,9 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%lump2d_north,            unit, iostat, iomsg)
     call write_bin_array(mesh%ind_south,               unit, iostat, iomsg)
     call write_bin_array(mesh%ind_north,               unit, iostat, iomsg)
+    write(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
+    call write_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
+    call write_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
 !   call write_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
 end subroutine write_t_mesh
 
@@ -248,6 +255,9 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%lump2d_north,            unit, iostat, iomsg)
     call read_bin_array(mesh%ind_south,               unit, iostat, iomsg)
     call read_bin_array(mesh%ind_north,               unit, iostat, iomsg)
+    read(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
+    call read_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
+    call read_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
 !   call read_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
 end subroutine read_t_mesh
 end module MOD_MESH

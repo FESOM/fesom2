@@ -66,7 +66,7 @@ MODULE io_BLOWUP
 	subroutine ini_blowup_io(year, tracers, mesh)
 		implicit none
 		integer, intent(in)       :: year
-                type(t_tracer), intent(in), target :: tracers(:)
+                type(t_tracer), intent(in), target :: tracers
                 type(t_mesh),   intent(in), target :: mesh
 		integer                   :: ncid, j
 		integer                   :: varid
@@ -117,7 +117,7 @@ MODULE io_BLOWUP
 !!PS 		call def_variable(bid, 'pgf_y'	, (/nl-1, elem2D/)	, 'meridional pressure gradient force', '???', pgf_y(:,:));
 !!PS 		call def_variable(bid, 'density_m_rho0'	, (/nl-1, nod2D/)	, 'density minus rho0', '???', density_m_rho0(:,:));
 		
-		do j=1,num_tracers
+		do j=1, tracers%num_tracers
 			SELECT CASE (j) 
 			CASE(1)
 				trname='temp'
@@ -132,9 +132,9 @@ MODULE io_BLOWUP
 				write(longname,'(A15,i1)') 'passive tracer ', j
 				units='none'
 			END SELECT
-			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%values(:,:));
+			call def_variable(bid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%values(:,:));
 !!PS 			longname=trim(longname)//', Adams–Bashforth'
-!!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%valuesAB(:,:)(:,:));
+!!PS 			call def_variable(bid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:)(:,:));
 		end do
 		call def_variable(bid, 'w'			, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel);
 		call def_variable(bid, 'w_expl'		, (/nl, nod2D/)		, 'vertical velocity', 'm/s', Wvel_e);
@@ -171,7 +171,7 @@ MODULE io_BLOWUP
 	subroutine blowup(istep, tracers, mesh)
 		implicit none
                 type(t_mesh),   intent(in), target :: mesh		
-                type(t_tracer), intent(in), target :: tracers(:)
+                type(t_tracer), intent(in), target :: tracers
 		integer                   :: istep
 		
 		ctime=timeold+(dayold-1.)*86400

@@ -1,61 +1,66 @@
 module oce_adv_tra_fct_interfaces
   interface
-    subroutine oce_adv_tra_fct_init(mesh)
+    subroutine oce_adv_tra_fct_init(twork, mesh)
       use MOD_MESH
+      use MOD_TRACER
       use g_PARSUP
-      type(t_mesh), intent(in), target  :: mesh
+      type(t_mesh), intent(in), target           :: mesh
+      type(t_tracer_work), intent(inout), target :: twork
     end subroutine
 
-    subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
+    subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, mesh)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, myDim_edge2D)
       real(kind=WP), intent(inout)      :: adf_v(mesh%nl,  myDim_nod2D)
+      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  myDim_nod2D)
     end subroutine
  end interface
 end module
 !
 !
 !===============================================================================
-subroutine oce_adv_tra_fct_init(mesh)
+subroutine oce_adv_tra_fct_init(twork, mesh)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
     use g_PARSUP
     implicit none
-    integer                  :: my_size
-    type(t_mesh), intent(in) , target :: mesh
-
+    integer                                    :: my_size
+    type(t_mesh),        intent(in) ,   target :: mesh
+    type(t_tracer_work), intent(inout), target :: twork
 #include "associate_mesh.h"
 
     my_size=myDim_nod2D+eDim_nod2D
-    allocate(fct_LO(nl-1, my_size))        ! Low-order solution 
-    allocate(adv_flux_hor(nl-1,myDim_edge2D)) ! antidiffusive hor. contributions / from edges
-    allocate(adv_flux_ver(nl, myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
+    allocate(twork%fct_LO(nl-1, my_size))        ! Low-order solution 
+    allocate(twork%adv_flux_hor(nl-1,myDim_edge2D)) ! antidiffusive hor. contributions / from edges
+    allocate(twork%adv_flux_ver(nl, myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
 
-    allocate(fct_ttf_max(nl-1, my_size),fct_ttf_min(nl-1, my_size))
-    allocate(fct_plus(nl-1, my_size),fct_minus(nl-1, my_size))
+    allocate(twork%fct_ttf_max(nl-1, my_size),twork%fct_ttf_min(nl-1, my_size))
+    allocate(twork%fct_plus(nl-1, my_size),   twork%fct_minus(nl-1, my_size))
     ! Initialize with zeros: 
-    fct_LO=0.0_WP
-    adv_flux_hor=0.0_WP
-    adv_flux_ver=0.0_WP
-    fct_ttf_max=0.0_WP
-    fct_ttf_min=0.0_WP
-    fct_plus=0.0_WP
-    fct_minus=0.0_WP
+    twork%fct_LO=0.0_WP
+    twork%adv_flux_hor=0.0_WP
+    twork%adv_flux_ver=0.0_WP
+    twork%fct_ttf_max=0.0_WP
+    twork%fct_ttf_min=0.0_WP
+    twork%fct_plus=0.0_WP
+    twork%fct_minus=0.0_WP
     
     if (mype==0) write(*,*) 'FCT is initialized'
 end subroutine oce_adv_tra_fct_init
+
 !
 !
 !===============================================================================
-subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
+subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
@@ -71,12 +76,15 @@ subroutine oce_tra_adv_fct(dttf_h, dttf_v, ttf, lo, adf_h, adf_v, mesh)
     use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh
-    real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, myDim_edge2D)
-    real(kind=WP), intent(inout)      :: adf_v(mesh%nl,  myDim_nod2D)
+    real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   myDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_plus (mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
     real(kind=WP)                     :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
     real(kind=WP)                     :: flux_eps=1e-16

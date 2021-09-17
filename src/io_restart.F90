@@ -89,7 +89,7 @@ subroutine ini_ocean_io(year, tracers, mesh)
   character(500)            :: trname, units
   character(4)              :: cyear
   type(t_mesh),   intent(in), target :: mesh
-  type(t_tracer), intent(in), target :: tracers(:)
+  type(t_tracer), intent(in), target :: tracers
 #include  "associate_mesh.h"
 
   write(cyear,'(i4)') year
@@ -132,7 +132,7 @@ subroutine ini_ocean_io(year, tracers, mesh)
         call def_variable(oid, 'uke_rhs',  (/nl-1, elem2D/), 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:));
   endif
   
-  do j=1,num_tracers
+  do j=1, tracers%num_tracers
      SELECT CASE (j) 
        CASE(1)
          trname='temp'
@@ -147,9 +147,9 @@ subroutine ini_ocean_io(year, tracers, mesh)
          write(longname,'(A15,i1)') 'passive tracer ', j
          units='none'
      END SELECT
-     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%values(:,:));
+     call def_variable(oid, trim(trname),       (/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%values(:,:));
      longname=trim(longname)//', Adams–Bashforth'
-     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers(j)%valuesAB(:,:));
+     call def_variable(oid, trim(trname)//'_AB',(/nl-1, nod2D/), trim(longname), trim(units), tracers%data(j)%valuesAB(:,:));
   end do
   call def_variable(oid, 'w',      (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel);
   call def_variable(oid, 'w_expl', (/nl, nod2D/), 'vertical velocity', 'm/s', Wvel_e);
@@ -214,7 +214,7 @@ subroutine restart(istep, l_write, l_read, tracers, mesh)
   logical :: is_restart
   integer :: mpierr
   type(t_mesh),   intent(in), target :: mesh
-  type(t_tracer), intent(in), target :: tracers(:)
+  type(t_tracer), intent(in), target :: tracers
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
                call ini_ocean_io(yearnew, tracers, mesh)

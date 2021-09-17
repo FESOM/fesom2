@@ -324,13 +324,13 @@ CONTAINS
       integer              :: ierror              ! return error code
 
       type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(inout), target :: tracers(:)
+      type(t_tracer), intent(inout), target :: tracers
 #include "associate_mesh.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP
       data1d=0.0_WP
-      tracers(current_tracer)%values(:,:)=dummy
+      tracers%data(current_tracer)%values(:,:)=dummy
       !open NETCDF file on 0 core     
       if (mype==0) then
          iost = nf_open(filename,NF_NOWRITE,ncid)
@@ -424,11 +424,11 @@ CONTAINS
                             cf_a  = (d2 - d1)/ delta_d
                             ! value of interpolated OB data on Z from model
                             cf_b  = d1 - cf_a * nc_depth(d_indx)
-                            !!PS tracers(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
-                            tracers(current_tracer)%values(k,ii) = -cf_a * aux_z + cf_b
+                            !!PS tracers%data(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tracers%data(current_tracer)%values(k,ii) = -cf_a * aux_z + cf_b
                         end if
                     elseif (d_indx==0) then
-                        tracers(current_tracer)%values(k,ii)=data1d(1)
+                        tracers%data(current_tracer)%values(k,ii)=data1d(1)
                     end if
                 enddo
             !___________________________________________________________________
@@ -448,10 +448,10 @@ CONTAINS
                             cf_a  = (d2 - d1)/ delta_d
                             ! value of interpolated OB data on Z from model
                             cf_b  = d1 - cf_a * nc_depth(d_indx)
-                            tracers(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tracers%data(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
                         end if
                     elseif (d_indx==0) then
-                        tracers(current_tracer)%values(k,ii)=data1d(1)
+                        tracers%data(current_tracer)%values(k,ii)=data1d(1)
                     end if
                 enddo
             end if ! --> if (use_cavity) then
@@ -476,7 +476,7 @@ CONTAINS
       real(kind=WP)                 :: locTmax, locTmin, locSmax, locSmin, glo
     
       type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(inout), target :: tracers(:)
+      type(t_tracer), intent(inout), target :: tracers
 
       if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
@@ -484,16 +484,16 @@ CONTAINS
       DO n=1, n_ic3d
       filename=trim(ClimateDataPath)//trim(filelist(n))
       varname =trim(varlist(n))
-      DO current_tracer=1, num_tracers
-         if (tracers(current_tracer)%ID==idlist(n)) then
+      DO current_tracer=1, tracers%num_tracers
+         if (tracers%data(current_tracer)%ID==idlist(n)) then
             ! read initial conditions for current tracer
             call nc_ic3d_ini(mesh)
             ! get first coeficients for time inerpolation on model grid for all datas
             call getcoeffld(tracers, mesh)
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tracers(current_tracer)%values(:,:), mesh)
+            call extrap_nod(tracers%data(current_tracer)%values(:,:), mesh)
             exit
-         elseif (current_tracer==num_tracers) then
+         elseif (current_tracer==tracers%num_tracers) then
             if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
             if (mype==0) write(*,*) "check your namelists!"
             call par_ex
@@ -503,11 +503,11 @@ CONTAINS
       END DO
       DEALLOCATE(bilin_indx_i, bilin_indx_j)
 
-      do current_tracer=1, num_tracers
+      do current_tracer=1, tracers%num_tracers
          !_________________________________________________________________________
          ! set remaining dummy values from bottom topography to 0.0_WP
-         where (tracers(current_tracer)%values > 0.9_WP*dummy)
-               tracers(current_tracer)%values=0.0_WP
+         where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
+               tracers%data(current_tracer)%values=0.0_WP
          end where
 
          !_________________________________________________________________________
@@ -515,15 +515,15 @@ CONTAINS
          ! initialisation
          do n=1,myDim_nod2d + eDim_nod2D
             ! ensure cavity is zero
-            if (use_cavity) tracers(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
+            if (use_cavity) tracers%data(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
             ! ensure bottom is zero
-            tracers(current_tracer)%values(mesh%nlevels_nod2D(n):mesh%nl-1,n)=0.0_WP
+            tracers%data(current_tracer)%values(mesh%nlevels_nod2D(n):mesh%nl-1,n)=0.0_WP
          end do
       end do
       !_________________________________________________________________________
       ! convert temperature from Kelvin --> °C
-      where (tracers(1)%values(:,:) > 100._WP)
-             tracers(1)%values(:,:) = tracers(1)%values(:,:)-273.15_WP
+      where (tracers%data(1)%values(:,:) > 100._WP)
+             tracers%data(1)%values(:,:) = tracers%data(1)%values(:,:)-273.15_WP
       end where
       
       !_________________________________________________________________________
@@ -539,10 +539,10 @@ CONTAINS
       locSmax = locTmax
       locSmin = locTmin
       do n=1,myDim_nod2d
-        locTmax = max(locTmax,maxval(tracers(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locTmin = min(locTmin,minval(tracers(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locSmax = max(locSmax,maxval(tracers(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locSmin = min(locSmin,minval(tracers(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locTmin = min(locTmin,minval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locSmax = max(locSmax,maxval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locSmin = min(locSmin,minval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
       if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo

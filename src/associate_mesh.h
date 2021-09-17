@@ -5,6 +5,7 @@ integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
 real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
+integer         , pointer :: nn_size
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
 integer, dimension(:,:)      , pointer :: edges       
@@ -31,6 +32,8 @@ type(sparse_matrix)          , pointer :: ssh_stiff
 integer,       dimension(:)  , pointer :: cavity_flag_n, cavity_flag_e
 real(kind=WP), dimension(:)  , pointer :: cavity_depth
 integer,       dimension(:)  , pointer :: ulevels, ulevels_nod2D, ulevels_nod2D_max
+integer,       dimension(:)  , pointer :: nn_num
+integer,       dimension(:,:), pointer :: nn_pos
 
 nod2D              => mesh%nod2D              
 elem2D             => mesh%elem2D             
@@ -39,7 +42,7 @@ edge2D_in          => mesh%edge2D_in
 ocean_area         => mesh%ocean_area
 ocean_areawithcav  => mesh%ocean_areawithcav         
 nl                 => mesh%nl  
-
+nn_size            => mesh%nn_size
 !!$coord_nod2D        => mesh%coord_nod2D        
 !!$geo_coord_nod2D    => mesh%geo_coord_nod2D    
 !!$elem2D_nodes       => mesh%elem2D_nodes       
@@ -122,3 +125,5 @@ cavity_depth(1:myDim_nod2D+eDim_nod2D)                     => mesh%cavity_depth
 ulevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%ulevels            
 ulevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%ulevels_nod2D
 ulevels_nod2D_max(1:myDim_nod2D+eDim_nod2D)                => mesh%ulevels_nod2D_max
+nn_num(1:myDim_nod2D)                                      => mesh%nn_num
+nn_pos(1:mesh%nn_size, 1:myDim_nod2D)                      => mesh%nn_pos

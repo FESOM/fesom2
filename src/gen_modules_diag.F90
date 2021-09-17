@@ -389,7 +389,7 @@ subroutine diag_densMOC(mode, tracers, mesh)
   implicit none
   integer, intent(in)                     :: mode
   type(t_mesh),   intent(in),     target  :: mesh
-  type(t_tracer), intent(in),     target  :: tracers(:)
+  type(t_tracer), intent(in),     target  :: tracers
   integer                                 :: nz, snz, elem, nzmax, nzmin, elnodes(3), is, ie, pos
   integer                                 :: e, edge, enodes(2), eelems(2)
   real(kind=WP)                           :: div, deltaX, deltaY, locz
@@ -402,8 +402,8 @@ subroutine diag_densMOC(mode, tracers, mesh)
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
 #include "associate_mesh.h"
 
-  temp=>tracers(1)%values(:,:)
-  salt=>tracers(2)%values(:,:)
+  temp=>tracers%data(1)%values(:,:)
+  salt=>tracers%data(2)%values(:,:)
 
   if (firstcall_s) then !allocate the stuff at the first call
      allocate(std_dens_UVDZ(2,std_dens_N, myDim_elem2D))
@@ -642,7 +642,7 @@ subroutine compute_diagnostics(mode, tracers, mesh)
   integer, intent(in)                  :: mode !constructor mode (0=only allocation; any other=do diagnostic)
   real(kind=WP)                        :: val
   type(t_mesh),   intent(in), target   :: mesh
-  type(t_tracer), intent(in), target   :: tracers(:)
+  type(t_tracer), intent(in), target   :: tracers
   !1. solver diagnostic
   if (ldiag_solver)      call diag_solver(mode, mesh)
   !2. compute curl(stress_surf)
@@ -654,7 +654,7 @@ subroutine compute_diagnostics(mode, tracers, mesh)
   !5. print integrated temperature 
   if (ldiag_salt3d) then
      if (mod(mstep,logfile_outfreq)==0) then
-        call integrate_nod(tracers(2)%values(:,:), val, mesh)
+        call integrate_nod(tracers%data(2)%values(:,:), val, mesh)
         if (mype==0) then
            write(*,*) 'total integral of salinity at timestep :', mstep, val
         end if
@@ -676,13 +676,14 @@ end subroutine compute_diagnostics
 !                      in a coastal model application ...
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tracer, mesh)
+subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, tracers, mesh)
     use o_arrays
     use g_PARSUP
     use oce_adv_tra_driver_interfaces    
     implicit none
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracer
+    integer,        intent(in)               :: tr_num
+    type(t_tracer), intent(inout), target    :: tracers
+    type(t_mesh),   intent(in),    target    :: mesh
     integer                  :: node, nz, nzmin, nzmax
     real(kind=WP)            :: tr_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D), trAB_sqr(mesh%nl-1,myDim_nod2D+eDim_nod2D)
 
@@ -698,8 +699,8 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tracer, mesh)
         nzmax = nlevels_nod2D(node)-1
         nzmin = ulevels_nod2D(node)
         do nz = nzmin, nzmax
-            tr_sqr(nz,node)   = tracer%values  (nz,node)**2
-            trAB_sqr(nz,node) = tracer%valuesAB(nz,node)**2
+            tr_sqr(nz,node)   = tracers%data(tr_num)%values  (nz,node)**2
+            trAB_sqr(nz,node) = tracers%data(tr_num)%valuesAB(nz,node)**2
         end do
     end do
         
@@ -707,10 +708,10 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tracer, mesh)
     ! calculate horizintal and vertical advection for squared tracer (2nd moments)
     ! see Burchard and Rennau, 2008, Comparative quantification of physically and 
     ! numerically induced mixing in ocean models ...
-    del_ttf_advhoriz = 0.0_WP
-    del_ttf_advvert  = 0.0_WP
+    tracers%work%del_ttf_advhoriz = 0.0_WP
+    tracers%work%del_ttf_advvert  = 0.0_WP
 !   maybe just to introduce an another tharer of t_tracer type with **do_Xmoment?
-!   call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+!   call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -729,8 +730,8 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tracer, mesh)
             ! --> split it up in DVD contribution from horizontal and vertical 
             ! advection since for the horizontal advection Adams Bashfort tracer 
             ! are used and for the vertical the normal tracer values.
-            tr_dvd_horiz(nz,node,tracer%ID) = hnode(nz,node)/hnode_new(nz,node)*trAB_sqr(nz,node) - del_ttf_advhoriz(nz,node)/hnode_new(nz,node)
-            tr_dvd_vert(nz,node,tracer%ID)  = hnode(nz,node)/hnode_new(nz,node)*tr_sqr(  nz,node) - del_ttf_advvert( nz,node)/hnode_new(nz,node)
+            tracers%work%tr_dvd_horiz(nz,node,tr_num) = hnode(nz,node)/hnode_new(nz,node)*trAB_sqr(nz,node) - tracers%work%del_ttf_advhoriz(nz,node)/hnode_new(nz,node)
+            tracers%work%tr_dvd_vert (nz,node,tr_num) = hnode(nz,node)/hnode_new(nz,node)*tr_sqr(  nz,node) - tracers%work%del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
 end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
@@ -743,24 +744,25 @@ end subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008
 ! see: 
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tracer, mesh)
+subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, tracers, mesh)
     use o_arrays
     use g_PARSUP
     use oce_adv_tra_driver_interfaces
     implicit none
-    integer                            :: node, nz, nzmin, nzmax
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracer
+    integer                                  :: node, nz, nzmin, nzmax
+    integer,        intent(in)               :: tr_num
+    type(t_tracer), intent(inout), target    :: tracers
+    type(t_mesh),   intent(in),    target    :: mesh
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
     ! calculate horizintal and vertical advection for squared tracer (2nd moments)
     ! see Burchard and Rennau, 2008, Comparative quantification of physically and 
     ! numerically induced mixing in ocean models ...
-    del_ttf_advhoriz = 0.0_WP
-    del_ttf_advvert  = 0.0_WP
+    tracers%work%del_ttf_advhoriz = 0.0_WP
+    tracers%work%del_ttf_advvert  = 0.0_WP
 !   maybe just to introduce an another tharer of t_tracer type with **do_Xmoment?
-!   call do_oce_adv_tra(tracer%values, tracer%valuesAB(:,:), UV, wvel, wvel_i, wvel_e, 2, del_ttf_advhoriz, del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+!   call do_oce_adv_tra(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB(:,:), UV, wvel, wvel_i, wvel_e, 2, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -783,10 +785,10 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tracer, mesh)
             ! --> split it up in DVD contribution from horizontal and vertical 
             ! advection since for the horizontal advection Adams Bashfort tracer 
             ! are used and for the vertical the normal tracer values.
-            tr_dvd_horiz(nz,node,tracer%ID) = hnode(nz,node)/hnode_new(nz,node)*(tracer%valuesAB(nz,node)**2) &
-                                           - del_ttf_advhoriz(nz,node)/hnode_new(nz,node)
-            tr_dvd_vert(nz,node,tracer%ID)  = hnode(nz,node)/hnode_new(nz,node)*(tracer%values  (nz,node)**2) &
-                                           - del_ttf_advvert( nz,node)/hnode_new(nz,node)
+            tracers%work%tr_dvd_horiz(nz,node,tr_num) = hnode(nz,node)/hnode_new(nz,node)*(tracers%data(tr_num)%valuesAB(nz,node)**2) &
+                                           - tracers%work%del_ttf_advhoriz(nz,node)/hnode_new(nz,node)
+            tracers%work%tr_dvd_vert(nz,node,tr_num)  = hnode(nz,node)/hnode_new(nz,node)*(tracers%data(tr_num)%values  (nz,node)**2) &
+                                           - tracers%work%del_ttf_advvert( nz,node)/hnode_new(nz,node)
         end do
     end do
 end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
@@ -801,15 +803,16 @@ end subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014
 !                      in a coastal model application ...
 ! Klingbeil et al., 2014, Quantification of spurious dissipation and mixing – 
 !                      Discrete variance decay in a Finite-Volume framework ...
-subroutine compute_diag_dvd(tracer, mesh)
+subroutine compute_diag_dvd(tr_num, tracers, mesh)
     use g_config, only: dt
     use o_arrays
     use g_PARSUP
     
     implicit none
     integer                  :: node, nz, nzmin, nzmax
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracer
+    integer,        intent(in)               :: tr_num
+    type(t_tracer), intent(inout), target    :: tracers
+    type(t_mesh),   intent(in),    target    :: mesh
 
 #include "associate_mesh.h"
     !___________________________________________________________________________
@@ -827,16 +830,16 @@ subroutine compute_diag_dvd(tracer, mesh)
             !                                         |
             !                                         v
             !                                    now add this part
-            ! --> tr_dvd_horiz contains already the expected target second moments
+            ! --> tracers%work%tr_dvd_horiz contains already the expected target second moments
             ! from subroutine compute_diag_dvd_2ndmoment
-            tr_dvd_horiz(nz,node,tracer%ID) = (tr_dvd_horiz(nz,node,tracer%ID)                                     &
-                                            -( hnode(nz,node)/hnode_new(nz,node)*tracer%valuesAB(nz,node)          &
-                                              -del_ttf_advhoriz(nz,node)/hnode_new(nz,node)                        &
+            tracers%work%tr_dvd_horiz(nz,node,tr_num) = (tracers%work%tr_dvd_horiz(nz,node,tr_num)                                     &
+                                            -( hnode(nz,node)/hnode_new(nz,node)*tracers%data(tr_num)%valuesAB(nz,node)          &
+                                              -tracers%work%del_ttf_advhoriz(nz,node)/hnode_new(nz,node)                        &
                                               )**2                                                                 &
                                             )/dt
-            tr_dvd_vert(nz,node,tracer%ID)  = (tr_dvd_vert(nz,node,tracer%ID)                                      &
-                                            -( hnode(nz,node)/hnode_new(nz,node)*tracer%values  (nz,node)          &
-                                              -del_ttf_advvert( nz,node)/hnode_new(nz,node)                        &
+            tracers%work%tr_dvd_vert(nz,node,tr_num)  = (tracers%work%tr_dvd_vert(nz,node,tr_num)                                      &
+                                            -( hnode(nz,node)/hnode_new(nz,node)*tracers%data(tr_num)%values  (nz,node)          &
+                                              -tracers%work%del_ttf_advvert( nz,node)/hnode_new(nz,node)                        &
                                               )**2                                                                 &
                                             )/dt
         end do

@@ -14,7 +14,7 @@ module ice_initial_state_interface
       use mod_mesh
       use mod_tracer
       type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(in), target    :: tracers(:)
+      type(t_tracer), intent(in), target    :: tracers
     end subroutine
   end interface
 end module
@@ -24,7 +24,7 @@ module ice_setup_interface
       use mod_mesh
       use mod_tracer
       type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(in), target    :: tracers(:)
+      type(t_tracer), intent(in), target    :: tracers
     end subroutine
   end interface
 end module
@@ -43,7 +43,7 @@ subroutine ice_setup(tracers, mesh)
     use ice_initial_state_interface
     implicit none 
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     
     ! ================ DO not change
     ice_dt=real(ice_ave_steps,WP)*dt
@@ -51,7 +51,6 @@ subroutine ice_setup(tracers, mesh)
     Tevp_inv=3.0_WP/ice_dt 
     Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                             ! it always enters
-
     ! ================
     call ice_array_setup(mesh)
     call ice_fct_init(mesh)
@@ -310,7 +309,7 @@ subroutine ice_initial_state(tracers, mesh)
     implicit none
     !
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     integer                            :: i
     character(MAX_PATH)                      :: filename
     real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
@@ -333,7 +332,7 @@ subroutine ice_initial_state(tracers, mesh)
         endif    
         
         !_______________________________________________________________________
-        if (tracers(1)%values(1,i)< 0.0_WP) then
+        if (tracers%data(1)%values(1,i)< 0.0_WP) then
             if (geo_coord_nod2D(2,i)>0._WP) then
                 m_ice(i) = 1.0_WP
                 m_snow(i)= 0.1_WP 

@@ -2,7 +2,7 @@
 !
 !------------------------------------------------------------------------------------------
 ! useful interface (write_bin_array) for writing arbitary binary arrays into an opened file
-MODULE MOD_WRITE_BINARY_ARRAYYS
+MODULE MOD_WRITE_BINARY_ARRAYS
 use o_PARAM
 private
 public :: write_bin_array
@@ -142,6 +142,6 @@ subroutine write3d_int(arr, unit, iostat, iomsg)
        write(unit, iostat=iostat, iomsg=iomsg) s1, s2, s3
     end if
 end subroutine write3d_int
-end module MOD_WRITE_BINARY_ARRAYYS
+end module MOD_WRITE_BINARY_ARRAYS
 !==========================================================
 

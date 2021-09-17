@@ -344,7 +344,7 @@ module g_cvmix_kpp
     ! calculate PP vertrical mixing coefficients from CVMIX library
     subroutine calc_cvmix_kpp(tracers, mesh)
         type(t_mesh),   intent(in), target :: mesh
-        type(t_tracer), intent(in), target :: tracers(:)
+        type(t_tracer), intent(in), target :: tracers
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -356,8 +356,8 @@ module g_cvmix_kpp
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
         real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include "associate_mesh.h"
-        temp=>tracers(1)%values(:,:)
-        salt=>tracers(2)%values(:,:)
+        temp=>tracers%data(1)%values(:,:)
+        salt=>tracers%data(2)%values(:,:)
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP

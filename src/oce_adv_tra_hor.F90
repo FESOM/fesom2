@@ -8,8 +8,9 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(ttf, vel, mesh, flux, init_zero)
+    subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
       use MOD_MESH
+      use MOD_TRACER
       use g_PARSUP
       type(t_mesh), intent(in) , target :: mesh
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -24,7 +25,7 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(ttf, vel, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh    
@@ -32,11 +33,13 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+      integer,       intent(in)         :: nboundary_lay(myDim_nod2D+eDim_nod2D)
+      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
 ! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
 ! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(ttf, vel, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
       use MOD_MESH
       use g_PARSUP
       type(t_mesh),  intent(in), target :: mesh    
@@ -44,6 +47,7 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
   end interface
@@ -51,7 +55,7 @@ end module
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_upw1(ttf, vel, mesh, flux, init_zero)
+subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
     use MOD_MESH
     use o_ARRAYS
     use o_PARAM
@@ -207,7 +211,7 @@ end subroutine adv_tra_hor_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_muscl(ttf, vel, mesh, num_ord, flux, init_zero)
+subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -221,6 +225,8 @@ subroutine adv_tra_hor_muscl(ttf, vel, mesh, num_ord, flux, init_zero)
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+    integer,       intent(in)         :: nboundary_lay(myDim_nod2D+eDim_nod2D)
+    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
     logical, optional                 :: init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
@@ -476,7 +482,7 @@ end subroutine adv_tra_hor_muscl
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_mfct(ttf, vel, mesh, num_ord, flux, init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
     use MOD_MESH
     use MOD_TRACER
     use o_ARRAYS
@@ -490,6 +496,7 @@ subroutine adv_tra_hor_mfct(ttf, vel, mesh, num_ord, flux, init_zero)
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
     real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
     logical, optional                 :: init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO

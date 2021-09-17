@@ -4,7 +4,7 @@ module cavity_heat_water_fluxes_3eq_interface
       use mod_mesh
       use mod_tracer
       type(t_mesh),   intent(in), target :: mesh
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
     end subroutine
   end interface
 end module
@@ -141,7 +141,7 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
     
     !___________________________________________________________________________
     type(t_mesh),   intent(inout),  target :: mesh
-    type(t_tracer), intent(in),     target :: tracers(:)
+    type(t_tracer), intent(in),     target :: tracers
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
@@ -189,8 +189,8 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
         if(nzmin==1) cycle ! if no cavity skip that node
         
         !_______________________________________________________________________
-        temp = tracers(1)%values(nzmin,node)
-        sal  = tracers(2)%values(nzmin,node)
+        temp = tracers%data(1)%values(nzmin,node)
+        sal  = tracers%data(2)%values(nzmin,node)
         zice = Z_3d_n(nzmin, node)  !(<0)
         
         !_______________________________________________________________________
@@ -327,7 +327,7 @@ subroutine cavity_heat_water_fluxes_2eq(tracers, mesh)
     implicit none
 
     type(t_mesh),   intent(inout) , target :: mesh
-    type(t_tracer), intent(in),     target :: tracers(:)
+    type(t_tracer), intent(in),     target :: tracers
     integer        :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
@@ -350,8 +350,8 @@ subroutine cavity_heat_water_fluxes_2eq(tracers, mesh)
     do node=1,myDim_nod2D      
         nzmin = ulevels_nod2D(node)
         if(nzmin==1) cycle
-        t_i  = tracers(1)%values(nzmin,node)
-        s_i  = tracers(2)%values(nzmin,node)
+        t_i  = tracers%data(1)%values(nzmin,node)
+        s_i  = tracers%data(2)%values(nzmin,node)
         t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(Z_3d_n(nzmin,node))
         
         heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)

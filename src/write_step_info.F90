@@ -5,7 +5,7 @@ module write_step_info_interface
       use MOD_TRACER
       integer				 :: istep,outfreq
       type(t_mesh),   intent(in), target :: mesh
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
     end subroutine
   end interface
 end module
@@ -15,7 +15,7 @@ module check_blowup_interface
       use MOD_MESH
       use MOD_TRACER
       integer				 :: istep
-      type(t_tracer), intent(in), target :: tracers(:)
+      type(t_tracer), intent(in), target :: tracers
       type(t_mesh),   intent(in), target :: mesh
     end subroutine
   end interface
@@ -46,7 +46,7 @@ subroutine write_step_info(istep, outfreq, tracers, mesh)
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
         type(t_mesh),   intent(in), target                      :: mesh
-        type(t_tracer), intent(in), target                      :: tracers(:)
+        type(t_tracer), intent(in), target                      :: tracers
 #include "associate_mesh.h"
 	if (mod(istep,outfreq)==0) then
 		
@@ -77,8 +77,8 @@ subroutine write_step_info(istep, outfreq, tracers, mesh)
 			loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
 			loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
 !!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
-!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tracers(1)%values(:, n))/(nlevels_nod2D(n)-1)
-!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tracers(2)%values(:, n))/(nlevels_nod2D(n)-1)
+!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tracers%data(1)%values(:, n))/(nlevels_nod2D(n)-1)
+!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tracers%data(2)%values(:, n))/(nlevels_nod2D(n)-1)
 		end do
 		
 		!_______________________________________________________________________
@@ -116,9 +116,9 @@ subroutine write_step_info(istep, outfreq, tracers, mesh)
 		call MPI_AllREDUCE(loc , min_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(heat_flux(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(tracers(1)%values(:,1:myDim_nod2D),MASK=(tracers(2)%values(:,1:myDim_nod2D)/=0.0))
+		loc = minval(tracers%data(1)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , min_temp , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(tracers(2)%values(:,1:myDim_nod2D),MASK=(tracers(2)%values(:,1:myDim_nod2D)/=0.0))
+		loc = minval(tracers%data(2)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , min_salt , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(Wvel(1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
@@ -148,9 +148,9 @@ subroutine write_step_info(istep, outfreq, tracers, mesh)
 		call MPI_AllREDUCE(loc , max_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(heat_flux(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(tracers(1)%values(:,1:myDim_nod2D),MASK=(tracers(2)%values(:,1:myDim_nod2D)/=0.0))
+		loc = maxval(tracers%data(1)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , max_temp , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(tracers(2)%values(:,1:myDim_nod2D),MASK=(tracers(2)%values(:,1:myDim_nod2D)/=0.0))
+		loc = maxval(tracers%data(2)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , max_salt , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(Wvel(1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -249,7 +249,7 @@ subroutine check_blowup(istep, tracers, mesh)
 	integer                            :: n, nz, istep, found_blowup_loc=0, found_blowup=0
 	integer 		           :: el, elidx
         type(t_mesh),   intent(in), target :: mesh
-        type(t_tracer), intent(in), target :: tracers(:)
+        type(t_tracer), intent(in), target :: tracers
 #include "associate_mesh.h"
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
@@ -377,8 +377,8 @@ subroutine check_blowup(istep, tracers, mesh)
 			do nz=1,nlevels_nod2D(n)-1
 				!_______________________________________________________________
 				! check temp
-				if ( (tracers(1)%values(nz, n) /= tracers(1)%values(nz, n)) .or. &
-					tracers(1)%values(nz, n) < -5.0 .or. tracers(1)%values(nz, n)>60) then
+				if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
+					tracers%data(1)%values(nz, n) < -5.0 .or. tracers%data(1)%values(nz, n)>60) then
 					found_blowup_loc=1
 					write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 					write(*,*) ' --STOP--> found temperture becomes NaN or <-5.0, >60'
@@ -390,10 +390,10 @@ subroutine check_blowup(istep, tracers, mesh)
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
-					write(*,*) 'temp(nz, n) = ',tracers(1)%values(nz, n)
-					write(*,*) 'temp(: , n) = ',tracers(1)%values(:, n)
-					write(*,*) 'temp_old(nz,n)= ',tracers(1)%valuesAB(nz, n)
-					write(*,*) 'temp_old(: ,n)= ',tracers(1)%valuesAB(:, n)
+					write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
+					write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
+					write(*,*) 'temp_old(nz,n)= ',tracers%data(1)%valuesAB(nz, n)
+					write(*,*) 'temp_old(: ,n)= ',tracers%data(1)%valuesAB(:, n)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
 					write(*,*) 'wflux       = ',water_flux(n)
@@ -428,12 +428,12 @@ subroutine check_blowup(istep, tracers, mesh)
 ! 					enddo
 					write(*,*)
 					
-				endif ! --> if ( (tracers(1)%values(nz, n) /= tracers(1)%values(nz, n)) .or. & ...
+				endif ! --> if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. & ...
 				
 				!_______________________________________________________________
 				! check salt
-				if ( (tracers(2)%values(nz, n) /= tracers(2)%values(nz, n)) .or.  &
-					tracers(2)%values(nz, n) < 0 .or. tracers(2)%values(nz, n)>50 ) then
+				if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
+					tracers%data(2)%values(nz, n) < 0 .or. tracers%data(2)%values(nz, n)>50 ) then
 					found_blowup_loc=1
 					write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 					write(*,*) ' --STOP--> found salinity becomes NaN or <0, >50'
@@ -444,11 +444,11 @@ subroutine check_blowup(istep, tracers, mesh)
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
-					write(*,*) 'salt(nz, n) = ',tracers(2)%values(nz, n)
-					write(*,*) 'salt(: , n) = ',tracers(2)%values(:, n)
+					write(*,*) 'salt(nz, n) = ',tracers%data(2)%values(nz, n)
+					write(*,*) 'salt(: , n) = ',tracers%data(2)%values(:, n)
 					write(*,*)
-					write(*,*) 'temp(nz, n) = ',tracers(1)%values(nz, n)
-					write(*,*) 'temp(: , n) = ',tracers(1)%values(:, n)
+					write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
+					write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
 					write(*,*)
@@ -482,7 +482,7 @@ subroutine check_blowup(istep, tracers, mesh)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 					write(*,*)
-				endif ! --> if ( (tracers(2)%values(nz, n) /= tracers(2)%values(nz, n)) .or.  & ...
+				endif ! --> if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  & ...
 			end do ! --> do nz=1,nlevels_nod2D(n)-1
 		end do ! --> do n=1, myDim_nod2d
 ! ! 	end if 

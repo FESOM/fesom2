@@ -4,7 +4,7 @@ module ocean2ice_interface
       use mod_mesh
       use mod_tracer
       type(t_mesh),   intent(in)  ,  target :: mesh
-      type(t_tracer), intent(inout), target :: tracers(:)
+      type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
 end module
@@ -15,7 +15,7 @@ module oce_fluxes_interface
       use mod_mesh
       use mod_tracer
       type(t_mesh),   intent(in)  ,  target :: mesh
-      type(t_tracer), intent(inout), target :: tracers(:)
+      type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
 end module
@@ -115,13 +115,13 @@ subroutine ocean2ice(tracers, mesh)
     implicit none
 
     type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers(:)
+    type(t_tracer), intent(in), target :: tracers
     integer :: n, elem, k
     real(kind=WP) :: uw, vw, vol
     real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include  "associate_mesh.h"
-    temp=>tracers(1)%values(:,:)
-    salt=>tracers(2)%values(:,:)
+    temp=>tracers%data(1)%values(:,:)
+    salt=>tracers%data(2)%values(:,:)
 
     ! the arrays in the ice model are renamed
         
@@ -199,14 +199,14 @@ subroutine oce_fluxes(tracers, mesh)
   use cavity_heat_water_fluxes_3eq_interface
   implicit none
   type(t_mesh),   intent(in),     target :: mesh
-  type(t_tracer), intent(in),     target :: tracers(:)
+  type(t_tracer), intent(in),     target :: tracers
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
   real(kind=WP), dimension(:,:), pointer :: temp, salt
 #include  "associate_mesh.h"
-  temp=>tracers(1)%values(:,:)
-  salt=>tracers(2)%values(:,:)
+  temp=>tracers%data(1)%values(:,:)
+  salt=>tracers%data(2)%values(:,:)
     
     allocate(flux(myDim_nod2D+eDim_nod2D))
     flux = 0.0_WP

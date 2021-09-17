@@ -49,7 +49,7 @@
                                      nt_ipnd, nt_aero, nt_fsd
     
           character(len=*), parameter :: subname='(init_state)'
-          type(t_tracer), intent(in), target  :: tracer
+          type(t_tracer_data), intent(in), target  :: tracer
 
           !-----------------------------------------------------------------
           ! query Icepack values
@@ -928,8 +928,8 @@
              tr_fsd,    &   ! from icepack
              wave_spec      ! from icepack
           character(len=*), parameter :: subname='(icedrv_initialize)'
-          type(t_mesh),   intent(in), target :: mesh
-          type(t_tracer), intent(in), target :: tracer
+          type(t_mesh),        intent(in), target :: mesh
+          type(t_tracer_data), intent(in), target :: tracer
           call icepack_query_parameters(wave_spec_out=wave_spec)
           call icepack_query_tracer_flags(tr_aero_out=tr_aero)
           call icepack_query_tracer_flags(tr_zaero_out=tr_zaero)
@@ -1006,8 +1006,8 @@
           implicit none
 
           ! local variables
-          type(t_tracer), intent(in),     target  :: tracer
-          real(kind=WP),  dimension(:,:), pointer :: tr_arr
+          type(t_tracer_data), intent(in), target  :: tracer
+          real(kind=WP), dimension(:,:),   pointer :: tr_arr
 
           integer (kind=int_kind) :: &
              i     , & ! horizontal indices
