@@ -100,47 +100,65 @@ subroutine init_ale(mesh)
     use oce_ale_interfaces
     Implicit NONE
     
-    integer                  :: n, nzmax, nzmin, elnodes(3), elem
-    type(t_mesh), intent(in) , target :: mesh
+    integer                             :: n, nzmax, nzmin, elnodes(3), elem
+    type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh.h"
     !___allocate________________________________________________________________
     ! hnode and hnode_new: layer thicknesses at nodes. 
-    allocate(hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
-    allocate(hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
+    allocate(mesh%hnode(1:nl-1, myDim_nod2D+eDim_nod2D))
+    allocate(mesh%hnode_new(1:nl-1, myDim_nod2D+eDim_nod2D))
     
     ! ssh_rhs_old: auxiliary array to store an intermediate part of the rhs computations.
     allocate(ssh_rhs_old(myDim_nod2D+eDim_nod2D))
     
     ! hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
-    allocate(hbar(myDim_nod2D+eDim_nod2D))
-    allocate(hbar_old(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%hbar(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%hbar_old(myDim_nod2D+eDim_nod2D))
     
     ! helem: layer thickness at elements. It is interpolated from hnode.
-    allocate(helem(1:nl-1, myDim_elem2D))
+    allocate(mesh%helem(1:nl-1, myDim_elem2D))
     
     ! dhe: The increment of total fluid depth on elements. It is used to update the matrix
     ! of the ssh operator.      
-    allocate(dhe(myDim_elem2D))
+    allocate(mesh%dhe(myDim_elem2D))
     
     ! zbar_n: depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(zbar_n(nl))
-    allocate(zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
+    allocate(mesh%zbar_n(nl))
+    allocate(mesh%zbar_3d_n(nl,myDim_nod2D+eDim_nod2D))
     
     ! Z_n: mid depth of layers due to ale thinkness variactions at ervery node n 
-    allocate(Z_n(nl-1))
-    allocate(Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%Z_n(nl-1))
+    allocate(mesh%Z_3d_n(nl-1,myDim_nod2D+eDim_nod2D)) 
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
-    allocate(bottom_elem_thickness(myDim_elem2D))
-    allocate(zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
-    allocate(zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
+    allocate(mesh%bottom_elem_thickness(myDim_elem2D))
+    allocate(mesh%zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
+    allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
     ! also change bottom thickness at nodes due to partial cell --> bottom 
     ! thickness at nodes is the volume weighted mean of sorounding elemental 
     ! thicknesses
-    allocate(bottom_node_thickness(myDim_nod2D+eDim_nod2D))
-    allocate(zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
-    allocate(zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%bottom_node_thickness(myDim_nod2D+eDim_nod2D))
+    allocate(mesh%zbar_n_bot(myDim_nod2D+eDim_nod2D)) 
+    allocate(mesh%zbar_n_srf(myDim_nod2D+eDim_nod2D)) 
+
+    ! reassociate after the allocation (no pointer exists before)
+    hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode
+    hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new
+    zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n
+    Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n
+    helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem
+    bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness
+    bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness
+    dhe(1:myDim_elem2D)                                        => mesh%dhe
+    hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
+    hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
+    zbar_n(1:mesh%nl)                                          => mesh%zbar_n
+    Z_n(1:mesh%nl-1)                                           => mesh%Z_n
+    zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
+    zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
+    zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
+    zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
     
     !___initialize______________________________________________________________
     hbar      = 0.0_WP
@@ -1108,7 +1126,6 @@ subroutine init_stiff_mat_ale(mesh)
     use o_PARAM
     use MOD_MESH
     use g_PARSUP
-    use o_ARRAYS, only:zbar_e_bot, zbar_e_srf
     use g_CONFIG
     implicit none
     

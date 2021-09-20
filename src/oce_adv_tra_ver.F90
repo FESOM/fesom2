@@ -2,9 +2,10 @@ module oce_adv_tra_ver_interfaces
   interface
 ! implicit 1st order upwind vertical advection with to solve for fct_LO
 ! updates the input tracer ttf
-    subroutine adv_tra_vert_impl(w, ttf, mesh)
+    subroutine adv_tra_vert_impl(dt, w, ttf, mesh)
       use mod_mesh
       use g_PARSUP
+      real(kind=WP), intent(in), target  :: dt
       type(t_mesh),  intent(in), target  :: mesh
       real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(in)          :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -46,9 +47,10 @@ module oce_adv_tra_ver_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(w, ttf, mesh, flux, init_zero)
+   subroutine adv_tra_vert_ppm(dt, w, ttf, mesh, flux, init_zero)
       use MOD_MESH
       use g_PARSUP
+      real(kind=WP), intent(in), target :: dt
       type(t_mesh),  intent(in), target :: mesh
       integer                           :: n, nz, nl1
       real(kind=WP)                     :: tvert(mesh%nl), tv
@@ -76,17 +78,14 @@ module oce_adv_tra_ver_interfaces
   end interface
 end module
 !===============================================================================
-subroutine adv_tra_vert_impl(w, ttf, mesh)
+subroutine adv_tra_vert_impl(dt, w, ttf, mesh)
     use MOD_MESH
-    use o_PARAM
-    use o_ARRAYS
-    use i_ARRAYS
+    use MOD_TRACER
     use g_PARSUP
-    use g_CONFIG
-    use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_        
-    
+    use g_comm_auto
+
     implicit none
+    real(kind=WP), intent(in) , target :: dt
     type(t_mesh),  intent(in) , target :: mesh
     real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -224,12 +223,11 @@ end subroutine adv_tra_vert_impl
 !
 !===============================================================================
 subroutine adv_tra_ver_upw1(w, ttf, mesh, flux, init_zero)
-    use g_config
     use MOD_MESH
-    use o_ARRAYS
-    use o_PARAM
+    use MOD_TRACER
     use g_PARSUP
-    use g_forcing_arrays
+    use g_comm_auto
+
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP)                     :: tvert(mesh%nl)
@@ -351,14 +349,13 @@ end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(w, ttf, mesh, flux, init_zero)
-    use g_config
+subroutine adv_tra_vert_ppm(dt, w, ttf, mesh, flux, init_zero)
     use MOD_MESH
-    use o_ARRAYS
-    use o_PARAM
+    use MOD_TRACER
     use g_PARSUP
-    use g_forcing_arrays
+    use g_comm_auto
     implicit none
+    real(kind=WP), intent(in),  target :: dt
     type(t_mesh),  intent(in) , target :: mesh
     real(kind=WP), intent(in)          :: ttf (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(in)          :: W  (mesh%nl,   myDim_nod2D+eDim_nod2D)
@@ -532,12 +529,10 @@ end subroutine adv_tra_vert_ppm
 !
 !===============================================================================
 subroutine adv_tra_ver_cdiff(w, ttf, mesh, flux, init_zero)
-    use g_config
     use MOD_MESH
-    use o_ARRAYS
-    use o_PARAM
+    use MOD_TRACER
     use g_PARSUP
-    use g_forcing_arrays
+    use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)

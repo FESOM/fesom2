@@ -57,10 +57,7 @@ end module
 !===============================================================================
 subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
     use MOD_MESH
-    use o_ARRAYS
-    use o_PARAM
     use g_PARSUP
-    use g_CONFIG
     use g_comm_auto
     implicit none
     type(t_mesh), intent(in) , target :: mesh    
@@ -74,7 +71,6 @@ subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
 #include "associate_mesh.h"
-
 
     if (present(init_zero))then
        if (init_zero) flux=0.0_WP
@@ -214,10 +210,7 @@ end subroutine adv_tra_hor_upw1
 subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
     use g_PARSUP
-    use g_CONFIG
     use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh    
@@ -485,10 +478,7 @@ end subroutine adv_tra_hor_muscl
     subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
     use MOD_MESH
     use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
     use g_PARSUP
-    use g_CONFIG
     use g_comm_auto
     implicit none
     type(t_mesh),  intent(in), target :: mesh    

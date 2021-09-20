@@ -35,6 +35,23 @@ integer,       dimension(:)  , pointer :: ulevels, ulevels_nod2D, ulevels_nod2D_
 integer,       dimension(:)  , pointer :: nn_num
 integer,       dimension(:,:), pointer :: nn_pos
 
+real(kind=WP), dimension(:,:), pointer :: hnode
+real(kind=WP), dimension(:,:), pointer :: hnode_new
+real(kind=WP), dimension(:,:), pointer :: zbar_3d_n
+real(kind=WP), dimension(:,:), pointer :: Z_3d_n
+real(kind=WP), dimension(:,:), pointer :: helem
+real(kind=WP), dimension(:)  , pointer :: bottom_elem_thickness
+real(kind=WP), dimension(:)  , pointer :: bottom_node_thickness
+real(kind=WP), dimension(:)  , pointer :: dhe
+real(kind=WP), dimension(:)  , pointer :: hbar
+real(kind=WP), dimension(:)  , pointer :: hbar_old
+real(kind=WP), dimension(:)  , pointer :: zbar_n
+real(kind=WP), dimension(:)  , pointer :: Z_n
+real(kind=WP), dimension(:)  , pointer :: zbar_n_bot
+real(kind=WP), dimension(:)  , pointer :: zbar_e_bot
+real(kind=WP), dimension(:)  , pointer :: zbar_n_srf
+real(kind=WP), dimension(:)  , pointer :: zbar_e_srf
+
 nod2D              => mesh%nod2D              
 elem2D             => mesh%elem2D             
 edge2D             => mesh%edge2D             
@@ -127,3 +144,21 @@ ulevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%ulevels_nod2D
 ulevels_nod2D_max(1:myDim_nod2D+eDim_nod2D)                => mesh%ulevels_nod2D_max
 nn_num(1:myDim_nod2D)                                      => mesh%nn_num
 nn_pos(1:mesh%nn_size, 1:myDim_nod2D)                      => mesh%nn_pos
+hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode
+hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new
+zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n
+Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n
+helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem
+bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness
+bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness
+dhe(1:myDim_elem2D)                                        => mesh%dhe
+hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
+hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
+zbar_n(1:mesh%nl)                                          => mesh%zbar_n
+Z_n(1:mesh%nl-1)                                           => mesh%Z_n
+zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
+zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
+zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
+zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
+
+

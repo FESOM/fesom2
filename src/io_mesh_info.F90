@@ -3,7 +3,6 @@ use g_PARSUP
 use MOD_MESH
 use g_config
 use g_comm_auto
-use o_ARRAYS
 use o_PARAM
 
 implicit none

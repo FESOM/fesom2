@@ -711,7 +711,7 @@ subroutine compute_diag_dvd_2ndmoment_burchard_etal_2008(tr_num, tracers, mesh)
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
 !   maybe just to introduce an another tharer of t_tracer type with **do_Xmoment?
-!   call do_oce_adv_tra(tr_sqr, trAB_sqr, UV, wvel, wvel_i, wvel_e, 1, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+!   call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tr_sqr, trAB_sqr, 1, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D
@@ -762,7 +762,7 @@ subroutine compute_diag_dvd_2ndmoment_klingbeil_etal_2014(tr_num, tracers, mesh)
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
 !   maybe just to introduce an another tharer of t_tracer type with **do_Xmoment?
-!   call do_oce_adv_tra(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB(:,:), UV, wvel, wvel_i, wvel_e, 2, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
+!   call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB(:,:), 2, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert, tra_adv_ph, tra_adv_pv, mesh)   
     !___________________________________________________________________________
     ! add target second moment to DVD
     do node = 1,mydim_nod2D

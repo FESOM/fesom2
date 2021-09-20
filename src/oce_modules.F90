@@ -236,42 +236,8 @@ real(kind=WP), allocatable,dimension(:)     :: dens_flux
 !Isoneutral diffusivities (or xy diffusivities if Redi=.false)
 real(kind=WP), allocatable :: Ki(:,:)
 
-!_______________________________________________________________________________
-! Arrays added for ALE implementation:
-! --> layer thinkness at node and depthlayer for t=n and t=n+1
-real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
-
-! --> layer thinkness at elements, interpolated from hnode
-real(kind=WP), allocatable,dimension(:,:)   :: helem
-
-! --> thinkness of bottom elem (important for partial cells)
-real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness 
-real(kind=WP), allocatable,dimension(:)     :: bottom_node_thickness 
-
-! --> The increment of total fluid depth on elements. It is used to update the matrix
-real(kind=WP), allocatable,dimension(:)     :: dhe
-
-! --> hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
-real(kind=WP), allocatable,dimension(:)     :: hbar, hbar_old
-
 ! --> auxiliary array to store an intermediate part of the rhs computations.
 real(kind=WP), allocatable,dimension(:)     :: ssh_rhs_old !, ssh_rhs_old2 !PS
-
-! --> auxiliary array to store depth of layers and depth of mid level due to changing 
-!     layer thinkness at every node
-real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
-
-! new bottom depth at node and element due to partial cells
-real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
-real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
-
-! new depth of cavity-ocean interface at node and element due to partial cells
-real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
-real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
-
-! --> multiplication factor for surface boundary condition in 
-!     diff_ver_part_impl_ale(tr_num) between linfs -->=0.0 and noninfs 
-!     (zlevel,zstar...) --> = 1.0
 real(kind=WP)                               :: is_nonlinfs
 
 !_______________________________________________________________________________

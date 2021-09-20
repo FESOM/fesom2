@@ -18,7 +18,6 @@ end module
 subroutine compute_nrst_pnt2cavline(mesh)
     use MOD_MESH
     use o_PARAM , only: WP
-    use o_ARRAYS, only: Z_3d_n
     use g_PARSUP
     implicit none
 
@@ -134,11 +133,10 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
     use MOD_MESH
     use MOD_TRACER
     use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, Z_3d_n, Unode, density_m_rho0,density_ref
+    use o_ARRAYS, only: heat_flux, water_flux, Unode, density_m_rho0,density_ref
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     use g_PARSUP
     implicit none
-    
     !___________________________________________________________________________
     type(t_mesh),   intent(inout),  target :: mesh
     type(t_tracer), intent(in),     target :: tracers
@@ -148,8 +146,7 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
     real (kind=WP)  :: ep1,ep2,ep3,ep4,ep5,ep31
     real (kind=WP)  :: ex1,ex2,ex3,ex4,ex5,ex6
     real (kind=WP)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
-    integer        :: node, nzmax, nzmin
-    
+    integer         :: node, nzmax, nzmin
     !___________________________________________________________________________
     real(kind=WP),parameter ::  rp =   0.                        !reference pressure
     real(kind=WP),parameter ::  a   = -0.0575                    !Foldvik&Kvinge (1974)
@@ -321,7 +318,7 @@ subroutine cavity_heat_water_fluxes_2eq(tracers, mesh)
     use MOD_MESH
     use MOD_TRACER
     use o_PARAM , only: WP
-    use o_ARRAYS, only: heat_flux, water_flux, Z_3d_n
+    use o_ARRAYS, only: heat_flux, water_flux
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
     use g_PARSUP
     implicit none

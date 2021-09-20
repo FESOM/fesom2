@@ -97,6 +97,36 @@ integer                                       :: nn_size
 integer, allocatable, dimension(:)            :: nn_num
 integer, allocatable, dimension(:,:)          :: nn_pos
 
+!_______________________________________________________________________________
+! Arrays added for ALE implementation:
+! --> layer thinkness at node and depthlayer for t=n and t=n+1
+real(kind=WP), allocatable,dimension(:,:)   :: hnode, hnode_new, zbar_3d_n, Z_3d_n
+
+! --> layer thinkness at elements, interpolated from hnode
+real(kind=WP), allocatable,dimension(:,:)   :: helem
+
+! --> thinkness of bottom elem (important for partial cells)
+real(kind=WP), allocatable,dimension(:)     :: bottom_elem_thickness 
+real(kind=WP), allocatable,dimension(:)     :: bottom_node_thickness 
+
+! --> The increment of total fluid depth on elements. It is used to update the matrix
+real(kind=WP), allocatable,dimension(:)     :: dhe
+
+! --> hbar, hbar_old: correspond to the elevation, but on semi-integer time steps.
+real(kind=WP), allocatable,dimension(:)     :: hbar, hbar_old
+
+! --> auxiliary array to store depth of layers and depth of mid level due to changing 
+!     layer thinkness at every node
+real(kind=WP), allocatable,dimension(:)     :: zbar_n, Z_n
+
+! new bottom depth at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_bot
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_bot
+
+! new depth of cavity-ocean interface at node and element due to partial cells
+real(kind=WP), allocatable,dimension(:)     :: zbar_n_srf
+real(kind=WP), allocatable,dimension(:)     :: zbar_e_srf
+
 character(:), allocatable :: representative_checksum
 
 contains
@@ -181,6 +211,22 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     write(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
     call write_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
     call write_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
+    call write_bin_array(mesh%hnode,                   unit, iostat, iomsg)
+    call write_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
+    call write_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
+    call write_bin_array(mesh%helem,                   unit, iostat, iomsg)
+    call write_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
+    call write_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)
+    call write_bin_array(mesh%dhe,                     unit, iostat, iomsg)
+    call write_bin_array(mesh%hbar,                    unit, iostat, iomsg)
+    call write_bin_array(mesh%hbar_old,                unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
+    call write_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_n_bot,              unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_e_bot,              unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
+    call write_bin_array(mesh%zbar_e_srf,              unit, iostat, iomsg)
 !   call write_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
 end subroutine write_t_mesh
 
@@ -258,6 +304,22 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     read(unit, iostat=iostat, iomsg=iomsg) mesh%nn_size
     call read_bin_array(mesh%nn_num,                  unit, iostat, iomsg)
     call read_bin_array(mesh%nn_pos,                  unit, iostat, iomsg)
+    call read_bin_array(mesh%hnode,                   unit, iostat, iomsg)
+    call read_bin_array(mesh%hnode_new,               unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_3d_n,               unit, iostat, iomsg)
+    call read_bin_array(mesh%Z_3d_n,                  unit, iostat, iomsg)
+    call read_bin_array(mesh%helem,                   unit, iostat, iomsg)
+    call read_bin_array(mesh%bottom_elem_thickness,   unit, iostat, iomsg)
+    call read_bin_array(mesh%bottom_node_thickness,   unit, iostat, iomsg)
+    call read_bin_array(mesh%dhe,                     unit, iostat, iomsg)
+    call read_bin_array(mesh%hbar,                    unit, iostat, iomsg)
+    call read_bin_array(mesh%hbar_old,                unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_n,                  unit, iostat, iomsg)
+    call read_bin_array(mesh%Z_n,                     unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_n_bot,              unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_e_bot,              unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_n_srf,              unit, iostat, iomsg)
+    call read_bin_array(mesh%zbar_e_srf,              unit, iostat, iomsg)
 !   call read_bin_array(mesh%representative_checksum, unit, iostat, iomsg)
 end subroutine read_t_mesh
 end module MOD_MESH

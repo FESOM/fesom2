@@ -8,9 +8,10 @@ module oce_adv_tra_fct_interfaces
       type(t_tracer_work), intent(inout), target :: twork
     end subroutine
 
-    subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, mesh)
+    subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, mesh)
       use MOD_MESH
       use g_PARSUP
+      real(kind=WP), intent(in), target :: dt
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
       real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -20,6 +21,7 @@ module oce_adv_tra_fct_interfaces
       real(kind=WP), intent(inout)      :: adf_v(mesh%nl,  myDim_nod2D)
       real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, myDim_edge2D)
       real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  myDim_nod2D)
+      real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
     end subroutine
  end interface
 end module
@@ -29,8 +31,6 @@ end module
 subroutine oce_adv_tra_fct_init(twork, mesh)
     use MOD_MESH
     use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
     use g_PARSUP
     implicit none
     integer                                    :: my_size
@@ -60,7 +60,7 @@ end subroutine oce_adv_tra_fct_init
 !
 !
 !===============================================================================
-subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, mesh)
+subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
@@ -69,12 +69,10 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
     ! Adds limited fluxes to the LO solution   
     use MOD_MESH
     use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
     use g_PARSUP
-    use g_CONFIG
     use g_comm_auto
     implicit none
+    real(kind=WP), intent(in), target :: dt
     type(t_mesh),  intent(in), target :: mesh
     real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
@@ -84,7 +82,7 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
     real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   myDim_nod2D)
     real(kind=WP), intent(inout)      :: fct_plus (mesh%nl-1, myDim_nod2D+eDim_nod2D)
     real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-
+    real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array, let us use twork%edge_up_dn_grad(1:4, 1:NL-2, 1:myDim_edge2D) to save space
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
     real(kind=WP)                     :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
     real(kind=WP)                     :: flux_eps=1e-16
@@ -112,19 +110,19 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
     !___________________________________________________________________________
     ! a2. Admissible increments on elements
     !     (only layers below the first and above the last layer)
-    !     look for max, min bounds for each element --> UV_rhs here auxilary array
+    !     look for max, min bounds for each element --> AUX here auxilary array
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
         nl1 = nlevels(elem)
         do nz=nu1, nl1-1
-            UV_rhs(1,nz,elem)=maxval(fct_ttf_max(nz,enodes))
-            UV_rhs(2,nz,elem)=minval(fct_ttf_min(nz,enodes))
+            AUX(1,nz,elem)=maxval(fct_ttf_max(nz,enodes))
+            AUX(2,nz,elem)=minval(fct_ttf_min(nz,enodes))
         end do
         if (nl1<=nl-1) then
             do nz=nl1,nl-1
-                UV_rhs(1,nz,elem)=-bignumber
-                UV_rhs(2,nz,elem)= bignumber
+                AUX(1,nz,elem)=-bignumber
+                AUX(2,nz,elem)= bignumber
             end do
         endif
     end do ! --> do elem=1, myDim_elem2D
@@ -146,8 +144,8 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
                 ! vertical layer
                 ! nod_in_elem2D     --> elem indices of which node n is surrounded
                 ! nod_in_elem2D_num --> max number of surrounded elem 
-                tvert_max(nz)= maxval(UV_rhs(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(UV_rhs(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
             end do
             
             !___________________________________________________________________
@@ -178,8 +176,8 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
             do nz=nu1,nl1-1
-                tvert_max(nz)= maxval(UV_rhs(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(UV_rhs(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
             end do
             do nz=nu1+1, nl1-2
                 tvert_max(nz)=max(tvert_max(nz),maxval(fct_ttf_max(nz-1:nz+1,n)))
@@ -200,8 +198,8 @@ subroutine oce_tra_adv_fct(ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_
             nu1 = ulevels_nod2D(n)
             nl1 = nlevels_nod2D(n)
             do nz=nu1, nl1-1
-                tvert_max(nz)= maxval(UV_rhs(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
-                tvert_min(nz)= minval(UV_rhs(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_max(nz)= maxval(AUX(1,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
+                tvert_min(nz)= minval(AUX(2,nz,nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
             end do
             do nz=nu1+1, nl1-2
                 tvert_max(nz)=min(tvert_max(nz),maxval(fct_ttf_max(nz-1:nz+1,n)))

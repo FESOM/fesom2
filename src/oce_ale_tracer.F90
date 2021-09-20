@@ -11,9 +11,10 @@ module diff_part_hor_redi_interface
 end module
 module adv_tracers_ale_interface
   interface
-    subroutine adv_tracers_ale(tr_num, tracer, mesh)
+    subroutine adv_tracers_ale(dt, tr_num, tracer, mesh)
       use mod_mesh
       use mod_tracer
+      real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
       type(t_mesh),   intent(in),    target :: mesh
@@ -142,7 +143,7 @@ subroutine solve_tracers_ale(tracers, mesh)
         call init_tracers_AB(tr_num, tracers, mesh)
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-        call adv_tracers_ale(tr_num, tracers, mesh)
+        call adv_tracers_ale(dt, tr_num, tracers, mesh)
         ! diffuse tracers 
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, tracers, mesh)
@@ -188,7 +189,7 @@ end subroutine solve_tracers_ale
 !
 !
 !===============================================================================
-subroutine adv_tracers_ale(tr_num, tracers, mesh)
+subroutine adv_tracers_ale(dt, tr_num, tracers, mesh)
     use g_config, only: flag_debug
     use g_parsup
     use mod_mesh
@@ -200,6 +201,7 @@ subroutine adv_tracers_ale(tr_num, tracers, mesh)
 !   use adv_tracers_vert_ppm_ale_interface
     use oce_adv_tra_driver_interfaces
     implicit none
+    real(kind=WP),  intent(in),    target :: dt
     integer                               :: node, nz
     integer,        intent(in)            :: tr_num
     type(t_mesh),   intent(in),    target :: mesh
@@ -223,7 +225,7 @@ subroutine adv_tracers_ale(tr_num, tracers, mesh)
     ! here --> add horizontal advection part to del_ttf(nz,n) = del_ttf(nz,n) + ...
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
-    call do_oce_adv_tra(UV, wvel, wvel_i, wvel_e, tr_num, tracers, mesh)   
+    call do_oce_adv_tra(dt, UV, wvel, wvel_i, wvel_e, tr_num, tracers, mesh)   
     !___________________________________________________________________________
     ! update array for total tracer flux del_ttf with the fluxes from horizontal
     ! and vertical advection

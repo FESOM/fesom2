@@ -204,11 +204,11 @@ subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
     integer                              :: i
 
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%num_tracers
-    write(*,*) 'number of tracers to read: ', tracer%num_tracers
+!   write(*,*) 'number of tracers to read: ', tracer%num_tracers
     allocate(tracer%data(tracer%num_tracers))
     do i=1, tracer%num_tracers
        read(unit, iostat=iostat, iomsg=iomsg) tracer%data(i)
-       write(*,*) 'tracer info:', tracer%data(i)%ID, TRIM(tracer%data(i)%tra_adv_hor), TRIM(tracer%data(i)%tra_adv_ver), TRIM(tracer%data(i)%tra_adv_lim)
+!      write(*,*) 'tracer info:', tracer%data(i)%ID, TRIM(tracer%data(i)%tra_adv_hor), TRIM(tracer%data(i)%tra_adv_ver), TRIM(tracer%data(i)%tra_adv_lim)
     end do
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%work
     read(unit, iostat=iostat, iomsg=iomsg)    tracer%smooth_bh_tra
