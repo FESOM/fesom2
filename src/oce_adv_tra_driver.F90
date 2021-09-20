@@ -136,7 +136,6 @@ subroutine do_oce_adv_tra(vel, w, wi, we, tr_num, tracers, mesh)
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
             end do
         end do
-        
         if (w_split) then !wvel/=wvel_e
             ! update for implicit contribution (w_split option)
             call adv_tra_vert_impl(wi, fct_LO, mesh)
@@ -173,26 +172,25 @@ subroutine do_oce_adv_tra(vel, w, wi, we, tr_num, tracers, mesh)
     else
        pwvel=>we
     end if
- 
     !___________________________________________________________________________
     ! do vertical tracer advection, in case of FCT high order solution 
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_ver))
         CASE('QR4C')
             ! compute the untidiffusive vertical flux   (init_zero=.false.:input is the LO vertical flux computed above)
-            call adv_tra_ver_qr4c (ttfAB, pwvel, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_qr4c (pwvel, ttfAB, mesh, optv, adv_flux_ver, init_zero=do_zero_flux)
         CASE('CDIFF')
-            call adv_tra_ver_cdiff(ttfAB, pwvel, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_cdiff(pwvel, ttfAB, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm (ttfAB, pwvel, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_vert_ppm (pwvel, ttfAB, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE('UPW1')
-            call adv_tra_ver_upw1 (ttfAB, pwvel, mesh,       adv_flux_ver, init_zero=do_zero_flux)
+            call adv_tra_ver_upw1 (pwvel, ttfAB, mesh,       adv_flux_ver, init_zero=do_zero_flux)
         CASE DEFAULT !unknown
             if (mype==0) write(*,*) 'Unknown vertical advection type ',  trim(tracers%data(tr_num)%tra_adv_ver), '! Check your namelists!'
             call par_ex(1)
         ! --> be aware the vertical implicite part in case without FCT is done in 
         !     oce_ale_tracer.F90 --> subroutine diff_ver_part_impl_ale(tr_num, mesh)
         !     for do_wimpl=.true.
-    END SELECT   
+    END SELECT
     !___________________________________________________________________________
     !
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
