@@ -196,6 +196,12 @@ CASE ('h2o16_ice ')
     call def_stream(nod2D,  myDim_nod2D,  'h2o16_ice',      'h2o16 concentration in sea ice',    'kmol/m**3',    tr_arr_ice(:,3),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
 !---wiso-code-end
 
+!---fwf-code-begin
+CASE ('landice   ')
+    call def_stream(nod2D,  myDim_nod2D,  'landice',      'freshwater flux',    'm/s',    runoff_landice,    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+!---fwf-code-end
+
+
 !___________________________________________________________________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')

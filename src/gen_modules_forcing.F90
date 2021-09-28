@@ -39,8 +39,11 @@ real(kind=WP)  :: Swind     =0.0_WP  ! parameterization for coupled current feed
   logical                       :: use_landice_water=.false.
   integer                       :: landice_start_mon=1
   integer                       :: landice_end_mon=12
+!---fwf-code-begin
+  character(MAX_PATH)           :: fwf_path='./mesh/'
+!---fwf-code-end
 
-  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon
+  namelist /land_ice/ use_landice_water, landice_start_mon, landice_end_mon, fwf_path !---fwf-code, add fwf_path
 
 end module g_forcing_param
 ! ====================================================================

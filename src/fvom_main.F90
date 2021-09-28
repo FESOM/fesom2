@@ -26,6 +26,10 @@ use fesom_version_info_module
 !---wiso-code
 use g_ic3d
 !---wiso-code-end
+  !---fwf-code
+use g_forcing_param, only: use_landice_water 
+use landice_water_init_interface
+  !---fwf-code-end
 
 ! Define icepack module
 #if defined (__icepack)
@@ -117,6 +121,11 @@ type(t_mesh),             target, save :: mesh
     endif
     if (mype==0) t5=MPI_Wtime()
     call compute_diagnostics(0, mesh) ! allocate arrays for diagnostic
+
+!---fwf-code-begin
+  if(use_landice_water) call landice_water_init(mesh)
+!---fwf-code-end
+
 #if defined (__oasis)
     call cpl_oasis3mct_define_unstr(mesh)
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv

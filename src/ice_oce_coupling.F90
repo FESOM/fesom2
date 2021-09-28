@@ -1,4 +1,4 @@
-!
+
 !
 !_______________________________________________________________________________
 subroutine oce_fluxes_mom(mesh)
@@ -153,7 +153,7 @@ subroutine oce_fluxes(mesh)
   use o_ARRAYS
   use i_ARRAYS
   use g_comm_auto
-  use g_forcing_param, only: use_virt_salt
+  use g_forcing_param, only: use_virt_salt,use_landice_water !---fwf-code, add use_landice_water
   use g_forcing_arrays
   use g_PARSUP
   use g_support
@@ -161,6 +161,9 @@ subroutine oce_fluxes(mesh)
   !---wiso-code
   use o_PARAM, only: num_wiso_tracers
   !---wiso-code-end
+  !---fwf-code
+  use g_clock 
+  !---fwf-code-end
   
 #if defined (__icepack)
   use icedrv_main,   only: icepack_to_fesom,    &
@@ -471,6 +474,22 @@ subroutine oce_fluxes(mesh)
    end if  ! lwiso end
    
 !---wiso-code-end
+
+!---fwf-code-begin
+   if(use_landice_water) then
+     do n=1, myDim_nod2D+eDim_nod2D
+        water_flux(n)=water_flux(n)-runoff_landice(n)*landice_season(month)
+     end do
+   end if
+
+   if(lwiso .and. use_landice_water) then
+     do n=1, myDim_nod2D+eDim_nod2D
+     wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+runoff_landice(n)*1000.0*wiso_smow(1)*(1-30.0/1000.0)*landice_season(month)
+     wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+runoff_landice(n)*1000.0*wiso_smow(2)*(1-240.0/1000.0)*landice_season(month)
+     wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+runoff_landice(n)*1000.0*landice_season(month)
+     end do
+   end if
+!---fwf-code-end
 
     !___________________________________________________________________________
     if (use_sw_pene) call cal_shortwave_rad(mesh)
