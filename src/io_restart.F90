@@ -245,12 +245,20 @@ subroutine ini_ice_io(year, mesh)
 
 #include  "associate_mesh.h"
 
+  write(*,*) "LA DEBUG: in ini_ice_io"
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
   iid%filename=trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
-  if (iid%is_in_use) return
+  if (iid%is_in_use) then
+      write(*,*) "LA DEBUG: is_in_use=true"
+      return
+  else
+      write(*,*) "LA DEBUG: is_in_use=false"
+  end if
   iid%is_in_use=.true.
+  write(*,*) "LA DEBUG: start def_dim"
   call def_dim(iid, 'node', nod2d)
+  write(*,*) "LA DEBUG: finished def_dim"
 
   !===========================================================================
   !===================== Definition part =====================================
@@ -291,20 +299,32 @@ subroutine restart(istep, l_write, l_read, mesh)
   if (.not. l_read) then
                call ini_ocean_io(yearnew, mesh)
 !!wiso-code!!!
-  if (lwiso)   call ini_wiso_io(yearnew, mesh)
+  if (lwiso) then 
+      call ini_wiso_io(yearnew, mesh)
+  end if
 !!wiso-code!!!
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+  if (use_ice) then
+      call ini_ice_io  (yearnew, mesh)
+  end if
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearnew, mesh)
+  if (use_ice) then
+      call init_restart_icepack(yearnew, mesh)
+  end if
 #endif
   else
                call ini_ocean_io(yearold, mesh)
 !!wiso-code!!!
-  if (lwiso)   call ini_wiso_io(yearold, mesh)
+  if (lwiso) then
+      call ini_wiso_io(yearold, mesh)
+  end if
 !!wiso-code!!!
-  if (use_ice) call ini_ice_io  (yearold, mesh)
+  if (use_ice) then
+      call ini_ice_io  (yearold, mesh)
+  end if
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearold, mesh)
+  if (use_ice) then
+      call init_restart_icepack(yearold, mesh)
+  end if
 #endif
   end if
 
@@ -358,19 +378,24 @@ subroutine restart(istep, l_write, l_read, mesh)
   call assoc_ids(oid);                  call was_error(oid)  
   call write_restart(oid, istep, mesh); call was_error(oid)
   if (use_ice) then
+     write(*,*) "LA DEBUG: Here 1"
      call assoc_ids(iid);                  call was_error(iid)  
+     write(*,*) "LA DEBUG: Here 2"
      call write_restart(iid, istep, mesh); call was_error(iid)
+     write(*,*) "LA DEBUG: Here 3"
 #if defined(__icepack)
      call assoc_ids(ip_id);                  call was_error(ip_id)
+     write(*,*) "LA DEBUG: Here 4"
      call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+     write(*,*) "LA DEBUG: Here 5"
 #endif
   end if
-!!!wiso-code!!!!
-  if (lwiso) then
-     call assoc_ids(wid);            call was_error(wid)
-     call write_restart(wid, istep, mesh); call was_error(wid)
-  end if
-!!!wiso-code!!!!
+!!!!wiso-code!!!!
+!  if (lwiso) then
+!     call assoc_ids(wid);            call was_error(wid)
+!     call write_restart(wid, istep, mesh); call was_error(wid)
+!  end if
+!!!!wiso-code!!!!
 
   
   ! actualize clock file to latest restart point

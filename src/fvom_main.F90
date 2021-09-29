@@ -1087,12 +1087,21 @@ type(t_mesh), intent(in) , target :: mesh
     call compute_diagnostics(1, mesh)
     t4 = MPI_Wtime()
     !___prepare output______________________________________________________
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start output"
+    end if
     call output (n, mesh)
     if (use_icebergs .and. bIcbCalcCycleCompleted) then
+        if (mype==0) then
+            write(*,*) "LA DEBUG: start reset_ib_fluxes"
+        end if
         call reset_ib_fluxes
     end if
 
     t5 = MPI_Wtime()
+    if (mype==0) then
+        write(*,*) "LA DEBUG: start restart"
+    end if
     call restart(n, .false., .false., mesh)
     t6 = MPI_Wtime()
 
