@@ -1099,13 +1099,15 @@ CONTAINS
       !==========================================================================
 
       ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=((day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400._WP))
+      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .and.
+             timenew==86400._WP) .or. mstep==1  )
 
       ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
          if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
-               i=month+1
+               i=month
+               if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
@@ -1119,7 +1121,8 @@ CONTAINS
        if(update_monthly_flag) then
          if(runoff_climatology) then
            !climatology monthly mean
-           i=month+1
+           i=month
+           if (mstep > 1) i=i+1 
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
            filename=trim(nm_runoff_file)
@@ -1130,8 +1133,8 @@ CONTAINS
 
          else
            !monthly data
-
-           i=month+1
+           i=month
+           if (mstep > 1) i=i+1 
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
            filename=trim(nm_runoff_file)//cyearnew//'.nc' 
