@@ -1099,8 +1099,7 @@ CONTAINS
       !==========================================================================
 
       ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .and.
-             timenew==86400._WP) .or. mstep==1  )
+      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
 
       ! read in SSS for applying SSS restoring
       if (surf_relax_S > 0._WP) then
