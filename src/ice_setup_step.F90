@@ -31,6 +31,7 @@ subroutine ice_setup(mesh)
     ice_dt=real(ice_ave_steps,WP)*dt
     ! ice_dt=dt
     Tevp_inv=3.0_WP/ice_dt 
+    Tevp_inv=1.0_WP/1800.0_WP
     Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                             ! it always enters
 

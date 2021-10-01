@@ -126,7 +126,8 @@
               strocnyT(i) = aux*(vvel(i) - vocn(i))
               ! freezing - melting potential
               Tf(i)   = icepack_sea_freezing_temperature(sss(i))
-              frzmlt(i) = min((Tf(i)-sst(i)) * cprho * hmix(i) / dt, 1000.0_dbl_kind)
+              !frzmlt(i) = min((Tf(i)-sst(i)) * cprho * hmix(i) / dt, 1000.0_dbl_kind)
+              frzmlt(i) = (Tf(i)-sst(i)) * cprho * hmix(i) / dt
            enddo
 
            ! Compute convergence and shear on the nodes

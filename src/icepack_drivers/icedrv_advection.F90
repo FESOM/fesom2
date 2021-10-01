@@ -1095,7 +1095,7 @@ submodule (icedrv_main) icedrv_advection
   
         logical (kind=log_kind) :: tr_brine, tr_lvl, flag_snow, flag_cold_ice, flag_warm_ice, &
                                    tr_pond_cesm, tr_pond_topo, tr_pond_lvl, tr_FY, tr_iage,   &
-                                   heat_capacity
+                                   heat_capacity, flag_thick_ice
         integer (kind=int_kind) :: nt_Tsfc, nt_qice, nt_qsno, nt_sice
         integer (kind=int_kind) :: nt_fbri, nt_alvl, nt_vlvl, nt_apnd, nt_hpnd, nt_ipnd, nt_FY, nt_iage
   
@@ -1162,10 +1162,11 @@ submodule (icedrv_main) icedrv_advection
   
                       ! Condition on ice enthalpy
   
-                      flag_warm_ice = .false.
-                      flag_cold_ice = .false.
-                      flag_snow     = .false.
-  
+                      flag_warm_ice  = .false.
+                      flag_cold_ice  = .false.
+                      flag_snow      = .false.
+                      flag_thick_ice = .false.
+
                       do k = 1, nilyr  ! Check for problems
   
                          if (ktherm == 2) then
@@ -1179,6 +1180,15 @@ submodule (icedrv_main) icedrv_advection
   
                       enddo !nilyr
   
+
+                      if (vicen(i,n) > 30.0_dbl_kind) then
+
+                         flag_cold_ice = .true.
+                         vicen(i,n) = 30.0_dbl_kind
+                         vsnon(i,n) = min(3.0_dbl_kind, vsnon(i,n))
+
+                      endif 
+
                       if (flag_cold_ice) then
   
                           trcrn(i,nt_Tsfc,n) = Tsfc

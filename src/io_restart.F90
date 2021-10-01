@@ -642,12 +642,14 @@ subroutine read_restart(id, mesh, arg)
         if (mype==0)          allocate(aux (size_gen))
         if (size_gen==nod2D)  allocate(laux(myDim_nod2D +eDim_nod2D ))
         if (size_gen==elem2D) allocate(laux(myDim_elem2D+eDim_elem2D))
+        laux(:) = 0.0_WP
         do lev=1, size_lev
            if (mype==0) then
               if (order==1) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
               if (order==2) id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
            end if
-           id%var(i)%pt2(lev,:)=0.
+           if (order==1) id%var(i)%pt2(:,lev)=0.0_WP
+           if (order==2) id%var(i)%pt2(lev,:)=0.0_WP
            if (size_gen==nod2D)  then
               call broadcast_nod (laux, aux)
               if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_nod2D+eDim_nod2D)
