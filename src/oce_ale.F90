@@ -1026,11 +1026,6 @@ subroutine restart_thickness_ale(mesh)
             nzmax = nlevels_nod2D(n)-1
             
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
-            if (nzmin > 1) cycle
-            
-            !___________________________________________________________________
             ! be sure that bottom layerthickness uses partial cell layer thickness
             ! in case its activated, especially when you make a restart from a non 
             ! partiall cell runs towards a simulation with partial cells
@@ -1049,11 +1044,6 @@ subroutine restart_thickness_ale(mesh)
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)-1
-            
-            !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
-            if (nzmin > 1) cycle
             
             !___________________________________________________________________
             elnodes=elem2D_nodes(:, elem)
