@@ -770,7 +770,6 @@ subroutine write_mean(entry, entry_index)
         end if
      end do
   end if
-
 end subroutine
 
 
@@ -927,7 +926,9 @@ use mod_partit
   entry%mypartit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
   call write_mean(entry, entry_index)
+write(*,*) 1111111
   if(entry%mypartit%mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+write(*,*) 2222222
 end subroutine
 
 

@@ -144,16 +144,9 @@ IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
 
-
-write(*,*) 'CP 1'
       call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh(partit, mesh)
       call set_par_support(partit, mesh)
-!!PS       call find_levels(partit, mesh)
-!!PS       
-!!PS       if (use_cavity) call find_levels_cavity(partit, mesh)
-!!PS         
-write(*,*) 'CP 2'
       call test_tri(partit, mesh)
       call load_edges(partit, mesh)
       call find_neighbors(partit, mesh)
@@ -190,15 +183,18 @@ type(t_partit), intent(inout), target :: partit
  character(len=MAX_PATH)  :: dist_mesh_dir
  integer        :: flag_wrongaux3d=0
  integer       :: ierror              ! return error code
- integer, allocatable, dimension(:)        :: mapping
- integer, allocatable, dimension(:,:)      :: ibuff
+ integer, allocatable, dimension(:)         :: mapping
+ integer, allocatable, dimension(:,:)       :: ibuff
  real(kind=WP), allocatable, dimension(:,:) :: rbuff
- integer, allocatable, dimension(:,:)      :: auxbuff ! will be used for reading aux3d.out 
- integer fileunit, iostat
- character(32) mesh_checksum
+ integer, allocatable, dimension(:,:)       :: auxbuff ! will be used for reading aux3d.out 
+ integer                                    :: fileunit, iostat
+ character(32)                              :: mesh_checksum
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
+mype=>partit%mype
+npes=>partit%npes
+MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   !mesh related files will be read in chunks of chunk_size
   chunk_size=100000
@@ -208,14 +204,12 @@ type(t_partit), intent(inout), target :: partit
   !==============================
   allocate(mapping(chunk_size))
   allocate(ibuff(chunk_size,4), rbuff(chunk_size,3))
-
   mapping=0 
   !==============================
   t0=MPI_Wtime()
   write(mype_string,'(i5.5)') mype  
-  write(npes_string,"(I10)") npes
+  write(npes_string,"(I10)")  npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
- 
   !=======================
   ! rank partitioning vector
   ! will be read by 0 proc
@@ -224,7 +218,8 @@ type(t_partit), intent(inout), target :: partit
      file_name=trim(dist_mesh_dir)//'rpart.out'
      fileID=10
      open(fileID, file=trim(file_name)) 
-     allocate(part(npes+1))
+     allocate(partit%part(npes+1))
+     part=>partit%part
      read(fileID,*) n
      error_status=0
      if (n/=npes) error_status=1 !set the error status for consistency in rpart
@@ -240,16 +235,16 @@ type(t_partit), intent(inout), target :: partit
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
-     call par_ex(1)
+     call par_ex(partit, 1)
      STOP
   end if
   ! broadcasting partitioning vector to the other procs
   if (mype/=0) then
-     allocate(part(npes+1))
+     allocate(partit%part(npes+1))
+     part=>partit%part
   end if
   call MPI_BCast(part, npes+1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   if (mype==0) write(*,*) mype,'rpart is read'
-
   !===========================
   ! Lists of nodes and elements in global indexing. 
   ! every proc reads its file
@@ -264,13 +259,13 @@ type(t_partit), intent(inout), target :: partit
   read(fileID,*) partit%myDim_nod2D
   read(fileID,*) partit%eDim_nod2D
   allocate(partit%myList_nod2D(partit%myDim_nod2D+partit%eDim_nod2D)) 	 
-  read(fileID,*) myList_nod2D
+  read(fileID,*) partit%myList_nod2D
 	 
   read(fileID,*) partit%myDim_elem2D
   read(fileID,*) partit%eDim_elem2D
   read(fileID,*) partit%eXDim_elem2D
   allocate(partit%myList_elem2D(partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
-  read(fileID,*) myList_elem2D
+  read(fileID,*) partit%myList_elem2D
 	
   read(fileID,*) partit%myDim_edge2D
   read(fileID,*) partit%eDim_edge2D
@@ -301,7 +296,7 @@ type(t_partit), intent(inout), target :: partit
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: nod2D/=part(npes+1)-1'
-     call par_ex(1)
+     call par_ex(partit, 1)
      STOP
   end if
 
@@ -604,7 +599,8 @@ end if
  read(fileID,*) com_nod2D%rPE(1:com_nod2D%rPEnum)
 !!$  ALLOCATE(com_nod2D%rptr(com_nod2D%rPEnum+1))
  read(fileID,*) com_nod2D%rptr(1:com_nod2D%rPEnum+1)
- ALLOCATE(com_nod2D%rlist(eDim_nod2D))
+ ALLOCATE(partit%com_nod2D%rlist(eDim_nod2D))
+
  read(fileID,*) com_nod2D%rlist
 	 
  read(fileID,*) com_nod2D%sPEnum

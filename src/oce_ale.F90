@@ -2685,7 +2685,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
 
     t0=MPI_Wtime()
-    
+
 !     water_flux = 0.0_WP
 !     heat_flux  = 0.0_WP
 !     stress_surf= 0.0_WP
@@ -2695,7 +2695,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
     call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
-    
+
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_force_4_...'//achar(27)//'[0m'
@@ -2704,18 +2704,19 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     else  
         call pressure_force_4_zxxxx(tracers, partit, mesh)
     end if
+
     !___________________________________________________________________________
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
     call sw_alpha_beta(tracers%data(1)%values, tracers%data(2)%values, partit, mesh)
-    
+
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
     call compute_sigma_xy(tracers%data(1)%values,tracers%data(2)%values, partit, mesh)
-    
+
     ! compute both: neutral slope and tapered neutral slope. Can be later combined with compute_sigma_xy
     ! will be primarily used for computing Redi diffusivities. etc?
-    call compute_neutral_slope(partit, partit, mesh)
-    
+    call compute_neutral_slope(partit, mesh)
+
     !___________________________________________________________________________
     ! call status_check(partit)
     !___________________________________________________________________________
@@ -2740,7 +2741,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix(partit, mesh)
     end if 
-    
+
     !___MAIN MIXING SCHEMES_____________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
@@ -2780,7 +2781,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
         call mo_convect(partit, mesh)
         
     end if     
-    
+
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
     ! in a numerical model of the ocean general circulation", ocean modelling to 
@@ -2802,7 +2803,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
 !!PS         if (any(ssh_rhs/=ssh_rhs))         write(*,*) n, mype,' --> found NaN ssh_rhs before compute_vel_rhs'
 !!PS         if (any(ssh_rhs_old/=ssh_rhs_old)) write(*,*) n, mype,' --> found NaN ssh_rhs_old before compute_vel_rhs'
 !!PS         if (any(abs(Wvel_e)>1.0e20))       write(*,*) n, mype,' --> found Inf Wvel_e before compute_vel_rhs'
-    
+
     if(mom_adv/=3) then
         call compute_vel_rhs(partit, mesh)
     else
@@ -2827,7 +2828,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
     ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
     call compute_ssh_rhs_ale(partit, mesh)
-    
+
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
     call solve_ssh_ale(partit, mesh)
@@ -2846,7 +2847,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(partit, mesh)
-    
+
     !___________________________________________________________________________
     ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
     !   equation (14) Danlov et.al "the finite volume sea ice ocean model FESOM2
@@ -2882,7 +2883,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(partit, mesh)
     t7=MPI_Wtime() 
-    
+
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
@@ -2902,6 +2903,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     ! togeather around 2.5% of model runtime
     call check_blowup(n, tracers, partit, mesh)
     t10=MPI_Wtime()
+
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
     rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)

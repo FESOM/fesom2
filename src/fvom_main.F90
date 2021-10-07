@@ -118,7 +118,7 @@ integer mpi_version_len
     ! and additional arrays needed for 
     ! fancy advection etc.  
     !=====================
-    call check_mesh_consistency(mesh)
+    call check_mesh_consistency(partit, mesh)
     if (mype==0) t2=MPI_Wtime()
 
     call tracer_init(tracers, partit, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
@@ -129,7 +129,7 @@ integer mpi_version_len
        write(*,*) 'FESOM ocean_setup... complete'
        t3=MPI_Wtime()
     endif
-    call forcing_setup(mesh)
+    call forcing_setup(partit, mesh)
 
     if (mype==0) t4=MPI_Wtime()
     if (use_ice) then 
@@ -197,6 +197,7 @@ integer mpi_version_len
     endif
 
     DUMP_DIR='DUMP/'
+    INQUIRE(file=trim(dump_dir), EXIST=L_EXISTS)
     if (.not. L_EXISTS) call system('mkdir '//trim(dump_dir))
 
     write (dump_filename, "(A7,I7.7)") "t_mesh.", mype
@@ -217,8 +218,8 @@ integer mpi_version_len
 !    read  (mype+300) tracers_copy
 !    close (mype+300)
 
-call par_ex(partit)
-stop
+!call par_ex(partit)
+!stop
 !         
 !    if (mype==10) write(,) mesh1%ssh_stiff%values-mesh%ssh_stiff%value
 
@@ -249,7 +250,6 @@ stop
     if (use_global_tides) then
        call foreph_ini(yearnew, month, partit)
     end if
-
     do n=1, nsteps        
         if (use_global_tides) then
            call foreph(partit, mesh)
@@ -264,10 +264,9 @@ stop
 #if defined (__oifs) || defined (__oasis)
             seconds_til_now=INT(dt)*(n-1)
 #endif
-        call clock
-        
+        call clock      
         !___compute horizontal velocity on nodes (originaly on elements)________
-        call compute_vel_nodes(mesh)
+        call compute_vel_nodes(partit, mesh)
         !___model sea-ice step__________________________________________________
         t1 = MPI_Wtime()
         if(use_ice) then
@@ -299,15 +298,19 @@ stop
         t2 = MPI_Wtime()
         !___model ocean step____________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+
         call oce_timestep_ale(n, tracers, partit, mesh)
+
         t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
         call compute_diagnostics(1, tracers, partit, mesh)
+
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         call output (n, tracers, partit, mesh)
+
         t5 = MPI_Wtime()
         call restart(n, .false., .false., tracers, partit, mesh)
         t6 = MPI_Wtime()
@@ -320,7 +323,7 @@ stop
     end do
     
     call finalize_output()
-    
+
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(MPI_COMM_FESOM, MPIERR)
@@ -329,7 +332,7 @@ stop
        runtime_alltimesteps = real(t1-t0,real32)
        write(*,*) 'FESOM Run is finished, updating clock'
     endif
-    
+
     mean_rtime(1)  = rtime_oce         
     mean_rtime(2)  = rtime_oce_mixpres 
     mean_rtime(3)  = rtime_oce_dyn     

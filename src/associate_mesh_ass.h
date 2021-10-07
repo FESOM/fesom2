@@ -4,6 +4,7 @@ edge2D             => mesh%edge2D
 edge2D_in          => mesh%edge2D_in          
 ocean_area         => mesh%ocean_area         
 nl                 => mesh%nl
+nn_size            => mesh%nn_size
 coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D
 geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D    
 elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes
