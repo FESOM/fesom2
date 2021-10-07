@@ -1,39 +1,47 @@
 module oce_initial_state_interface
   interface
-    subroutine oce_initial_state(tracers, mesh)
-      use mod_mesh
+    subroutine oce_initial_state(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
       use mod_tracer
       type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
 end module
 module tracer_init_interface
   interface
-    subroutine tracer_init(tracers, mesh)
-      use mod_mesh
+    subroutine tracer_init(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
 end module
 module ocean_setup_interface
   interface
-    subroutine ocean_setup(tracers, mesh)
-      use mod_mesh
+    subroutine ocean_setup(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
 end module
 module before_oce_step_interface
   interface
-    subroutine before_oce_step(tracers, mesh)
-      use mod_mesh
+    subroutine before_oce_step(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
@@ -42,11 +50,11 @@ end module
 !
 !
 !_______________________________________________________________________________
-subroutine ocean_setup(tracers, mesh)
+subroutine ocean_setup(tracers, partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE MOD_TRACER
 USE o_PARAM
-USE g_PARSUP
 USE o_ARRAYS
 USE g_config
 USE g_forcing_param, only: use_virt_salt
@@ -60,6 +68,7 @@ use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
+type(t_partit), intent(inout), target :: partit
 type(t_tracer), intent(inout), target :: tracers
 integer                               :: n
     !___setup virt_salt_flux____________________________________________________
@@ -79,13 +88,13 @@ integer                               :: n
    
     !___________________________________________________________________________
     ! initialize arrays for ALE
-    if (mype==0) then
+    if (partit%mype==0) then
        write(*,*) '____________________________________________________________'
        write(*,*) ' --> initialise ALE arrays + sparse SSH stiff matrix'
        write(*,*)
     end if
-    call init_ale(mesh)
-    call init_stiff_mat_ale(mesh) !!PS test  
+    call init_ale(partit, mesh)
+    call init_stiff_mat_ale(partit, mesh) !!PS test  
     
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
@@ -107,39 +116,39 @@ integer                               :: n
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
         case default 
             stop "!not existing mixing scheme!"
-            call par_ex
+            call par_ex(partit)
     end select
 
     ! initialise fesom1.4 like KPP
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
-        call oce_mixing_kpp_init(mesh)
+        call oce_mixing_kpp_init(partit, mesh)
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
     
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
-        call init_cvmix_kpp(mesh)
+        call init_cvmix_kpp(partit, mesh)
         
     ! initialise cvmix_PP    
     elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
-        call init_cvmix_pp(mesh)
+        call init_cvmix_pp(partit, mesh)
         
     ! initialise cvmix_TKE    
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
-        call init_cvmix_tke(mesh)
+        call init_cvmix_tke(partit, mesh)
         
     endif
   
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
-        call init_cvmix_idemix(mesh)
+        call init_cvmix_idemix(partit, mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
     elseif (mod(mix_scheme_nmb,10)==7) then
-        call init_cvmix_tidal(mesh)
+        call init_cvmix_tidal(partit, mesh)
     end if         
     
     !___________________________________________________________________________
@@ -150,18 +159,18 @@ integer                               :: n
     ! compute for all cavity points (ulevels_nod2D>1), which is the closest
     ! cavity line point to that point --> use their coordinates and depth -->
     ! use for extrapolation of init state under cavity
-    if (use_cavity) call compute_nrst_pnt2cavline(mesh)
+    if (use_cavity) call compute_nrst_pnt2cavline(partit, mesh)
       
-    if (use_density_ref) call init_ref_density(mesh)
+    if (use_density_ref) call init_ref_density(partit, mesh)
     
     
     !___________________________________________________________________________
-    if(mype==0) write(*,*) 'Arrays are set'
+    if(partit%mype==0) write(*,*) 'Arrays are set'
         
     !if(open_boundary) call set_open_boundary   !TODO
     
-    call oce_adv_tra_fct_init(tracers%work, mesh)
-    call muscl_adv_init(tracers%work, mesh) !!PS test
+    call oce_adv_tra_fct_init(tracers%work, partit, mesh)
+    call muscl_adv_init(tracers%work, partit, mesh) !!PS test
     !=====================
     ! Initialize fields
     ! A user-defined routine has to be called here!
@@ -170,13 +179,13 @@ integer                               :: n
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
            if (mod(mstep, soufflet_forc_update)==0) then
-              call initial_state_soufflet(tracers, mesh)
-              call compute_zonal_mean_ini(mesh)  
-              call compute_zonal_mean(tracers, mesh)
+              call initial_state_soufflet(tracers, partit, mesh)
+              call compute_zonal_mean_ini(partit, mesh)  
+              call compute_zonal_mean(tracers, partit, mesh)
            end if
        END SELECT
     else
-       call oce_initial_state(tracers, mesh)   ! Use it if not running tests
+       call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 
     if (.not.r_restart) then
@@ -187,16 +196,16 @@ integer                               :: n
     
     !___________________________________________________________________________
     ! first time fill up array for hnode & helem
-    if (mype==0) then
+    if (partit%mype==0) then
         write(*,*) '____________________________________________________________'
         write(*,*) ' --> call init_thickness_ale'
         write(*,*)
     end if
-    call init_thickness_ale(mesh)
+    call init_thickness_ale(partit, mesh)
     
     !___________________________________________________________________________
-    if(mype==0) write(*,*) 'Initial state'
-    if (w_split .and. mype==0) then
+    if(partit%mype==0) write(*,*) 'Initial state'
+    if (w_split .and. partit%mype==0) then
         write(*,*) '******************************************************************************'
         write(*,*) 'vertical velocity will be split onto explicit and implicit constitutes;'
         write(*,*) 'maximum allowed CDF on explicit W is set to: ', w_max_cfl
@@ -204,11 +213,11 @@ integer                               :: n
     end if
 end subroutine ocean_setup
 !_______________________________________________________________________________
-SUBROUTINE tracer_init(tracers, mesh)
+SUBROUTINE tracer_init(tracers, partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE MOD_TRACER
 USE DIAGNOSTICS, only: ldiag_DVD
-USE g_PARSUP
 USE g_ic3d
 IMPLICIT NONE
 integer        :: elem_size, node_size
@@ -221,6 +230,7 @@ logical        :: i_vert_diff, smooth_bh_tra
 real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
 
 type(t_mesh),   intent(in) ,   target               :: mesh
+type(t_partit), intent(inout), target               :: partit
 type(t_tracer), intent(inout), target               :: tracers
 type(nml_tracer_list_type),    target, allocatable  :: nml_tracer_list(:)
 
@@ -228,7 +238,10 @@ namelist /tracer_listsize/ num_tracers
 namelist /tracer_list    / nml_tracer_list
 namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 ! OPEN and read namelist for I/O
 open( unit=nm_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
@@ -236,7 +249,7 @@ if (iost == 0) then
    if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
 else
    if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-   call par_ex
+   call par_ex(partit)
    stop
 end if
 
@@ -297,11 +310,11 @@ END SUBROUTINE tracer_init
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE arrays_init(num_tracers, mesh)
+SUBROUTINE arrays_init(num_tracers, partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 use g_comm_auto
 use g_config
 use g_forcing_arrays
@@ -309,11 +322,15 @@ use o_mixing_kpp_mod ! KPP
 USE g_forcing_param, only: use_virt_salt
 use diagnostics,     only: ldiag_dMOC, ldiag_DVD
 IMPLICIT NONE
-integer                          :: elem_size, node_size
-integer                          :: n
-integer,      intent(in)         :: num_tracers
-type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+integer                               :: elem_size, node_size
+integer                               :: n
+integer,        intent(in)            :: num_tracers
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 
 elem_size=myDim_elem2D+eDim_elem2D
@@ -432,7 +449,7 @@ do n=1, node_size
 !  Ki(n)=K_hor*area(1,n)/scale_area
    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
 end do
-call exchange_nod(Ki)
+call exchange_nod(Ki, partit)
 
 neutral_slope=0.0_WP
 slope_tapered=0.0_WP
@@ -549,11 +566,11 @@ END SUBROUTINE arrays_init
 !_______________________________________________________________________________
 ! Here the 3D tracers will be initialized. Initialization strategy depends on a tracer ID.
 ! ID = 0 and 1 are reserved for temperature and salinity
-SUBROUTINE oce_initial_state(tracers, mesh)
+SUBROUTINE oce_initial_state(tracers, partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE MOD_TRACER
 USE o_ARRAYS
-USE g_PARSUP
 USE g_config
 USE g_ic3d
   !
@@ -563,10 +580,14 @@ USE g_ic3d
   integer                  :: i, k, counter, rcounter3, id
   character(len=10)        :: i_string, id_string
   type(t_mesh),   intent(in) ,   target :: mesh
+  type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
   real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) write(*,*) tracers%num_tracers, ' tracers will be used in FESOM'
   if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
@@ -575,7 +596,7 @@ USE g_ic3d
   ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
   if(mype==0) write(*,*) 'read Temperatur climatology from:', trim(filelist(1))
   if(mype==0) write(*,*) 'read Salt       climatology from:', trim(filelist(2))
-  call do_ic3d(tracers, mesh)
+  call do_ic3d(tracers, partit, mesh)
   
   Tclim=tracers%data(1)%values
   Sclim=tracers%data(2)%values
@@ -700,7 +721,7 @@ USE g_ic3d
             if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
             if (mype==0) write(*,*) 'the model will stop!'
          end if
-         call par_ex
+         call par_ex(partit)
          stop
      END SELECT
   END DO
@@ -709,26 +730,30 @@ end subroutine oce_initial_state
 !
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
-SUBROUTINE before_oce_step(tracers, mesh)
+SUBROUTINE before_oce_step(tracers, partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
     USE MOD_TRACER
     USE o_ARRAYS
-    USE g_PARSUP
     USE g_config
     USE Toy_Channel_Soufflet
     implicit none
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh),  intent(in),     target              :: mesh
-    type(t_tracer), intent(inout), target              :: tracers
+    type(t_mesh),   intent(in),    target  :: mesh
+    type(t_partit), intent(inout), target  :: partit
+    type(t_tracer), intent(inout), target  :: tracers
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     if (toy_ocean) then
         SELECT CASE (TRIM(which_toy))
             CASE ("soufflet") !forcing update for soufflet testcase
             if (mod(mstep, soufflet_forc_update)==0) then
-                call compute_zonal_mean(tracers, mesh)
+                call compute_zonal_mean(tracers, partit, mesh)
             end if
         END SELECT
     end if

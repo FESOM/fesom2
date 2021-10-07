@@ -5,22 +5,26 @@
 !  fer_gamma2vel
 !  fer_compute_C_K ! this subroutine shall be a subject of future tuning (with respect to fer_k)
 !===========================================================================
-subroutine fer_solve_Gamma(mesh)
+subroutine fer_solve_Gamma(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
     USE o_PARAM
     USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
-    type(t_mesh), intent(in)               , target :: mesh	
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh),   intent(in),    target  :: mesh	
     integer                                :: nz, n, nzmax, nzmin
     real(kind=WP)                          :: zinv1,zinv2, zinv, m, r
     real(kind=WP)                          :: a(mesh%nl), b(mesh%nl), c(mesh%nl)
     real(kind=WP)                          :: cp(mesh%nl), tp(2,mesh%nl)
     real(kind=WP), dimension(:,:), pointer :: tr
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     DO n=1,myDim_nod2D
         tr=>fer_gamma(:,:,n)
@@ -116,17 +120,17 @@ subroutine fer_solve_Gamma(mesh)
         end do
     END DO   !!! cycle over nodes
     
-    call exchange_nod(fer_gamma)
+    call exchange_nod(fer_gamma, partit)
 END subroutine fer_solve_Gamma
 !
 !
 !
 !====================================================================
-subroutine fer_gamma2vel(mesh)
+subroutine fer_gamma2vel(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_gamma, fer_uv
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -134,9 +138,13 @@ subroutine fer_gamma2vel(mesh)
     integer                                :: nz, nzmax, el, elnod(3), nzmin
     real(kind=WP)                          :: zinv
     real(kind=WP)                          :: onethird=1._WP/3._WP
-    type(t_mesh), intent(in)               , target :: mesh
+    type(t_partit), intent(inout), target  :: partit
+    type(t_mesh),   intent(in),    target  :: mesh
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     DO el=1, myDim_elem2D
         elnod=elem2D_nodes(:,el)
@@ -150,21 +158,22 @@ subroutine fer_gamma2vel(mesh)
             fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
         END DO
     END DO
-    call exchange_elem(fer_uv)
+    call exchange_elem(fer_uv, partit)
 end subroutine fer_gamma2vel
 !
 !
 !
 !===============================================================================
-subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
+subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node
-    USE g_PARSUP
+    USE MOD_PARTIT
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
     integer                  :: n, nz, nzmax, nzmin
     real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux_zz(mesh%nl)
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
@@ -172,7 +181,10 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
@@ -334,8 +346,8 @@ subroutine init_Redi_GM(mesh) !fer_compute_C_K_Redi
         end if
    end do
 
-   if (Fer_GM) call exchange_nod(fer_c)
-   if (Fer_GM) call exchange_nod(fer_k)
-   if (Redi)   call exchange_nod(Ki)
+   if (Fer_GM) call exchange_nod(fer_c, partit)
+   if (Fer_GM) call exchange_nod(fer_k, partit)
+   if (Redi)   call exchange_nod(Ki, partit)
 end subroutine init_Redi_GM
 !====================================================================

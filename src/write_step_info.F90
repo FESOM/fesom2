@@ -1,34 +1,38 @@
 module write_step_info_interface
   interface
-    subroutine write_step_info(istep,outfreq,tracers,mesh)
+    subroutine write_step_info(istep,outfreq,tracers,partit,mesh)
       use MOD_MESH
+      use MOD_PARTIT
       use MOD_TRACER
-      integer				 :: istep,outfreq
-      type(t_mesh),   intent(in), target :: mesh
-      type(t_tracer), intent(in), target :: tracers
+      integer				    :: istep,outfreq
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
 module check_blowup_interface
   interface
-    subroutine check_blowup(istep, tracers, mesh)
+    subroutine check_blowup(istep, tracers,partit,mesh)
       use MOD_MESH
+      use MOD_PARTIT
       use MOD_TRACER
-      integer				 :: istep
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+      integer				    :: istep
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
 !
 !
 !===============================================================================
-subroutine write_step_info(istep, outfreq, tracers, mesh)
+subroutine write_step_info(istep, outfreq, tracers, partit, mesh)
 	use g_config, only: dt, use_ice
 	use MOD_MESH
+        use MOD_PARTIT
         use MOD_TRACER
 	use o_PARAM
-	use g_PARSUP
 	use o_ARRAYS
 	use i_ARRAYS
 	use g_comm_auto
@@ -45,9 +49,13 @@ subroutine write_step_info(istep, outfreq, tracers, mesh)
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-        type(t_mesh),   intent(in), target                      :: mesh
-        type(t_tracer), intent(in), target                      :: tracers
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in),    target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 	if (mod(istep,outfreq)==0) then
 		
 		!_______________________________________________________________________
@@ -231,12 +239,12 @@ end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep, tracers, mesh)
+subroutine check_blowup(istep, tracers, partit, mesh)
 	use g_config, only: logfile_outfreq, which_ALE
 	use MOD_MESH
         use MOD_TRACER
+        use MOD_PARTIT
 	use o_PARAM
-	use g_PARSUP
 	use o_ARRAYS
 	use i_ARRAYS
 	use g_comm_auto
@@ -246,11 +254,15 @@ subroutine check_blowup(istep, tracers, mesh)
 	use write_step_info_interface
 	implicit none
 	
-	integer                            :: n, nz, istep, found_blowup_loc=0, found_blowup=0
-	integer 		           :: el, elidx
-        type(t_mesh),   intent(in), target :: mesh
-        type(t_tracer), intent(in), target :: tracers
-#include "associate_mesh.h"
+	integer                               :: n, nz, istep, found_blowup_loc=0, found_blowup=0
+	integer 		              :: el, elidx
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in),    target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
 ! ! 		if (mype==0) then 
@@ -493,7 +505,7 @@ subroutine check_blowup(istep, tracers, mesh)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1,tracers,mesh)
+			call write_step_info(istep,1,tracers,partit,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)
@@ -513,7 +525,7 @@ subroutine check_blowup(istep, tracers, mesh)
 				write(*,*) '                  _____.,-#%&$@%#&#~,._____'
 				write(*,*)
 			end if
-			call blowup(istep, tracers, mesh)
+			call blowup(istep, tracers, partit, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
 			call par_ex
 		endif 

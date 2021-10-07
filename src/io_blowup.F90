@@ -1,9 +1,9 @@
 MODULE io_BLOWUP
 	use g_config
 	use g_clock
-	use g_parsup
 	use g_comm_auto
         USE MOD_MESH
+        USE MOD_PARTIT
         USE MOD_TRACER        
 	use o_arrays
 	use i_arrays
@@ -63,11 +63,12 @@ MODULE io_BLOWUP
 	!_______________________________________________________________________________
 	! ini_ocean_io initializes bid datatype which contains information of all variables need to be written into 
 	! the ocean restart file. This is the only place need to be modified if a new variable is added!
-	subroutine ini_blowup_io(year, tracers, mesh)
+	subroutine ini_blowup_io(year, tracers, partit, mesh)
 		implicit none
 		integer, intent(in)       :: year
-                type(t_tracer), intent(in), target :: tracers
-                type(t_mesh),   intent(in), target :: mesh
+                type(t_mesh),   intent(in),    target :: mesh
+                type(t_partit), intent(inout), target :: partit
+                type(t_tracer), intent(in),    target :: tracers
 		integer                   :: ncid, j
 		integer                   :: varid
 		character(500)            :: longname
@@ -75,7 +76,10 @@ MODULE io_BLOWUP
 		character(500)            :: trname, units
 		character(4)              :: cyear
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 		if(mype==0) write(*,*)' --> Init. blowpup file '
 		write(cyear,'(i4)') year
@@ -168,37 +172,38 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine blowup(istep, tracers, mesh)
+	subroutine blowup(istep, tracers, partit, mesh)
 		implicit none
-                type(t_mesh),   intent(in), target :: mesh		
-                type(t_tracer), intent(in), target :: tracers
-		integer                   :: istep
+                type(t_mesh),   intent(in),    target :: mesh
+                type(t_partit), intent(inout), target :: partit
+                type(t_tracer), intent(in),    target :: tracers
+		integer                               :: istep
 		
 		ctime=timeold+(dayold-1.)*86400
-		call ini_blowup_io(yearnew, tracers, mesh)
-		if(mype==0) write(*,*)'Do output (netCDF, blowup) ...'
-		if(mype==0) write(*,*)' --> call assoc_ids(bid)'
-		call assoc_ids(bid) ; call was_error(bid)  
-		if(mype==0) write(*,*)' --> call write_blowup(bid, istep)'
-		call write_blowup(bid, istep, mesh) ; call was_error(bid)
+		call ini_blowup_io(yearnew, tracers, partit, mesh)
+		if(partit%mype==0) write(*,*)'Do output (netCDF, blowup) ...'
+		if(partit%mype==0) write(*,*)' --> call assoc_ids(bid)'
+		call assoc_ids(bid, partit) ; call was_error(bid, partit)
+		if(partit%mype==0) write(*,*)' --> call write_blowup(bid, istep)'
+		call write_blowup(bid, istep, partit, mesh) ; call was_error(bid, partit)
 	
 	end subroutine blowup
 !
 !
 !_______________________________________________________________________________
-	subroutine create_new_file(id)
+	subroutine create_new_file(id, partit)
 		implicit none
-		
+                type(t_partit), intent(inout), target :: partit		
 		type(nc_file),  intent(inout) :: id
 		integer                       :: c, j
 		integer                       :: n, k, l, kdim, dimid(4)
 		character(2000)               :: att_text
 		! Serial output implemented so far
-		if (mype/=0) return
+		if (partit%mype/=0) return
 		c=1
 		id%error_status=0
 		! create an ocean output file
-		if(mype==0) write(*,*) 'initializing blowup file ', trim(id%filename)
+		if(partit%mype==0) write(*,*) 'initializing blowup file ', trim(id%filename)
 		id%error_status(c) = nf_create(id%filename, IOR(NF_NOCLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), id%ncid); c=c+1
 		
 		do j=1, id%ndim
@@ -345,16 +350,20 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine write_blowup(id, istep, mesh)
+	subroutine write_blowup(id, istep, partit, mesh)
 		implicit none
 		type(nc_file),  intent(inout) :: id
 		integer,  intent(in)          :: istep
 		real(kind=WP), allocatable     :: aux1(:), aux2(:,:) 
 		integer                       :: i, size1, size2, shape
 		integer                       :: c
-                type(t_mesh), intent(in), target :: mesh
+                type(t_mesh),   intent(in),    target :: mesh
+                type(t_partit), intent(inout), target :: partit
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 		! Serial output implemented so far
 		if (mype==0) then
@@ -372,8 +381,8 @@ MODULE io_BLOWUP
 			if (shape==1) then
 				size1=id%var(i)%dims(1)
 				if (mype==0) allocate(aux1(size1))
-				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1)
-				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1)
+				if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux1, partit)
+				if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux1, partit)
 				if (mype==0) then
 				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux1, 1); c=c+1
 				end if
@@ -383,37 +392,37 @@ MODULE io_BLOWUP
 				size1=id%var(i)%dims(1)
 				size2=id%var(i)%dims(2)
 				if (mype==0) allocate(aux2(size1, size2))
-				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2)
-				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2)
+				if (size1==nod2D  .or. size2==nod2D)  call gather_nod (id%var(i)%pt2, aux2, partit)
+				if (size1==elem2D .or. size2==elem2D) call gather_elem(id%var(i)%pt2, aux2, partit)
 				if (mype==0) then
 				id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, 1, id%rec_count/), (/size1, size2, 1/), aux2, 2); c=c+1
 				end if
 				if (mype==0) deallocate(aux2)
 			else
 				if (mype==0) write(*,*) 'not supported shape of array in restart file'
-				call par_ex
+				call par_ex(partit)
 				stop
 			end if
 		end do
 		
 		if (mype==0) id%error_count=c-1
-		call was_error(id)
+		call was_error(id, partit)
 		if (mype==0) id%error_status(1)=nf_close(id%ncid);
 		id%error_count=1
-		call was_error(id)
+		call was_error(id, partit)
 	end subroutine write_blowup
 !
 !
 !_______________________________________________________________________________
-	subroutine assoc_ids(id)
+	subroutine assoc_ids(id, partit)
 		implicit none
-		
+                type(t_partit), intent(inout) :: partit		
 		type(nc_file),  intent(inout) :: id
 		character(500)                :: longname
 		integer                       :: c, j, k
 		real(kind=WP)                 :: rtime !timestamp of the record
 		! Serial output implemented so far
-		if (mype/=0) return
+		if (partit%mype/=0) return
 		c=1
 		id%error_status=0
 		! open existing netcdf file
@@ -422,7 +431,7 @@ MODULE io_BLOWUP
 		id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid)
 		!if the file does not exist it will be created!
 		if (id%error_status(c) .ne. nf_noerr) then
-			call create_new_file(id) ! error status counter will be reset
+			call create_new_file(id, partit) ! error status counter will be reset
 			c=id%error_count+1
 			id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
 		end if
@@ -449,9 +458,9 @@ MODULE io_BLOWUP
 				exit ! a proper rec_count detected, ready for reading restart, exit the loop
 			end if
 			if (k==1) then
-				if (mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
-				if (mype==0) write(*,*) 'reading restart will not be possible !'
-				if (mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
+				if (partit%mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
+				if (partit%mype==0) write(*,*) 'reading restart will not be possible !'
+				if (partit%mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
 				id%error_status(c)=-310;
 			end if
 		end do
@@ -468,20 +477,21 @@ MODULE io_BLOWUP
 !
 !
 !_______________________________________________________________________________
-	subroutine was_error(id)
+	subroutine was_error(id, partit)
 		implicit none
-		type(nc_file),  intent(inout) :: id
-		integer                       :: k, status, ierror
-		
-		call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-		call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+		type(nc_file),  intent(inout)   :: id
+                type(t_partit), intent(in)      :: partit		
+		integer                         :: k, status, ierror
+
+		call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+		call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 		
 		do k=1, id%error_count
 			status=id%error_status(k)
 			if (status .ne. nf_noerr) then
-				if (mype==0) write(*,*) 'error counter=', k
-				if (mype==0) call handle_err(status)
-				call par_ex
+				if (partit%mype==0) write(*,*) 'error counter=', k
+				if (partit%mype==0) call handle_err(status, partit)
+				call par_ex(partit)
 				stop
 			end if
 		end do

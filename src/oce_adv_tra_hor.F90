@@ -8,14 +8,15 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
+    subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
       use MOD_MESH
       use MOD_TRACER
-      use g_PARSUP
-      type(t_mesh), intent(in) , target :: mesh
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+      use MOD_PARTIT
+      type(t_partit),intent(in), target :: partit
+      type(t_mesh),  intent(in), target :: mesh
+      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
 !===============================================================================
@@ -25,29 +26,31 @@ module oce_adv_tra_hor_interfaces
 ! IF init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
+    subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
       use MOD_MESH
-      use g_PARSUP
+      use MOD_PARTIT
+      type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh    
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
-      integer,       intent(in)         :: nboundary_lay(myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
+      integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
 ! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
 ! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
       use MOD_MESH
-      use g_PARSUP
+      use MOD_PARTIT
+      type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh    
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
+      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
+      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: init_zero
     end subroutine
   end interface
@@ -55,22 +58,26 @@ end module
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_upw1(vel, ttf, mesh, flux, init_zero)
+subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
     use MOD_MESH
-    use g_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
-    type(t_mesh), intent(in) , target :: mesh    
-    real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-    real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
+    type(t_partit),intent(in), target :: partit
+    type(t_mesh),  intent(in), target :: mesh    
+    real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+    real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
     logical, optional                 :: init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: a, vflux
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     if (present(init_zero))then
        if (init_zero) flux=0.0_WP
@@ -207,19 +214,20 @@ end subroutine adv_tra_hor_upw1
 !
 !
 !===============================================================================
-subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
+subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    use g_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
+    type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh    
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-    real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-    real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
-    integer,       intent(in)         :: nboundary_lay(myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+    real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
+    integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
     logical, optional                 :: init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
@@ -228,7 +236,10 @@ subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nbo
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     if (present(init_zero))then
        if (init_zero) flux=0.0_WP
@@ -475,18 +486,19 @@ end subroutine adv_tra_hor_muscl
 !
 !
 !===============================================================================
-    subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
+    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
     use MOD_MESH
     use MOD_TRACER
-    use g_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
+    type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh    
     real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-    real(kind=WP), intent(in)         :: ttf(mesh%nl-1,  myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, myDim_elem2D+eDim_elem2D)
-    real(kind=WP), intent(inout)      :: flux(mesh%nl-1, myDim_edge2D)
-    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, myDim_edge2D)
+    real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
+    real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
     logical, optional                 :: init_zero
     real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP)                     :: Tmean1, Tmean2, cHO
@@ -494,7 +506,10 @@ end subroutine adv_tra_hor_muscl
     integer                           :: el(2), enodes(2), nz, edge
     integer                           :: nu12, nl12, nl1, nl2, nu1, nu2
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     if (present(init_zero))then
        if (init_zero) flux=0.0_WP

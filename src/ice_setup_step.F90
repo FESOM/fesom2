@@ -1,49 +1,56 @@
 module ice_array_setup_interface
   interface
-    subroutine ice_array_setup(mesh)
+    subroutine ice_array_setup(partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in),    target              :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
     end subroutine
   end interface
 end module
 
 module ice_initial_state_interface
   interface
-    subroutine ice_initial_state(tracers, mesh)
+    subroutine ice_initial_state(tracers, partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(in), target    :: tracers
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
 module ice_setup_interface
   interface
-    subroutine ice_setup(tracers, mesh)
+    subroutine ice_setup(tracers, partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(in), target    :: tracers
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
 !
 !_______________________________________________________________________________
 ! ice initialization + array allocation + time stepping
-subroutine ice_setup(tracers, mesh)
+subroutine ice_setup(tracers, partit, mesh)
     use o_param
-    use g_parsup
     use i_param
     use i_arrays
     use g_CONFIG
     use mod_mesh
+    use mod_partit
     use mod_tracer
     use ice_array_setup_interface
     use ice_initial_state_interface
     implicit none 
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in),    target :: tracers
     
     ! ================ DO not change
     ice_dt=real(ice_ave_steps,WP)*dt
@@ -52,19 +59,19 @@ subroutine ice_setup(tracers, mesh)
     Clim_evp=Clim_evp*(evp_rheol_steps/ice_dt)**2/Tevp_inv  ! This is combination 
                                                             ! it always enters
     ! ================
-    call ice_array_setup(mesh)
-    call ice_fct_init(mesh)
+    call ice_array_setup(partit, mesh)
+    call ice_fct_init(partit, mesh)
     ! ================
     ! Initialization routine, user input is required 
     ! ================
     !call ice_init_fields_test
-    call ice_initial_state(tracers, mesh)   ! Use it unless running test example
-    if(mype==0) write(*,*) 'Ice is initialized'
+    call ice_initial_state(tracers, partit, mesh)   ! Use it unless running test example
+    if(partit%mype==0) write(*,*) 'Ice is initialized'
 end subroutine ice_setup
 !
 !
 !_______________________________________________________________________________
-subroutine ice_array_setup(mesh)
+subroutine ice_array_setup(partit, mesh)
 !
 ! inializing sea ice model 
 !
@@ -74,15 +81,19 @@ subroutine ice_array_setup(mesh)
 use o_param
 use i_param
 use MOD_MESH
+use MOD_PARTIT
 use i_arrays
-use g_parsup
 USE g_CONFIG
 
 implicit none
-type(t_mesh), intent(in)           , target :: mesh
-integer   :: n_size, e_size, mn, k, n, n1, n2
+type(t_partit), intent(inout), target :: partit
+type(t_mesh),   intent(in),    target :: mesh
+integer                               :: n_size, e_size, mn, k, n, n1, n2
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 n_size=myDim_nod2D+eDim_nod2D
 e_size=myDim_elem2D+eDim_elem2D
@@ -179,26 +190,33 @@ end subroutine ice_array_setup
 !
 !_______________________________________________________________________________
 ! Sea ice model step
-subroutine ice_timestep(step, mesh)
+subroutine ice_timestep(step, partit, mesh)
+use mod_mesh
+use mod_partit
 use i_arrays
 use o_param
-use g_parsup
 use g_CONFIG
 use i_PARAM, only: whichEVP
-use mod_mesh
 
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack 
 #endif
 
 implicit none 
-type(t_mesh), intent(in)   , target :: mesh
-integer                    :: step,i
-REAL(kind=WP)              :: t0,t1, t2, t3
+type(t_partit), intent(inout), target :: partit
+type(t_mesh),   intent(in),    target :: mesh
+integer                               :: step,i
+REAL(kind=WP)                         :: t0,t1, t2, t3
 
 #if defined (__icepack)
-real(kind=WP)              :: time_evp, time_advec, time_therm
+real(kind=WP)                         :: time_evp, time_advec, time_therm
 #endif
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
 
 t0=MPI_Wtime()
 
@@ -211,18 +229,18 @@ t0=MPI_Wtime()
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'  
     SELECT CASE (whichEVP)
     CASE (0)
-        call EVPdynamics(mesh)
+        call EVPdynamics  (partit, mesh)
     CASE (1)
-        call EVPdynamics_m(mesh)
+        call EVPdynamics_m(partit, mesh)
     CASE (2)
-        call EVPdynamics_a(mesh)
+        call EVPdynamics_a(partit, mesh)
     CASE DEFAULT
         if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
-        call par_ex
+        call par_ex(partit)
         stop
     END SELECT
     
-    if (use_cavity) call cavity_ice_clean_vel(mesh)
+    if (use_cavity) call cavity_ice_clean_vel(partit, mesh)
     t1=MPI_Wtime()   
     
     !___________________________________________________________________________
@@ -238,26 +256,26 @@ t0=MPI_Wtime()
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
-    call ice_TG_rhs_div(mesh)   
+    call ice_TG_rhs_div    (partit, mesh)   
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_fct_solve...'//achar(27)//'[0m' 
-    call ice_fct_solve(mesh)
+    call ice_fct_solve     (partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call ice_update_for_div...'//achar(27)//'[0m'
-    call ice_update_for_div(mesh)
+    call ice_update_for_div(partit, mesh)
 #if defined (__oifs)
     do i=1,myDim_nod2D+eDim_nod2D
         if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/a_ice(i)
     end do
 #endif /* (__oifs) */
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
-    call cut_off(mesh)
+    call cut_off(partit, mesh)
     
-    if (use_cavity) call cavity_ice_clean_ma(mesh)
+    if (use_cavity) call cavity_ice_clean_ma(partit, mesh)
     t2=MPI_Wtime()
     
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
-    call thermodynamics(mesh)
+    call thermodynamics(partit, mesh)
 #endif /* (__icepack) */
 
 
@@ -270,10 +288,6 @@ t0=MPI_Wtime()
             write(*,*)
         end if 
     end do
-
-
-
-
     t3=MPI_Wtime()
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
@@ -298,23 +312,28 @@ end subroutine ice_timestep
 !
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
-subroutine ice_initial_state(tracers, mesh)
+subroutine ice_initial_state(tracers, partit, mesh)
     use i_ARRAYs
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_PARAM   
     use o_arrays        
-    use g_parsup 
     use g_CONFIG
     implicit none
     !
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
-    integer                            :: i
-    character(MAX_PATH)                      :: filename
-    real(kind=WP), external            :: TFrez  ! Sea water freeze temperature.
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in),    target :: tracers
+    integer                               :: i
+    character(MAX_PATH)                   :: filename
+    real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
     m_ice =0._WP
     a_ice =0._WP
     u_ice =0._WP

@@ -1,28 +1,19 @@
 ! ==============================================================
-subroutine setup_model
-  implicit none
-  call read_namelist    ! should be before clock_init
-end subroutine setup_model
-! ==============================================================
-subroutine read_namelist
-  ! Reads namelist files and overwrites default parameters.
-  !
-  ! Coded by Lars Nerger
-  ! Modified by Qiang Wang, SD
-  !--------------------------------------------------------------
+subroutine setup_model(partit)
+  use mod_partit
   use o_param
   use i_param
   use i_therm_param
   use g_forcing_param
-  use g_parsup
   use g_config
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_energy, &
                          ldiag_dMOC, ldiag_DVD, diag_list
-  use g_clock, only: timenew, daynew, yearnew
+  use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d 
   implicit none
+  type(t_partit), intent(inout), target :: partit
+  character(len=MAX_PATH)               :: nmlfile
 
-  character(len=MAX_PATH)   :: nmlfile
   namelist /clockinit/ timenew, daynew, yearnew
 
   nmlfile ='namelist.config'    ! name of general configuration namelist file
@@ -83,11 +74,11 @@ subroutine read_namelist
   read (20,NML=diag_list)
   close (20)
 
-  if(mype==0) write(*,*) 'Namelist files are read in'
+  if(partit%mype==0) write(*,*) 'Namelist files are read in'
   
   !_____________________________________________________________________________
   ! Check for namelist parameter consistency
-  if(mype==0) then
+  if(partit%mype==0) then
     
     ! check for valid step per day number
     if (mod(86400,step_per_day)==0) then
@@ -111,25 +102,25 @@ subroutine read_namelist
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(0)
+        call par_ex(partit, 0)
     endif
     
 
   endif
-
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
-end subroutine read_namelist
+end subroutine setup_model
 ! =================================================================
-subroutine get_run_steps(nsteps)
+subroutine get_run_steps(nsteps, partit)
   ! Coded by Qiang Wang
   ! Reviewed by ??
-  !--------------------------------------------------------------
-  
+  !--------------------------------------------------------------  
   use g_clock
-  use g_parsup
+  use mod_partit
   implicit none
 
-  integer      :: i, temp_year, temp_mon, temp_fleapyear, nsteps
+  type(t_partit), intent(in)    :: partit
+  integer,        intent(inout) :: nsteps 
+  integer                       :: i, temp_year, temp_mon, temp_fleapyear
 
   ! clock should have been inialized before calling this routine
 
@@ -161,11 +152,11 @@ subroutine get_run_steps(nsteps)
   else
      write(*,*) 'Run length unit ', run_length_unit, ' is not defined.'
      write(*,*) 'Please check and update the code.'
-     call par_ex(1)
+     call par_ex(partit, 1)
      stop
   end if
 
-  if(mype==0) write(*,*) nsteps, ' steps to run for ', runid, ' job submission'
+  if(partit%mype==0) write(*,*) nsteps, ' steps to run for ', runid, ' job submission'
 end subroutine get_run_steps
 
     

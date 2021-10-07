@@ -3,7 +3,7 @@
 !2. computing surface integrals of the FESOM fields
 module g_support
   USE MOD_MESH
-  use g_parsup
+  use MOD_PARTIT
   use g_comm_auto
   use o_ARRAYS
   use g_config, only: dummy
@@ -43,15 +43,20 @@ contains
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_nod2D(arr, N, mesh)
+subroutine smooth_nod2D(arr, N, partit, mesh)
   IMPLICIT NONE
-  type(t_mesh), intent(in)                  , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer, intent(in)                        :: N
   real(KIND=WP), dimension(:), intent(inout) :: arr
   integer                                    :: node, elem, j, q, elnodes(3)
   real(kind=WP)                              :: vol
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
   allocate(work_array(myDim_nod2D))
   DO q=1, N !apply mass matrix N times to smooth the field
      DO node=1, myDim_nod2D
@@ -68,25 +73,31 @@ subroutine smooth_nod2D(arr, N, mesh)
     DO node=1,myDim_nod2D
        arr(node)=work_array(node)
     ENDDO
-    call exchange_nod(arr)
+    call exchange_nod(arr, partit)
   END DO
   deallocate(work_array)
 end subroutine smooth_nod2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_nod3D(arr, N_smooth, mesh)
+subroutine smooth_nod3D(arr, N_smooth, partit, mesh)
   IMPLICIT NONE
-  type(t_mesh), intent(in)      , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+
   integer, intent(in)            :: N_smooth
   real(KIND=WP), intent(inout)   :: arr(:,:)
 
   integer                        :: n, el, nz, j, q, num_el, nlev, nl_loc, nu_loc
   integer                        :: uln, nln, ule, nle
-  real(kind=WP)                  :: vol(mesh%nl,myDim_nod2D)
+  real(kind=WP)                  :: vol(mesh%nl, partit%myDim_nod2D)
   real(kind=WP), allocatable     :: work_array(:,:)
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
   nlev=ubound(arr,1)
   allocate(work_array(nlev,myDim_nod2D))
   
@@ -138,7 +149,7 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
      END DO
   end DO
   
-  call exchange_nod(arr)
+  call exchange_nod(arr, partit)
 
 ! And the remaining smoothing sweeps
 
@@ -171,7 +182,7 @@ subroutine smooth_nod3D(arr, N_smooth, mesh)
            arr(nz, n) = work_array(nz, n) *vol(nz,n) 
         END DO
      end DO
-     call exchange_nod(arr)
+     call exchange_nod(arr, partit)
   enddo
 
   deallocate(work_array)
@@ -180,14 +191,18 @@ end subroutine smooth_nod3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_elem2D(arr, N, mesh)
+subroutine smooth_elem2D(arr, N, partit, mesh)
     IMPLICIT NONE
-    type(t_mesh), intent(in)                  , target :: mesh
+    type(t_mesh),   intent(in),    target         :: mesh
+    type(t_partit), intent(inout), target         :: partit
     integer, intent(in)                        :: N
     real(KIND=WP), dimension(:), intent(inout) :: arr
     integer                                    :: node, elem, j, q, elnodes(3)
     real(kind=WP)                              :: vol
-#include "associate_mesh.h"    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     DO q=1, N !apply mass matrix N times to smooth the field
         DO node=1, myDim_nod2D
@@ -201,26 +216,30 @@ subroutine smooth_elem2D(arr, N, mesh)
             END DO
             work_array(node)=work_array(node)/vol
         END DO
-        call exchange_nod(work_array)
+        call exchange_nod(work_array, partit)
         DO elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:, elem)
             arr(elem)=sum(work_array(elnodes))/3.0_WP  ! Here, we need the inverse and scale by 1/3
         ENDDO
-        call exchange_elem(arr)
+        call exchange_elem(arr, partit)
     END DO
     deallocate(work_array)
 end subroutine smooth_elem2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine smooth_elem3D(arr, N, mesh)
+subroutine smooth_elem3D(arr, N, partit, mesh)
     IMPLICIT NONE
-    type(t_mesh), intent(in)                    , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
     integer, intent(in)                          :: N
     real(KIND=WP), dimension(:,:), intent(inout) :: arr
     integer                                      :: node, elem, my_nl, nz, j, q, elnodes(3)
     real(kind=WP)                                :: vol
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     
@@ -243,7 +262,7 @@ subroutine smooth_elem3D(arr, N, mesh)
                 END DO
                 work_array(node)=work_array(node)/vol
             END DO
-            call exchange_nod(work_array)
+            call exchange_nod(work_array, partit)
             DO elem=1, myDim_elem2D
                 if (nz>nlevels(elem)  ) CYCLE
                 if (nz<ulevels(elem)) CYCLE
@@ -251,7 +270,7 @@ subroutine smooth_elem3D(arr, N, mesh)
                 arr(nz, elem)=sum(work_array(elnodes))/3.0_WP
             ENDDO
         END DO
-        call exchange_elem(arr)
+        call exchange_elem(arr, partit)
     END DO
     deallocate(work_array)
 
@@ -259,18 +278,22 @@ end subroutine smooth_elem3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine integrate_nod_2D(data, int2D, mesh)
-  use g_PARSUP
+subroutine integrate_nod_2D(data, int2D, partit, mesh)
+  use MOD_PARTIT
   use g_comm_auto
 
   IMPLICIT NONE
-  type(t_mesh),  intent(in)      , target :: mesh
-  real(kind=WP), intent(in)       :: data(:)
-  real(kind=WP), intent(inout)    :: int2D
+  type(t_mesh),  intent(in),    target :: mesh
+  type(t_partit),intent(inout), target :: partit
+  real(kind=WP), intent(in)         :: data(:)
+  real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
   real(kind=WP) :: lval
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
   lval=0.0_WP
   do row=1, myDim_nod2D
      !!PS lval=lval+data(row)*area(1,row)
@@ -284,18 +307,22 @@ end subroutine integrate_nod_2D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine integrate_nod_3D(data, int3D, mesh)
-  use g_PARSUP
+subroutine integrate_nod_3D(data, int3D, partit, mesh)
+  use MOD_PARTIT
   use g_comm_auto
 
   IMPLICIT NONE
-  type(t_mesh),  intent(in)      , target :: mesh
+  type(t_mesh),  intent(in), target :: mesh
+  type(t_partit),intent(in), target :: partit
   real(kind=WP), intent(in)       :: data(:,:)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
   real(kind=WP) :: lval
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
   lval=0.0_WP
   do row=1, myDim_nod2D
@@ -311,10 +338,11 @@ end subroutine integrate_nod_3D
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine extrap_nod3D(arr, mesh)
+subroutine extrap_nod3D(arr, partit, mesh)
     IMPLICIT NONE
-    type(t_mesh),  intent(in)     , target :: mesh
-    real(KIND=WP), intent(inout)   :: arr(:,:)
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    real(KIND=WP),  intent(inout)  :: arr(:,:)
     integer                        :: n, nl1, nz, k, j, el, cnt, jj
     real(kind=WP), allocatable     :: work_array(:)
     real(kind=WP)                  :: val
@@ -323,10 +351,13 @@ subroutine extrap_nod3D(arr, mesh)
     real(kind=WP)                  :: loc_max, glob_max
     integer                        :: loc_sum, glob_sum, glob_sum_old
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
     !___________________________________________________________________________
     allocate(work_array(myDim_nod2D+eDim_nod2D))
-    call exchange_nod(arr)
+    call exchange_nod(arr, partit)
     
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
@@ -391,7 +422,7 @@ subroutine extrap_nod3D(arr, mesh)
         end do ! --> do nz=1, nl-1
         
         !_______________________________________________________________________
-        call exchange_nod(arr)
+        call exchange_nod(arr, partit)
         
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
@@ -409,7 +440,7 @@ subroutine extrap_nod3D(arr, mesh)
             if (arr(nz,n)>0.99_WP*dummy) arr(nz,n)=arr(nz-1,n)
         end do
     end do
-    call exchange_nod(arr)
+    call exchange_nod(arr, partit)
     
     !___________________________________________________________________________
     deallocate(work_array)

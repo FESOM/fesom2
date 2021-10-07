@@ -33,7 +33,6 @@ module g_rotate_grid
     ! angle A around z-axis, the second is by an angle B about the new 
     ! x-axis, and the third is by an angle G about the new z-axis.   
     use o_PARAM
-    use g_PARSUP, only : mype
     implicit none
     real(kind=WP)      :: al, be, ga
 
@@ -51,7 +50,6 @@ module g_rotate_grid
     r2g_matrix(3,1)=sin(be)*sin(al) 
     r2g_matrix(3,2)=-sin(be)*cos(al)  
     r2g_matrix(3,3)=cos(be)
-    if(mype==0) write(*,*) 'rotation matrix for rotated model grids prepared'
   end subroutine set_mesh_transform_matrix
 !
 !----------------------------------------------------------------

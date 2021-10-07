@@ -1,10 +1,12 @@
 module cavity_heat_water_fluxes_3eq_interface
   interface
-    subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
+    subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in), target :: mesh
-      type(t_tracer), intent(in), target :: tracers
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
@@ -15,19 +17,23 @@ end module
 ! that have at least one cavity nodes as nearest neighbour.
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
-subroutine compute_nrst_pnt2cavline(mesh)
+subroutine compute_nrst_pnt2cavline(partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use o_PARAM , only: WP
-    use g_PARSUP
     implicit none
 
-    type(t_mesh),   intent(inout) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(inout), target :: mesh
     integer                                             :: node, kk, elnodes(3), gnode, aux_idx
     integer,       allocatable, dimension(:)            :: cavl_idx, lcl_cavl_idx
     real(kind=WP), allocatable, dimension(:)            :: cavl_lon, cavl_lat, cavl_dep,lcl_cavl_lon, lcl_cavl_lat, lcl_cavl_dep
     real(kind=WP)                                       :: aux_x, aux_y, aux_d, aux_dmin
     
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     if (mype==0) write(*,*) ' --> compute cavity line '
@@ -129,16 +135,17 @@ end subroutine compute_nrst_pnt2cavline
 ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
-subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
+subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, Unode, density_m_rho0,density_ref
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
-    use g_PARSUP
     implicit none
     !___________________________________________________________________________
-    type(t_mesh),   intent(inout),  target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_mesh),   intent(in),     target :: mesh
     type(t_tracer), intent(in),     target :: tracers
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
@@ -178,7 +185,10 @@ subroutine cavity_heat_water_fluxes_3eq(tracers, mesh)
     !      oomw= -30.
     !      oofw= -2.5
     
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     do node=1,myDim_nod2D !+eDim_nod2D  
@@ -314,23 +324,27 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Compute the heat and freshwater fluxes under ice cavity using simple 2equ.
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
-subroutine cavity_heat_water_fluxes_2eq(tracers, mesh)
+subroutine cavity_heat_water_fluxes_2eq(tracers, partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
     use i_ARRAYS, only: net_heat_flux, fresh_wa_flux
-    use g_PARSUP
     implicit none
 
-    type(t_mesh),   intent(inout) , target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_mesh),   intent(in),     target :: mesh
     type(t_tracer), intent(in),     target :: tracers
     integer        :: node, nzmin
     real(kind=WP)   :: gama, L, aux
     real(kind=WP)   :: c2, c3, c4, c5, c6
     real(kind=WP)   :: t_i, s_i, p, t_fz
     
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! parameter for computing heat and water fluxes
@@ -364,20 +378,24 @@ end subroutine cavity_heat_water_fluxes_2eq
 !_______________________________________________________________________________
 ! Compute the momentum fluxes under ice cavity
 ! Moved to this separated routine by Qiang, 20.1.2012
-subroutine cavity_momentum_fluxes(mesh)
+subroutine cavity_momentum_fluxes(partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use o_PARAM , only: density_0, C_d, WP
     use o_ARRAYS, only: UV, Unode, stress_surf, stress_node_surf
-    use i_ARRAYS, only: u_w, v_w
-    use g_PARSUP   
+    use i_ARRAYS, only: u_w, v_w  
     implicit none
     
     !___________________________________________________________________________
-    type(t_mesh), intent(inout) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
     integer        :: elem, elnodes(3), nzmin, node
     real(kind=WP)  :: aux
 
-#include "associate_mesh.h" 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     do elem=1,myDim_elem2D
@@ -409,15 +427,19 @@ end subroutine cavity_momentum_fluxes
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_vel(mesh)
+subroutine cavity_ice_clean_vel(partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use i_ARRAYS, only: U_ice, V_ice
-    use g_PARSUP   
     implicit none
-    type(t_mesh), intent(inout) , target :: mesh
-    integer        :: node
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    integer                               :: node
     
-#include "associate_mesh.h" 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
@@ -429,15 +451,19 @@ end subroutine cavity_ice_clean_vel
 !
 !
 !_______________________________________________________________________________
-subroutine cavity_ice_clean_ma(mesh)
+subroutine cavity_ice_clean_ma(partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use i_ARRAYS, only: m_ice, m_snow, a_ice
-    use g_PARSUP   
     implicit none
-    type(t_mesh), intent(inout) , target :: mesh
-    integer        :: node
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    integer                               :: node
     
-#include "associate_mesh.h" 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     do node=1,myDim_nod2d+eDim_nod2d           
         if(ulevels_nod2D(node)>1) then
@@ -469,7 +495,7 @@ end subroutine dist_on_earth
 ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
 ! eines Iterationsverfahrens aus.
 subroutine potit(salz,pt,pres,rfpres,tin)
-  use o_PARAM , only: WP
+    use o_PARAM , only: WP
     integer iter
     real(kind=WP) :: salz,pt,pres,rfpres,tin
     real(kind=WP) :: epsi, pt1,ptd,pttmpr
@@ -502,7 +528,7 @@ end subroutine potit
 !            PRES   = 10000.000 dbar
 !            RFPRES =     0.000 dbar
 real(kind=WP) function pttmpr(salz,temp,pres,rfpres)
-  use o_PARAM , only: WP
+    use o_PARAM , only: WP
 
     real(kind=WP) :: salz,temp,pres,rfpres
     real(kind=WP) :: p,t,dp,dt,q

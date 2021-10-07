@@ -26,7 +26,7 @@ module g_cvmix_tke
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    use mod_partit
     use o_arrays
     use g_comm_auto 
     implicit none
@@ -116,13 +116,19 @@ module g_cvmix_tke
     !===========================================================================
     ! allocate and initialize TKE 2D and 3D variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tke(mesh)
+    subroutine init_cvmix_tke(partit, mesh)
         implicit none
-        character(len=cvmix_strlen)       :: nmlfile
-        logical                  :: nmlfile_exist=.False.
-        integer                  :: node_size
-        type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        character(len=cvmix_strlen)           :: nmlfile
+        logical                               :: nmlfile_exist=.False.
+        integer                               :: node_size
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -242,15 +248,19 @@ module g_cvmix_tke
     !
     !===========================================================================
     ! calculate TKE vertical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_tke(mesh)
+    subroutine calc_cvmix_tke(partit, mesh)
         implicit none
-        type(t_mesh), intent(in), target :: mesh
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         integer       :: node, elem, nelem, nz, nln, nun, elnodes(3), node_size
         real(kind=WP) :: tvol
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
         
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
         node_size = myDim_nod2D
         !_______________________________________________________________________
@@ -374,12 +384,12 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         ! write out diffusivity
-        call exchange_nod(tke_Kv)
+        call exchange_nod(tke_Kv, partit)
         Kv = tke_Kv
             
         !_______________________________________________________________________
         ! write out viscosity -->interpolate therefor from nodes to elements
-        call exchange_nod(tke_Av) !Warning: don't forget to communicate before averaging on elements!!!
+        call exchange_nod(tke_Av, partit) !Warning: don't forget to communicate before averaging on elements!!!
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

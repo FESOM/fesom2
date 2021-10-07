@@ -25,7 +25,7 @@ module g_cvmix_pp
     use g_config
     use o_param           
     use MOD_MESH
-    use g_parsup
+    use MOD_PARTIT
     use o_arrays
     use g_comm_auto 
     use i_arrays
@@ -64,14 +64,18 @@ module g_cvmix_pp
     !===========================================================================
     ! allocate and initialize CVMIX PP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_pp(mesh)
+    subroutine init_cvmix_pp(partit, mesh)
         use MOD_MESH
         implicit none
-        type(t_mesh), intent(in), target :: mesh        
-        character(len=MAX_PATH)       :: nmlfile
-        logical                  :: nmlfile_exist=.False.
-        integer                  :: node_size
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        character(len=MAX_PATH)          :: nmlfile
+        logical                          :: nmlfile_exist=.False.
+        integer                          :: node_size
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -157,13 +161,17 @@ module g_cvmix_pp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_pp(mesh)
+    subroutine calc_cvmix_pp(partit, mesh)
         use MOD_MESH
         implicit none
-        type(t_mesh), intent(in), target :: mesh                
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         node_size = myDim_nod2D
         !_______________________________________________________________________
         do node = 1,node_size
@@ -247,13 +255,13 @@ module g_cvmix_pp
 
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(pp_Kv)
+        call exchange_nod(pp_Kv, partit)
         Kv = pp_Kv
            
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(pp_Av)
+        call exchange_nod(pp_Av, partit)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

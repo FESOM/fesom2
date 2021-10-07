@@ -140,6 +140,7 @@ contains
 
 ! Unformatted writing for t_mesh
 subroutine write_t_mesh(mesh, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(t_mesh), intent(in)         :: mesh
     integer,      intent(in)          :: unit
     integer,      intent(out)         :: iostat
@@ -232,6 +233,7 @@ end subroutine write_t_mesh
 
 ! Unformatted reading for t_mesh
 subroutine read_t_mesh(mesh, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(t_mesh), intent(inout)       :: mesh
     integer,       intent(in)          :: unit
     integer,       intent(out)         :: iostat

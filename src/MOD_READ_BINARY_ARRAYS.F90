@@ -5,7 +5,7 @@
 MODULE MOD_READ_BINARY_ARRAYS
 use o_PARAM
 private
-public :: read_bin_array
+public :: read_bin_array, read1d_int_static
 INTERFACE read_bin_array
           MODULE PROCEDURE read1d_real, read1d_int, read1d_char, read2d_real, read2d_int, read3d_real, read3d_int
 END INTERFACE
@@ -48,6 +48,19 @@ subroutine read1d_char(arr, unit, iostat, iomsg)
     allocate(arr(s1))
     read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1)
 end subroutine read1d_char
+
+subroutine read1d_int_static(arr, unit, iostat, iomsg)
+    IMPLICIT NONE
+    integer,       intent(inout)              :: arr(:)
+    integer,       intent(in)                 :: unit
+    integer,       intent(out)                :: iostat
+    character(*),  intent(inout)              :: iomsg
+    integer                                   :: s1
+
+    read(unit, iostat=iostat, iomsg=iomsg) s1
+    if (s1==0) return
+    read(unit, iostat=iostat, iomsg=iomsg) arr(1:s1)
+end subroutine read1d_int_static
 
 subroutine read2d_real(arr, unit, iostat, iomsg)
     real(kind=WP), intent(inout), allocatable :: arr(:,:)

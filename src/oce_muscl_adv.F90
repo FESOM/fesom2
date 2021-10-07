@@ -1,9 +1,11 @@
 module find_up_downwind_triangles_interface
   interface
-    subroutine find_up_downwind_triangles(twork, mesh)
+    subroutine find_up_downwind_triangles(twork, partit, mesh)
       use MOD_MESH
+      use MOD_PARTIT
       use MOD_TRACER
       type(t_mesh),        intent(in)  ,  target :: mesh
+      type(t_partit),      intent(inout), target :: partit
       type(t_tracer_work), intent(inout), target :: twork
     end subroutine
   end interface
@@ -26,12 +28,12 @@ end module
 !	find_up_downwind_triangles
 !	fill_up_dn_grad
 !	adv_tracer_muscl
-subroutine muscl_adv_init(twork, mesh)
+subroutine muscl_adv_init(twork, partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
     use o_PARAM
-    use g_PARSUP
     use g_comm_auto
     use g_config
     use find_up_downwind_triangles_interface
@@ -40,13 +42,17 @@ subroutine muscl_adv_init(twork, mesh)
     integer     :: nz
 
     type(t_mesh),        intent(inout), target :: mesh
+    type(t_partit),      intent(inout), target :: partit
     type(t_tracer_work), intent(inout), target :: twork
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! find upwind and downwind triangle for each local edge 
-    call find_up_downwind_triangles(twork, mesh)
+    call find_up_downwind_triangles(twork, partit, mesh)
     
     !___________________________________________________________________________
     nn_size=0
@@ -112,12 +118,12 @@ end SUBROUTINE muscl_adv_init
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE find_up_downwind_triangles(twork, mesh)
+SUBROUTINE find_up_downwind_triangles(twork, partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE MOD_TRACER
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
@@ -127,8 +133,12 @@ real(kind=WP), allocatable :: coord_elem(:, :,:), temp(:)
 integer, allocatable       :: temp_i(:), e_nodes(:,:)
 
 type(t_mesh),        intent(in)   , target :: mesh
+type(t_partit),      intent(inout), target :: partit
 type(t_tracer_work), intent(inout), target :: twork
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 allocate(twork%edge_up_dn_tri(2,myDim_edge2D))
 allocate(twork%edge_up_dn_grad(4,nl-1,myDim_edge2D))
@@ -144,7 +154,7 @@ allocate(temp(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
            do el=1,myDim_elem2D
               temp(el)=coord_nod2D(k,elem2D_nodes(n,el))
            end do
-	   call exchange_elem(temp)
+	   call exchange_elem(temp, partit)
 	   coord_elem(k,n,:)=temp(:)
 	END DO
    END DO
@@ -156,7 +166,7 @@ allocate(temp_i(myDim_elem2D+eDim_elem2D+eXDim_elem2D))
        do el=1,myDim_elem2D
           temp_i(el)=myList_nod2D(elem2D_nodes(n,el))
        end do
-       call exchange_elem(temp_i)
+       call exchange_elem(temp_i, partit)
        e_nodes(n,:)=temp_i(:)
     END DO   
 deallocate(temp_i)
@@ -274,19 +284,23 @@ end SUBROUTINE find_up_downwind_triangles
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE fill_up_dn_grad(twork, mesh)
+SUBROUTINE fill_up_dn_grad(twork, partit, mesh)
 ! ttx, tty  elemental gradient of tracer 
 USE o_PARAM
 USE MOD_MESH
+USE MOD_PARTIT
 USE MOD_TRACER
 USE o_ARRAYS
-USE g_PARSUP
 IMPLICIT NONE
 integer                  :: n, nz, elem, k, edge, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
 type(t_mesh),        intent(in),    target :: mesh
+type(t_partit),      intent(inout), target :: partit
 type(t_tracer_work), intent(inout), target :: twork
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 	!___________________________________________________________________________
 	! loop over edge segments

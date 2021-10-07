@@ -23,61 +23,62 @@ module g_comm
 contains
 
 #ifdef DEBUG
-  ! Only needed in debug mode
-  subroutine check_mpi_comm(rn, sn, r_mpitype, s_mpitype, rPE, sPE)
-    USE g_PARSUP
-    IMPLICIT NONE
-
-    ! General version of the communication routine for 2D nodal fields
-
-    integer, intent(in) :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:), sPE(:)
-    integer  :: n, sdebug, rdebug, status(MPI_STATUS_SIZE), request
-
-    DO n=1,rn    
-       call MPI_TYPE_SIZE(r_mpitype(n), rdebug, MPIerr)
-       CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_FESOM, request, MPIerr)
-    END DO
-
-    DO n=1, sn
-       call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, MPI_COMM_FESOM,    &
-            status, MPIerr)
-       call MPI_TYPE_SIZE(s_mpitype(n), rdebug, MPIerr)
-       if (sdebug /= rdebug) then
-          print *, "Mismatching MPI send/recieve message lengths."
-          print *,"Send/receive process numbers: ", mype, '/', sPE(n)
-          print *,"Number of send/receive bytes: ", sdebug, '/', rdebug
-          call MPI_ABORT( MPI_COMM_FESOM, 1 )
-       end if
-    END DO
-    CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-
-  END SUBROUTINE check_mpi_comm
+! General version of the communication routine for 2D nodal fields
+! Only needed in debug mode
+subroutine check_mpi_comm(rn, sn, r_mpitype, s_mpitype, rPE, sPE, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+integer,        intent(in)         :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:), sPE(:)
+integer                            :: n, sdebug, rdebug, status(MPI_STATUS_SIZE), request
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+DO n=1,rn    
+   CALL MPI_TYPE_SIZE(r_mpitype(n), rdebug, MPIerr)
+   CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_FESOM, request, MPIerr)
+END DO
+DO n=1, sn
+   call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, MPI_COMM_FESOM,    &
+        status, MPIerr)
+   call MPI_TYPE_SIZE(s_mpitype(n), rdebug, MPIerr)
+   if (sdebug /= rdebug) then
+      print *, "Mismatching MPI send/recieve message lengths."
+      print *,"Send/receive process numbers: ", mype, '/', sPE(n)
+      print *,"Number of send/receive bytes: ", sdebug, '/', rdebug
+      call MPI_ABORT( MPI_COMM_FESOM, 1 )
+      end if
+END DO
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+END SUBROUTINE check_mpi_comm
 #endif
 
 
-subroutine exchange_nod2D_i(nod_array2D)
-
-USE g_PARSUP
+subroutine exchange_nod2D_i(nod_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
- 
- integer, intent(inout)  :: nod_array2D(:)
-
- if (npes > 1) then
-    call exchange_nod2D_i_begin(nod_array2D)
-    call exchange_nod_end  
+type(t_partit), intent(inout), target :: partit
+integer,        intent(inout)         :: nod_array2D(:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+if (npes > 1) then
+    call exchange_nod2D_i_begin(nod_array2D, partit)
+    call exchange_nod_end(partit)
 endif
 END SUBROUTINE exchange_nod2D_i
 
 !=============================================================================
-
-subroutine exchange_nod2D_i_begin(nod_array2D)
-  USE g_PARSUP
-  IMPLICIT NONE
-
-  ! General version of the communication routine for 2D nodal fields
-
-  integer, intent(inout)  :: nod_array2D(:)
-  integer  :: n, sn, rn
+! General version of the communication routine for 2D nodal fields
+subroutine exchange_nod2D_i_begin(nod_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+integer,        intent(inout)         :: nod_array2D(:)
+integer                               :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
   if (npes > 1) then
 
@@ -108,32 +109,34 @@ subroutine exchange_nod2D_i_begin(nod_array2D)
 END SUBROUTINE exchange_nod2D_i_begin
 
 ! ========================================================================
-subroutine exchange_nod2D(nod_array2D)
-
-USE g_PARSUP
-IMPLICIT NONE
-
 ! General version of the communication routine for 2D nodal fields
- 
- real(real64), intent(inout)  :: nod_array2D(:)
+subroutine exchange_nod2D(nod_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)      :: nod_array2D(:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes > 1) then
-    call exchange_nod2D_begin(nod_array2D)  
-    call exchange_nod_end
+    call exchange_nod2D_begin(nod_array2D, partit)  
+    call exchange_nod_end(partit)
  end if
  
 END SUBROUTINE exchange_nod2D
 
 ! ========================================================================
-subroutine exchange_nod2D_begin(nod_array2D)
-  USE g_PARSUP
-  IMPLICIT NONE
-
-  ! General version of the communication routine for 2D nodal fields
-
-  real(real64), intent(inout)  :: nod_array2D(:)
-
-  integer  :: n, sn, rn
+! General version of the communication routine for 2D nodal fields
+subroutine exchange_nod2D_begin(nod_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array2D(:)
+integer                               :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
   if (npes > 1) then
 
@@ -161,36 +164,39 @@ subroutine exchange_nod2D_begin(nod_array2D)
 
 END SUBROUTINE exchange_nod2D_begin
 !===============================================
-subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D)
-
-USE g_PARSUP
-IMPLICIT NONE
-
 ! General version of the communication routine for 2D nodal fields
- 
- real(real64), intent(inout)  :: nod1_array2D(:)
- real(real64), intent(inout)  :: nod2_array2D(:)
+subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)      :: nod1_array2D(:)
+real(real64),   intent(inout)      :: nod2_array2D(:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
 
  if (npes > 1) then
-    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)  
-    call exchange_nod_end
+    call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit)  
+    call exchange_nod_end(partit)
  end if
  
 END SUBROUTINE exchange_nod2D_2fields
 
 ! ========================================================================
-subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D)
-USE g_PARSUP
-IMPLICIT NONE
-
 ! General version of the communication routine for 2D nodal fields
- 
- real(real64), intent(inout)  :: nod1_array2D(:)
- real(real64), intent(inout)  :: nod2_array2D(:)
+subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod1_array2D(:)
+real(real64),   intent(inout)         :: nod2_array2D(:)
+integer                               :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
- integer  :: n, sn, rn
-
- if (npes > 1) then
+if (npes > 1) then
 
   sn=com_nod2D%sPEnum
   rn=com_nod2D%rPEnum
@@ -223,37 +229,39 @@ end if
 END SUBROUTINE exchange_nod2D_2fields_begin
 
 !===============================================
-subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D)
-
-USE g_PARSUP
-IMPLICIT NONE
-
+subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit)
 ! General version of the communication routine for 2D nodal fields
- 
- real(real64), intent(inout)  :: nod1_array2D(:)
- real(real64), intent(inout)  :: nod2_array2D(:)
- real(real64), intent(inout)  :: nod3_array2D(:)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)      :: nod1_array2D(:)
+real(real64),   intent(inout)      :: nod2_array2D(:)
+real(real64),   intent(inout)      :: nod3_array2D(:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
 
  if (npes > 1) then
-    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)  
-    call exchange_nod_end
+    call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit)  
+    call exchange_nod_end(partit)
  end if
  
 END SUBROUTINE exchange_nod2D_3fields
 
 ! ========================================================================
-subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D)
-USE g_PARSUP
-IMPLICIT NONE
-
+subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit)
 ! General version of the communication routine for 2D nodal fields
- 
- real(real64), intent(inout)  :: nod1_array2D(:)
- real(real64), intent(inout)  :: nod2_array2D(:)
- real(real64), intent(inout)  :: nod3_array2D(:)
-
-
- integer  :: n, sn, rn
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)      :: nod1_array2D(:)
+real(real64),   intent(inout)      :: nod2_array2D(:)
+real(real64),   intent(inout)      :: nod3_array2D(:)
+integer                            :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes > 1) then
 
@@ -294,33 +302,35 @@ end if
 END SUBROUTINE exchange_nod2D_3fields_begin
 
 ! ========================================================================
-subroutine exchange_nod3D(nod_array3D)
-
-USE g_PARSUP
-IMPLICIT NONE
-
-real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
- 
-if (npes > 1) then
-   call exchange_nod3D_begin(nod_array3D)
-   call exchange_nod_end
+subroutine exchange_nod3D(nod_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array3D(:,:) 
+
+if (partit%npes > 1) then
+   call exchange_nod3D_begin(nod_array3D, partit)
+   call exchange_nod_end(partit)
 endif
+
 END SUBROUTINE exchange_nod3D
 
 ! ========================================================================
-subroutine exchange_nod3D_begin(nod_array3D)
-USE g_PARSUP
-IMPLICIT NONE
-
-
-real(real64), intent(inout) :: nod_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
- 
- integer  :: n, sn, rn
- integer  :: nz, nl1
+subroutine exchange_nod3D_begin(nod_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)      :: nod_array3D(:,:) 
+integer                            :: n, sn, rn
+integer                            :: nz, nl1
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes > 1) then
     sn=com_nod2D%sPEnum
@@ -333,7 +343,7 @@ real(real64), intent(inout) :: nod_array3D(:,:)
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(1)
+       call par_ex(partit, 1)
     endif
 
     ! Check MPI point-to-point communication for consistency
@@ -341,52 +351,52 @@ real(real64), intent(inout) :: nod_array3D(:,:)
     call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,1), s_mpitype_nod3D(:,nl1,1), &
          com_nod2D%rPE, com_nod2D%sPE)
 #endif
-
     DO n=1,rn    
        call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
             com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr) 
     END DO
-
     DO n=1, sn
        call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
             mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
     END DO
-
     com_nod2D%nreq = rn+sn
 
  endif
 END SUBROUTINE exchange_nod3D_begin
 
 ! ========================================================================
-subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D)
-
-USE g_PARSUP
-IMPLICIT NONE
-
-real(real64), intent(inout) :: nod1_array3D(:,:) 
-real(real64), intent(inout) :: nod2_array3D(:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
- 
+subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod1_array3D(:,:) 
+real(real64),   intent(inout)         :: nod2_array3D(:,:) 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
 if (npes > 1) then
-   call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D)
-   call exchange_nod_end
+   call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit)
+   call exchange_nod_end(partit)
 endif
 END SUBROUTINE exchange_nod3D_2fields
 
 ! ========================================================================
-subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D)
-USE g_PARSUP
-IMPLICIT NONE
-
-
-real(real64), intent(inout) :: nod1_array3D(:,:) 
-real(real64), intent(inout) :: nod2_array3D(:,:) 
+subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit)
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
- 
- integer  :: n, sn, rn
- integer  :: nz, nl1, nl2
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod1_array3D(:,:) 
+real(real64),   intent(inout)         :: nod2_array3D(:,:) 
+integer                               :: n, sn, rn
+integer                               :: nz, nl1, nl2
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes > 1) then
     sn=com_nod2D%sPEnum
@@ -437,39 +447,37 @@ real(real64), intent(inout) :: nod2_array3D(:,:)
  endif
 END SUBROUTINE exchange_nod3D_2fields_begin
 ! ========================================================================
-subroutine exchange_nod3D_n(nod_array3D)
-USE g_PARSUP
+subroutine exchange_nod3D_n(nod_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-real(real64), intent(inout) :: nod_array3D(:,:,:) 
- 
-if (npes>1) then
-   call exchange_nod3D_n_begin(nod_array3D)
-   call exchange_nod_end
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array3D(:,:,:) 
+if (partit%npes>1) then
+   call exchange_nod3D_n_begin(nod_array3D, partit)
+   call exchange_nod_end(partit)
 endif
 
 END SUBROUTINE exchange_nod3D_n
 
 !=================================================
-
-subroutine exchange_nod3D_n_begin(nod_array3D)
-USE g_PARSUP
-IMPLICIT NONE
-
-real(real64), intent(inout) :: nod_array3D(:,:,:) 
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
- 
- integer  :: n, sn, rn
- integer  :: nz, nl1, n_val
-
+subroutine exchange_nod3D_n_begin(nod_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: nod_array3D(:,:,:)
+integer                             :: n, sn, rn
+integer                             :: nz, nl1, n_val
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 if (npes>1) then
  ! nod_array3D(n_val,nl1,nod2D_size)
-  nl1= ubound(nod_array3D,2)
+  nl1   = ubound(nod_array3D,2)
   n_val = ubound(nod_array3D,1)
-
   if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
-
      ! This routine also works for swapped dimensions nod_array3D(nl1,n_val, nod2D_size) 
      nl1   = ubound(nod_array3D,1)
      n_val = ubound(nod_array3D,2)
@@ -513,17 +521,24 @@ END SUBROUTINE exchange_nod3D_n_begin
 ! AND WAITING
 !=======================================
  
-SUBROUTINE exchange_nod_end
-  USE g_PARSUP
+SUBROUTINE exchange_nod_end(partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
 
-if (npes > 1) &
-  call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+if (partit%npes > 1) &
+  call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
 END SUBROUTINE exchange_nod_end
 
-SUBROUTINE exchange_elem_end
-
-  USE g_PARSUP
+SUBROUTINE exchange_elem_end(partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
   if (npes > 1) then
      if (elem_full_flag) then
@@ -535,129 +550,32 @@ SUBROUTINE exchange_elem_end
      endif
   end if
 END SUBROUTINE exchange_elem_end
-! ========================================================================
-
-!nr  Not used, no MPI datatype built (yet)
-!
-!!$subroutine exchange_edge3D(edge_array3D)
-!!$  use g_PARSUP 
-!!$  implicit none
-!!$  
-!!$ ! Communication of edge based data stored in (vertical, horizontal) format 
-!!$
-!!$ INTEGER  :: sreq(maxPEnum)
-!!$ INTEGER  :: rreq(maxPEnum)
-!!$ INTEGER  :: sstat(MPI_STATUS_SIZE,maxPEnum)
-!!$ INTEGER  :: rstat(MPI_STATUS_SIZE,maxPEnum)
-!!$ integer  :: n, sn, rn, dest, nini, nend, offset, source,tag
-!!$ integer  :: nz, nh, nc
-!!$ real(real64) :: edge_array3D(nl-1,edge2D) 
-!!$  
-!!$  sn=com_edge2D%sPEnum
-!!$  rn=com_edge2D%rPEnum
-!!$  ! Put data to be communicated into send buffer 
-!!$
-!!$
-!!$  do n=1, sn
-!!$     nini=com_edge2D%sptr(n)
-!!$     nend=com_edge2D%sptr(n+1) - 1
-!!$      nc=0
-!!$      DO nh=nini, nend
-!!$         DO nz=1, nl-1
-!!$	 nc=nc+1
-!!$         s_buff_edge3D(n)%array(nc)=edge_array3D(nz,com_edge2D%slist(nh))
-!!$	 END DO
-!!$      END DO	 
-!!$  end do
-!!$
-!!$
-!!$  do n=1, sn
-!!$     dest=com_edge2D%sPE(n)
-!!$     nini=com_edge2D%sptr(n)
-!!$     offset=(com_edge2D%sptr(n+1) - nini)*(nl-1)
-!!$
-!!$     call MPI_ISEND(s_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, dest, mype, & 
-!!$          MPI_COMM_FESOM, sreq(n), MPIerr)
-!!$  end do
-!!$  do n=1, rn
-!!$     source=com_edge2D%rPE(n)
-!!$     nini=com_edge2D%rptr(n)
-!!$     offset=(com_edge2D%rptr(n+1) - nini)*(nl-1)
-!!$
-!!$     call MPI_IRECV(r_buff_edge3D(n)%array, offset, MPI_DOUBLE_PRECISION, source, &
-!!$          source, MPI_COMM_FESOM, rreq(n), MPIerr) 
-!!$  end do
-!!$
-!!$  call MPI_WAITALL(sn,sreq,sstat, MPIerr)
-!!$  call MPI_WAITALL(rn,rreq,rstat, MPIerr)
-!!$
-!!$  ! Put received data to their destination
-!!$
-!!$  do n=1, rn
-!!$     nini=com_edge2D%rptr(n)
-!!$     nend=com_edge2D%rptr(n+1) - 1
-!!$      nc=0
-!!$      DO nh=nini, nend
-!!$         DO nz=1, nl-1
-!!$	 nc=nc+1
-!!$	 edge_array3D(nz,com_edge2D%rlist(nh))=r_buff_edge3D(n)%array(nc)
-!!$         END DO
-!!$      END DO	  
-!!$  end do
-!!$
-!!$end subroutine exchange_edge3D
-!==========================================================================
-
-!!$subroutine exchange_edge2D(edge_array2D)
-!!$  use g_PARSUP 
-!!$  implicit none
-!!$
-!!$! General version of the communication routine for 2D edge fields
-!!$! This routine is not split, it is used only once during setup. 
-!!$ real(real64), intent(inout)  :: edge_array2D(:)
-!!$
-!!$ integer  :: n, sn, rn
-!!$
-!!$ if (npes> 1) then
-!!$  sn=com_edge2D%sPEnum
-!!$  rn=com_edge2D%rPEnum
-!!$
-!!$  DO n=1,rn         
-!!$     call MPI_IRECV(edge_array2D, 1, r_mpitype_edge2D(n), com_edge2D%rPE(n), &
-!!$               com_edge2D%rPE(n), MPI_COMM_FESOM, com_edge2D%req(n), MPIerr) 
-!!$  END DO  
-!!$  DO n=1, sn
-!!$     call MPI_ISEND(edge_array2D, 1, s_mpitype_edge2D(n), com_edge2D%sPE(n), &
-!!$                    mype, MPI_COMM_FESOM, com_edge2D%req(rn+n), MPIerr)
-!!$  END DO
-!!$  
-!!$  call MPI_WAITALL(rn+sn,com_edge2D%req,MPI_STATUSES_IGNORE, MPIerr)
-!!$
-!!$  endif
-!!$
-!!$end subroutine exchange_edge2D
 !=============================================================================
-subroutine exchange_elem3D(elem_array3D)
-
-USE g_PARSUP 
+subroutine exchange_elem3D(elem_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: elem_array3D(:,:) 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
- real(real64), intent(inout) :: elem_array3D(:,:) 
-
- call exchange_elem3D_begin(elem_array3D)
- call exchange_elem_end
+call exchange_elem3D_begin(elem_array3D, partit)
+call exchange_elem_end(partit)
 
 END SUBROUTINE exchange_elem3D
 !===========================================
-subroutine exchange_elem3D_begin(elem_array3D)
-USE g_PARSUP 
-IMPLICIT NONE
-
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
-
-real(real64), intent(inout) :: elem_array3D(:,:) 
-integer  :: n, sn, rn, nl1
+subroutine exchange_elem3D_begin(elem_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: elem_array3D(:,:) 
+integer                             :: n, sn, rn, nl1
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 if (npes> 1) then
 
@@ -775,30 +693,34 @@ endif
 END SUBROUTINE exchange_elem3D_begin
 
 !=============================================================================
-subroutine exchange_elem3D_n(elem_array3D)
-USE g_PARSUP 
-IMPLICIT NONE
-
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
- 
- real(real64), intent(inout) :: elem_array3D(:,:,:) 
+subroutine exchange_elem3D_n(elem_array3D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: elem_array3D(:,:,:) 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes> 1) then
-    call exchange_elem3D_n_begin(elem_array3D)
-    call exchange_elem_end
+    call exchange_elem3D_n_begin(elem_array3D, partit)
+    call exchange_elem_end(partit)
  endif
 END SUBROUTINE exchange_elem3D_n
 !=============================================================================
-subroutine exchange_elem3D_n_begin(elem_array3D)
-USE g_PARSUP 
-IMPLICIT NONE
-
+subroutine exchange_elem3D_n_begin(elem_array3D, partit)
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
- 
- real(real64), intent(inout) :: elem_array3D(:,:,:) 
- integer  :: n, sn, rn, n_val, nl1
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: elem_array3D(:,:,:) 
+integer                             :: n, sn, rn, n_val, nl1
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes> 1) then
  nl1   = ubound(elem_array3D,2)
@@ -874,33 +796,37 @@ IMPLICIT NONE
 endif  
 END SUBROUTINE exchange_elem3D_n_begin
 !========================================================================
-subroutine exchange_elem2D(elem_array2D)
-USE g_PARSUP 
-IMPLICIT NONE
-
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
- 
- real(real64), intent(inout) :: elem_array2D(:) 
+subroutine exchange_elem2D(elem_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: elem_array2D(:) 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes> 1) then
-    call exchange_elem2D_begin(elem_array2D)
-    call exchange_elem_end
+    call exchange_elem2D_begin(elem_array2D, partit)
+    call exchange_elem_end(partit)
  end if
   
 END SUBROUTINE exchange_elem2D
 !========================================================================
-subroutine exchange_elem2D_begin(elem_array2D)
-USE g_PARSUP 
-IMPLICIT NONE
-
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
- 
- real(real64), intent(inout) :: elem_array2D(:) 
- integer  :: n, sn, rn
+subroutine exchange_elem2D_begin(elem_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)       :: elem_array2D(:) 
+integer                             :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
- if (npes> 1) then
+if (npes> 1) then
 
   if (ubound(elem_array2D,1)<=myDim_elem2D+eDim_elem2D) then
 
@@ -955,30 +881,34 @@ end if
   
 END SUBROUTINE exchange_elem2D_begin
 ! ========================================================================
-subroutine exchange_elem2D_i(elem_array2D)
 !Exchange with ALL(!) the neighbours
-USE g_PARSUP 
+subroutine exchange_elem2D_i(elem_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
- integer, intent(inout)  :: elem_array2D(:)
-
- integer  :: n, sn, rn
+type(t_partit), intent(inout), target  :: partit
+integer,        intent(inout)       :: elem_array2D(:)
+integer                             :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes> 1) then
-    call exchange_elem2D_i_begin(elem_array2D)
-    call exchange_elem_end
+    call exchange_elem2D_i_begin(elem_array2D, partit)
+    call exchange_elem_end(partit)
 end if
 
 END SUBROUTINE exchange_elem2D_i
 !=============================================================================
-subroutine exchange_elem2D_i_begin(elem_array2D)
 !Exchange with ALL(!) the neighbours
-USE g_PARSUP 
+subroutine exchange_elem2D_i_begin(elem_array2D, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
- integer, intent(inout)  :: elem_array2D(:)
-
- integer  :: n, sn, rn
+type(t_partit), intent(inout), target  :: partit
+integer,        intent(inout)       :: elem_array2D(:)
+integer                             :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
  if (npes> 1) then
 
@@ -1009,27 +939,25 @@ IMPLICIT NONE
 end if
 
 END SUBROUTINE exchange_elem2D_i_begin
-!=============================================================================
-
-
-
 ! ========================================================================
 ! Broadcast routines
 ! Many because of different sizes.
 ! ========================================================================
-subroutine broadcast_nod3D(arr3D, arr3Dglobal)
+subroutine broadcast_nod3D(arr3D, arr3Dglobal, partit)
 ! Distribute the nodal information available on 0 PE to other PEs
-use g_PARSUP
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-INTEGER      :: nz, counter,nl1
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(real64) ::  arr3D(:,:)
-real(real64) ::  arr3Dglobal(:,:)
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nz, counter,nl1
+integer                             ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
+real(real64)                        ::  arr3D(:,:)
+real(real64)                        ::  arr3Dglobal(:,:)
+integer                             :: node_size
+INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
 real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-integer       :: node_size
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 node_size=myDim_nod2D+eDim_nod2D
 nl1=ubound(arr3D,1)
@@ -1081,18 +1009,20 @@ end subroutine broadcast_nod3D
 !
 !============================================================================
 !
-subroutine broadcast_nod2D(arr2D, arr2Dglobal)
+subroutine broadcast_nod2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
-use g_PARSUP
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2Dglobal(:)
-
-integer                                  ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:)  ::  sendbuf
-integer       :: node_size
+type(t_partit), intent(in), target       :: partit
+real(real64)                             :: arr2D(:)
+real(real64)                             :: arr2Dglobal(:)
+integer                                  :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
+INTEGER,      ALLOCATABLE, DIMENSION(:)  :: irecvbuf
+real(real64), ALLOCATABLE, DIMENSION(:)  :: sendbuf
+integer                                  :: node_size
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 node_size=myDim_nod2D+eDim_nod2D
 
@@ -1129,19 +1059,22 @@ end subroutine broadcast_nod2D
 !
 !============================================================================
 !
-subroutine broadcast_elem3D(arr3D, arr3Dglobal)
+subroutine broadcast_elem3D(arr3D, arr3Dglobal, partit)
 ! Distribute the elemental information available on 0 PE to other PEs
-use g_PARSUP
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(in), target      :: partit
+INTEGER                                 :: nz, counter,nl1
+integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
+real(real64)                            :: arr3D(:,:)
+real(real64)                            :: arr3Dglobal(:,:)
+integer                                 :: elem_size
 
-INTEGER      :: nz, counter,nl1
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(real64) ::  arr3D(:,:)
-real(real64) ::  arr3Dglobal(:,:)
+INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
 real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-integer       :: elem_size
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 elem_size=myDim_elem2D+eDim_elem2D
 
@@ -1194,22 +1127,22 @@ end subroutine broadcast_elem3D
 !
 !============================================================================
 !
-subroutine broadcast_elem2D(arr2D, arr2Dglobal)
+subroutine broadcast_elem2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
-use g_PARSUP
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-integer      ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:)       ::  irecvbuf
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2Dglobal(:)
-real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf
-integer       :: elem_size
+type(t_partit), intent(in), target      :: partit
+integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
+real(real64)                            :: arr2D(:)
+real(real64)                            :: arr2Dglobal(:)
+integer                                 :: elem_size
+INTEGER,      ALLOCATABLE, DIMENSION(:) :: irecvbuf
+real(real64), ALLOCATABLE, DIMENSION(:) :: sendbuf
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 elem_size=myDim_elem2D+eDim_elem2D
-
-
 
 IF ( mype == 0 ) THEN
     if (npes>1) then
@@ -1243,28 +1176,24 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_elem2D
 !
 !============================================================================
-!
-subroutine gather_nod3D(arr3D, arr3D_global)
-
 ! Make nodal information available to master PE 
-!
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+subroutine gather_nod3D(arr3D, arr3D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                                :: nl1
+integer                                :: n
+real(real64)                           :: arr3D(:,:)
+real(real64)                           :: arr3D_global(:,:)
+real(real64), allocatable              :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, n3D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
-
-real(real64) ::  arr3D(:,:)
-real(real64) ::  arr3D_global(:,:)
-real(real64), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, n3D
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1306,27 +1235,26 @@ end subroutine gather_nod3D
 !
 !============================================================================
 !
-subroutine gather_real4_nod3D(arr3D, arr3D_global)
+subroutine gather_real4_nod3D(arr3D, arr3D_global, partit)
 
 ! Make nodal information available to master PE 
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+real(real32)                        :: arr3D(:,:)
+real(real32)                        :: arr3D_global(:,:)
+real(real32), allocatable           :: recvbuf(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n3D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
-
-real(real32)  ::  arr3D(:,:)
-real(real32)  ::  arr3D_global(:,:)
-real(real32), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, n3D
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1367,26 +1295,27 @@ end if
 end subroutine gather_real4_nod3D
 !=======================================================
 
-subroutine gather_int2_nod3D(arr3D, arr3D_global)
+subroutine gather_int2_nod3D(arr3D, arr3D_global, partit)
 
 ! Make nodal information available to master PE 
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+integer(int16)                      :: arr3D(:,:)
+integer(int16)                      :: arr3D_global(:,:)
+integer(int16), allocatable         :: recvbuf(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n3D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
 
-integer(int16) ::  arr3D(:,:)
-integer(int16) ::  arr3D_global(:,:)
-integer(int16), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, n3D
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1426,23 +1355,22 @@ ENDIF
 end if
 end subroutine gather_int2_nod3D
 !==============================================
-subroutine gather_nod2D(arr2D, arr2D_global)
-
+subroutine gather_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE 
-
-use g_PARSUP
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real64)                        :: arr2D(:)
+real(real64)                        :: arr2D_global(:)
+real(real64), allocatable           :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2D_global(:)
-real(real64), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
-
- if (npes> 1) then
+if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
@@ -1480,23 +1408,22 @@ ENDIF
 endif
 end subroutine gather_nod2D
 !==============================================
-subroutine gather_real4_nod2D(arr2D, arr2D_global)
-
+subroutine gather_real4_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE 
-
-use g_PARSUP
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real32)                        :: arr2D(:)
+real(real32)                        :: arr2D_global(:)
+real(real32),   allocatable         :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-real(real32)  ::  arr2D(:)
-real(real32)  ::  arr2D_global(:)
-real(real32), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
-
- if (npes> 1) then
+if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
@@ -1535,23 +1462,22 @@ endif
 end subroutine gather_real4_nod2D
 
 !==============================================
-subroutine gather_int2_nod2D(arr2D, arr2D_global)
-
-! Make nodal information available to master PE 
-
-use g_PARSUP
-
+! Make nodal information available to master PE
+subroutine gather_int2_nod2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+integer(int16)                      :: arr2D(:)
+integer(int16)                      :: arr2D_global(:)
+integer(int16), allocatable         :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-integer(int16) ::  arr2D(:)
-integer(int16) ::  arr2D_global(:)
-integer(int16), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
-
- if (npes> 1) then
+if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
@@ -1590,28 +1516,26 @@ endif
 end subroutine gather_int2_nod2D
 
 !============================================================================
-subroutine gather_elem3D(arr3D, arr3D_global)
-
+subroutine gather_elem3D(arr3D, arr3D_global, partit)
 ! Make element information available to master PE 
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+real(real64)                        :: arr3D(:,:)
+real(real64)                        :: arr3D_global(:,:)
+real(real64),   allocatable         :: recvbuf(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e3D, ende, err_alloc
+integer                             :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
-
-real(real64) ::  arr3D(:,:)
-real(real64) ::  arr3D_global(:,:)
-real(real64), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, e3D, ende, err_alloc
-integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1656,29 +1580,25 @@ endif
 end subroutine gather_elem3D
 
 !===================================================================
-
-subroutine gather_real4_elem3D(arr3D, arr3D_global)
-
 ! Make element information available to master PE 
-!
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+subroutine gather_real4_elem3D(arr3D, arr3D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                                :: nl1
+integer                                :: n
+real(real32)                           :: arr3D(:,:)
+real(real32)                           :: arr3D_global(:,:)
+real(real32),   allocatable            :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, e3D, ende, err_alloc
+integer                                :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER        :: nl1
-integer        :: n
-
-real(real32)   ::  arr3D(:,:)
-real(real32)   ::  arr3D_global(:,:)
-real(real32), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, e3D, ende, err_alloc
-integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1724,29 +1644,25 @@ end subroutine gather_real4_elem3D
 
 
 !===================================================================
-
-subroutine gather_int2_elem3D(arr3D, arr3D_global)
-
 ! Make element information available to master PE 
-!
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+subroutine gather_int2_elem3D(arr3D, arr3D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+integer(int16)                      :: arr3D(:,:)
+integer(int16)                      :: arr3D_global(:,:)
+integer(int16), allocatable         :: recvbuf(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e3D, ende, err_alloc
+integer                             :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
-
-integer(int16) ::  arr3D(:,:)
-integer(int16) ::  arr3D_global(:,:)
-integer(int16), allocatable :: recvbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, e3D, ende, err_alloc
-integer        :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 nl1=ubound(arr3D,1)
@@ -1792,24 +1708,22 @@ end subroutine gather_int2_elem3D
 
 
 !==============================================
-subroutine gather_elem2D(arr2D, arr2D_global)
-
 ! Make element information available to master PE 
-
-use g_PARSUP
-
+subroutine gather_elem2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real64)                        :: arr2D(:)
+real(real64)                        :: arr2D_global(:)
+real(real64), allocatable           :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2D_global(:)
-real(real64), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, e2D
-
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -1850,25 +1764,24 @@ end if
 
 end subroutine gather_elem2D
 
-!==============================================
-subroutine gather_real4_elem2D(arr2D, arr2D_global)
-
+!================================================
 ! Make element information available to master PE 
-
-use g_PARSUP
-
+subroutine gather_real4_elem2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real32)                        :: arr2D(:)
+real(real32)                        :: arr2D_global(:)
+real(real32), allocatable           :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
 
-real(real32)  ::  arr2D(:)
-real(real32)  ::  arr2D_global(:)
-real(real32), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, e2D
-
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -1909,25 +1822,23 @@ end if
 
 end subroutine gather_real4_elem2D
 
-!==============================================
-subroutine gather_int2_elem2D(arr2D, arr2D_global)
-
+!================================================
 ! Make element information available to master PE 
-
-use g_PARSUP
-
+subroutine gather_int2_elem2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                                :: n
+integer(int16)                         :: arr2D(:)
+integer(int16)                         :: arr2D_global(:)
+integer(int16), allocatable            :: recvbuf(:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, e2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-integer(int16) ::  arr2D(:)
-integer(int16) ::  arr2D_global(:)
-integer(int16), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, e2D
-
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -1970,28 +1881,25 @@ end subroutine gather_int2_elem2D
 
 
 !============================================================================
-subroutine gather_real8to4_nod3D(arr3D, arr3D_global)
-
 ! Make nodal information available to master PE 
-!
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+subroutine gather_real8to4_nod3D(arr3D, arr3D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+real(real64)                        :: arr3D(:,:)
+real(real32)                        :: arr3D_global(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n3D, ierr
+real(real32), allocatable           :: recvbuf(:,:)
+real(real32), allocatable           :: sendbuf(:,:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
-
-real(real64)  ::  arr3D(:,:)
-real(real32)   ::  arr3D_global(:,:)
-real(real32), allocatable :: recvbuf(:,:)
-real(real32), allocatable :: sendbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, n3D, ierr
-
- if (npes> 1) then
+if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 nl1=ubound(arr3D,1)
@@ -2036,22 +1944,21 @@ end if
 
 end subroutine gather_real8to4_nod3D
 !==============================================
-subroutine gather_real8to4_nod2D(arr2D, arr2D_global)
-
 ! Make nodal information available to master PE 
-
-use g_PARSUP
-
+subroutine gather_real8to4_nod2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-integer      :: n
-
-real(real64)  ::  arr2D(:)
-real(real32)   :: arr2D_global(:)
-real(real32)   :: sendbuf(myDim_nod2D)
-real(real64), allocatable :: recvbuf(:)
-integer        :: req(npes-1)
-integer        :: start, n2D
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real64)                        :: arr2D(:)
+real(real32)                        :: arr2D_global(:)
+real(real32)                        :: sendbuf(partit%myDim_nod2D)
+real(real64), allocatable           :: recvbuf(:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
@@ -2089,31 +1996,27 @@ ENDIF
 
 end if
 end subroutine gather_real8to4_nod2D
-!==============================================
 !============================================================================
-subroutine gather_real8to4_elem3D(arr3D, arr3D_global)
-
+subroutine gather_real8to4_elem3D(arr3D, arr3D_global, partit)
 ! Make element information available to master PE 
-!
 ! Use only with 3D arrays stored in (vertical, horizontal) way
-
-use g_PARSUP
-
-
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+INTEGER                             :: nl1
+integer                             :: n
+real(real64)                        :: arr3D(:,:)
+real(real32)                        :: arr3D_global(:,:)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e3D
+real(real32), allocatable           :: recvbuf(:,:)
+real(real32), allocatable           :: sendbuf(:,:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-INTEGER      :: nl1
-integer      :: n
 
-real(real64) ::  arr3D(:,:)
-real(real32)  ::  arr3D_global(:,:)
-real(real32), allocatable :: recvbuf(:,:)
-real(real32), allocatable :: sendbuf(:,:)
-integer        :: req(npes-1)
-integer        :: start, e3D
-
-
- if (npes> 1) then
+if (npes> 1) then
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 nl1=ubound(arr3D,1)
 
@@ -2153,26 +2056,24 @@ ENDIF
 
 end if
 end subroutine gather_real8to4_elem3D
-!==============================================
-subroutine gather_real8to4_elem2D(arr2D, arr2D_global)
-
+!================================================
 ! Make element information available to master PE 
-
-use g_PARSUP
-
+subroutine gather_real8to4_elem2D(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                             :: n
+real(real64)                        :: arr2D(:)
+real(real32)                        :: arr2D_global(:)
+real(real32), allocatable           :: recvbuf(:)
+real(real32)                        :: sendbuf(partit%myDim_elem2D)
+integer                             :: req(partit%npes-1)
+integer                             :: start, e2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-integer      :: n
-
-real(real64) ::  arr2D(:)
-real(real32)  ::  arr2D_global(:)
-real(real32), allocatable :: recvbuf(:)
-real(real32)  :: sendbuf(myDim_elem2D)
-integer        :: req(npes-1)
-integer        :: start, e2D
-
-
- if (npes> 1) then
+if (npes> 1) then
 
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 ! Consider MPI-datatypes to recv directly into arr2D_global!
@@ -2213,18 +2114,23 @@ ENDIF
 end if
 end subroutine gather_real8to4_elem2D
 !==============================================
-subroutine gather_elem2D_i(arr2D, arr2D_global)
+subroutine gather_elem2D_i(arr2D, arr2D_global, partit)
 ! Make element information available to master PE 
-  use g_PARSUP
-  IMPLICIT NONE
+use MOD_MESH
+use MOD_PARTIT
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+integer                       :: n
+integer                       :: arr2D(:)
+integer                       :: arr2D_global(:)
+integer, allocatable          :: recvbuf(:)
+integer                       :: req(partit%npes-1)
+integer                       :: start, e2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
-  integer                       :: n
-  integer                       :: arr2D(:)
-  integer                       :: arr2D_global(:)
-  integer, allocatable          :: recvbuf(:)
-  integer                       :: req(npes-1)
-  integer                       :: start, e2D
-  CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
   ! Consider MPI-datatypes to recv directly into arr2D_global!
   IF ( mype == 0 ) THEN
      if (npes > 1) then
@@ -2246,21 +2152,21 @@ subroutine gather_elem2D_i(arr2D, arr2D_global)
      call MPI_SEND(arr2D, myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
   ENDIF
 end subroutine gather_elem2D_i
-!============================================================================
-subroutine gather_nod2D_i(arr2D, arr2D_global)
-
-! Make nodal information available to master PE 
-
-use g_PARSUP
-
+!==============================================
+! Make nodal information available to master PE
+subroutine gather_nod2D_i(arr2D, arr2D_global, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
+type(t_partit), intent(inout), target :: partit
 integer              :: n
 integer              :: arr2D(:)
 integer              :: arr2D_global(:)
 integer, allocatable :: recvbuf(:)
-integer              :: req(npes-1)
+integer              :: req(partit%npes-1)
 integer              :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 if (npes> 1) then
 
@@ -2300,18 +2206,19 @@ ENDIF
 endif
 end subroutine gather_nod2D_i
 !============================================================================
-!
-subroutine gather_edg2D(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
-use g_PARSUP
+subroutine gather_edg2D(arr2D, arr2Dglobal, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-real(real64) ::  arr2D(:)
-real(real64) ::  arr2Dglobal(:)
-
-integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf
+type(t_partit), intent(in), target      :: partit
+real(real64)                            :: arr2D(:)
+real(real64)                            :: arr2Dglobal(:)
+integer                                 ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:)      ::  ibuf
 REAL(real64), ALLOCATABLE, DIMENSION(:) ::  rbuf
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
@@ -2340,17 +2247,18 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D
 !
 !============================================================================
-!
-subroutine gather_edg2D_i(arr2D, arr2Dglobal)
 ! A 2D version of the previous routine
-use g_PARSUP
+subroutine gather_edg2D_i(arr2D, arr2Dglobal, partit)
+use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
-
-integer  ::  arr2D(:)
-integer  ::  arr2Dglobal(:)
-
-integer                                  ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
-INTEGER, ALLOCATABLE, DIMENSION(:)       ::  ibuf, vbuf
+type(t_partit), intent(inout), target  :: partit
+integer                                :: arr2D(:)
+integer                                :: arr2Dglobal(:)
+integer                                :: i, n, buf_size, sender, status(MPI_STATUS_SIZE)
+INTEGER, ALLOCATABLE, DIMENSION(:)     :: ibuf, vbuf
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
 IF ( mype == 0 ) THEN
     arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)

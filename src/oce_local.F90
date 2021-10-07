@@ -1,22 +1,28 @@
 module com_global2local_interface
   interface
-    subroutine com_global2local(mesh)
+    subroutine com_global2local(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 
 !=============================================================================
-SUBROUTINE com_global2local(mesh)
-USE g_PARSUP
+SUBROUTINE com_global2local(partit, mesh)
 use MOD_MESH
+use MOD_PARTIT
 IMPLICIT NONE
 
-type(t_mesh), intent(in)           , target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+
 INTEGER                            :: n, m
 INTEGER, ALLOCATABLE, DIMENSION(:) :: temp
 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 #include "associate_mesh_ini.h"
 
 allocate(temp(max(nod2D, elem2D))) 
@@ -116,15 +122,16 @@ allocate(temp(max(nod2D, elem2D)))
 deallocate(temp)
 END SUBROUTINE com_global2local       	  
 !=============================================================================
-SUBROUTINE save_dist_mesh(mesh)
+SUBROUTINE save_dist_mesh(partit, mesh)
   USE g_CONFIG
   USE MOD_MESH
-  USE o_ARRAYS
-  USE g_PARSUP 
+  USE MOD_PARTIT
+  USE o_ARRAYS 
   use com_global2local_interface
   IMPLICIT NONE
 
-  type(t_mesh), intent(in)           , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   Integer        n, m, q, q2, counter, fileID, nend, nini,ed(2)
   character*10   mype_string,npes_string
   character(MAX_PATH) file_name
@@ -132,7 +139,8 @@ SUBROUTINE save_dist_mesh(mesh)
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
 
-#include  "associate_mesh_ini.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
 
 !!$  allocate(temp(nod2D))  ! serves for mapping
 !!$  allocate(ncount(npes+1))

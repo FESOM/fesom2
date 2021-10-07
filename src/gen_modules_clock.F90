@@ -65,12 +65,13 @@ contains
   !
   !--------------------------------------------------------------------------------
   !
-  subroutine clock_init
-    use g_parsup
+  subroutine clock_init(partit)
+    use mod_partit
     use g_config
     implicit none
-    integer          :: i, daystart, yearstart
-    real(kind=WP)    :: aux1, aux2, timestart
+    type(t_partit), intent(in), target    :: partit
+    integer                               :: i, daystart, yearstart
+    real(kind=WP)                         :: aux1, aux2, timestart
  
     ! the model initialized at
     timestart=timenew
@@ -123,7 +124,7 @@ contains
        aux1=aux2
     end do
 
-    if(mype==0) then
+    if(partit%mype==0) then
         if(r_restart) then
             write(*,*)
             print *, achar(27)//'[31m'    //'____________________________________________________________'//achar(27)//'[0m'

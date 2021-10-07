@@ -23,8 +23,8 @@ module g_cvmix_kpp
     use g_config
     use o_param           
     use mod_mesh
+    use mod_partit
     use mod_tracer
-    use g_parsup
     use o_arrays
     use g_comm_auto 
     use i_arrays
@@ -219,13 +219,17 @@ module g_cvmix_kpp
     !===========================================================================
     ! allocate and initialize CVMIX KPP variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_kpp(mesh)
+    subroutine init_cvmix_kpp(partit, mesh)
         implicit none
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         character(len=MAX_PATH) :: nmlfile
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
-        type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -342,9 +346,10 @@ module g_cvmix_kpp
     !
     !===========================================================================
     ! calculate PP vertrical mixing coefficients from CVMIX library
-    subroutine calc_cvmix_kpp(tracers, mesh)
-        type(t_mesh),   intent(in), target :: mesh
-        type(t_tracer), intent(in), target :: tracers
+    subroutine calc_cvmix_kpp(tracers, partit, mesh)
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in),    target :: tracers
         integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
@@ -355,7 +360,10 @@ module g_cvmix_kpp
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
         real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
         temp=>tracers%data(1)%values(:,:)
         salt=>tracers%data(2)%values(:,:)
         !_______________________________________________________________________
@@ -894,14 +902,14 @@ module g_cvmix_kpp
         ! original kpp parameterisation of FESOM1.4 & FESOM2.0
         !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc smooth kpp_oblmixc'//achar(27)//'[0m'    
         if (kpp_use_smoothblmc .and. kpp_use_fesomkpp) then
-            call exchange_nod(kpp_oblmixc(:,:,1))
-            call exchange_nod(kpp_oblmixc(:,:,2))
-            call exchange_nod(kpp_oblmixc(:,:,3))
+            call exchange_nod(kpp_oblmixc(:,:,1), partit)
+            call exchange_nod(kpp_oblmixc(:,:,2), partit)
+            call exchange_nod(kpp_oblmixc(:,:,3), partit)
             do nz=1, 3
                 !_______________________________________________________________
                 ! all loops go over myDim_nod2D so no halo information --> for 
                 ! smoothing haloinfo is required --> therefor exchange_nod
-                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb, mesh)
+                call smooth_nod(kpp_oblmixc(:,:,nz), kpp_smoothblmc_nmb, partit, mesh)
             end do
         end if 
         
@@ -934,13 +942,13 @@ module g_cvmix_kpp
         
         !_______________________________________________________________________
         ! write out diffusivities to FESOM2.0 --> diffusivities remain on nodes
-        call exchange_nod(kpp_Kv)
+        call exchange_nod(kpp_Kv, partit)
         Kv = kpp_Kv
         
         !_______________________________________________________________________
         ! write out viscosities to FESOM2.0 --> viscosities for FESOM2.0 are 
         ! defined on elements --> interpolate therefor from nodes to elements
-        call exchange_nod(kpp_Av)
+        call exchange_nod(kpp_Av, partit)
         Av = 0.0_WP
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)

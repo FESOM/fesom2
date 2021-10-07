@@ -90,16 +90,16 @@ end subroutine step_event
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine handle_err(errcode)
-  use g_parsup
+subroutine handle_err(errcode, partit)
+  use mod_partit
   implicit none
   
 #include "netcdf.inc" 
-  
-  integer errcode
+  type(t_partit), intent(inout) :: partit  
+  integer                       :: errcode
   
   write(*,*) 'Error: ', nf_strerror(errcode)
-  call par_ex(1)
+  call par_ex(partit, 1)
   stop
 end subroutine handle_err
 !

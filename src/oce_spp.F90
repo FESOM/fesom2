@@ -8,10 +8,10 @@
 ! Ref: Duffy1997, Duffy1999, Nguyen2009
 ! Originaly coded by Qiang Wang in FESOM 1.4 
 !--------------------------------------------------------
-subroutine cal_rejected_salt(mesh)
-use g_parsup
+subroutine cal_rejected_salt(partit, mesh)
 use o_arrays
 use mod_mesh
+use mod_partit
 use g_comm_auto
 use o_tracers
 use g_forcing_arrays, only: thdgr
@@ -22,9 +22,13 @@ implicit none
 
 integer         :: row
 real(kind=WP)   :: aux
-type(t_mesh), intent(in), target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(in),    target :: partit
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 aux=rhoice/rhowat*dt
 do row=1, myDim_nod2d +eDim_nod2D! myDim is sufficient
@@ -41,12 +45,12 @@ end subroutine cal_rejected_salt
 !
 !----------------------------------------------------------------------------
 !
-subroutine app_rejected_salt(ttf, mesh)
-  use g_parsup
+subroutine app_rejected_salt(ttf, partit, mesh)
   use o_arrays
   use mod_mesh
-  use g_comm_auto
+  use mod_partit
   use o_tracers
+  use g_comm_auto
   implicit none
 
   integer         :: row, k, nod, nup, nlo, kml, nzmin, nzmax
@@ -58,10 +62,14 @@ subroutine app_rejected_salt(ttf, mesh)
   data n_distr /5/
   data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
 
-  type(t_mesh),  intent(in), target :: mesh
-  real(kind=WP), intent (inout)     :: ttf(mesh%nl-1,myDim_nod2D+eDim_nod2D)
+  type(t_mesh),   intent(in), target :: mesh
+  type(t_partit), intent(in), target :: partit
+  real(kind=WP),  intent (inout)     :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   do row=1,myDim_nod2d+eDim_nod2D   ! myDim is sufficient
      if (ulevels_nod2D(row)>1) cycle

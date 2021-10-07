@@ -1,9 +1,11 @@
 module ocean2ice_interface
   interface
-    subroutine ocean2ice(tracers, mesh)
+    subroutine ocean2ice(tracers, partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
@@ -11,10 +13,12 @@ end module
 
 module oce_fluxes_interface
   interface
-    subroutine oce_fluxes(tracers, mesh)
+    subroutine oce_fluxes(tracers, partit, mesh)
       use mod_mesh
+      use mod_partit
       use mod_tracer
-      type(t_mesh),   intent(in)  ,  target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
       type(t_tracer), intent(inout), target :: tracers
     end subroutine
   end interface
@@ -23,14 +27,14 @@ end module
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes_mom(mesh)
+subroutine oce_fluxes_mom(partit, mesh)
     ! transmits the relevant fields from the ice to the ocean model
     !
     use o_PARAM
     use o_ARRAYS
     use MOD_MESH
+    use MOD_PARTIT
     use i_ARRAYS
-    use g_PARSUP
     use i_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -43,9 +47,13 @@ subroutine oce_fluxes_mom(mesh)
     
     integer                  :: n, elem, elnodes(3),n1
     real(kind=WP)            :: aux, aux1
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! ==================
     ! momentum flux:
@@ -94,13 +102,13 @@ subroutine oce_fluxes_mom(mesh)
     END DO
     
     !___________________________________________________________________________
-    if (use_cavity) call cavity_momentum_fluxes(mesh)
+    if (use_cavity) call cavity_momentum_fluxes(partit, mesh)
   
 end subroutine oce_fluxes_mom
 !
 !
 !_______________________________________________________________________________
-subroutine ocean2ice(tracers, mesh)
+subroutine ocean2ice(tracers, partit, mesh)
   
     ! transmits the relevant fields from the ocean to the ice model
 
@@ -109,17 +117,21 @@ subroutine ocean2ice(tracers, mesh)
     use i_ARRAYS
     use MOD_MESH
     use MOD_TRACER
-    use g_PARSUP
+    use MOD_PARTIT
     USE g_CONFIG
     use g_comm_auto
     implicit none
 
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_tracer), intent(in),    target :: tracers
     integer :: n, elem, k
     real(kind=WP) :: uw, vw, vol
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
 
@@ -173,22 +185,22 @@ subroutine ocean2ice(tracers, mesh)
             v_w(n)=(v_w(n)*real(ice_steps_since_upd,WP)+vw)/real(ice_steps_since_upd+1,WP)
         endif
     end do
-    call exchange_nod(u_w, v_w)
+    call exchange_nod(u_w, v_w, partit)
 end subroutine ocean2ice
 !
 !
 !_______________________________________________________________________________
-subroutine oce_fluxes(tracers, mesh)
+subroutine oce_fluxes(tracers, partit, mesh)
 
   use MOD_MESH
   use MOD_TRACER
+  use MOD_PARTIT
   USE g_CONFIG
   use o_ARRAYS
   use i_ARRAYS
   use g_comm_auto
   use g_forcing_param, only: use_virt_salt
   use g_forcing_arrays
-  use g_PARSUP
   use g_support
   use i_therm_param
 
@@ -198,13 +210,17 @@ subroutine oce_fluxes(tracers, mesh)
 #endif
   use cavity_heat_water_fluxes_3eq_interface
   implicit none
-  type(t_mesh),   intent(in),     target :: mesh
-  type(t_tracer), intent(in),     target :: tracers
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_tracer), intent(in),    target :: tracers
   integer                    :: n, elem, elnodes(3),n1
   real(kind=WP)              :: rsss, net
   real(kind=WP), allocatable :: flux(:)
   real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   temp=>tracers%data(1)%values(:,:)
   salt=>tracers%data(2)%values(:,:)
     
@@ -248,14 +264,14 @@ subroutine oce_fluxes(tracers, mesh)
     water_flux  = -fresh_wa_flux
 #endif 
     heat_flux_in=heat_flux ! sw_pene will change the heat_flux
-    if (use_cavity) call cavity_heat_water_fluxes_3eq(tracers, mesh)
+    if (use_cavity) call cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
     !!PS if (use_cavity) call cavity_heat_water_fluxes_2eq(mesh)
     
 !!PS     where(ulevels_nod2D>1) heat_flux=0.0_WP
 !!PS     where(ulevels_nod2D>1) water_flux=0.0_WP
     
     !___________________________________________________________________________
-    call exchange_nod(heat_flux, water_flux) 
+    call exchange_nod(heat_flux, water_flux, partit)
 
     !___________________________________________________________________________
     ! on freshwater inflow/outflow or virtual salinity:
@@ -282,9 +298,9 @@ subroutine oce_fluxes(tracers, mesh)
         if (use_cavity) then
             flux = virtual_salt
             where (ulevels_nod2d > 1) flux = 0.0_WP
-            call integrate_nod(flux, net, mesh)
+            call integrate_nod(flux, net, partit, mesh)
         else   
-            call integrate_nod(virtual_salt, net, mesh)
+            call integrate_nod(virtual_salt, net, partit, mesh)
         end if    
         virtual_salt=virtual_salt-net/ocean_area
     end if
@@ -311,7 +327,7 @@ subroutine oce_fluxes(tracers, mesh)
     end if 
     
     ! --> if use_cavity=.true. relax_salt anyway zero where is cavity see above
-    call integrate_nod(relax_salt, net, mesh)
+    call integrate_nod(relax_salt, net, partit, mesh)
     relax_salt=relax_salt-net/ocean_area
     
     !___________________________________________________________________________
@@ -346,7 +362,7 @@ subroutine oce_fluxes(tracers, mesh)
     end if 
     
     ! compute total global net freshwater flux into the ocean 
-    call integrate_nod(flux, net, mesh)
+    call integrate_nod(flux, net, partit, mesh)
     
     !___________________________________________________________________________
     ! here the + sign must be used because we switched up the sign of the 
@@ -364,7 +380,7 @@ subroutine oce_fluxes(tracers, mesh)
     end if 
     
     !___________________________________________________________________________
-    if (use_sw_pene) call cal_shortwave_rad(mesh)
+    if (use_sw_pene) call cal_shortwave_rad(partit, mesh)
     
     !___________________________________________________________________________
     deallocate(flux)

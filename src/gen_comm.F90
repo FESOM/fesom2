@@ -4,22 +4,22 @@
 ! The communication rules are saved. 
 ! set_par_support in the main phase just allocates memory for buffer 
 ! arrays, the rest is read together with mesh from saved files.
-
-!KK: moved par_ex,set_par_support,set_par_support_ini to module g_PARSUP
-
-! ===============================================================
 !=======================================================================
-subroutine communication_nodn(mesh)
+subroutine communication_nodn(partit, mesh)
   use MOD_MESH
-  use g_PARSUP
+  use MOD_PARTIT
   implicit none
-  type(t_mesh), intent(in), target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                  :: n, np, prank, el, r_count, s_count, q, i, j, nod, k, l
   integer                  :: num_send(0:npes-1), num_recv(0:npes-1), nd_count
   integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
   logical                  :: max_laendereck_too_small=.false.
   integer                  :: IERR
-#include "associate_mesh_ini.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
 
@@ -159,12 +159,13 @@ subroutine communication_nodn(mesh)
 
   r_count = 0
   eDim_nod2D=com_nod2D%rptr(com_nod2D%rPEnum+1)-1   
-  allocate(com_nod2D%rlist(eDim_nod2D), &
-       com_nod2D%slist(com_nod2D%sptr(com_nod2D%sPEnum+1)-1), STAT=IERR) 
+  allocate(partit%com_nod2D%rlist(eDim_nod2D), &
+           partit%com_nod2D%slist(com_nod2D%sptr(com_nod2D%sPEnum+1)-1), STAT=IERR) 
   if (IERR /= 0) then
      write (*,*) 'Could not allocate arrays in communication_nodn'
      stop
   endif
+  com_nod2D=>partit%com_nod2D
 
   do np = 1,com_nod2D%rPEnum
      prank = com_nod2D%rPE(np)
@@ -215,19 +216,23 @@ subroutine communication_nodn(mesh)
 end subroutine communication_nodn
 
 !==========================================================================
-subroutine communication_elemn(mesh)
+subroutine communication_elemn(partit, mesh)
   use MOD_MESH
-  use g_PARSUP
+  use MOD_PARTIT
   implicit none
 
-  type(t_mesh), intent(in), target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer, allocatable     :: recv_from_pe(:), send_to_pes(:,:)
   logical                  :: max_laendereck_too_small=.false.
   integer                  :: n, k, ep, np, prank, el, nod
   integer                  :: p, q, j, elem, i, l, r_count, s_count, el_count
   integer                  :: num_send(0:npes-1), num_recv(0:npes-1)
   integer                  :: IERR
-#include "associate_mesh_ini.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   ! Assume we have 2D partitioning vector in part. Find communication
   ! rules. An elem is external to element n if neither of its nodes 
   ! belongs to PE, but it is among the neighbors. Element n belongs to PE if 
@@ -258,11 +263,12 @@ subroutine communication_elemn(mesh)
   end do
   myDim_elem2D=el_count
 
-  allocate(myList_elem2D(el_count), send_to_pes(MAX_LAENDERECK,el_count), STAT=IERR)
+  allocate(partit%myList_elem2D(el_count), send_to_pes(MAX_LAENDERECK,el_count), STAT=IERR)
   if (IERR /= 0) then
      write (*,*) 'Could not allocate arrays in communication_elemn'
      stop
   endif
+  myList_elem2D=>partit%myList_elem2D
 
   myList_elem2D(1:el_count) = recv_from_pe(1:el_count)
   num_send(0:npes-1) = 0
@@ -362,7 +368,8 @@ subroutine communication_elemn(mesh)
 
   r_count = 0
   eDim_elem2D=com_elem2D%rptr(com_elem2D%rPEnum+1)-1   
-  allocate(com_elem2D%rlist(eDim_elem2D)) 
+  allocate(partit%com_elem2D%rlist(eDim_elem2D))
+  com_elem2D=>partit%com_elem2D !not needed?
   do np = 1,com_elem2D%rPEnum
      prank = com_elem2D%rPE(np)
      do el = 1, elem2D
@@ -374,7 +381,8 @@ subroutine communication_elemn(mesh)
   end do
   
   s_count = 0
-  allocate(com_elem2D%slist(com_elem2D%sptr(com_elem2D%sPEnum+1)-1)) 
+  allocate(partit%com_elem2D%slist(com_elem2D%sptr(com_elem2D%sPEnum+1)-1)) 
+  com_elem2D=>partit%com_elem2D! not needed?
   do np = 1,com_elem2D%sPEnum
      prank = com_elem2D%sPE(np)
      do l = 1, el_count
@@ -487,7 +495,8 @@ subroutine communication_elemn(mesh)
   ! Lists themselves
 
   r_count = 0
-  allocate(com_elem2D_full%rlist(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1)-1)) 
+  allocate(partit%com_elem2D_full%rlist(com_elem2D_full%rptr(com_elem2D_full%rPEnum+1)-1)) 
+  com_elem2D_full=>partit%com_elem2D_full !not needed?
   do np = 1,com_elem2D_full%rPEnum
      prank = com_elem2D_full%rPE(np)
      do el = 1, elem2D
@@ -500,6 +509,7 @@ subroutine communication_elemn(mesh)
 
   s_count = 0
   allocate(com_elem2D_full%slist(com_elem2D_full%sptr(com_elem2D_full%sPEnum+1)-1)) 
+  com_elem2D_full=>partit%com_elem2D_full !not needed?
   do np = 1,com_elem2D_full%sPEnum
      prank = com_elem2D_full%sPE(np)
      do l = 1, el_count
@@ -514,15 +524,19 @@ subroutine communication_elemn(mesh)
   deallocate(recv_from_pe, send_to_pes)
 end subroutine communication_elemn
 !==========================================================================
-subroutine mymesh(mesh)
+subroutine mymesh(partit, mesh)
   use MOD_MESH
-  use g_PARSUP 
+  use MOD_PARTIT
   implicit none
 
-  type(t_mesh), intent(in), target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                  :: n, counter, q, k, elem, q2, eledges(4)
   integer, allocatable     :: aux(:)
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !======= NODES 
 
   ! Owned nodes + external nodes which I need:
@@ -641,17 +655,18 @@ subroutine mymesh(mesh)
 end subroutine mymesh
 !=================================================================
 #ifndef FVOM_INIT
-subroutine status_check
+subroutine status_check(partit)
 use g_config
-use g_parsup
+use mod_partit
 implicit none
+type(t_partit), intent(in), target :: partit
 integer :: res
 res=0
-call MPI_Allreduce (pe_status, res, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 if (res /= 0 ) then
-    if (mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
+    if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
 !!! a restart file must be written here !!!
-    call par_ex(1)
+    call par_ex(partit, 1)
 endif
 end subroutine status_check
 #endif

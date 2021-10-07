@@ -1,14 +1,18 @@
 !===================================================================
-subroutine cut_off(mesh)
+subroutine cut_off(partit, mesh)
     use o_param
     use i_arrays
     use MOD_MESH
+    use MOD_PARTIT
     use g_config, only: use_cavity
-    use g_parsup
     implicit none
-    type(t_mesh), intent(in)           , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! lower cutoff: a_ice
@@ -73,7 +77,7 @@ end subroutine cut_off
 ! by Qiang Wang, 13.01.2009
 !----------------------------------------------------------------------------
 
-subroutine thermodynamics(mesh)
+subroutine thermodynamics(partit, mesh)
   !
   ! For every surface node, this subroutine extracts the information
   ! needed for computation of thermodydnamics, calls the relevant
@@ -83,16 +87,19 @@ subroutine thermodynamics(mesh)
   
   use o_param
   use mod_mesh
+  use mod_partit
   use i_therm_param
   use i_param
   use i_arrays
   use g_config
   use g_forcing_param
   use g_forcing_arrays
-  use g_parsup
   use g_comm_auto
   use g_sbf, only: l_snow
   implicit none
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+
   real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
   real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
   real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli
@@ -101,9 +108,10 @@ subroutine thermodynamics(mesh)
   real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
 
-  type(t_mesh), intent(in)   , target :: mesh  
-
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   rsss=ref_sss
 
@@ -122,7 +130,7 @@ subroutine thermodynamics(mesh)
               (v_ice(i)-v_w(i))**2)
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
     END DO
-  call exchange_nod(ustar_aux) !TODO Why do we need it?
+  call exchange_nod(ustar_aux, partit) !TODO Why do we need it?
   ! ================
   ! end: friction velocity 
   ! ================
@@ -258,10 +266,8 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
 
   use i_therm_param
-  use g_forcing_param,  only: use_virt_salt
-  
+  use g_forcing_param,  only: use_virt_salt  
   use o_param
-  use g_parsup
   implicit none
 
   integer k

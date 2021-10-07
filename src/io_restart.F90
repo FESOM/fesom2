@@ -1,9 +1,9 @@
 MODULE io_RESTART
   use g_config
   use g_clock
-  use g_parsup
   use g_comm_auto
   use mod_mesh
+  use mod_partit
   use mod_tracer
   use o_arrays
   use i_arrays
@@ -78,7 +78,7 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year, tracers, mesh)
+subroutine ini_ocean_io(year, tracers, partit, mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -88,9 +88,13 @@ subroutine ini_ocean_io(year, tracers, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh),   intent(in), target :: mesh
-  type(t_tracer), intent(in), target :: tracers
-#include  "associate_mesh.h"
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(in),    target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -159,7 +163,7 @@ end subroutine ini_ocean_io
 !--------------------------------------------------------------------------------------------
 ! ini_ice_io initializes iid datatype which contains information of all variables need to be written into 
 ! the ice restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ice_io(year, mesh)
+subroutine ini_ice_io(year, partit, mesh)
   implicit none
 
   integer,      intent(in)  :: year
@@ -169,9 +173,13 @@ subroutine ini_ice_io(year, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   write(cyear,'(i4)') year
   ! create an ocean restart file; serial output implemented so far
@@ -198,7 +206,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read, tracers, mesh)
+subroutine restart(istep, l_write, l_read, tracers, partit, mesh)
 
 #if defined(__icepack)
   use icedrv_main,   only: init_restart_icepack
@@ -213,32 +221,33 @@ subroutine restart(istep, l_write, l_read, tracers, mesh)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
-  type(t_mesh),   intent(in), target :: mesh
-  type(t_tracer), intent(in), target :: tracers
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(in),    target :: tracers
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, tracers, mesh)
-  if (use_ice) call ini_ice_io  (yearnew, mesh)
+               call ini_ocean_io(yearnew, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearnew, partit, mesh)
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearnew, mesh)
+  if (use_ice) call init_restart_icepack(yearnew, partit, mesh)
 #endif
   else
-               call ini_ocean_io(yearold, tracers, mesh)
-  if (use_ice) call ini_ice_io  (yearold, mesh)
+               call ini_ocean_io(yearold, tracers, partit, mesh)
+  if (use_ice) call ini_ice_io  (yearold, partit, mesh)
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearold, mesh)
+  if (use_ice) call init_restart_icepack(yearold, partit, mesh)
 #endif
   end if
 
   if (l_read) then
-   call assoc_ids(oid);          call was_error(oid)
-   call read_restart(oid, mesh); call was_error(oid)
+   call assoc_ids(oid, partit);          call was_error(oid, partit)
+   call read_restart(oid, partit, mesh); call was_error(oid, partit)
    if (use_ice) then
-      call assoc_ids(iid);          call was_error(iid)
-      call read_restart(iid, mesh); call was_error(iid)
+      call assoc_ids(iid, partit);          call was_error(iid, partit)
+      call read_restart(iid, partit, mesh); call was_error(iid, partit)
 #if defined(__icepack)
-      call assoc_ids(ip_id);          call was_error(ip_id)
-      call read_restart(ip_id, mesh); call was_error(ip_id)
+      call assoc_ids(ip_id, partit);          call was_error(ip_id, partit)
+      call read_restart(ip_id, partit, mesh); call was_error(ip_id, partit)
 #endif
     end if
   end if
@@ -270,20 +279,20 @@ subroutine restart(istep, l_write, l_read, tracers, mesh)
   if (.not. is_restart) return
 
   ! write restart
-  if(mype==0) write(*,*)'Do output (netCDF, restart) ...'
-  call assoc_ids(oid);                  call was_error(oid)  
-  call write_restart(oid, istep, mesh); call was_error(oid)
+  if(partit%mype==0) write(*,*)'Do output (netCDF, restart) ...'
+  call assoc_ids(oid, partit);                  call was_error(oid, partit)  
+  call write_restart(oid, istep, partit, mesh); call was_error(oid, partit)
   if (use_ice) then
-     call assoc_ids(iid);                  call was_error(iid)  
-     call write_restart(iid, istep, mesh); call was_error(iid)
+     call assoc_ids(iid, partit);                  call was_error(iid, partit)  
+     call write_restart(iid, istep, partit, mesh); call was_error(iid, partit)
 #if defined(__icepack)
-     call assoc_ids(ip_id);                  call was_error(ip_id)
-     call write_restart(ip_id, istep, mesh); call was_error(ip_id)
+     call assoc_ids(ip_id, partit);                  call was_error(ip_id, partit)
+     call write_restart(ip_id, istep, partit, mesh); call was_error(ip_id, partit)
 #endif
   end if
   
   ! actualize clock file to latest restart point
-  if (mype==0) then
+  if (partit%mype==0) then
 		write(*,*) ' --> actualize clock file to latest restart point'
 		call clock_finish  
   end if
@@ -292,15 +301,15 @@ end subroutine restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine create_new_file(id)
+subroutine create_new_file(id, partit)
   implicit none
-
+  type(t_partit), intent(in)    :: partit
   type(nc_file),  intent(inout) :: id
   integer                       :: c, j
   integer                       :: n, k, l, kdim, dimid(4)
   character(2000)               :: att_text
   ! Serial output implemented so far
-  if (mype/=0) return
+  if (partit%mype/=0) return
   c=1
   id%error_status=0
   ! create an ocean output file
@@ -455,17 +464,21 @@ end subroutine def_variable_2d
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine write_restart(id, istep, mesh)
+subroutine write_restart(id, istep, partit, mesh)
   implicit none
   type(nc_file),  intent(inout) :: id
   integer,  intent(in)          :: istep
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   real(kind=WP), allocatable    :: aux(:), laux(:)
   real(kind=WP)                 :: t0, t1, t2, t3
   integer                       :: i, lev, size1, size2, size_gen, size_lev, shape
   integer                       :: c, order
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   ! Serial output implemented so far
   if (mype==0) then
@@ -477,7 +490,7 @@ subroutine write_restart(id, istep, mesh)
      id%error_status(c)=nf_put_vara_int(id%ncid,    id%iID, id%rec_count, 1, globalstep+istep, 1);   c=c+1
   end if
 
-  call was_error(id); c=1
+  call was_error(id, partit); c=1
 
   do i=1, id%nvar
      shape=id%var(i)%ndim
@@ -486,8 +499,8 @@ subroutine write_restart(id, istep, mesh)
         size1=id%var(i)%dims(1)
         if (mype==0) allocate(aux(size1))
         t0=MPI_Wtime()
-        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux)
-        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux)
+        if (size1==nod2D)  call gather_nod (id%var(i)%pt1, aux, partit)
+        if (size1==elem2D) call gather_elem(id%var(i)%pt1, aux, partit)
         t1=MPI_Wtime()
         if (mype==0) then
            id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
@@ -524,8 +537,8 @@ subroutine write_restart(id, istep, mesh)
         do lev=1, size_lev
            if (order==1) laux=id%var(i)%pt2(:,lev)
            if (order==2) laux=id%var(i)%pt2(lev,:)
-           if (size_gen==nod2D)  call gather_nod (laux, aux)
-           if (size_gen==elem2D) call gather_elem(laux, aux)
+           if (size_gen==nod2D)  call gather_nod (laux, aux, partit)
+           if (size_gen==elem2D) call gather_elem(laux, aux, partit)
            if (mype==0) then
               if (order==1) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/1, lev, id%rec_count/), (/size_gen, 1, 1/), aux, 1); c=c+1
               if (order==2) id%error_status(c)=nf_put_vara_double(id%ncid, id%var(i)%code, (/lev, 1, id%rec_count/), (/1, size_gen, 1/), aux, 1); c=c+1
@@ -544,19 +557,19 @@ subroutine write_restart(id, istep, mesh)
            call par_ex
            stop
      end if
-     call was_error(id); c=1
+     call was_error(id, partit); c=1
   end do
 
   if (mype==0) id%error_count=c-1
-  call was_error(id)
+  call was_error(id, partit)
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
-  call was_error(id)
+  call was_error(id, partit)
 end subroutine write_restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine read_restart(id, mesh, arg)
+subroutine read_restart(id, partit, mesh, arg)
   implicit none
   type(nc_file),     intent(inout) :: id
   integer, optional, intent(in)    :: arg
@@ -565,9 +578,14 @@ subroutine read_restart(id, mesh, arg)
   integer                          :: rec2read, c, order, ierror
   real(kind=WP)                    :: rtime !timestamp of the record
   logical                          :: file_exist=.False., var_exist
-  type(t_mesh), intent(in)        , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
 
-#include  "associate_mesh.h"
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   ! laux=0.
   ! Serial output implemented so far
@@ -606,7 +624,7 @@ subroutine read_restart(id, mesh, arg)
      end if
   end if
 
-  call was_error(id); c=1
+  call was_error(id, partit); c=1
 
   do i=1, id%nvar
      shape=id%var(i)%ndim
@@ -626,8 +644,8 @@ subroutine read_restart(id, mesh, arg)
            id%error_status(c)=nf_get_vara_double(id%ncid, id%var(i)%code, (/1, id%rec_count/), (/size1, 1/), aux, 1); c=c+1
 !          write(*,*) 'min/max 2D =', minval(aux), maxval(aux)
         end if
-        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux)
-        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux)
+        if (size1==nod2D)  call broadcast_nod (id%var(i)%pt1, aux, partit)
+        if (size1==elem2D) call broadcast_elem(id%var(i)%pt1, aux, partit)
         if (mype==0) deallocate(aux)
 !_______writing 3D fields________________________________________________
      elseif (shape==2) then
@@ -658,12 +676,12 @@ subroutine read_restart(id, mesh, arg)
            end if
            id%var(i)%pt2(lev,:)=0.
            if (size_gen==nod2D)  then
-              call broadcast_nod (laux, aux)
+              call broadcast_nod (laux, aux, partit)
               if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_nod2D+eDim_nod2D)
               if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_nod2D+eDim_nod2D)
            end if
            if (size_gen==elem2D) then
-              call broadcast_elem(laux, aux)
+              call broadcast_elem(laux, aux, partit)
               if (order==1) id%var(i)%pt2(:,lev)=laux(1:myDim_elem2D+eDim_elem2D)
               if (order==2) id%var(i)%pt2(lev,:)=laux(1:myDim_elem2D+eDim_elem2D)
            end if
@@ -675,25 +693,25 @@ subroutine read_restart(id, mesh, arg)
            call par_ex
            stop
      end if
-     call was_error(id); c=1
+     call was_error(id, partit); c=1
   end do
 
   if (mype==0) id%error_status(1)=nf_close(id%ncid);
   id%error_count=1
-  call was_error(id)
+  call was_error(id, partit)
 end subroutine read_restart
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine assoc_ids(id)
+subroutine assoc_ids(id, partit)
   implicit none
-
-  type(nc_file),  intent(inout) :: id
-  character(500)                :: longname
-  integer                       :: c, j, k, status
-  real(kind=WP)                 :: rtime !timestamp of the record
+  type(t_partit), intent(in), target :: partit
+  type(nc_file),  intent(inout)      :: id
+  character(500)                     :: longname
+  integer                            :: c, j, k, status
+  real(kind=WP)                      :: rtime !timestamp of the record
   ! Serial output implemented so far
-  if (mype/=0) return
+  if (partit%mype/=0) return
   c=1
   id%error_status=0
   ! open existing netcdf file
@@ -702,7 +720,7 @@ subroutine assoc_ids(id)
   id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid)
   !if the file does not exist it will be created!
   if (id%error_status(c) .ne. nf_noerr) then
-     call create_new_file(id) ! error status counter will be reset
+     call create_new_file(id, partit) ! error status counter will be reset
      c=id%error_count+1
      id%error_status(c) = nf_open(id%filename, nf_nowrite, id%ncid); c=c+1
   end if
@@ -729,9 +747,9 @@ subroutine assoc_ids(id)
         exit ! a proper rec_count detected, ready for reading restart, exit the loop
      end if
      if (k==1) then
-        if (mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
-        if (mype==0) write(*,*) 'reading restart will not be possible !'
-        if (mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
+        if (partit%mype==0) write(*,*) 'WARNING: all dates in restart file are after the current date'
+        if (partit%mype==0) write(*,*) 'reading restart will not be possible !'
+        if (partit%mype==0) write(*,*) 'the model attempted to start with the time stamp = ', int(ctime)
         id%error_status(c)=-310;
      end if
   end do
@@ -752,20 +770,21 @@ end subroutine assoc_ids
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine was_error(id)
+subroutine was_error(id, partit)
   implicit none
-  type(nc_file),  intent(inout) :: id
-  integer                       :: k, status, ierror
+  type(t_partit), intent(inout), target :: partit
+  type(nc_file),  intent(inout)         :: id
+  integer                               :: k, status, ierror
 
-  call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+  call MPI_BCast(id%error_status(1), id%error_count, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
 
   do k=1, id%error_count
      status=id%error_status(k)
      if (status .ne. nf_noerr) then
-        if (mype==0) write(*,*) 'error counter=', k
-        if (mype==0) call handle_err(status)
-        call par_ex
+        if (partit%mype==0) write(*,*) 'error counter=', k
+        if (partit%mype==0) call handle_err(status, partit)
+        call par_ex(partit)
         stop
      end if
   end do

@@ -1,155 +1,187 @@
 module densityJM_components_interface
   interface
-    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
       USE MOD_MESH
-      real(kind=WP), intent(IN)  :: t,s
-      real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rhopot
-      type(t_mesh), intent(in) , target :: mesh
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      real(kind=WP),  intent(IN)             :: t,s
+      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
     end subroutine
   end interface
 end module
 
 module density_linear_interface
   interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, mesh)
+    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
       USE MOD_MESH
-      real(kind=WP), intent(IN)  :: t,s
-      real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rho_out
-      type(t_mesh), intent(in) , target :: mesh
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      real(kind=WP),  intent(IN)             :: t,s
+      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
     end subroutine
   end interface
 end module
 
 module pressure_force_4_linfs_fullcell_interface
   interface
-    subroutine pressure_force_4_linfs_fullcell(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_linfs_fullcell(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_nemo_interface
   interface
-    subroutine pressure_force_4_linfs_nemo(tracers, mesh)
-      use mod_mesh
-      use mod_tracer
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+    subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_shchepetkin_interface
   interface
-    subroutine pressure_force_4_linfs_shchepetkin(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_easypgf_interface
   interface
-    subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
-      use mod_mesh
-      use mod_tracer
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+    subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_tracer), intent(in),     target :: tracers
+      type(t_partit), intent(inout),  target :: partit
+      type(t_mesh),   intent(in),     target :: mesh
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_cubicspline_interface
   interface
-    subroutine pressure_force_4_linfs_cubicspline(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_cavity_interface
   interface
-    subroutine pressure_force_4_linfs_cavity(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_linfs_cavity(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module pressure_force_4_zxxxx_shchepetkin_interface
   interface
-    subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module pressure_force_4_zxxxx_easypgf_interface
   interface
-    subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
-      use mod_mesh
-      use mod_tracer
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+    subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 module pressure_force_4_zxxxx_cubicspline_interface
   interface
-    subroutine pressure_force_4_zxxxx_cubicspline(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module init_ref_density_interface
   interface
-    subroutine init_ref_density(mesh)
-      use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+    subroutine init_ref_density(partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
     end subroutine
   end interface
 end module
 module insitu2pot_interface
   interface
-    subroutine insitu2pot(tracers, mesh)
-    use mod_mesh
-    use mod_tracer
-    type(t_mesh),   intent(in),     target  :: mesh
-    type(t_tracer), intent(inout),  target  :: tracers
+    subroutine insitu2pot(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 module pressure_bv_interface
   interface
-    subroutine pressure_bv(tracers, mesh)
-    use mod_mesh
-    use mod_tracer
-    type(t_mesh),   intent(in),  target  :: mesh
-    type(t_tracer), intent(in),  target  :: tracers
+    subroutine pressure_bv(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 module pressure_force_4_linfs_interface
   interface
-    subroutine pressure_force_4_linfs(tracers, mesh)
-      use mod_mesh
-      use mod_tracer
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+    subroutine pressure_force_4_linfs(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 module pressure_force_4_zxxxx_interface
   interface
-    subroutine pressure_force_4_zxxxx(tracers, mesh)
-      use mod_mesh
-      use mod_tracer
-      type(t_tracer), intent(in), target :: tracers
-      type(t_mesh),   intent(in), target :: mesh
+    subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_TRACER
+      type(t_mesh),   intent(in) ,    target :: mesh
+      type(t_partit), intent(inout),  target :: partit
+      type(t_tracer), intent(in),     target :: tracers
     end subroutine
   end interface
 end module
 !
 !
 !===============================================================================
-subroutine pressure_bv(tracers, mesh)
+subroutine pressure_bv(tracers, partit, mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency 
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
@@ -157,25 +189,28 @@ subroutine pressure_bv(tracers, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_TRACER
+    USE MOD_PARTIT
     USE o_ARRAYS
-    USE g_PARSUP
     use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
     USE diagnostics,      only: ldiag_dMOC
     use densityJM_components_interface
     use density_linear_interface
     IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_tracer), intent(inout), target :: tracers
-    real(kind=WP)            :: dz_inv, bv,  a, rho_up, rho_dn, t, s
-    integer                  :: node, nz, nl1, nzmax, nzmin
-    real(kind=WP)            :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
-    real(kind=WP)            :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
-    real(kind=WP)            :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
-    logical                  :: flag1, flag2, mixing_kpp
-
-    real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    real(kind=WP)                           :: dz_inv, bv,  a, rho_up, rho_dn, t, s
+    integer                                 :: node, nz, nl1, nzmax, nzmin
+    real(kind=WP)                           :: rhopot(mesh%nl), bulk_0(mesh%nl), bulk_pz(mesh%nl), bulk_pz2(mesh%nl), rho(mesh%nl), dbsfc1(mesh%nl), db_max
+    real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
+    real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
+    logical                                 :: flag1, flag2, mixing_kpp
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
@@ -231,9 +266,9 @@ subroutine pressure_bv(tracers, mesh)
             s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                 case(1)
-                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                    call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(1)
@@ -295,9 +330,9 @@ subroutine pressure_bv(tracers, mesh)
             do nz=1, nzmin-1
                 select case(state_equation)
                     case(0)
-                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                        call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                     case(1)
-                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), mesh)
+                        call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -420,10 +455,10 @@ end subroutine pressure_bv
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
-subroutine pressure_force_4_linfs(tracers, mesh)
+subroutine pressure_force_4_linfs(tracers, partit, mesh)
     use g_config
-    use g_PARSUP
     use mod_mesh
+    use MOD_PARTIT
     use mod_tracer
     use pressure_force_4_linfs_fullcell_interface
     use pressure_force_4_linfs_nemo_interface
@@ -432,7 +467,8 @@ subroutine pressure_force_4_linfs(tracers, mesh)
     use pressure_force_4_linfs_cavity_interface
     use pressure_force_4_linfs_easypgf_interface
     implicit none
-    type(t_mesh),   intent(in),     target  :: mesh
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
     type(t_tracer), intent(in),     target  :: tracers
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
     temp=>tracers%data(1)%values(:,:)
@@ -440,15 +476,15 @@ subroutine pressure_force_4_linfs(tracers, mesh)
     !___________________________________________________________________________
     ! calculate pressure gradient force (PGF) for linfs with full cells
     if ( .not. use_partial_cell .and. .not. use_cavity_partial_cell) then
-        call pressure_force_4_linfs_fullcell(mesh)
+        call pressure_force_4_linfs_fullcell(partit, mesh)
         
     elseif (use_cavity .and. use_cavity_partial_cell ) then
         if     (trim(which_pgf)=='sergey') then
-            call pressure_force_4_linfs_cavity(mesh)  
+            call pressure_force_4_linfs_cavity(partit, mesh)  
         elseif (trim(which_pgf)=='shchepetkin') then    
-            call pressure_force_4_linfs_shchepetkin(mesh)
+            call pressure_force_4_linfs_shchepetkin(partit, mesh)
         elseif (trim(which_pgf)=='easypgf') then
-            call pressure_force_4_linfs_easypgf(tracers, mesh)    
+            call pressure_force_4_linfs_easypgf(tracers, partit, mesh)    
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -463,13 +499,13 @@ subroutine pressure_force_4_linfs(tracers, mesh)
     ! calculate pressure gradient force (PGF) for linfs with partiall cells
     else ! --> (trim(which_ale)=='linfs' .and. use_partial_cell )
         if     (trim(which_pgf)=='nemo') then
-            call pressure_force_4_linfs_nemo(tracers, mesh)
+            call pressure_force_4_linfs_nemo(tracers, partit, mesh)
         elseif (trim(which_pgf)=='shchepetkin') then
-            call pressure_force_4_linfs_shchepetkin(mesh)
+            call pressure_force_4_linfs_shchepetkin(partit, mesh)
         elseif (trim(which_pgf)=='cubicspline') then
-            call pressure_force_4_linfs_cubicspline(mesh)
+            call pressure_force_4_linfs_cubicspline(partit, mesh)
         elseif (trim(which_pgf)=='easypgf') then
-            call pressure_force_4_linfs_easypgf(tracers, mesh)    
+            call pressure_force_4_linfs_easypgf(tracers, partit, mesh)    
         else
             write(*,*) '________________________________________________________'
             write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -486,19 +522,21 @@ end subroutine pressure_force_4_linfs
 !
 !===============================================================================
 ! calculate pressure gradient force for linfs in case full cells
-subroutine pressure_force_4_linfs_fullcell(mesh)
+subroutine pressure_force_4_linfs_fullcell(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     implicit none
-    
-    integer                  :: elem, elnodes(3), nle, ule,  nlz
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit    
+    integer                                :: elem, elnodes(3), nle, ule,  nlz
 
-#include  "associate_mesh.h"
-    
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -533,27 +571,30 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Calculate pressure gradient force (PGF) like in NEMO based on NEMO ocean engine
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
-subroutine pressure_force_4_linfs_nemo(tracers, mesh)
+subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     use densityJM_components_interface
     use density_linear_interface
     implicit none
-    
-    logical             :: do_interpTS=.true.
-    integer             :: elem, elnodes(3), nle, ule, nlz, nln(3), uln(3), ni, nlc, nlce
-    real(kind=WP)       :: hpress_n_bottom(3)
-    real(kind=WP)       :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
-                           dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
-    real(kind=WP)       :: rhopot, bulk_0, bulk_pz, bulk_pz2
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_tracer), intent(in),     target :: tracers    
+    logical                                :: do_interpTS=.true.
+    integer                                :: elem, elnodes(3), nle, ule, nlz, nln(3), uln(3), ni, nlc, nlce
+    real(kind=WP)                          :: hpress_n_bottom(3)
+    real(kind=WP)                          :: interp_n_dens(3), interp_n_temp, interp_n_salt, &
+                                              dZn, dZn_i, dh, dval, mean_e_rho,dZn_rho_grad(2)
+    real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
@@ -661,9 +702,9 @@ subroutine pressure_force_4_linfs_nemo(tracers, mesh)
                 ! salinity
                 select case(state_equation)
                     case(0)
-                        call density_linear(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+                        call density_linear(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
                     case(1)
-                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+                        call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -706,19 +747,22 @@ end subroutine pressure_force_4_linfs_nemo
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_shchepetkin(mesh)
+subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     implicit none
-    
-    integer             :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
-    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit    
+    integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
+    real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -957,30 +1001,32 @@ end subroutine pressure_force_4_linfs_shchepetkin
 !===============================================================================
 ! Calculate pressure gradient force (PGF) 
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
+subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     use densityJM_components_interface
     use density_linear_interface
     implicit none
-    
-    integer             :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, aux_sum
-    real(kind=WP)       :: dx10(3), dx20(3), dx21(3)
-    real(kind=WP)       :: t0(3), dt10(3), dt21(3)
-    real(kind=WP)       :: s0(3), ds10(3), ds21(3)
-    real(kind=WP)       :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
-    real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
-    real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
-    
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_tracer), intent(in),     target :: tracers    
+    integer                                :: elem, elnodes(3), nle, ule, nlz, idx(3),ni
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, aux_sum
+    real(kind=WP)                          :: dx10(3), dx20(3), dx21(3)
+    real(kind=WP)                          :: t0(3), dt10(3), dt21(3)
+    real(kind=WP)                          :: s0(3), ds10(3), ds21(3)
+    real(kind=WP)                          :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
+    real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)                          :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
 
@@ -1013,9 +1059,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
         if (use_cavity .and. .not. use_density_ref) then
             select case(state_equation)
                 case(0)
-                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, mesh)
+                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case(1)
-                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, mesh)
+                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(1)
@@ -1103,9 +1149,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
                     ! compute density from state equation 
                     select case(state_equation)
                         case(0)
-                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)   
+                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)   
                         case(1)
-                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)   
+                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)   
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                             call par_ex(1)
@@ -1142,9 +1188,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
                     ! compute density from state equation 
                     select case(state_equation)
                         case(0)
-                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)    
+                            call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)    
                         case(1)
-                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)    
+                            call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)    
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                             call par_ex(1)
@@ -1245,9 +1291,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -1284,9 +1330,9 @@ subroutine pressure_force_4_linfs_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -1317,23 +1363,26 @@ end subroutine pressure_force_4_linfs_easypgf
 !===============================================================================
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_linfs_cubicspline(mesh)
+subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     implicit none
-    
-    integer             :: elem, elnodes(3), nle, ule, nlz, nlc, ni, node, nln(3), uln(3), dd
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, auxp
-    real(kind=WP)       :: dx10, dx20, dx21, df10, df21
-    real(kind=WP)       :: interp_n_dens(3) 
-    integer             :: s_ind(4)
-    real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
-    real(kind=WP)       :: a, b, c, d, dz 
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit    
+    integer                                :: elem, elnodes(3), nle, ule, nlz, nlc, ni, node, nln(3), uln(3), dd
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, drho_dz, auxp
+    real(kind=WP)                          :: dx10, dx20, dx21, df10, df21
+    real(kind=WP)                          :: interp_n_dens(3) 
+    integer                                :: s_ind(4)
+    real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, s_dup, s_dlo
+    real(kind=WP)                          :: a, b, c, d, dz 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1516,20 +1565,23 @@ end subroutine pressure_force_4_linfs_cubicspline
 !===============================================================================
 ! calculate pressure gradient force for linfs in case cavities are used with 
 ! surface partial cells or bottom partial cells
-subroutine pressure_force_4_linfs_cavity(mesh)
+subroutine pressure_force_4_linfs_cavity(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     implicit none
-    
-    integer             :: elem, elnodes(3), nle, ule,  nlz, idx(3), ni
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
-    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit    
+    integer                                :: elem, elnodes(3), nle, ule,  nlz, idx(3), ni
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, dz_dx, aux_sum
+    real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3), drho_dz(3)
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -1726,25 +1778,25 @@ end subroutine pressure_force_4_linfs_cavity
 !
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
-subroutine pressure_force_4_zxxxx(tracers, mesh)
-    use g_PARSUP
-    use g_config
+subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     use mod_mesh
+    use MOD_PARTIT
     use mod_tracer
+    use g_config
     use pressure_force_4_zxxxx_shchepetkin_interface
     use pressure_force_4_zxxxx_cubicspline_interface
     use pressure_force_4_zxxxx_easypgf_interface
     implicit none
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
-
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    type(t_tracer), intent(in),     target :: tracers
     !___________________________________________________________________________
     if     (trim(which_pgf)=='shchepetkin') then
-        call pressure_force_4_zxxxx_shchepetkin(mesh)
+        call pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     elseif (trim(which_pgf)=='cubicspline') then
-        call pressure_force_4_zxxxx_cubicspline(mesh)
+        call pressure_force_4_zxxxx_cubicspline(partit, mesh)
     elseif (trim(which_pgf)=='easypgf'    ) then
-        call pressure_force_4_zxxxx_easypgf(tracers, mesh)    
+        call pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)    
     else
         write(*,*) '________________________________________________________'
         write(*,*) ' --> ERROR: the choosen form of pressure gradient       '
@@ -1765,22 +1817,25 @@ end subroutine pressure_force_4_zxxxx
 ! interpolation.
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
-subroutine pressure_force_4_zxxxx_cubicspline(mesh)
+subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     implicit none
-    
-    integer             :: elem, elnodes(3), nle, ule, nln(3), uln(3), nlz, nlc,dd
-    integer             :: ni, node, dens_ind,kk
-    real(kind=WP)       :: ze
-    integer             :: s_ind(4)
-    real(kind=WP)       :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
-    real(kind=WP)       :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit    
+    integer                                :: elem, elnodes(3), nle, ule, nln(3), uln(3), nlz, nlc,dd
+    integer                                :: ni, node, dens_ind,kk
+    real(kind=WP)                          :: ze
+    integer                                :: s_ind(4)
+    real(kind=WP)                          :: s_z(4), s_dens(4), s_H, aux1, aux2, aux(2), s_dup, s_dlo
+    real(kind=WP)                          :: a, b, c, d, dz, rho_n(3), rhograd_e(2), p_grad(2)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     ! loop over triangular elemments
     do elem=1, myDim_elem2D
@@ -1946,22 +2001,25 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_zxxxx_shchepetkin(mesh)
+subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     use densityJM_components_interface
     use density_linear_interface
     implicit none
-    
-    integer             :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(3), dz_dx, dz_dy, aux_sum 
-    real(kind=WP)       :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
-    real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    integer                                :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
+    real(kind=WP)                          :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(3), dz_dx, dz_dy, aux_sum 
+    real(kind=WP)                          :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
+    real(kind=WP)                          :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     ! loop over triangular elemments
@@ -2184,30 +2242,33 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 ! --> based on density jacobian method ...
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
-subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
+subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
+    use MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
-    use g_PARSUP
     use g_config
     use densityJM_components_interface
     use density_linear_interface
     implicit none
-    
-    integer             :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
-    real(kind=WP)       :: int_dp_dx(2), drho_dx, dz_dx, drho_dy, dz_dy,aux_sum 
-    real(kind=WP)       :: dx10(3), dx20(3), dx21(3)
-    real(kind=WP)       :: f0(3), df10(3), df21(3)
-    real(kind=WP)       :: t0(3), dt10(3), dt21(3)
-    real(kind=WP)       :: s0(3), ds10(3), ds21(3)
-    real(kind=WP)       :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
-    real(kind=WP)       :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
-    real(kind=WP)       :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
-    type(t_mesh),   intent(in), target :: mesh
-    type(t_tracer), intent(in), target :: tracers
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers    
+    integer                                 :: elem, elnodes(3), nle,ule, nlz, nln(3), ni, nlc, nlce, idx(3)
+    real(kind=WP)                           :: int_dp_dx(2), drho_dx, dz_dx, drho_dy, dz_dy,aux_sum 
+    real(kind=WP)                           :: dx10(3), dx20(3), dx21(3)
+    real(kind=WP)                           :: f0(3), df10(3), df21(3)
+    real(kind=WP)                           :: t0(3), dt10(3), dt21(3)
+    real(kind=WP)                           :: s0(3), ds10(3), ds21(3)
+    real(kind=WP)                           :: rho_at_Zn(3), temp_at_Zn(3), salt_at_Zn(3), drho_dz(3), aux_dref
+    real(kind=WP)                           :: rhopot(3), bulk_0(3), bulk_pz(3), bulk_pz2(3)
+    real(kind=WP)                           :: dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     temp=>tracers%data(1)%values(:,:)
     salt=>tracers%data(2)%values(:,:)
     !___________________________________________________________________________
@@ -2239,9 +2300,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
         if (use_cavity .and. .not. use_density_ref) then
             select case(state_equation)
                 case(0)
-                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, mesh)
+                    call density_linear(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case(1)
-                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, mesh)
+                    call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(1)
@@ -2318,9 +2379,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -2367,9 +2428,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -2447,13 +2508,13 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
             ! compute density from state equation 
             select case(state_equation)
                 case(0)
-                    call density_linear(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), mesh)             
-                    call density_linear(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), mesh)             
-                    call density_linear(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), mesh)             
+                    call density_linear(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)             
+                    call density_linear(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)             
+                    call density_linear(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)             
                 case(1)
-                    call densityJM_components(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), mesh)             
-                    call densityJM_components(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), mesh)             
-                    call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), mesh)             
+                    call densityJM_components(temp_at_Zn(1), salt_at_Zn(1), bulk_0(1), bulk_pz(1), bulk_pz2(1), rhopot(1), partit, mesh)             
+                    call densityJM_components(temp_at_Zn(2), salt_at_Zn(2), bulk_0(2), bulk_pz(2), bulk_pz2(2), rhopot(2), partit, mesh)             
+                    call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)             
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                     call par_ex(1)
@@ -2532,9 +2593,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -2581,9 +2642,9 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, mesh)
                 ! compute density from state equation 
                 select case(state_equation)
                     case(0)
-                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call density_linear(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case(1)
-                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), mesh)             
+                        call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
                         call par_ex(1)
@@ -2624,11 +2685,11 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
 !===============================================================================
-SUBROUTINE densityJM_local(t, s, pz, rho_out, mesh)
+SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
 USE MOD_MESH
+use MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP !, only: par_ex,pe_status
 use densityJM_components_interface
 IMPLICIT NONE
 
@@ -2640,16 +2701,19 @@ IMPLICIT NONE
   ! - has been derived from the SPEM subroutine rhocal
   !
   !---------------------------------------------------------------------------
-
-  real(kind=WP), intent(IN)  :: t,s,pz
-  real(kind=WP), intent(OUT) :: rho_out                 
-  real(kind=WP)              :: rhopot, bulk
-  real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
-  type(t_mesh), intent(in)   , target :: mesh
-#include "associate_mesh.h"
+  type(t_mesh),   intent(in) ,   target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  real(kind=WP),  intent(IN)            :: t,s,pz
+  real(kind=WP),  intent(OUT)           :: rho_out                 
+  real(kind=WP)                         :: rhopot, bulk
+  real(kind=WP)                         :: bulk_0, bulk_pz, bulk_pz2
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !compute secant bulk modulus
 
-  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+  call densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
 
   bulk = bulk_0 + pz*(bulk_pz + pz*bulk_pz2) 
 
@@ -2659,11 +2723,11 @@ end subroutine densityJM_local
 !
 !
 !===============================================================================
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
 USE MOD_MESH
+use MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP !, only: par_ex,pe_status
 IMPLICIT NONE
 
   !
@@ -2677,9 +2741,11 @@ IMPLICIT NONE
   !---------------------------------------------------------------------------
   ! N. Rakowski 2014 the split form
   !---------------------------------------------------------------------------
-  real(kind=WP), intent(IN)  :: t,s
-  real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)              :: s_sqrt
+  type(t_mesh),   intent(in) ,   target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  real(kind=WP),  intent(IN)            :: t,s
+  real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
+  real(kind=WP)                         :: s_sqrt
 
   real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
   real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
@@ -2705,9 +2771,11 @@ IMPLICIT NONE
   real(kind=WP), parameter   :: bst4 = 5.38750e-9	
   real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
   real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
-  type(t_mesh), intent(in) , target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   !compute secant bulk modulus
 
@@ -2809,7 +2877,7 @@ end function atg
 !
 !
 !===============================================================================
-subroutine sw_alpha_beta(TF1,SF1, mesh)
+subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   ! DESCRIPTION:
   !   A function to calculate the thermal expansion coefficient
   !   and saline contraction coefficient. (elementwise)
@@ -2834,19 +2902,23 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
   use mod_mesh
+  use MOD_PARTIT
   use o_arrays
-  use g_parsup
   use o_param
   use g_comm_auto
   implicit none
   !
-  type(t_mesh), intent(in) , target :: mesh
-  integer        :: n, nz, nzmin, nzmax
-  real(kind=WP)  :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
-  real(kind=WP)  :: a_over_b    
-  real(kind=WP)  :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D),SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+  type(t_mesh),   intent(in) ,    target :: mesh
+  type(t_partit), intent(inout),  target :: partit
+  integer                                :: n, nz, nzmin, nzmax
+  real(kind=WP)                          :: t1,t1_2,t1_3,t1_4,p1,p1_2,p1_3,s1,s35,s35_2 
+  real(kind=WP)                          :: a_over_b    
+  real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   do n = 1,myDim_nod2d
      nzmin = ulevels_nod2d(n)   
@@ -2892,14 +2964,14 @@ subroutine sw_alpha_beta(TF1,SF1, mesh)
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
    end do
  end do
-call exchange_nod(sw_alpha)
-call exchange_nod(sw_beta)
+call exchange_nod(sw_alpha, partit)
+call exchange_nod(sw_beta, partit)
 end subroutine sw_alpha_beta
 !
 !
 !
 !===============================================================================
-subroutine compute_sigma_xy(TF1,SF1, mesh)
+subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   !--------------------------------------------------------------------
   ! DESCRIPTION:
   !   computes density gradient
@@ -2908,23 +2980,27 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
   !   SF          = salinity              [psu      (PSS-78)]
   !   TF          = potential temperature [degree C (ITS-90)]
   !
-  ! OUTPUT:
+  ! OUTPUT:7
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
   use mod_mesh
+  use MOD_PARTIT
   use o_param
   use o_arrays
-  use g_parsup
   use g_comm_auto
   implicit none
   !
-  type(t_mesh),  intent(in)   , target :: mesh
-  real(kind=WP), intent(IN)   :: TF1(mesh%nl-1, myDim_nod2D+eDim_nod2D), SF1(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-  real(kind=WP)               :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
-  integer                     :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
+  type(t_mesh),   intent(in) ,    target :: mesh
+  type(t_partit), intent(inout),  target :: partit
+  real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+  real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
+  integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !
   DO n=1, myDim_nod2D
         nln = nlevels_nod2D(n)-1
@@ -2972,27 +3048,31 @@ subroutine compute_sigma_xy(TF1,SF1, mesh)
         sigma_xy(2,uln:nln,n) = (-sw_alpha(uln:nln,n)*ty(uln:nln)+sw_beta(uln:nln,n)*sy(uln:nln))/vol(uln:nln)*density_0
   END DO 
 
-  call exchange_nod(sigma_xy)
+  call exchange_nod(sigma_xy, partit)
 end subroutine compute_sigma_xy
 !
 !
 !
 !===============================================================================
-subroutine compute_neutral_slope(mesh)
+subroutine compute_neutral_slope(partit, mesh)
     use o_ARRAYS
-    use g_PARSUP
+    use MOD_PARTIT
     use MOD_MESH
     use o_param
     use g_config
     use g_comm_auto
     IMPLICIT NONE
-    real(kind=WP)   :: deltaX1,deltaY1,deltaX2,deltaY2
-    integer         :: edge
-    integer         :: n,nz,nl1,ul1,el(2),elnodes(3),enodes(2)
-    real(kind=WP)   :: c, ro_z_inv,eps,S_cr,S_d
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    real(kind=WP)                          :: deltaX1,deltaY1,deltaX2,deltaY2
+    integer                                :: edge
+    integer                                :: n,nz,nl1,ul1,el(2),elnodes(3),enodes(2)
+    real(kind=WP)                          :: c, ro_z_inv,eps,S_cr,S_d
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
     S_cr=1.0e-2_WP
@@ -3017,8 +3097,8 @@ subroutine compute_neutral_slope(mesh)
         enddo
     enddo
 
-    call exchange_nod(neutral_slope)
-    call exchange_nod(slope_tapered)
+    call exchange_nod(neutral_slope, partit)
+    call exchange_nod(slope_tapered, partit)
 end subroutine compute_neutral_slope
 !
 !
@@ -3026,22 +3106,25 @@ end subroutine compute_neutral_slope
 !===============================================================================
 !converts insitu temperature to a potential one
 !               tracers%data(1)%values will be modified!
-subroutine insitu2pot(tracers, mesh)
+subroutine insitu2pot(tracers, partit, mesh)
   use mod_mesh
+  use MOD_PARTIT
   use mod_tracer
   use o_param
   use o_arrays
   use g_config
-  use g_PARSUP
   implicit none
-  real(kind=WP), external     :: ptheta
-  real(kind=WP)               :: pp, pr, tt, ss
-  integer                     :: n, nz, nzmin,nzmax
-  type(t_mesh),   intent(in),     target  :: mesh
-  type(t_tracer), intent(inout),  target  :: tracers
-  real(kind=WP),  dimension(:,:), pointer :: temp, salt
-  
-#include  "associate_mesh.h"
+  type(t_mesh),   intent(in) ,   target   :: mesh
+  type(t_partit), intent(inout), target   :: partit
+  type(t_tracer), intent(in),    target   :: tracers
+  real(kind=WP),  external                :: ptheta
+  real(kind=WP)                           :: pp, pr, tt, ss
+  integer                                 :: n, nz, nzmin,nzmax
+  real(kind=WP),  dimension(:,:), pointer :: temp, salt 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   temp=>tracers%data(1)%values(:,:)
   salt=>tracers%data(2)%values(:,:)
   ! Convert in situ temperature into potential temperature
@@ -3069,21 +3152,24 @@ end subroutine insitu2pot
 !
 !
 !===============================================================================
-SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, mesh)
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
 !coded by Margarita Smolentseva, 21.05.2020
 USE MOD_MESH
+use MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
-use g_PARSUP !, only: par_ex,pe_status
 use g_config !, only: which_toy, toy_ocean
 IMPLICIT NONE
-
-  real(kind=WP), intent(IN)  :: t,s
-  real(kind=WP), intent(OUT) :: rho_out                 
-  real(kind=WP)              :: rhopot, bulk
-  real(kind=WP), intent(OUT) :: bulk_0, bulk_pz, bulk_pz2
-  type(t_mesh), intent(in)   , target :: mesh
-#include "associate_mesh.h"
+  type(t_mesh),   intent(in) ,    target :: mesh
+  type(t_partit), intent(inout),  target :: partit
+  real(kind=WP),  intent(IN)             :: t,s
+  real(kind=WP),  intent(OUT)            :: rho_out                 
+  real(kind=WP)                          :: rhopot, bulk
+  real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !compute secant bulk modulus
   
   bulk_0   = 1
@@ -3101,25 +3187,29 @@ end subroutine density_linear
 !
 !
 !===============================================================================
-subroutine init_ref_density(mesh)
+subroutine init_ref_density(partit, mesh)
     ! compute reference density
     ! Coded by Qiang Wang
     ! Reviewed by ??
     !___________________________________________________________________________
     USE MOD_MESH
+    use MOD_PARTIT
     use o_PARAM
     use o_ARRAYS
-    use g_PARSUP
     use densityJM_components_interface
     implicit none
     
     !___________________________________________________________________________
-    type(t_mesh), intent(in) , target :: mesh    
-    integer         :: node, nz, nzmin, nzmax
-    real(kind=WP)   :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho 
-    real(kind=8)    :: T, S, auxz
+    type(t_mesh),   intent(in) ,    target :: mesh
+    type(t_partit), intent(inout),  target :: partit
+    integer                                :: node, nz, nzmin, nzmax
+    real(kind=WP)                          :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho 
+    real(kind=8)                           :: T, S, auxz
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
 !!PS     S=34.  
@@ -3134,7 +3224,7 @@ subroutine init_ref_density(mesh)
         auxz=min(0.0,Z_3d_n(nzmin,node))
         
         !_______________________________________________________________________
-        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)
+        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
         rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
         density_ref(nzmin,node) = rho*rhopot/(rho+0.1_WP*auxz)
         

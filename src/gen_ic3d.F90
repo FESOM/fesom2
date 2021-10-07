@@ -13,9 +13,9 @@ MODULE g_ic3d
    !!
    USE o_ARRAYS
    USE MOD_MESH
+   USE MOD_PARTIT
    USE MOD_TRACER
    USE o_PARAM
-   USE g_PARSUP
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
@@ -64,33 +64,33 @@ MODULE g_ic3d
 
 !============== NETCDF ==========================================
 CONTAINS
-   SUBROUTINE nc_readGrid
+   SUBROUTINE nc_readGrid(partit)
    ! Read time array and grid from nc file
       IMPLICIT NONE
-
-      integer              :: iost !I/O status     
-      integer              :: ncid      ! netcdf file id
-      integer              :: i
+      type(t_partit), intent(in) :: partit 
+      integer                    :: iost !I/O status     
+      integer                    :: ncid      ! netcdf file id
+      integer                    :: i
       ! ID dimensions and variables:
-      integer              :: id_lon
-      integer              :: id_lat
-      integer              :: id_lond
-      integer              :: id_latd
-      integer              :: id_depth
-      integer              :: id_depthd      
-      integer              :: nf_start(4)
-      integer              :: nf_edges(4)         
-      integer              :: ierror              ! return error code
+      integer                    :: id_lon
+      integer                    :: id_lat
+      integer                    :: id_lond
+      integer                    :: id_latd
+      integer                    :: id_depth
+      integer                    :: id_depthd      
+      integer                    :: nf_start(4)
+      integer                    :: nf_edges(4)         
+      integer                    :: ierror              ! return error code
     
       !open file
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_open(trim(filename),NF_NOWRITE,ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)
 
       ! get dimensions
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
@@ -99,9 +99,9 @@ CONTAINS
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
-      if (mype==0) then 
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)
+      if (partit%mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
          if      (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
@@ -110,18 +110,18 @@ CONTAINS
             iost = nf_inq_dimid(ncid, "lon",       id_lond)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename) 
-      if (mype==0) then   
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit) 
+      if (partit%mype==0) then   
          iost = nf_inq_dimid(ncid, "depth", id_depthd)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)  
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)  
 
       ! get variable id
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
-      if (mype==0) then
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid,    "LAT",      id_lat)
          if     (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lat",      id_lat)
@@ -130,7 +130,7 @@ CONTAINS
             iost = nf_inq_varid(ncid, "latitude", id_lat)
          end if
       end if
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid,    "LON",       id_lon)
          if      (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "longitude", id_lon)
@@ -139,75 +139,75 @@ CONTAINS
             iost = nf_inq_varid(ncid, "lon",       id_lon)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)  
-      if (mype==0) then   
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)  
+      if (partit%mype==0) then   
          iost = nf_inq_varid(ncid, "depth", id_depth)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)   
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)   
       
       ! get dimensions size
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, nc_Nlat)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)   
-      if (mype==0) then      
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)   
+      if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, nc_Nlon)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)   
-      if (mype==0) then      
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)   
+      if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_depthd, nc_Ndepth)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename) 
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit) 
       nc_Nlon=nc_Nlon+2 !for the halo in case of periodic boundary
-      call MPI_BCast(nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_Ndepth, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_Nlon,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_Nlat,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_Ndepth, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
          
 
       ALLOCATE( nc_lon(nc_Nlon), nc_lat(nc_Nlat),&
                 &       nc_depth(nc_Ndepth))
    !read variables from file
    ! coordinates
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlat
          iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
-      if (mype==0) then
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
          nc_lon(1)        =nc_lon(nc_Nlon-1)
          nc_lon(nc_Nlon)  =nc_lon(2)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
-      call check_nferr(iost,filename)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
+      call check_nferr(iost,filename,partit)
    ! depth
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Ndepth
          iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
          if (nc_depth(2) < 0.) nc_depth=-nc_depth
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
-      call check_nferr(iost,filename)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
+      call check_nferr(iost,filename,partit)
 
-      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_depth, nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_depth, nc_Ndepth, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
 
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_close(ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,filename,partit)
 
       if (ic_cyclic) then
          nc_lon(1)      =nc_lon(1)-360.
@@ -216,18 +216,21 @@ CONTAINS
    END SUBROUTINE nc_readGrid
 
    
-   SUBROUTINE nc_ic3d_ini(mesh)
+   SUBROUTINE nc_ic3d_ini(partit, mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : inizialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-   
-      integer                  :: i
-      integer                  :: elnodes(3)
-      real(wp)                 :: x, y       ! coordinates of elements
+      type(t_mesh),   intent(in) ,    target    :: mesh
+      type(t_partit), intent(inout),  target    :: partit 
+      integer                                   :: i
+      integer                                   :: elnodes(3)
+      real(wp)                                  :: x, y       ! coordinates of elements
       real(kind=WP), allocatable,dimension(:,:) :: cav_nrst_xyz
-      type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
       
       warn = 0
 
@@ -236,7 +239,7 @@ CONTAINS
          write(*,*) 'variable  : ', trim(varname)
       end if
       
-      call nc_readGrid
+      call nc_readGrid(partit)
 
       ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
       !_________________________________________________________________________
@@ -296,7 +299,7 @@ CONTAINS
       end if   
    END SUBROUTINE nc_ic3d_ini
 
-   SUBROUTINE getcoeffld(tracers, mesh)
+   SUBROUTINE getcoeffld(tracers, partit, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE getcoeffld ***
       !!              
@@ -305,27 +308,28 @@ CONTAINS
       !! ** Action  : 
       !!----------------------------------------------------------------------
       IMPLICIT NONE      
-      
-      integer              :: iost !I/O status     
-      integer              :: ncid      ! netcdf file id
+      type(t_mesh),   intent(in),    target   :: mesh
+      type(t_partit), intent(inout), target   :: partit 
+      type(t_tracer), intent(inout), target   :: tracers      
+      integer                                 :: iost !I/O status     
+      integer                                 :: ncid      ! netcdf file id
       ! ID dimensions and variables:
-      integer              :: id_data
-      integer              :: nf_start(4)
-      integer              :: nf_edges(4)         
-      integer              :: fld_idx, i,j,ii, ip1, jp1, k
-      integer              :: d_indx, d_indx_p1  ! index of neares      
-      real(wp)             :: cf_a, cf_b, delta_d
-      integer              :: nl1, ul1
-      real(wp)             :: denom, x1, x2, y1, y2, x, y, d1,d2, aux_z     
-      
-      real(wp), allocatable, dimension(:,:,:)  :: ncdata
-      real(wp), allocatable, dimension(:)      :: data1d      
-      integer              :: elnodes(3)
-      integer              :: ierror              ! return error code
-
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
-#include "associate_mesh.h"
+      integer                                 :: id_data
+      integer                                 :: nf_start(4)
+      integer                                 :: nf_edges(4)         
+      integer                                 :: fld_idx, i,j,ii, ip1, jp1, k
+      integer                                 :: d_indx, d_indx_p1  ! index of neares      
+      real(wp)                                :: cf_a, cf_b, delta_d
+      integer                                 :: nl1, ul1
+      real(wp)                                :: denom, x1, x2, y1, y2, x, y, d1,d2, aux_z           
+      real(wp), allocatable, dimension(:,:,:) :: ncdata
+      real(wp), allocatable, dimension(:)     :: data1d      
+      integer                                 :: elnodes(3)
+      integer                                 :: ierror              ! return error code
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP
@@ -336,13 +340,13 @@ CONTAINS
          iost = nf_open(filename,NF_NOWRITE,ncid)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
+      call check_nferr(iost,filename,partit)
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)   
+      call check_nferr(iost,filename,partit)   
       !read data from file
       if (mype==0) then
          nf_start(1)=1
@@ -359,7 +363,7 @@ CONTAINS
          end where
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,filename)
+      call check_nferr(iost,filename,partit)
       call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
@@ -464,7 +468,7 @@ CONTAINS
       DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
    
-   SUBROUTINE do_ic3d(tracers, mesh)
+   SUBROUTINE do_ic3d(tracers, partit, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE do_ic3d ***
       !!              
@@ -472,31 +476,31 @@ CONTAINS
       !!----------------------------------------------------------------------
       USE insitu2pot_interface
       IMPLICIT NONE
-      integer                       :: n, i
-      real(kind=WP)                 :: locTmax, locTmin, locSmax, locSmin, glo
-    
-      type(t_mesh),   intent(in), target    :: mesh
-      type(t_tracer), intent(inout), target :: tracers
+      type(t_mesh),   intent(in),    target   :: mesh
+      type(t_partit), intent(inout), target   :: partit 
+      type(t_tracer), intent(inout), target   :: tracers  
+      integer                                 :: n, i
+      real(kind=WP)                           :: locTmax, locTmin, locSmax, locSmin, glo   
 
-      if (mype==0) write(*,*) "Start: Initial conditions  for tracers"
+      if (partit%mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
-      ALLOCATE(bilin_indx_i(myDim_nod2d+eDim_nod2D), bilin_indx_j(myDim_nod2d+eDim_nod2D))
+      ALLOCATE(bilin_indx_i(partit%myDim_nod2d+partit%eDim_nod2D), bilin_indx_j(partit%myDim_nod2d+partit%eDim_nod2D))
       DO n=1, n_ic3d
       filename=trim(ClimateDataPath)//trim(filelist(n))
       varname =trim(varlist(n))
       DO current_tracer=1, tracers%num_tracers
          if (tracers%data(current_tracer)%ID==idlist(n)) then
             ! read initial conditions for current tracer
-            call nc_ic3d_ini(mesh)
+            call nc_ic3d_ini(partit, mesh)
             ! get first coeficients for time inerpolation on model grid for all datas
-            call getcoeffld(tracers, mesh)
+            call getcoeffld(tracers, partit, mesh)
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tracers%data(current_tracer)%values(:,:), mesh)
+            call extrap_nod(tracers%data(current_tracer)%values(:,:), partit, mesh)
             exit
          elseif (current_tracer==tracers%num_tracers) then
-            if (mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
-            if (mype==0) write(*,*) "check your namelists!"
-            call par_ex
+            if (partit%mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
+            if (partit%mype==0) write(*,*) "check your namelists!"
+            call par_ex(partit)
             stop
          end if
       END DO
@@ -513,7 +517,7 @@ CONTAINS
          !_________________________________________________________________________
          ! eliminate values within cavity that result from the extrapolation of 
          ! initialisation
-         do n=1,myDim_nod2d + eDim_nod2D
+         do n=1,partit%myDim_nod2d + partit%eDim_nod2D
             ! ensure cavity is zero
             if (use_cavity) tracers%data(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
             ! ensure bottom is zero
@@ -528,46 +532,33 @@ CONTAINS
       
       !_________________________________________________________________________
       if (t_insitu) then
-         if (mype==0) write(*,*) "converting insitu temperature to potential..."
-         call insitu2pot(tracers, mesh)
+         if (partit%mype==0) write(*,*) "converting insitu temperature to potential..."
+         call insitu2pot(tracers, partit, mesh)
       end if
-      if (mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
+      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
       !_________________________________________________________________________
       ! check initial fields
       locTmax = -6666
       locTmin = 6666
       locSmax = locTmax
       locSmin = locTmin
-      do n=1,myDim_nod2d
+      do n=1, partit%myDim_nod2d
         locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locTmin = min(locTmin,minval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locSmax = max(locSmax,maxval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locSmin = min(locSmin,minval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
       end do
-      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
-      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
-      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
-      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-      if (mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
+      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
+      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
+      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
+      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
   
    END SUBROUTINE do_ic3d
-   
-   SUBROUTINE err_call(iost,fname)
-      !!---------------------------------------------------------------------
-      !!                    ***  ROUTINE  err_call ***
-      !!----------------------------------------------------------------------
-   IMPLICIT NONE
-      integer, intent(in)            :: iost
-      character(len=MAX_PATH), intent(in) :: fname
-      write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
-      call par_ex
-      stop
-   END SUBROUTINE err_call
-   
-
+    
    SUBROUTINE nc_end
 
     IMPLICIT NONE
@@ -576,13 +567,14 @@ CONTAINS
 
    END SUBROUTINE nc_end
 
-   SUBROUTINE check_nferr(iost,fname)
+   SUBROUTINE check_nferr(iost,fname, partit )
    IMPLICIT NONE
+      type(t_partit),          intent(in) :: partit 
       character(len=MAX_PATH), intent(in) :: fname
-      integer, intent(in) :: iost
+      integer, intent(in)                 :: iost
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
-         call par_ex 
+         call par_ex (partit)
          stop
       endif
    END SUBROUTINE

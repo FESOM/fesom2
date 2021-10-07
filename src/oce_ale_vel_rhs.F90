@@ -1,8 +1,10 @@
 module momentum_adv_scalar_interface
   interface
-    subroutine momentum_adv_scalar(mesh)
+    subroutine momentum_adv_scalar(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      use mod_partit
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
@@ -10,13 +12,13 @@ end module
 !
 !
 !_______________________________________________________________________________
-subroutine compute_vel_rhs(mesh)
+subroutine compute_vel_rhs(partit, mesh)
     use MOD_MESH
+    use MOD_PARTIT
     use o_ARRAYS
     use i_ARRAYS
     use i_therm_param
     use o_PARAM
-    use g_PARSUP
     use g_CONFIG
     use g_forcing_param, only: use_virt_salt
     use g_forcing_arrays, only: press_air
@@ -25,7 +27,8 @@ subroutine compute_vel_rhs(mesh)
     use momentum_adv_scalar_interface
     
     implicit none 
-    type(t_mesh), intent(in) , target :: mesh   
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
     integer                  :: elem, elnodes(3), nz, nzmax, nzmin 
     real(kind=WP)            :: ff, mm 
     real(kind=WP)            :: Fx, Fy, pre(3)
@@ -33,8 +36,10 @@ subroutine compute_vel_rhs(mesh)
     real(kind=WP)            :: t1, t2, t3, t4
     real(kind=WP)            :: p_ice(3), p_air(3), p_eta(3)
     integer                  :: use_pice
-
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     t1=MPI_Wtime()
     use_pice=0
@@ -114,7 +119,7 @@ subroutine compute_vel_rhs(mesh)
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
        call par_ex(1)
     elseif (mom_adv==2) then
-       call momentum_adv_scalar(mesh)
+       call momentum_adv_scalar(partit, mesh)
     end if
     t3=MPI_Wtime() 
 
@@ -151,22 +156,26 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 !_______________________________________________________________________________
-subroutine momentum_adv_scalar(mesh)
+subroutine momentum_adv_scalar(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 use g_comm_auto
 IMPLICIT NONE
 
-type(t_mesh), intent(in) , target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
 integer                  :: n, nz, el1, el2
 integer                  :: nl1, nl2, ul1, ul2, nod(2), el, ed, k, nle, ule
 real(kind=WP)            :: un1(1:mesh%nl-1), un2(1:mesh%nl-1)
 real(kind=WP)            :: wu(1:mesh%nl), wv(1:mesh%nl)
-real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
+real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,partit%myDim_nod2d+partit%eDim_nod2D)
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
@@ -327,7 +336,7 @@ real(kind=WP)            :: Unode_rhs(2,mesh%nl-1,myDim_nod2d+eDim_nod2D)
     end do !-->do n=1,myDim_nod2d
 
     !___________________________________________________________________________
-    call exchange_nod(Unode_rhs)
+    call exchange_nod(Unode_rhs, partit)
 
     !___________________________________________________________________________
     ! convert total nodal advection from vertice --> elements

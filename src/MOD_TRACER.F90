@@ -85,6 +85,7 @@ contains
 
 ! Unformatted writing for T_TRACER_DATA
 subroutine WRITE_T_TRACER_DATA(tdata, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER_DATA), intent(in)     :: tdata
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
@@ -107,6 +108,7 @@ end subroutine WRITE_T_TRACER_DATA
 
 ! Unformatted reading for T_TRACER_DATA
 subroutine READ_T_TRACER_DATA(tdata, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER_DATA), intent(inout)  :: tdata
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
@@ -129,6 +131,7 @@ end subroutine READ_T_TRACER_DATA
 
 ! Unformatted writing for T_TRACER_WORK
 subroutine WRITE_T_TRACER_WORK(twork, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER_WORK), intent(in)     :: twork
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
@@ -153,6 +156,7 @@ end subroutine WRITE_T_TRACER_WORK
 
 ! Unformatted reading for T_TRACER_WORK
 subroutine READ_T_TRACER_WORK(twork, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER_WORK), intent(inout)  :: twork
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
@@ -177,6 +181,7 @@ end subroutine READ_T_TRACER_WORK
 
 ! Unformatted writing for T_TRACER
 subroutine WRITE_T_TRACER(tracer, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER),      intent(in)     :: tracer
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat
@@ -197,6 +202,7 @@ end subroutine WRITE_T_TRACER
 
 ! Unformatted reading for T_TRACER
 subroutine READ_T_TRACER(tracer, unit, iostat, iomsg)
+    IMPLICIT NONE
     class(T_TRACER),      intent(inout)  :: tracer
     integer,              intent(in)     :: unit
     integer,              intent(out)    :: iostat

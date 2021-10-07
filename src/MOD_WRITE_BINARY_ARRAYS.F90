@@ -5,7 +5,7 @@
 MODULE MOD_WRITE_BINARY_ARRAYS
 use o_PARAM
 private
-public :: write_bin_array
+public :: write_bin_array, write1d_int_static
 INTERFACE write_bin_array
           MODULE PROCEDURE write1d_real, write1d_int, write1d_char, write2d_real, write2d_int, write3d_real, write3d_int
 END INTERFACE
@@ -61,6 +61,19 @@ subroutine write1d_char(arr, unit, iostat, iomsg)
        write(unit, iostat=iostat, iomsg=iomsg) s1
     end if
 end subroutine write1d_char
+
+subroutine write1d_int_static(arr, unit, iostat, iomsg)
+    IMPLICIT NONE
+    integer,       intent(in)               :: arr(:) 
+    integer,       intent(in)               :: unit
+    integer,       intent(out)              :: iostat
+    character(*),  intent(inout)            :: iomsg
+    integer                                 :: s1
+
+    s1=size(arr, 1)
+    write(unit, iostat=iostat, iomsg=iomsg) s1
+    write(unit, iostat=iostat, iomsg=iomsg) arr(1:s1)
+end subroutine write1d_int_static
 
 subroutine write2d_real(arr, unit, iostat, iomsg)
     real(kind=WP), intent(in), allocatable :: arr(:,:)

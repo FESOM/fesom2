@@ -8,9 +8,9 @@ MODULE o_mixing_KPP_mod
   !---------------------------------------------------------------  
   USE o_PARAM
   USE MOD_MESH
+  USE MOD_PARTIT
   USE MOD_TRACER
   USE o_ARRAYS
-  USE g_PARSUP
   USE g_config
   USE i_arrays
   USE g_forcing_arrays
@@ -95,7 +95,7 @@ contains
 !     PP:  Kv(nl,node_size) and Av(nl,elem_size)
 !      *******************************************************************
 
-  subroutine oce_mixing_kpp_init(mesh)
+  subroutine oce_mixing_kpp_init(partit, mesh)
 
      IMPLICIT NONE
 
@@ -115,9 +115,12 @@ contains
 
      integer :: i, j
 
-     type(t_mesh), intent(in) , target :: mesh
-
-#include "associate_mesh.h"
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
      allocate ( ghats     ( nl-1,    myDim_nod2D+eDim_nod2D         ))   ! nonlocal transport (s/m^2)
      allocate ( hbl       (    myDim_nod2D+eDim_nod2D         ))   ! boundary layer depth
@@ -238,7 +241,7 @@ contains
   !  diffK = diffusion coefficient (m^2/s) 
   !
   !---------------------------------------------------------------  
-  subroutine oce_mixing_KPP(viscAE, diffK, tracers, mesh)
+  subroutine oce_mixing_KPP(viscAE, diffK, tracers, partit, mesh)
 
      IMPLICIT NONE
 
@@ -246,23 +249,26 @@ contains
 !     Define allocatble arrays under oce_modules.F90
 !     Allocate arrays under oce_setup_step.F90
 !      *******************************************************************
-     type(t_mesh),   intent(in), target :: mesh
-     type(t_tracer), intent(in), target :: tracers
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
+     type(t_tracer), intent(in),    target :: tracers
      integer                    :: node, kn, elem, elnodes(3)
      integer                    :: nz, ns, j, q, lay, lay_mi, nzmin, nzmax
      real(KIND=WP)              :: smftu, smftv, aux, vol
      real(KIND=WP)              :: dens_up, minmix
      real(KIND=WP)              :: u_loc, v_loc
-!!PS      real(kind=WP)              :: tsurf, ssurf, t, s
      real(kind=WP)              :: usurf, vsurf
      real(kind=WP)              :: rhopot, bulk, pz
      real(kind=WP)              :: bulk_0, bulk_pz, bulk_pz2
      real(kind=WP)              :: rho_surf, rho_insitu
-     real(KIND=WP), dimension(mesh%nl, myDim_elem2D+eDim_elem2D), intent(inout) :: viscAE!for momentum (elements)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D)                  :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_elem2D+partit%eDim_elem2D), intent(inout)                     :: viscAE!for momentum (elements)
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D)                                     :: viscA !for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   ViscA=0.0_WP
   DO node=1, myDim_nod2D !+eDim_nod2D
@@ -340,30 +346,30 @@ contains
 ! compute interior mixing coefficients everywhere, due to constant 
 ! internal wave activity, static instability, and local shear 
 ! instability.
-    CALL ri_iwmix(viscA, diffK, tracers, mesh)
+    CALL ri_iwmix(viscA, diffK, tracers, partit, mesh)
 ! add double diffusion
     IF (double_diffusion) then
-       CALL ddmix(diffK, tracers, mesh)
+       CALL ddmix(diffK, tracers, partit, mesh)
     END IF
 
 ! boundary layer mixing coefficients: diagnose new b.l. depth
-    CALL bldepth(mesh)
+    CALL bldepth(partit, mesh)
    
 ! boundary layer diffusivities
-    CALL blmix_kpp(viscA, diffK, mesh)
+    CALL blmix_kpp(viscA, diffK, partit, mesh)
 
 ! enhance diffusivity at interface kbl - 1
-    CALL enhance(viscA, diffK, mesh)
+    CALL enhance(viscA, diffK, partit, mesh)
     
     if (smooth_blmc) then
-       call exchange_nod(blmc(:,:,1))
-       call exchange_nod(blmc(:,:,2))
-       call exchange_nod(blmc(:,:,3))
+       call exchange_nod(blmc(:,:,1), partit)
+       call exchange_nod(blmc(:,:,2), partit)
+       call exchange_nod(blmc(:,:,3), partit)
        do j=1, 3
           !_____________________________________________________________________  
           ! all loops go over myDim_nod2D so no halo information --> for smoothing 
           ! haloinfo is required --> therefor exchange_nod
-          call smooth_nod(blmc(:,:,j), 3, mesh)
+          call smooth_nod(blmc(:,:,j), 3, partit, mesh)
        end do
     end if
     
@@ -387,12 +393,12 @@ contains
   !_____________________________________________________________________________
   ! do all node loops only over myDim_nod2D --> therefore do an halo exchange 
   ! only at the end should save some time
-  call exchange_nod(diffK(:,:,1))
-  call exchange_nod(diffK(:,:,2))
-  call exchange_nod(ghats)
+  call exchange_nod(diffK(:,:,1), partit)
+  call exchange_nod(diffK(:,:,2), partit)
+  call exchange_nod(ghats, partit)
   
 ! OVER ELEMENTS 
-  call exchange_nod(viscA) !Warning: don't forget to communicate before averaging on elements!!!
+  call exchange_nod(viscA, partit) !Warning: don't forget to communicate before averaging on elements!!!
   minmix=3.0e-3_WP
   DO elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)
@@ -465,7 +471,7 @@ contains
   !      real caseA(t2d)      ! =1 in case A, =0 in case B                
   !      integer kbl(t2d)     ! index of first grid level below hbl        
   !
-  SUBROUTINE bldepth(mesh)
+  SUBROUTINE bldepth(partit, mesh)
 
      IMPLICIT NONE
 
@@ -478,9 +484,13 @@ contains
      real(KIND=WP), parameter :: cekman = 0.7_WP  ! constant for Ekman depth
      real(KIND=WP), parameter :: cmonob = 1.0_WP  ! constant for Monin-Obukhov depth
 
-     type(t_mesh), intent(in) , target :: mesh
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 ! Initialize hbl and kbl to bottomed out values
      DO node=1, myDim_nod2D !+eDim_nod2D
@@ -590,8 +600,8 @@ contains
   END DO
 
   if (smooth_hbl) then
-    call exchange_nod(hbl)
-    call smooth_nod(hbl, 3, mesh)
+    call exchange_nod(hbl, partit)
+    call smooth_nod(hbl, 3, partit, mesh)
   end if
 
   DO node=1, myDim_nod2D !+eDim_nod2D
@@ -718,24 +728,28 @@ contains
   !    visc = viscosity coefficient (m**2/s)       
   !    diff = diffusion coefficient (m**2/s)     
   !
-  subroutine ri_iwmix(viscA, diffK, tracers, mesh)
+  subroutine ri_iwmix(viscA, diffK, tracers, partit, mesh)
      IMPLICIT NONE
-     type(t_mesh),   intent(in), target :: mesh
-     type(t_tracer), intent(in), target :: tracers
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
+     type(t_tracer), intent(in),    target :: tracers
      integer                     :: node, nz, mr, nzmin, nzmax
      real(KIND=WP) , parameter   :: Riinfty = 0.8_WP                ! local Richardson Number limit for shear instability (LMD 1994 uses 0.7)
      real(KIND=WP)               :: ri_prev, tmp
      real(KIND=WP)               :: Rigg, ratio, frit
      real(KIND=WP)               :: dz_inv, shear, aux, dep, lat, Kv0_b
 
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D             ), intent(inout) :: viscA !for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D ,tracers%num_tracers), intent(inout) :: diffK !for T and S
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D             ),         intent(inout) :: viscA !for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D ,tracers%num_tracers), intent(inout) :: diffK !for T and S
 
 ! Put them under the namelist.oce
      logical                     :: smooth_richardson_number = .false.
      integer                     :: num_smoothings = 1              ! for vertical smoothing of Richardson number
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 ! Compute Richardson number and store it as diffK to save memory
      DO node=1, myDim_nod2D! +eDim_nod2D
@@ -776,7 +790,7 @@ contains
      END DO
 
     if (smooth_Ri_hor) then
-       call smooth_nod(diffK(:,:,1), 3, mesh)
+       call smooth_nod(diffK(:,:,1), 3, partit, mesh)
     end if
 
     !___________________________________________________________________________
@@ -844,11 +858,12 @@ contains
   !
   ! output: update diffu
   !
-  subroutine ddmix(diffK, tracers, mesh)
+  subroutine ddmix(diffK, tracers, partit, mesh)
 
      IMPLICIT NONE
-     type(t_mesh),   intent(in), target :: mesh
-     type(t_tracer), intent(in), target :: tracers
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
+     type(t_tracer), intent(in),    target :: tracers
      real(KIND=WP), parameter       :: Rrho0               = 1.9_WP          ! limit for double diffusive density ratio
      real(KIND=WP), parameter       :: dsfmax              = 1.e-4_WP        ! (m^2/s) max diffusivity in case of salt fingering
      real(KIND=WP), parameter       :: viscosity_molecular = 1.5e-6_WP       ! (m^2/s)
@@ -857,9 +872,12 @@ contains
      real(KIND=WP)                  :: alphaDT, betaDS
      real(KIND=WP)                  :: diffdd, Rrho, prandtl
 
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
      DO node=1, myDim_nod2D!+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -946,10 +964,11 @@ contains
   !      real blmc(3d,3) = boundary layer mixing coeff.(m**2/s)   
   !      real ghats(3d)  = nonlocal scalar transport              
   !
-  subroutine blmix_kpp(viscA,diffK, mesh)
+  subroutine blmix_kpp(viscA,diffK, partit, mesh)
 
      IMPLICIT NONE
-     type(t_mesh), intent(in) , target :: mesh
+     type(t_mesh),   intent(in),    target :: mesh
+     type(t_partit), intent(inout), target :: partit
      integer           :: node, nz, kn, elem, elnodes(3), knm1, knp1, nl1, nu1
      real(KIND=WP)     :: delhat, R, dvdzup, dvdzdn
      real(KIND=WP)     :: viscp, difsp, diftp, visch, difsh, difth, f1
@@ -959,10 +978,13 @@ contains
 
      real(KIND=WP)     :: dthick(mesh%nl), diff_col(mesh%nl,3), diff_colE(mesh%nl)
 
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
      blmc = 0.0_WP
 
@@ -1140,16 +1162,20 @@ contains
   ! output
   !      real blmc(n3,3) = enhanced boundary layer mixing coefficient
   !
-  subroutine enhance(viscA, diffK, mesh)
+  subroutine enhance(viscA, diffK, partit, mesh)
      IMPLICIT NONE
-     type(t_mesh), intent(in)                                                   , target :: mesh
-     real(KIND=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D),   intent(inout) :: viscA !for momentum (nodes)
-     real(kind=WP), dimension(mesh%nl, myDim_nod2D+eDim_nod2D,2), intent(inout) :: diffK !for T and S
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+     real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D),   intent(inout) :: viscA !for momentum (nodes)
+     real(kind=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D,2), intent(inout) :: diffK !for T and S
 
      integer           :: nz, node, k
      real(kind=WP)     :: delta, dkmp5, dstar
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
      DO node=1, myDim_nod2D !+eDim_nod2D
 

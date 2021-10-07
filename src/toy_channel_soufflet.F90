@@ -1,9 +1,9 @@
 MODULE Toy_Channel_Soufflet
-  use mod_mesh
-  use mod_tracer
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_TRACER
   USE o_ARRAYS
   USE o_PARAM
-  USE g_PARSUP
   USE g_config
   use g_comm_auto
 
@@ -43,12 +43,16 @@ MODULE Toy_Channel_Soufflet
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine relax_zonal_vel(mesh)
+subroutine relax_zonal_vel(partit, mesh)
   implicit none
   integer        :: elem,  nz, nn, nn1
   real(kind=WP)  :: a, yy, uzon 
   type(t_mesh),   intent(in),    target :: mesh
-#include  "associate_mesh.h"
+  type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
   DO elem=1, myDim_elem2D
      ! ========
@@ -72,18 +76,20 @@ subroutine relax_zonal_vel(mesh)
         UV_rhs(1,nz,elem) = UV_rhs(1,nz,elem)+dt*tau_inv*(Uclim(nz,elem)-Uzon)
      END DO
   END DO
-  call exchange_elem(UV_rhs)
-   
+  call exchange_elem(UV_rhs, partit)   
 end subroutine relax_zonal_vel
 !==========================================================================
-subroutine relax_zonal_temp(tdata, mesh)
+subroutine relax_zonal_temp(tdata, partit, mesh)
   implicit none
   integer                                    :: n, nz, nn, nn1
   real(kind=WP)                              :: yy, a, Tzon
   type(t_mesh),        intent(in),    target :: mesh
+  type(t_partit),      intent(inout), target :: partit
   type(t_tracer_data), intent(inout), target :: tdata
-
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
   do n=1, myDim_nod2D+eDim_nod2D
      yy=coord_nod2D(2,n)-lat0
@@ -105,14 +111,17 @@ subroutine relax_zonal_temp(tdata, mesh)
   end do
 end subroutine relax_zonal_temp
 !==========================================================================
-subroutine compute_zonal_mean_ini(mesh)
+subroutine compute_zonal_mean_ini(partit, mesh)
   implicit none 
   real(kind=8)                      :: ymean, Ly
   integer                           :: elem, nz, m, elnodes(3)
-  real(kind=8), allocatable         :: zvel1D(:), znum1D(:)
+  real(kind=8),   allocatable       :: zvel1D(:), znum1D(:)
   type(t_mesh),   intent(in),    target :: mesh
-
-#include  "associate_mesh.h"
+  type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
 Ly=ysize/r_earth       ! The meridional lenght in radians
 dy=Ly/real(nybins)
@@ -161,15 +170,17 @@ ztem=0.0
  ! no division by 0 is occurring 
 end subroutine compute_zonal_mean_ini
 !==========================================================================
-subroutine compute_zonal_mean(tracers, mesh)
+subroutine compute_zonal_mean(tracers, partit, mesh)
   implicit none 
   integer                            :: elem, nz, m, elnodes(3)
   real(kind=8), allocatable          :: zvel1D(:), znum1D(:)
-  type(t_mesh),   intent(in), target :: mesh
-  type(t_tracer), intent(in), target :: tracers
-
-#include  "associate_mesh.h"
-
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_tracer), intent(inout), target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
  ztem=0.
  zvel=0.
@@ -223,10 +234,11 @@ subroutine compute_zonal_mean(tracers, mesh)
 
 end subroutine compute_zonal_mean
 ! ====================================================================================
-subroutine initial_state_soufflet(tracers, mesh)
+subroutine initial_state_soufflet(tracers, partit, mesh)
  ! Profiles Soufflet 2016 (OM)
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   type(t_tracer), intent(inout), target :: tracers
 
   integer                            :: n, nz, elnodes(3)
@@ -234,7 +246,10 @@ subroutine initial_state_soufflet(tracers, mesh)
 ! real(kind=8)                       :: Ljet,rhomax,Sb, drho_No, drho_So
 ! real(kind=8)                       :: z_No, z_So,dz_No,dz_So, drhosurf_No, drhosurf_So, zsurf 
   real(kind=8)                       :: d_No(mesh%nl-1), d_So(mesh%nl-1), rho_No(mesh%nl-1), rho_So(mesh%nl-1)
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
 
   dy=ysize/nybins/r_earth
 
@@ -332,20 +347,26 @@ do n=1, myDim_nod2D+eDim_nod2D
         UV(1,nz,n)=UV(1,nz+1,n)+d_No(nz+1)*(zbar(nz+1)-Z(nz+1))+d_No(nz)*(Z(nz)-zbar(nz+1)) 
     END DO 
   END DO
-  call exchange_elem(UV)
+  call exchange_elem(UV, partit)
   
   allocate(Uclim(nl-1,myDim_elem2D+eDim_elem2D))
   Uclim=UV(1,:,:)    
   write(*,*) mype, 'Vel', maxval(UV(1,:,:)), minval(UV(1,:,:))
  END subroutine initial_state_soufflet
 ! ===============================================================================
-subroutine energy_out_soufflet(mesh)
+subroutine energy_out_soufflet(partit, mesh)
   implicit none 
   real(kind=8)                      :: tke(2), aux(2), ww, wwaux 
   integer                           :: elem, nz, m, elnodes(3), nybins
-  real(kind=8), allocatable         :: zvel1D(:), znum1D(:)
-  type(t_mesh), intent(in) , target :: mesh
-#include  "associate_mesh.h"
+  real(kind=8),   allocatable       :: zvel1D(:), znum1D(:)
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+
 
  nybins=100
  zvel=0.

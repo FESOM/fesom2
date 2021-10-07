@@ -1,26 +1,28 @@
 module oce_adv_tra_fct_interfaces
   interface
-    subroutine oce_adv_tra_fct_init(twork, mesh)
+    subroutine oce_adv_tra_fct_init(twork, partit, mesh)
       use MOD_MESH
       use MOD_TRACER
-      use g_PARSUP
-      type(t_mesh), intent(in), target           :: mesh
-      type(t_tracer_work), intent(inout), target :: twork
+      use MOD_PARTIT
+      type(t_mesh),  intent(in),    target        :: mesh
+      type(t_partit),intent(inout), target        :: partit
+      type(t_tracer_work), intent(inout), target  :: twork
     end subroutine
 
-    subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, mesh)
+    subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
       use MOD_MESH
-      use g_PARSUP
-      real(kind=WP), intent(in), target :: dt
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(in)         :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
-      real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, myDim_edge2D)
-      real(kind=WP), intent(inout)      :: adf_v(mesh%nl,  myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, myDim_edge2D)
-      real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  myDim_nod2D)
+      use MOD_PARTIT
+      real(kind=WP), intent(in),    target :: dt
+      type(t_partit),intent(inout), target :: partit
+      type(t_mesh),  intent(in),    target :: mesh
+      real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
+      real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
+      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_edge2D)
+      real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
     end subroutine
  end interface
@@ -28,20 +30,24 @@ end module
 !
 !
 !===============================================================================
-subroutine oce_adv_tra_fct_init(twork, mesh)
+subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
-    use g_PARSUP
+    use MOD_PARTIT
     implicit none
     integer                                    :: my_size
     type(t_mesh),        intent(in) ,   target :: mesh
+   type(t_partit),       intent(inout), target :: partit
     type(t_tracer_work), intent(inout), target :: twork
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(twork%fct_LO(nl-1, my_size))        ! Low-order solution 
-    allocate(twork%adv_flux_hor(nl-1,myDim_edge2D)) ! antidiffusive hor. contributions / from edges
-    allocate(twork%adv_flux_ver(nl, myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
+    allocate(twork%adv_flux_hor(nl-1,partit%myDim_edge2D)) ! antidiffusive hor. contributions / from edges
+    allocate(twork%adv_flux_ver(nl, partit%myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
 
     allocate(twork%fct_ttf_max(nl-1, my_size),twork%fct_ttf_min(nl-1, my_size))
     allocate(twork%fct_plus(nl-1, my_size),   twork%fct_minus(nl-1, my_size))
@@ -60,7 +66,7 @@ end subroutine oce_adv_tra_fct_init
 !
 !
 !===============================================================================
-subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, mesh)
+subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
     !
     ! 3D Flux Corrected Transport scheme
     ! Limits antidiffusive fluxes==the difference in flux HO-LO
@@ -69,27 +75,31 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! Adds limited fluxes to the LO solution   
     use MOD_MESH
     use MOD_TRACER
-    use g_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
-    real(kind=WP), intent(in), target :: dt
-    type(t_mesh),  intent(in), target :: mesh
-    real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(in)         :: lo (mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, myDim_edge2D)
-    real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   myDim_nod2D)
-    real(kind=WP), intent(inout)      :: fct_plus (mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array, let us use twork%edge_up_dn_grad(1:4, 1:NL-2, 1:myDim_edge2D) to save space
+    real(kind=WP), intent(in),    target :: dt
+    type(t_mesh),  intent(in),    target :: mesh
+    type(t_partit),intent(inout), target :: partit
+    real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
+    real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_plus (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array, let us use twork%edge_up_dn_grad(1:4, 1:NL-2, 1:partit%myDim_edge2D) to save space
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
     real(kind=WP)                     :: flux, ae,tvert_max(mesh%nl-1),tvert_min(mesh%nl-1) 
     real(kind=WP)                     :: flux_eps=1e-16
     real(kind=WP)                     :: bignumber=1e3
     integer                           :: vlimit=1
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
@@ -282,7 +292,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     end do 
     
     ! fct_minus and fct_plus must be known to neighbouring PE
-    call exchange_nod(fct_plus, fct_minus)
+    call exchange_nod(fct_plus, fct_minus, partit)
     
     !___________________________________________________________________________
     ! b3. Limiting   
@@ -318,7 +328,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! the bottom flux is always zero 
     end do
 
-    call exchange_nod_end  ! fct_plus, fct_minus
+    call exchange_nod_end(partit)  ! fct_plus, fct_minus
     
     !Horizontal
     do edge=1, myDim_edge2D
