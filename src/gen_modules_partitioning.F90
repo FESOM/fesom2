@@ -77,7 +77,6 @@ end subroutine par_init
 !=================================================================
 subroutine par_ex(partit, abort)       ! finalizes MPI
 USE MOD_PARTIT
-USE MOD_PARSUP
 #ifndef __oifs
 !For standalone and coupled ECHAM runs
 #if defined (__oasis)
