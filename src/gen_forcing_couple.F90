@@ -3,6 +3,7 @@ module force_flux_consv_interface
     subroutine force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       real(kind=WP), intent (inout) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
@@ -17,6 +18,7 @@ module compute_residual_interface
     subroutine compute_residual(field2d, mask, n, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       real(kind=WP),  intent (in) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
@@ -30,6 +32,7 @@ module integrate_2D_interface
     subroutine integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
@@ -45,6 +48,7 @@ module update_atm_forcing_interface
     subroutine update_atm_forcing(istep, tracers, partit,mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       integer,        intent(in)            :: istep
       type(t_tracer), intent(in),    target :: tracers
@@ -58,6 +62,7 @@ module net_rec_from_atm_interface
   interface
     subroutine net_rec_from_atm(action, partit)
       USE MOD_PARTIT
+      USE MOD_PARSUP
       logical,        intent(in)             :: action
       type(t_partit), intent(inout), target  :: partit
     end subroutine
@@ -69,6 +74,7 @@ subroutine update_atm_forcing(istep, tracers, partit, mesh)
   use o_PARAM
   use MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use MOD_TRACER
   use o_arrays
   use i_arrays
@@ -394,6 +400,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
 				flux_correction_total
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
   use o_PARAM,           only : mstep, WP
   use compute_residual_interface
@@ -515,6 +522,7 @@ SUBROUTINE compute_residual(field2d, mask, n, partit, mesh)
   use o_PARAM, only : WP 
   use MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use integrate_2D_interface
  
   IMPLICIT NONE
@@ -550,6 +558,7 @@ END SUBROUTINE compute_residual
 SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
   use MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_PARAM, only: WP 
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
@@ -615,6 +624,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   use cpl_driver
   use o_PARAM, only: WP
   USE MOD_PARTIT
+  USE MOD_PARSUP
   IMPLICIT NONE
 
   LOGICAL,        INTENT (IN)   		  :: action

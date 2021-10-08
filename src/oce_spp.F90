@@ -12,6 +12,7 @@ subroutine cal_rejected_salt(partit, mesh)
 use o_arrays
 use mod_mesh
 USE MOD_PARTIT
+USE MOD_PARSUP
 use g_comm_auto
 use o_tracers
 use g_forcing_arrays, only: thdgr
@@ -49,6 +50,7 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   use o_arrays
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_tracers
   use g_comm_auto
   implicit none

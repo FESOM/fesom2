@@ -3,8 +3,7 @@ module oce_adv_tra_fct_interfaces
     subroutine oce_adv_tra_fct_init(twork, partit, mesh)
       use MOD_MESH
       use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_mesh),  intent(in),    target        :: mesh
       type(t_partit),intent(inout), target        :: partit
       type(t_tracer_work), intent(inout), target  :: twork
@@ -12,8 +11,7 @@ module oce_adv_tra_fct_interfaces
 
     subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       real(kind=WP), intent(in),    target :: dt
       type(t_partit),intent(inout), target :: partit
       type(t_mesh),  intent(in),    target :: mesh
@@ -35,8 +33,7 @@ end module
 subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     implicit none
     integer                                    :: my_size
     type(t_mesh),        intent(in) ,   target :: mesh
@@ -78,8 +75,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! Adds limited fluxes to the LO solution   
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt

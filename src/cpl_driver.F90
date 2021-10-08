@@ -166,6 +166,7 @@ contains
 #endif
     use mod_mesh
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
@@ -510,6 +511,7 @@ contains
   subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
     USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -580,6 +582,7 @@ contains
     use o_param
     use g_comm_auto
     USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------

@@ -25,6 +25,7 @@ MODULE mo_tidal
       USE o_ARRAYS, only : ssh_gp
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE g_config, only : dt
       USE g_clock
       IMPLICIT NONE

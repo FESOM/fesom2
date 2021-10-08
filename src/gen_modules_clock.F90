@@ -67,6 +67,7 @@ contains
   !
   subroutine clock_init(partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_config
     implicit none
     type(t_partit), intent(in), target    :: partit

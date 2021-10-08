@@ -24,6 +24,7 @@ module g_cvmix_kpp
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use mod_tracer
     use o_arrays
     use g_comm_auto 

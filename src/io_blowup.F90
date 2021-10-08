@@ -4,6 +4,7 @@ MODULE io_BLOWUP
 	use g_comm_auto
         USE MOD_MESH
         USE MOD_PARTIT
+        USE MOD_PARSUP
         USE MOD_TRACER        
 	use o_arrays
 	use i_arrays

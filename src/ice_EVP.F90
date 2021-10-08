@@ -3,6 +3,7 @@ module ice_EVP_interfaces
     subroutine stress_tensor(ice_strength, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       real(kind=WP),  intent(in)            :: ice_strength(partit%mydim_elem2D)
@@ -11,6 +12,7 @@ module ice_EVP_interfaces
     subroutine stress2rhs(inv_areamass, ice_strength, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       REAL(kind=WP),  intent(in)            :: inv_areamass(partit%myDim_nod2D), ice_strength(partit%mydim_elem2D)
@@ -32,6 +34,7 @@ use i_arrays
 USE g_CONFIG
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 
 #if defined (__icepack)
 use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
@@ -146,6 +149,7 @@ use i_arrays
 USE g_CONFIG
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -253,6 +257,7 @@ USE i_arrays
 use g_config, only: use_cavity
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 
 IMPLICIT NONE
 type(t_mesh),   intent(in),    target :: mesh
@@ -335,6 +340,7 @@ USE i_THERM_PARAM
 USE i_arrays
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 
 IMPLICIT NONE
 type(t_mesh),   intent(in),    target :: mesh
@@ -413,6 +419,7 @@ USE g_comm_auto
 use ice_EVP_interfaces
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 
 #if defined (__icepack)
   use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength

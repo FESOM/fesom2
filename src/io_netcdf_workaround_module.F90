@@ -8,6 +8,7 @@ contains
 
   integer function next_io_rank(communicator, async_netcdf_allowed, partit) result(result)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use mpi_topology_module
     integer, intent(in)                :: communicator
     logical, intent(out)               :: async_netcdf_allowed

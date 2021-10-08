@@ -3,6 +3,7 @@ module densityJM_components_interface
     subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       real(kind=WP),  intent(IN)             :: t,s
@@ -16,6 +17,7 @@ module density_linear_interface
     subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
       real(kind=WP),  intent(IN)             :: t,s
@@ -29,6 +31,7 @@ module pressure_force_4_linfs_fullcell_interface
     subroutine pressure_force_4_linfs_fullcell(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -39,6 +42,7 @@ module pressure_force_4_linfs_nemo_interface
     subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -51,6 +55,7 @@ module pressure_force_4_linfs_shchepetkin_interface
     subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -61,6 +66,7 @@ module pressure_force_4_linfs_easypgf_interface
     subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_tracer), intent(in),     target :: tracers
       type(t_partit), intent(inout),  target :: partit
@@ -73,6 +79,7 @@ module pressure_force_4_linfs_cubicspline_interface
     subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -83,6 +90,7 @@ module pressure_force_4_linfs_cavity_interface
     subroutine pressure_force_4_linfs_cavity(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -93,6 +101,7 @@ module pressure_force_4_zxxxx_shchepetkin_interface
     subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -103,6 +112,7 @@ module pressure_force_4_zxxxx_easypgf_interface
     subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -115,6 +125,7 @@ module pressure_force_4_zxxxx_cubicspline_interface
     subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -125,6 +136,7 @@ module init_ref_density_interface
     subroutine init_ref_density(partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
     end subroutine
@@ -135,6 +147,7 @@ module insitu2pot_interface
     subroutine insitu2pot(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -147,6 +160,7 @@ module pressure_bv_interface
     subroutine pressure_bv(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -159,6 +173,7 @@ module pressure_force_4_linfs_interface
     subroutine pressure_force_4_linfs(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -171,6 +186,7 @@ module pressure_force_4_zxxxx_interface
     subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       USE MOD_TRACER
       type(t_mesh),   intent(in) ,    target :: mesh
       type(t_partit), intent(inout),  target :: partit
@@ -190,6 +206,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     use i_arrays
     USE o_mixing_KPP_mod, only: dbsfc
@@ -459,6 +476,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
     use g_config
     use mod_mesh
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use mod_tracer
     use pressure_force_4_linfs_fullcell_interface
     use pressure_force_4_linfs_nemo_interface
@@ -526,6 +544,7 @@ subroutine pressure_force_4_linfs_fullcell(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     implicit none
@@ -575,6 +594,7 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -751,6 +771,7 @@ subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     implicit none
@@ -1005,6 +1026,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -1367,6 +1389,7 @@ subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     implicit none
@@ -1569,6 +1592,7 @@ subroutine pressure_force_4_linfs_cavity(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     implicit none
@@ -1781,6 +1805,7 @@ end subroutine pressure_force_4_linfs_cavity
 subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     use mod_mesh
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use mod_tracer
     use g_config
     use pressure_force_4_zxxxx_shchepetkin_interface
@@ -1821,6 +1846,7 @@ subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     implicit none
@@ -2005,6 +2031,7 @@ subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config
     use densityJM_components_interface
@@ -2246,6 +2273,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -2687,7 +2715,8 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !===============================================================================
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
 USE MOD_MESH
-USE MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT
+USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use densityJM_components_interface
@@ -2725,7 +2754,8 @@ end subroutine densityJM_local
 !===============================================================================
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
 USE MOD_MESH
-USE MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT
+USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
@@ -2903,6 +2933,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   !-----------------------------------------------------------------
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_arrays
   use o_param
   use g_comm_auto
@@ -2986,6 +3017,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   !-------------------------------------------------------------------
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_param
   use o_arrays
   use g_comm_auto
@@ -3057,6 +3089,7 @@ end subroutine compute_sigma_xy
 subroutine compute_neutral_slope(partit, mesh)
     use o_ARRAYS
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use MOD_MESH
     use o_param
     use g_config
@@ -3109,6 +3142,7 @@ end subroutine compute_neutral_slope
 subroutine insitu2pot(tracers, partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use mod_tracer
   use o_param
   use o_arrays
@@ -3155,7 +3189,8 @@ end subroutine insitu2pot
 SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
 !coded by Margarita Smolentseva, 21.05.2020
 USE MOD_MESH
-USE MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT
+USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use g_config !, only: which_toy, toy_ocean
@@ -3194,6 +3229,7 @@ subroutine init_ref_density(partit, mesh)
     !___________________________________________________________________________
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface

@@ -3,6 +3,7 @@ module oce_ale_interfaces
     subroutine init_bottom_elem_thickness(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -10,6 +11,7 @@ module oce_ale_interfaces
     subroutine init_bottom_node_thickness(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -17,6 +19,7 @@ module oce_ale_interfaces
     subroutine init_surface_elem_depth(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -24,6 +27,7 @@ module oce_ale_interfaces
     subroutine init_surface_node_depth(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -31,6 +35,7 @@ module oce_ale_interfaces
     subroutine impl_vert_visc_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -38,6 +43,7 @@ module oce_ale_interfaces
     subroutine update_stiff_mat_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -45,6 +51,7 @@ module oce_ale_interfaces
     subroutine compute_ssh_rhs_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -52,6 +59,7 @@ module oce_ale_interfaces
     subroutine solve_ssh_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -59,6 +67,7 @@ module oce_ale_interfaces
     subroutine compute_hbar_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -66,6 +75,7 @@ module oce_ale_interfaces
     subroutine vert_vel_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -73,6 +83,7 @@ module oce_ale_interfaces
     subroutine update_thickness_ale(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -84,6 +95,7 @@ module oce_timestep_ale_interface
     subroutine oce_timestep_ale(n, tracers, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       integer,        intent(in)                         :: n
       type(t_mesh),   intent(in),    target :: mesh
@@ -118,6 +130,7 @@ subroutine init_ale(partit, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE g_config, only: which_ale, use_cavity, use_partial_cell
     USE g_forcing_param, only: use_virt_salt
@@ -256,6 +269,7 @@ subroutine init_bottom_elem_thickness(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell, partial_cell_thresh
     use g_comm_auto
@@ -378,6 +392,7 @@ subroutine init_bottom_node_thickness(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_partial_cell
     use g_comm_auto
@@ -488,6 +503,7 @@ subroutine init_surface_elem_depth(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh
     use g_comm_auto
@@ -565,6 +581,7 @@ subroutine init_surface_node_depth(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only:  use_cavity, use_cavity_partial_cell
     use g_comm_auto
@@ -630,6 +647,7 @@ subroutine init_thickness_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     implicit none
     integer :: n, nz, elem, elnodes(3), nzmin, nzmax
@@ -878,6 +896,7 @@ subroutine update_thickness_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
@@ -1079,6 +1098,7 @@ subroutine restart_thickness_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
@@ -1184,6 +1204,7 @@ subroutine init_stiff_mat_ale(partit, mesh)
     use o_PARAM
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_CONFIG
     implicit none
     
@@ -1472,6 +1493,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_ARRAYS
     !
     implicit none
@@ -1583,6 +1605,7 @@ subroutine compute_ssh_rhs_ale(partit, mesh)
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_comm_auto
     implicit none
     
@@ -1695,6 +1718,7 @@ subroutine compute_hbar_ale(partit, mesh)
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_comm_auto
     
     implicit none
@@ -1806,6 +1830,7 @@ subroutine vert_vel_ale(partit, mesh)
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_comm_auto
     use io_RESTART !!PS
     use i_arrays !!PS
@@ -2326,6 +2351,7 @@ use o_PARAM
 use MOD_MESH
 use o_ARRAYS
 USE MOD_PARTIT
+USE MOD_PARSUP
 use g_comm_auto
 use g_config, only: which_ale
     !
@@ -2474,6 +2500,7 @@ USE MOD_MESH
 USE o_PARAM
 USE o_ARRAYS
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE g_CONFIG,only: dt
 IMPLICIT NONE
 
@@ -2654,6 +2681,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     use o_ARRAYS
     use o_PARAM
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_comm_auto
     use io_RESTART !PS
     use i_ARRAYS !PS

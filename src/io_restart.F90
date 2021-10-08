@@ -4,6 +4,7 @@ MODULE io_RESTART
   use g_comm_auto
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use mod_tracer
   use o_arrays
   use i_arrays

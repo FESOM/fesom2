@@ -17,6 +17,7 @@ subroutine oce_mixing_pp(partit, mesh)
     !      
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
 USE g_config

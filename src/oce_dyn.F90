@@ -16,6 +16,7 @@ module h_viscosity_leith_interface
     subroutine h_viscosity_leith(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -26,6 +27,7 @@ module visc_filt_harmon_interface
     subroutine visc_filt_harmon(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -36,6 +38,7 @@ module visc_filt_hbhmix_interface
     subroutine visc_filt_hbhmix(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -46,6 +49,7 @@ module visc_filt_biharm_interface
     subroutine visc_filt_biharm(option, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       integer       :: option
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -57,6 +61,7 @@ module visc_filt_bcksct_interface
     subroutine visc_filt_bcksct(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -67,6 +72,7 @@ module visc_filt_bilapl_interface
     subroutine visc_filt_bilapl(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -77,6 +83,7 @@ module visc_filt_bidiff_interface
     subroutine visc_filt_bidiff(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -87,6 +94,7 @@ module visc_filt_dbcksc_interface
     subroutine visc_filt_dbcksc(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -97,6 +105,7 @@ module backscatter_coef_interface
     subroutine backscatter_coef(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -107,6 +116,7 @@ module uke_update_interface
     subroutine uke_update(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
+      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -121,6 +131,7 @@ end module
 SUBROUTINE update_vel(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -157,6 +168,7 @@ end subroutine update_vel
 subroutine compute_vel_nodes(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_PARAM
     USE o_ARRAYS
     use g_comm_auto
@@ -200,6 +212,7 @@ subroutine viscosity_filter(option, partit, mesh)
 use o_PARAM
 use MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 use h_viscosity_leith_interface
 use visc_filt_harmon_interface
 use visc_filt_hbhmix_interface
@@ -266,6 +279,7 @@ end subroutine viscosity_filter
 SUBROUTINE visc_filt_harmon(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
 USE g_CONFIG
@@ -309,6 +323,7 @@ end subroutine visc_filt_harmon
 SUBROUTINE visc_filt_biharm(option, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -414,6 +429,7 @@ end subroutine visc_filt_biharm
 SUBROUTINE visc_filt_hbhmix(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -505,6 +521,7 @@ SUBROUTINE h_viscosity_leith(partit, mesh)
     ! Coefficient of horizontal viscosity is a combination of the Leith (with Leith_c) and modified Leith (with Div_c)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -608,6 +625,7 @@ END subroutine h_viscosity_leith
 SUBROUTINE visc_filt_bcksct(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -707,6 +725,7 @@ end subroutine visc_filt_bcksct
 SUBROUTINE visc_filt_bilapl(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -788,6 +807,7 @@ end subroutine visc_filt_bilapl
 SUBROUTINE visc_filt_bidiff(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -863,6 +883,7 @@ end subroutine visc_filt_bidiff
 SUBROUTINE visc_filt_dbcksc(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
 USE g_CONFIG
@@ -1019,6 +1040,7 @@ end subroutine visc_filt_dbcksc
 SUBROUTINE backscatter_coef(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
 USE g_CONFIG
@@ -1054,6 +1076,7 @@ end subroutine backscatter_coef
 SUBROUTINE uke_update(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
 USE g_CONFIG

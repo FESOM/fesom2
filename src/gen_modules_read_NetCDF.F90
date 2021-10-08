@@ -17,6 +17,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, part
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
 #include "netcdf.inc" 
@@ -52,7 +53,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, part
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit)
      stop
   endif
 
@@ -166,6 +167,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
     implicit none
 #include "netcdf.inc" 
@@ -200,7 +202,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit)
      stop
   endif
 
@@ -287,6 +289,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_rotate_grid
   implicit none
 
@@ -316,7 +319,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit)
      stop
   endif
 

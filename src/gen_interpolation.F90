@@ -30,12 +30,13 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i, ii, jj, k, nod_find
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer,        intent(in)   	:: num_lon_reg, num_lat_reg, num_mod
-  type(t_partit), intent(in)    :: partit
+  type(t_partit), intent(inout) :: partit
   real(kind=WP) 			:: x, y, diff, d, dmin
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
   real(kind=WP)                  :: data(2,2)
@@ -164,13 +165,14 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
   integer, intent(in)         	:: num_lon_reg, num_lat_reg, num_mod
   integer, intent(in)          	:: phase_flag
-  type(t_partit), intent(in)    :: partit
+  type(t_partit), intent(inout) :: partit
   real(kind=WP) 			:: x, y, diff
   real(kind=WP)			:: rt_lat1, rt_lat2, rt_lon1, rt_lon2
   real(kind=WP)                 :: data_ll, data_lh, data_hl, data_hh
@@ -183,7 +185,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   if(lon_reg(1)<0.0_WP .or. lon_reg(num_lon_reg)>360._WP) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex
+     call par_ex(partit)
      stop
   end if
 
@@ -314,6 +316,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   !-------------------------------------------------------------------------------------
   use MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz
@@ -332,8 +335,8 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   real(kind=WP), intent(in)	:: data_reg(num_lon_reg, num_lat_reg, num_lay_reg)
   real(kind=WP), intent(in)	:: lon_mod(num_mod), lat_mod(num_mod), lay_mod(num_mod)
   real(kind=WP), intent(out)  	:: data_mod(num_mod_z,num_mod)
-  type(t_mesh),   intent(in), target :: mesh  
-  type(t_partit), intent(in), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh  
+  type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"

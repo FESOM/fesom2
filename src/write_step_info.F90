@@ -3,6 +3,7 @@ module write_step_info_interface
     subroutine write_step_info(istep,outfreq,tracers,partit,mesh)
       use MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use MOD_TRACER
       integer				    :: istep,outfreq
       type(t_mesh),   intent(in),    target :: mesh
@@ -16,6 +17,7 @@ module check_blowup_interface
     subroutine check_blowup(istep, tracers,partit,mesh)
       use MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use MOD_TRACER
       integer				    :: istep
       type(t_mesh),   intent(in),    target :: mesh
@@ -31,6 +33,7 @@ subroutine write_step_info(istep, outfreq, tracers, partit, mesh)
 	use g_config, only: dt, use_ice
 	use MOD_MESH
         USE MOD_PARTIT
+        USE MOD_PARSUP
         use MOD_TRACER
 	use o_PARAM
 	use o_ARRAYS
@@ -244,6 +247,7 @@ subroutine check_blowup(istep, tracers, partit, mesh)
 	use MOD_MESH
         use MOD_TRACER
         USE MOD_PARTIT
+        USE MOD_PARSUP
 	use o_PARAM
 	use o_ARRAYS
 	use i_ARRAYS

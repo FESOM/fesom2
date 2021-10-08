@@ -8,6 +8,7 @@
 subroutine fer_solve_Gamma(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_PARAM
     USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K
     USE g_CONFIG
@@ -129,6 +130,7 @@ END subroutine fer_solve_Gamma
 subroutine fer_gamma2vel(partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_gamma, fer_uv
     USE g_CONFIG
@@ -169,6 +171,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE o_PARAM
     USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, coriolis_node
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE

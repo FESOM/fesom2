@@ -35,6 +35,7 @@ MODULE g_sbf
    !!
    USE MOD_MESH
    USE MOD_PARTIT
+   USE MOD_PARSUP
    USE o_ARRAYS
    USE o_PARAM
    USE g_comm_auto

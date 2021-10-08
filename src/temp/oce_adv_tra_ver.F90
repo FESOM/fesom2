@@ -4,8 +4,7 @@ module oce_adv_tra_ver_interfaces
 ! updates the input tracer ttf
     subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
       use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       real(kind=WP), intent(in), target  :: dt
       type(t_partit),intent(in), target  :: partit
       type(t_mesh),  intent(in), target  :: mesh
@@ -20,8 +19,7 @@ module oce_adv_tra_ver_interfaces
 ! flux is not multiplied with dt
     subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(in)  :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
@@ -37,8 +35,7 @@ module oce_adv_tra_ver_interfaces
 ! flux is not multiplied with dt
     subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
@@ -55,8 +52,7 @@ module oce_adv_tra_ver_interfaces
 ! flux is not multiplied with dt
    subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       real(kind=WP), intent(in), target :: dt
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
@@ -74,8 +70,7 @@ module oce_adv_tra_ver_interfaces
 ! flux is not multiplied with dt
     subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
       integer                           :: n, nz, nl1
@@ -91,8 +86,7 @@ end module
 subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
 
     implicit none
@@ -240,8 +234,7 @@ end subroutine adv_tra_vert_impl
 subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
 
     implicit none
@@ -299,8 +292,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, init_zero)
     use MOD_MESH
     use o_ARRAYS
     use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -375,8 +367,7 @@ end subroutine adv_tra_ver_qr4c
 subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     real(kind=WP), intent(in),  target :: dt
@@ -559,8 +550,7 @@ end subroutine adv_tra_vert_ppm
 subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit

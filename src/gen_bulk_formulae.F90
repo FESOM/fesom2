@@ -1,7 +1,8 @@
 MODULE gen_bulk
     ! Compute heat and momentum exchange coefficients
     use mod_mesh
-    USE MOD_PARTIT    
+    USE MOD_PARTIT
+    USE MOD_PARSUP    
     use i_therm_param
     use i_arrays
     use g_forcing_arrays

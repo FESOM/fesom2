@@ -1,37 +1,32 @@
-module mod_parsup
+module par_support_interfaces
   interface
+  subroutine par_init(partit)
+     USE o_PARAM
+     USE MOD_PARTIT
+     implicit none
+     type(t_partit), intent(inout), target :: partit
+  end subroutine
+
   subroutine par_ex(partit, abort)
      USE MOD_PARTIT
      implicit none
      type(t_partit), intent(inout), target :: partit
      integer,optional                      :: abort
   end subroutine
-  end interface
-end module mod_parsup
 
-module par_support_interfaces
-  interface
-  subroutine par_init(partit)
-     USE o_PARAM
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit
-  end subroutine
-
-  subroutine init_mpi_types(partit, mesh)
+  subroutine set_par_support(partit, mesh)
      use MOD_MESH
-     USE MOD_PARTIT
-     USE MOD_PARSUP
+     use MOD_PARTIT
      implicit none
      type(t_partit), intent(in), target :: partit
      type(t_mesh),   intent(in), target :: mesh
   end subroutine
 
-  subroutine init_gatherLists(partit)
+  subroutine init_gatherLists(partit, mesh)
+     USE MOD_MESH
      USE MOD_PARTIT
-     USE MOD_PARSUP
      implicit none
+     type(t_mesh),   intent(in), target    :: mesh
      type(t_partit), intent(inout), target :: partit    
   end subroutine
   end interface
@@ -40,7 +35,6 @@ end module
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
   USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   type(t_partit), intent(inout), target :: partit
   integer                               :: i
@@ -77,7 +71,6 @@ end subroutine par_init
 !=================================================================
 subroutine par_ex(partit, abort)       ! finalizes MPI
 USE MOD_PARTIT
-USE MOD_PARSUP
 #ifndef __oifs
 !For standalone and coupled ECHAM runs
 #if defined (__oasis)
@@ -124,10 +117,9 @@ USE MOD_PARSUP
 
 end subroutine par_ex
 !=======================================================================
-subroutine init_mpi_types(partit, mesh)
+subroutine set_par_support(partit, mesh)
   use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
+  use MOD_PARTIT
   implicit none
 
   type(t_partit), intent(inout), target :: partit
@@ -446,18 +438,27 @@ subroutine init_mpi_types(partit, mesh)
 
       deallocate(blocklen,     displace)
       deallocate(blocklen_tmp, displace_tmp)
+
    endif
-end subroutine init_mpi_types
+
+   call init_gatherLists(partit, mesh)
+   if(mype==0) write(*,*) 'Communication arrays are set' 
+end subroutine set_par_support
+
+
 !===================================================================
-subroutine init_gatherLists(partit)
+subroutine init_gatherLists(partit, mesh)
+  USE MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
+  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
   integer                               :: n, estart, nstart
 #include "associate_part_def.h"
+#include "associate_mesh_def.h"
 #include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   if (mype==0) then
 
      if (npes > 1) then
@@ -505,19 +506,3 @@ subroutine init_gatherLists(partit)
 
   endif
 end subroutine init_gatherLists
-!===================================================================
-subroutine status_check(partit)
-use g_config
-USE MOD_PARTIT
-USE MOD_PARSUP
-implicit none
-type(t_partit), intent(inout), target :: partit
-integer                               :: res
-res=0
-call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
-if (res /= 0 ) then
-    if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
-    call par_ex(partit, 1)
-endif
-end subroutine status_check
-

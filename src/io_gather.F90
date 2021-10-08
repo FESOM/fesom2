@@ -1,5 +1,6 @@
 module io_gather_module
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
   public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
   private
@@ -17,6 +18,7 @@ contains
 
   subroutine init_io_gather(partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     type(t_partit), intent(inout), target  :: partit
     integer err
@@ -61,6 +63,7 @@ contains
 
   subroutine init_elem2D_lists(partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     type(t_partit), intent(inout), target  :: partit
 #include "associate_part_def.h"
@@ -97,6 +100,7 @@ contains
   ! thread-safe procedure
   subroutine gather_nod2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -124,6 +128,7 @@ contains
   ! thread-safe procedure
   subroutine gather_real4_nod2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -151,6 +156,7 @@ contains
   ! thread-safe procedure
   subroutine gather_elem2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real64
     implicit none
     type(t_partit), intent(inout), target  :: partit
@@ -178,6 +184,7 @@ contains
   ! thread-safe procedure
   subroutine gather_real4_elem2D(arr2D, arr2D_global, root_rank, tag, io_comm, partit)
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use, intrinsic :: iso_fortran_env, only: real32
     implicit none
     type(t_partit), intent(inout), target  :: partit

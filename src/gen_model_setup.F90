@@ -1,6 +1,7 @@
 ! ==============================================================
 subroutine setup_model(partit)
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use o_param
   use i_param
   use i_therm_param
@@ -116,6 +117,7 @@ subroutine get_run_steps(nsteps, partit)
   !--------------------------------------------------------------  
   use g_clock
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
   type(t_partit), intent(in)    :: partit

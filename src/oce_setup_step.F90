@@ -3,6 +3,7 @@ module oce_initial_state_interface
     subroutine oce_initial_state(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       type(t_mesh),   intent(in)  ,  target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -15,6 +16,7 @@ module tracer_init_interface
     subroutine tracer_init(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -27,6 +29,7 @@ module ocean_setup_interface
     subroutine ocean_setup(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -39,6 +42,7 @@ module before_oce_step_interface
     subroutine before_oce_step(tracers, partit, mesh)
       USE MOD_MESH
       USE MOD_PARTIT
+      USE MOD_PARSUP
       use mod_tracer
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -53,6 +57,7 @@ end module
 subroutine ocean_setup(tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE MOD_TRACER
 USE o_PARAM
 USE o_ARRAYS
@@ -216,6 +221,7 @@ end subroutine ocean_setup
 SUBROUTINE tracer_init(tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE MOD_TRACER
 USE DIAGNOSTICS, only: ldiag_DVD
 USE g_ic3d
@@ -313,6 +319,7 @@ END SUBROUTINE tracer_init
 SUBROUTINE arrays_init(num_tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
 use g_comm_auto
@@ -569,6 +576,7 @@ END SUBROUTINE arrays_init
 SUBROUTINE oce_initial_state(tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
+USE MOD_PARSUP
 USE MOD_TRACER
 USE o_ARRAYS
 USE g_config
@@ -733,6 +741,7 @@ end subroutine oce_initial_state
 SUBROUTINE before_oce_step(tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE MOD_TRACER
     USE o_ARRAYS
     USE g_config

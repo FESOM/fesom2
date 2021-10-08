@@ -92,6 +92,7 @@ end subroutine step_event
 !
 subroutine handle_err(errcode, partit)
   USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
   
 #include "netcdf.inc" 

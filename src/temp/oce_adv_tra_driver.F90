@@ -3,8 +3,7 @@ module oce_adv_tra_driver_interfaces
    subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
       use MOD_MESH
       use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in)            :: tr_num
       type(t_partit), intent(inout), target :: partit
@@ -23,8 +22,7 @@ module oce_tra_adv_flux2dtracer_interface
     subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
       !update the solution for vertical and horizontal flux contributions
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       real(kind=WP), intent(in),    target :: dt
       type(t_partit),intent(inout), target :: partit
       type(t_mesh),  intent(in),    target :: mesh
@@ -44,8 +42,7 @@ end module
 subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
@@ -54,8 +51,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
-    type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
     type(t_tracer), intent(inout), target :: tracers
     real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
     real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
@@ -211,8 +208,7 @@ end subroutine do_oce_adv_tra
 subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
     use MOD_MESH
     use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt

@@ -11,8 +11,7 @@ module oce_adv_tra_hor_interfaces
     subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
       use MOD_MESH
       use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh
       real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
@@ -29,8 +28,7 @@ module oce_adv_tra_hor_interfaces
 ! flux is not multiplied with dt
     subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh    
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
@@ -45,8 +43,7 @@ module oce_adv_tra_hor_interfaces
 ! it runs with FCT option only
     subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
       use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
+      use MOD_PARTIT
       type(t_partit),intent(in), target :: partit
       type(t_mesh),  intent(in), target :: mesh    
       real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
@@ -63,8 +60,7 @@ end module
 !===============================================================================
 subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, init_zero)
     use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit
@@ -221,8 +217,7 @@ end subroutine adv_tra_hor_upw1
 subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, init_zero)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit
@@ -494,8 +489,7 @@ end subroutine adv_tra_hor_muscl
     subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 init_zero)
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
     use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit

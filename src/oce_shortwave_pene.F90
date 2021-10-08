@@ -6,6 +6,7 @@ subroutine cal_shortwave_rad(partit, mesh)
   ! Ref.: Morel and Antoine 1994, Sweeney et al. 2005
   USE MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   USE o_PARAM
   USE o_ARRAYS
   USE g_CONFIG

@@ -3,6 +3,7 @@ module diagnostics
   use g_config
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use mod_tracer
   use g_clock
   use g_comm_auto

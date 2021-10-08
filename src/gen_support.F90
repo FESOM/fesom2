@@ -4,6 +4,7 @@
 module g_support
   USE MOD_MESH
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_comm_auto
   use o_ARRAYS
   use g_config, only: dummy
@@ -280,6 +281,7 @@ end subroutine smooth_elem3D
 !
 subroutine integrate_nod_2D(data, int2D, partit, mesh)
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_comm_auto
 
   IMPLICIT NONE
@@ -309,6 +311,7 @@ end subroutine integrate_nod_2D
 !
 subroutine integrate_nod_3D(data, int3D, partit, mesh)
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_comm_auto
 
   IMPLICIT NONE

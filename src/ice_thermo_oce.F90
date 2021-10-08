@@ -4,6 +4,7 @@ subroutine cut_off(partit, mesh)
     use i_arrays
     use MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_config, only: use_cavity
     implicit none
     type(t_mesh),   intent(in),    target :: mesh
@@ -88,6 +89,7 @@ subroutine thermodynamics(partit, mesh)
   use o_param
   use mod_mesh
   USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_therm_param
   use i_param
   use i_arrays

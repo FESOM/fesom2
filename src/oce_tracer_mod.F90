@@ -3,6 +3,7 @@ MODULE o_tracers
 USE MOD_MESH
 USE MOD_TRACER
 USE MOD_PARTIT
+USE MOD_PARSUP
 IMPLICIT NONE
 
 interface
@@ -10,6 +11,7 @@ interface
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
+    USE MOD_PARSUP
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -25,6 +27,7 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
@@ -58,6 +61,7 @@ END SUBROUTINE tracer_gradient_elements
 SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE MOD_TRACER
     use g_config, only: flag_debug
     use o_arrays
@@ -100,6 +104,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
     use o_arrays
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE MOD_TRACER
     IMPLICIT NONE
 
@@ -143,6 +148,7 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
+    USE MOD_PARSUP
     USE MOD_TRACER
     USE o_PARAM
     USE o_ARRAYS
