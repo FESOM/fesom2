@@ -120,7 +120,7 @@ subroutine get_run_steps(nsteps, partit)
   USE MOD_PARSUP
   implicit none
 
-  type(t_partit), intent(in)    :: partit
+  type(t_partit), intent(inout) :: partit
   integer,        intent(inout) :: nsteps 
   integer                       :: i, temp_year, temp_mon, temp_fleapyear
 

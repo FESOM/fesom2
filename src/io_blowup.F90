@@ -481,7 +481,7 @@ MODULE io_BLOWUP
 	subroutine was_error(id, partit)
 		implicit none
 		type(nc_file),  intent(inout)   :: id
-                type(t_partit), intent(in)      :: partit		
+                type(t_partit), intent(inout)   :: partit		
 		integer                         :: k, status, ierror
 
 		call MPI_BCast(id%error_count, 1,  MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)

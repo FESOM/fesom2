@@ -206,7 +206,7 @@ CONTAINS
       end if
 
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
 
       ! get dimensions
       if (partit%mype==0) then
@@ -222,7 +222,7 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,flf%file_name,partit)  
 
       if (partit%mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
@@ -237,7 +237,7 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name) 
+      call check_nferr(iost,flf%file_name,partit) 
 
       if (partit%mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
@@ -249,7 +249,7 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call check_nferr(iost,flf%file_name,partit)  
 
       ! get variable id
       if (partit%mype==0) then
@@ -265,7 +265,7 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then
          iost = nf_inq_varid(ncid,    "LON",       id_lon)
          if      (iost .ne. NF_NOERR) then
@@ -279,7 +279,7 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
 
       if (partit%mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
@@ -291,23 +291,23 @@ CONTAINS
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,flf%file_name,partit)   
       ! get dimensions size
       if (partit%mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call check_nferr(iost,flf%file_name,partit)   
       if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_timed,flf%nc_Ntime)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name) 
+      call check_nferr(iost,flf%file_name,partit) 
       flf%nc_Nlon=flf%nc_Nlon+2 !for the halo in case of periodic boundary
       call MPI_BCast(flf%nc_Nlon,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call MPI_BCast(flf%nc_Nlat,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -330,7 +330,7 @@ CONTAINS
          iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, flf%nc_lat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
       
     ! read lon  
       if (partit%mype==0) then
@@ -341,7 +341,7 @@ CONTAINS
          flf%nc_lon(flf%nc_Nlon)  =flf%nc_lon(2)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
     !____________________________________________________________________________
     ! read time axis from file
       if (partit%mype==0) then
@@ -352,7 +352,7 @@ CONTAINS
       end if
       call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
       
       ! digg for calendar attribute in time axis variable
       if (partit%mype==0 .and. use_flpyrcheck) then
@@ -386,7 +386,7 @@ CONTAINS
                 write(*,*) '          message block in gen_surface_forcing.F90.'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(0)
+                call par_ex(partit, 0)
             end if
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
@@ -407,7 +407,7 @@ CONTAINS
                 write(*,*) '          gen_surface_forcing.F90'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(0)
+                call par_ex(partit, 0)
             end if 
          else
             print *, achar(27)//'[31m'
@@ -426,7 +426,7 @@ CONTAINS
             write(*,*) '        example with ncdump -h forcing_file.nc '
             write(*,*) '____________________________________________________________'
             print *, achar(27)//'[0m'
-            call par_ex(0)
+            call par_ex(partit, 0)
          end if 
       end if
       
@@ -459,7 +459,7 @@ CONTAINS
          iost = nf_close(ncid)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call check_nferr(iost,flf%file_name,partit)
 
       if (ic_cyclic) then
          flf%nc_lon(1)      =flf%nc_lon(1)-360._WP
@@ -921,7 +921,7 @@ CONTAINS
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
       else
          if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
-         call par_ex
+         call par_ex(partit)
          stop
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
@@ -1260,14 +1260,15 @@ CONTAINS
                   &  qns, emp, qsr)
    END SUBROUTINE sbc_end
 
-   SUBROUTINE check_nferr(iost,fname)
+   SUBROUTINE check_nferr(iost,fname, partit)
    IMPLICIT NONE
-      character(len=MAX_PATH), intent(in) :: fname
-      integer, intent(in) :: iost
+      type(t_partit),          intent(inout), target :: partit
+      character(len=MAX_PATH), intent(in)            :: fname
+      integer, intent(in)                            :: iost
 
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex
+         call par_ex(partit)
          stop
       endif
    END SUBROUTINE check_nferr

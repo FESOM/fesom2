@@ -288,7 +288,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(1)
+                    call par_ex(partit, 1)
             end select
         end do
             
@@ -352,7 +352,7 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), partit, mesh)
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 !_______________________________________________________________
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
@@ -510,7 +510,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = sergey,   '
             write(*,*) '            shchepetkin, easypgf '
             write(*,*) '________________________________________________________'
-            call par_ex(1)
+            call par_ex(partit, 1)
         end if     
         
     !___________________________________________________________________________
@@ -531,7 +531,7 @@ subroutine pressure_force_4_linfs(tracers, partit, mesh)
             write(*,*) '            see in namelist.oce --> which_pgf = nemo,   '
             write(*,*) '            shchepetkin, cubicspline '
             write(*,*) '________________________________________________________'
-            call par_ex(1)
+            call par_ex(partit, 1)
         end if 
     end if 
 end subroutine pressure_force_4_linfs
@@ -727,7 +727,7 @@ subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
                         call densityJM_components(interp_n_temp, interp_n_salt, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 interp_n_dens(ni) = bulk_0 + Z_n(nle)*(bulk_pz + Z_n(nle)*bulk_pz2)
                 !!PS interp_n_dens(ni) = interp_n_dens(ni)*rhopot/(interp_n_dens(ni)+0.1_WP*Z_n(nle))*real(state_equation))-density_0
@@ -1086,7 +1086,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(1)
+                    call par_ex(partit, 1)
             end select
         end if
         
@@ -1176,7 +1176,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)   
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(1)
+                            call par_ex(partit, 1)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1215,7 +1215,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                             call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)    
                         case default !unknown
                             if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                            call par_ex(1)
+                            call par_ex(partit, 1)
                     end select
                     rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                     rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1318,7 +1318,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1357,7 +1357,7 @@ subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -1830,7 +1830,7 @@ subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
         write(*,*) '            see in namelist.oce --> which_pgf =         '
         write(*,*) '            shchepetkin, cubicspline, easypgf                   '
         write(*,*) '________________________________________________________'
-        call par_ex(1)
+        call par_ex(partit, 1)
     end if 
 end subroutine pressure_force_4_zxxxx
 !
@@ -2333,7 +2333,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     call densityJM_components(density_ref_T, density_ref_S, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, dref_rhopot, partit, mesh)
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(1)
+                    call par_ex(partit, 1)
             end select
         end if     
         
@@ -2412,7 +2412,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -2461,7 +2461,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -2475,7 +2475,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 ! --> this is not wanted !!!
                 write(*,*) ' --> would do second order surface boundary density extrapolation'
                 write(*,*) '     This is not wanted, model stops here'
-                call par_ex(0)    
+                call par_ex(partit, 0)    
             end if 
         end do
         !_______________________________________________________________________
@@ -2545,7 +2545,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                     call densityJM_components(temp_at_Zn(3), salt_at_Zn(3), bulk_0(3), bulk_pz(3), bulk_pz2(3), rhopot(3), partit, mesh)             
                 case default !unknown
                     if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                    call par_ex(1)
+                    call par_ex(partit, 1)
             end select
             rho_at_Zn = bulk_0 + Z_n(nlz)*(bulk_pz + Z_n(nlz)*bulk_pz2)
             rho_at_Zn = rho_at_Zn*rhopot/(rho_at_Zn+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -2626,7 +2626,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -2675,7 +2675,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                         call densityJM_components(temp_at_Zn(ni), salt_at_Zn(ni), bulk_0(ni), bulk_pz(ni), bulk_pz2(ni), rhopot(ni), partit, mesh)             
                     case default !unknown
                         if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
-                        call par_ex(1)
+                        call par_ex(partit, 1)
                 end select
                 rho_at_Zn(ni) = bulk_0(ni) + Z_n(nlz)*(bulk_pz(ni) + Z_n(nlz)*bulk_pz2(ni))
                 rho_at_Zn(ni) = rho_at_Zn(ni)*rhopot(ni)/(rho_at_Zn(ni)+0.1_WP*Z_n(nlz)*real(state_equation))-aux_dref
@@ -2692,7 +2692,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
                 write(*,*) ' idx = ', idx
                 write(*,*) ' nle = ', nle
                 write(*,*) ' nln = ', nlevels_nod2D(elnodes)-1
-                call par_ex(0)
+                call par_ex(partit, 0)
             end if 
         end do
         !_______________________________________________________________________

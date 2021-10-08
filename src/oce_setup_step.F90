@@ -50,9 +50,6 @@ module before_oce_step_interface
     end subroutine
   end interface
 end module
-
-!
-!
 !_______________________________________________________________________________
 subroutine ocean_setup(tracers, partit, mesh)
 USE MOD_MESH

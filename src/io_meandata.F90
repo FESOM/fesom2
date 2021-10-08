@@ -128,7 +128,7 @@ subroutine ini_mean_io(tracers, partit, mesh)
   if (mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
      else
   if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.io',' ; iostat=',iost
-     call par_ex
+     call par_ex(partit)
      stop
   endif
   READ(nm_io_unit, nml=nml_listsize, iostat=iost )

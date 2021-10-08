@@ -878,7 +878,7 @@ subroutine init_thickness_ale(partit, mesh)
         write(*,*)
         write(*,*) '____________________________________________________________'
         write(*,*) 'The vertical ALE discretisation ', which_ale,' is currently not supported!!!'
-        call par_ex(1)
+        call par_ex(partit, 1)
         end if 
     endif
     
@@ -2267,7 +2267,7 @@ subroutine vert_vel_ale(partit, mesh)
                 write(*,*)
             end if 
         end do
-!!PS         call par_ex(1)
+!!PS         call par_ex(partit, 1)
     endif
     
     !___________________________________________________________________________

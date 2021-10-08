@@ -68,20 +68,20 @@ CONTAINS
    SUBROUTINE nc_readGrid(partit)
    ! Read time array and grid from nc file
       IMPLICIT NONE
-      type(t_partit), intent(in) :: partit 
-      integer                    :: iost !I/O status     
-      integer                    :: ncid      ! netcdf file id
-      integer                    :: i
+      type(t_partit), intent(inout) :: partit 
+      integer                       :: iost !I/O status     
+      integer                       :: ncid      ! netcdf file id
+      integer                       :: i
       ! ID dimensions and variables:
-      integer                    :: id_lon
-      integer                    :: id_lat
-      integer                    :: id_lond
-      integer                    :: id_latd
-      integer                    :: id_depth
-      integer                    :: id_depthd      
-      integer                    :: nf_start(4)
-      integer                    :: nf_edges(4)         
-      integer                    :: ierror              ! return error code
+      integer                       :: id_lon
+      integer                       :: id_lat
+      integer                       :: id_lond
+      integer                       :: id_latd
+      integer                       :: id_depth
+      integer                       :: id_depthd      
+      integer                       :: nf_start(4)
+      integer                       :: nf_edges(4)         
+      integer                       :: ierror              ! return error code
     
       !open file
       if (partit%mype==0) then
@@ -568,11 +568,11 @@ CONTAINS
 
    END SUBROUTINE nc_end
 
-   SUBROUTINE check_nferr(iost,fname, partit )
+   SUBROUTINE check_nferr(iost,fname, partit)
    IMPLICIT NONE
-      type(t_partit),          intent(in) :: partit 
-      character(len=MAX_PATH), intent(in) :: fname
-      integer, intent(in)                 :: iost
+      type(t_partit),          intent(inout) :: partit 
+      character(len=MAX_PATH), intent(in)    :: fname
+      integer, intent(in)                    :: iost
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ', trim(fname)
          call par_ex (partit)

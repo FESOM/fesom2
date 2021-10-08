@@ -1172,7 +1172,7 @@ subroutine find_levels_cavity(mesh)
         print *, achar(27)//'[31m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;31m'//' -[ERROR]->: Cavity geometry constrains did not converge !!! *\(>︿<)/*'//achar(27)//'[0m'
         write(*,*)
-        call par_ex(0)
+        call par_ex(partit, 0)
     else    
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
