@@ -147,7 +147,9 @@ IMPLICIT NONE
 
       call set_mesh_transform_matrix  !(rotated grid)
       call read_mesh(partit, mesh)
-      call set_par_support(partit, mesh)
+      call init_mpi_types(partit, mesh)
+      call init_gatherLists(partit)
+      if(mype==0) write(*,*) 'Communication arrays are set' 
       call test_tri(partit, mesh)
       call load_edges(partit, mesh)
       call find_neighbors(partit, mesh)

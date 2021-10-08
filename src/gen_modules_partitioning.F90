@@ -14,7 +14,7 @@ module par_support_interfaces
      integer,optional                      :: abort
   end subroutine
 
-  subroutine set_par_support(partit, mesh)
+  subroutine init_mpi_types(partit, mesh)
      use MOD_MESH
      use MOD_PARTIT
      implicit none
@@ -29,6 +29,16 @@ module par_support_interfaces
   end subroutine
   end interface
 end module
+
+module mod_parsup
+  interface
+  subroutine par_ex(partit, abort)
+     USE MOD_PARTIT
+     implicit none
+     type(t_partit), intent(inout), target :: partit
+     integer,optional                      :: abort
+  end subroutine
+end module mod_parsup
 
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
@@ -115,8 +125,7 @@ USE MOD_PARTIT
 
 end subroutine par_ex
 !=======================================================================
-subroutine set_par_support(partit, mesh)
-  use par_support_interfaces
+subroutine init_mpi_types(partit, mesh)
   use MOD_MESH
   use MOD_PARTIT
   implicit none
@@ -437,12 +446,8 @@ subroutine set_par_support(partit, mesh)
 
       deallocate(blocklen,     displace)
       deallocate(blocklen_tmp, displace_tmp)
-
    endif
-
-   call init_gatherLists(partit)
-   if(mype==0) write(*,*) 'Communication arrays are set' 
-end subroutine set_par_support
+end subroutine init_mpi_types
 !===================================================================
 subroutine init_gatherLists(partit)
   USE MOD_PARTIT

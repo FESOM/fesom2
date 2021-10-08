@@ -654,19 +654,3 @@ subroutine mymesh(partit, mesh)
   ! shared edges which mype updates
 end subroutine mymesh
 !=================================================================
-#ifndef FVOM_INIT
-subroutine status_check(partit)
-use g_config
-use mod_partit
-implicit none
-type(t_partit), intent(in), target :: partit
-integer :: res
-res=0
-call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
-if (res /= 0 ) then
-    if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
-!!! a restart file must be written here !!!
-    call par_ex(partit, 1)
-endif
-end subroutine status_check
-#endif
