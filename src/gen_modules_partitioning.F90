@@ -38,6 +38,7 @@ module mod_parsup
      type(t_partit), intent(inout), target :: partit
      integer,optional                      :: abort
   end subroutine
+  end interface
 end module mod_parsup
 
 subroutine par_init(partit)    ! initializes MPI
