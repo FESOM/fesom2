@@ -22,11 +22,9 @@ module par_support_interfaces
      type(t_mesh),   intent(in), target :: mesh
   end subroutine
 
-  subroutine init_gatherLists(partit, mesh)
-     USE MOD_MESH
+  subroutine init_gatherLists(partit)
      USE MOD_PARTIT
      implicit none
-     type(t_mesh),   intent(in), target    :: mesh
      type(t_partit), intent(inout), target :: partit    
   end subroutine
   end interface
@@ -118,6 +116,7 @@ USE MOD_PARTIT
 end subroutine par_ex
 !=======================================================================
 subroutine set_par_support(partit, mesh)
+  use par_support_interfaces
   use MOD_MESH
   use MOD_PARTIT
   implicit none
@@ -441,24 +440,18 @@ subroutine set_par_support(partit, mesh)
 
    endif
 
-   call init_gatherLists(partit, mesh)
+   call init_gatherLists(partit)
    if(mype==0) write(*,*) 'Communication arrays are set' 
 end subroutine set_par_support
-
-
 !===================================================================
-subroutine init_gatherLists(partit, mesh)
-  USE MOD_MESH
+subroutine init_gatherLists(partit)
   USE MOD_PARTIT
   implicit none
-  type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
   integer                               :: n, estart, nstart
 #include "associate_part_def.h"
-#include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   if (mype==0) then
 
      if (npes > 1) then
@@ -506,3 +499,18 @@ subroutine init_gatherLists(partit, mesh)
 
   endif
 end subroutine init_gatherLists
+!===================================================================
+subroutine status_check(partit)
+use g_config
+use mod_partit
+implicit none
+type(t_partit), intent(in), target :: partit
+integer                            :: res
+res=0
+call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+if (res /= 0 ) then
+    if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
+    call par_ex(partit, 1)
+endif
+end subroutine status_check
+

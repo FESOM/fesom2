@@ -140,6 +140,7 @@ use load_edges_interface
 use find_levels_min_e2n_interface
 use find_neighbors_interface
 use mesh_areas_interface
+use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit

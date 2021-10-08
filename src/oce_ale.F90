@@ -2718,7 +2718,7 @@ subroutine oce_timestep_ale(n, tracers, partit, mesh)
     call compute_neutral_slope(partit, mesh)
 
     !___________________________________________________________________________
-    ! call status_check(partit)
+    call status_check(partit)
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
     ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<

@@ -31,7 +31,7 @@ use oce_fluxes_interface
 use update_atm_forcing_interface
 use before_oce_step_interface
 use oce_timestep_ale_interface
-use par_support_interfaces
+!use par_support_interfaces
 use read_mesh_interface
 use fesom_version_info_module
 use command_line_options_module

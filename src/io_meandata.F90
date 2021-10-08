@@ -16,7 +16,7 @@ module io_MEANDATA
 
   type Meandata
     private
-    type(t_partit), pointer                            :: mypartit
+    type(t_partit), pointer                            :: p_partit
     integer                                            :: ndim
     integer                                            :: glsize(2)
     integer                                            :: accuracy
@@ -711,7 +711,6 @@ end subroutine
 !
 subroutine write_mean(entry, entry_index)
   use mod_mesh
-  use mod_partit
   use io_gather_module
   implicit none
   type(Meandata), intent(inout) :: entry
@@ -722,7 +721,7 @@ subroutine write_mean(entry, entry_index)
 
 
   ! Serial output implemented so far
-  if (entry%mypartit%mype==entry%root_rank) then
+  if (entry%p_partit%mype==entry%root_rank) then
      write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
      call assert_nf( nf_put_vara_double(entry%ncid, entry%Tid, entry%rec_count, 1, entry%ctime_copy, 1), __LINE__)
   end if
@@ -732,16 +731,16 @@ subroutine write_mean(entry, entry_index)
   tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
 !___________writing 8 byte real_________________________________________ 
   if (entry%accuracy == i_real8) then
-     if(entry%mypartit%mype==entry%root_rank) then
+     if(entry%p_partit%mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
      end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%mypartit)
+         call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
-         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%mypartit)
+         call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
        end if
-        if (entry%mypartit%mype==entry%root_rank) then
+        if (entry%p_partit%mype==entry%root_rank) then
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
@@ -752,16 +751,16 @@ subroutine write_mean(entry, entry_index)
 
 !___________writing 4 byte real _________________________________________ 
   else if (entry%accuracy == i_real4) then
-     if(entry%mypartit%mype==entry%root_rank) then
+     if(entry%p_partit%mype==entry%root_rank) then
        if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
      end if
      do lev=1, size1
        if(.not. entry%is_elem_based) then
-         call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%mypartit)
+         call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
        else
-         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%mypartit)
+         call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
        end if
-        if (entry%mypartit%mype==entry%root_rank) then
+        if (entry%p_partit%mype==entry%root_rank) then
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
@@ -923,12 +922,12 @@ use mod_partit
 
 
   entry=>io_stream(entry_index)
-  entry%mypartit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
+  entry%p_partit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
 
   call write_mean(entry, entry_index)
-write(*,*) 1111111
-  if(entry%mypartit%mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
-write(*,*) 2222222
+write(*,*) 1111111, entry%p_partit%mype, entry%root_rank
+  if(entry%p_partit%mype == entry%root_rank) call assert_nf( nf_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+write(*,*) 2222222, entry%p_partit%mype, entry%root_rank
 end subroutine
 
 
@@ -1159,7 +1158,7 @@ end subroutine
     if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call entry%thread%disable_async()
     
     entry%mype_workaround = partit%mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
-    entry%mypartit=>partit
+    entry%p_partit=>partit
   end subroutine
 
 
