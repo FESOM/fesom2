@@ -2,7 +2,7 @@ module read_mesh_interface
   interface
     subroutine read_mesh(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -12,7 +12,7 @@ module find_levels_interface
   interface
     subroutine find_levels(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -22,7 +22,7 @@ module find_levels_cavity_interface
   interface
     subroutine find_levels_cavity(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -32,7 +32,7 @@ module test_tri_interface
   interface
     subroutine test_tri(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -42,7 +42,7 @@ module load_edges_interface
   interface
     subroutine load_edges(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -52,7 +52,7 @@ module find_neighbors_interface
   interface
     subroutine find_neighbors(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -62,7 +62,7 @@ module mesh_areas_interface
   interface
     subroutine mesh_areas(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -72,7 +72,7 @@ module elem_center_interface
   interface
     subroutine elem_center(elem, x, y, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       integer       :: elem    
       real(kind=WP) :: x, y
       type(t_mesh),   intent(inout), target :: mesh
@@ -83,7 +83,7 @@ module edge_center_interface
   interface
     subroutine edge_center(n1, n2, x, y, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       integer                     :: n1, n2
       real(kind=WP)               :: x, y
       type(t_mesh),   intent(inout), target :: mesh
@@ -94,7 +94,7 @@ module mesh_auxiliary_arrays_interface
   interface
     subroutine mesh_auxiliary_arrays(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -104,7 +104,7 @@ module find_levels_min_e2n_interface
   interface
     subroutine find_levels_min_e2n(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -114,7 +114,7 @@ module check_total_volume_interface
   interface
     subroutine check_total_volume(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine

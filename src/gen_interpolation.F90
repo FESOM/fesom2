@@ -29,7 +29,7 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  use mod_partit
+  USE MOD_PARTIT
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i, ii, jj, k, nod_find
@@ -163,7 +163,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  use mod_partit
+  USE MOD_PARTIT
   use o_PARAM, only: WP
   implicit none
   integer             		:: n, i
@@ -313,7 +313,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz

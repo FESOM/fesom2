@@ -2,28 +2,28 @@ module ice_fct_interfaces
   interface
     subroutine ice_mass_matrix_fill(partit, mesh)
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
     end subroutine
 
     subroutine ice_solve_high_order(partit, mesh)
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
     end subroutine
 
     subroutine ice_solve_low_order(partit, mesh)
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
     end subroutine
     
     subroutine ice_fem_fct(tr_array_id, partit, mesh)
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       integer   :: tr_array_id
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -46,7 +46,7 @@ end module
 ! =====================================================================
 subroutine ice_TG_rhs(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use i_Arrays
   use i_PARAM
   use o_PARAM
@@ -116,7 +116,7 @@ end subroutine ice_TG_rhs
 subroutine ice_fct_init(partit, mesh)
   use o_PARAM
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use i_ARRAYS
   use ice_fct_interfaces
   implicit none
@@ -166,7 +166,7 @@ end subroutine ice_fct_init
 !
 subroutine ice_fct_solve(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use ice_fct_interfaces
   implicit none
   type(t_partit), intent(inout), target :: partit
@@ -201,7 +201,7 @@ subroutine ice_solve_low_order(partit, mesh)
     ! matrices acting on the field from the previous time step. The consistent 
     ! mass matrix on the lhs is replaced with the lumped one.       
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use i_ARRAYS
     use i_PARAM
@@ -259,7 +259,7 @@ end subroutine ice_solve_low_order
 !_______________________________________________________________________________
 subroutine ice_solve_high_order(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use MOD_TRACER
   use i_ARRAYS
   use o_PARAM
@@ -351,7 +351,7 @@ subroutine ice_fem_fct(tr_array_id, partit, mesh)
     ! Turek. (kuzmin@math.uni-dortmund.de) 
     !
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use i_arrays
     use i_param
@@ -661,7 +661,7 @@ end subroutine ice_fem_fct
 SUBROUTINE ice_mass_matrix_fill(partit, mesh)
 ! Used in ice_fct inherited from FESOM
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use MOD_TRACER
   use i_PARAM
   use i_ARRAYS
@@ -743,7 +743,7 @@ END SUBROUTINE ice_mass_matrix_fill
 !
 subroutine ice_TG_rhs_div(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use i_Arrays
   use i_PARAM
   use o_PARAM
@@ -838,7 +838,7 @@ end subroutine ice_TG_rhs_div
 !_______________________________________________________________________________
 subroutine ice_update_for_div(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use i_Arrays
     use i_PARAM

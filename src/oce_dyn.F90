@@ -15,7 +15,7 @@ module h_viscosity_leith_interface
   interface
     subroutine h_viscosity_leith(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -25,7 +25,7 @@ module visc_filt_harmon_interface
   interface
     subroutine visc_filt_harmon(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -35,7 +35,7 @@ module visc_filt_hbhmix_interface
   interface
     subroutine visc_filt_hbhmix(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -45,7 +45,7 @@ module visc_filt_biharm_interface
   interface
     subroutine visc_filt_biharm(option, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       integer       :: option
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -56,7 +56,7 @@ module visc_filt_bcksct_interface
   interface
     subroutine visc_filt_bcksct(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -66,7 +66,7 @@ module visc_filt_bilapl_interface
   interface
     subroutine visc_filt_bilapl(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -76,7 +76,7 @@ module visc_filt_bidiff_interface
   interface
     subroutine visc_filt_bidiff(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -86,7 +86,7 @@ module visc_filt_dbcksc_interface
   interface
     subroutine visc_filt_dbcksc(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -96,7 +96,7 @@ module backscatter_coef_interface
   interface
     subroutine backscatter_coef(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -106,7 +106,7 @@ module uke_update_interface
   interface
     subroutine uke_update(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine

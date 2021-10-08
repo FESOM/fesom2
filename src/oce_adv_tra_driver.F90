@@ -3,7 +3,7 @@ module oce_adv_tra_driver_interfaces
    subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
       use MOD_MESH
       use MOD_TRACER
-      use MOD_PARTIT
+      USE MOD_PARTIT
       real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in)            :: tr_num
       type(t_partit), intent(inout), target :: partit
@@ -22,7 +22,7 @@ module oce_tra_adv_flux2dtracer_interface
     subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
       !update the solution for vertical and horizontal flux contributions
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       real(kind=WP), intent(in),    target :: dt
       type(t_partit),intent(inout), target :: partit
       type(t_mesh),  intent(in),    target :: mesh
@@ -42,7 +42,7 @@ end module
 subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use g_comm_auto
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
@@ -208,7 +208,7 @@ end subroutine do_oce_adv_tra
 subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
     use MOD_MESH
     use o_ARRAYS
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt

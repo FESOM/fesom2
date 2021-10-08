@@ -2,7 +2,7 @@ module forcing_array_setup_interfaces
   interface
     subroutine forcing_array_setup(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -17,7 +17,7 @@ subroutine forcing_setup(partit, mesh)
 use g_CONFIG
 use g_sbf, only: sbc_ini
 use mod_mesh
-use mod_partit
+USE MOD_PARTIT
 use forcing_array_setup_interfaces
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
@@ -36,7 +36,7 @@ subroutine forcing_array_setup(partit, mesh)
   !inializing forcing fields 
   use o_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use i_arrays
   use g_forcing_arrays
   use g_forcing_param

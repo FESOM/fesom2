@@ -3,7 +3,7 @@ MODULE io_RESTART
   use g_clock
   use g_comm_auto
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use mod_tracer
   use o_arrays
   use i_arrays

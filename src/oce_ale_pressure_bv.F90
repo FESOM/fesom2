@@ -458,7 +458,7 @@ end subroutine pressure_bv
 subroutine pressure_force_4_linfs(tracers, partit, mesh)
     use g_config
     use mod_mesh
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use mod_tracer
     use pressure_force_4_linfs_fullcell_interface
     use pressure_force_4_linfs_nemo_interface
@@ -525,7 +525,7 @@ end subroutine pressure_force_4_linfs
 subroutine pressure_force_4_linfs_fullcell(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     implicit none
@@ -574,7 +574,7 @@ end subroutine pressure_force_4_linfs_fullcell
 subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -750,7 +750,7 @@ end subroutine pressure_force_4_linfs_nemo
 subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     implicit none
@@ -1004,7 +1004,7 @@ end subroutine pressure_force_4_linfs_shchepetkin
 subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -1366,7 +1366,7 @@ end subroutine pressure_force_4_linfs_easypgf
 subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     implicit none
@@ -1568,7 +1568,7 @@ end subroutine pressure_force_4_linfs_cubicspline
 subroutine pressure_force_4_linfs_cavity(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     implicit none
@@ -1780,7 +1780,7 @@ end subroutine pressure_force_4_linfs_cavity
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
 subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
     use mod_mesh
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use mod_tracer
     use g_config
     use pressure_force_4_zxxxx_shchepetkin_interface
@@ -1820,7 +1820,7 @@ end subroutine pressure_force_4_zxxxx
 subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     implicit none
@@ -2004,7 +2004,7 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use g_config
     use densityJM_components_interface
@@ -2245,7 +2245,7 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     use o_PARAM
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
     use g_config
@@ -2687,7 +2687,7 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !===============================================================================
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
 USE MOD_MESH
-use MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use densityJM_components_interface
@@ -2725,7 +2725,7 @@ end subroutine densityJM_local
 !===============================================================================
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot, partit, mesh)
 USE MOD_MESH
-use MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 IMPLICIT NONE
@@ -2902,7 +2902,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
   use mod_mesh
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use o_arrays
   use o_param
   use g_comm_auto
@@ -2985,7 +2985,7 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
   use mod_mesh
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use o_param
   use o_arrays
   use g_comm_auto
@@ -3056,7 +3056,7 @@ end subroutine compute_sigma_xy
 !===============================================================================
 subroutine compute_neutral_slope(partit, mesh)
     use o_ARRAYS
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_MESH
     use o_param
     use g_config
@@ -3108,7 +3108,7 @@ end subroutine compute_neutral_slope
 !               tracers%data(1)%values will be modified!
 subroutine insitu2pot(tracers, partit, mesh)
   use mod_mesh
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use mod_tracer
   use o_param
   use o_arrays
@@ -3155,7 +3155,7 @@ end subroutine insitu2pot
 SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, partit, mesh)
 !coded by Margarita Smolentseva, 21.05.2020
 USE MOD_MESH
-use MOD_PARTIT !, only: par_ex,pe_status
+USE MOD_PARTIT !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use g_config !, only: which_toy, toy_ocean
@@ -3193,7 +3193,7 @@ subroutine init_ref_density(partit, mesh)
     ! Reviewed by ??
     !___________________________________________________________________________
     USE MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface

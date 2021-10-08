@@ -15,7 +15,7 @@ module g_cvmix_tidal
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF

@@ -2,7 +2,7 @@ module diff_part_hor_redi_interface
   interface
     subroutine diff_part_hor_redi(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -15,7 +15,7 @@ module adv_tracers_ale_interface
   interface
     subroutine adv_tracers_ale(dt, tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       real(kind=WP),  intent(in),    target :: dt
       integer,        intent(in),    target :: tr_num
@@ -29,7 +29,7 @@ module diff_ver_part_expl_ale_interface
   interface
     subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -42,7 +42,7 @@ module diff_ver_part_redi_expl_interface
   interface
     subroutine diff_ver_part_redi_expl(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -55,7 +55,7 @@ module diff_ver_part_impl_ale_interface
   interface
     subroutine diff_ver_part_impl_ale(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -68,7 +68,7 @@ module diff_tracers_ale_interface
   interface
     subroutine diff_tracers_ale(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -81,7 +81,7 @@ module bc_surface_interface
   interface
     function bc_surface(n, id, sval, partit) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       integer , intent(in)                  :: n, id
       type(t_partit), intent(inout), target :: partit
       real(kind=WP)                         :: bc_surface
@@ -93,7 +93,7 @@ module diff_part_bh_interface
   interface
     subroutine diff_part_bh(tr_num, tracer, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       integer,        intent(in),    target :: tr_num
       type(t_tracer), intent(inout), target :: tracer
@@ -106,7 +106,7 @@ module solve_tracers_ale_interface
   interface
     subroutine solve_tracers_ale(tracers, partit, mesh) 
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer      
       type(t_tracer), intent(inout), target :: tracers
       type(t_mesh),   intent(in),    target :: mesh
@@ -123,7 +123,7 @@ subroutine solve_tracers_ale(tracers, partit, mesh)
     use o_PARAM, only: SPP, Fer_GM
     use o_arrays
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use mod_tracer
     use g_comm_auto
     use o_tracers
@@ -211,7 +211,7 @@ end subroutine solve_tracers_ale
 subroutine adv_tracers_ale(dt, tr_num, tracers, partit, mesh) 
     use g_config, only: flag_debug
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use mod_tracer
     use o_arrays
     use diagnostics, only: ldiag_DVD, compute_diag_dvd_2ndmoment_klingbeil_etal_2014, & 
@@ -264,7 +264,7 @@ end subroutine adv_tracers_ale
 !===============================================================================
 subroutine diff_tracers_ale(tr_num, tracers, partit, mesh) 
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use mod_tracer
     use o_arrays
     use o_tracers
@@ -349,7 +349,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
     use o_ARRAYS
     use g_forcing_arrays
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use g_config,only: dt
     
@@ -426,12 +426,12 @@ end subroutine diff_ver_part_expl_ale
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
 subroutine diff_ver_part_impl_ale(tr_num, tracers, partit, mesh) 
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_PARAM
     use o_ARRAYS
     use i_ARRAYS
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use g_CONFIG
     use g_forcing_arrays
     use o_mixing_KPP_mod !for ghats _GO_   
@@ -891,7 +891,7 @@ end subroutine diff_ver_part_impl_ale
 subroutine diff_ver_part_redi_expl(tr_num, tracers, partit, mesh) 
     use o_ARRAYS
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     USE o_param
     use g_config
@@ -975,7 +975,7 @@ end subroutine diff_ver_part_redi_expl
 subroutine diff_part_hor_redi(tr_num, tracers, partit, mesh) 
     use o_ARRAYS
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_param
     use g_config
@@ -1132,7 +1132,7 @@ end subroutine diff_part_hor_redi
 SUBROUTINE diff_part_bh(tr_num, tracers, partit, mesh) 
     use o_ARRAYS
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_param
     use g_config
@@ -1210,7 +1210,7 @@ end subroutine diff_part_bh
 ! ID = 0 and 1 are reserved for temperature and salinity
 FUNCTION bc_surface(n, id, sval, partit) 
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config

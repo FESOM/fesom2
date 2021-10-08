@@ -2,35 +2,35 @@ module ice_maEVP_interfaces
   interface
     subroutine ssh2rhs(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
     subroutine stress_tensor_a(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
     subroutine stress2rhs_m(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
     subroutine find_alpha_field_a(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
 
     subroutine find_beta_field_a(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -49,7 +49,7 @@ subroutine stress_tensor_m(partit, mesh)
   use o_param
   use i_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
 
@@ -147,7 +147,7 @@ subroutine ssh2rhs(partit, mesh)
   use o_param
   use i_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
   use i_therm_param
@@ -230,7 +230,7 @@ subroutine stress2rhs_m(partit, mesh)
   use i_param
   use i_therm_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
   implicit none
@@ -303,7 +303,7 @@ subroutine EVPdynamics_m(partit, mesh)
   use i_param
   use i_therm_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
   use o_arrays
@@ -644,7 +644,7 @@ subroutine find_alpha_field_a(partit, mesh)
   use i_param
   use i_therm_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
 
@@ -722,7 +722,7 @@ subroutine stress_tensor_a(partit, mesh)
   use o_param
   use i_param
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use g_config
   use i_arrays
 
@@ -823,7 +823,7 @@ subroutine EVPdynamics_a(partit, mesh)
 
 use o_param
 use mod_mesh
-use mod_partit
+USE MOD_PARTIT
 use i_arrays
 USE o_arrays
 use i_param
@@ -931,7 +931,7 @@ subroutine find_beta_field_a(partit, mesh)
 ! alpha \ne beta, but not aEVP).
 
 use mod_mesh
-use mod_partit
+USE MOD_PARTIT
 use o_param
 USE i_param
 use i_arrays

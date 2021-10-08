@@ -2,7 +2,7 @@ module ice_array_setup_interface
   interface
     subroutine ice_array_setup(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -14,7 +14,7 @@ module ice_initial_state_interface
   interface
     subroutine ice_initial_state(tracers, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -26,7 +26,7 @@ module ice_setup_interface
   interface
     subroutine ice_setup(tracers, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -43,7 +43,7 @@ subroutine ice_setup(tracers, partit, mesh)
     use i_arrays
     use g_CONFIG
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use mod_tracer
     use ice_array_setup_interface
     use ice_initial_state_interface
@@ -81,7 +81,7 @@ subroutine ice_array_setup(partit, mesh)
 use o_param
 use i_param
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 use i_arrays
 USE g_CONFIG
 
@@ -192,7 +192,7 @@ end subroutine ice_array_setup
 ! Sea ice model step
 subroutine ice_timestep(step, partit, mesh)
 use mod_mesh
-use mod_partit
+USE MOD_PARTIT
 use i_arrays
 use o_param
 use g_CONFIG
@@ -315,7 +315,7 @@ end subroutine ice_timestep
 subroutine ice_initial_state(tracers, partit, mesh)
     use i_ARRAYs
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_PARAM   
     use o_arrays        

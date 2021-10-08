@@ -2,7 +2,7 @@ module cavity_heat_water_fluxes_3eq_interface
   interface
     subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -19,7 +19,7 @@ end module
 ! cavity line point to that point --> use their coordinates and depth
 subroutine compute_nrst_pnt2cavline(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_PARAM , only: WP
     implicit none
 
@@ -137,7 +137,7 @@ end subroutine compute_nrst_pnt2cavline
 ! adapted by P. SCholz for FESOM2.0
 subroutine cavity_heat_water_fluxes_3eq(tracers, partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, Unode, density_m_rho0,density_ref
@@ -326,7 +326,7 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Reviewed by Qiang Wang
 subroutine cavity_heat_water_fluxes_2eq(tracers, partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
@@ -380,7 +380,7 @@ end subroutine cavity_heat_water_fluxes_2eq
 ! Moved to this separated routine by Qiang, 20.1.2012
 subroutine cavity_momentum_fluxes(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_PARAM , only: density_0, C_d, WP
     use o_ARRAYS, only: UV, Unode, stress_surf, stress_node_surf
     use i_ARRAYS, only: u_w, v_w  
@@ -429,7 +429,7 @@ end subroutine cavity_momentum_fluxes
 !_______________________________________________________________________________
 subroutine cavity_ice_clean_vel(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use i_ARRAYS, only: U_ice, V_ice
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -453,7 +453,7 @@ end subroutine cavity_ice_clean_vel
 !_______________________________________________________________________________
 subroutine cavity_ice_clean_ma(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use i_ARRAYS, only: m_ice, m_snow, a_ice
     implicit none
     type(t_partit), intent(inout), target :: partit

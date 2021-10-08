@@ -2,7 +2,7 @@ module ocean2ice_interface
   interface
     subroutine ocean2ice(tracers, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -15,7 +15,7 @@ module oce_fluxes_interface
   interface
     subroutine oce_fluxes(tracers, partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       use mod_tracer
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -33,7 +33,7 @@ subroutine oce_fluxes_mom(partit, mesh)
     use o_PARAM
     use o_ARRAYS
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use i_ARRAYS
     use i_PARAM
     USE g_CONFIG
@@ -117,7 +117,7 @@ subroutine ocean2ice(tracers, partit, mesh)
     use i_ARRAYS
     use MOD_MESH
     use MOD_TRACER
-    use MOD_PARTIT
+    USE MOD_PARTIT
     USE g_CONFIG
     use g_comm_auto
     implicit none
@@ -194,7 +194,7 @@ subroutine oce_fluxes(tracers, partit, mesh)
 
   use MOD_MESH
   use MOD_TRACER
-  use MOD_PARTIT
+  USE MOD_PARTIT
   USE g_CONFIG
   use o_ARRAYS
   use i_ARRAYS

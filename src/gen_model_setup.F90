@@ -1,6 +1,6 @@
 ! ==============================================================
 subroutine setup_model(partit)
-  use mod_partit
+  USE MOD_PARTIT
   use o_param
   use i_param
   use i_therm_param
@@ -115,7 +115,7 @@ subroutine get_run_steps(nsteps, partit)
   ! Reviewed by ??
   !--------------------------------------------------------------  
   use g_clock
-  use mod_partit
+  USE MOD_PARTIT
   implicit none
 
   type(t_partit), intent(in)    :: partit

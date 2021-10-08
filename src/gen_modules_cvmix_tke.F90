@@ -26,7 +26,7 @@ module g_cvmix_tke
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use o_arrays
     use g_comm_auto 
     implicit none

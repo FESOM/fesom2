@@ -16,7 +16,7 @@ module par_support_interfaces
 
   subroutine init_mpi_types(partit, mesh)
      use MOD_MESH
-     use MOD_PARTIT
+     USE MOD_PARTIT
      implicit none
      type(t_partit), intent(in), target :: partit
      type(t_mesh),   intent(in), target :: mesh
@@ -127,7 +127,7 @@ end subroutine par_ex
 !=======================================================================
 subroutine init_mpi_types(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   implicit none
 
   type(t_partit), intent(inout), target :: partit
@@ -507,7 +507,7 @@ end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
 use g_config
-use mod_partit
+USE MOD_PARTIT
 implicit none
 type(t_partit), intent(in), target :: partit
 integer                            :: res

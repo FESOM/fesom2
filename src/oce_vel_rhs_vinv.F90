@@ -2,7 +2,7 @@ module relative_vorticity_interface
   interface
     subroutine relative_vorticity(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine

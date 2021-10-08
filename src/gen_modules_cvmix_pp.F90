@@ -25,7 +25,7 @@ module g_cvmix_pp
     use g_config
     use o_param           
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_arrays
     use g_comm_auto 
     use i_arrays

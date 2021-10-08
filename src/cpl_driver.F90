@@ -165,7 +165,7 @@ contains
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
 #endif
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
@@ -509,7 +509,7 @@ contains
 
   subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
-    use MOD_PARTIT
+    USE MOD_PARTIT
     implicit none
     save
     !---------------------------------------------------------------------
@@ -579,7 +579,7 @@ contains
   subroutine cpl_oasis3mct_recv(ind, data_array, action, partit)
     use o_param
     use g_comm_auto
-    use MOD_PARTIT
+    USE MOD_PARTIT
     implicit none
     save
     !---------------------------------------------------------------------

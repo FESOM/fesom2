@@ -2,7 +2,7 @@ module find_up_downwind_triangles_interface
   interface
     subroutine find_up_downwind_triangles(twork, partit, mesh)
       use MOD_MESH
-      use MOD_PARTIT
+      USE MOD_PARTIT
       use MOD_TRACER
       type(t_mesh),        intent(in)  ,  target :: mesh
       type(t_partit),      intent(inout), target :: partit
@@ -30,7 +30,7 @@ end module
 !	adv_tracer_muscl
 subroutine muscl_adv_init(twork, partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use MOD_TRACER
     use o_ARRAYS
     use o_PARAM

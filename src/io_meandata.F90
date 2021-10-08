@@ -1,5 +1,5 @@
 module io_MEANDATA
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use o_PARAM, only : WP
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
@@ -95,7 +95,7 @@ module io_MEANDATA
 subroutine ini_mean_io(tracers, partit, mesh)
   use MOD_MESH
   use MOD_TRACER
-  use MOD_PARTIT
+  USE MOD_PARTIT
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -544,7 +544,7 @@ end subroutine
 !
 function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use diagnostics
 #if defined (__icepack)
   use icedrv_main,   only: ncat ! number of ice thickness cathegories
@@ -580,7 +580,7 @@ end function
 subroutine create_new_file(entry, partit, mesh)
   use g_clock
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use fesom_version_info_module
   use g_config
   use i_PARAM
@@ -804,7 +804,7 @@ end subroutine
 subroutine output(istep, tracers, partit, mesh)
   use g_clock
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   use mod_tracer
   use io_gather_module
 #if defined (__icepack)
@@ -915,7 +915,7 @@ end subroutine
 
 subroutine do_output_callback(entry_index)
 use mod_mesh
-use mod_partit
+USE MOD_PARTIT
   integer, intent(in) :: entry_index
   ! EO args
   type(Meandata), pointer               :: entry
@@ -946,7 +946,7 @@ end subroutine
 !
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array)
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   implicit none
   type(t_partit),        intent(inout), target :: partit
   integer,               intent(in)    :: glsize(2), lcsize(2)
@@ -1011,7 +1011,7 @@ end subroutine
 !
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh)
   use mod_mesh
-  use mod_partit
+  USE MOD_PARTIT
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -1088,7 +1088,7 @@ end subroutine
 
   subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh)
     use mod_mesh
-    use mod_partit
+    USE MOD_PARTIT
     use io_netcdf_workaround_module
     type(Meandata),        intent(inout)  :: entry
     character(len=*),      intent(in)     :: name, description, units

@@ -2,7 +2,7 @@ module momentum_adv_scalar_interface
   interface
     subroutine momentum_adv_scalar(partit, mesh)
       use mod_mesh
-      use mod_partit
+      USE MOD_PARTIT
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine
@@ -14,7 +14,7 @@ end module
 !_______________________________________________________________________________
 subroutine compute_vel_rhs(partit, mesh)
     use MOD_MESH
-    use MOD_PARTIT
+    USE MOD_PARTIT
     use o_ARRAYS
     use i_ARRAYS
     use i_therm_param

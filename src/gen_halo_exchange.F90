@@ -27,7 +27,7 @@ contains
 ! Only needed in debug mode
 subroutine check_mpi_comm(rn, sn, r_mpitype, s_mpitype, rPE, sPE, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(in)         :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:), sPE(:)
@@ -56,7 +56,7 @@ END SUBROUTINE check_mpi_comm
 
 subroutine exchange_nod2D_i(nod_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
@@ -72,7 +72,7 @@ END SUBROUTINE exchange_nod2D_i
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D_i_begin(nod_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
@@ -112,7 +112,7 @@ END SUBROUTINE exchange_nod2D_i_begin
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D(nod_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)      :: nod_array2D(:)
@@ -130,7 +130,7 @@ END SUBROUTINE exchange_nod2D
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D_begin(nod_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array2D(:)
@@ -167,7 +167,7 @@ END SUBROUTINE exchange_nod2D_begin
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D_2fields(nod1_array2D, nod2_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)      :: nod1_array2D(:)
@@ -187,7 +187,7 @@ END SUBROUTINE exchange_nod2D_2fields
 ! General version of the communication routine for 2D nodal fields
 subroutine exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array2D(:)
@@ -232,7 +232,7 @@ END SUBROUTINE exchange_nod2D_2fields_begin
 subroutine exchange_nod2D_3fields(nod1_array2D, nod2_array2D, nod3_array2D, partit)
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)      :: nod1_array2D(:)
@@ -253,7 +253,7 @@ END SUBROUTINE exchange_nod2D_3fields
 subroutine exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit)
 ! General version of the communication routine for 2D nodal fields
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)      :: nod1_array2D(:)
@@ -306,7 +306,7 @@ END SUBROUTINE exchange_nod2D_3fields_begin
 ! stored in (vertical, horizontal) format
 subroutine exchange_nod3D(nod_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array3D(:,:) 
@@ -323,7 +323,7 @@ END SUBROUTINE exchange_nod3D
 ! stored in (vertical, horizontal) format
 subroutine exchange_nod3D_begin(nod_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)      :: nod_array3D(:,:) 
@@ -369,7 +369,7 @@ END SUBROUTINE exchange_nod3D_begin
 ! stored in (vertical, horizontal) format
 subroutine exchange_nod3D_2fields(nod1_array3D,nod2_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array3D(:,:) 
@@ -388,7 +388,7 @@ subroutine exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit)
 ! General version of the communication routine for 3D nodal fields
 ! stored in (vertical, horizontal) format
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod1_array3D(:,:) 
@@ -449,7 +449,7 @@ END SUBROUTINE exchange_nod3D_2fields_begin
 ! ========================================================================
 subroutine exchange_nod3D_n(nod_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array3D(:,:,:) 
@@ -465,7 +465,7 @@ END SUBROUTINE exchange_nod3D_n
 ! stored in (vertical, horizontal) format
 subroutine exchange_nod3D_n_begin(nod_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: nod_array3D(:,:,:)
@@ -523,7 +523,7 @@ END SUBROUTINE exchange_nod3D_n_begin
  
 SUBROUTINE exchange_nod_end(partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 
@@ -534,7 +534,7 @@ END SUBROUTINE exchange_nod_end
 
 SUBROUTINE exchange_elem_end(partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -553,7 +553,7 @@ END SUBROUTINE exchange_elem_end
 !=============================================================================
 subroutine exchange_elem3D(elem_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: elem_array3D(:,:) 
@@ -569,7 +569,7 @@ END SUBROUTINE exchange_elem3D
 ! stored in (vertical, horizontal) format
 subroutine exchange_elem3D_begin(elem_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array3D(:,:) 
@@ -697,7 +697,7 @@ END SUBROUTINE exchange_elem3D_begin
 ! stored in (vertical, horizontal) format
 subroutine exchange_elem3D_n(elem_array3D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array3D(:,:,:) 
@@ -714,7 +714,7 @@ subroutine exchange_elem3D_n_begin(elem_array3D, partit)
 ! General version of the communication routine for 3D elemental fields
 ! stored in (vertical, horizontal) format
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array3D(:,:,:) 
@@ -800,7 +800,7 @@ END SUBROUTINE exchange_elem3D_n_begin
 ! stored in (vertical, horizontal) format
 subroutine exchange_elem2D(elem_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array2D(:) 
@@ -818,7 +818,7 @@ END SUBROUTINE exchange_elem2D
 ! stored in (vertical, horizontal) format
 subroutine exchange_elem2D_begin(elem_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)       :: elem_array2D(:) 
@@ -884,7 +884,7 @@ END SUBROUTINE exchange_elem2D_begin
 !Exchange with ALL(!) the neighbours
 subroutine exchange_elem2D_i(elem_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
@@ -902,7 +902,7 @@ END SUBROUTINE exchange_elem2D_i
 !Exchange with ALL(!) the neighbours
 subroutine exchange_elem2D_i_begin(elem_array2D, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
@@ -946,7 +946,7 @@ END SUBROUTINE exchange_elem2D_i_begin
 subroutine broadcast_nod3D(arr3D, arr3Dglobal, partit)
 ! Distribute the nodal information available on 0 PE to other PEs
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nz, counter,nl1
@@ -1012,7 +1012,7 @@ end subroutine broadcast_nod3D
 subroutine broadcast_nod2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(in), target       :: partit
 real(real64)                             :: arr2D(:)
@@ -1062,7 +1062,7 @@ end subroutine broadcast_nod2D
 subroutine broadcast_elem3D(arr3D, arr3Dglobal, partit)
 ! Distribute the elemental information available on 0 PE to other PEs
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 INTEGER                                 :: nz, counter,nl1
@@ -1130,7 +1130,7 @@ end subroutine broadcast_elem3D
 subroutine broadcast_elem2D(arr2D, arr2Dglobal, partit)
 ! A 2D version of the previous routine
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
@@ -1180,7 +1180,7 @@ end subroutine broadcast_elem2D
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 subroutine gather_nod3D(arr3D, arr3D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                                :: nl1
@@ -1241,7 +1241,7 @@ subroutine gather_real4_nod3D(arr3D, arr3D_global, partit)
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1301,7 +1301,7 @@ subroutine gather_int2_nod3D(arr3D, arr3D_global, partit)
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1358,7 +1358,7 @@ end subroutine gather_int2_nod3D
 subroutine gather_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE 
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1411,7 +1411,7 @@ end subroutine gather_nod2D
 subroutine gather_real4_nod2D(arr2D, arr2D_global, partit)
 ! Make nodal information available to master PE 
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1465,7 +1465,7 @@ end subroutine gather_real4_nod2D
 ! Make nodal information available to master PE
 subroutine gather_int2_nod2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1521,7 +1521,7 @@ subroutine gather_elem3D(arr3D, arr3D_global, partit)
 !
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1584,7 +1584,7 @@ end subroutine gather_elem3D
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 subroutine gather_real4_elem3D(arr3D, arr3D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                                :: nl1
@@ -1648,7 +1648,7 @@ end subroutine gather_real4_elem3D
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 subroutine gather_int2_elem3D(arr3D, arr3D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1711,7 +1711,7 @@ end subroutine gather_int2_elem3D
 ! Make element information available to master PE 
 subroutine gather_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1768,7 +1768,7 @@ end subroutine gather_elem2D
 ! Make element information available to master PE 
 subroutine gather_real4_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -1826,7 +1826,7 @@ end subroutine gather_real4_elem2D
 ! Make element information available to master PE 
 subroutine gather_int2_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: n
@@ -1885,7 +1885,7 @@ end subroutine gather_int2_elem2D
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 subroutine gather_real8to4_nod3D(arr3D, arr3D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -1947,7 +1947,7 @@ end subroutine gather_real8to4_nod3D
 ! Make nodal information available to master PE 
 subroutine gather_real8to4_nod2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2001,7 +2001,7 @@ subroutine gather_real8to4_elem3D(arr3D, arr3D_global, partit)
 ! Make element information available to master PE 
 ! Use only with 3D arrays stored in (vertical, horizontal) way
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nl1
@@ -2060,7 +2060,7 @@ end subroutine gather_real8to4_elem3D
 ! Make element information available to master PE 
 subroutine gather_real8to4_elem2D(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                             :: n
@@ -2117,7 +2117,7 @@ end subroutine gather_real8to4_elem2D
 subroutine gather_elem2D_i(arr2D, arr2D_global, partit)
 ! Make element information available to master PE 
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer                       :: n
@@ -2156,7 +2156,7 @@ end subroutine gather_elem2D_i
 ! Make nodal information available to master PE
 subroutine gather_nod2D_i(arr2D, arr2D_global, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer              :: n
@@ -2209,7 +2209,7 @@ end subroutine gather_nod2D_i
 ! A 2D version of the previous routine
 subroutine gather_edg2D(arr2D, arr2Dglobal, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 real(real64)                            :: arr2D(:)
@@ -2250,7 +2250,7 @@ end subroutine gather_edg2D
 ! A 2D version of the previous routine
 subroutine gather_edg2D_i(arr2D, arr2Dglobal, partit)
 use MOD_MESH
-use MOD_PARTIT
+USE MOD_PARTIT
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 integer                                :: arr2D(:)

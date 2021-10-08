@@ -7,7 +7,7 @@
 !=======================================================================
 subroutine communication_nodn(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -218,7 +218,7 @@ end subroutine communication_nodn
 !==========================================================================
 subroutine communication_elemn(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -526,7 +526,7 @@ end subroutine communication_elemn
 !==========================================================================
 subroutine mymesh(partit, mesh)
   use MOD_MESH
-  use MOD_PARTIT
+  USE MOD_PARTIT
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
