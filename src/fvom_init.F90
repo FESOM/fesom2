@@ -14,7 +14,7 @@ program MAIN
 
   use o_PARAM
   use MOD_MESH
-  use g_PARSUP
+  use MOD_PARTIT
   use g_CONFIG
   use g_rotate_grid
   
@@ -58,15 +58,19 @@ interface
    end subroutine stiff_mat_ini
 end interface
 interface
-   subroutine set_par_support_ini(mesh)
+   subroutine set_par_support_ini(partit, mesh)
      use mod_mesh
-     type(t_mesh), intent(inout)  , target :: mesh
+     use mod_partit
+     type(t_mesh),   intent(inout), target :: mesh
+     type(t_partit), intent(inout), target :: partit
    end subroutine set_par_support_ini
 end interface
 interface
-   subroutine communication_ini(mesh)
+   subroutine communication_ini(partit, mesh)
      use mod_mesh
-     type(t_mesh), intent(inout)  , target :: mesh
+     use mod_partit
+     type(t_mesh),   intent(inout), target :: mesh
+     type(t_partit), intent(inout), target :: partit
    end subroutine communication_ini
 end interface
 
@@ -86,7 +90,8 @@ end interface
 
   character(len=MAX_PATH)         :: nmlfile  !> name of configuration namelist file
   integer                     :: start_t, interm_t, finish_t, rate_t
-  type(t_mesh), target, save  :: mesh
+  type(t_mesh),   target, save :: mesh
+  type(t_partit), target, save :: partit
 
   call system_clock(start_t, rate_t)
   interm_t = start_t
@@ -126,12 +131,12 @@ end interface
   interm_t = finish_t
 
   call stiff_mat_ini(mesh)
-  call set_par_support_ini(mesh)
+  call set_par_support_ini(partit, mesh)
   call system_clock(finish_t)
   print '("**** Partitioning time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
   interm_t = finish_t
-  call communication_ini(mesh)
+  call communication_ini(partit, mesh)
   call system_clock(finish_t)
   print '("**** Storing partitioned mesh time = ",f12.3," seconds. ****")', &
        real(finish_t-interm_t)/real(rate_t)
@@ -144,7 +149,6 @@ end program MAIN
 subroutine read_mesh_ini(mesh)
 USE MOD_MESH
 USE o_PARAM
-USE g_PARSUP
 use g_CONFIG
 use g_rotate_grid
 !
@@ -162,11 +166,9 @@ INTEGER                             :: i_error
 ! ===================
 ! Surface mesh
 ! ===================
-    if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: read elem2d.out & nod2d.out                           '//achar(27)//'[0m'
-    end if 
-    
+ print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+ print *, achar(27)//'[7;1m' //' -->: read elem2d.out & nod2d.out                           '//achar(27)//'[0m'
+   
   open (20,file=trim(meshpath)//'nod2d.out', status='old')
   open (21,file=trim(meshpath)//'elem2d.out', status='old')
   READ(20,*) mesh%nod2D
@@ -202,15 +204,8 @@ INTEGER                             :: i_error
      mesh%elem2D_nodes(1:3,:) = reshape(elem_data, shape(mesh%elem2D_nodes(1:3,:)))
      mesh%elem2D_nodes(4,:)   = mesh%elem2D_nodes(1,:)
   end if
-     
+    
   deallocate(elem_data)
-!!$  do n=1,elem2D
-!!$     read(21,*) n1,n2,n3
-!!$     elem2D_nodes(1,n)=n1
-!!$     elem2D_nodes(2,n)=n2
-!!$     elem2D_nodes(3,n)=n3
-!!$  end do
-  !
   CLOSE(21)
    	   	 
 write(*,*) '========================='
@@ -223,21 +218,18 @@ END SUBROUTINE read_mesh_ini
 subroutine read_mesh_cavity(mesh)
     use mod_mesh
     use o_PARAM
-    use g_PARSUP
     use g_CONFIG
     implicit none
 
     type(t_mesh), intent(inout), target :: mesh
     integer                             :: node
-    character(len=MAX_PATH)                 :: fname
+    character(len=MAX_PATH)             :: fname
     logical                             :: file_exist=.False.
 #include "associate_mesh_ini.h"
     
     !___________________________________________________________________________    
-    if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: read cavity depth                                     '//achar(27)//'[0m'
-    end if 
+    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+    print *, achar(27)//'[7;1m' //' -->: read cavity depth                                     '//achar(27)//'[0m'
   
     !___________________________________________________________________________
     ! read depth of cavity-ocean boundary
@@ -249,12 +241,10 @@ subroutine read_mesh_cavity(mesh)
         allocate(mesh%cavity_depth(mesh%nod2D))
         cavity_depth => mesh%cavity_depth 
     else
-        if (mype==0) then
-            write(*,*) '____________________________________________________________________'
-            write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
-            write(*,*) '        --> stop partitioning here !'
-            write(*,*) '____________________________________________________________________'    
-        end if 
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: could not find cavity file: cavity_depth.out'    
+        write(*,*) '        --> stop partitioning here !'
+        write(*,*) '____________________________________________________________________'    
         stop 
     end if
     
@@ -314,7 +304,6 @@ END SUBROUTINE  test_tri_ini
 SUBROUTINE find_edges_ini(mesh)
 USE MOD_MESH
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 use g_rotate_grid
 IMPLICIT NONE
@@ -341,10 +330,8 @@ type(t_mesh), intent(inout), target   :: mesh
 ! (a) find edges. To make the procedure fast 
 ! one needs neighbourhood arrays
 ! ====================
-if (mype==0) then
-    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-    print *, achar(27)//'[7;1m' //' -->: compute edge connectivity                             '//achar(27)//'[0m'
-end if 
+print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+print *, achar(27)//'[7;1m' //' -->: compute edge connectivity                             '//achar(27)//'[0m'
 
 allocate(ne_num(nod2d), ne_pos(MAX_ADJACENT, nod2D), nn_num(nod2D))
 ne_num=0
@@ -654,7 +641,6 @@ END SUBROUTINE find_edges_ini
 subroutine find_levels(mesh)
     use g_config
     use mod_mesh
-    use g_parsup
     implicit none
     INTEGER :: nodes(3), elems(3), eledges(3)
     integer :: elem, elem1, j, n, nneighb, q, node, i, nz
@@ -666,10 +652,8 @@ subroutine find_levels(mesh)
 
 #include "associate_mesh_ini.h"
 
-    if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
-    end if 
+    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+    print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
     
     ALLOCATE(mesh%depth(nod2D))
     depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
@@ -697,11 +681,9 @@ subroutine find_levels(mesh)
     if(depth(2)>0) depth=-depth  ! depth is negative
 
     !___________________________________________________________________________
-    if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
-    end if 
-    
+    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+    print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
+     
     allocate(mesh%nlevels(elem2D))
     nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
     allocate(mesh%nlevels_nod2D(nod2D))
@@ -741,16 +723,13 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! write out vertical level indices before iterative geometric adaption to 
     ! exclude isolated cells 
-    if (mype==0) then
-        !_______________________________________________________________________
-        file_name=trim(meshpath)//'elvls_raw.out'
-        open(fileID, file=file_name)
-        do n=1,elem2D
-            write(fileID,*) nlevels(n)
-        end do
-        close(fileID)
-    endif
-
+    !_______________________________________________________________________
+    file_name=trim(meshpath)//'elvls_raw.out'
+    open(fileID, file=file_name)
+      do n=1,elem2D
+         write(fileID,*) nlevels(n)
+      end do
+    close(fileID)
     !___________________________________________________________________________
     ! check for isolated cells (cells with at least two boundary faces or three 
     ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
@@ -841,30 +820,27 @@ subroutine find_levels(mesh)
 
     !___________________________________________________________________________
     ! write vertical level indices into file
-    if (mype==0) then
-        !_______________________________________________________________________
-        file_name=trim(meshpath)//'elvls.out'
-        open(fileID, file=file_name)
-        do n=1,elem2D
-            write(fileID,*) nlevels(n)
-        end do
-        close(fileID)
+    !_______________________________________________________________________
+    file_name=trim(meshpath)//'elvls.out'
+    open(fileID, file=file_name)
+    do n=1,elem2D
+       write(fileID,*) nlevels(n)
+    end do
+    close(fileID)
+    !_______________________________________________________________________
+    file_name=trim(meshpath)//'nlvls.out'
+    open(fileID, file=file_name)
+      do n=1,nod2D
+         write(fileID,*) nlevels_nod2D(n)
+      end do
+    close(fileID)
         
-        !_______________________________________________________________________
-        file_name=trim(meshpath)//'nlvls.out'
-        open(fileID, file=file_name)
-        do n=1,nod2D
-            write(fileID,*) nlevels_nod2D(n)
-        end do
-        close(fileID)
-        
-        !_______________________________________________________________________
-        write(*,*) '========================='
-        write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
-        write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
-        write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
-        write(*,*) '========================='
-    endif
+    !_______________________________________________________________________
+    write(*,*) '========================='
+    write(*,*) 'Mesh is read : ', 'nod2D=', nod2D,' elem2D=', elem2D, ' nl=', nl
+    write(*,*) 'Min/max depth on mype: ',  -zbar(minval(nlevels)),-zbar(maxval(nlevels))
+    write(*,*) '3D tracer nodes on mype ', sum(nlevels_nod2d)-(elem2D)
+    write(*,*) '========================='
 end subroutine find_levels
 
 !
@@ -875,7 +851,6 @@ end subroutine find_levels
 subroutine find_levels_cavity(mesh)
     use mod_mesh
     use g_config
-    use g_parsup
     implicit none
     integer        :: nodes(3), elems(3)
     integer        :: elem, node, nz, j, idx
@@ -888,11 +863,8 @@ subroutine find_levels_cavity(mesh)
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
     !___________________________________________________________________________
-    if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: compute elem,vertice cavity depth index               '//achar(27)//'[0m'
-    end if 
-    
+    print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+    print *, achar(27)//'[7;1m' //' -->: compute elem,vertice cavity depth index               '//achar(27)//'[0m'   
     !___________________________________________________________________________
     allocate(mesh%ulevels(elem2D))
     ulevels => mesh%ulevels 
@@ -931,16 +903,13 @@ subroutine find_levels_cavity(mesh)
     ! write out cavity mesh files for vertice and elemental position of 
     ! vertical cavity-ocean boundary before the iterative geometric adaption to 
     ! eliminate isolated cells
-    if (mype==0) then
-        ! write out elemental cavity-ocean boundary level
-        file_name=trim(meshpath)//'cavity_elvls_raw.out'
-        open(20, file=file_name)
-        do elem=1,elem2D
-            write(20,*) ulevels(elem)
-        enddo
-        close(20)
-    endif
-    
+    ! write out elemental cavity-ocean boundary level
+    file_name=trim(meshpath)//'cavity_elvls_raw.out'
+    open(20, file=file_name)
+      do elem=1,elem2D
+         write(20,*) ulevels(elem)
+      enddo
+    close(20)   
     !___________________________________________________________________________
     ! Eliminate cells that have two cavity boundary faces --> should not be 
     ! possible in FESOM2.0
@@ -1056,7 +1025,7 @@ subroutine find_levels_cavity(mesh)
         
         do elem=1,elem2D
             if (ulevels(elem)>=nlevels(elem)) then 
-                if (mype==0) write(*,*) ' -[check]->: elem cavity depth deeper or equal bottom depth, elem=',elem                
+                write(*,*) ' -[check]->: elem cavity depth deeper or equal bottom depth, elem=',elem                
                 exit_flag2 = 0
                 
             end if 
@@ -1073,20 +1042,20 @@ subroutine find_levels_cavity(mesh)
         do node=1,nod2D
             !___________________________________________________________________
             if (ulevels_nod2D(node)>=nlevels_nod2D(node)) then 
-                if (mype==0) write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', node
+                write(*,*) ' -[check]->:  vertice cavity depth deeper or equal bottom depth, node=', node
                 exit_flag2 = 0
             end if
             
             !___________________________________________________________________
             if (nlevels_nod2D(node)-ulevels_nod2D(node)<3) then 
-                if (mype==0) write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', node
+                write(*,*) ' -[check]->: less than three valid vertice ocean layers, node=', node
                 exit_flag2 = 0
             end if
         end do ! --> do node=1,nod2D
         
         do elem=1,elem2D
             if (ulevels(elem)< maxval(ulevels_nod2D(elem2D_nodes(:,elem))) ) then 
-                if (mype==0) write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
+                write(*,*) ' -[check]->:  found elem cavity shallower than its valid maximum cavity vertice depths, elem=', elem2d
                 exit_flag2 = 0
             end if 
         end do ! --> do elem=1,elem2D
@@ -1172,36 +1141,32 @@ subroutine find_levels_cavity(mesh)
         print *, achar(27)//'[31m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;31m'//' -[ERROR]->: Cavity geometry constrains did not converge !!! *\(>︿<)/*'//achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit, 0)
+        stop
     else    
         write(*,*)
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, ' -['//achar(27)//'[7;32m'//' OK  '//achar(27)//'[0m'//']->: Cavity geometry constrains did converge !!! *\(^o^)/*'
-
-        write(*,*)
     end if     
  
 
     !___________________________________________________________________________
     ! write out cavity mesh files for vertice and elemental position of 
     ! vertical cavity-ocean boundary
-    if (mype==0) then
-        ! write out elemental cavity-ocean boundary level
-        file_name=trim(meshpath)//'cavity_elvls.out'
-        open(20, file=file_name)
-        do elem=1,elem2D
-            write(20,*) ulevels(elem)
-        enddo
-        close(20)
-        
-        ! write out vertice cavity-ocean boundary level + yes/no cavity flag
-        file_name=trim(meshpath)//'cavity_nlvls.out'
-        open(20, file=file_name)
-        do node=1,nod2D
-            write(20,*) ulevels_nod2D(node)
-        enddo
-        close(20)
-    endif
+    ! write out elemental cavity-ocean boundary level
+    file_name=trim(meshpath)//'cavity_elvls.out'
+    open(20, file=file_name)
+      do elem=1,elem2D
+         write(20,*) ulevels(elem)
+      enddo
+    close(20)
+    ! write out vertice cavity-ocean boundary level + yes/no cavity flag
+    file_name=trim(meshpath)//'cavity_nlvls.out'
+    open(20, file=file_name)
+      do node=1,nod2D
+         write(20,*) ulevels_nod2D(node)
+      enddo
+    close(20)
+
 
 end subroutine find_levels_cavity
 
@@ -1256,7 +1221,6 @@ end subroutine elem_center
 SUBROUTINE find_elem_neighbors_ini(mesh)
 ! For each element three its element neighbors are found
 USE MOD_MESH
-USE g_PARSUP
 implicit none
 integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
 type(t_mesh), intent(inout), target :: mesh
@@ -1289,7 +1253,6 @@ DO elem=1,elem2D
    if (elem1<2) then
     write(*,*) 'find_elem_neighbors_ini:Insufficient number of neighbors ',elem
     write(*,*) 'find_elem_neighbors_ini:Elem neighbors ',elem_neighbors(:,elem)
-    if (mype==0) then 
     write(*,*) '____________________________________________________________________'
     write(*,*) ' ERROR: The mesh you want to partitioning contains triangles that'
     write(*,*) '        have just one neighbor, this was OK for FESOM1.4 but not'
@@ -1311,8 +1274,7 @@ DO elem=1,elem2D
     write(*,*) '        eliminate these triangles and the corresponding         '
     write(*,*) '        unconnected vertice and try to re-partitioning again    '
     write(*,*) '____________________________________________________________________'
-    end if 
-   STOP
+    STOP
    end if
 END DO    
 
@@ -1414,10 +1376,10 @@ end subroutine stiff_mat_ini
 
 !===================================================================
 ! Setup of communication arrays
-subroutine communication_ini(mesh)
+subroutine communication_ini(partit, mesh)
   use MOD_MESH
   USE g_CONFIG
-  USE g_PARSUP
+  USE MOD_PARTIT
   use omp_lib
   implicit none
 
@@ -1425,13 +1387,15 @@ subroutine communication_ini(mesh)
   character*10   :: npes_string
   character(MAX_PATH)  :: dist_mesh_dir
   LOGICAL        :: L_EXISTS
-  type(t_mesh), intent(inout), target :: mesh
+  type(t_mesh),   intent(inout), target :: mesh
+  type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
 #include "associate_mesh_ini.h"
+#include "associate_part_ass.h" !only my
 
-  if (mype==0) then
-        print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
-        print *, achar(27)//'[7;1m' //' -->: compute communication arrays                          '//achar(27)//'[0m'
-  end if 
+  print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
+  print *, achar(27)//'[7;1m' //' -->: compute communication arrays                          '//achar(27)//'[0m'
+ 
   ! Create the distributed mesh subdirectory
   write(npes_string,"(I10)") npes
   dist_mesh_dir=trim(meshpath)//'dist_'//trim(ADJUSTL(npes_string))//'/'
@@ -1451,45 +1415,49 @@ subroutine communication_ini(mesh)
 !$OMP DO
   do n = 0, npes-1
      mype = n ! mype is threadprivate and must not be iterator
-     call communication_nodn(mesh)
-     call communication_elemn(mesh)
-     call save_dist_mesh(mesh)         ! Write out communication file com_infoxxxxx.out
+     call communication_nodn(partit, mesh)
+     call communication_elemn(partit, mesh)
+     call save_dist_mesh(partit, mesh)         ! Write out communication file com_infoxxxxx.out
   end do
 !$OMP END DO
 !$OMP END PARALLEL
 
   deallocate(mesh%elem_neighbors)
   deallocate(mesh%elem_edges)
-  deallocate(part)
+  deallocate(partit%part)
   write(*,*) 'Communication arrays have been set up'   
 end subroutine communication_ini
 !=================================================================
-subroutine set_par_support_ini(mesh)
-  use g_PARSUP
+subroutine set_par_support_ini(partit, mesh)
   use iso_c_binding, only: idx_t=>C_INT32_T
   use MOD_MESH
+  use MOD_PARTIT
   use g_config
   implicit none
-
 interface 
-   subroutine check_partitioning(mesh)
+   subroutine check_partitioning(partit, mesh)
      use MOD_MESH
-     type(t_mesh), intent(inout)  , target :: mesh
+     use MOD_PARTIT
+     type(t_mesh),   intent(inout), target :: mesh
+     type(t_partit), intent(inout), target :: partit
    end subroutine check_partitioning
 end interface
 
   integer         :: n, j, k, nini, nend, ierr
   integer(idx_t)  :: np(10)
-  type(t_mesh), intent(inout), target :: mesh
-
+  type(t_mesh),   intent(inout), target :: mesh
+  type(t_partit), intent(inout), target :: partit
   interface 
-     subroutine partit(n,ptr,adj,wgt,np,part) bind(C)
+     subroutine do_partit(n,ptr,adj,wgt,np,part) bind(C)
        use iso_c_binding, only: idx_t=>C_INT32_T
        integer(idx_t), intent(in)  :: n, ptr(*), adj(*), wgt(*), np(*)
        integer(idx_t), intent(out) :: part(*)
-     end subroutine partit
+     end subroutine do_partit
   end interface
+
+#include "associate_part_def.h"
 #include "associate_mesh_ini.h"
+#include "associate_part_ass.h"
 
   if (mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
@@ -1499,7 +1467,7 @@ end interface
   ! Construct partitioning vector
   if (n_levels<1 .OR. n_levels>10) then
      print *,'Number of hierarchic partition levels is out of range [1-10]! Aborting...'
-     call MPI_ABORT( MPI_COMM_FESOM, 1 )
+     stop
   end if
 
   np(:) = n_part(:)               ! Number of partitions on each hierarchy level
@@ -1511,7 +1479,8 @@ end interface
      np(n_levels+1) = 0 
   end if
 
-  allocate(part(nod2D))
+  allocate(partit%part(nod2D))
+  part=>partit%part
   part=0
 
   npes = PRODUCT(np(1:n_levels))
@@ -1521,10 +1490,12 @@ end interface
   end if
   
   write(*,*) 'Calling partit for npes=', np
-  call partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
+  call do_partit(ssh_stiff%dim, ssh_stiff%rowptr, ssh_stiff%colind, &
        nlevels_nod2D, np, part)
 
-  call check_partitioning(mesh)
+write(*,*) 'DONE'
+write(*,*) size(partit%part)
+  call check_partitioning(partit, mesh)
 
   write(*,*) 'Partitioning is done.'
 
@@ -1536,7 +1507,7 @@ end interface
   deallocate(mesh%nlevels_nod2D)
 end subroutine set_par_support_ini
 !=======================================================================
-subroutine check_partitioning(mesh)
+subroutine check_partitioning(partit, mesh)
 
   ! In general, METIS 5 has several advantages compared to METIS 4, e.g.,
   !   * neighbouring tasks get neighbouring partitions (important for multicore computers!)
@@ -1550,26 +1521,30 @@ subroutine check_partitioning(mesh)
   ! trying not to spoil the load balance.
 
   use MOD_MESH
-  use g_PARSUP
+  use MOD_PARTIT
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(inout), target :: mesh
   integer :: i, j, k, n, n_iso, n_iter, is, ie, kmax, np, cnt
-  integer :: nod_per_partition(2,0:npes-1)
+  integer :: nod_per_partition(2,0:partit%npes-1)
   integer :: max_nod_per_part(2), min_nod_per_part(2)
   integer :: average_nod_per_part(2), node_neighb_part(100)
   logical :: already_counted, found_part
 
   integer :: max_adjacent_nodes
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
-  type(t_mesh), intent(inout), target :: mesh
+#include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-    
+#include "associate_part_ass.h" !just for partit%part
+
   if (mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;1m' //' -->: check partitioning                                    '//achar(27)//'[0m'
-  end if   
+  end if
+
   ! Check load balancing
-  do i=0,npes-1
+  do i=0, npes-1
      nod_per_partition(1,i) = count(part(:) == i)
-     nod_per_partition(2,i) = sum(nlevels_nod2D,part(:) == i)
+     nod_per_partition(2,i) = sum(nlevels_nod2D, part(:) == i)
   enddo
 
   min_nod_per_part(1) = minval( nod_per_partition(1,:))
