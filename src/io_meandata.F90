@@ -830,7 +830,6 @@ subroutine output(istep, tracers, partit, mesh)
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
      call ini_mean_io(tracers, partit, mesh)
-     call init_io_gather(partit)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
