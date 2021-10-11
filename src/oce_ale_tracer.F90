@@ -1265,7 +1265,7 @@ FUNCTION bc_surface(n, id, sval, partit)
          if (partit%mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified in boundary conditions'
          if (partit%mype==0) write(*,*) 'the model will stop!'
       end if
-      call par_ex(partit)
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
       stop
   END SELECT
   RETURN

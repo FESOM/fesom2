@@ -128,7 +128,7 @@ subroutine ini_mean_io(tracers, partit, mesh)
   if (mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
      else
   if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.io',' ; iostat=',iost
-     call par_ex(partit)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
   READ(nm_io_unit, nml=nml_listsize, iostat=iost )
@@ -832,7 +832,7 @@ subroutine output(istep, tracers, partit, mesh)
      call ini_mean_io(tracers, partit, mesh)
      call init_io_gather(partit)
 #if defined (__icepack)
-     call init_io_icepack(partit, mesh)
+     call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif
      call init_io_gather(partit)
   end if
@@ -862,7 +862,7 @@ subroutine output(istep, tracers, partit, mesh)
      else
         write(*,*) 'You did not specify a supported outputflag.'
         write(*,*) 'The program will stop to give you opportunity to do it.'
-        call par_ex(partit, 1)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
         stop
      endif
 
@@ -1120,7 +1120,7 @@ end subroutine
       allocate(data_strategy_nf_float_type :: entry%data_strategy)
     else
        if (partit%mype==0) write(*,*) 'not supported output accuracy:',accuracy,'for',trim(name)
-       call par_ex(partit)
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype)
        stop
     endif ! accuracy
 

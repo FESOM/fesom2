@@ -118,7 +118,7 @@ integer                               :: n
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
         case default 
             stop "!not existing mixing scheme!"
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     end select
 
     ! initialise fesom1.4 like KPP
@@ -252,7 +252,7 @@ if (iost == 0) then
    if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
 else
    if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
-   call par_ex(partit)
+   call par_ex(partit%MPI_COMM_FESOM, partit%mype)
    stop
 end if
 
@@ -726,7 +726,7 @@ USE g_ic3d
             if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
             if (mype==0) write(*,*) 'the model will stop!'
          end if
-         call par_ex(partit)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
      END SELECT
   END DO

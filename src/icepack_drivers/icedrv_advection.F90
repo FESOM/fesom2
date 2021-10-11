@@ -39,7 +39,6 @@ submodule (icedrv_main) icedrv_advection
     
         use mod_mesh
         use i_param
-        use g_parsup
         use o_param
         use g_config
     
@@ -57,7 +56,7 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)           :: n,          q,     row,        &
                                             elem,       elnodes(3)
     
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
     
         ! Taylor-Galerkin (Lax-Wendroff) rhs
       
@@ -100,14 +99,13 @@ submodule (icedrv_main) icedrv_advection
     module subroutine init_advection_icepack(mesh)
     
         use o_param
-        use g_parsup
         use mod_mesh
     
         implicit none
       
         type(t_mesh), intent(in), target :: mesh
 
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
           
         ! Initialization of arrays necessary to implement FCT algorithm
         allocate(trl(nx))   ! low-order solutions
@@ -141,7 +139,6 @@ submodule (icedrv_main) icedrv_advection
     
         use mod_mesh
         use i_param
-        use g_parsup
       
         implicit none
       
@@ -152,7 +149,7 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)                 :: flag=0 ,iflag=0
         type(t_mesh), intent(in), target       :: mesh
       
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
       
         allocate(col_pos(nx))
           
@@ -215,9 +212,7 @@ submodule (icedrv_main) icedrv_advection
         ! mass matrix on the lhs is replaced with the lumped one.
     
         use mod_mesh
-        use i_param
-        use g_parsup
-  
+        use i_param  
       
         implicit none
       
@@ -226,7 +221,7 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
       
         gamma = ice_gamma_fct       ! Added diffusivity parameter
                                     ! Adjust it to ensure posivity of solution
@@ -241,7 +236,7 @@ submodule (icedrv_main) icedrv_advection
                       (1.0_WP-gamma) * trc(row)
         enddo
       
-        call exchange_nod(trl)
+        call exchange_nod(trl, p_partit)
       
         ! Low-order solution must be known to neighbours
     
@@ -252,9 +247,7 @@ submodule (icedrv_main) icedrv_advection
     subroutine solve_high_order_icepack(mesh, trc)
     
         use mod_mesh
-        use i_param
-        use g_parsup
-   
+        use i_param 
     
         implicit none
       
@@ -264,7 +257,7 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
       
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
       
         ! Taylor-Galerkin solution
        
@@ -273,7 +266,7 @@ submodule (icedrv_main) icedrv_advection
            d_tr(row) = rhs_tr(row) / area(1,row)
         end do
       
-        call exchange_nod(d_tr)
+        call exchange_nod(d_tr, p_partit)
       
         ! Iterate
         do n = 1, num_iter_solve - 1
@@ -288,7 +281,7 @@ submodule (icedrv_main) icedrv_advection
            do row = 1, nx_nh
               d_tr(row) = trl(row)
            enddo
-           call exchange_nod(d_tr)
+           call exchange_nod(d_tr, p_partit)
         enddo
       
     end subroutine solve_high_order_icepack
@@ -308,9 +301,7 @@ submodule (icedrv_main) icedrv_advection
     
         use mod_mesh
         use o_param
-        use i_param
-        use g_parsup
-   
+        use i_param 
     
         integer(kind=int_kind)                            :: icoef(3,3), n, q, elem, elnodes(3), row
         real   (kind=dbl_kind), allocatable, dimension(:) :: tmax, tmin
@@ -318,7 +309,7 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh  
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
       
         gamma = ice_gamma_fct        ! It should coinside with gamma in
                                      ! ts_solve_low_order
@@ -412,7 +403,7 @@ submodule (icedrv_main) icedrv_advection
          enddo
        
          ! pminus and pplus are to be known to neighbouting PE
-         call exchange_nod(icepminus, icepplus)
+         call exchange_nod(icepminus, icepplus, p_partit)
        
          !========================
          ! Limiting
@@ -446,7 +437,7 @@ submodule (icedrv_main) icedrv_advection
              enddo
           enddo
        
-          call exchange_nod(trc)
+          call exchange_nod(trc, p_partit)
        
           deallocate(tmin, tmax)
     
@@ -459,8 +450,6 @@ submodule (icedrv_main) icedrv_advection
         use mod_mesh
         use o_param
         use i_param
-        use g_parsup
-  
     
         implicit none
     
@@ -470,7 +459,7 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc    
 
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
     
         ! Computes the rhs in a Taylor-Galerkin way (with urrayspwind 
         ! type of correction for the advection operator).
@@ -526,9 +515,7 @@ submodule (icedrv_main) icedrv_advection
     
         use mod_mesh
         use o_param
-        use i_param
-        use g_parsup
-    
+        use i_param  
     
         implicit none
     
@@ -539,7 +526,7 @@ submodule (icedrv_main) icedrv_advection
         type(t_mesh),        target,        intent(in)     :: mesh
         real(kind=dbl_kind), dimension(nx), intent(inout)  :: trc
     
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
     
         ! Computes Taylor-Galerkin solution
         ! first approximation
@@ -548,7 +535,7 @@ submodule (icedrv_main) icedrv_advection
            d_tr(row) = rhs_trdiv(row) / area(1,row)
         enddo
       
-        call exchange_nod(d_tr)
+        call exchange_nod(d_tr, p_partit)
       
         ! Iterate
       
@@ -564,7 +551,7 @@ submodule (icedrv_main) icedrv_advection
            do row = 1, nx_nh
               d_tr(row) = trl(row)
            enddo
-           call exchange_nod(d_tr)
+           call exchange_nod(d_tr, p_partit)
         enddo
       
         trc = trc + d_tr

@@ -386,7 +386,7 @@ CONTAINS
                 write(*,*) '          message block in gen_surface_forcing.F90.'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(partit, 0)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
@@ -407,7 +407,7 @@ CONTAINS
                 write(*,*) '          gen_surface_forcing.F90'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(partit, 0)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
          else
             print *, achar(27)//'[31m'
@@ -426,7 +426,7 @@ CONTAINS
             write(*,*) '        example with ncdump -h forcing_file.nc '
             write(*,*) '____________________________________________________________'
             print *, achar(27)//'[0m'
-            call par_ex(partit, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
          end if 
       end if
       
@@ -921,7 +921,7 @@ CONTAINS
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
       else
          if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
-         call par_ex(partit)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
@@ -1268,7 +1268,7 @@ CONTAINS
 
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex(partit)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
    END SUBROUTINE check_nferr

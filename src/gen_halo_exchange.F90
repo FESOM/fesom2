@@ -354,7 +354,7 @@ integer                            :: nz, nl1
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit, 1)
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
 
     ! Check MPI point-to-point communication for consistency
@@ -422,7 +422,7 @@ integer                               :: nz, nl1, nl2
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit, 1)
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
 
     nl2 = ubound(nod2_array3D,1)
@@ -431,7 +431,7 @@ integer                               :: nz, nl1, nl2
           print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
-       call par_ex(partit, 1)
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     endif
 
 #ifdef DEBUG
@@ -503,7 +503,7 @@ if (npes>1) then
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
         endif
-        call par_ex(partit, 1)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      endif
   endif
   sn=com_nod2D%sPEnum
@@ -647,7 +647,7 @@ if (npes> 1) then
          END DO
       else
          if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
-         call par_ex(partit, 1)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
 
       com_elem2D%nreq = rn+sn
@@ -700,7 +700,7 @@ if (npes> 1) then
          END DO
       else
          if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
-         call par_ex(partit, 1)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
 
       com_elem2D_full%nreq = rn+sn
@@ -759,7 +759,7 @@ integer                             :: n, sn, rn, n_val, nl1
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
         endif
-        call par_ex(partit, 1)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      endif
   endif
 

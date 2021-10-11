@@ -252,7 +252,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: NPES does not coincide with that of the mesh'
-     call par_ex(partit, 1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      STOP
   end if
   ! broadcasting partitioning vector to the other procs
@@ -313,7 +313,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
   if (error_status/=0) then
      write(*,*) n
      write(*,*) 'error: nod2D/=part(npes+1)-1'
-     call par_ex(partit, 1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      STOP
   end if
 
@@ -412,7 +412,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     !___________________________________________________________________________
     ! check if rotation needs to be applied to an unrotated mesh
     elseif ((mype==0) .and. (.not. force_rotation) .and. (flag_checkmustrot==1) .and. (.not. toy_ocean)) then
@@ -433,7 +433,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     end if
   
   
@@ -525,7 +525,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
  call MPI_BCast(mesh%nl, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
  if (mesh%nl < 3) then
     write(*,*) '!!!Number of levels is less than 3, model will stop!!!'
-    call par_ex(partit)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     stop
  end if
  allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
@@ -596,7 +596,7 @@ if ((mype==0) .and. (flag_wrongaux3d==1)) then
     write(*,*) '____________________________________________________________________'
     print *, achar(27)//'[0m'
     write(*,*)
-    call par_ex(partit, 0)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
 end if 
 
  ! ==============================
@@ -997,7 +997,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
@@ -1085,7 +1085,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if    
     end if
     
@@ -1244,7 +1244,7 @@ subroutine find_levels_cavity(partit, mesh)
             write(*,*) '____________________________________________________________________'
             print *, achar(27)//'[0m'
             write(*,*)
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         end if 
     end if
     
@@ -1818,7 +1818,7 @@ DO elem=1,myDim_elem2D
    END DO
    if (elem1<2) then
     write(*,*) 'Insufficient number of neighbors ', myList_elem2D(elem)
-    call par_ex(partit, 1)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     STOP
    end if
 END DO
@@ -2562,7 +2562,7 @@ end do
 write(*,*) '***end level area_test***'
 end if
 
-!call par_ex(partit)
+!call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 !stop
 END SUBROUTINE check_mesh_consistency
 !

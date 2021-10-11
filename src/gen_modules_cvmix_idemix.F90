@@ -237,7 +237,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if
-            call par_ex(partit, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -260,7 +260,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(partit, 0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________

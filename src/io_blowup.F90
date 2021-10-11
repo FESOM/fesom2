@@ -401,7 +401,7 @@ MODULE io_BLOWUP
 				if (mype==0) deallocate(aux2)
 			else
 				if (mype==0) write(*,*) 'not supported shape of array in restart file'
-				call par_ex(partit)
+				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do
@@ -492,7 +492,7 @@ MODULE io_BLOWUP
 			if (status .ne. nf_noerr) then
 				if (partit%mype==0) write(*,*) 'error counter=', k
 				if (partit%mype==0) call handle_err(status, partit)
-				call par_ex(partit)
+				call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 				stop
 			end if
 		end do

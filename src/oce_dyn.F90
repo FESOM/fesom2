@@ -271,7 +271,7 @@ CASE (8)
      call visc_filt_dbcksc(partit, mesh) 
 CASE DEFAULT
      if (partit%mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
-     call par_ex(partit)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
 END SELECT
 end subroutine viscosity_filter  

@@ -103,7 +103,7 @@ subroutine setup_model(partit)
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit, 0)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
     endif
     
 
@@ -154,7 +154,7 @@ subroutine get_run_steps(nsteps, partit)
   else
      write(*,*) 'Run length unit ', run_length_unit, ' is not defined.'
      write(*,*) 'Please check and update the code.'
-     call par_ex(partit, 1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      stop
   end if
 

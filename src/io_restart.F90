@@ -230,13 +230,13 @@ subroutine restart(istep, l_write, l_read, tracers, partit, mesh)
                call ini_ocean_io(yearnew, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearnew, partit, mesh)
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearnew, partit, mesh)
+  if (use_ice) call init_restart_icepack(yearnew, mesh) !icapack has its copy of p_partit => partit
 #endif
   else
                call ini_ocean_io(yearold, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearold, partit, mesh)
 #if defined(__icepack)
-  if (use_ice) call init_restart_icepack(yearold, partit, mesh)
+  if (use_ice) call init_restart_icepack(yearold, mesh) !icapack has its copy of p_partit => partit
 #endif
   end if
 
@@ -271,7 +271,7 @@ subroutine restart(istep, l_write, l_read, tracers, partit, mesh)
   else
      write(*,*) 'You did not specify a supported outputflag.'
      write(*,*) 'The program will stop to give you opportunity to do it.'
-     call par_ex(partit, 1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      stop
   endif
 
@@ -529,7 +529,7 @@ subroutine write_restart(id, istep, partit, mesh)
             order=2
         else
             if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if 
         if (mype==0)          allocate(aux (size_gen))
@@ -555,7 +555,7 @@ subroutine write_restart(id, istep, partit, mesh)
         if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file'
-           call par_ex(partit)
+           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
            stop
      end if
      call was_error(id, partit); c=1
@@ -607,7 +607,7 @@ subroutine read_restart(id, partit, mesh, arg)
         write(*,*) '____________________________________________________________________'
         print *, achar(27)//'[0m'
         write(*,*)
-        call par_ex(partit)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      end if 
      
      if (.not. present(arg)) then
@@ -664,7 +664,7 @@ subroutine read_restart(id, partit, mesh, arg)
             order=2
         else
             if (mype==0) write(*,*) 'the shape of the array in the restart file and the grid size are different'
-            call par_ex(partit)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
         if (mype==0)          allocate(aux (size_gen))
@@ -691,7 +691,7 @@ subroutine read_restart(id, partit, mesh, arg)
         if (mype==0) deallocate(aux)
      else
         if (mype==0) write(*,*) 'not supported shape of array in restart file when reading restart'
-           call par_ex(partit)
+           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
            stop
      end if
      call was_error(id, partit); c=1
@@ -785,7 +785,7 @@ subroutine was_error(id, partit)
      if (status .ne. nf_noerr) then
         if (partit%mype==0) write(*,*) 'error counter=', k
         if (partit%mype==0) call handle_err(status, partit)
-        call par_ex(partit)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
      end if
   end do

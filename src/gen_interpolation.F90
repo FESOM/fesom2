@@ -49,7 +49,7 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   if(lon_reg(1)<0.0 .or. lon_reg(num_lon_reg)>360.) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex(partit, 1)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      stop
   end if
 
@@ -185,7 +185,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   if(lon_reg(1)<0.0_WP .or. lon_reg(num_lon_reg)>360._WP) then
      write(*,*) 'Error in 2D interpolation!'
      write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex(partit)
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   end if
 

@@ -100,7 +100,7 @@ subroutine handle_err(errcode, partit)
   integer                       :: errcode
   
   write(*,*) 'Error: ', nf_strerror(errcode)
-  call par_ex(partit, 1)
+  call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   stop
 end subroutine handle_err
 !

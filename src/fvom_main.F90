@@ -150,9 +150,9 @@ integer mpi_version_len
     ! Setup icepack
     !=====================
     if (mype==0) write(*,*) 'Icepack: reading namelists from namelist.icepack'
-    call set_icepack
+    call set_icepack(partit)
     call alloc_icepack
-    call init_icepack(tracers%data(1), partit, mesh)
+    call init_icepack(tracers%data(1), mesh)
     if (mype==0) write(*,*) 'Icepack: setup complete'
 #endif
     call clock_newyear                        ! check if it is a new year
@@ -218,7 +218,7 @@ integer mpi_version_len
 !    read  (mype+300) tracers_copy
 !    close (mype+300)
 
-!call par_ex(partit)
+!call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 !stop
 !         
 !    if (mype==10) write(,) mesh1%ssh_stiff%values-mesh%ssh_stiff%value
@@ -381,6 +381,6 @@ integer mpi_version_len
         write(*,*)
     end if    
 !   call clock_finish  
-    call par_ex(partit)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 end program main
     

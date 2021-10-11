@@ -531,6 +531,6 @@ subroutine check_blowup(istep, tracers, partit, mesh)
 			end if
 			call blowup(istep, tracers, partit, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
-			call par_ex(partit)
+			call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 		endif 
 end subroutine

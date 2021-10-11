@@ -242,7 +242,7 @@ t0=MPI_Wtime()
         call EVPdynamics_a(partit, mesh)
     CASE DEFAULT
         if (mype==0) write(*,*) 'a non existing EVP scheme specified!'
-        call par_ex(partit)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     END SELECT
     

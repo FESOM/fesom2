@@ -559,7 +559,7 @@ module g_cvmix_kpp
             else
                 write(*,*) " --> Error: this kpp_internalmix scheme is not supported"
                 write(*,*) "     for the mixing below the OBL, either KPP or PP !"
-                call par_ex(partit)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             end if 
             
             !___________________________________________________________________

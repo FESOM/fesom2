@@ -1,10 +1,11 @@
 module mod_parsup
   interface
-  subroutine par_ex(partit, abort)
+  subroutine par_ex(COMM, mype, abort)
      USE MOD_PARTIT
      implicit none
-     type(t_partit), intent(inout), target :: partit
-     integer,optional                      :: abort
+     integer,           intent(in)   :: COMM
+     integer,           intent(in)   :: mype
+     integer, optional, intent(in)   :: abort
   end subroutine
   end interface
 end module mod_parsup
@@ -75,7 +76,7 @@ subroutine par_init(partit)    ! initializes MPI
   end if
 end subroutine par_init
 !=================================================================
-subroutine par_ex(partit, abort)       ! finalizes MPI
+subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 USE MOD_PARTIT
 #ifndef __oifs
 !For standalone and coupled ECHAM runs
@@ -83,41 +84,43 @@ USE MOD_PARTIT
   use mod_prism 
 #endif
   implicit none
-  type(t_partit), intent(inout), target :: partit
-  integer,optional                      :: abort
+  integer,           intent(in)   :: COMM
+  integer,           intent(in)   :: mype
+  integer, optional, intent(in)   :: abort
+  integer                         :: error
 
 #ifndef __oasis
   if (present(abort)) then
-     if (partit%mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT(partit%MPI_COMM_FESOM, 1 )
+     if (mype==0) write(*,*) 'Run finished unexpectedly!'
+     call MPI_ABORT(COMM, 1 )
   else
-     call  MPI_Barrier(partit%MPI_COMM_FESOM,partit%MPIerr)
-     call  MPI_Finalize(partit%MPIerr)
+     call  MPI_Barrier(COMM, error)
+     call  MPI_Finalize(error)
   endif
 #else
   if (.not. present(abort)) then
-     if (partit%mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
-     call  MPI_Barrier(MPI_COMM_WORLD, partit%MPIerr)
+     if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
+     call  MPI_Barrier(MPI_COMM_WORLD, error)
   end if
-  call prism_terminate_proto(MPIerr)
-  if (partit%mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
-  call  MPI_Barrier(MPI_COMM_WORLD, partit%MPIerr)
+  call prism_terminate_proto(error)
+  if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
+  call  MPI_Barrier(MPI_COMM_WORLD, error)
   
-  if (partit%mype==0) print *, 'FESOM calls MPI_Finalize'
-  call MPI_Finalize(MPIerr)
+  if (mype==0) print *, 'FESOM calls MPI_Finalize'
+  call MPI_Finalize(error)
 #endif
-  if (partit%mype==0) print *, 'fesom should stop with exit status = 0'
+  if (mype==0) print *, 'fesom should stop with exit status = 0'
 #endif
 #if defined (__oifs)
 !OIFS coupling doesnt call prism_terminate_proto and uses MPI_COMM_FESOM
   implicit none
   integer,optional :: abort
   if (present(abort)) then
-	if (partit%mype==0) write(*,*) 'Run finished unexpectedly!'
-	call MPI_ABORT( partit%MPI_COMM_FESOM, 1 )
+	if (mype==0) write(*,*) 'Run finished unexpectedly!'
+	call MPI_ABORT(COMM, 1 )
   else
-	call  MPI_Barrier(partit%MPI_COMM_FESOM,partit%MPIerr)
-	call  MPI_Finalize(partit%MPIerr)
+	call  MPI_Barrier(COMM, error)
+	call  MPI_Finalize(error)
   endif
 #endif
 
@@ -516,7 +519,7 @@ res=0
 call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
 if (res /= 0 ) then
     if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
-    call par_ex(partit, 1)
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
 

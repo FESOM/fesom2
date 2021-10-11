@@ -7,16 +7,16 @@
       module icedrv_system
 
       use icedrv_kinds
-      use g_parsup,         only: par_ex          
+      use mod_parsup,       only: par_ex
       use icedrv_constants, only: ice_stderr
       use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
-
+      use mod_partit
       implicit none
 
-      public :: icedrv_system_abort
+      public :: icedrv_system_abort, icedrv_system_init
    
       private
-
+      type(t_partit), save, pointer  :: p_partit             ! a pointer to the mesh partitioning (has been accessed via "use g_parsup" in the original code)
 !=======================================================================
 
       contains
@@ -49,12 +49,21 @@
        
       ! Stop FESOM2
 
-      call par_ex(1)
+      call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype, 1)
       stop
 
       end subroutine icedrv_system_abort
 
 !=======================================================================
+      subroutine icedrv_system_init(partit)
+      implicit none
+      type(t_partit), intent(inout), target :: partit
+
+      p_partit => partit
+      end subroutine icedrv_system_init
+
+!=======================================================================
+
 
       end module icedrv_system
 

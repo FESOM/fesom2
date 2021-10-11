@@ -110,11 +110,14 @@ subroutine thermodynamics(partit, mesh)
   real(kind=WP), allocatable  :: ustar_aux(:)
   real(kind=WP)  lid_clo
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+  integer, pointer                       :: myDim_nod2D, eDim_nod2D
+  integer,        dimension(:),  pointer :: ulevels_nod2D
+  real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
 
+  myDim_nod2d=>partit%myDim_nod2D
+  eDim_nod2D =>partit%eDim_nod2D
+  ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
+  geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D 
   rsss=ref_sss
 
   ! u_ice and v_ice are at nodes
@@ -132,7 +135,7 @@ subroutine thermodynamics(partit, mesh)
               (v_ice(i)-v_w(i))**2)
        ustar_aux(i)=sqrt(ustar*Cd_oce_ice)
     END DO
-  call exchange_nod(ustar_aux, partit) !TODO Why do we need it?
+  call exchange_nod(ustar_aux, partit)
   ! ================
   ! end: friction velocity 
   ! ================

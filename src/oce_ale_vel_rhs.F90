@@ -119,7 +119,7 @@ subroutine compute_vel_rhs(partit, mesh)
     ! advection
     if (mom_adv==1) then
        if (mype==0) write(*,*) 'in moment not adapted mom_adv advection typ for ALE, check your namelist'
-       call par_ex(partit, 1)
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     elseif (mom_adv==2) then
        call momentum_adv_scalar(partit, mesh)
     end if
