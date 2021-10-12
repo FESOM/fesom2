@@ -893,8 +893,9 @@ end subroutine diff_ver_part_impl_ale
     use ver_sinking_recom_benthos_interface
     ! deniz: commented out and added conditional compilation on top of the subroutine
     !#if defined(__recom)
-        USE REcoM_GloVar
-        use recom_config, only : allow_var_sinking, GlowFluxPhy, GlowFluxDet, GlowFluxDia     !, recom_debug
+        USE REcoM_GloVar, only: GlowFluxPhy, GlowFluxDet, GlowFluxDia     !, recom_debug
+        use recom_config, only: allow_var_sinking, vdet, vdet_a, vphy, vdia, vdet_zoo2, secondsperday, use_fe2n, &
+            fe2n_benthos, fe2c_benthos, redo2c, ciso
     !#endif
         IMPLICIT NONE
         type(t_mesh), intent(in) , target  :: mesh
@@ -906,7 +907,7 @@ end subroutine diff_ver_part_impl_ale
         real(kind=WP)             :: ver_flux(mesh%nl,myDim_nod2D+eDim_nod2D)
     !   real(kind=WP)             :: Vbenthic_det,Vbenthic_phy,Vbenthic_dia
     !    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
-    #include "associate_mesh.h"
+#include "associate_mesh.h"
 
        do n=1, myDim_nod2D
             nl1=nlevels_nod2D(n)-1
@@ -1043,8 +1044,8 @@ end subroutine diff_ver_part_impl_ale
     use diff_ver_recom_expl_interface
     ! deniz: commented out this one moved it to top
     !#if defined(__recom)
-        USE REcoM_GloVar
-        use recom_config, only: GlodecayBenthos, GlowFluxPhy, GlowFluxDet, GlowFluxDia  !, recom_debug
+        USE REcoM_GloVar, only: GlodecayBenthos, GlowFluxPhy, GlowFluxDet, GlowFluxDia  !, recom_debug
+        use recom_config
     !#endif
         IMPLICIT NONE
         type(t_mesh), intent(in) , target :: mesh
@@ -1054,7 +1055,7 @@ end subroutine diff_ver_part_impl_ale
         integer                  :: nlevels_nod2D_minimum
         real(kind=WP)            :: bottom_flux(myDim_nod2D+eDim_nod2D)
 
-    #include "associate_mesh.h"
+#include "associate_mesh.h"
 
     bottom_flux = 0._WP
     id = tracer_id(tr_num)
