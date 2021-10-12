@@ -509,7 +509,6 @@ subroutine init_gatherLists(partit)
 end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
-use g_config
 USE MOD_PARTIT
 USE MOD_PARSUP
 implicit none
