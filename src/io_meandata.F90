@@ -99,8 +99,9 @@ subroutine ini_mean_io(mesh)
   use g_PARSUP
   use diagnostics
 #if defined(__recom)
-  use REcoM_GloVar
-  use recom_config, only: PAR3D
+  use REcoM_GloVar, only: PAR3D, glodpco2surf, glopco2surf, gloco2flux, glohplus, atmfeinput, &
+      atmninput, denitben, benthos, diags2d
+  use recom_config
 !  use REcoM_ciso
 #endif
   use i_PARAM, only: whichEVP

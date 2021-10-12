@@ -17,7 +17,7 @@ MODULE g_ic3d
    USE g_PARSUP
    USE g_comm_auto
    USE g_support
-   USE g_config, only: dummy, ClimateDataPath, use_cavity
+   USE g_config, only: dummy, ClimateDataPath, use_cavity, use_recom
 #if defined (__recom)
    USE recom_config
 #endif
