@@ -1,97 +1,63 @@
-!==========================================================
-module g_PARSUP
-USE o_PARAM
-! Variables to organize parallel work  
-implicit none
-save
+module mod_parsup
+  interface
+  subroutine par_ex(COMM, mype, abort)
+     USE MOD_PARTIT
+     implicit none
+     integer,           intent(in)   :: COMM
+     integer,           intent(in)   :: mype
+     integer, optional, intent(in)   :: abort
+  end subroutine
+  end interface
+end module mod_parsup
 
-#ifdef PETSC
-#include "finclude/petsc.h"
-#else
- include 'mpif.h'
-#endif
+module par_support_interfaces
+  interface
+  subroutine par_init(partit)
+     USE o_PARAM
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(inout), target :: partit
+  end subroutine
 
- integer                                :: MPI_COMM_FESOM
- integer, parameter   :: MAX_LAENDERECK=16
- integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
-  type com_struct
-     integer                                       :: rPEnum ! the number of PE I receive info from 
-     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: rPE    ! their list
-     integer, dimension(MAX_NEIGHBOR_PARTITIONS+1) :: rptr   ! allocatables to the list of nodes
-     integer, dimension(:), allocatable            :: rlist  ! the list of nodes
-     integer                                       :: sPEnum ! send part 
-     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sPE
-     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sptr
-     integer, dimension(:), allocatable            :: slist
-     integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
-     integer                                       :: nreq   ! number of requests for MPI_Wait
-                                                             ! (to combine halo exchange of several fields)
-  end type com_struct
+  subroutine init_mpi_types(partit, mesh)
+     use MOD_MESH
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(in), target :: partit
+     type(t_mesh),   intent(in), target :: mesh
+  end subroutine
 
-  type(com_struct)   :: com_nod2D
-!!$  type(com_struct)   :: com_edge2D
-  type(com_struct), target :: com_elem2D
-  type(com_struct), target :: com_elem2D_full
- 
-  ! MPI Datatypes for interface exchange
+  subroutine init_gatherLists(partit)
+     USE MOD_PARTIT
+     USE MOD_PARSUP
+     implicit none
+     type(t_partit), intent(inout), target :: partit    
+  end subroutine
+  end interface
+end module
 
-  ! Edge fields (2D)
-  integer, allocatable       :: s_mpitype_edge2D(:),         r_mpitype_edge2D(:)   
-
-  ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
-  !                 small halo and / or full halo
-  integer, allocatable, target :: s_mpitype_elem2D(:,:),       r_mpitype_elem2D(:,:) 
-  integer, allocatable         :: s_mpitype_elem2D_full_i(:),  r_mpitype_elem2D_full_i(:) 
-  integer, allocatable, target :: s_mpitype_elem2D_full(:,:),  r_mpitype_elem2D_full(:,:) 
-  integer, allocatable, target :: s_mpitype_elem3D(:,:,:),     r_mpitype_elem3D(:,:,:) 
-  integer, allocatable, target :: s_mpitype_elem3D_full(:,:,:),r_mpitype_elem3D_full(:,:,:) 
-
-  ! Nodal fields (2D; 2D integer; 3D with nl-1 or nl levels, one, two, or three values)
-  integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:) 
-  integer, allocatable       :: s_mpitype_nod2D_i(:),   r_mpitype_nod2D_i(:)
-  integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:) 
-
-  ! general MPI part
-  integer            :: MPIERR
-  integer            :: npes
-  integer            :: mype
-  integer            :: maxPEnum=100
-  integer, allocatable, dimension(:)  :: part
-
-  ! Mesh partition
-  integer                             :: myDim_nod2D, eDim_nod2D
-  integer, allocatable, dimension(:)  :: myList_nod2D
-  integer                             :: myDim_elem2D, eDim_elem2D, eXDim_elem2D
-  integer, allocatable, dimension(:)  :: myList_elem2D
-  integer                             :: myDim_edge2D, eDim_edge2D
-  integer, allocatable, dimension(:)  :: myList_edge2D
-
-  integer :: pe_status = 0 ! if /=0 then something is wrong 
-
-  integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
-  integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
-
-  logical :: elem_full_flag  
-
-contains
-subroutine par_init    ! initializes MPI
+subroutine par_init(partit)    ! initializes MPI
+  USE o_PARAM
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
-
-
-  integer :: i
-  integer provided_mpi_thread_support_level
-  character(:), allocatable :: provided_mpi_thread_support_level_name
+  type(t_partit), intent(inout), target :: partit
+  integer                               :: i
+  integer                               :: provided_mpi_thread_support_level
+  character(:), allocatable             :: provided_mpi_thread_support_level_name
 
 #ifndef __oasis
-  call MPI_Comm_Size(MPI_COMM_WORLD,npes,i)
-  call MPI_Comm_Rank(MPI_COMM_WORLD,mype,i)
-  MPI_COMM_FESOM=MPI_COMM_WORLD
+  call MPI_Comm_Size(MPI_COMM_WORLD,partit%npes,i)
+  call MPI_Comm_Rank(MPI_COMM_WORLD,partit%mype,i)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD
 #else
-  call MPI_Comm_Size(MPI_COMM_FESOM,npes,i)
-  call MPI_Comm_Rank(MPI_COMM_FESOM,mype,i)
+  call MPI_Comm_Size(MPI_COMM_FESOM,partit%npes,i)
+  call MPI_Comm_Rank(MPI_COMM_FESOM,partit%mype,i)
 #endif  
 
-  if(mype==0) then
+  if(partit%mype==0) then
     call MPI_Query_thread(provided_mpi_thread_support_level, i)
     if(provided_mpi_thread_support_level == MPI_THREAD_SINGLE) then
       provided_mpi_thread_support_level_name = "MPI_THREAD_SINGLE"
@@ -106,38 +72,42 @@ subroutine par_init    ! initializes MPI
     end if
     write(*,*) 'MPI has been initialized, provided MPI thread support level: ', &
          provided_mpi_thread_support_level_name,provided_mpi_thread_support_level
-    write(*, *) 'Running on ', npes, ' PEs'
+    write(*, *) 'Running on ', partit%npes, ' PEs'
   end if
 end subroutine par_init
 !=================================================================
-subroutine par_ex(abort)       ! finalizes MPI
+subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
+USE MOD_PARTIT
 #ifndef __oifs
 !For standalone and coupled ECHAM runs
 #if defined (__oasis)
   use mod_prism 
 #endif
   implicit none
-  integer,optional :: abort
+  integer,           intent(in)   :: COMM
+  integer,           intent(in)   :: mype
+  integer, optional, intent(in)   :: abort
+  integer                         :: error
 
 #ifndef __oasis
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
-     call MPI_ABORT( MPI_COMM_FESOM, 1 )
+     call MPI_ABORT(COMM, 1 )
   else
-     call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
-     call  MPI_Finalize(MPIerr)
+     call  MPI_Barrier(COMM, error)
+     call  MPI_Finalize(error)
   endif
 #else
   if (.not. present(abort)) then
      if (mype==0) print *, 'FESOM calls MPI_Barrier before calling prism_terminate'
-     call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
+     call  MPI_Barrier(MPI_COMM_WORLD, error)
   end if
-  call prism_terminate_proto(MPIerr)
+  call prism_terminate_proto(error)
   if (mype==0) print *, 'FESOM calls MPI_Barrier before calling MPI_Finalize'
-  call  MPI_Barrier(MPI_COMM_WORLD, MPIerr)
+  call  MPI_Barrier(MPI_COMM_WORLD, error)
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
-  call MPI_Finalize(MPIerr)
+  call MPI_Finalize(error)
 #endif
   if (mype==0) print *, 'fesom should stop with exit status = 0'
 #endif
@@ -147,26 +117,32 @@ subroutine par_ex(abort)       ! finalizes MPI
   integer,optional :: abort
   if (present(abort)) then
 	if (mype==0) write(*,*) 'Run finished unexpectedly!'
-	call MPI_ABORT( MPI_COMM_FESOM, 1 )
+	call MPI_ABORT(COMM, 1 )
   else
-	call  MPI_Barrier(MPI_COMM_FESOM,MPIerr)
-	call  MPI_Finalize(MPIerr)
+	call  MPI_Barrier(COMM, error)
+	call  MPI_Finalize(error)
   endif
 #endif
 
 end subroutine par_ex
 !=======================================================================
-subroutine set_par_support(mesh)
+subroutine init_mpi_types(partit, mesh)
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
-  type(t_mesh), intent(in)         , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
   integer                          :: n, offset
   integer                          :: i, max_nb, nb, nini, nend, nl1, n_val
   integer, allocatable             :: blocklen(:),     displace(:)
   integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-#include "associate_mesh.h"  
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   !
   ! In the distributed memory version, most of the job is already done 
   ! at the initialization phase and is taken into account in read_mesh
@@ -178,30 +154,25 @@ subroutine set_par_support(mesh)
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
-      allocate(com_nod2D%req(            3*com_nod2D%rPEnum +       3*com_nod2D%sPEnum))
-      allocate(com_elem2D%req(          3*com_elem2D%rPEnum +      3*com_elem2D%sPEnum))
-      allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum + 3*com_elem2D_full%sPEnum))
-
+      if (.not. allocated(com_nod2D%req))        allocate(com_nod2D%req(            3*com_nod2D%rPEnum  + 3*com_nod2D%sPEnum))
+      if (.not. allocated(com_elem2D%req))       allocate(com_elem2D%req(           3*com_elem2D%rPEnum + 3*com_elem2D%sPEnum))
+      if (.not. allocated(com_elem2D_full%req))  allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum  + 3*com_elem2D_full%sPEnum))
 !================================================
 ! MPI DATATYPES
 !================================================
-
       ! Build MPI Data types for halo exchange: Elements
-      allocate(r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
-      allocate(s_mpitype_elem2D(com_elem2D%sPEnum,4))
-      allocate(r_mpitype_elem2D_full_i(com_elem2D_full%rPEnum))   ! 2D, wide halo, integer
-      allocate(s_mpitype_elem2D_full_i(com_elem2D_full%sPEnum))
-
-      allocate(r_mpitype_elem2D_full(com_elem2D_full%rPEnum,4))     ! 2D, wide halo 
-      allocate(s_mpitype_elem2D_full(com_elem2D_full%sPEnum,4))
-
-      allocate(r_mpitype_elem3D(com_elem2D%rPEnum, nl-1:nl,4))     ! 3D, small halo 
-      allocate(s_mpitype_elem3D(com_elem2D%sPEnum, nl-1:nl,4))
-
-      allocate(r_mpitype_elem3D_full(com_elem2D_full%rPEnum, nl-1:nl,4))     ! 3D, wide halo
-      allocate(s_mpitype_elem3D_full(com_elem2D_full%sPEnum, nl-1:nl,4))
-      
-      
+      allocate(partit%r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
+      allocate(partit%s_mpitype_elem2D(com_elem2D%sPEnum,4))
+      allocate(partit%r_mpitype_elem2D_full_i(com_elem2D_full%rPEnum))   ! 2D, wide halo, integer
+      allocate(partit%s_mpitype_elem2D_full_i(com_elem2D_full%sPEnum))
+      allocate(partit%r_mpitype_elem2D_full(com_elem2D_full%rPEnum,4))     ! 2D, wide halo 
+      allocate(partit%s_mpitype_elem2D_full(com_elem2D_full%sPEnum,4))
+      allocate(partit%r_mpitype_elem3D(com_elem2D%rPEnum, nl-1:nl,4))     ! 3D, small halo 
+      allocate(partit%s_mpitype_elem3D(com_elem2D%sPEnum, nl-1:nl,4))
+      allocate(partit%r_mpitype_elem3D_full(com_elem2D_full%rPEnum, nl-1:nl,4))     ! 3D, wide halo
+      allocate(partit%s_mpitype_elem3D_full(com_elem2D_full%sPEnum, nl-1:nl,4))
+!after the allocation we just reassotiate ALL pointers again here
+#include "associate_part_ass.h"
       ! Upper limit for the length of the local interface between the neighbor PEs 
       max_nb = max(  &
            maxval(com_elem2D%rptr(2:com_elem2D%rPEnum+1) - com_elem2D%rptr(1:com_elem2D%rPEnum)), &
@@ -378,13 +349,15 @@ subroutine set_par_support(mesh)
 
    ! Build MPI Data types for halo exchange: Nodes
 
-      allocate(r_mpitype_nod2D(com_nod2D%rPEnum))     ! 2D
-      allocate(s_mpitype_nod2D(com_nod2D%sPEnum))
-      allocate(r_mpitype_nod2D_i(com_nod2D%rPEnum))   ! 2D integer
-      allocate(s_mpitype_nod2D_i(com_nod2D%sPEnum))   
+      allocate(partit%r_mpitype_nod2D(com_nod2D%rPEnum))     ! 2D
+      allocate(partit%s_mpitype_nod2D(com_nod2D%sPEnum))
+      allocate(partit%r_mpitype_nod2D_i(com_nod2D%rPEnum))   ! 2D integer
+      allocate(partit%s_mpitype_nod2D_i(com_nod2D%sPEnum))   
 
-      allocate(r_mpitype_nod3D(com_nod2D%rPEnum,nl-1:nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
-      allocate(s_mpitype_nod3D(com_nod2D%sPEnum,nl-1:nl,3))
+      allocate(partit%r_mpitype_nod3D(com_nod2D%rPEnum,nl-1:nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
+      allocate(partit%s_mpitype_nod3D(com_nod2D%sPEnum,nl-1:nl,3))
+!after the allocation we just reassotiate ALL pointers again here
+#include "associate_part_ass.h"
   
       ! Upper limit for the length of the local interface between the neighbor PEs 
       max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
@@ -475,30 +448,26 @@ subroutine set_par_support(mesh)
 
       deallocate(blocklen,     displace)
       deallocate(blocklen_tmp, displace_tmp)
-
    endif
-
-   call init_gatherLists
-   if(mype==0) write(*,*) 'Communication arrays are set' 
-end subroutine set_par_support
-
-
+end subroutine init_mpi_types
 !===================================================================
-subroutine init_gatherLists
-
-  use o_MESH
+subroutine init_gatherLists(partit)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
-  
-  integer :: n2D, e2D, sum_loc_elem2D
-  integer :: n, estart, nstart
-
+  type(t_partit), intent(inout), target :: partit    
+  integer                               :: n2D, e2D, sum_loc_elem2D
+  integer                               :: n, estart, nstart
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
   if (mype==0) then
 
      if (npes > 1) then
 
-        allocate(remPtr_nod2D(npes))
-        allocate(remPtr_elem2D(npes))
-
+        allocate(partit%remPtr_nod2D(npes))
+        allocate(partit%remPtr_elem2D(npes))
+!reassociate the pointers to the just allocated arrays
+#include "associate_part_ass.h"
         remPtr_nod2D(1) = 1
         remPtr_elem2D(1) = 1
         
@@ -510,12 +479,12 @@ subroutine init_gatherLists
            remPtr_elem2D(n+1) = remPtr_elem2D(n) + e2D 
         enddo
 
-
-
-        allocate(remList_nod2D(remPtr_nod2D(npes)))   ! this should be nod2D - myDim_nod2D
-        allocate(remList_elem2D(remPtr_elem2D(npes))) ! this is > elem2D, because the elements overlap.
+        allocate(partit%remList_nod2D(remPtr_nod2D(npes)))   ! this should be nod2D - myDim_nod2D
+        allocate(partit%remList_elem2D(remPtr_elem2D(npes))) ! this is > elem2D, because the elements overlap.
                                                       ! Consider optimization: avoid multiple communication
                                                       ! of the same elem from different PEs.
+!reassociate the pointers to the just allocated arrays
+#include "associate_part_ass.h"
 
         do n=1, npes-1
            nstart = remPtr_nod2D(n)
@@ -537,8 +506,19 @@ subroutine init_gatherLists
      call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_FESOM, MPIerr )
 
   endif
-
 end subroutine init_gatherLists
+!===================================================================
+subroutine status_check(partit)
+USE MOD_PARTIT
+USE MOD_PARSUP
+implicit none
+type(t_partit), intent(inout), target :: partit
+integer                               :: res
+res=0
+call MPI_Allreduce (partit%pe_status, res, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+if (res /= 0 ) then
+    if (partit%mype==0) write(*,*) 'Something Broke. Flushing and stopping...'
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+endif
+end subroutine status_check
 
-
-end module g_PARSUP

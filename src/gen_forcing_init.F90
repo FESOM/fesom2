@@ -1,8 +1,11 @@
 module forcing_array_setup_interfaces
   interface
-    subroutine forcing_array_setup(mesh)
+    subroutine forcing_array_setup(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
@@ -11,40 +14,48 @@ end module
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12
 ! ==========================================================
-subroutine forcing_setup(mesh)
-use g_parsup
+subroutine forcing_setup(partit, mesh)
 use g_CONFIG
 use g_sbf, only: sbc_ini
 use mod_mesh
+USE MOD_PARTIT
+USE MOD_PARSUP
 use forcing_array_setup_interfaces
 implicit none
-  type(t_mesh), intent(in)  , target :: mesh
-  if (mype==0) write(*,*) '****************************************************'
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+
+  if (partit%mype==0) write(*,*) '****************************************************'
   if (use_ice) then
-     call forcing_array_setup(mesh)
+     call forcing_array_setup(partit, mesh)
 #ifndef __oasis
-     call sbc_ini(mesh)         ! initialize forcing fields
+     call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif 
 end subroutine forcing_setup
 ! ==========================================================
-subroutine forcing_array_setup(mesh)
+subroutine forcing_array_setup(partit, mesh)
   !inializing forcing fields 
   use o_param
   use mod_mesh
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_arrays
   use g_forcing_arrays
   use g_forcing_param
-  use g_parsup
   use g_config
   use g_sbf, only: l_mslp, l_cloud
 #if defined (__oasis)
   use cpl_driver, only : nrecv
 #endif   
   implicit none
-  type(t_mesh), intent(in)  , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer    :: n2
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   n2=myDim_nod2D+eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))

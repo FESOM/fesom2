@@ -15,7 +15,6 @@ module cpl_driver
   use mod_oasis                    ! oasis module
   use g_config, only : dt
   use o_param,  only : rad
-  use g_PARSUP
   implicit none
   save   
   !
@@ -93,7 +92,7 @@ module cpl_driver
 contains
 
   subroutine cpl_oasis3mct_init( localCommunicator )
-    implicit none
+    implicit none   
     save
 
     !-------------------------------------------------------------------
@@ -109,7 +108,7 @@ contains
     !
     !--------------------------------------------------------------------
     !
-    
+
 #ifdef VERBOSE
       print *, '================================================='
       print *, 'cpl_oasis3mct_init : coupler initialization for OASIS3-MCT'
@@ -158,7 +157,7 @@ contains
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_define_unstr(mesh)
+  subroutine cpl_oasis3mct_define_unstr(partit, mesh)
    
 #ifdef __oifs
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
@@ -166,11 +165,14 @@ contains
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
 #endif
     use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-    type(t_mesh), intent(in), target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
     ! exchange between FESOM, ECHAM6 and OASIS3-MCT.
@@ -225,7 +227,10 @@ contains
     real(kind=WP), allocatable :: all_y_coords(:, :)     ! latitude  coordinates
     real(kind=WP), allocatable :: all_area(:,:)    
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 #ifdef VERBOSE
       print *, '=============================================================='
@@ -479,10 +484,9 @@ contains
 
    call oasis_enddef(ierror)
    if (commRank) print *, 'fesom oasis_enddef: COMPLETED'
-
 #ifndef __oifs
    if (commRank) print *, 'FESOM: calling exchange_roots'
-   call exchange_roots(source_root, target_root, 1, MPI_COMM_FESOM, MPI_COMM_WORLD)
+   call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
    if (commRank) print *, 'FESOM source/target roots: ', source_root, target_root
 #endif
 
@@ -504,8 +508,10 @@ contains
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_send(ind, data_array, action)
+  subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -523,7 +529,8 @@ contains
     !
     integer, intent( IN )          :: ind       ! variable Id
     logical, intent( OUT )         :: action    !
-    real(kind=WP), intent(IN)       :: data_array(myDim_nod2D+eDim_nod2D)
+    type(t_partit), intent(in)     :: partit
+    real(kind=WP),  intent(IN)     :: data_array(partit%myDim_nod2D+partit%eDim_nod2D)
     !
     ! Local declarations
     !
@@ -540,11 +547,11 @@ contains
     cplsnd(ind, :)=cplsnd(ind, :)+data_array
     ! call do_oce_2_atm(cplsnd(ind, :)/real(o2a_call_count), atm_fld, 1)
 
-    exfld = cplsnd(ind, 1:myDim_nod2D)/real(o2a_call_count)
+    exfld = cplsnd(ind, 1:partit%myDim_nod2D)/real(o2a_call_count)
 
     t2=MPI_Wtime()
 #ifdef VERBOSE
-    if (mype==0) then
+    if (partit%mype==0) then
         print *, 'FESOM oasis_send: ', cpl_send(ind)   
     endif     
 #endif
@@ -571,9 +578,11 @@ contains
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   ! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-  subroutine cpl_oasis3mct_recv(ind, data_array, action)
+  subroutine cpl_oasis3mct_recv(ind, data_array, action, partit)
     use o_param
     use g_comm_auto
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -616,7 +625,7 @@ contains
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
    if (action) then
       data_array(1:myDim_nod2d) = exfld
-      call exchange_nod(data_array)
+      call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()
    if (ind==1) then
@@ -643,13 +652,14 @@ SUBROUTINE exchange_roots(source_root, target_root, il_side, &
 !global_comm (i.e. comm_psmile here)
 
         IMPLICIT NONE
-		
-        INTEGER, INTENT(IN) :: il_side
-        INTEGER, INTENT(IN) :: local_comm, global_comm
-        INTEGER, INTENT(OUT) :: source_root, target_root
+
+        INTEGER, INTENT(IN)        :: il_side
+        INTEGER, INTENT(IN)        :: local_comm, global_comm
+        INTEGER, INTENT(OUT)       :: source_root, target_root
 
         INTEGER :: status(MPI_STATUS_SIZE)
         INTEGER :: local_rank, my_global_rank, ierror
+
 
         source_root = 500000
         target_root = 500000

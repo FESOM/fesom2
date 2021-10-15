@@ -27,7 +27,8 @@ module g_cvmix_idemix
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -114,15 +115,18 @@ module g_cvmix_idemix
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_idemix(mesh)
+    subroutine init_cvmix_idemix(partit, mesh)
         implicit none
         character(len=cvmix_strlen) :: nmlfile
         logical                  :: file_exist=.False.
         integer                  :: node_size
 
-        type(t_mesh), intent(in), target :: mesh
-
-#include "associate_mesh.h"     
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -220,7 +224,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near inertial wave surface forcing'
-            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., mesh) 
+            call read_other_NetCDF(idemix_surforc_file, 'var706', 1, forc_iw_surface_2D, .true., partit, mesh) 
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             forc_iw_surface_2D = forc_iw_surface_2D/density_0 * idemix_sforcusage 
             
@@ -233,7 +237,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -243,7 +247,7 @@ module g_cvmix_idemix
         inquire(file=trim(idemix_surforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., mesh) 
+            call read_other_NetCDF(idemix_botforc_file, 'wave_dissipation', 1, forc_iw_bottom_2D, .true., partit, mesh) 
             ! convert from W/m^2 to m^3/s^3
             forc_iw_bottom_2D  = forc_iw_bottom_2D/density_0
             
@@ -256,7 +260,7 @@ module g_cvmix_idemix
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -268,9 +272,10 @@ module g_cvmix_idemix
     !
     !===========================================================================
     ! calculate IDEMIX internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix(mesh)
+    subroutine calc_cvmix_idemix(partit, mesh)
         implicit none
-        type(t_mesh), intent(in), target :: mesh
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         integer       :: node, elem, edge, node_size
         integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln 
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
@@ -278,7 +283,10 @@ module g_cvmix_idemix
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         logical       :: debug=.false.
 
-#include "associate_mesh.h"   
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
         ! nils
         tstep_count = tstep_count + 1
           
@@ -364,7 +372,7 @@ module g_cvmix_idemix
         
             ! make boundary exchange for iwe, and iwe_v0 --> for propagation need
             ! to calculate edge contribution that crosses the halo
-            call exchange_nod(iwe)
+            call exchange_nod(iwe, partit)
             
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
@@ -423,8 +431,8 @@ module g_cvmix_idemix
                 iwe_v0(nln+1,node) = min(iwe_v0(nln+1,node),aux)
                 
             end do !-->do node = 1,node_size
-            call exchange_nod(vol_wcelli)
-            call exchange_nod(iwe_v0)
+            call exchange_nod(vol_wcelli, partit)
+            call exchange_nod(iwe_v0, partit)
             
             !___________________________________________________________________
             ! calculate horizontal diffusion term for internal wave energy
@@ -667,12 +675,12 @@ module g_cvmix_idemix
         if(mix_scheme_nmb==6) then 
             !___________________________________________________________________
             ! write out diffusivity
-            call exchange_nod(iwe_Kv)
+            call exchange_nod(iwe_Kv, partit)
             Kv = iwe_Kv
             
             !___________________________________________________________________
             ! write out viscosity -->interpolate therefor from nodes to elements
-            call exchange_nod(iwe_Av) !Warning: don't forget to communicate before averaging on elements!!!
+            call exchange_nod(iwe_Av, partit) !Warning: don't forget to communicate before averaging on elements!!!
             do elem=1, myDim_elem2D
                 elnodes1=elem2D_nodes(:,elem)
                 !!PS do nz=1,nlevels(elem)-1

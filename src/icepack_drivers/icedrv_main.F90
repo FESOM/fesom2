@@ -10,7 +10,7 @@
 
           use icedrv_kinds
           use icedrv_constants
-          use g_parsup,            only: mype
+          use mod_partit
 
           implicit none
 
@@ -64,6 +64,8 @@
           integer (kind=int_kind), save  :: max_ntrcr            ! number of tracers in total
           integer (kind=int_kind), save  :: nfreq                ! number of wave frequencies ! HARDWIRED FOR NOW
           integer (kind=int_kind), save  :: ndtd                 ! dynamic time steps per thermodynamic time step
+          type(t_partit), pointer, save  :: p_partit             ! a pointer to the mesh partitioning (has been accessed via "use g_parsup" in the previous versions)
+          integer (kind=int_kind), save  :: mype                 ! a copy of a mype which has been accessed via "use g_parsup" in the previous versions
 
           !=======================================================================
           ! 2. State variabels for icepack
@@ -751,8 +753,10 @@
           interface
 
               ! Read icepack namelists, setup the model parameter and write diagnostics               
-              module subroutine set_icepack()
+              module subroutine set_icepack(partit)
+                  use mod_partit
                   implicit none 
+                  type(t_partit), intent(inout), target :: partit
               end subroutine set_icepack
 
               ! Set up hemispheric masks 
@@ -788,10 +792,12 @@
               end subroutine init_history_bgc
 
               ! Initialize all
-              module subroutine init_icepack(mesh)
+              module subroutine init_icepack(tracer, mesh)
                   use mod_mesh
+                  use mod_tracer
                   implicit none
-                  type(t_mesh), intent(in), target :: mesh
+                  type(t_mesh),        intent(in), target :: mesh
+                  type(t_tracer_data), intent(in), target :: tracer
               end subroutine init_icepack
 
               ! Copy variables from fesom to icepack
@@ -858,7 +864,6 @@
                   use mod_mesh
                   use g_config,              only: dt
                   use i_PARAM,               only: whichEVP
-                  use g_parsup
                   use icepack_intfc,         only: icepack_ice_strength
                   implicit none
                   real (kind=dbl_kind), intent(out) :: &

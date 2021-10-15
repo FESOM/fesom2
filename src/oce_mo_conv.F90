@@ -1,20 +1,26 @@
 !
 !
 !_______________________________________________________________________________
-subroutine mo_convect(mesh)
+subroutine mo_convect(partit, mesh)
     USE o_PARAM
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
-    USE g_PARSUP
     USE g_config
     use i_arrays
     use g_comm_auto
     IMPLICIT NONE
 
-    integer                           :: node, elem, nz, elnodes(3), nzmin, nzmax
-    type(t_mesh), intent(in) , target :: mesh
+    integer                               :: node, elem, nz, elnodes(3), nzmin, nzmax
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+
     !___________________________________________________________________________
     ! add vertical mixing scheme of Timmermann and Beckmann, 2004,"Parameterization 
     ! of vertical mixing in the Weddell Sea!

@@ -1,10 +1,14 @@
-integer         , pointer :: nod2D 
-integer         , pointer :: elem2D   
-integer         , pointer :: edge2D   
+integer         , pointer :: nod2D,  myDim_nod2D, eDim_nod2D
+integer         , pointer :: elem2D, myDim_elem2D, eDim_elem2D, eXDim_elem2D
+integer         , pointer :: edge2D, myDim_edge2D, eDim_edge2D
 integer         , pointer :: edge2D_in
 real(kind=WP)   , pointer :: ocean_area
 real(kind=WP)   , pointer :: ocean_areawithcav
 integer         , pointer :: nl
+integer         , pointer :: nn_size
+
+
+
 real(kind=WP), dimension(:,:), pointer :: coord_nod2D, geo_coord_nod2D
 integer, dimension(:,:)      , pointer :: elem2D_nodes
 integer, dimension(:,:)      , pointer :: edges       
@@ -31,6 +35,25 @@ type(sparse_matrix)          , pointer :: ssh_stiff
 integer,       dimension(:)  , pointer :: cavity_flag_n, cavity_flag_e
 real(kind=WP), dimension(:)  , pointer :: cavity_depth
 integer,       dimension(:)  , pointer :: ulevels, ulevels_nod2D, ulevels_nod2D_max
+integer,       dimension(:)  , pointer :: nn_num
+integer,       dimension(:,:), pointer :: nn_pos
+
+real(kind=WP), dimension(:,:), pointer :: hnode
+real(kind=WP), dimension(:,:), pointer :: hnode_new
+real(kind=WP), dimension(:,:), pointer :: zbar_3d_n
+real(kind=WP), dimension(:,:), pointer :: Z_3d_n
+real(kind=WP), dimension(:,:), pointer :: helem
+real(kind=WP), dimension(:)  , pointer :: bottom_elem_thickness
+real(kind=WP), dimension(:)  , pointer :: bottom_node_thickness
+real(kind=WP), dimension(:)  , pointer :: dhe
+real(kind=WP), dimension(:)  , pointer :: hbar
+real(kind=WP), dimension(:)  , pointer :: hbar_old
+real(kind=WP), dimension(:)  , pointer :: zbar_n
+real(kind=WP), dimension(:)  , pointer :: Z_n
+real(kind=WP), dimension(:)  , pointer :: zbar_n_bot
+real(kind=WP), dimension(:)  , pointer :: zbar_e_bot
+real(kind=WP), dimension(:)  , pointer :: zbar_n_srf
+real(kind=WP), dimension(:)  , pointer :: zbar_e_srf
 
 nod2D              => mesh%nod2D              
 elem2D             => mesh%elem2D             
@@ -39,46 +62,17 @@ edge2D_in          => mesh%edge2D_in
 ocean_area         => mesh%ocean_area
 ocean_areawithcav  => mesh%ocean_areawithcav         
 nl                 => mesh%nl  
+nn_size            => mesh%nn_size
 
-!!$coord_nod2D        => mesh%coord_nod2D        
-!!$geo_coord_nod2D    => mesh%geo_coord_nod2D    
-!!$elem2D_nodes       => mesh%elem2D_nodes       
-!!$edges              => mesh%edges              
-!!$edge_tri           => mesh%edge_tri           
-!!$elem_edges         => mesh%elem_edges         
-!!$elem_area          => mesh%elem_area          
-!!$node_area          => mesh%node_area  
-!!$edge_dxdy          => mesh%edge_dxdy          
-!!$edge_cross_dxdy    => mesh%edge_cross_dxdy    
-!!$elem_cos           => mesh%elem_cos           
-!!$metric_factor      => mesh%metric_factor      
-!!$elem_neighbors     => mesh%elem_neighbors     
-!!$nod_in_elem2D      => mesh%nod_in_elem2D      
-!!$x_corners          => mesh%x_corners          
-!!$y_corners          => mesh%y_corners          
-!!$nod_in_elem2D_num  => mesh%nod_in_elem2D_num  
-!!$depth              => mesh%depth              
-!!$gradient_vec       => mesh%gradient_vec       
-!!$gradient_sca       => mesh%gradient_sca       
-!!$bc_index_nod2D     => mesh%bc_index_nod2D     
-!!$zbar               => mesh%zbar               
-!!$Z                  => mesh%Z
-!!$elem_depth         => mesh%elem_depth      
-!!$nlevels            => mesh%nlevels            
-!!$nlevels_nod2D      => mesh%nlevels_nod2D
-!!$nlevels_nod2D_min  => mesh%nlevels_nod2D_min
-!!$area               => mesh%area  
-!!$area2               => mesh%area2 
-!!$area_inv           => mesh%area_inv     
-!!$mesh_resolution    => mesh%mesh_resolution    
-!!$ssh_stiff          => mesh%ssh_stiff          
-!!$cavity_flag        => mesh%cavity_flag  
-!!$cavity_lev_nod2D   => mesh%cavity_lev_nod2D  
-!!$cavity_lev_elem2D  => mesh%cavity_lev_elem2D  
-!!$cavity_depth       => mesh%cavity_depth  
-!!$ulevels            => mesh%ulevels  
-!!$ulevels_nod2D      => mesh%ulevels_nod2D
-!!$ulevels_nod2D_max  => mesh%ulevels_nod2D_max
+
+myDim_nod2D  => p_partit%myDim_nod2D
+eDim_nod2D   => p_partit%eDim_nod2D
+myDim_elem2D => p_partit%myDim_elem2D
+eDim_elem2D  => p_partit%eDim_elem2D
+eXDim_elem2D => p_partit%eXDim_elem2D
+myDim_edge2D => p_partit%myDim_edge2D
+eDim_edge2D  => p_partit%eDim_edge2D
+
 
 coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D        
 geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D    
@@ -122,3 +116,23 @@ cavity_depth(1:myDim_nod2D+eDim_nod2D)                     => mesh%cavity_depth
 ulevels(1:myDim_elem2D+eDim_elem2D+eXDim_elem2D)           => mesh%ulevels            
 ulevels_nod2D(1:myDim_nod2D+eDim_nod2D)                    => mesh%ulevels_nod2D
 ulevels_nod2D_max(1:myDim_nod2D+eDim_nod2D)                => mesh%ulevels_nod2D_max
+nn_num(1:myDim_nod2D)                                      => mesh%nn_num
+nn_pos(1:mesh%nn_size, 1:myDim_nod2D)                      => mesh%nn_pos
+hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode
+hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new
+zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n
+Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n
+helem(1:mesh%nl-1, 1:myDim_elem2D)                         => mesh%helem
+bottom_elem_thickness(1:myDim_elem2D)                      => mesh%bottom_elem_thickness
+bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness
+dhe(1:myDim_elem2D)                                        => mesh%dhe
+hbar(1:myDim_nod2D+eDim_nod2D)                             => mesh%hbar
+hbar_old(1:myDim_nod2D+eDim_nod2D)                         => mesh%hbar_old
+zbar_n(1:mesh%nl)                                          => mesh%zbar_n
+Z_n(1:mesh%nl-1)                                           => mesh%Z_n
+zbar_n_bot(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_bot
+zbar_e_bot(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_bot
+zbar_n_srf(1:myDim_nod2D+eDim_nod2D)                       => mesh%zbar_n_srf
+zbar_e_srf(1:myDim_elem2D+eDim_elem2D)                     => mesh%zbar_e_srf
+
+

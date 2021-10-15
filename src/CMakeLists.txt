@@ -29,7 +29,7 @@ add_custom_command(OUTPUT 5303B6F4_E4F4_45B2_A6E5_8E2B9FB5CDC4 ${FESOM_GENERATED
 #if(${FESOM_STANDALONE})
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
-list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_C       ${src_home}/fort_part.c)
 
 # depends on the metis library

@@ -13,82 +13,112 @@
 ! 5. Leith_c=?    (need to be adjusted)
 module h_viscosity_leith_interface
   interface
-    subroutine h_viscosity_leith(mesh)
+    subroutine h_viscosity_leith(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_harmon_interface
   interface
-    subroutine visc_filt_harmon(mesh)
+    subroutine visc_filt_harmon(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_hbhmix_interface
   interface
-    subroutine visc_filt_hbhmix(mesh)
+    subroutine visc_filt_hbhmix(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_biharm_interface
   interface
-    subroutine visc_filt_biharm(option, mesh)
+    subroutine visc_filt_biharm(option, partit, mesh)
       use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
       integer       :: option
-      type(t_mesh), intent(in)  , target :: mesh
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_bcksct_interface
   interface
-    subroutine visc_filt_bcksct(mesh)
+    subroutine visc_filt_bcksct(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_bilapl_interface
   interface
-    subroutine visc_filt_bilapl(mesh)
+    subroutine visc_filt_bilapl(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_bidiff_interface
   interface
-    subroutine visc_filt_bidiff(mesh)
+    subroutine visc_filt_bidiff(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module visc_filt_dbcksc_interface
   interface
-    subroutine visc_filt_dbcksc(mesh)
+    subroutine visc_filt_dbcksc(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module backscatter_coef_interface
   interface
-    subroutine backscatter_coef(mesh)
+    subroutine backscatter_coef(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
 module uke_update_interface
   interface
-    subroutine uke_update(mesh)
+    subroutine uke_update(partit, mesh)
       use mod_mesh
-      type(t_mesh), intent(in)  , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
     end subroutine
   end interface
 end module
@@ -98,20 +128,25 @@ end module
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
 ! ===================================================================
-SUBROUTINE update_vel(mesh)
+SUBROUTINE update_vel(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
     integer       :: elem, elnodes(3), nz, m, nzmax, nzmin
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
@@ -127,21 +162,26 @@ SUBROUTINE update_vel(mesh)
         END DO
     END DO
     eta_n=eta_n+d_eta
-    call exchange_elem(UV)
+    call exchange_elem(UV, partit)
 end subroutine update_vel
 !==========================================================================
-subroutine compute_vel_nodes(mesh)
+subroutine compute_vel_nodes(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_PARAM
     USE o_ARRAYS
-    USE g_PARSUP
     use g_comm_auto
     IMPLICIT NONE
     integer            :: n, nz, k, elem, nln, uln, nle, ule
     real(kind=WP)      :: tx, ty, tvol
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     DO n=1, myDim_nod2D 
         uln = ulevels_nod2D(n)
@@ -165,13 +205,14 @@ subroutine compute_vel_nodes(mesh)
             Unode(2,nz,n)=ty/tvol
         END DO
     END DO
-    call exchange_nod(Unode)
+    call exchange_nod(Unode, partit)
 end subroutine compute_vel_nodes
 !===========================================================================
-subroutine viscosity_filter(option, mesh)
+subroutine viscosity_filter(option, partit, mesh)
 use o_PARAM
-use g_PARSUP
 use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 use h_viscosity_leith_interface
 use visc_filt_harmon_interface
 use visc_filt_hbhmix_interface
@@ -182,8 +223,10 @@ use visc_filt_bidiff_interface
 use visc_filt_dbcksc_interface
 use backscatter_coef_interface
 IMPLICIT NONE 
-integer                  :: option
-type(t_mesh), intent(in) , target :: mesh
+integer                               :: option
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+
 ! Driving routine 
 ! Background viscosity is selected in terms of Vl, where V is 
 ! background velocity scale and l is the resolution. V is 0.005 
@@ -198,54 +241,59 @@ CASE (1)
      ! ====
      ! Harmonic Leith parameterization
      ! ====
-     call h_viscosity_leith(mesh)
-     call visc_filt_harmon(mesh)
+     call h_viscosity_leith(partit, mesh)
+     call visc_filt_harmon(partit, mesh)
 CASE (2)
      ! ===
      ! Laplacian+Leith+biharmonic background
      ! ===
-     call h_viscosity_leith(mesh)
-     call visc_filt_hbhmix(mesh)
+     call h_viscosity_leith(partit, mesh)
+     call visc_filt_hbhmix(partit, mesh)
 CASE (3)
      ! ===
      ! Biharmonic Leith parameterization
      ! ===
-     call h_viscosity_leith(mesh)
-     call visc_filt_biharm(2, mesh)
+     call h_viscosity_leith(partit, mesh)
+     call visc_filt_biharm(2, partit, mesh)
 CASE (4)
      ! ===
      ! Biharmonic+upwind-type
      ! ===
-     call visc_filt_biharm(1, mesh)
+     call visc_filt_biharm(1, partit, mesh)
 CASE (5)
-     call visc_filt_bcksct(mesh)
+     call visc_filt_bcksct(partit, mesh)
 CASE (6)
-     call visc_filt_bilapl(mesh)
+     call visc_filt_bilapl(partit, mesh)
 CASE (7)
-     call visc_filt_bidiff(mesh)
+     call visc_filt_bidiff(partit, mesh)
 CASE (8)
-     call backscatter_coef(mesh)
-     call visc_filt_dbcksc(mesh) 
+     call backscatter_coef(partit, mesh)
+     call visc_filt_dbcksc(partit, mesh) 
 CASE DEFAULT
-     if (mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
-     call par_ex
+     if (partit%mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
 END SELECT
 end subroutine viscosity_filter  
 ! ===================================================================
-SUBROUTINE visc_filt_harmon(mesh)
+SUBROUTINE visc_filt_harmon(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 IMPLICIT NONE
 
 real(kind=WP) :: u1, v1, le(2), len, vi
 integer       :: nz, ed, el(2) , nzmin,nzmax
-type(t_mesh), intent(in) , target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -272,11 +320,12 @@ type(t_mesh), intent(in) , target :: mesh
  END DO
 end subroutine visc_filt_harmon
 ! ===================================================================
-SUBROUTINE visc_filt_biharm(option, mesh)
+SUBROUTINE visc_filt_biharm(option, partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -286,9 +335,13 @@ SUBROUTINE visc_filt_biharm(option, mesh)
     real(kind=WP) :: u1, v1, vi, len
     integer       :: ed, el(2), nz, option, nzmin, nzmax
     real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -350,8 +403,8 @@ SUBROUTINE visc_filt_biharm(option, mesh)
         end do
     end if
 
- call exchange_elem(U_c)
- call exchange_elem(V_c)
+ call exchange_elem(U_c, partit)
+ call exchange_elem(V_c, partit)
  DO ed=1, myDim_edge2D+eDim_edge2D
      ! check if its a boudnary edge
     if(myList_edge2D(ed)>edge2D_in) cycle
@@ -373,11 +426,12 @@ SUBROUTINE visc_filt_biharm(option, mesh)
  
 end subroutine visc_filt_biharm
 ! ===================================================================
-SUBROUTINE visc_filt_hbhmix(mesh)
+SUBROUTINE visc_filt_hbhmix(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -389,9 +443,13 @@ SUBROUTINE visc_filt_hbhmix(mesh)
     real(kind=WP)                      :: u1, v1, vi, len, crosslen, le(2)
     integer                            :: ed, el(2), nz, nzmin, nzmax
     real(kind=WP), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh),  intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -434,8 +492,8 @@ SUBROUTINE visc_filt_hbhmix(mesh)
             V_c(nz,ed)=-V_c(nz,ed)*vi
         END DO
     end do
-    call exchange_elem(U_c)
-    call exchange_elem(V_c)
+    call exchange_elem(U_c, partit)
+    call exchange_elem(V_c, partit)
     DO ed=1, myDim_edge2D+eDim_edge2D
         ! check if its a boudnary edge
         if(myList_edge2D(ed)>edge2D_in) cycle
@@ -458,13 +516,14 @@ SUBROUTINE visc_filt_hbhmix(mesh)
 end subroutine visc_filt_hbhmix
 
 ! ===================================================================
-SUBROUTINE h_viscosity_leith(mesh)
+SUBROUTINE h_viscosity_leith(partit, mesh)
     !
     ! Coefficient of horizontal viscosity is a combination of the Leith (with Leith_c) and modified Leith (with Div_c)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     use g_comm_auto
     IMPLICIT NONE
@@ -472,12 +531,15 @@ SUBROUTINE h_viscosity_leith(mesh)
     integer        :: elem, nl1, nz, elnodes(3), n, k, nt, ul1
     real(kind=WP)  :: leithx, leithy
     real(kind=WP), allocatable :: aux(:,:) 
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
-
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !  
-    if(mom_adv<4) call relative_vorticity(mesh)  !!! vorticity array should be allocated
+    if(mom_adv<4) call relative_vorticity(partit, mesh)  !!! vorticity array should be allocated
     ! Fill in viscosity:
     Visc = 0.0_WP
     DO  elem=1, myDim_elem2D    	!! m=1, myDim_elem2D
@@ -539,7 +601,7 @@ SUBROUTINE h_viscosity_leith(mesh)
                 aux(nz,n)=vi/dz
            END DO
         END DO 
-        call exchange_nod(aux)
+        call exchange_nod(aux, partit)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             nl1=nlevels(elem)-1
@@ -556,15 +618,16 @@ SUBROUTINE h_viscosity_leith(mesh)
             END Do
         end do
     end do
-    call exchange_elem(Visc)
+    call exchange_elem(Visc, partit)
     deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
-SUBROUTINE visc_filt_bcksct(mesh)
+SUBROUTINE visc_filt_bcksct(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
@@ -572,9 +635,13 @@ SUBROUTINE visc_filt_bcksct(mesh)
     real(kind=8)  :: u1, v1, len, vi 
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
     real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
-    type(t_mesh), intent(in) , target :: mesh
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
@@ -610,8 +677,8 @@ SUBROUTINE visc_filt_bcksct(mesh)
             V_b(nz,el(2))=V_b(nz,el(2))+v1/elem_area(el(2))
         END DO 
     END DO
-    call exchange_elem(U_b)
-    call exchange_elem(V_b)
+    call exchange_elem(U_b, partit)
+    call exchange_elem(V_b, partit)
     ! ===========
     ! Compute smoothed viscous term: 
     ! ===========
@@ -633,8 +700,8 @@ SUBROUTINE visc_filt_bcksct(mesh)
             V_c(nz,ed)=v1/vi
         END DO
     END DO
-    call exchange_nod(U_c)
-    call exchange_nod(V_c)
+    call exchange_nod(U_c, partit)
+    call exchange_nod(V_c, partit)
     do ed=1, myDim_elem2D
         nelem=elem2D_nodes(:,ed)
         nzmin = ulevels(ed)
@@ -655,20 +722,26 @@ end subroutine visc_filt_bcksct
 ! \nu=|3u_c-u_n1-u_n2-u_n3|*sqrt(S_c)/100. There is an additional term
 ! in viscosity that is proportional to the velocity amplitude squared.
 ! The coefficient has to be selected experimentally.
-SUBROUTINE visc_filt_bilapl(mesh)
+SUBROUTINE visc_filt_bilapl(partit, mesh)
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
-!
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
     U_c=0.0_WP
@@ -704,8 +777,8 @@ SUBROUTINE visc_filt_bilapl(mesh)
         END DO
     end do
     
-    call exchange_elem(U_c)
-    call exchange_elem(V_c)
+    call exchange_elem(U_c, partit)
+    call exchange_elem(V_c, partit)
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -731,21 +804,25 @@ end subroutine visc_filt_bilapl
 ! On each edge, \nu=sqrt(|u_c1-u_c2|*sqrt(S_c1+S_c2)/100)
 ! The effect is \nu^2
 ! Quadratic in velocity term can be introduced if needed.
-SUBROUTINE visc_filt_bidiff(mesh)
+SUBROUTINE visc_filt_bidiff(partit, mesh)
     USE MOD_MESH
-    USE o_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     USE o_ARRAYS
     USE o_PARAM
-    USE g_PARSUP
     USE g_CONFIG
     USE g_comm_auto
     IMPLICIT NONE
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -773,8 +850,8 @@ SUBROUTINE visc_filt_bidiff(mesh)
         END DO 
     END DO
     
-    call exchange_elem(U_c)
-    call exchange_elem(V_c)
+    call exchange_elem(U_c, partit)
+    call exchange_elem(V_c, partit)
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -803,11 +880,12 @@ end subroutine visc_filt_bidiff
 
 
 ! ===================================================================
-SUBROUTINE visc_filt_dbcksc(mesh)
+SUBROUTINE visc_filt_dbcksc(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 USE g_comm_auto
 USE g_support
@@ -818,8 +896,13 @@ real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1
 integer       :: nz, ed, el(2)
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:), UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
 real(kind=8), allocatable  :: uuu(:)
-type(t_mesh), intent(in) , target :: mesh
-#include "associate_mesh.h"
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
  ! on triangles, which is Visc*Laplacian/4 on equilateral triangles. 
@@ -869,8 +952,8 @@ allocate(uuu(ed))
  end do
 
 
- call exchange_elem(U_c)
- call exchange_elem(V_c) 
+ call exchange_elem(U_c, partit)
+ call exchange_elem(V_c, partit) 
 
  DO ed=1, myDim_edge2D+eDim_edge2D
     if(myList_edge2D(ed)>edge2D_in) cycle
@@ -920,16 +1003,16 @@ allocate(uuu(ed))
     END DO 
  END DO
  
-call exchange_elem(UV_back)
+call exchange_elem(UV_back, partit)
 
 DO  nz=1, nl-1
     uuu=0.0_8
     uuu=UV_back(1,nz,:)
-    call smooth_elem(uuu,smooth_back_tend, mesh)
+    call smooth_elem(uuu,smooth_back_tend, partit, mesh)
     UV_back(1,nz,:)=uuu
     uuu=0.0_8
     uuu=UV_back(2,nz,:)
-    call smooth_elem(uuu,smooth_back_tend, mesh)
+    call smooth_elem(uuu,smooth_back_tend, partit, mesh)
     UV_back(2,nz,:)=uuu 
 END DO
 
@@ -945,7 +1028,7 @@ END DO
  UV_back_tend=UV_back
  uke_dif=uke_d
  
- call uke_update(mesh)
+ call uke_update(partit, mesh)
  deallocate(V_c,U_c)
  deallocate(UV_dis,UV_back) 
  deallocate(uke_d)
@@ -954,17 +1037,22 @@ END DO
 end subroutine visc_filt_dbcksc
 !===========================================================================
 
-SUBROUTINE backscatter_coef(mesh)
+SUBROUTINE backscatter_coef(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 IMPLICIT NONE
-type(t_mesh), intent(in) , target :: mesh
-integer                 :: elem, nz
-#include "associate_mesh.h"
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+integer                               :: elem, nz
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 !Potentially add the Rossby number scaling to the script...
 !check if sign is right! Different in the Jansen paper
@@ -980,16 +1068,17 @@ v_back(nz,elem)=min(-c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.
      END DO
 END DO
 
-call exchange_elem(v_back)
+call exchange_elem(v_back, partit)
 
 end subroutine backscatter_coef
 !===========================================================================
 
-SUBROUTINE uke_update(mesh)
+SUBROUTINE uke_update(partit, mesh)
 USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_ARRAYS
 USE o_PARAM
-USE g_PARSUP
 USE g_CONFIG
 use g_comm_auto
 USE g_support
@@ -1000,18 +1089,19 @@ IMPLICIT NONE
 
 !Why is it necessary to implement the length of the array? It doesn't work without!
 !integer, intent(in)        :: t_levels
-type(t_mesh), intent(in) , target :: mesh
-!real(kind=8), dimension(:,:,:), intent(in)   :: UV_dis, UV_back
-!real(kind=8), dimension(:,:), intent(in)   :: UV_dif
-!real(kind=8), intent(in)   :: UV_dis(nl-1,myDim_elem2D+eDim_elem2D), UV_back(nl-1, myDim_elem2D+eDim_elem2D)
-!real(kind=8), intent(in)   :: UV_dif(nl-1,myDim_elem2D+eDim_elem2D)
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
 real(kind=8)		   :: hall, h1_eta, hnz, vol
 integer			   :: elnodes(3), nz, ed, edi, node, j, elem, q
 real(kind=8), allocatable  :: uuu(:), work_array(:), U_work(:,:), V_work(:,:), rosb_array(:,:), work_uv(:)
 integer			   :: kk, nzmax, el
 real(kind=8)       :: c1, rosb, vel_u, vel_v, vel_uv, scaling, reso
 real*8             :: c_min=0.5, f_min=1.e-6, r_max=200000., ex, ey, a1, a2, len_reg, dist_reg(2) ! Are those values still correct?
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
 !rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
 !rossby_num=2
 
@@ -1030,7 +1120,7 @@ END DO
 DO  nz=1,nl-1
     uuu=0.0_8
     uuu=uke_back(nz,:)
-    call smooth_elem(uuu,smooth_back, mesh) !3) ?
+    call smooth_elem(uuu,smooth_back, partit, mesh) !3) ?
     uke_back(nz,:)=uuu
 END DO
 
@@ -1043,7 +1133,7 @@ ed=myDim_elem2D+eDim_elem2D
 allocate(U_work(nl-1,myDim_nod2D+eDim_nod2D),V_work(nl-1,myDim_nod2D+eDim_nod2D))
 allocate(work_uv(myDim_nod2D+eDim_nod2D))
 allocate(rosb_array(nl-1,ed))
-call exchange_elem(UV)
+call exchange_elem(UV, partit)
 rosb_array=0._8
 DO nz=1, nl-1
     work_uv=0._WP
@@ -1061,10 +1151,10 @@ DO nz=1, nl-1
        V_work(nz,node)=U_work(nz,node)/vol
     END DO
     work_uv=U_work(nz,:)
-    call exchange_nod(work_uv)
+    call exchange_nod(work_uv, partit)
     U_work(nz,:)=work_uv
     work_uv=V_work(nz,:)
-    call exchange_nod(work_uv)
+    call exchange_nod(work_uv, partit)
     V_work(nz,:)=work_uv    
 END DO
 
@@ -1132,11 +1222,10 @@ END DO
 deallocate(U_work, V_work)
 deallocate(rosb_array)
 deallocate(work_uv)
-call exchange_elem(uke_dis)
-!call exchange_elem(uke_dif)
+call exchange_elem(uke_dis, partit)
 DO nz=1, nl-1  
     uuu=uke_dis(nz,:)
-    call smooth_elem(uuu,smooth_dis, mesh)
+    call smooth_elem(uuu,smooth_dis, partit, mesh)
     uke_dis(nz,:)=uuu
 END DO
 DO ed=1, myDim_elem2D
@@ -1146,7 +1235,7 @@ DO ed=1, myDim_elem2D
     uke(nz,ed)=uke(nz,ed)+1.5_8*uke_rhs(nz,ed)-0.5_8*uke_rhs_old(nz,ed)
     END DO
 END DO
-call exchange_elem(uke)
+call exchange_elem(uke, partit)
 
 deallocate(uuu)
 end subroutine uke_update

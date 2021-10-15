@@ -3,7 +3,7 @@
 !
 module g_read_other_NetCDF
 contains
-subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh)
+subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, partit, mesh)
   ! Read 2D data and interpolate to the model grid.
   ! Currently used to read runoff and SSS.
   ! First, missing values are filled in on the raw regular grid;
@@ -16,11 +16,13 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   use g_config
   use o_param
   USE MOD_MESH
-  use g_parsup
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)  , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                    :: i, j, ii, jj, k, n, num, flag, cnt
   integer                    :: itime, latlen, lonlen
   integer                    :: status, ncid, varid
@@ -30,13 +32,17 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   real(real64), allocatable  :: lon(:), lat(:)
   real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
   real(real64), allocatable  :: temp_x(:), temp_y(:)
-  real(real64)               :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(*)               :: vari
   character(*)               :: file
   logical                    :: check_dummy
   integer                    :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
 
   if (mype==0) then
      ! open file
@@ -47,7 +53,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -144,13 +150,13 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, mesh
   ! interpolation
   flag=0
   call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
-       model_2Darray, flag) 
+       model_2Darray, flag, partit) 
   deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
 end subroutine read_other_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-  subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, mesh)
+subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit, mesh)
     ! Read WOA (NetCDF) surface T/S and interpolate to the model grid.
     ! Currently used for surface restoring in case of ocean-alone models
     ! Calling interp_2d_field_v2 to do interpolation, which also treats the dummy value.
@@ -160,12 +166,13 @@ end subroutine read_other_NetCDF
     use g_config
     use o_param
     USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use g_rotate_grid
-    use g_parsup
     implicit none
-
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: i, j,  n, num
   integer                       :: itime, latlen, lonlen
   integer                       :: status, ncid, varid
@@ -175,13 +182,16 @@ end subroutine read_other_NetCDF
   real(real64), allocatable     :: lon(:), lat(:)
   real(real64), allocatable     :: ncdata(:,:)
   real(real64), allocatable     :: temp_x(:), temp_y(:)
-  real(real64)                  :: model_2Darray(myDim_nod2d+eDim_nod2D)   
+  real(real64)                  :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(15)                 :: vari
   character(300)                :: file
   logical                       :: check_dummy
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
      ! open file
@@ -192,7 +202,7 @@ end subroutine read_other_NetCDF
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 
@@ -265,36 +275,41 @@ end subroutine read_other_NetCDF
   end do
   ! interpolation
   call interp_2d_field_v2(lonlen, latlen, lon, lat, ncdata, miss, &
-       num, temp_x, temp_y, model_2Darray) 
+       num, temp_x, temp_y, model_2Darray, partit) 
   deallocate(temp_y, temp_x, ncdata, lon, lat)
 end subroutine read_surf_hydrography_NetCDF
 !
 !------------------------------------------------------------------------------------
 !
-subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)  
+subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, mesh)  
 
   use, intrinsic :: ISO_FORTRAN_ENV
 
   use g_config
   use o_param
   USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use g_rotate_grid
-  use g_parsup
   implicit none
 
 #include "netcdf.inc" 
-  type(t_mesh), intent(in)     , target :: mesh
+  type(t_mesh),   intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
   integer                       :: n, i
   integer                       :: itime
   integer                       :: status, ncid, varid
   integer                       :: istart(2), icount(2)
   real(real64)                  :: ncdata(mesh%nod2D)
-  real(real64),   intent(out)	:: model_2Darray(myDim_nod2D+eDim_nod2D)
-  character(*), intent(in) 	:: file
+  real(real64),   intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+  character(*),  intent(in) 	:: file
   character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   if (mype==0) then
     ! open file
@@ -304,7 +319,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, mesh)
   if (status.ne.nf_noerr)then
      print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
      print*,'Error in opening netcdf file'//file
-     call par_ex
+     call par_ex(partit%MPI_COMM_FESOM, partit%mype)
      stop
   endif
 

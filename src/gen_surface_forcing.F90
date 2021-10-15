@@ -33,10 +33,11 @@ MODULE g_sbf
    !!   sbc_ini  -- inizialization atmpospheric forcing
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
-   USE o_ARRAYS
    USE MOD_MESH
+   USE MOD_PARTIT
+   USE MOD_PARSUP
+   USE o_ARRAYS
    USE o_PARAM
-   USE g_PARSUP
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
@@ -178,37 +179,37 @@ MODULE g_sbf
 
 
 CONTAINS
-   SUBROUTINE nc_readTimeGrid(flf)
+   SUBROUTINE nc_readTimeGrid(flf, partit)
    ! Read time array and grid from nc file
-      IMPLICIT NONE
- 
-     type(flfi_type),intent(inout) :: flf
-      integer                      :: iost !I/O status     
-      integer                      :: ncid      ! netcdf file id
-      integer                      :: i
+      IMPLICIT NONE 
+      type(flfi_type),intent(inout)         :: flf
+      type(t_partit), intent(inout), target :: partit
+      integer                               :: iost !I/O status     
+      integer                               :: ncid      ! netcdf file id
+      integer                               :: i
       ! ID dimensions and variables:
-      integer                      :: id_lon
-      integer                      :: id_lat
-      integer                      :: id_lond
-      integer                      :: id_latd
-      integer                      :: id_time
-      integer                      :: id_timed      
-      integer                      :: nf_start(4)
-      integer                      :: nf_edges(4)         
-      integer                      :: ierror              ! return error code
-      character(len=20)            :: aux_calendar
-      integer                      :: aux_len
+      integer                               :: id_lon
+      integer                               :: id_lat
+      integer                               :: id_lond
+      integer                               :: id_latd
+      integer                               :: id_time
+      integer                               :: id_timed      
+      integer                               :: nf_start(4)
+      integer                               :: nf_edges(4)         
+      integer                               :: ierror              ! return error code
+      character(len=20)                     :: aux_calendar
+      integer                               :: aux_len
 
       !open file
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_open(trim(flf%file_name),NF_NOWRITE,ncid)
       end if
 
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
 
       ! get dimensions
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lat",      id_latd)
@@ -220,10 +221,10 @@ CONTAINS
             iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)  
 
-      if (mype==0) then 
+      if (partit%mype==0) then 
          iost = nf_inq_dimid(ncid,    "LON",       id_lond)
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "lon",       id_lond)
@@ -235,10 +236,10 @@ CONTAINS
             iost = nf_inq_dimid(ncid, "LON1",      id_lond)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name) 
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit) 
 
-      if (mype==0) then   
+      if (partit%mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_dimid(ncid, "time",  id_timed)
@@ -247,11 +248,11 @@ CONTAINS
                  iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)  
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)  
 
       ! get variable id
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid,    "LAT",      id_lat)
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "lat",      id_lat)
@@ -263,9 +264,9 @@ CONTAINS
             iost = nf_inq_varid(ncid, "LAT1",     id_lat)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
-      if (mype==0) then
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid,    "LON",       id_lon)
          if      (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "longitude", id_lon)
@@ -277,10 +278,10 @@ CONTAINS
             iost = nf_inq_varid(ncid, "LON1",      id_lon)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
 
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
          if      (iost .ne. NF_NOERR) then
                  iost = nf_inq_varid(ncid, "time", id_time)
@@ -289,28 +290,28 @@ CONTAINS
                  iost = nf_inq_varid(ncid, "TIME1",id_time)
          end if
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)   
       ! get dimensions size
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_dimlen(ncid, id_latd, flf%nc_Nlat)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
-      if (mype==0) then      
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
+      if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_lond, flf%nc_Nlon)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)   
-      if (mype==0) then      
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)   
+      if (partit%mype==0) then      
          iost = nf_inq_dimlen(ncid, id_timed,flf%nc_Ntime)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name) 
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit) 
       flf%nc_Nlon=flf%nc_Nlon+2 !for the halo in case of periodic boundary
-      call MPI_BCast(flf%nc_Nlon,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(flf%nc_Nlat,   1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(flf%nc_Ntime,  1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_Nlon,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_Nlat,   1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_Ntime,  1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
          
       if (.not. allocated(flf%nc_time)) then
          allocate( flf%nc_lon(flf%nc_Nlon), flf%nc_lat(flf%nc_Nlat),&
@@ -323,38 +324,38 @@ CONTAINS
     !____________________________________________________________________________   
     !read variables from file
     ! read lat
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlat
          iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, flf%nc_lat)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
       
     ! read lon  
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Nlon-2
          iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, flf%nc_lon(2:flf%nc_Nlon-1))
          flf%nc_lon(1)        =flf%nc_lon(flf%nc_Nlon-1)
          flf%nc_lon(flf%nc_Nlon)  =flf%nc_lon(2)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)      
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
+      call check_nferr(iost,flf%file_name,partit)
     !____________________________________________________________________________
     ! read time axis from file
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=flf%nc_Ntime
          iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
          ! digg for calendar attribute in time axis variable         
       end if
-      call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
       
       ! digg for calendar attribute in time axis variable
-      if (mype==0 .and. use_flpyrcheck) then
+      if (partit%mype==0 .and. use_flpyrcheck) then
          iost = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
          iost = nf_get_att(ncid, id_time,'calendar',aux_calendar)
          aux_calendar = aux_calendar(1:aux_len)
@@ -385,7 +386,7 @@ CONTAINS
                 write(*,*) '          message block in gen_surface_forcing.F90.'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(0)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
          elseif ((trim(flf%calendar).eq.'julian')    .or. &
                  (trim(flf%calendar).eq.'gregorian') .or. &
@@ -406,7 +407,7 @@ CONTAINS
                 write(*,*) '          gen_surface_forcing.F90'
                 write(*,*) '____________________________________________________________'
                 print *, achar(27)//'[0m'
-                call par_ex(0)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
          else
             print *, achar(27)//'[31m'
@@ -425,7 +426,7 @@ CONTAINS
             write(*,*) '        example with ncdump -h forcing_file.nc '
             write(*,*) '____________________________________________________________'
             print *, achar(27)//'[0m'
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
          end if 
       end if
       
@@ -439,8 +440,8 @@ CONTAINS
            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
          end if
       end if
-      call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     !flip lat and data in case of lat from -90 to 90
@@ -450,15 +451,15 @@ CONTAINS
          if ( flf%nc_lat(1) > flf%nc_lat(flf%nc_Nlat) ) then
             flip_lat = 1
             flf%nc_lat=flf%nc_lat(flf%nc_Nlat:1:-1)
-            if (mype==0) write(*,*) "fv_sbc: nc_readTimeGrid: FLIP lat and data while lat from -90 to 90"
+            if (partit%mype==0) write(*,*) "fv_sbc: nc_readTimeGrid: FLIP lat and data while lat from -90 to 90"
          endif
       endif
 
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_close(ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-      call check_nferr(iost,flf%file_name)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      call check_nferr(iost,flf%file_name,partit)
 
       if (ic_cyclic) then
          flf%nc_lon(1)      =flf%nc_lon(1)-360._WP
@@ -510,7 +511,7 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   SUBROUTINE nc_sbc_ini(rdate, mesh)
+   SUBROUTINE nc_sbc_ini(rdate, partit, mesh)
       !!---------------------------------------------------------------------
       !! ** Purpose : initialization of ocean forcing from NETCDF file
       !!----------------------------------------------------------------------
@@ -528,9 +529,12 @@ CONTAINS
       real(wp)                 :: x, y       ! coordinates of elements
       integer                  :: fld_idx
       type(flfi_type), pointer :: flf
-      type(t_mesh), intent(in)              , target :: mesh
-
-#include "associate_mesh.h"
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
 ! used for interpolate on elements
 !      ALLOCATE( bilin_indx_i(elem2D),bilin_indx_j(elem2D), &
@@ -546,7 +550,7 @@ CONTAINS
       call nc_sbc_ini_fillnames(yyyy)
       ! we assume that all NetCDF files have identical grid and time variable
       do fld_idx = 1, i_totfl
-         call nc_readTimeGrid(sbc_flfi(fld_idx))
+         call nc_readTimeGrid(sbc_flfi(fld_idx), partit)
       end do
       if (lfirst) then
       do fld_idx = 1, i_totfl
@@ -589,13 +593,13 @@ CONTAINS
       end if
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
-         call getcoeffld(fld_idx, rdate, mesh)
+         call getcoeffld(fld_idx, rdate, partit, mesh)
       end do
          ! interpolate in time
-      call data_timeinterp(rdate)
+      call data_timeinterp(rdate, partit)
    END SUBROUTINE nc_sbc_ini
 
-   SUBROUTINE getcoeffld(fld_idx, rdate, mesh)
+   SUBROUTINE getcoeffld(fld_idx, rdate, partit, mesh)
       use forcing_provider_async_module
       use io_netcdf_workaround_module
       !!---------------------------------------------------------------------
@@ -606,6 +610,8 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       IMPLICIT NONE
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
       integer, intent(in)  :: fld_idx
       real(wp),intent(in)  :: rdate ! initialization date
       integer              :: iost  !I/O status
@@ -634,12 +640,14 @@ CONTAINS
       character(len=MAX_PATH), pointer   :: file_name
       character(len=34) , pointer   :: var_name
       real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
-      type(t_mesh), intent(in) , target :: mesh
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
 
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
       ! fld_idx determines which ouf our forcing fields we use here
       nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
@@ -658,7 +666,7 @@ CONTAINS
         sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
         allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
         sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
-        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed)
+        sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
       end if
       rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
 
@@ -848,7 +856,7 @@ CONTAINS
 !!$OMP END PARALLEL
    END SUBROUTINE getcoeffld
 
-   SUBROUTINE data_timeinterp(rdate)
+   SUBROUTINE data_timeinterp(rdate, partit)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE data_timeinterp ***
       !!
@@ -857,7 +865,8 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       IMPLICIT NONE
-      real(wp),intent(in)    :: rdate  ! seconds
+      type(t_partit), intent(inout), target :: partit
+      real(wp),       intent(in)            :: rdate  ! seconds
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
@@ -865,7 +874,7 @@ CONTAINS
 !!$OMP PARALLEL
 !!$OMP DO
       do fld_idx = 1, i_totfl
-         do i = 1, myDim_nod2D+eDim_nod2D
+         do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
             ! store processed forcing data for fesom computation
             atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
          end do !nod2D
@@ -874,7 +883,7 @@ CONTAINS
 !!$OMP END PARALLEL
    END SUBROUTINE data_timeinterp
 
-   SUBROUTINE sbc_ini(mesh)
+   SUBROUTINE sbc_ini(partit, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_ini ***
       !!
@@ -890,7 +899,8 @@ CONTAINS
       integer            :: sbc_alloc                   !: allocation status
 
       real(wp)           :: tx, ty
-      type(t_mesh), intent(in)   , target :: mesh
+      type(t_mesh),   intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
@@ -899,13 +909,19 @@ CONTAINS
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
       ! OPEN and read namelist for SBC
       open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
       else
          if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist_bc.nml',' ; iostat=',iost
-         call par_ex
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
@@ -1023,13 +1039,13 @@ CONTAINS
       emp          = 0.0_WP
       qsr          = 0.0_WP
       ALLOCATE(sbc_flfi(i_totfl))
-      call nc_sbc_ini(rdate, mesh)
+      call nc_sbc_ini(rdate, partit, mesh)
       !==========================================================================
       ! runoff    
       if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
          ! runoff in CORE is constant in time
          ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., mesh) 
+         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., partit, mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
       end if
 
@@ -1037,7 +1053,7 @@ CONTAINS
       if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
    END SUBROUTINE sbc_ini
 
-   SUBROUTINE sbc_do(mesh)
+   SUBROUTINE sbc_do(partit, mesh)
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -1054,10 +1070,14 @@ CONTAINS
       integer      :: yyyy, dd, mm
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
-      character(len=MAX_PATH)   :: filename
-      type(t_mesh), intent(in) , target :: mesh
+      character(len=MAX_PATH)               :: filename
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
       
-#include  "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
       force_newcoeff=.false.
       if (yearnew/=yearold) then
@@ -1067,7 +1087,7 @@ CONTAINS
          call nc_sbc_ini_fillnames(yyyy)
          ! we assume that all NetCDF files have identical grid and time variable
          do fld_idx = 1, i_totfl
-            call nc_readTimeGrid(sbc_flfi(fld_idx))            
+            call nc_readTimeGrid(sbc_flfi(fld_idx), partit)            
          end do
          force_newcoeff=.true.
       end if
@@ -1084,7 +1104,7 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
-            call getcoeffld(fld_idx, rdate, mesh)
+            call getcoeffld(fld_idx, rdate, partit, mesh)
             if (fld_idx==i_xwind) do_rotation=.true.
          endif
       end do
@@ -1109,7 +1129,7 @@ CONTAINS
                if (mstep > 1) i=i+1 
                if (i > 12) i=1
                if (mype==0) write(*,*) 'Updating SSS restoring data for month ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., mesh) 
+               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., partit, mesh) 
             end if
          end if
       end if
@@ -1125,7 +1145,7 @@ CONTAINS
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
            filename=trim(nm_runoff_file)
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
            runoff=runoff/1000.0_WP
@@ -1137,7 +1157,7 @@ CONTAINS
            if (i > 12) i=1
            if (mype==0) write(*,*) 'Updating monthly runoff for month ', i 
            filename=trim(nm_runoff_file)//cyearnew//'.nc' 
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, mesh)
+           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
            runoff=runoff/1000.0_WP
@@ -1149,26 +1169,9 @@ CONTAINS
 
 
       ! interpolate in time
-      call data_timeinterp(rdate)
+      call data_timeinterp(rdate, partit)
    END SUBROUTINE sbc_do
 
-
-   SUBROUTINE err_call(iost,fname)
-      !!---------------------------------------------------------------------
-      !!                    ***  ROUTINE  err_call ***
-      !!
-      !! ** Purpose : call Error
-      !! ** Method  :
-      !! ** Action  :
-      !!----------------------------------------------------------------------
-   IMPLICIT NONE
-      integer, intent(in)            :: iost
-      character(len=MAX_PATH), intent(in) :: fname
-      write(*,*) 'ERROR: I/O status=',iost,' file= ',fname
-      STOP 'ERROR:  stop'
-
-
-   END SUBROUTINE err_call
 
    FUNCTION julday(yyyy,mm,dd)
 
@@ -1259,14 +1262,15 @@ CONTAINS
                   &  qns, emp, qsr)
    END SUBROUTINE sbc_end
 
-   SUBROUTINE check_nferr(iost,fname)
+   SUBROUTINE check_nferr(iost,fname, partit)
    IMPLICIT NONE
-      character(len=MAX_PATH), intent(in) :: fname
-      integer, intent(in) :: iost
+      type(t_partit),          intent(inout), target :: partit
+      character(len=MAX_PATH), intent(in)            :: fname
+      integer, intent(in)                            :: iost
 
       if (iost .ne. NF_NOERR) then
          write(*,*) 'ERROR: I/O status= "',trim(nf_strerror(iost)),'";',iost,' file= ',fname
-         call par_ex
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
    END SUBROUTINE check_nferr

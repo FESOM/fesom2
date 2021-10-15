@@ -15,7 +15,8 @@ module g_cvmix_tidal
     use g_config , only: dt
     use o_param           
     use mod_mesh
-    use g_parsup
+    USE MOD_PARTIT
+    USE MOD_PARSUP
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -76,13 +77,17 @@ module g_cvmix_tidal
     !===========================================================================
     ! allocate and initialize IDEMIX variables --> call initialisation 
     ! routine from cvmix library
-    subroutine init_cvmix_tidal(mesh)
+    subroutine init_cvmix_tidal(partit, mesh)
         
         character(len=MAX_PATH)  :: nmlfile
         logical                  :: file_exist=.False.
         integer                  :: node_size
-        type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -134,7 +139,7 @@ module g_cvmix_tidal
         inquire(file=trim(tidal_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (mype==0) write(*,*) ' --> read TIDAL near tidal bottom forcing'
-            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., mesh) 
+            call read_other_NetCDF(tidal_botforc_file, 'wave_dissipation', 1, tidal_forc_bottom_2D, .true., partit, mesh) 
             !!PS ! convert from W/m^2 to m^3/s^3
             !!PS tidal_forc_bottom_2D  = tidal_forc_bottom_2D/density_0
             ! --> the tidal energy for dissipation is divided by rho0 in 
@@ -148,7 +153,7 @@ module g_cvmix_tidal
                 write(*,*) '        --> check your namelist.cvmix, tidal_botforc_file &  '
                 write(*,*) '____________________________________________________________________'
             end if 
-            call par_ex(0)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -165,14 +170,17 @@ module g_cvmix_tidal
     !
     !===========================================================================
     ! calculate TIDAL mixing parameterisation
-    subroutine calc_cvmix_tidal(mesh)
-        type(t_mesh), intent(in), target :: mesh
+    subroutine calc_cvmix_tidal(partit, mesh)
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
         integer       :: node, elem, node_size
         integer       :: nz, nln, nun
         integer       :: elnodes(3)
         real(kind=WP) :: simmonscoeff, vertdep(mesh%nl)
-
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
         !_______________________________________________________________________
         node_size = myDim_nod2D
         do node = 1,node_size
@@ -226,13 +234,13 @@ module g_cvmix_tidal
         ! 
         ! MPIOM note 2: background diffusivities were already added in the mixed layer 
         !               scheme (KPP)
-        call exchange_nod(tidal_Kv)
+        call exchange_nod(tidal_Kv, partit)
         Kv = Kv + tidal_Kv
             
         !_______________________________________________________________________
         ! add tidal viscosity to main model diffusivity Av -->interpolate 
         ! therefor from nodes to elements
-        call exchange_nod(tidal_Av)
+        call exchange_nod(tidal_Av, partit)
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             !!PS do nz=1,nlevels(elem)-1

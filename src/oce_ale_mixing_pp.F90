@@ -1,5 +1,5 @@
 !=======================================================================
-subroutine oce_mixing_pp(mesh)
+subroutine oce_mixing_pp(partit, mesh)
     !  Compute Richardson number dependent Av and Kv following
     !  Pacanowski and Philander, 1981
     !  Av = Avmax * factor**2 + Av0,
@@ -15,19 +15,24 @@ subroutine oce_mixing_pp(mesh)
     ! SD no if in Kv computations (only minor differences are introduced)
     !    
     !      
-use MOD_MESH
+USE MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
-USE g_PARSUP
 USE g_config
 use i_arrays
 IMPLICIT NONE
 
-type(t_mesh), intent(in) , target :: mesh
-real(kind=WP)            :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
-integer                  :: node, nz, nzmax, nzmin, elem, elnodes(3), i
+type(t_mesh),   intent(in),    target :: mesh
+type(t_partit), intent(inout), target :: partit
+real(kind=WP)                    :: dz_inv, bv, shear, a, rho_up, rho_dn, t, s, Kv0_b
+integer                          :: node, nz, nzmax, nzmin, elem, elnodes(3), i
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2d(node)

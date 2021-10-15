@@ -1,5 +1,5 @@
 #if defined (__oasis)
-subroutine thermodynamics(mesh)
+subroutine thermodynamics(partit, mesh)
 
   !===================================================================
   !
@@ -14,55 +14,17 @@ subroutine thermodynamics(mesh)
   !         Wolfgang Dorn (AWI), Oct-2012 (h0min adapted)
   !
   !===================================================================
-  !---- variables from oce_modules.F90
-#if 0
-  use o_param,          only: ref_sss, ref_sss_local
-#ifdef use_fullfreesurf
-  use o_array,          only: real_salt_flux
-#endif
-  use g_parsup,         only: myDim_nod2D, eDim_nod2D
-#ifdef use_cavity
-  use o_mesh,           only: coord_nod2D, ulevels_nod2D
-#else
-  use o_mesh,           only: coord_nod2D
-#endif
-
-  !---- variables from ice_modules.F90
-  use i_dyn_parms,      only: Cd_oce_ice
-  use i_therm_parms,    only: rhowat, rhoice, rhosno, cc, cl, con, consn, Sice
-#if defined (__oifs)
-  use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
-       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, enthalpyoffuse, S_oc_array, T_oc_array
-#else
-  use i_array,          only: a_ice, m_ice, m_snow, u_ice, v_ice, u_w, v_w  &
-       , fresh_wa_flux, net_heat_flux, oce_heat_flux, ice_heat_flux, S_oc_array, T_oc_array
-#endif
-
-  !---- variables from gen_modules_config.F90
-  use g_config,         only: dt
-
-  !---- variables from gen_modules_forcing.F90
-#if defined (__oifs)
-  use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
-       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice  &
-       , enthalpyoffuse
-#else
-  use g_forcing_arrays, only: shortwave, evap_no_ifrac, sublimation  &
-       , prec_rain, prec_snow, runoff, evaporation, thdgr, thdgrsn, flice
-#endif
-  !---- variables from gen_modules_rotate_grid.F90
-  use g_rotate_grid,    only: r2g
-#endif
 
   use o_param
-  use mod_mesh
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_therm_param
   use i_param
   use i_arrays
   use g_config
   use g_forcing_param
   use g_forcing_arrays
-  use g_parsup
   use g_comm_auto
   use g_rotate_grid
   implicit none
@@ -87,11 +49,20 @@ subroutine thermodynamics(mesh)
   real(kind=WP)  :: geolon, geolat
   !---- minimum and maximum of the lead closing parameter
   real(kind=WP)  :: h0min = 0.5, h0max = 1.5
-  type(t_mesh), intent(in)   , target :: mesh  
 
   real(kind=WP), parameter :: Aimin = 0.001, himin = 0.005
-#include  "associate_mesh.h"
 
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+
+  integer, pointer                       :: myDim_nod2D, eDim_nod2D
+  integer,        dimension(:),  pointer :: ulevels_nod2D
+  real(kind=WP),  dimension(:,:),pointer :: geo_coord_nod2D
+
+  myDim_nod2d=>partit%myDim_nod2D
+  eDim_nod2D =>partit%eDim_nod2D
+  ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D
+  geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D) => mesh%geo_coord_nod2D
 
   rsss = ref_sss
 
@@ -134,14 +105,14 @@ subroutine thermodynamics(mesh)
 
 #if defined (__oifs)
      !---- different lead closing parameter for NH and SH
-     call r2g(geolon, geolat, coord_nod2d(1,inod), coord_nod2d(2,inod))
-     if (geolat.lt.0.) then
-        h0min = 1.0
-        h0max = 1.0
-     else
+     if (geo_coord_nod2D(2, inod)>0) then
         h0min = 0.3
         h0max = 0.3
+     else
+        h0min = 1.0
+        h0max = 1.0
      endif
+
      !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
      ! then send those to OpenIFS where they are used to calucate the 
      ! energy fluxes ---!

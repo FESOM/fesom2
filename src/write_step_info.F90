@@ -1,21 +1,41 @@
 module write_step_info_interface
   interface
-    subroutine write_step_info(istep,outfreq, mesh)
+    subroutine write_step_info(istep,outfreq,tracers,partit,mesh)
       use MOD_MESH
-      integer								:: istep,outfreq
-      type(t_mesh), intent(in)                               , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_TRACER
+      integer				    :: istep,outfreq
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_tracer), intent(in),    target :: tracers
     end subroutine
   end interface
 end module
-
+module check_blowup_interface
+  interface
+    subroutine check_blowup(istep, tracers,partit,mesh)
+      use MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_TRACER
+      integer				    :: istep
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_tracer), intent(in),    target :: tracers
+    end subroutine
+  end interface
+end module
 !
 !
 !===============================================================================
-subroutine write_step_info(istep,outfreq, mesh)
+subroutine write_step_info(istep, outfreq, tracers, partit, mesh)
 	use g_config, only: dt, use_ice
 	use MOD_MESH
+        USE MOD_PARTIT
+        USE MOD_PARSUP
+        use MOD_TRACER
 	use o_PARAM
-	use g_PARSUP
 	use o_ARRAYS
 	use i_ARRAYS
 	use g_comm_auto
@@ -32,8 +52,13 @@ subroutine write_step_info(istep,outfreq, mesh)
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-    type(t_mesh), intent(in)                               , target :: mesh
-#include "associate_mesh.h"
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in),    target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 	if (mod(istep,outfreq)==0) then
 		
 		!_______________________________________________________________________
@@ -63,8 +88,8 @@ subroutine write_step_info(istep,outfreq, mesh)
 			loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
 			loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
 !!PS 			loc_hflux = loc_hflux + area(1, n)*heat_flux(n)
-!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tr_arr(:,n,1))/(nlevels_nod2D(n)-1)
-!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tr_arr(:,n,2))/(nlevels_nod2D(n)-1)
+!!PS 			loc_temp  = loc_temp  + area(1, n)*sum(tracers%data(1)%values(:, n))/(nlevels_nod2D(n)-1)
+!!PS 			loc_salt  = loc_salt  + area(1, n)*sum(tracers%data(2)%values(:, n))/(nlevels_nod2D(n)-1)
 		end do
 		
 		!_______________________________________________________________________
@@ -102,9 +127,9 @@ subroutine write_step_info(istep,outfreq, mesh)
 		call MPI_AllREDUCE(loc , min_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(heat_flux(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(tr_arr(:,1:myDim_nod2D,1),MASK=(tr_arr(:,1:myDim_nod2D,2)/=0.0))
+		loc = minval(tracers%data(1)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , min_temp , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-		loc = minval(tr_arr(:,1:myDim_nod2D,2),MASK=(tr_arr(:,1:myDim_nod2D,2)/=0.0))
+		loc = minval(tracers%data(2)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , min_salt , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 		loc = minval(Wvel(1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , min_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
@@ -134,9 +159,9 @@ subroutine write_step_info(istep,outfreq, mesh)
 		call MPI_AllREDUCE(loc , max_wflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(heat_flux(1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_hflux, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(tr_arr(:,1:myDim_nod2D,1),MASK=(tr_arr(:,1:myDim_nod2D,2)/=0.0))
+		loc = maxval(tracers%data(1)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , max_temp , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-		loc = maxval(tr_arr(:,1:myDim_nod2D,2),MASK=(tr_arr(:,1:myDim_nod2D,2)/=0.0))
+		loc = maxval(tracers%data(2)%values(:,1:myDim_nod2D),MASK=(tracers%data(2)%values(:,1:myDim_nod2D)/=0.0))
 		call MPI_AllREDUCE(loc , max_salt , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		loc = maxval(Wvel(1,1:myDim_nod2D))
 		call MPI_AllREDUCE(loc , max_wvel , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
@@ -217,11 +242,13 @@ end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep, mesh)
+subroutine check_blowup(istep, tracers, partit, mesh)
 	use g_config, only: logfile_outfreq, which_ALE
 	use MOD_MESH
+        use MOD_TRACER
+        USE MOD_PARTIT
+        USE MOD_PARSUP
 	use o_PARAM
-	use g_PARSUP
 	use o_ARRAYS
 	use i_ARRAYS
 	use g_comm_auto
@@ -231,10 +258,15 @@ subroutine check_blowup(istep, mesh)
 	use write_step_info_interface
 	implicit none
 	
-	integer           :: n, nz, istep, found_blowup_loc=0, found_blowup=0
-	integer 		  :: el, elidx
-        type(t_mesh), intent(in), target :: mesh
-#include "associate_mesh.h"
+	integer                               :: n, nz, istep, found_blowup_loc=0, found_blowup=0
+	integer 		              :: el, elidx
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        type(t_tracer), intent(in),    target :: tracers
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
 ! ! 		if (mype==0) then 
@@ -361,8 +393,8 @@ subroutine check_blowup(istep, mesh)
 			do nz=1,nlevels_nod2D(n)-1
 				!_______________________________________________________________
 				! check temp
-				if ( (tr_arr(nz, n,1) /= tr_arr(nz, n,1)) .or. &
-					tr_arr(nz, n,1) < -5.0 .or. tr_arr(nz, n,1)>60) then
+				if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
+					tracers%data(1)%values(nz, n) < -5.0 .or. tracers%data(1)%values(nz, n)>60) then
 					found_blowup_loc=1
 					write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 					write(*,*) ' --STOP--> found temperture becomes NaN or <-5.0, >60'
@@ -374,10 +406,10 @@ subroutine check_blowup(istep, mesh)
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
-					write(*,*) 'temp(nz, n) = ',tr_arr(nz, n,1)
-					write(*,*) 'temp(: , n) = ',tr_arr(:, n,1)
-					write(*,*) 'temp_old(nz,n)= ',tr_arr_old(nz, n,1)
-					write(*,*) 'temp_old(: ,n)= ',tr_arr_old(:, n,1)
+					write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
+					write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
+					write(*,*) 'temp_old(nz,n)= ',tracers%data(1)%valuesAB(nz, n)
+					write(*,*) 'temp_old(: ,n)= ',tracers%data(1)%valuesAB(:, n)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
 					write(*,*) 'wflux       = ',water_flux(n)
@@ -412,12 +444,12 @@ subroutine check_blowup(istep, mesh)
 ! 					enddo
 					write(*,*)
 					
-				endif ! --> if ( (tr_arr(nz, n,1) /= tr_arr(nz, n,1)) .or. & ...
+				endif ! --> if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. & ...
 				
 				!_______________________________________________________________
 				! check salt
-				if ( (tr_arr(nz, n,2) /= tr_arr(nz, n,2)) .or.  &
-					tr_arr(nz, n,2) < 0 .or. tr_arr(nz, n,2)>50 ) then
+				if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
+					tracers%data(2)%values(nz, n) < 0 .or. tracers%data(2)%values(nz, n)>50 ) then
 					found_blowup_loc=1
 					write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
 					write(*,*) ' --STOP--> found salinity becomes NaN or <0, >50'
@@ -428,11 +460,11 @@ subroutine check_blowup(istep, mesh)
 					write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
 					write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
 					write(*,*) 'z=', Z_n(nz)
-					write(*,*) 'salt(nz, n) = ',tr_arr(nz, n,2)
-					write(*,*) 'salt(: , n) = ',tr_arr(:, n,2)
+					write(*,*) 'salt(nz, n) = ',tracers%data(2)%values(nz, n)
+					write(*,*) 'salt(: , n) = ',tracers%data(2)%values(:, n)
 					write(*,*)
-					write(*,*) 'temp(nz, n) = ',tr_arr(nz, n,1)
-					write(*,*) 'temp(: , n) = ',tr_arr(:, n,1)
+					write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
+					write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
 					write(*,*)
 					write(*,*) 'hflux       = ',heat_flux(n)
 					write(*,*)
@@ -466,7 +498,7 @@ subroutine check_blowup(istep, mesh)
 					write(*,*)
 					write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
 					write(*,*)
-				endif ! --> if ( (tr_arr(nz, n,2) /= tr_arr(nz, n,2)) .or.  & ...
+				endif ! --> if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  & ...
 			end do ! --> do nz=1,nlevels_nod2D(n)-1
 		end do ! --> do n=1, myDim_nod2d
 ! ! 	end if 
@@ -477,7 +509,7 @@ subroutine check_blowup(istep, mesh)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1,mesh)
+			call write_step_info(istep,1,tracers,partit,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)
@@ -497,8 +529,8 @@ subroutine check_blowup(istep, mesh)
 				write(*,*) '                  _____.,-#%&$@%#&#~,._____'
 				write(*,*)
 			end if
-			call blowup(istep, mesh)
+			call blowup(istep, tracers, partit, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
-			call par_ex
+			call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 		endif 
 end subroutine

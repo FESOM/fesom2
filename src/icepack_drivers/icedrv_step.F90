@@ -1121,7 +1121,6 @@ submodule (icedrv_main) icedrv_step
           use icepack_intfc,          only: icepack_ice_strength
           use g_config,               only: dt
           use i_PARAM,                only: whichEVP
-          use g_parsup
           use mod_mesh    
 
           implicit none
@@ -1240,14 +1239,14 @@ submodule (icedrv_main) icedrv_step
 
              select case (whichEVP)
                 case (0)
-                   call EVPdynamics(mesh)
+                   call EVPdynamics  (p_partit, mesh)
                 case (1)
-                   call EVPdynamics_m(mesh)
+                   call EVPdynamics_m(p_partit, mesh)
                 case (2)
-                   call EVPdynamics_a(mesh)
+                   call EVPdynamics_a(p_partit, mesh)
                 case default
                    if (mype==0) write(*,*) 'A non existing EVP scheme specified!'
-                   call par_ex
+                   call par_ex(p_partit%MPI_COMM_FESOM, p_partit%mype)
                    stop
              end select
 

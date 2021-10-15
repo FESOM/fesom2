@@ -1,24 +1,36 @@
 module ice_fct_interfaces
   interface
-    subroutine ice_mass_matrix_fill(mesh)
+    subroutine ice_mass_matrix_fill(partit, mesh)
       use MOD_MESH
-      type(t_mesh), intent(in)              , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
     end subroutine
 
-    subroutine ice_solve_high_order(mesh)
+    subroutine ice_solve_high_order(partit, mesh)
       use MOD_MESH
-      type(t_mesh), intent(in)              , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
     end subroutine
 
-    subroutine ice_solve_low_order(mesh)
+    subroutine ice_solve_low_order(partit, mesh)
       use MOD_MESH
-      type(t_mesh), intent(in)              , target :: mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
     end subroutine
     
-    subroutine ice_fem_fct(tr_array_id, mesh)
+    subroutine ice_fem_fct(tr_array_id, partit, mesh)
       use MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
       integer   :: tr_array_id
-      type(t_mesh), intent(in)              , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
     end subroutine
   end interface
 end module
@@ -36,19 +48,24 @@ end module
 ! The code is adapted from  FESOM
 !
 ! =====================================================================
-subroutine ice_TG_rhs(mesh)
+subroutine ice_TG_rhs(partit, mesh)
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_Arrays
   use i_PARAM
-  use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
   real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer         :: n, q, row, elem, elnodes(3)
-  type(t_mesh), intent(in)              , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! Taylor-Galerkin (Lax-Wendroff) rhs
     DO row=1, myDim_nod2D
@@ -101,17 +118,22 @@ end subroutine ice_TG_rhs
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_init(mesh)
+subroutine ice_fct_init(partit, mesh)
   use o_PARAM
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_ARRAYS
-  use g_PARSUP
   use ice_fct_interfaces
   implicit none
   integer   :: n_size
-  type(t_mesh), intent(in)              , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
   
   n_size=myDim_nod2D+eDim_nod2D
@@ -142,35 +164,38 @@ subroutine ice_fct_init(mesh)
   dm_snow = 0.0_WP
   
   ! Fill in  the mass matrix    
-  call ice_mass_matrix_fill(mesh)
+  call ice_mass_matrix_fill(partit, mesh)
   if (mype==0) write(*,*) 'Ice FCT is initialized' 
 end subroutine ice_fct_init
 !
 !----------------------------------------------------------------------------
 !
-subroutine ice_fct_solve(mesh)
+subroutine ice_fct_solve(partit, mesh)
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use ice_fct_interfaces
   implicit none
-  type(t_mesh), intent(in)              , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
   ! Driving routine
-  call ice_solve_high_order(mesh)   ! uses arrays of low-order solutions as temp
+  call ice_solve_high_order(partit, mesh)   ! uses arrays of low-order solutions as temp
                                     ! storage. It should preceed the call of low
                                     ! order solution.  
-  call ice_solve_low_order(mesh)
+  call ice_solve_low_order(partit, mesh)
 
-  call ice_fem_fct(1, mesh)    ! m_ice
-  call ice_fem_fct(2, mesh)    ! a_ice
-  call ice_fem_fct(3, mesh)    ! m_snow
+  call ice_fem_fct(1, partit, mesh)    ! m_ice
+  call ice_fem_fct(2, partit, mesh)    ! a_ice
+  call ice_fem_fct(3, partit, mesh)    ! m_snow
 #if defined (__oifs)
-  call ice_fem_fct(4, mesh)    ! ice_temp
+  call ice_fem_fct(4, partit, mesh)    ! ice_temp
 #endif /* (__oifs) */
 
 end subroutine ice_fct_solve
 !
 !
 !_______________________________________________________________________________
-subroutine ice_solve_low_order(mesh)
+subroutine ice_solve_low_order(partit, mesh)
  
     !============================
     ! Low-order solution
@@ -181,20 +206,24 @@ subroutine ice_solve_low_order(mesh)
     ! We add diffusive contribution to the rhs. The diffusion operator
     ! is implemented as the difference between the consistent and lumped mass
     ! matrices acting on the field from the previous time step. The consistent 
-    ! mass matrix on the lhs is replaced with the lumped one.   
-    
+    ! mass matrix on the lhs is replaced with the lumped one.       
     use MOD_MESH
-    use o_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
     use i_ARRAYS
     use i_PARAM
-    use g_PARSUP
     use g_comm_auto
     implicit none
     integer       :: row, clo, clo2, cn, location(100)
     real(kind=WP) :: gamma
-    type(t_mesh), intent(in)              , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     gamma=ice_gamma_fct         ! Added diffusivity parameter
                                 ! Adjust it to ensure posivity of solution    
@@ -225,10 +254,10 @@ subroutine ice_solve_low_order(mesh)
     end do
     
     ! Low-order solution must be known to neighbours
-    call exchange_nod(m_icel,a_icel,m_snowl)
+    call exchange_nod(m_icel,a_icel,m_snowl, partit)
 
 #if defined (__oifs)
-    call exchange_nod(m_templ)
+    call exchange_nod(m_templ, partit)
 #endif /* (__oifs) */
 
 
@@ -236,22 +265,26 @@ end subroutine ice_solve_low_order
 !
 !
 !_______________________________________________________________________________
-subroutine ice_solve_high_order(mesh)
-
+subroutine ice_solve_high_order(partit, mesh)
   use MOD_MESH
-  use O_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_TRACER
   use i_ARRAYS
-  use g_PARSUP
   use o_PARAM
   use g_comm_auto
   implicit none
   !
-  integer                              :: n,i,clo,clo2,cn,location(100),row
-  real(kind=WP)                        :: rhs_new
-  integer                              :: num_iter_solve=3
-  type(t_mesh), intent(in)              , target :: mesh
+  integer                               :: n,i,clo,clo2,cn,location(100),row
+  real(kind=WP)                         :: rhs_new
+  integer                               :: num_iter_solve=3
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   ! Does Taylor-Galerkin solution
   !
   !the first approximation
@@ -268,10 +301,10 @@ subroutine ice_solve_high_order(mesh)
 #endif /* (__oifs) */
   end do
 
-  call exchange_nod(dm_ice, da_ice, dm_snow)
+  call exchange_nod(dm_ice, da_ice, dm_snow, partit)
 
 #if defined (__oifs)
-     call exchange_nod(dm_temp)
+     call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
   !iterate 
   do n=1,num_iter_solve-1
@@ -307,10 +340,10 @@ subroutine ice_solve_high_order(mesh)
         dm_temp(row)=m_templ(row)
 #endif /* (__oifs) */
      end do
-     call exchange_nod(dm_ice, da_ice, dm_snow)
+     call exchange_nod(dm_ice, da_ice, dm_snow, partit)
 
 #if defined (__oifs)
-     call exchange_nod(dm_temp)
+     call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
 
   end do
@@ -318,7 +351,7 @@ end subroutine ice_solve_high_order
 !
 !
 !_______________________________________________________________________________
-subroutine ice_fem_fct(tr_array_id, mesh)
+subroutine ice_fem_fct(tr_array_id, partit, mesh)
     ! Flux corrected transport algorithm for tracer advection
     !
     ! It is based on Loehner et al. (Finite-element flux-corrected 
@@ -326,13 +359,13 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     ! Int. J. Numer. Meth. Fluids, 7 (1987), 1093--1109) as described by Kuzmin and
     ! Turek. (kuzmin@math.uni-dortmund.de) 
     !
-
     use MOD_MESH
-    use O_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
     use i_arrays
     use i_param
     use o_PARAM
-    use g_PARSUP
     use g_comm_auto
     implicit none
 
@@ -340,9 +373,13 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     integer   :: icoef(3,3),n,q, elem,elnodes(3),row
     real(kind=WP), allocatable, dimension(:) :: tmax, tmin 
     real(kind=WP)   :: vol, flux, ae, gamma
-    type(t_mesh), intent(in)              , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
   
     gamma=ice_gamma_fct        ! It should coinside with gamma in 
                              ! ts_solve_low_order  
@@ -516,7 +553,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         end if
     end do
     ! pminus and pplus are to be known to neighbouting PE
-    call exchange_nod(icepminus, icepplus)
+    call exchange_nod(icepminus, icepplus, partit)
     
     !======================== 
     ! Limiting
@@ -620,10 +657,10 @@ subroutine ice_fem_fct(tr_array_id, mesh)
     end if
 #endif /* (__oifs) */
     
-    call exchange_nod(m_ice, a_ice, m_snow)
+    call exchange_nod(m_ice, a_ice, m_snow, partit)
 
 #if defined (__oifs)
-    call exchange_nod(ice_temp)
+    call exchange_nod(ice_temp, partit)
 #endif /* (__oifs) */    
 
     deallocate(tmin, tmax)
@@ -631,13 +668,14 @@ end subroutine ice_fem_fct
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE ice_mass_matrix_fill(mesh)
+SUBROUTINE ice_mass_matrix_fill(partit, mesh)
 ! Used in ice_fct inherited from FESOM
   use MOD_MESH
-  use O_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use MOD_TRACER
   use i_PARAM
   use i_ARRAYS
-  use g_PARSUP
   !
   implicit none
   integer                             :: n, n1, n2, row
@@ -646,9 +684,13 @@ SUBROUTINE ice_mass_matrix_fill(mesh)
   integer, allocatable                :: col_pos(:)
   real(kind=WP)                       :: aa
   integer                             :: flag=0,iflag=0
-  type(t_mesh), intent(in)              , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
     !
     ! a)
     allocate(mass_matrix(sum(nn_num(1:myDim_nod2D))))
@@ -710,20 +752,25 @@ END SUBROUTINE ice_mass_matrix_fill
 !
 !=========================================================
 !
-subroutine ice_TG_rhs_div(mesh)
+subroutine ice_TG_rhs_div(partit, mesh)
   use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
   use i_Arrays
   use i_PARAM
-  use g_PARSUP
   use o_PARAM
   USE g_CONFIG
   implicit none 
   real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer                  :: n, q, row, elem, elnodes(3)
   real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
-  type(t_mesh), intent(in) , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  type(t_mesh),   intent(in),    target :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
  ! Computes the rhs in a Taylor-Galerkin way (with upwind type of 
  ! correction for the advection operator)
@@ -801,12 +848,13 @@ end subroutine ice_TG_rhs_div
 !
 !
 !_______________________________________________________________________________
-subroutine ice_update_for_div(mesh)
+subroutine ice_update_for_div(partit, mesh)
     use MOD_MESH
-    use O_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
     use i_Arrays
     use i_PARAM
-    use g_PARSUP
     use o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -815,9 +863,13 @@ subroutine ice_update_for_div(mesh)
     integer                                 :: n,i,clo,clo2,cn,location(100),row
     real(kind=WP)                           :: rhs_new
     integer                                 :: num_iter_solve=3
-    type(t_mesh), intent(in)                , target :: mesh
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh),   intent(in),    target   :: mesh
 
-#include "associate_mesh.h"
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
 
     ! Does Taylor-Galerkin solution
     !
@@ -834,11 +886,11 @@ subroutine ice_update_for_div(mesh)
         dm_temp(row)=rhs_tempdiv(row)/area(1,row)
 #endif /* (__oifs) */
     end do
-    call exchange_nod(dm_ice)
-    call exchange_nod(da_ice)
-    call exchange_nod(dm_snow)
+    call exchange_nod(dm_ice, partit)
+    call exchange_nod(da_ice, partit)
+    call exchange_nod(dm_snow, partit)
 #if defined (__oifs)
-    call exchange_nod(dm_temp)
+    call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
 
     !iterate 
@@ -875,11 +927,11 @@ subroutine ice_update_for_div(mesh)
             dm_temp(row)=m_templ(row)
 #endif /* (__oifs) */
         end do
-        call exchange_nod(dm_ice)
-        call exchange_nod(da_ice)
-        call exchange_nod(dm_snow)
+        call exchange_nod(dm_ice, partit)
+        call exchange_nod(da_ice, partit)
+        call exchange_nod(dm_snow, partit)
 #if defined (__oifs)
-        call exchange_nod(dm_temp)
+        call exchange_nod(dm_temp, partit)
 #endif /* (__oifs) */
     end do
     m_ice=m_ice+dm_ice

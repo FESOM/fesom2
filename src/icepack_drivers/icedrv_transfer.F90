@@ -31,8 +31,7 @@
           use g_config,         only: dt
           use o_param,          only: mstep
           use mod_mesh
-          use o_mesh
-          use g_parsup
+          use mod_tracer
           use g_clock
  
           implicit none
@@ -62,7 +61,7 @@
 
           type(t_mesh), target, intent(in) :: mesh
 
-#include "../associate_mesh.h"
+#include "associate_mesh.h"
 
           ! Ice 
     
@@ -145,7 +144,7 @@
               rdg_shear(i) = ty / tvol
            enddo
 
-           call exchange_nod(rdg_conv, rdg_shear)
+           call exchange_nod(rdg_conv, rdg_shear, p_partit)
 
           ! Clock variables
     
