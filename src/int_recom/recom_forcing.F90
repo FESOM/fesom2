@@ -22,6 +22,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, PAR,
   use g_comm_auto
   use i_therm_param
   use g_comm
+  use g_support
 
   Implicit none
   type(t_mesh), intent(in) , target         :: mesh
@@ -164,7 +165,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idchl)  = max(tiny_chl,state(1:nn,idchl))
   state(1:nn,idian)  = max(tiny_N_d,state(1:nn,idian))
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
-  state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
+!  state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
+
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
   if (ciso) then
 !    Calculcate isotopic fractionation of 13|14C, radioactive decay of 14C is calculated in oce_ale_tracer.F90

@@ -71,23 +71,33 @@ subroutine recom_init(mesh)
     allocate(Benthos(node_size,benthos_num))
     allocate(LocBenthos(benthos_num))
     allocate(decayBenthos(benthos_num)) ! [1/day] Decay rate of detritus in the benthic layer
-    allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
+
+!    allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
+
     allocate(wFluxPhy(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, calc and chl through sinking of phytoplankton
     allocate(wFluxDia(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C, Si and chl through sinking of diatoms 	
 
 !    allocate(GlowFlux(node_size,2))     ! 
 !    GlowFlux=0.0d0
 
+if (REcoM_Second_Zoo) then
+    allocate(GlowFluxDet(node_size,benthos_num*2))
+    allocate(wFluxDet(benthos_num*2))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
+else
     allocate(GlowFluxDet(node_size,benthos_num))
+    allocate(wFluxDet(benthos_num))     ! [mmol/(m2 * day)] Flux of N,C,Si and calc through sinking of detritus
+end if 
     allocate(GlowFluxPhy(node_size,benthos_num))
     allocate(GlowFluxDia(node_size,benthos_num))
 
     GlowFluxDet=0.0d0
     GlowFluxPhy=0.0d0
-    GlowFluxDia=0.0d0
+    GlowFluxDia=0.0d0    
 
-
-
+    allocate(addtiny(nl-1,4))
+    addtiny=0.0d0
+    allocate(Gloaddtiny(nl-1,node_size,4))
+    Gloaddtiny=0.0d0
 
     allocate(GloHplus(node_size))
 
@@ -242,8 +252,9 @@ subroutine recom_init(mesh)
 
     tr_arr(:,:,15) = tiny                  ! tracer 15 = DiaN
     tr_arr(:,:,16) = tiny * Redfield       ! tracer 16 = DiaC
-    tr_arr(:,:,17) = tiny * 1.56d0         ! tracer 17 = DiaCh
-    tr_arr(:,:,18) = tiny                  ! tracer 18 = DiaSi
+    tr_arr(:,:,17) = tiny * 1.56d0         ! tracer 17 = DiaChl
+
+    tr_arr(:,:,18) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax !tiny                   ! tracer 18 = DiaSi
 
     tr_arr(:,:,19) = tiny                  ! tracer 19 = DetSi 
     !tr_arr(:,:,20)                        ! tracer 20 = DSi     
@@ -255,12 +266,32 @@ subroutine recom_init(mesh)
     tr_arr(:,:,22) = cPhyN * 0.25d0        ! tracer 22 = PhyCalc
     tr_arr(:,:,23) = tiny                  ! tracer 23 = DetCalc
 !!#endif
-    !tr_arr(:,:,24)                        ! tracer 24 = Oxy     
+    !tr_arr(:,:,24)                        ! tracer 24 = Oxy     ! read from the file
 
-if (REcoM_Second_Zoo) then
+!if (REcoM_Second_Zoo) then
     tr_arr(:,:,25) = tiny                   ! tracer 25 = Zoo2N
     tr_arr(:,:,26) = tiny * Redfield        ! tracer 26 = Zoo2C
-endif
+!endif
+
+
+
+ if (REcoM_Second_Zoo) then
+!   if (REcoM_Second_Zoo .and. zoo2_initial_field) then
+!     tracer(:,:,27) = tiny            ! tracer 26 = DetZ2N
+!     tracer(:,:,28) = tiny            ! tracer 27 = DetZ2C
+!     tracer(:,:,29) = tiny            ! tracer 28 = DetZ2Si
+!     tracer(:,:,30) = tiny            ! tracer 29 = DetZ2Calc
+!     else
+!     tracer(:,:,25) = tiny            ! tracer 24 = Zoo2N                                      
+!     tracer(:,:,26) = tiny            ! tracer 25 = Zoo2C 
+     tracer(:,:,27) = tiny            ! tracer 26 = DetZ2N                              
+     tracer(:,:,28) = tiny            ! tracer 27 = DetZ2C                                    
+     tracer(:,:,29) = tiny            ! tracer 28 = DetZ2Si                            
+     tracer(:,:,30) = tiny            ! tracer 29 = DetZ2Calc 
+!   endif
+  endif
+
+
 
 if (ciso) then
    tr_arr(:,:,27) = (1. + 0.001 * (2.3 - 0.06 * tr_arr(:,:,3))) * tr_arr(:,:,4) ! DIC_13, GLODAP2 > 500 m 

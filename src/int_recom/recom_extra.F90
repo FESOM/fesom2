@@ -221,7 +221,7 @@ endif
   if (mstep == 1) then ! The year has changed
     if (constant_CO2) then
       AtmCO2(:) = CO2_for_spinup
-      if (mype==0) write(*,*),'in atm_input: Atm CO2=',AtmCO2
+      !if (mype==0) write(*,*),'in atm_input: Atm CO2=',AtmCO2
       if (ciso) then
         AtmCO2_13(:) = CO2_for_spinup_13
         AtmCO2_14(:) = CO2_for_spinup_14

@@ -55,6 +55,7 @@ real(kind=real32) :: runtime_alltimesteps
 real(kind=WP),  save,  target                 :: intDSi
 real(kind=WP),  save,  target                 :: intDiaSi
 real(kind=WP),  save,  target                 :: intDetSi
+real(kind=WP),  save,  target                 :: intDetz2Si
 real(kind=WP),  save,  target                 :: intBenSi
 real(kind=WP),  save,  target                 :: sumSi1, sumSi2
 #endif
@@ -257,10 +258,48 @@ type(t_mesh),             target, save :: mesh
         end if
         call before_oce_step(mesh) ! prepare the things if required
 #if defined (__recom)
+
+
+
+
         if (use_REcoM) then
+if (0) then
+        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetz2si+2), intDetz2Si, mesh)
+        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        if (mype==0) print *, 'intDSi: ', intDSi
+        if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        if (mype==0) print *, 'intDetSi: ', intDetSi
+        if (mype==0) print *, 'intDetz2Si: ', intDetz2Si
+        if (mype==0) print *, 'intBenSi: ', intBenSi
+
+        sumSi1 = intDSi + intDiaSi + intDetSi + intDetz2Si + intBenSi
+        if (mype==0) print *, 'sumSi1, before recom call: ', sumSi1
+endif
            call recom(mesh)
+if (0) then
+        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
+        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
+        call integrate_nod(tr_arr(:,:,idetz2si+2), intDetz2Si, mesh)
+        call integrate_nod(Benthos(:,3), intBenSi, mesh)
+        if (mype==0) print *, 'intDSi: ', intDSi
+        if (mype==0) print *, 'intDiaSi: ', intDiaSi
+        if (mype==0) print *, 'intDetSi: ', intDetSi
+        if (mype==0) print *, 'intDetz2Si: ', intDetz2Si
+        if (mype==0) print *, 'intBenSi: ', intBenSi
 
+        sumSi2 = intDSi + intDiaSi + intDetSi + intDetz2Si + intBenSi
 
+        if (mype==0) print *, 'sumSi2, after recom call: ', sumSi2
+        if (mype==0) print *, ' '
+        if (mype==0) print *, ' '
+        if (mype==0) print *, 'sumSi2 - sumSi1', sumSi2 -  sumSi1
+        if (mype==0) print *, ' '
+        if (mype==0) print *, ' '
+        if (mype==0) print *, 'relative (sumSi2 - sumSi1)/sumSi1', (sumSi2 -  sumSi1)/sumSi1
 
        ! for silicate mass balance:
 !        if (mype==0) print *, '2) si tracer global integral in fvom_main before oce_timestep_ale:'
@@ -278,6 +317,11 @@ type(t_mesh),             target, save :: mesh
 !        if (mype==0) print *, ''
 !        if (mype==0) print *, ''
 
+
+end if 
+
+!call par_ex
+!stop
            if (mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call RECOM         '//achar(27)//'[0m'
            call compute_recom_diagnostics(1, mesh)
         end if
