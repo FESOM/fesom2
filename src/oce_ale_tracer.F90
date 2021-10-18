@@ -114,6 +114,16 @@ module ver_sinking_recom_benthos_interface
     end subroutine
   end interface
 end module
+module integrate_bottom_interface
+  interface
+    subroutine integrate_bottom(tflux, mesh)
+      use mod_mesh
+      use g_PARSUP
+      type(t_mesh), intent(in) , target :: mesh
+      integer, intent(inout)      :: tflux
+    end subroutine
+  end interface
+end module
 !
 !
 !===============================================================================
@@ -295,6 +305,7 @@ subroutine diff_tracers_ale(tr_num, mesh)
 
 #if defined(__recom)
     dtr_bf         = 0.0_WP
+    str_bf         = 0.0_WP
     vert_sink      = 0.0_WP
 #endif
 
@@ -321,47 +332,18 @@ subroutine diff_tracers_ale(tr_num, mesh)
 ! OG recom bottom boundary layer contribution
 #if defined(__recom)
 
-!    if (tracer_id(tr_num) == 1007 .or.    &   ! idetn
-!        tracer_id(tr_num) == 1008 .or.    &   ! idetc
-!        tracer_id(tr_num) == 1017 .or.    &   ! idetsi
-!        tracer_id(tr_num) == 1021 .or.    &   ! idetcal
+! 1) Remineralization from the benthos
+!    Nutrient fluxes come from the bottom boundary
+!    Unit [mmol/m2/s]
 
-!        tracer_id(tr_num) == 1004 .or.    &  !iphyn
-!        tracer_id(tr_num) == 1005 .or.    &  !iphyc
-!        tracer_id(tr_num) == 1020 .or.    &  !iphycal
-!        tracer_id(tr_num) == 1006 .or.    &  !ipchl
-
-!        tracer_id(tr_num) == 1013 .or.    &  !idian
-!        tracer_id(tr_num) == 1014 .or.    &  !idiac
-!        tracer_id(tr_num) == 1016 .or.    &  !idiasi
-!        tracer_id(tr_num) == 1015 ) then     !idchl
-
-!       call ver_sinking_recom_benthos(tr_num, mesh)                                              
-!    end if
+if (1) then
 
     if (tracer_id(tr_num) == 1001 .or.    &   ! DIN
         tracer_id(tr_num) == 1002 .or.    &   ! DIC
         tracer_id(tr_num) == 1003 .or.    &   ! Alk
 
-!        tracer_id(tr_num) == 1004 .or.    &   ! iphyn
-!        tracer_id(tr_num) == 1005 .or.    &   ! iphyc
-!        tracer_id(tr_num) == 1006 .or.    &   ! ipchl
-!        tracer_id(tr_num) == 1007 .or.    &   ! idetn
-!        tracer_id(tr_num) == 1008 .or.    &   ! idetc
-!        tracer_id(tr_num) == 1013 .or.    &   ! idian
-!        tracer_id(tr_num) == 1014 .or.    &   ! idiac
-!        tracer_id(tr_num) == 1015 .or.    &   ! idchl
-!        tracer_id(tr_num) == 1016 .or.    &   ! idiasi
-!        tracer_id(tr_num) == 1017 .or.    &   ! idetsi
-
-
         tracer_id(tr_num) == 1018 .or.    &   ! Si
         tracer_id(tr_num) == 1019 .or.    &   ! Fe
-
-!        tracer_id(tr_num) == 1020 .or.    &   ! iphycal
-!        tracer_id(tr_num) == 1021 .or.    &   ! idetcal
-
-
 
 #if defined(__ciso)
         tracer_id(tr_num) == 1033 .or.    &   ! DIC_13
@@ -369,7 +351,6 @@ subroutine diff_tracers_ale(tr_num, mesh)
 #endif
         tracer_id(tr_num) == 1022     ) then  ! Oxy
 
-! call bottom boundary 
         call diff_ver_recom_expl(tr_num,mesh)
 
 ! update tracer fields
@@ -380,6 +361,79 @@ subroutine diff_tracers_ale(tr_num, mesh)
                                         dtr_bf(nzmin:nzmax,n)
         end do
     end if
+
+! 2) Sinking in water column 
+
+    if (tracer_id(tr_num) == 1007 .or.    &   ! idetn
+        tracer_id(tr_num) == 1008 .or.    &   ! idetc
+        tracer_id(tr_num) == 1017 .or.    &   ! idetsi
+        tracer_id(tr_num) == 1021 .or.    &   ! idetcal
+
+        tracer_id(tr_num) == 1004 .or.    &   !iphyn
+        tracer_id(tr_num) == 1005 .or.    &   !iphyc
+        tracer_id(tr_num) == 1020 .or.    &   !iphycal
+        tracer_id(tr_num) == 1006 .or.    &   !ipchl
+
+        tracer_id(tr_num) == 1013 .or.    &   !idian
+        tracer_id(tr_num) == 1014 .or.    &   !idiac
+        tracer_id(tr_num) == 1016 .or.    &   !idiasi
+        tracer_id(tr_num) == 1015 .or.    &   !idchl
+
+! if (REcoM_Second_Zoo) then
+        tracer_id(tr_num) == 1025 .or.    &   !idetz2n
+        tracer_id(tr_num) == 1026 .or.    &   !idetz2c
+        tracer_id(tr_num) == 1027 .or.    &   !idetz2si
+        tracer_id(tr_num) == 1028 ) then      !idetz2calc
+! endif
+
+       call recom_sinking_new(tr_num,mesh)
+       
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                        vert_sink(nzmin:nzmax,n)
+        end do                                           
+    end if
+
+! 3) sinking into the benthos
+
+    if (tracer_id(tr_num) == 1004 .or.    &   ! iphyn
+        tracer_id(tr_num) == 1005 .or.    &   ! iphyc
+        tracer_id(tr_num) == 1020 .or.    &   ! iphycal
+        tracer_id(tr_num) == 1006 .or.    &   ! ipchl
+
+        tracer_id(tr_num) == 1007 .or.    &   ! idetn
+        tracer_id(tr_num) == 1008 .or.    &   ! idetc
+        tracer_id(tr_num) == 1017 .or.    &   ! idetsi
+        tracer_id(tr_num) == 1021 .or.    &   ! idetcal
+
+        tracer_id(tr_num) == 1013 .or.    &   ! idian
+        tracer_id(tr_num) == 1014 .or.    &   ! idiac
+        tracer_id(tr_num) == 1016 .or.    &   ! idiasi
+        tracer_id(tr_num) == 1015 .or.    &   ! idchl
+
+! if (REcoM_Second_Zoo) then
+        tracer_id(tr_num)==1025   .or.    &  !idetz2n
+        tracer_id(tr_num)==1026   .or.    &  !idetz2c
+        tracer_id(tr_num)==1027   .or.    &  !idetz2si
+        tracer_id(tr_num)==1028  ) then      !idetz2calc
+! endif
+
+! call bottom boundary 
+        call ver_sinking_recom_benthos(tr_num,mesh)
+! update tracer fields
+        do n=1, myDim_nod2D 
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
+                                        str_bf(nzmin:nzmax,n)
+        end do
+    endif
+
+end if
+
 #endif
     
     !___________________________________________________________________________
@@ -836,17 +890,6 @@ subroutine diff_ver_part_impl_ale(tr_num, mesh)
     end do ! --> do n=1,myDim_nod2D   
 end subroutine diff_ver_part_impl_ale
 
-
-
-
-
-
-
-
-
-
-
-
 !
 !
 !===============================================================================
@@ -859,6 +902,7 @@ subroutine ver_sinking_recom_benthos(tr_num,mesh)
     use g_comm_auto
     USE O_MESH
     use g_forcing_arrays
+    use g_support
 use ver_sinking_recom_benthos_interface
 #if defined(__recom)
     USE REcoM_GloVar
@@ -867,22 +911,22 @@ use ver_sinking_recom_benthos_interface
     IMPLICIT NONE
     type(t_mesh), intent(in) , target  :: mesh
     integer                   :: elem,k, tr_num
-    integer                   :: n2,nl1,nl2,nz,n,id,ul1
-    real(kind=WP)             :: bottom_flux(myDim_nod2D)
-    real(kind=WP)             :: Vben(mesh%nl)
+    integer                   :: nl1,ul1,nz,n,nzmin, nzmax
+    real(kind=WP)             :: Vben(mesh%nl),  aux(mesh%nl-1), flux(mesh%nl), add_benthos_2d(myDim_nod2D+eDim_nod2D)
     integer                   :: nlevels_nod2D_minimum
-    real(kind=WP)             :: ver_flux(mesh%nl,myDim_nod2D+eDim_nod2D)
-!   real(kind=WP)             :: Vbenthic_det,Vbenthic_phy,Vbenthic_dia
-!    real(kind=WP), intent(inout), target :: ttf(mesh%nl-1, myDim_nod2D+eDim_nod2D)
+    real(kind=WP)             :: tv
 #include "associate_mesh.h"
 
-   do n=1, myDim_nod2D
+   do n=1, myDim_nod2D ! needs exchange_nod in the end
         nl1=nlevels_nod2D(n)-1
         ul1=ulevels_nod2D(n)
+        
+        aux=0._WP
+        Vben=0._WP
+        add_benthos_2d=0._WP
 
-        ver_flux=0._WP
-        bottom_flux=0._WP
-!tr_arr(:,:,tr_num)
+! 1) Calculate sinking velociy for vertical sinking case
+! ******************************************************
         if (tracer_id(tr_num)==1007 .or. &  !idetn
             tracer_id(tr_num)==1008 .or. &  !idetc
             tracer_id(tr_num)==1017 .or. &  !idetsi
@@ -892,10 +936,6 @@ use ver_sinking_recom_benthos_interface
             else
             	Vben = VDet
             endif
-!        if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
 
         elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
                tracer_id(tr_num)==1005 .or. &  !iphyc
@@ -908,10 +948,6 @@ use ver_sinking_recom_benthos_interface
             	   Vben = VPhy
                endif
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
         elseif(tracer_id(tr_num)==1013 .or. &  !idian
                tracer_id(tr_num)==1014 .or. &  !idiac
                tracer_id(tr_num)==1016 .or. &  !idiasi
@@ -922,73 +958,139 @@ use ver_sinking_recom_benthos_interface
                else
             	   Vben = VDia
                endif
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
-        else
+
+! Constant vertical sinking for the second detritus class
+! *******************************************************
+
+!   if (REcoM_Second_Zoo) then ! No variable sinking
+        elseif(tracer_id(tr_num)==1025 .or. &  !idetz2n
+               tracer_id(tr_num)==1026 .or. &  !idetz2c
+               tracer_id(tr_num)==1027 .or. &  !idetz2si
+               tracer_id(tr_num)==1028 ) then  !idetz2calc
+
+               Vben = VDet_zoo2
         endif
 
-        Vben=Vben/SecondsPerDay ! convert from [m/d] to [m/s]
+        Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (negative vertical velocity)
 
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> Vben,  = ', Vben(ul1:nl1+1)
-!         endif
+if (0) then ! From Dima
+        nzmax=nlevels_nod2D(n)
+        nzmin=ulevels_nod2D(n)  
+    
+        ! surface flux
+        flux(nzmin)=0.0_WP
+
+        ! bottom flux
+        flux(nzmax)=0.0_WP
+        ! mid-layer flux
+        do nz=nzmin+1, nzmax-1
+           flux(nz)=-0.5*(                                            &
+                            (tr_arr(nz  , n,tr_num))*(Vben(nz)+abs(Vben(nz)))  + &
+                            (tr_arr(nz-1, n,tr_num))*(Vben(nz)-abs(Vben(nz)))) *area(nz,n)
+        end do
+        do nz=nzmin, nzmax-1  
+           str_bf(nz,n) = str_bf(nz,n) + (flux(nz)-flux(nz+1))*dt/areasvol(nz,n)/hnode_new(nz,n) ![mmol/m3] (zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
+        end do
+end if
+
+if (1)then
+        k=nod_in_elem2D_num(n)
+        ! Screening minimum depth in neigbouring nodes around node n
+        nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
+
+        do nz=nlevels_nod2D_minimum, nl1
+           tv = tr_arr(nz  ,n,tr_num)*Vben(nz)
+           aux(nz)= - tv*(area(nz,n)-area(nz+1,n))
+        end do
+
+        nz=nl1
+        tv = tr_arr(nz  ,n,tr_num)*Vben(nz)
+        aux(nz+1)= - tv*(area(nz+1,n))
+
+        do nz=ul1,nl1
+           str_bf(nz,n) = str_bf(nz,n) + (aux(nz))*dt/areasvol(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n)) !/hnode_new(nz,n)
+           add_benthos_2d(n) = add_benthos_2d(n) - (aux(nz))*dt!*area(nz,n)
+        end do
+
+        if(tracer_id(tr_num)==1004 .or. &  !iphyn
+           tracer_id(tr_num)==1007 .or. &  !idetn
+           tracer_id(tr_num)==1013 .or. &  !idian
+           tracer_id(tr_num)==1025 ) then  !idetz2n
+           Benthos(n,1)= Benthos(n,1) + add_benthos_2d(n) ![mmol/m2]
+        endif
+         
+         ! C
+        if(tracer_id(tr_num)==1005 .or. &  !iphyc
+           tracer_id(tr_num)==1008 .or. &  !idetc
+           tracer_id(tr_num)==1014 .or. &  !idiac
+           tracer_id(tr_num)==1026 ) then  !idetz2c
+           Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+        endif
+
+         ! Si
+        if(tracer_id(tr_num)==1016 .or. &  !idiasi
+           tracer_id(tr_num)==1017 .or. &  !idetsi
+           tracer_id(tr_num)==1027 ) then  !idetz2si
+           Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+        endif
+
+         ! Cal
+        if(tracer_id(tr_num)==1020 .or. &  !iphycal
+           tracer_id(tr_num)==1021 .or. &  !idetcal
+           tracer_id(tr_num)==1028 ) then  !idetz2cal
+           Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n) 
+        endif
+end if 
+end do
+
+    do n=1, benthos_num
+      call exchange_nod(Benthos(:,n))
+    end do
+end subroutine ver_sinking_recom_benthos
+
+subroutine integrate_bottom(tflux,mesh)
+    use o_ARRAYS
+    use g_PARSUP
+    use MOD_MESH
+    USE o_param
+    use g_config
+    use g_comm_auto
+    USE O_MESH
+    use g_forcing_arrays
+    use integrate_bottom_interface
+#if defined(__recom)
+    USE REcoM_GloVar
+    use recom_config !, recom_debug
+#endif
+    IMPLICIT NONE
+    type(t_mesh), intent(in) , target  :: mesh
+    integer                            :: elem,k, tr_num
+    integer                            :: nl1,ul1,nz,n
+    real(kind=WP)                      :: tf
+    real(kind=WP), intent(inout)       :: tflux
+    integer                            :: nlevels_nod2D_minimum
+#include "associate_mesh.h"
+
+   tf =0._WP
+   do n=1, myDim_nod2D ! needs exchange_nod in the end
+        nl1=nlevels_nod2D(n)-1
+        ul1=ulevels_nod2D(n)
 
         k=nod_in_elem2D_num(n)
         ! Screening minimum depth in neigbouring nodes around node n
         nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k, n))-1)
 
-        !_______________________________________________________________________
-        ! Bottom flux
-        do nz=nlevels_nod2D_minimum, nl1
-           ver_flux(nz,n)=(area(nz,n)-area(nz+1,n)) * Vben(nz) * tr_arr(nz,n,tr_num) ![m2 * m/s * mmol/m3]
-        end do
-        nz=nl1
-        ver_flux(nz+1,n)= area(nz+1,n) * Vben(nz) * tr_arr(nz,n,tr_num)
-        
-        bottom_flux(n)=sum(ver_flux(ul1:nl1+1,n)/areasvol(nz,n)) ![mmol/m2/s]
-
-!         if (mype==0) then
-!             write(*,*) '____________________________________________________________'
-!             write(*,*) ' --> bottom_flux,  = ', bottom_flux(n)
-!         endif        
-
-         if (tracer_id(tr_num)==1004) GlowFluxPhy(n,1)= bottom_flux(n) !iphyn
-         if (tracer_id(tr_num)==1005) GlowFluxPhy(n,2)= bottom_flux(n) !iphyc
-         if (tracer_id(tr_num)==1006) GlowFluxPhy(n,4)= bottom_flux(n) !ipchl
-         if (tracer_id(tr_num)==1007) GlowFluxDet(n,1)= bottom_flux(n) !idetn
-         if (tracer_id(tr_num)==1008) GlowFluxDet(n,2)= bottom_flux(n) !idetc
-         if (tracer_id(tr_num)==1013) GlowFluxDia(n,1)= bottom_flux(n) !idian
-         if (tracer_id(tr_num)==1014) GlowFluxDia(n,2)= bottom_flux(n) !idiac
-         if (tracer_id(tr_num)==1015) GlowFluxDia(n,4)= bottom_flux(n) !idchl
-         if (tracer_id(tr_num)==1016) GlowFluxDia(n,3)= bottom_flux(n) !idiasi
-         if (tracer_id(tr_num)==1017) GlowFluxDet(n,3)= bottom_flux(n) !idetsi
-         if (tracer_id(tr_num)==1020) GlowFluxPhy(n,3)= bottom_flux(n) !iphycal
-         if (tracer_id(tr_num)==1021) GlowFluxPhy(n,4)= bottom_flux(n) !idetcal
-    end do
-
-!GlodecayBenthos(n,3)
-end subroutine ver_sinking_recom_benthos
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+!        do nz=nlevels_nod2D_minimum, nl1
+!            tf=tf+ Benthos(n,3)/(area(nz,n)-area(nz+1,n))
+!        end do
+!        nz=nl1
+!        tf=tf+Benthos(n,3)/(area(nz+1,n))
+         tf=tf+Benthos(n,3)
+   end do
+   tflux=0.0_WP
+   call MPI_AllREDUCE(tf, tflux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        MPI_COMM_FESOM, MPIerr)
+end subroutine integrate_bottom
 !
 !
 !===============================================================================
@@ -1018,57 +1120,22 @@ use diff_ver_recom_expl_interface
 
 bottom_flux = 0._WP
 id = tracer_id(tr_num)
-!if (mype==0) write (*,*) "id= ", id
 
   SELECT CASE (id)
     CASE (1001)
       bottom_flux = GlodecayBenthos(:,1) ! DIN
     CASE (1002)
-      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(n,4) ! DIC and calcification
+      bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) ! DIC + calcification
     CASE (1003)
       bottom_flux = GlodecayBenthos(:,4) * 2.0_WP ! Alk
-
-    CASE (1004)
-      bottom_flux = -GlowFluxPhy(:,1) ! iphyn
-    CASE (1005)
-      bottom_flux = -GlowFluxPhy(:,2) ! iphyc
-    CASE (1006)
-      bottom_flux = -GlowFluxPhy(:,4) ! ipchl
-    CASE (1007)
-      bottom_flux = -GlowFluxDet(:,1) ! idetn
-    CASE (1008)
-      bottom_flux = -GlowFluxDet(:,2) ! idetc
-    CASE (1013)
-      bottom_flux = -GlowFluxDia(:,1) ! idian
-    CASE (1014)
-      bottom_flux = -GlowFluxDia(:,2) ! idiac
-    CASE (1015)
-      bottom_flux = -GlowFluxDia(:,4) ! idchl
-    CASE (1016)
-      bottom_flux = -GlowFluxDia(:,3) ! idiasi
-    CASE (1017)
-      bottom_flux = -GlowFluxDet(:,3) ! idetsi
-
-!    CASE (1016)
-!      bottom_flux = -GloWflux(:,1) ! idiasi
-!    CASE (1017)
-!      bottom_flux = -GloWflux(:,2) ! idetsi
-
     CASE (1018)
       bottom_flux = GlodecayBenthos(:,3) ! Si
     CASE (1019)
       if(use_Fe2N) then 
-        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos
+        bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos ! Fe
       else
         bottom_flux = GlodecayBenthos(:,2) * Fe2C_benthos
       end if
-
-    CASE (1020)
-      bottom_flux = -GlowFluxPhy(:,3) ! iphycal
-    CASE (1021)
-      bottom_flux = -GlowFluxDet(:,4) ! idetcal
-
-
     CASE (1022)
       bottom_flux = -GlodecayBenthos(:,2) * redO2C ! Oxy
     CASE (1033)
@@ -1087,8 +1154,6 @@ id = tracer_id(tr_num)
       call par_ex
       stop
   END SELECT
- 
-
 
    do n=1, myDim_nod2D
 
@@ -1105,12 +1170,12 @@ id = tracer_id(tr_num)
         ! Bottom flux
         do nz=nlevels_nod2D_minimum, nl1
 !            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* GlodecayBenthos(n,3)
-            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)            
+            vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)/(area(1,n))           
         end do
 
         nz=nl1
 !        vd_flux(nz+1)= (area(nz+1,n))* GlodecayBenthos(n,3)       
-        vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)
+        vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)/(area(1,n))
 
         !_______________________________________________________________________
         ! writing flux into rhs

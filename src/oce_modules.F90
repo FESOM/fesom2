@@ -239,7 +239,7 @@ real(kind=WP), allocatable         :: tr_arr(:,:,:),tr_arr_old(:,:,:)
 real(kind=WP), allocatable         :: del_ttf(:,:)
 real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:),del_ttf_advvert(:,:) !!PS ,del_ttf_diff(:,:)
 
-real(kind=WP), allocatable    :: dtr_bf(:,:) ! OG, jh -> for fluxes from benthos
+real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:) ! OG, jh -> for fluxes from benthos
 real(kind=WP), allocatable    :: vert_sink(:,:)   ! OG -> vertical sinking
 
 real(kind=WP), allocatable    :: water_flux(:), Ssurf(:)

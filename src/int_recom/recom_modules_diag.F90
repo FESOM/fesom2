@@ -25,7 +25,7 @@ module recom_diag
 #include "netcdf.inc"
   private
 
-  public :: ldiag_carbon, ldiag_silicate, recom_diag_freq, recom_diag_freq_unit, recom_logfile_outfreq, total_carbon, total_silicate, &
+  public :: ldiag_carbon, ldiag_silicate, recom_diag_freq, recom_diag_freq_unit, recom_logfile_outfreq, total_carbon, total_silicate, total_del_silicate, &
             compute_carbon_diag, compute_silicate_diag, write_recom_diag, compute_recom_diagnostics, precom_diag_list
 
   real(kind=WP),  save,  target                 :: total_carbon
@@ -40,9 +40,17 @@ module recom_diag
   real(kind=WP),  save,  target                 :: valDSi
   real(kind=WP),  save,  target                 :: valDiaSi
   real(kind=WP),  save,  target                 :: valDetSi
+  real(kind=WP),  save,  target                 :: valDetz2Si
   real(kind=WP),  save,  target                 :: valBenSi
 
+  real(kind=WP),  save,  target                 :: valdelDSi
+  real(kind=WP),  save,  target                 :: valdelDiaSi
+  real(kind=WP),  save,  target                 :: valdelDetSi
+  real(kind=WP),  save,  target                 :: valdelDetz2Si
+
+
   real(kind=WP),  save,  target                 :: total_silicate
+  real(kind=WP),  save,  target                 :: total_del_silicate
 
   logical                                       :: ldiag_carbon        =.true.
   logical                                       :: ldiag_silicate      =.true.
@@ -51,6 +59,7 @@ module recom_diag
   integer                                       :: recom_logfile_outfreq = 120         !in logfile info. output frequency, # steps
 
   real(kind=WP)                                 :: ctime !current time in seconds from the beginning of the year
+  integer                                       :: row 
   
   namelist /precom_diag_list/ ldiag_carbon, ldiag_silicate, recom_diag_freq, recom_diag_freq_unit, recom_logfile_outfreq
 
@@ -145,6 +154,7 @@ subroutine compute_silicate_diag(mesh)
 
 
   total_silicate=0.0
+  total_del_silicate=0.0
 
         !DSi
         call integrate_nod(tr_arr(:,:,20), valDSi, mesh)
@@ -161,12 +171,47 @@ subroutine compute_silicate_diag(mesh)
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DetSi at timestep :', mstep, valDetSi
         total_silicate=total_silicate+valDetSi
 
+!if (REcoM_Second_Zoo) then
+        !Detz2Si
+        call integrate_nod(tr_arr(:,:,29), valDetz2Si, mesh)
+        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of Detz2Si at timestep :', mstep, valDetSi
+        total_silicate=total_silicate+valDetz2Si
+!end if 
         !BenSi
-        call integrate_nod(Benthos(:,3), valBenSi, mesh)
-        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of BenSi at timestep :', mstep, valBenSi
+!        call integrate_nod(Benthos(:,3), valBenSi, mesh)
+         call integrate_bottom(valBenSi,mesh)
+!        sum(add_benthos_3d) ! MPI_sum
+!        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of BenSi at timestep :', mstep, valBenSi
         total_silicate=total_silicate+valBenSi
 
         if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of silicate at timestep :', mstep, total_silicate
+
+
+
+! **********************************************
+        !delDSi
+        call integrate_nod(Gloaddtiny(:,:,1), valdelDSi, mesh)
+        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of tiny DSi at timestep :', mstep, valdelDSi
+        total_del_silicate=total_del_silicate+valdelDSi
+
+        !delDetSi
+        call integrate_nod(Gloaddtiny(:,:,2), valdelDetSi, mesh)
+        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DetSi at timestep :', mstep, valdelDetSi
+        total_del_silicate=total_del_silicate+valdelDetSi
+
+        !delDiaSi
+        call integrate_nod(Gloaddtiny(:,:,3), valdelDiaSi, mesh)
+        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of DiaSi at timestep :', mstep, valdelDiaSi
+        total_del_silicate=total_del_silicate+valdelDiaSi
+
+!if (REcoM_Second_Zoo) then
+        !delDetz2Si
+        call integrate_nod(Gloaddtiny(:,:,4), valdelDetz2Si, mesh)
+        if (mype==0 .and. mod(mstep,recom_logfile_outfreq)==0) write(*,*) 'total integral of Detz2Si at timestep :', mstep, valdelDetSi
+        total_del_silicate=total_del_silicate+valdelDetz2Si
+!end if 
+!*********************************
+
 
 end subroutine compute_silicate_diag
 
@@ -176,9 +221,10 @@ subroutine write_recom_diag(mode, mesh)
   implicit none
   integer                            :: status, ncid, j, k
   character(2000)                    :: filename
-  integer                            :: recID, tID, tcID, tsID
+  integer                            :: recID, tID, tcID, tsID, tsdelID
   integer                            :: valDICID, valDOCID, valPhyCID, valDetCID, valHetCID, valDiaCID, valPhyCalcID, valDetCalcID
-  integer                            :: valDSiID, valDiaSiID, valDetSiID, valBenSiID
+  integer                            :: valDSiID, valDiaSiID, valDetSiID, valDetz2SiID, valBenSiID
+  integer                            :: valdelDSiID, valdelDiaSiID, valdelDetSiID, valdelDetz2SiID
   integer                            :: rec_count=0
   character(2000)                    :: att_text
   real(real64)                       :: rtime !timestamp of the record
@@ -242,7 +288,19 @@ subroutine write_recom_diag(mode, mesh)
      status = nf_def_var(ncid, 'total_DSi', NF_DOUBLE, 1, recID, valDSiID)
      status = nf_def_var(ncid, 'total_DiaSi', NF_DOUBLE, 1, recID, valDiaSiID)
      status = nf_def_var(ncid, 'total_DetSi', NF_DOUBLE, 1, recID, valDetSiID)
+     status = nf_def_var(ncid, 'total_Detz2Si', NF_DOUBLE, 1, recID, valDetz2SiID)
      status = nf_def_var(ncid, 'total_BenSi', NF_DOUBLE, 1, recID, valBenSiID)
+
+
+
+
+     status = nf_def_var(ncid, 'total_del_silicate', NF_DOUBLE, 1, recID, tsdelID)
+
+     status = nf_def_var(ncid, 'total_del_DSi', NF_DOUBLE, 1, recID, valdelDSiID)
+     status = nf_def_var(ncid, 'total_del_DiaSi', NF_DOUBLE, 1, recID, valdelDiaSiID)
+     status = nf_def_var(ncid, 'total_del_DetSi', NF_DOUBLE, 1, recID, valdelDetSiID)
+     status = nf_def_var(ncid, 'total_del_Detz2Si', NF_DOUBLE, 1, recID, valdelDetz2SiID)
+
 
 !! add attributes
      att_text='time'
@@ -282,8 +340,15 @@ if (do_output) then
   status = nf_inq_varid(ncid, 'total_DSi', valDSiID)
   status = nf_inq_varid(ncid, 'total_DiaSi', valDiaSiID)
   status = nf_inq_varid(ncid, 'total_DetSi', valDetSiID)
+  status = nf_inq_varid(ncid, 'total_Detz2Si', valDetz2SiID)
   status = nf_inq_varid(ncid, 'total_BenSi', valBenSiID)
 
+  status = nf_inq_varid(ncid, 'total_del_silicate', tsdelID)
+
+  status = nf_inq_varid(ncid, 'total_del_DSi', valdelDSiID)
+  status = nf_inq_varid(ncid, 'total_del_DiaSi', valdelDiaSiID)
+  status = nf_inq_varid(ncid, 'total_del_DetSi', valdelDetSiID)
+  status = nf_inq_varid(ncid, 'total_del_Detz2Si', valdelDetz2SiID)
 
   do k=rec_count, 1, -1
      status=nf_get_vara_double(ncid, tID, k, 1, rtime, 1);
@@ -316,7 +381,15 @@ if (do_output) then
   status = nf_put_vara_double(ncid, valDSiID, rec_count, 1, valDSi, 1)
   status = nf_put_vara_double(ncid, valDiaSiID, rec_count, 1, valDiaSi, 1)
   status = nf_put_vara_double(ncid, valDetSiID, rec_count, 1, valDetSi, 1)
+  status = nf_put_vara_double(ncid, valDetz2SiID, rec_count, 1, valDetz2Si, 1)
   status = nf_put_vara_double(ncid, valBenSiID, rec_count, 1, valBenSi, 1)
+
+  status = nf_put_vara_double(ncid, tsdelID, rec_count, 1, total_del_silicate, 1)
+  status = nf_put_vara_double(ncid, valdelDSiID, rec_count, 1, valdelDSi, 1)
+  status = nf_put_vara_double(ncid, valdelDiaSiID, rec_count, 1, valdelDiaSi, 1)
+  status = nf_put_vara_double(ncid, valdelDetSiID, rec_count, 1, valdelDetSi, 1)
+  status = nf_put_vara_double(ncid, valdelDetz2SiID, rec_count, 1, valdelDetz2Si, 1)
+
 
   status=nf_close(ncid)
 
