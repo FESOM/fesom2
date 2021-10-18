@@ -2149,7 +2149,6 @@ endif
         sms(Nn,idiac_14)   = sms(Nn,idiac_14) - wFluxDia(6) * dt_b * recipthick(Nn)
         LocBenthos(6)      = LocBenthos(6)   + wFluxDia(6) * dt_b ! / thickness of benthos layer
     end if ! ciso
-
 end if
 
 end subroutine REcoM_sms

@@ -141,7 +141,7 @@ end if
 
     allocate(ErosionTON2D(node_size))
     allocate(ErosionTOC2D(node_size))
-    allocate(ErosionTSI2D(node_size))
+    allocate(ErosionTSi2D(node_size))
 
     !___initialize______________________________________________________________
     GloFeDust = 0.d0

@@ -31,7 +31,7 @@ elif [[ $LOGINHOST =~ ^ollie[0-9]$ ]] || [[ $LOGINHOST =~ ^prod-[0-9]{4}$ ]]; th
    STRATEGY="ollie"
 elif [[ $LOGINHOST =~ ^h[A-Za-z0-9]+\.hsn\.hlrn\.de$ ]]; then
    STRATEGY="hlogin.hlrn.de"
-elif [[ $LOGINHOST =~ ^b[A-Za-z0-9]+\.hsn\.hlrn\.de$ ]]; then
+elif [[ $LOGINHOST =~ ^b[A-Za-z0-9]+\.usr\.hlrn\.de$ ]]; then
    STRATEGY="blogin.hlrn.de"
 elif [[ $LOGINHOST =~ \.hww\.de$ ]] || [[ $LOGINHOST =~ ^nid[0-9]{5}$ ]]; then
    STRATEGY="hazelhen.hww.de"

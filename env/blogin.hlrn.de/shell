@@ -1,15 +1,54 @@
 # make the contents as shell agnostic as possible so we can include them with bash, zsh and others
 
-module load gcc/4.9.3
-module load intel/17.0.4.196
 
-module swap PrgEnv-cray PrgEnv-intel
-module swap cray-mpich cray-mpich
-module unload cray-hdf5
-module load cray-netcdf
-module load cray-hdf5
+module purge
+module load slurm
+module load HLRNenv
+module load sw.skl
+module load cmake
+module load cdo nco
+#module load gcc #/4.9.3
+
+
+module load intel/19.0.5 #17.0.4.196
+module load impi/2019.5
+export FC=mpiifort
+export F77=mpiifort
+export MPIFC=mpiifort
+export FCFLAGS=-free
+export CC=mpiicc
+export CXX=mpiicpc
+export MPIROOT="\"$(mpiifort -show | perl -lne 'm{ -I(.*?)/include } and print $1')\""
+export MPI_LIB="\"$(mpiifort -show |sed -e 's/^[^ ]*//' -e 's/-[I][^ ]*//g')\""
+export NETCDF_DIR=/sw/dataformats/netcdf/intel.18/4.7.3/skl/
+
+export IO_LIB_ROOT=/home/shkifmsw/sw/HPC_libraries/intel2019.0.5_impi2019.5_20200811
+
+
+
+
+export PATH=$IO_LIB_ROOT/bin:$PATH
+export LD_LIBRARY_PATH=$IO_LIB_ROOT/lib:$LD_LIBRARY_PATH
+
+export SZIPROOT=$IO_LIB_ROOT
+export HDF5ROOT=$IO_LIB_ROOT
+export HDF5_ROOT=$HDF5ROOT
+export NETCDFROOT=$IO_LIB_ROOT
+export NETCDFFROOT=$IO_LIB_ROOT
+export ECCODESROOT=$IO_LIB_ROOT
+
+export HDF5_C_INCLUDE_DIRECTORIES=$HDF5_ROOT/include
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=$NETCDFFROOT/include
+export NETCDF_C_INCLUDE_DIRECTORIES=$NETCDFROOT/include
+export NETCDF_CXX_INCLUDE_DIRECTORIES=$NETCDFROOT/include
+
+#module swap PrgEnv-cray PrgEnv-intel
+#module swap cray-mpich cray-mpich
+#module unload cray-hdf5
+#module load cray-netcdf
+#module load cray-hdf5
 
 export CRAYPE_LINK_TYPE=dynamic
 export PATH=/gfs1/work/hbxeeeee/sw/cmake/bin:$PATH
 
-export FC=ftn CC=cc CXX=g++
+#export FC=ftn CC=cc CXX=g++
