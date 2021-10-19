@@ -1,5 +1,5 @@
 
-module load intel/2017.4 impi/2017.4 mkl/2017.4 bsc/1.0 netcdf/4.2
+module load intel/2020.1 impi/2018.4 mkl/2020.1 bsc/1.0 netcdf/4.2
 
 export FC=mpiifort CC=mpiicc CXX=mpiicpc
 
