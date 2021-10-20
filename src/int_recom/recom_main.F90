@@ -80,9 +80,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'
 !********************************* LOOP STARTS *****************************************			
 
   do n=1, myDim_nod2D  ! needs exchange_nod in the end
-     if (ulevels_nod2D(n)>1) cycle 
-            nzmin = ulevels_nod2D(n)
-!            nzmax = nlevels_nod2D(n)-1
+!     if (ulevels_nod2D(n)>1) cycle 
+!            nzmin = ulevels_nod2D(n)
 
      !!---- Number of vertical layers
      nzmax = nlevels_nod2D(n)-1
@@ -204,6 +203,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forci
 
   do n=1, benthos_num
     call exchange_nod(Benthos(:,n))
+    call exchange_nod(Gloaddtiny(:,:,n))
   end do
   
   do n=1, 8

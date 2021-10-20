@@ -50,22 +50,24 @@ subroutine recom_sinking_new(tr_num,mesh)
         tracer_id(tr_num)==1017 .or. &  !idetsi
         tracer_id(tr_num)==1021 ) then  !idetcal
 	   
-            Vsink = 20.0d0/SecondsPerDay ! -- > Vdet
+            Vsink = VDet 
           
     elseif(tracer_id(tr_num)==1004 .or. &  !iphyn
         tracer_id(tr_num)==1005 .or. &  !iphyc
         tracer_id(tr_num)==1020 .or. &  !iphycal
         tracer_id(tr_num)==1006 ) then  !ipchl
 
-            Vsink = 0.0d0 ! --> VPhy
+            Vsink = VPhy
 
     elseif(tracer_id(tr_num)==1013 .or. &  !idian
         tracer_id(tr_num)==1014 .or. &  !idiac
         tracer_id(tr_num)==1016 .or. &  !idiasi
         tracer_id(tr_num)==1015 ) then  !idchl
 
-            Vsink = 0.0d0 ! --> VDia
+            Vsink = VDia
     end if 
+
+if (Vsink .gt. 0.1) then
 
     do n = 1,myDim_nod2D
         if (ulevels_nod2D(n)>1) cycle 
@@ -186,6 +188,8 @@ end do
 !stop
 
 end do
+
+end if
 
 end subroutine recom_sinking_new
 

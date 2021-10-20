@@ -301,23 +301,6 @@ if (0) then
         if (mype==0) print *, ' '
         if (mype==0) print *, 'relative (sumSi2 - sumSi1)/sumSi1', (sumSi2 -  sumSi1)/sumSi1
 
-       ! for silicate mass balance:
-!        if (mype==0) print *, '2) si tracer global integral in fvom_main before oce_timestep_ale:'
-!        call integrate_nod(tr_arr(:,:,isi+2), intDSi, mesh)
-!        call integrate_nod(tr_arr(:,:,idiasi+2), intDiaSi, mesh)
-!        call integrate_nod(tr_arr(:,:,idetsi+2), intDetSi, mesh)
-!        call integrate_nod(Benthos(:,3), intBenSi, mesh)
-        !if (mype==0) print *, 'intDSi: ', intDSi
-        !if (mype==0) print *, 'intDiaSi: ', intDiaSi
-        !if (mype==0) print *, 'intDetSi: ', intDetSi
-        !if (mype==0) print *, 'intBenSi: ', intBenSi
-!        sumSi1 = intDSi + intDiaSi + intDetSi + intBenSi
-!        if (mype==0 .and. (sumSi1-sumSi8)<0) print *, 'sumSi8, sumSi1, fvom before oce_step: ', sumSi8, sumSi1
-!        if (mype==0) print *, 'sumSi1: ', sumSi1
-!        if (mype==0) print *, ''
-!        if (mype==0) print *, ''
-
-
 end if 
 
 !call par_ex

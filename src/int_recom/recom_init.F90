@@ -237,9 +237,9 @@ end if
     !tr_arr(:,:,4)                         ! tracer 4  = DIC
     !tr_arr(:,:,5)                         ! tracer 5  = Alk
 
-    tr_arr(:,:,6)  = tiny                  ! tracer 6  = PhyN   -> Intracellular conc of Nitrogen in small phytoplankton
-    tr_arr(:,:,7)  = tiny * Redfield       ! tracer 7  = PhyC   -> Intracellular conc of Carbon in small phytoplankton
-    tr_arr(:,:,8)  = tiny * 1.56d0         ! tracer 8  = PhyChl -> Current intracellular ChlA conc
+    tr_arr(:,:,6)  = tiny_chl/chl2N_max       !tiny                  ! tracer 6  = PhyN   -> Intracellular conc of Nitrogen in small phytoplankton
+    tr_arr(:,:,7)  = tiny_chl/chl2N_max/NCmax !tiny * Redfield       ! tracer 7  = PhyC   -> Intracellular conc of Carbon in small phytoplankton
+    tr_arr(:,:,8)  = tiny_chl                 !tiny * 1.56d0         ! tracer 8  = PhyChl -> Current intracellular ChlA conc
 
     tr_arr(:,:,9)  = tiny                  ! tracer 9  = DetN
     tr_arr(:,:,10) = tiny                  ! tracer 10 = DetC
@@ -250,9 +250,9 @@ end if
     tr_arr(:,:,13) = tiny                  ! tracer 13 = DON
     tr_arr(:,:,14) = tiny                  ! tracer 14 = DOC
 
-    tr_arr(:,:,15) = tiny                  ! tracer 15 = DiaN
-    tr_arr(:,:,16) = tiny * Redfield       ! tracer 16 = DiaC
-    tr_arr(:,:,17) = tiny * 1.56d0         ! tracer 17 = DiaChl
+    tr_arr(:,:,15) = tiny_chl/chl2N_max !tiny                  ! tracer 15 = DiaN
+    tr_arr(:,:,16) = tiny_chl/chl2N_max/NCmax !tiny * Redfield       ! tracer 16 = DiaC
+    tr_arr(:,:,17) = tiny_chl !tiny * 1.56d0         ! tracer 17 = DiaChl
 
     tr_arr(:,:,18) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax !tiny                   ! tracer 18 = DiaSi
 
@@ -263,7 +263,7 @@ end if
 
 
 !!#ifdef REcoM_calcification
-    tr_arr(:,:,22) = cPhyN * 0.25d0        ! tracer 22 = PhyCalc
+    tr_arr(:,:,22) = tiny !cPhyN * 0.25d0        ! tracer 22 = PhyCalc
     tr_arr(:,:,23) = tiny                  ! tracer 23 = DetCalc
 !!#endif
     !tr_arr(:,:,24)                        ! tracer 24 = Oxy     ! read from the file
