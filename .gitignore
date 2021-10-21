@@ -7,4 +7,5 @@
 *.swp
 src/icepack_drivers/Icepack
 /work_*
+/work
 Makefile.in
