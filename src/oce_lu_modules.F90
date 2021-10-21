@@ -1,7 +1,10 @@
 MODULE o_LU_ARRAYS
 
- IMPLICIT NONE
+! LU arrays ...
 
+ USE o_PARAM
+ IMPLICIT NONE
+ save
   real(kind=WP), allocatable    :: sdbt_x_lu(:,:,:)
   real(kind=WP), allocatable    :: sdbt_y_lu(:,:,:)
   real(kind=WP), allocatable    :: sdbt_z_lu(:,:,:)
