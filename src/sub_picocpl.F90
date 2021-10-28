@@ -11,6 +11,7 @@ module g_picocpl
   real(kind=WP), dimension(:),  allocatable  :: work_array
   real(kind=WP), dimension(:),  allocatable  :: f2pico_data_t, f2pico_data_s, f2pico_count
   real(kind=WP), dimension(:),  allocatable  :: pico_data_t, pico_data_s, pico_z_up, pico_z_lo, pico_lon
+  real(kind=WP)                              :: lvol, gvol
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -93,6 +94,7 @@ subroutine fesom2pico(mesh)
   f2pico_data_t=0.
   f2pico_data_s=0.
   f2pico_count =0.
+  lvol         =0.
   DO n=1, myDim_nod2D
      IF (coast_Antc(n)) then
         x=geo_coord_nod2D(1,n)
@@ -106,12 +108,14 @@ subroutine fesom2pico(mesh)
         ipico=minloc(abs(work_array), 1)
         DO k=1, nlevels_nod2D(n)-1
            if (((zbar_3d_n(k,   n) <= pico_z_up(ipico)) .AND. & !FESOM segment within the PICO segment
-               (zbar_3d_n(k+1, n) >= pico_z_lo(ipico))) .OR.  &!PICO segment within the FESOM segment
+               (zbar_3d_n(k+1, n) >= pico_z_lo(ipico))) .OR.  & !PICO segment within the FESOM segment
                ((zbar_3d_n(k,   n) <= pico_z_up(ipico)) .AND. &
                (zbar_3d_n(k+1, n) <= pico_z_lo(ipico)))) then
                if (pico_data_s(ipico) < 1.) CYCLE !SKIP 
                tr_arr(k, n, 1)=tr_arr(k, n, 1)+gammaT*(pico_data_t(ipico)-tr_arr(k, n, 1)) !apply nudging
                tr_arr(k, n, 2)=tr_arr(k, n, 2)+gammaS*(pico_data_s(ipico)-tr_arr(k, n, 2)) !apply nudging
+               lvol=lvol+area(k,n)*hnode_new(k,n) !will the the total volume of 3D points where nuging is applied
+
                f2pico_data_t(ipico)=f2pico_data_t(ipico)+tr_arr(k, n, 1)
                f2pico_data_s(ipico)=f2pico_data_s(ipico)+tr_arr(k, n, 2)
                f2pico_count (ipico)=f2pico_count (ipico)+1.
@@ -136,6 +140,8 @@ subroutine fesom2pico(mesh)
   call MPI_AllREDUCE(f2pico_count , work_array , pico_N, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
   f2pico_count=work_array
 
+  call MPI_AllREDUCE(lvol, gvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
   where (f2pico_count>0.1)
          f2pico_data_t=f2pico_data_t/f2pico_count
          f2pico_data_s=f2pico_data_s/f2pico_count
@@ -145,6 +151,7 @@ subroutine fesom2pico(mesh)
   ! f2pico_data_s<->pico_data_s
   ! do comparison with PICO & output
   if (mype==0) then
+     if (mstep==1) write(*,*) 'the 3D volume of PICO nudged area [m3] is : ', gvol
      if (mod(mstep, 10)==1) then
      OPEN(UNIT=2010, FILE='fesom.dat', POSITION='APPEND') 
      write(2010,*)'****************** ', mstep, ' ******************'
