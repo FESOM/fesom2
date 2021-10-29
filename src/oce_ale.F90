@@ -2562,11 +2562,12 @@ subroutine oce_timestep_ale(n, mesh)
 !     stress_surf= 0.0_WP
 !     stress_node_surf= 0.0_WP
     
-    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d) &
 #ifdef WITH_ACC_ASYNC
-    !$acc& async(stream_ver_diff_tra)&
+    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d) &
+    !$acc& async(stream_ver_diff_tra)
+#else
+    !$acc update device(water_flux,heat_flux,Tsurf,virtual_salt,relax_salt,real_salt_flux,prec_rain,sw_3d)
 #endif
-    !$acc
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -2593,11 +2594,12 @@ subroutine oce_timestep_ale(n, mesh)
     ! will be primarily used for computing Redi diffusivities. etc?
     call compute_neutral_slope(mesh)
 
-    !$acc update device(slope_tapered) &
 #ifdef WITH_ACC_ASYNC
-    !$acc &async(stream_hor_diff_tra)&
+    !$acc update device(slope_tapered) &
+    !$acc &async(stream_hor_diff_tra)
+#else
+    !$acc update device(slope_tapered)
 #endif
-    !$acc
 
     
     !___________________________________________________________________________
@@ -2678,11 +2680,12 @@ subroutine oce_timestep_ale(n, mesh)
         
     end if
     
-    !$acc update device(Kv) &
 #ifdef WITH_ACC_ASYNC
-    !$acc& async(stream_ver_diff_tra)&
+    !$acc update device(Kv) &
+    !$acc& async(stream_ver_diff_tra)
+#else
+    !$acc update device(Kv)
 #endif
-    !$acc
     
     t1=MPI_Wtime()
     
@@ -2709,10 +2712,7 @@ subroutine oce_timestep_ale(n, mesh)
     if(i_vert_visc) call impl_vert_visc_ale(mesh)
     
     !!$acc update device(hnode_new) &
-!#ifdef WITH_ACC_ASYNC
-    !!$acc &async(stream_hnode_update)&
-!#endif
-    !!$acc
+    !!$acc &async(stream_hnode_update)
     
     t2=MPI_Wtime()
         
@@ -2745,11 +2745,12 @@ subroutine oce_timestep_ale(n, mesh)
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
     call compute_hbar_ale(mesh)
-    !$acc update device(hnode_new) &
 #ifdef WITH_ACC_ASYNC
-    !$acc & async(stream_hnode_update)&
+    !$acc update device(hnode_new) &
+    !$acc & async(stream_hnode_update)
+#else
+    !$acc update device(hnode_new)
 #endif
-    !$acc
     
     !___________________________________________________________________________
     ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2771,11 +2772,12 @@ subroutine oce_timestep_ale(n, mesh)
     ! Do horizontal and vertical scaling of GM/Redi  diffusivity 
     if (Fer_GM .or. Redi) then
         call init_Redi_GM(mesh)
-        !$acc update device(Ki) &
 #ifdef WITH_ACC_ASYNC
-        !$acc &async(stream_hor_diff_tra)&
+        !$acc update device(Ki) &
+        !$acc &async(stream_hor_diff_tra)
+#else
+        !$acc update device(Ki)
 #endif
-        !$acc
     end if
     
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
@@ -2792,11 +2794,12 @@ subroutine oce_timestep_ale(n, mesh)
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
     call vert_vel_ale(mesh)
-    !$acc update device(Wvel_i)&
 #ifdef WITH_ACC_ASYNC
-    !$acc & async(stream_ver_diff_tra)&
+    !$acc update device(Wvel_i)&
+    !$acc & async(stream_ver_diff_tra)
+#else
+    !$acc update device(Wvel_i)
 #endif
-    !$acc
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
@@ -2814,11 +2817,12 @@ subroutine oce_timestep_ale(n, mesh)
     call update_thickness_ale(mesh)
     t9=MPI_Wtime()
 
-    !$acc update device(hnode,helem,z_3d_n,zbar_3d_n) &
 #ifdef WITH_ACC_ASYNC
-    !$acc& async(stream_hnode_update)&
+    !$acc update device(hnode,helem,z_3d_n,zbar_3d_n) &
+    !$acc& async(stream_hnode_update)
+#else
+    !$acc update device(hnode,helem,z_3d_n,zbar_3d_n)
 #endif
-    !$acc
     
     !___________________________________________________________________________
     ! write out global fields for debugging
