@@ -306,14 +306,13 @@ type(t_mesh), intent(in) , target :: mesh
 	!$acc parallel loop gang present(edge_up_dn_grad,ulevels,nlevels,edges,edge_up_dn_tri,&
 	!$acc& ulevels_nod2D,nod_in_elem2D_num,elem_area,tr_xy,ulevels_nod2D_max,nlevels_nod2D_min,&
 	!$acc& nod_in_elem2d,nlevels_nod2d)&
-	!$acc& private(ednodes,nzmin,nzmax,tvol,tx,ty,elem)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_hor_adv_tra)&
 #endif
-    !$acc
+	!$acc& private(ednodes,nzmin,nzmax,tvol,tx,ty,elem)
 	DO edge=1,myDim_edge2D
 		ednodes=edges(:,edge)
 		!_______________________________________________________________________
