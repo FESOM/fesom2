@@ -111,7 +111,7 @@ subroutine adv_tra_vert_impl(ttf, w, mesh)
     ! loop over local nodes
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,area,hnode_new,zbar_n_bot,areasvol)&
     !$acc& default(none) &
-    !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,zinv,dz,c1,v_adv,z_n(nzmax),zbar_n(nzmax))
+    !$acc& private(nzmax,nzmin,nz,n,a,b,c,tr,cp,tp,zinv,dz,c1,v_adv,dt,m)
     do n=1,myDim_nod2D
         ! max. number of levels at node n
         nzmax=nlevels_nod2D(n)
@@ -226,11 +226,11 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)&
+        !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
-        !$acc& async(stream_ver_adv_tra)&
+        !$acc& async(stream_ver_adv_tra) &
 #endif
-        !$acc
+        !$acc&  present(flux)
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -238,11 +238,11 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)&
+      !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
       !$acc& async(stream_ver_adv_tra)&
 #endif
-      !$acc
+      !$acc& present(flux)
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -251,14 +251,13 @@ subroutine adv_tra_ver_upw1(ttf, w, do_Xmoment, mesh, flux, init_zero)
     end if
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area)&
-    !$acc& private(nzmax,nzmin,nz)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_ver_adv_tra)&
 #endif
-    !$acc
+    !$acc& private(nzmax,nzmin,nz)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -317,11 +316,11 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)&
+        !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
         !$acc& async(stream_ver_adv_tra)&
 #endif
-        !$acc
+        !$acc& present(flux)
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -329,11 +328,11 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)&
+      !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
       !$acc& async(stream_ver_adv_tra)&
 #endif
-      !$acc
+      !$acc& present(flux)
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -342,14 +341,13 @@ subroutine adv_tra_ver_qr4c(ttf, w, do_Xmoment, mesh, num_ord, flux, init_zero)
     end if
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area,z_3d_n,zbar_3d_n)&
-    !$acc& private(nzmax,nzmin,nz)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_ver_adv_tra)&
 #endif
-    !$acc
+    !$acc& private(nzmax,nzmin,nz)
     do n=1, myDim_nod2D
        !_______________________________________________________________________
        nzmax=nlevels_nod2D(n)
@@ -424,11 +422,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)&
+        !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
         !$acc& async(stream_ver_adv_tra)&
 #endif
-        !$acc
+        !$acc& present(flux)
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -436,11 +434,11 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)&
+      !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
       !$acc& async(stream_ver_adv_tra)&
 #endif
-      !$acc
+      !$acc& present(flux)
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -459,14 +457,13 @@ subroutine adv_tra_vert_ppm(ttf, w, do_Xmoment, mesh, flux, init_zero)
     overshoot_counter=0
     counter          =0
     !$acc parallel loop gang present(flux,W,ttf,nlevels_nod2D,ulevels_nod2D,hnode,hnode_new,area)&
-    !$acc& private(nzmin,nzmax,tvert,tv,aL,aR,aj,x)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_ver_adv_tra)&
 #endif
-    !$acc
+    !$acc& private(nzmin,nzmax,tvert,tv,aL,aR,aj,x)
     do n=1, myDim_nod2D
 
         !_______________________________________________________________________
@@ -646,11 +643,11 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     nzmax=mesh%nl
     if (present(init_zero))then
       if (init_zero)then
-        !$acc parallel loop collapse(2) present(flux)&
+        !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
         !$acc& async(stream_ver_adv_tra)&
 #endif
-        !$acc
+        !$acc& present(flux)
         do n=1, myDim_nod2D
           do nz=1,nzmax
             flux(nz,n)=0.0_WP
@@ -658,11 +655,11 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
         end do
       end if
     else
-      !$acc parallel loop collapse(2) present(flux)&
+      !$acc parallel loop collapse(2) &
 #ifdef WITH_ACC_ASYNC
       !$acc& async(stream_ver_adv_tra)&
 #endif
-      !$acc
+      !$acc& present(flux)
       do n=1, myDim_nod2D
         do nz=1,nzmax
           flux(nz,n)=0.0_WP
@@ -671,14 +668,13 @@ subroutine adv_tra_ver_cdiff(ttf, w, do_Xmoment, mesh, flux, init_zero)
     end if
 
     !$acc parallel loop gang present(W,ttf,nlevels_nod2D,ulevels_nod2D,flux,area)&
-    !$acc& private(nzmin,nzmax,tvert)&
 #ifdef WITH_ACC_VECTOR_LENGTH
     !$acc& vector_length(z_vector_length)&
 #endif
 #ifdef WITH_ACC_ASYNC
     !$acc& async(stream_ver_adv_tra)&
 #endif
-    !$acc
+    !$acc& private(nzmin,nzmax,tvert)
     do n=1, myDim_nod2D
         !_______________________________________________________________________
         nzmax=nlevels_nod2D(n)-1
