@@ -1,42 +1,48 @@
 module write_step_info_interface
   interface
-    subroutine write_step_info(istep,outfreq,tracers,partit,mesh)
+    subroutine write_step_info(istep,outfreq,dynamics, tracers,partit,mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use MOD_TRACER
+      use MOD_DYN
       integer				    :: istep,outfreq
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(in),    target :: tracers
+      type(t_tracer), intent(in)   , target :: tracers
+      type(t_dyn)   , intent(in)   , target :: dynamics
     end subroutine
   end interface
 end module
 module check_blowup_interface
   interface
-    subroutine check_blowup(istep, tracers,partit,mesh)
+    subroutine check_blowup(istep, dynamics, tracers,partit,mesh)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use MOD_TRACER
+      use MOD_DYN
       integer				    :: istep
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       type(t_tracer), intent(in),    target :: tracers
+      type(t_dyn)   , intent(in)   , target :: dynamics
     end subroutine
   end interface
 end module
 !
 !
 !===============================================================================
-subroutine write_step_info(istep, outfreq, tracers, partit, mesh)
+subroutine write_step_info(istep, outfreq, dynamics, tracers, partit, mesh)
 	use g_config, only: dt, use_ice
 	use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_TRACER
+    use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS
+	use o_ARRAYS, only: eta_n, d_eta, water_flux, heat_flux, Wvel, Unode, CFL_z, &
+                        pgf_x, pgf_y, Av, Kv
 	use i_ARRAYS
 	use g_comm_auto
 	implicit none
@@ -52,13 +58,17 @@ subroutine write_step_info(istep, outfreq, tracers, partit, mesh)
                                            max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
 	real(kind=WP)						:: int_deta , int_dhbar
 	real(kind=WP)						:: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_tracer), intent(in),    target :: tracers
+    type(t_mesh),   intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "associate_mesh_ass.h" 
+    UV => dynamics%uv(:,:,:)
+    
 	if (mod(istep,outfreq)==0) then
 		
 		!_______________________________________________________________________
@@ -242,14 +252,16 @@ end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep, tracers, partit, mesh)
+subroutine check_blowup(istep, dynamics, tracers, partit, mesh)
 	use g_config, only: logfile_outfreq, which_ALE
 	use MOD_MESH
-        use MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
+    use MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use MOD_DYN
 	use o_PARAM
-	use o_ARRAYS
+	use o_ARRAYS, only: eta_n, d_eta, ssh_rhs, ssh_rhs_old, water_flux, stress_surf, &
+                        Wvel, CFL_z, heat_flux, Kv, Av
 	use i_ARRAYS
 	use g_comm_auto
 	use io_BLOWUP
@@ -259,14 +271,18 @@ subroutine check_blowup(istep, tracers, partit, mesh)
 	implicit none
 	
 	integer                               :: n, nz, istep, found_blowup_loc=0, found_blowup=0
-	integer 		              :: el, elidx
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_tracer), intent(in),    target :: tracers
+	integer 		                      :: el, elidx
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_tracer), intent(in)   , target :: tracers
+    type(t_dyn)   , intent(in)   , target :: dynamics
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "associate_mesh_ass.h" 
+    UV => dynamics%uv(:,:,:)
+    
 	!___________________________________________________________________________
 ! ! 	if (mod(istep,logfile_outfreq)==0) then
 ! ! 		if (mype==0) then 
@@ -509,7 +525,7 @@ subroutine check_blowup(istep, tracers, partit, mesh)
 		! moment only over CPU mype==0
 		call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 		if (found_blowup==1) then
-			call write_step_info(istep,1,tracers,partit,mesh)
+			call write_step_info(istep, 1, dynamics, tracers,partit,mesh)
 			if (mype==0) then
 				call sleep(1)
 				write(*,*)
@@ -529,7 +545,7 @@ subroutine check_blowup(istep, tracers, partit, mesh)
 				write(*,*) '                  _____.,-#%&$@%#&#~,._____'
 				write(*,*)
 			end if
-			call blowup(istep, tracers, partit, mesh)
+			call blowup(istep, dynamics, tracers, partit, mesh)
 			if (mype==0) write(*,*) ' --> finished writing blow up file'
 			call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 		endif 

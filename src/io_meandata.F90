@@ -93,11 +93,12 @@ module io_MEANDATA
   end subroutine
 
 
-subroutine ini_mean_io(tracers, partit, mesh)
+subroutine ini_mean_io(dynamics, tracers, partit, mesh)
   use MOD_MESH
   use MOD_TRACER
   USE MOD_PARTIT
   USE MOD_PARSUP
+  USE MOD_DYN
   use g_cvmix_tke
   use g_cvmix_idemix
   use g_cvmix_kpp
@@ -111,9 +112,10 @@ subroutine ini_mean_io(tracers, partit, mesh)
   integer,dimension(15)     :: sel_forcvar=0
   character(len=10)         :: id_string
 
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_dyn)   , intent(in)   , target :: dynamics
   namelist /nml_listsize/ io_listsize
   namelist /nml_list    / io_list
 
@@ -315,9 +317,9 @@ CASE ('N2        ')
 CASE ('Kv        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  dynamics.uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('v         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  dynamics.uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
@@ -429,8 +431,8 @@ END DO
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'unod',  'horizontal velocity at nodes', 'm/s', Unode(1,:,:), 1, 'm', i_real8, partit, mesh)
      call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),  'vnod',  'meridional velocity at nodes', 'm/s', Unode(2,:,:), 1, 'm', i_real8, partit, mesh)
     
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', uv(1,:,:),     1, 'm', i_real4, partit, mesh)
-     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', uv(2,:,:),     1, 'm', i_real4, partit, mesh)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'um',  'horizontal velocity', 'm/s', dynamics%uv(1,:,:),     1, 'm', i_real4, partit, mesh)
+     call def_stream((/nl-1, elem2D/), (/nl-1,   myDim_elem2D/), 'vm',  'meridional velocity', 'm/s', dynamics%uv(2,:,:),     1, 'm', i_real4, partit, mesh)
      call def_stream((/nl, nod2D/),    (/nl,     myDim_nod2D/),  'wm',  'vertical velocity',   'm/s', Wvel(:,:),     1, 'm', i_real8, partit, mesh)
 
      call def_stream(elem2D, myDim_elem2D,   'utau_surf',  '(u, tau) at the surface',      'N/(m s)', utau_surf(1:myDim_elem2D),     1, 'm', i_real4, partit, mesh)
@@ -805,11 +807,12 @@ end subroutine
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine output(istep, tracers, partit, mesh)
+subroutine output(istep, dynamics, tracers, partit, mesh)
   use g_clock
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use MOD_DYN
   use mod_tracer
   use io_gather_module
 #if defined (__icepack)
@@ -821,15 +824,16 @@ subroutine output(istep, tracers, partit, mesh)
   integer       :: n, k
   logical       :: do_output
   type(Meandata), pointer :: entry
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_dyn)   , intent(in)   , target :: dynamics
   character(:),   allocatable           :: filepath
   real(real64)                          :: rtime !timestamp of the record
 
   ctime=timeold+(dayold-1.)*86400
   if (lfirst) then
-     call ini_mean_io(tracers, partit, mesh)
+     call ini_mean_io(dynamics, tracers, partit, mesh)
 #if defined (__icepack)
      call init_io_icepack(mesh) !icapack has its copy of p_partit => partit
 #endif

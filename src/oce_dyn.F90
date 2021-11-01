@@ -13,112 +13,142 @@
 ! 5. Leith_c=?    (need to be adjusted)
 module h_viscosity_leith_interface
   interface
-    subroutine h_viscosity_leith(partit, mesh)
+    subroutine h_viscosity_leith(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_harmon_interface
   interface
-    subroutine visc_filt_harmon(partit, mesh)
+    subroutine visc_filt_harmon(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_hbhmix_interface
   interface
-    subroutine visc_filt_hbhmix(partit, mesh)
+    subroutine visc_filt_hbhmix(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_biharm_interface
   interface
-    subroutine visc_filt_biharm(option, partit, mesh)
+    subroutine visc_filt_biharm(option, dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
+      USE MOD_DYN
       integer       :: option
-      type(t_mesh),   intent(in),    target :: mesh
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_bcksct_interface
   interface
-    subroutine visc_filt_bcksct(partit, mesh)
+    subroutine visc_filt_bcksct(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_bilapl_interface
   interface
-    subroutine visc_filt_bilapl(partit, mesh)
+    subroutine visc_filt_bilapl(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_bidiff_interface
   interface
-    subroutine visc_filt_bidiff(partit, mesh)
+    subroutine visc_filt_bidiff(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module visc_filt_dbcksc_interface
   interface
-    subroutine visc_filt_dbcksc(partit, mesh)
+    subroutine visc_filt_dbcksc(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module backscatter_coef_interface
   interface
-    subroutine backscatter_coef(partit, mesh)
+    subroutine backscatter_coef(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
 module uke_update_interface
   interface
-    subroutine uke_update(partit, mesh)
+    subroutine uke_update(dynamics, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
+      USE MOD_DYN
+      type(t_dyn)   , intent(inout), target :: dynamics
       type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+      
     end subroutine
   end interface
 end module
@@ -128,11 +158,13 @@ end module
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
 ! ===================================================================
-SUBROUTINE update_vel(partit, mesh)
+SUBROUTINE update_vel(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    USE MOD_DYN
+    
+    USE o_ARRAYS, only: d_eta, eta_n, UV_rhs
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -140,13 +172,16 @@ SUBROUTINE update_vel(partit, mesh)
     integer       :: elem, elnodes(3), nz, m, nzmax, nzmin
     real(kind=WP) :: eta(3) 
     real(kind=WP) :: Fx, Fy
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
+    type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV=>dynamics%uv(:,:,:)
 
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
@@ -165,23 +200,27 @@ SUBROUTINE update_vel(partit, mesh)
     call exchange_elem(UV, partit)
 end subroutine update_vel
 !==========================================================================
-subroutine compute_vel_nodes(partit, mesh)
+subroutine compute_vel_nodes(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    USE MOD_DYN
     USE o_PARAM
     USE o_ARRAYS
     use g_comm_auto
     IMPLICIT NONE
     integer            :: n, nz, k, elem, nln, uln, nle, ule
     real(kind=WP)      :: tx, ty, tvol
-    type(t_mesh),   intent(in),    target :: mesh
+    
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV=>dynamics%uv(:,:,:)
 
     DO n=1, myDim_nod2D 
         uln = ulevels_nod2D(n)
@@ -208,11 +247,12 @@ subroutine compute_vel_nodes(partit, mesh)
     call exchange_nod(Unode, partit)
 end subroutine compute_vel_nodes
 !===========================================================================
-subroutine viscosity_filter(option, partit, mesh)
+subroutine viscosity_filter(option, dynamics, partit, mesh)
 use o_PARAM
 use MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
+use MOD_DYN
 use h_viscosity_leith_interface
 use visc_filt_harmon_interface
 use visc_filt_hbhmix_interface
@@ -224,7 +264,8 @@ use visc_filt_dbcksc_interface
 use backscatter_coef_interface
 IMPLICIT NONE 
 integer                               :: option
-type(t_mesh),   intent(in),    target :: mesh
+type(t_dyn)   , intent(inout), target :: dynamics
+type(t_mesh)  , intent(in)   , target :: mesh
 type(t_partit), intent(inout), target :: partit
 
 ! Driving routine 
@@ -241,34 +282,34 @@ CASE (1)
      ! ====
      ! Harmonic Leith parameterization
      ! ====
-     call h_viscosity_leith(partit, mesh)
-     call visc_filt_harmon(partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
+     call visc_filt_harmon(dynamics, partit, mesh)
 CASE (2)
      ! ===
      ! Laplacian+Leith+biharmonic background
      ! ===
-     call h_viscosity_leith(partit, mesh)
-     call visc_filt_hbhmix(partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
+     call visc_filt_hbhmix(dynamics, partit, mesh)
 CASE (3)
      ! ===
      ! Biharmonic Leith parameterization
      ! ===
-     call h_viscosity_leith(partit, mesh)
-     call visc_filt_biharm(2, partit, mesh)
+     call h_viscosity_leith(dynamics, partit, mesh)
+     call visc_filt_biharm(2, dynamics, partit, mesh)
 CASE (4)
      ! ===
      ! Biharmonic+upwind-type
      ! ===
-     call visc_filt_biharm(1, partit, mesh)
+     call visc_filt_biharm(1, dynamics, partit, mesh)
 CASE (5)
-     call visc_filt_bcksct(partit, mesh)
+     call visc_filt_bcksct(dynamics, partit, mesh)
 CASE (6)
-     call visc_filt_bilapl(partit, mesh)
+     call visc_filt_bilapl(dynamics, partit, mesh)
 CASE (7)
-     call visc_filt_bidiff(partit, mesh)
+     call visc_filt_bidiff(dynamics, partit, mesh)
 CASE (8)
-     call backscatter_coef(partit, mesh)
-     call visc_filt_dbcksc(partit, mesh) 
+     call backscatter_coef(dynamics, partit, mesh)
+     call visc_filt_dbcksc(dynamics, partit, mesh) 
 CASE DEFAULT
      if (partit%mype==0) write(*,*) 'mixing scheme with option ' , option, 'has not yet been implemented'
      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -276,24 +317,27 @@ CASE DEFAULT
 END SELECT
 end subroutine viscosity_filter  
 ! ===================================================================
-SUBROUTINE visc_filt_harmon(partit, mesh)
+SUBROUTINE visc_filt_harmon(dynamics, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
-USE o_ARRAYS
+USE MOD_DYN
+USE o_ARRAYS, only: Visc, UV_rhs
 USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
 
 real(kind=WP) :: u1, v1, le(2), len, vi
 integer       :: nz, ed, el(2) , nzmin,nzmax
-type(t_mesh),   intent(in),    target :: mesh
+type(t_dyn)   , intent(inout), target :: dynamics
+type(t_mesh)  , intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
-
+real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+UV => dynamics%uv(:,:,:)
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -320,11 +364,12 @@ type(t_partit), intent(inout), target :: partit
  END DO
 end subroutine visc_filt_harmon
 ! ===================================================================
-SUBROUTINE visc_filt_biharm(option, partit, mesh)
+SUBROUTINE visc_filt_biharm(option, dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    use MOD_DYN
+    USE o_ARRAYS, only: Visc, UV_rhs
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -335,13 +380,15 @@ SUBROUTINE visc_filt_biharm(option, partit, mesh)
     real(kind=WP) :: u1, v1, vi, len
     integer       :: ed, el(2), nz, option, nzmin, nzmax
     real(kind=WP), allocatable  :: U_c(:,:), V_c(:,:) 
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV => dynamics%uv(:,:,:)
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -426,11 +473,12 @@ SUBROUTINE visc_filt_biharm(option, partit, mesh)
  
 end subroutine visc_filt_biharm
 ! ===================================================================
-SUBROUTINE visc_filt_hbhmix(partit, mesh)
+SUBROUTINE visc_filt_hbhmix(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    use MOD_DYN 
+    USE o_ARRAYS, only: Visc, UV_rhs
     USE o_PARAM
     USE g_CONFIG
     use g_comm_auto
@@ -443,13 +491,15 @@ SUBROUTINE visc_filt_hbhmix(partit, mesh)
     real(kind=WP)                      :: u1, v1, vi, len, crosslen, le(2)
     integer                            :: ed, el(2), nz, nzmin, nzmax
     real(kind=WP), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn), intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh),   intent(in),    target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV => dynamics%uv(:,:,:)
 
     ! Filter is applied twice. 
     ed=myDim_elem2D+eDim_elem2D
@@ -516,12 +566,13 @@ SUBROUTINE visc_filt_hbhmix(partit, mesh)
 end subroutine visc_filt_hbhmix
 
 ! ===================================================================
-SUBROUTINE h_viscosity_leith(partit, mesh)
+SUBROUTINE h_viscosity_leith(dynamics, partit, mesh)
     !
     ! Coefficient of horizontal viscosity is a combination of the Leith (with Leith_c) and modified Leith (with Div_c)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
+    use MOD_DYN
     USE o_ARRAYS
     USE o_PARAM
     USE g_CONFIG
@@ -531,9 +582,10 @@ SUBROUTINE h_viscosity_leith(partit, mesh)
     integer        :: elem, nl1, nz, elnodes(3), n, k, nt, ul1
     real(kind=WP)  :: leithx, leithy
     real(kind=WP), allocatable :: aux(:,:) 
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -622,11 +674,12 @@ SUBROUTINE h_viscosity_leith(partit, mesh)
     deallocate(aux)
 END subroutine h_viscosity_leith
 ! =======================================================================
-SUBROUTINE visc_filt_bcksct(partit, mesh)
+SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    use MOD_DYN
+    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -635,13 +688,15 @@ SUBROUTINE visc_filt_bcksct(partit, mesh)
     real(kind=8)  :: u1, v1, len, vi 
     integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
     real(kind=8), allocatable  ::  U_b(:,:), V_b(:,:), U_c(:,:), V_c(:,:)  
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV => dynamics%uv(:,:,:)
 
     ! An analog of harmonic viscosity operator.
     ! Same as visc_filt_h, but with the backscatter. 
@@ -722,11 +777,12 @@ end subroutine visc_filt_bcksct
 ! \nu=|3u_c-u_n1-u_n2-u_n3|*sqrt(S_c)/100. There is an additional term
 ! in viscosity that is proportional to the velocity amplitude squared.
 ! The coefficient has to be selected experimentally.
-SUBROUTINE visc_filt_bilapl(partit, mesh)
+SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    use MOD_DYN
+    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -734,13 +790,17 @@ SUBROUTINE visc_filt_bilapl(partit, mesh)
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh),   intent(in),    target :: mesh
+    
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV => dynamics%uv(:,:,:)
 
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -804,11 +864,12 @@ end subroutine visc_filt_bilapl
 ! On each edge, \nu=sqrt(|u_c1-u_c2|*sqrt(S_c1+S_c2)/100)
 ! The effect is \nu^2
 ! Quadratic in velocity term can be introduced if needed.
-SUBROUTINE visc_filt_bidiff(partit, mesh)
+SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
-    USE o_ARRAYS
+    use MOD_DYN
+    USE o_ARRAYS, only: UV_rhs
     USE o_PARAM
     USE g_CONFIG
     USE g_comm_auto
@@ -816,13 +877,16 @@ SUBROUTINE visc_filt_bidiff(partit, mesh)
     real(kind=8)  :: u1, v1, vi, len
     integer       :: ed, el(2), nz, nzmin, nzmax
     real(kind=8), allocatable         :: U_c(:,:), V_c(:,:) 
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
-
+    type(t_mesh)  , intent(in)   , target :: mesh
+    
+    real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    UV => dynamics%uv(:,:,:)
     !
     ed=myDim_elem2D+eDim_elem2D
     allocate(U_c(nl-1,ed), V_c(nl-1, ed)) 
@@ -880,11 +944,13 @@ end subroutine visc_filt_bidiff
 
 
 ! ===================================================================
-SUBROUTINE visc_filt_dbcksc(partit, mesh)
+SUBROUTINE visc_filt_dbcksc(dynamics, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
-USE o_ARRAYS
+use MOD_DYN
+USE o_ARRAYS, only: UV_rhs, v_back, UV_dis_tend, UV_total_tend, UV_back_tend, &
+                    uke, uke_dif
 USE o_PARAM
 USE g_CONFIG
 USE g_comm_auto
@@ -896,12 +962,15 @@ real(kind=8)  :: u1, v1, le(2), len, crosslen, vi, uke1
 integer       :: nz, ed, el(2)
 real(kind=8), allocatable  :: U_c(:,:), V_c(:,:), UV_back(:,:,:), UV_dis(:,:,:), uke_d(:,:) 
 real(kind=8), allocatable  :: uuu(:)
-type(t_mesh),   intent(in),    target :: mesh
+type(t_dyn)   , intent(inout), target :: dynamics
 type(t_partit), intent(inout), target :: partit
+type(t_mesh)  , intent(in)   , target :: mesh
+real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+UV => dynamics%uv(:,:,:)
 
  ! An analog of harmonic viscosity operator.  
  ! It adds to the rhs(0) Visc*(u1+u2+u3-3*u0)/area
@@ -1028,7 +1097,7 @@ END DO
  UV_back_tend=UV_back
  uke_dif=uke_d
  
- call uke_update(partit, mesh)
+ call uke_update(dynamics, partit, mesh)
  deallocate(V_c,U_c)
  deallocate(UV_dis,UV_back) 
  deallocate(uke_d)
@@ -1073,11 +1142,13 @@ call exchange_elem(v_back, partit)
 end subroutine backscatter_coef
 !===========================================================================
 
-SUBROUTINE uke_update(partit, mesh)
+SUBROUTINE uke_update(dynamics, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
-USE o_ARRAYS
+use MOD_DYN
+USE o_ARRAYS, only: uke_rhs, uke_dif, uke_back, uke_dis, uke, UV_dis_tend, uv_back_tend, uke_rhs_old, &
+                    bvfreq, coriolis_node
 USE o_PARAM
 USE g_CONFIG
 use g_comm_auto
@@ -1089,18 +1160,22 @@ IMPLICIT NONE
 
 !Why is it necessary to implement the length of the array? It doesn't work without!
 !integer, intent(in)        :: t_levels
-type(t_mesh),   intent(in),    target :: mesh
+type(t_dyn)   , intent(inout), target :: dynamics
 type(t_partit), intent(inout), target :: partit
+type(t_mesh)  , intent(in)   , target :: mesh
+
 real(kind=8)		   :: hall, h1_eta, hnz, vol
 integer			   :: elnodes(3), nz, ed, edi, node, j, elem, q
 real(kind=8), allocatable  :: uuu(:), work_array(:), U_work(:,:), V_work(:,:), rosb_array(:,:), work_uv(:)
 integer			   :: kk, nzmax, el
 real(kind=8)       :: c1, rosb, vel_u, vel_v, vel_uv, scaling, reso
 real*8             :: c_min=0.5, f_min=1.e-6, r_max=200000., ex, ey, a1, a2, len_reg, dist_reg(2) ! Are those values still correct?
+real(kind=WP), dimension(:,:,:), pointer :: UV
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "associate_mesh_ass.h" 
+UV => dynamics%uv(:,:,:)
 
 !rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
 !rossby_num=2
@@ -1241,3 +1316,4 @@ deallocate(uuu)
 end subroutine uke_update
 
 ! ===================================================================
+

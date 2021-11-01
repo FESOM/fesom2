@@ -6,6 +6,7 @@ MODULE io_RESTART
   USE MOD_PARTIT
   USE MOD_PARSUP
   use mod_tracer
+  use MOD_DYN
   use o_arrays
   use i_arrays
   use g_cvmix_tke
@@ -79,7 +80,7 @@ MODULE io_RESTART
 !--------------------------------------------------------------------------------------------
 ! ini_ocean_io initializes oid datatype which contains information of all variables need to be written into 
 ! the ocean restart file. This is the only place need to be modified if a new variable is added!
-subroutine ini_ocean_io(year, tracers, partit, mesh)
+subroutine ini_ocean_io(year, dynamics, tracers, partit, mesh)
   implicit none
 
   integer, intent(in)       :: year
@@ -89,9 +90,10 @@ subroutine ini_ocean_io(year, tracers, partit, mesh)
   character(500)            :: filename
   character(500)            :: trname, units
   character(4)              :: cyear
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_dyn)   , intent(in)   , target :: dynamics
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -120,8 +122,8 @@ subroutine ini_ocean_io(year, tracers, partit, mesh)
   call def_variable(oid, 'hnode',    (/nl-1,  nod2D/), 'nodal layer thickness', 'm',   hnode);
   
   !___Define the netCDF variables for 3D fields_______________________________
-  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', UV(1,:,:));
-  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', UV(2,:,:));
+  call def_variable(oid, 'u',        (/nl-1, elem2D/), 'zonal velocity',        'm/s', dynamics.uv(1,:,:));
+  call def_variable(oid, 'v',        (/nl-1, elem2D/), 'meridional velocity',   'm/s', dynamics.uv(2,:,:));
   call def_variable(oid, 'urhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for u', 'm/s', UV_rhsAB(1,:,:));
   call def_variable(oid, 'vrhs_AB',  (/nl-1, elem2D/), 'Adams–Bashforth for v', 'm/s', UV_rhsAB(2,:,:));
   
@@ -207,7 +209,7 @@ end subroutine ini_ice_io
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine restart(istep, l_write, l_read, tracers, partit, mesh)
+subroutine restart(istep, l_write, l_read, dynamics, tracers, partit, mesh)
 
 #if defined(__icepack)
   use icedrv_main,   only: init_restart_icepack
@@ -222,18 +224,19 @@ subroutine restart(istep, l_write, l_read, tracers, partit, mesh)
   logical :: l_write, l_read
   logical :: is_restart
   integer :: mpierr
-  type(t_mesh),   intent(in),    target :: mesh
+  type(t_mesh)  , intent(in)   , target :: mesh
   type(t_partit), intent(inout), target :: partit
-  type(t_tracer), intent(in),    target :: tracers
+  type(t_tracer), intent(in)   , target :: tracers
+  type(t_dyn)   , intent(in)   , target :: dynamics
   ctime=timeold+(dayold-1.)*86400
   if (.not. l_read) then
-               call ini_ocean_io(yearnew, tracers, partit, mesh)
+               call ini_ocean_io(yearnew, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearnew, partit, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearnew, mesh) !icapack has its copy of p_partit => partit
 #endif
   else
-               call ini_ocean_io(yearold, tracers, partit, mesh)
+               call ini_ocean_io(yearold, dynamics, tracers, partit, mesh)
   if (use_ice) call ini_ice_io  (yearold, partit, mesh)
 #if defined(__icepack)
   if (use_ice) call init_restart_icepack(yearold, mesh) !icapack has its copy of p_partit => partit
