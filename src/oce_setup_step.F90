@@ -11,6 +11,7 @@ module oce_initial_state_interface
     end subroutine
   end interface
 end module
+
 module tracer_init_interface
   interface
     subroutine tracer_init(tracers, partit, mesh)
@@ -24,6 +25,21 @@ module tracer_init_interface
     end subroutine
   end interface
 end module
+
+module dynamics_init_interface
+  interface
+    subroutine dynamics_init(dynamics, partit, mesh)
+      USE MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      use MOD_DYN
+      type(t_mesh)  , intent(in)   , target :: mesh
+      type(t_partit), intent(inout), target :: partit
+      type(t_dyn)   , intent(inout), target :: dynamics
+    end subroutine
+  end interface
+end module
+
 module ocean_setup_interface
   interface
     subroutine ocean_setup(tracers, partit, mesh)
@@ -37,6 +53,7 @@ module ocean_setup_interface
     end subroutine
   end interface
 end module
+
 module before_oce_step_interface
   interface
     subroutine before_oce_step(tracers, partit, mesh)
@@ -51,11 +68,12 @@ module before_oce_step_interface
   end interface
 end module
 !_______________________________________________________________________________
-subroutine ocean_setup(tracers, partit, mesh)
+subroutine ocean_setup(dynamics, tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
 USE MOD_TRACER
+USE MOD_DYN
 USE o_PARAM
 USE o_ARRAYS
 USE g_config
@@ -69,9 +87,10 @@ use Toy_Channel_Soufflet
 use oce_initial_state_interface
 use oce_adv_tra_fct_interfaces
 IMPLICIT NONE
-type(t_mesh),   intent(inout), target :: mesh
-type(t_partit), intent(inout), target :: partit
+type(t_dyn)   , intent(inout), target :: dynamics
 type(t_tracer), intent(inout), target :: tracers
+type(t_partit), intent(inout), target :: partit
+type(t_mesh)  , intent(inout), target :: mesh
 integer                               :: n
     !___setup virt_salt_flux____________________________________________________
     ! if the ale thinkness remain unchanged (like in 'linfs' case) the vitrual 
@@ -181,9 +200,9 @@ integer                               :: n
        SELECT CASE (TRIM(which_toy))
          CASE ("soufflet") !forcing update for soufflet testcase
            if (mod(mstep, soufflet_forc_update)==0) then
-              call initial_state_soufflet(tracers, partit, mesh)
+              call initial_state_soufflet(dynamics, tracers, partit, mesh)
               call compute_zonal_mean_ini(partit, mesh)  
-              call compute_zonal_mean(tracers, partit, mesh)
+              call compute_zonal_mean(dynamics, tracers, partit, mesh)
            end if
        END SELECT
     else
@@ -313,6 +332,103 @@ END SUBROUTINE tracer_init
 !
 !
 !_______________________________________________________________________________
+SUBROUTINE dynamics_init(dynamics, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    IMPLICIT NONE
+    integer        :: elem_size, node_size
+    integer, save  :: nm_unit  = 104       ! unit to open namelist file, skip 100-102 for cray
+    integer        :: iost
+
+    integer        :: visc_opt
+    real(kind=WP)  :: gamma0_visc, gamma1_visc, gamma2_visc
+    real(kind=WP)  :: div_c_visc, leith_c_visc, easybackscat_return
+    logical        :: use_ivertvisc
+    integer        :: momadv_opt
+    logical        :: use_freeslip
+    logical        :: use_wsplit
+    real(kind=WP)  :: wsplit_maxcfl
+
+    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    type(t_dyn)   , intent(inout), target :: dynamics
+    
+    ! define dynamics namelist parameter
+    namelist /dynamics_visc    / visc_opt, gamma0_visc, gamma1_visc, gamma2_visc,  &
+                                 div_c_visc, leith_c_visc, use_ivertvisc, easy_bs_return
+    namelist /dynamics_general / momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl 
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    ! open and read namelist for I/O
+    open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
+    if (iost == 0) then
+        if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
+    else
+        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+    read(nm_unit, nml=dynamics_visc   , iostat=iost)
+    read(nm_unit, nml=dynamics_general, iostat=iost)
+    close(nm_unit)
+
+    ! define local vertice & elem array size
+    elem_size=myDim_elem2D+eDim_elem2D
+    node_size=myDim_nod2D+eDim_nod2D
+
+    ! allocate data arrays in derived type
+    allocate(dynamics%uv(        2, nl-1, elem_size))
+    allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  2, nl-1, elem_size))
+    allocate(dynamics%uvnode(    2, nl-1, node_size))
+    allocate(dynamics%uvnode_rhs(2, nl-1, node_size))
+    dynamics%uv         = 0.0_WP
+    dynamics%uv_rhs     = 0.0_WP
+    dynamics%uv_rhsAB   = 0.0_WP
+    dynamics%uvnode     = 0.0_WP
+    dynamics%uvnode_rhs = 0.0_WP
+    
+    allocate(dynamics%w(              nl, node_size))
+    allocate(dynamics%w_e(            nl, node_size))
+    allocate(dynamics%w_i(            nl, node_size))
+    allocate(dynamics%cfl_z(          nl, node_size))
+    dynamics%w          = 0.0_WP
+    dynamics%w_e        = 0.0_WP
+    dynamics%w_i        = 0.0_WP
+    dynamics%cfl_z      = 0.0_WP
+    
+    allocate(dynamics%eta_n(      node_size))
+    allocate(dynamics%d_eta(      node_size))
+    allocate(dynamics%ssh_rhs(    node_size))
+    allocate(dynamics%ssh_rhs_old(node_size))
+    dynamics%eta_n      = 0.0_WP
+    dynamics%d_eta      = 0.0_WP
+    dynamics%ssh_rhs    = 0.0_WP
+    dynamics%ssh_rhs_old= 0.0_WP    
+    
+    ! set parameters in derived type
+    dynamics%visc_opt      = visc_opt
+    dynamics%gamma0_visc   = gamma0_visc
+    dynamics%gamma1_visc   = gamma1_visc
+    dynamics%gamma2_visc   = gamma2_visc
+    dynamics%div_c_visc    = div_c_visc
+    dynamics%leith_c_visc  = leith_c_visc
+    dynamics%use_ivertvisc = use_ivertvisc
+    dynamics%momadv_opt    = momadv_opt
+    dynamics%use_freeslip  = use_freeslip
+    dynamics%use_wsplit    = use_wsplit
+    dynamics%wsplit_maxcfl = wsplit_maxcfl
+    
+END SUBROUTINE dynamics_init
+!
+!
+!_______________________________________________________________________________
 SUBROUTINE arrays_init(num_tracers, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
@@ -345,7 +461,7 @@ node_size=myDim_nod2D+eDim_nod2D
 ! Velocities
 ! ================     
 !allocate(stress_diag(2, elem_size))!delete me
-allocate(UV(2, nl-1, elem_size))
+!!PS allocate(UV(2, nl-1, elem_size))
 allocate(UV_rhs(2,nl-1, elem_size))
 allocate(UV_rhsAB(2,nl-1, elem_size))
 allocate(Visc(nl-1, elem_size))
@@ -494,7 +610,7 @@ end if
 ! Initialize with zeros 
 ! =================
 
-    UV=0.0_WP
+!!PS     UV=0.0_WP
     UV_rhs=0.0_WP
     UV_rhsAB=0.0_WP
 !
@@ -735,20 +851,22 @@ end subroutine oce_initial_state
 !
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
-SUBROUTINE before_oce_step(tracers, partit, mesh)
+SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
     USE MOD_MESH
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_TRACER
+    use MOD_DYN
     USE o_ARRAYS
     USE g_config
     USE Toy_Channel_Soufflet
     implicit none
     integer                  :: i, k, counter, rcounter3, id
     character(len=10)        :: i_string, id_string
-    type(t_mesh),   intent(in),    target  :: mesh
+    type(t_mesh)  , intent(in)   , target  :: mesh
     type(t_partit), intent(inout), target  :: partit
     type(t_tracer), intent(inout), target  :: tracers
+    type(t_dyn)   , intent(inout), target  :: dynamics
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -759,7 +877,7 @@ SUBROUTINE before_oce_step(tracers, partit, mesh)
         SELECT CASE (TRIM(which_toy))
             CASE ("soufflet") !forcing update for soufflet testcase
             if (mod(mstep, soufflet_forc_update)==0) then
-                call compute_zonal_mean(tracers, partit, mesh)
+                call compute_zonal_mean(dynamics, tracers, partit, mesh)
             end if
         END SELECT
     end if
