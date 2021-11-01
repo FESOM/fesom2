@@ -317,9 +317,9 @@ CASE ('N2        ')
 CASE ('Kv        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'Kv',        'vertical diffusivity Kv',  'm2/s', Kv(:,:),              io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('u         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  dynamics.uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'u',         'horizontal velocity','m/s',  dynamics%uv(1,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('v         ')
-    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  dynamics.uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'v',         'meridional velocity','m/s',  dynamics%uv(2,:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',  Wvel(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
@@ -639,7 +639,8 @@ subroutine create_new_file(entry, partit, mesh)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'axis', len_trim('T'), trim('T')), __LINE__)
   call assert_nf( nf_put_att_text(entry%ncid, entry%tID, 'stored_direction', len_trim('increasing'), trim('increasing')), __LINE__)
   
-  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
+  call assert_nf( nf_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), entry%ndim+1, &
+                                    (/entry%dimid(1:entry%ndim), entry%recID/), entry%varID), __LINE__)
 !CHUNKING stuff (netcdf libraries not always compited with it)
 !if (entry%ndim==2) then
 !     call assert_nf( nf_def_var_chunking(entry%ncid, entry%varID, NF_CHUNKED, (/1, entry%glsize(1)/)), __LINE__);
@@ -749,7 +750,7 @@ subroutine write_mean(entry, entry_index)
           if (entry%ndim==1) then
             call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r8, 1), __LINE__)
           elseif (entry%ndim==2) then
-            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r8, 1), __LINE__)
+            call assert_nf( nf_put_vara_double(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r8, 1), __LINE__)
           end if
         end if
      end do
@@ -769,7 +770,7 @@ subroutine write_mean(entry, entry_index)
            if (entry%ndim==1) then
              call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, entry%rec_count/), (/size2, 1/), entry%aux_r4, 1), __LINE__)
            elseif (entry%ndim==2) then
-             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/1, lev, entry%rec_count/), (/size2, 1, 1/), entry%aux_r4, 1), __LINE__)
+             call assert_nf( nf_put_vara_real(entry%ncid, entry%varID, (/lev, 1, entry%rec_count/), (/1, size2, 1/), entry%aux_r4, 1), __LINE__)
            end if
         end if
      end do
