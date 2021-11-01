@@ -8,9 +8,10 @@
 
 program main
 USE MOD_MESH
-USE MOD_TRACER
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE MOD_TRACER
+USE MOD_DYN
 USE o_ARRAYS
 USE o_PARAM
 USE i_PARAM
@@ -56,10 +57,10 @@ real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
 real(kind=real32) :: runtime_alltimesteps
 
 
-type(t_mesh),       target, save :: mesh
-type(t_tracer),     target, save :: tracers
-type(t_partit),     target, save :: partit
-
+type(t_mesh)  , target, save :: mesh
+type(t_partit), target, save :: partit
+type(t_tracer), target, save :: tracers
+type(t_dyn)   , target, save :: dynamics
 
 character(LEN=256)               :: dump_dir, dump_filename
 logical                          :: L_EXISTS
@@ -122,6 +123,7 @@ integer mpi_version_len
     if (mype==0) t2=MPI_Wtime()
 
     call tracer_init(tracers, partit, mesh)                ! allocate array of ocean tracers (derived type "t_tracer")
+    call dynamics_init(dynamics, partit, mesh)                ! allocate array of ocean dynamics (derived type "t_tracer")
     call arrays_init(tracers%num_tracers, partit, mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
     call ocean_setup(tracers, partit, mesh)
 
@@ -139,7 +141,7 @@ integer mpi_version_len
         if (mype==0) write(*,*) 'EVP scheme option=', whichEVP
     endif
     if (mype==0) t5=MPI_Wtime()
-    call compute_diagnostics(0, tracers, partit, mesh) ! allocate arrays for diagnostic
+    call compute_diagnostics(0, dynamics, tracers, partit, mesh) ! allocate arrays for diagnostic
 #if defined (__oasis)
     call cpl_oasis3mct_define_unstr(partit, mesh)
     if(mype==0)  write(*,*) 'FESOM ---->     cpl_oasis3mct_define_unstr nsend, nrecv:',nsend, nrecv
@@ -164,7 +166,7 @@ integer mpi_version_len
     ! if l_write  is TRUE the restart will be forced
     ! if l_read the restart will be read
     ! as an example, for reading restart one does: call restart(0, .false., .false., .true., tracers, partit, mesh)
-    call restart(0, .false., r_restart, tracers, partit, mesh) ! istep, l_write, l_read
+    call restart(0, .false., r_restart, dynamics, tracers, partit, mesh) ! istep, l_write, l_read
     if (mype==0) t7=MPI_Wtime()
     ! store grid information into netcdf file
     if (.not. r_restart) call write_mesh_info(partit, mesh)
@@ -272,7 +274,7 @@ integer mpi_version_len
         if(use_ice) then
             !___compute fluxes from ocean to ice________________________________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call ocean2ice(n)'//achar(27)//'[0m'
-            call ocean2ice(tracers, partit, mesh)
+            call ocean2ice(dynamics, tracers, partit, mesh)
             
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
@@ -291,7 +293,7 @@ integer mpi_version_len
             if (ice_update) call ice_timestep(n, partit, mesh)  
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
-            call oce_fluxes_mom(partit, mesh) ! momentum only
+            call oce_fluxes_mom(dynamics, partit, mesh) ! momentum only
             call oce_fluxes(tracers, partit, mesh)
         end if
         call before_oce_step(tracers, partit, mesh) ! prepare the things if required
@@ -304,15 +306,15 @@ integer mpi_version_len
         t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
-        call compute_diagnostics(1, tracers, partit, mesh)
+        call compute_diagnostics(1, dynamics, tracers, partit, mesh)
 
         t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
-        call output (n, tracers, partit, mesh)
+        call output (n, dynamics, tracers, partit, mesh)
 
         t5 = MPI_Wtime()
-        call restart(n, .false., .false., tracers, partit, mesh)
+        call restart(n, .false., .false., dynamics, tracers, partit, mesh)
         t6 = MPI_Wtime()
         
         rtime_fullice       = rtime_fullice       + t2 - t1
